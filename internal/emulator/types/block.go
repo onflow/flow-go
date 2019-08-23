@@ -3,9 +3,10 @@ package types
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/protobuf/ptypes"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 )
 
@@ -17,13 +18,14 @@ type Block struct {
 }
 
 func (b *Block) Hash() crypto.Hash {
-	bytes := crypto.EncodeAsBytes(
+	// TODO: generate proper hash
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+
+	d, _ := rlp.EncodeToBytes([]interface{}{
 		b.Number,
-		b.Timestamp,
-		b.PreviousBlockHash,
-		b.TransactionHashes,
-	)
-	return crypto.NewHash(bytes)
+	})
+
+	return hasher.ComputeBytesHash(d)
 }
 
 func (b *Block) ToMessage() *observe.Block {
@@ -44,7 +46,7 @@ func GenesisBlock() *Block {
 	return &Block{
 		Number:            0,
 		Timestamp:         time.Now(),
-		PreviousBlockHash: crypto.Hash{},
+		PreviousBlockHash: nil,
 		TransactionHashes: make([]crypto.Hash, 0),
 	}
 }
