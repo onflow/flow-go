@@ -1,25 +1,29 @@
 package accounts_test
 
 import (
+	"encoding/hex"
+	"fmt"
 	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 )
 
+const p256PrivateKey = "30770201010420619c2fad537f955dcc7d549c637109579e340dcba542ee84cf6ddc2e5c0bcb46a00a06082a8648ce3d030107a14403420004f2ab95c30795946b0b8cd8775fc0146504f94a158e253086ca1f55744d634900b69726931793db7be983c323973621a9338c9c7d323c689aa1e03698643c71b7"
+
 func TestLoadAccount(t *testing.T) {
 	RegisterTestingT(t)
 
-	const validAccountJSON = `
+	var validAccountJSON = fmt.Sprintf(`
 		{	
 			"account": "0000000000000000000000000000000000000002",
-			"seed": "elephant ears"
+			"privateKey": "%s"
 		}
-	`
+	`, p256PrivateKey)
 
 	const invalidAccountJSON = `
 		{	
@@ -31,10 +35,13 @@ func TestLoadAccount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	address := types.HexToAddress("0000000000000000000000000000000000000002")
-	keyPair, _ := crypto.KeyPairFromSeed("elephant ears")
+
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	prKeyDer, err := hex.DecodeString(p256PrivateKey)
+	prKey, err := salg.ParsePrKey(prKeyDer)
 
 	Expect(a.Account).To(Equal(address))
-	Expect(a.KeyPair).To(Equal(keyPair))
+	Expect(a.Key).To(Equal(prKey))
 
 	// account loading should be deterministic
 	b, err := accounts.LoadAccount(strings.NewReader(validAccountJSON))
