@@ -69,3 +69,14 @@ func (a *HashAlgo) AddBytes(data []byte) {
 func (a *HashAlgo) AddStruct(struc Encoder) {
 	a.Write(struc.Encode())
 }
+
+// HashesToBytes converts a slice of hashes to a slice of bytes.
+func HashesToBytes(hashes []Hash) [][]byte {
+	b := make([][]byte, len(hashes))
+
+	for i, h := range hashes {
+		b[i] = h.Bytes()
+	}
+
+	return b
+}

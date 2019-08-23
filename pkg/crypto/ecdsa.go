@@ -8,6 +8,7 @@ import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"math/big"
 )
 
@@ -108,6 +109,44 @@ func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrKey, error) {
 		return nil, cryptoError{"The ECDSA key generation has failed"}
 	}
 	return &(PrKeyECDSA{a, sk}), nil
+}
+
+func (a *ECDSAalgo) EncodePrKey(sk PrKey) ([]byte, error) {
+	skECDSA, ok := sk.(*PrKeyECDSA)
+	if !ok {
+		return nil, cryptoError{"key is not an ECDSA private key"}
+	}
+
+	der, err := x509.MarshalECPrivateKey(skECDSA.goPrKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return der, nil
+}
+
+func (a *ECDSAalgo) ParsePrKey(der []byte) (PrKey, error) {
+	sk, err := x509.ParseECPrivateKey(der)
+	if err != nil {
+		return nil, err
+	}
+
+	return &(PrKeyECDSA{a, sk}), nil
+}
+
+func (a *ECDSAalgo) EncodePubKey(pk PubKey) ([]byte, error) {
+	ecdsaPk, ok := pk.(*PubKeyECDSA)
+	if !ok {
+		return nil, cryptoError{"key is not an ECDSA public key"}
+	}
+
+	b := elliptic.Marshal(a.curve, ecdsaPk.X, ecdsaPk.Y)
+	return b, nil
+}
+
+func (a *ECDSAalgo) ParsePubKey(b []byte) (PubKey, error) {
+	x, y := elliptic.Unmarshal(a.curve, b)
+	return &PubKeyECDSA{a.curve, x, y}, nil
 }
 
 // PrKeyECDSA is the private key of ECDSA, it implements PrKey

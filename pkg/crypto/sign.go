@@ -60,6 +60,10 @@ type Signer interface {
 	VerifyStruct(PubKey, Signature, Encoder, Hasher) (bool, error)
 	// Private key functions
 	GeneratePrKey([]byte) (PrKey, error)
+	EncodePrKey(PrKey) ([]byte, error)
+	ParsePrKey([]byte) (PrKey, error)
+	EncodePubKey(PubKey) ([]byte, error)
+	ParsePubKey([]byte) (PubKey, error)
 }
 
 // SignAlgo
