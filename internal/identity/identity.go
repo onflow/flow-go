@@ -102,7 +102,7 @@ func (ns nodeIdentities) Len() int           { return len(ns) }
 func (ns nodeIdentities) Less(i, j int) bool { return ns[i].coreID.ID < ns[j].coreID.ID }
 func (ns nodeIdentities) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 
-// InMemoryIdentityTable is a In-memory implementation of the interface identity.Table
+// InMemoryIdentityTable is an in-memory implementation of the interface identity.Table
 type InMemoryIdentityTable struct {
 	nodes      []*nodeIdentity
 	addressMap map[string]*nodeIdentity
@@ -115,7 +115,8 @@ func (t InMemoryIdentityTable) Count() uint {
 
 func (t InMemoryIdentityTable) Nodes() []NodeIdentity {
 	identities := make([]NodeIdentity, len(t.nodes))
-	for i, n := range t.nodes { // converting explicitly from nodeIdentity ti interface NodeIdentity
+    // converting explicitly from nodeIdentity to interface NodeIdentity
+	for i, n := range t.nodes {
 		identities[i] = n
 	}
 	return identities
@@ -238,7 +239,7 @@ func (e *NodeNotFoundError) Error() string {
 }
 
 
-// NewInMemoryIdentityTable generates a `identity.Table` which is maintained in-memory
+// NewInMemoryIdentityTable generates an `identity.Table` which is maintained in-memory
 func NewInMemoryIdentityTable(nodes []*NodeRecord) *InMemoryIdentityTable {
 	nidentities := newSortedNodeIdentities(nodes)
 
