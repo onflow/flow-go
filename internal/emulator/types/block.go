@@ -31,10 +31,16 @@ func (b *Block) Hash() crypto.Hash {
 func (b *Block) ToMessage() *observe.Block {
 	timestamp, _ := ptypes.TimestampProto(b.Timestamp)
 
+	var prevBlockHash []byte
+
+	if b.PreviousBlockHash != nil {
+		prevBlockHash = b.PreviousBlockHash.Bytes()
+	}
+
 	blockMsg := &observe.Block{
 		Hash:              b.Hash().Bytes(),
 		Number:            b.Number,
-		PrevBlockHash:     b.PreviousBlockHash.Bytes(),
+		PrevBlockHash:     prevBlockHash,
 		Timestamp:         timestamp,
 		TransactionHashes: crypto.HashesToBytes(b.TransactionHashes),
 	}
