@@ -10,7 +10,7 @@ node_modules
 .DS_Store
 
 bamboo
-bamboo.mnemonic
+bamboo.json
  
 .idea
 

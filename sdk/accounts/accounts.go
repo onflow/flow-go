@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -59,6 +60,24 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 		Account: types.HexToAddress(conf.Address),
 		Key:     prKey,
 	}, nil
+}
+
+// SaveAccountToFile saves an account key as a JSON file.
+func SaveAccountToFile(account *types.AccountKey, filename string) error {
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	prKeyDer, _ := salg.EncodePrKey(account.Key)
+
+	conf := accountConfig{
+		Address:    account.Account.Hex(),
+		PrivateKey: hex.EncodeToString(prKeyDer),
+	}
+
+	data, err := json.Marshal(conf)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filename, data, 0777)
 }
 
 // CreateAccount generates a transaction that creates a new account.
