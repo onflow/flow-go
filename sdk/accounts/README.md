@@ -24,7 +24,7 @@
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1443:1507#L65)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1444:1508#L65)
 ``` go
 func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
@@ -52,7 +52,7 @@ An error will be returned if the file cannot be read or if it contains invalid J
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1888:1968#L83)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1889:1969#L83)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```

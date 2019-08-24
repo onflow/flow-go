@@ -38,7 +38,7 @@ func TestLoadAccount(t *testing.T) {
 
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	prKeyDer, err := hex.DecodeString(p256PrivateKey)
-	prKey, err := salg.ParsePrKey(prKeyDer)
+	prKey, err := salg.DecodePrKey(prKeyDer)
 
 	Expect(a.Account).To(Equal(address))
 	Expect(a.Key).To(Equal(prKey))

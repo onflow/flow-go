@@ -50,7 +50,7 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 		return nil, err
 	}
 
-	prKey, err := salg.ParsePrKey(prKeyDer)
+	prKey, err := salg.DecodePrKey(prKeyDer)
 	if err != nil {
 		return nil, err
 	}
