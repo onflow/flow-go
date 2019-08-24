@@ -76,9 +76,12 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
+// AnyParameterTypeInInvocationError
 
-func (e *ArgumentCountError) EndPosition() ast.Position {
-	return e.EndPos
+type AnyParameterTypeInInvocationError struct{}
+
+func (e *AnyParameterTypeInInvocationError) Error() string {
+	return "cannot invoke functions with `Any` parameter type"
 }
 
 // ConditionError

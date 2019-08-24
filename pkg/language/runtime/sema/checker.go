@@ -2791,7 +2791,24 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 }
 
 func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
-	convertedType := checker.ConvertType(expression.Type)
-	checker.FailableDowncastingTypes[expression] = convertedType
-	return &OptionalType{Type: convertedType}
+
+	leftHandExpression := expression.Expression
+	leftHandType := leftHandExpression.Accept(checker).(Type)
+	rightHandType := checker.ConvertType(expression.Type)
+	checker.FailableDowncastingTypes[expression] = rightHandType
+
+	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
+
+	if _, ok := leftHandType.(*AnyType); !ok {
+
+		checker.report(
+			&UnsupportedTypeError{
+				Type:     leftHandType,
+				StartPos: leftHandExpression.StartPosition(),
+				EndPos:   leftHandExpression.EndPosition(),
+			},
+		)
+	}
+
+	return &OptionalType{Type: rightHandType}
 }
