@@ -55,11 +55,22 @@ func (tx *RawTransaction) Encode() []byte {
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *SignedTransaction {
+func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) (*SignedTransaction, error) {
 	// TODO: don't hard-code signature algo
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
-	sig, _ := salg.SignStruct(prKey, tx, hasher)
+	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	if err != nil {
+		return nil, err
+	}
+
+	hasher, err := crypto.NewHashAlgo(crypto.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := salg.SignStruct(prKey, tx, hasher)
+	if err != nil {
+		return nil, err
+	}
 
 	accountSig := AccountSignature{
 		Account:   account,
@@ -72,7 +83,7 @@ func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *Signed
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
 		PayerSignature: accountSig,
-	}
+	}, nil
 }
 
 // SignedTransaction is a transaction that has been signed by at least one account.
