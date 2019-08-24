@@ -103,8 +103,8 @@ func (tx *SignedTransaction) Hash() crypto.Hash {
 	return hasher.ComputeStructHash(tx)
 }
 
-// RawHash computes the hash of the original unsigned transaction.
-func (tx *SignedTransaction) RawHash() crypto.Hash {
+// UnsignedHash computes the hash of the original unsigned transaction.
+func (tx *SignedTransaction) UnsignedHash() crypto.Hash {
 	return (&RawTransaction{
 		tx.Script,
 		tx.Nonce,

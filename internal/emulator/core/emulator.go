@@ -177,7 +177,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if err := b.validateSignature(tx.PayerSignature, tx.RawHash()); err != nil {
+	if err := b.validateSignature(tx.PayerSignature, tx.UnsignedHash()); err != nil {
 		return err
 	}
 
@@ -296,7 +296,7 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash.Bytes())] = bytes
 }
 
-func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature, txHash crypto.Hash) error {
+func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature, unsignedTxHash crypto.Hash) error {
 	account, err := b.GetAccount(signature.Account)
 	if err != nil {
 		return &ErrInvalidSignatureAccount{Account: signature.Account}
@@ -311,7 +311,7 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 			continue
 		}
 
-		valid, err := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), txHash)
+		valid, err := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), unsignedTxHash)
 		if err != nil {
 			continue
 		}
