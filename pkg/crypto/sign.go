@@ -60,6 +60,10 @@ type Signer interface {
 	VerifyStruct(PubKey, Signature, Encoder, Hasher) (bool, error)
 	// Private key functions
 	GeneratePrKey([]byte) (PrKey, error)
+	EncodePrKey(PrKey) ([]byte, error)
+	DecodePrKey([]byte) (PrKey, error)
+	EncodePubKey(PubKey) ([]byte, error)
+	DecodePubKey([]byte) (PubKey, error)
 }
 
 // SignAlgo
@@ -82,8 +86,8 @@ func (a *SignAlgo) SignatureSize() int {
 
 // Signature type tools
 
-// ToBytes returns a byte array of the signature data
-func (s Signature) ToBytes() []byte {
+// Bytes returns a byte array of the signature data
+func (s Signature) Bytes() []byte {
 	return s[:]
 }
 

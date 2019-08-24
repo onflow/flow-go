@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -37,27 +38,32 @@ type RawTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	bytes := crypto.EncodeAsBytes(
+	// TODO: generate proper hash
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+
+	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
-		tx.Timestamp,
-	)
-	return crypto.NewHash(bytes)
+	})
+
+	return hasher.ComputeBytesHash(b)
 }
 
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) SignPayer(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
-	hash := tx.Hash()
+func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *SignedTransaction {
+	// TODO: don't hard-code signature algo
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	sig, _ := salg.SignHash(prKey, tx.Hash())
 
-	// TODO: include account in signature
-	sig := crypto.Sign(hash, keyPair)
+	// TODO: create simpler function for encoding/decoding keys
+	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
 
 	accountSig := AccountSignature{
 		Account:   account,
-		PublicKey: keyPair.PublicKey,
+		PublicKey: pubKeyBytes,
 		Signature: sig.Bytes(),
 	}
 
@@ -83,14 +89,16 @@ type SignedTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	bytes := crypto.EncodeAsBytes(
+	// TODO: generate proper hash
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+
+	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
-		tx.Timestamp,
-		tx.PayerSignature.Bytes(),
-	)
-	return crypto.NewHash(bytes)
+	})
+
+	return hasher.ComputeBytesHash(b)
 }
 
 // InvalidTransactionError indicates that a transaction does not contain all

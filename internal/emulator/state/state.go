@@ -3,7 +3,7 @@ package state
 import (
 	"sync"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
@@ -11,11 +11,11 @@ import (
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
-	Blocks            map[crypto.Hash]*etypes.Block
+	Blocks            map[string]*etypes.Block
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
-	Transactions      map[crypto.Hash]*types.SignedTransaction
+	Transactions      map[string]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
 	Registers         etypes.Registers
 	registersMutex    sync.RWMutex
@@ -25,13 +25,13 @@ type WorldState struct {
 
 // NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
-	blocks := make(map[crypto.Hash]*etypes.Block)
+	blocks := make(map[string]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
-	transactions := make(map[crypto.Hash]*types.SignedTransaction)
+	transactions := make(map[string]*types.SignedTransaction)
 	registers := make(etypes.Registers)
 
 	genesis := etypes.GenesisBlock()
-	blocks[genesis.Hash()] = genesis
+	blocks[string(genesis.Hash().Bytes())] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
@@ -64,7 +64,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
-	if block, ok := ws.Blocks[hash]; ok {
+	if block, ok := ws.Blocks[string(hash.Bytes())]; ok {
 		return block
 	}
 
@@ -90,7 +90,7 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
-	if tx, ok := ws.Transactions[hash]; ok {
+	if tx, ok := ws.Transactions[string(hash.Bytes())]; ok {
 		return tx
 	}
 
@@ -99,7 +99,7 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 
 // ContainsTransaction returns true if the transaction exists in the state, false otherwise.
 func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
-	_, exists := ws.Transactions[hash]
+	_, exists := ws.Transactions[string(hash.Bytes())]
 	return exists
 }
 
@@ -116,11 +116,11 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
 
-	if _, exists := ws.Blocks[block.Hash()]; exists {
+	if _, exists := ws.Blocks[string(block.Hash().Bytes())]; exists {
 		return
 	}
 
-	ws.Blocks[block.Hash()] = block
+	ws.Blocks[string(block.Hash().Bytes())] = block
 
 	ws.blockchainMutex.Lock()
 	defer ws.blockchainMutex.Unlock()
@@ -138,11 +138,11 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
-	if _, exists := ws.Transactions[tx.Hash()]; exists {
+	if _, exists := ws.Transactions[string(tx.Hash().Bytes())]; exists {
 		return
 	}
 
-	ws.Transactions[tx.Hash()] = tx
+	ws.Transactions[string(tx.Hash().Bytes())] = tx
 
 	ws.latestStateMutex.Lock()
 	defer ws.latestStateMutex.Unlock()
@@ -161,5 +161,5 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.Transa
 	defer ws.transactionsMutex.Unlock()
 
 	tx.Status = status
-	ws.Transactions[tx.Hash()] = tx
+	ws.Transactions[string(tx.Hash().Bytes())] = tx
 }

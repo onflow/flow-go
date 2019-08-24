@@ -70,6 +70,26 @@ func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) (PrKey, error) {
 	return &sk, nil
 }
 
+func (a *BLS_BLS12381Algo) EncodePrKey(PrKey) ([]byte, error) {
+	// TODO: implement EncodePrKey
+	return nil, nil
+}
+
+func (a *BLS_BLS12381Algo) DecodePrKey([]byte) (PrKey, error) {
+	// TODO: implement DecodePrKey
+	return nil, nil
+}
+
+func (a *BLS_BLS12381Algo) EncodePubKey(sk PubKey) ([]byte, error) {
+	// TODO: implement EncodePubKey
+	return nil, nil
+}
+
+func (a *BLS_BLS12381Algo) DecodePubKey([]byte) (PubKey, error) {
+	// TODO: implement DecodePubKey
+	return nil, nil
+}
+
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrKey
 type PrKeyBLS_BLS12381 struct {
 	// the signature algo
