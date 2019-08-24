@@ -13,11 +13,12 @@ func _() {
 	_ = x[BinaryOperationKindIntegerComparison-2]
 	_ = x[BinaryOperationKindBooleanLogic-3]
 	_ = x[BinaryOperationKindEquality-4]
+	_ = x[BinaryOperationKindNilCoalescing-5]
 }
 
-const _BinaryOperationKind_name = "BinaryOperationKindUnknownBinaryOperationKindIntegerArithmeticBinaryOperationKindIntegerComparisonBinaryOperationKindBooleanLogicBinaryOperationKindEquality"
+const _BinaryOperationKind_name = "BinaryOperationKindUnknownBinaryOperationKindIntegerArithmeticBinaryOperationKindIntegerComparisonBinaryOperationKindBooleanLogicBinaryOperationKindEqualityBinaryOperationKindNilCoalescing"
 
-var _BinaryOperationKind_index = [...]uint8{0, 26, 62, 98, 129, 156}
+var _BinaryOperationKind_index = [...]uint8{0, 26, 62, 98, 129, 156, 188}
 
 func (i BinaryOperationKind) String() string {
 	if i < 0 || i >= BinaryOperationKind(len(_BinaryOperationKind_index)-1) {

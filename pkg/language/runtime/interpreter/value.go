@@ -855,28 +855,6 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
-// TupleValue
-
-type TupleValue struct {
-	Left, Right Value
-}
-
-func (TupleValue) isValue() {}
-
-func (v TupleValue) Copy() Value {
-	return TupleValue{
-		Left:  v.Left.Copy(),
-		Right: v.Right.Copy(),
-	}
-}
-
-func (v TupleValue) String() string {
-	return fmt.Sprintf(
-		"Tuple(left: %s, right: %s)",
-		v.Left, v.Right,
-	)
-}
-
 // NilValue
 
 type NilValue struct{}
@@ -925,6 +903,28 @@ func (v MetaTypeValue) Copy() Value {
 	return v
 }
 
+// AnyValue
+
+type AnyValue struct {
+	Value Value
+	Type  sema.Type
+}
+
+func (AnyValue) isValue() {}
+
+func (v AnyValue) Copy() Value {
+	return AnyValue{
+		Value: v.Value.Copy(),
+		Type:  v.Type,
+	}
+}
+
+func (v AnyValue) String() string {
+	return fmt.Sprint(v.Value)
+}
+
+//
+
 func init() {
 	gob.Register(VoidValue{})
 	gob.Register(BoolValue(true))
@@ -941,8 +941,8 @@ func init() {
 	gob.Register(UInt64Value(0))
 	gob.Register(StructureValue{})
 	gob.Register(DictionaryValue{})
-	gob.Register(TupleValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
 	gob.Register(MetaTypeValue{})
+	gob.Register(AnyValue{})
 }

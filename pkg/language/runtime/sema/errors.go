@@ -951,3 +951,28 @@ func (e *ImportedProgramError) StartPosition() ast.Position {
 func (e *ImportedProgramError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// UnsupportedTypeError
+
+type UnsupportedTypeError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *UnsupportedTypeError) Error() string {
+	return fmt.Sprintf(
+		"unsupported type: `%s`",
+		e.Type.String(),
+	)
+}
+
+func (*UnsupportedTypeError) isSemanticError() {}
+
+func (e *UnsupportedTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}

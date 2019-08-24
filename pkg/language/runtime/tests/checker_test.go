@@ -2973,6 +2973,64 @@ func TestCheckInvalidNilCoalescingRightSubtype(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckInvalidNilCoalescingNonMatchingTypes(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int? = 1
+      let y = x ?? false
+   `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}))
+}
+
+func TestCheckNilCoalescingAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let x: Any? = 1
+     let y = x ?? false
+  `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckNilCoalescingOptionalRightHandSide(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+     let x: Int? = 1
+     let y: Int? = 2
+     let z = x ?? y
+  `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["z"].Type).
+		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
+}
+
+func TestCheckNilCoalescingBothOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+     let x: Int?? = 1
+     let y: Int? = 2
+     let z = x ?? y
+  `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["z"].Type).
+		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
+}
+
 func TestCheckNilsComparison(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -3816,7 +3874,7 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 	_, err := parseAndCheckWithExtra(
 		`
            import "unknown"
-           import "unknown" 
+           import "unknown"
         `,
 		nil,
 		nil,
@@ -4050,6 +4108,142 @@ func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 		nil,
 		nil,
 	)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckFailableDowncastingAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      let x: Any = 1
+      let y: Int? = x as? Int
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.FailableDowncastingTypes).
+		To(Not(BeEmpty()))
+}
+
+func TestCheckInvalidFailableDowncastingAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Any = 1
+      let y: Bool? = x as? Int
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+// TODO: add support for statically known casts
+func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Int = 1
+      let y: Int? = x as? Int
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+}
+
+// TODO: add support for interfaces
+func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface I {}
+
+      struct S: I {}
+
+      let x: I = S()
+      let y: S? = x as? S
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+}
+
+// TODO: add support for "wrapped" Any: optional, array, dictionary
+func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Any? = 1
+      let y: Int?? = x as? Int?
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+}
+
+// TODO: requires array subtyping
+
+// TODO: add support for "wrapped" Any: optional, array, dictionary
+func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Any[] = [1]
+      let y: Int[]? = x as? Int[]
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+}
+
+func TestCheckOptionalAnyFailableDowncastingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      let x: Any? = nil
+      let y = x ?? 23
+      let z = y as? Int
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.Globals["x"].Type).
+		To(Equal(&sema.OptionalType{Type: &sema.AnyType{}}))
+
+	// TODO: record result type of conditional and box to any in interpreter
+	Expect(checker.Globals["y"].Type).
+		To(Equal(&sema.AnyType{}))
+
+	Expect(checker.Globals["z"].Type).
+		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
+}
+
+// TODO: return common super type for conditional
+func TestCheckInvalidAnyConditional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x: Any = true
+      let y = true ? 1 : x
+    `)
 
 	errs := expectCheckerErrors(err, 1)
 

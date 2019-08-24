@@ -58,21 +58,26 @@ type FunctionExtractor interface {
 	ExtractFunction(extractor *ExpressionExtractor, expression *FunctionExpression) ExpressionExtraction
 }
 
+type FailableDowncastExtractor interface {
+	ExtractFailableDowncast(extractor *ExpressionExtractor, expression *FailableDowncastExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
-	nextIdentifier       int
-	BoolExtractor        BoolExtractor
-	NilExtractor         NilExtractor
-	IntExtractor         IntExtractor
-	StringExtractor      StringExtractor
-	ArrayExtractor       ArrayExtractor
-	IdentifierExtractor  IdentifierExtractor
-	InvocationExtractor  InvocationExtractor
-	MemberExtractor      MemberExtractor
-	IndexExtractor       IndexExtractor
-	ConditionalExtractor ConditionalExtractor
-	UnaryExtractor       UnaryExtractor
-	BinaryExtractor      BinaryExtractor
-	FunctionExtractor    FunctionExtractor
+	nextIdentifier            int
+	BoolExtractor             BoolExtractor
+	NilExtractor              NilExtractor
+	IntExtractor              IntExtractor
+	StringExtractor           StringExtractor
+	ArrayExtractor            ArrayExtractor
+	IdentifierExtractor       IdentifierExtractor
+	InvocationExtractor       InvocationExtractor
+	MemberExtractor           MemberExtractor
+	IndexExtractor            IndexExtractor
+	ConditionalExtractor      ConditionalExtractor
+	UnaryExtractor            UnaryExtractor
+	BinaryExtractor           BinaryExtractor
+	FunctionExtractor         FunctionExtractor
+	FailableDowncastExtractor FailableDowncastExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -500,4 +505,33 @@ func (extractor *ExpressionExtractor) VisitFunctionExpression(expression *Functi
 func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpression) ExpressionExtraction {
 	// NOTE: not supported
 	panic(&errors.UnreachableError{})
+}
+
+func (extractor *ExpressionExtractor) VisitFailableDowncastExpression(expression *FailableDowncastExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.FailableDowncastExtractor != nil {
+		return extractor.FailableDowncastExtractor.ExtractFailableDowncast(extractor, expression)
+	} else {
+		return extractor.ExtractFailableDowncast(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractFailableDowncast(expression *FailableDowncastExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
 }

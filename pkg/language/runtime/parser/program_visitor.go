@@ -921,7 +921,7 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{} {
 	// NOTE: right associative
 
-	left := ctx.AdditiveExpression().Accept(v)
+	left := ctx.FailableDowncastingExpression().Accept(v)
 	if left == nil {
 		return nil
 	}
@@ -938,6 +938,21 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 		Operation: ast.OperationNilCoalesce,
 		Left:      leftExpression,
 		Right:     rightExpression,
+	}
+}
+
+func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+	typeContext := ctx.FullType()
+	if typeContext == nil {
+		return ctx.AdditiveExpression().Accept(v)
+	}
+
+	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
+	fullType := typeContext.Accept(v).(ast.Type)
+
+	return &ast.FailableDowncastExpression{
+		Expression: expression,
+		Type:       fullType,
 	}
 }
 

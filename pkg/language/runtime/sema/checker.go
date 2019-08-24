@@ -47,12 +47,20 @@ type Checker struct {
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
+	VariableDeclarationTargetTypes     map[*ast.VariableDeclaration]Type
+	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
 	StructureDeclarationTypes          map[*ast.StructureDeclaration]*StructureType
 	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
+	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
 	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
+	FailableDowncastingTypes           map[*ast.FailableDowncastExpression]Type
+	ReturnStatementValueTypes          map[*ast.ReturnStatement]Type
+	ReturnStatementReturnTypes         map[*ast.ReturnStatement]Type
+	BinaryExpressionResultTypes        map[*ast.BinaryExpression]Type
+	BinaryExpressionRightTypes         map[*ast.BinaryExpression]Type
 }
 
 func NewChecker(
@@ -78,12 +86,20 @@ func NewChecker(
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
+		VariableDeclarationTargetTypes:     map[*ast.VariableDeclaration]Type{},
+		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
 		StructureDeclarationTypes:          map[*ast.StructureDeclaration]*StructureType{},
 		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
+		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
 		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
+		FailableDowncastingTypes:           map[*ast.FailableDowncastExpression]Type{},
+		ReturnStatementValueTypes:          map[*ast.ReturnStatement]Type{},
+		ReturnStatementReturnTypes:         map[*ast.ReturnStatement]Type{},
+		BinaryExpressionResultTypes:        map[*ast.BinaryExpression]Type{},
+		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
 	}
 
 	for _, declaration := range predeclaredValues {
@@ -492,6 +508,8 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 	valueType := declaration.Value.Accept(checker).(Type)
 
+	checker.VariableDeclarationValueTypes[declaration] = valueType
+
 	// if the variable declaration is a optional binding, the value must be optional
 
 	var valueIsOptional bool
@@ -552,7 +570,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = optionalValueType.Type
 	}
 
-	checker.VariableDeclarationValueTypes[declaration] = declarationType
+	checker.VariableDeclarationTargetTypes[declaration] = declarationType
 
 	variable := checker.declareVariable(
 		declaration.Identifier.Identifier,
@@ -784,6 +802,9 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	returnType := checker.currentFunction().returnType
 
+	checker.ReturnStatementValueTypes[statement] = valueType
+	checker.ReturnStatementReturnTypes[statement] = returnType
+
 	if valueType != nil {
 		if valueIsInvalid {
 			// return statement has expression, but function has Void return type?
@@ -910,9 +931,9 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 
 	valueType := assignment.Value.Accept(checker).(Type)
+	checker.AssignmentStatementValueTypes[assignment] = valueType
 
 	targetType := checker.visitAssignmentValueType(assignment, valueType)
-
 	checker.AssignmentStatementTargetTypes[assignment] = targetType
 
 	return nil
@@ -1190,12 +1211,16 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		)
 
 	case BinaryOperationKindNilCoalescing:
-
-		return checker.checkBinaryExpressionNilCoalescing(
+		resultType := checker.checkBinaryExpressionNilCoalescing(
 			expression, operation, operationKind,
 			leftType, rightType,
 			leftIsInvalid, rightIsInvalid, anyInvalid,
 		)
+
+		checker.BinaryExpressionResultTypes[expression] = resultType
+		checker.BinaryExpressionRightTypes[expression] = rightType
+
+		return resultType
 	}
 
 	panic(&unsupportedOperation{
@@ -1693,6 +1718,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			returnType = functionType.ReturnType
 		}
 
+		checker.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 		checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 	}
 
@@ -2786,4 +2812,27 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 	}
 
 	return nil
+}
+
+func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+
+	leftHandExpression := expression.Expression
+	leftHandType := leftHandExpression.Accept(checker).(Type)
+	rightHandType := checker.ConvertType(expression.Type)
+	checker.FailableDowncastingTypes[expression] = rightHandType
+
+	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
+
+	if _, ok := leftHandType.(*AnyType); !ok {
+
+		checker.report(
+			&UnsupportedTypeError{
+				Type:     leftHandType,
+				StartPos: leftHandExpression.StartPosition(),
+				EndPos:   leftHandExpression.EndPosition(),
+			},
+		)
+	}
+
+	return &OptionalType{Type: rightHandType}
 }

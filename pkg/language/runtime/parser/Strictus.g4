@@ -202,51 +202,56 @@ variableDeclaration
     ;
 
 assignment
-	: Identifier expressionAccess* '=' expression
-	;
+    : Identifier expressionAccess* '=' expression
+    ;
 
 expression
     : conditionalExpression
     ;
 
 conditionalExpression
-	: <assoc=right> orExpression ('?' then=expression ':' alt=expression)?
-	;
+    : <assoc=right> orExpression ('?' then=expression ':' alt=expression)?
+    ;
 
 orExpression
-	: andExpression
-	| orExpression '||' andExpression
-	;
+    : andExpression
+    | orExpression '||' andExpression
+    ;
 
 andExpression
-	: equalityExpression
-	| andExpression '&&' equalityExpression
-	;
+    : equalityExpression
+    | andExpression '&&' equalityExpression
+    ;
 
 equalityExpression
-	: relationalExpression
-	| equalityExpression equalityOp relationalExpression
-	;
+    : relationalExpression
+    | equalityExpression equalityOp relationalExpression
+    ;
 
 relationalExpression
-	: nilCoalescingExpression
-	| relationalExpression relationalOp nilCoalescingExpression
-	;
+    : nilCoalescingExpression
+    | relationalExpression relationalOp nilCoalescingExpression
+    ;
 
 nilCoalescingExpression
-	// NOTE: right associative
-    : additiveExpression (NilCoalescing nilCoalescingExpression)?
+    // NOTE: right associative
+    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    ;
+
+failableDowncastingExpression
+    : additiveExpression
+    | failableDowncastingExpression FailableDowncasting fullType
     ;
 
 additiveExpression
-	: multiplicativeExpression
-	| additiveExpression additiveOp multiplicativeExpression
-	;
+    : multiplicativeExpression
+    | additiveExpression additiveOp multiplicativeExpression
+    ;
 
 multiplicativeExpression
-	: unaryExpression
-	| multiplicativeExpression multiplicativeOp unaryExpression
-	;
+    : unaryExpression
+    | multiplicativeExpression multiplicativeOp unaryExpression
+    ;
 
 unaryExpression
     : primaryExpression
@@ -312,6 +317,8 @@ Optional : '?' ;
 
 NilCoalescing : '??' ;
 
+FailableDowncasting : 'as?' ;
+
 primaryExpressionStart
     : Identifier                                                  # IdentifierExpression
     | literal                                                     # LiteralExpression
@@ -325,16 +332,16 @@ expressionAccess
     ;
 
 memberAccess
-	: '.' Identifier
-	;
+    : '.' Identifier
+    ;
 
 bracketExpression
-	: '[' expression ']'
-	;
+    : '[' expression ']'
+    ;
 
 invocation
-	: '(' (argument (',' argument)*)? ')'
-	;
+    : '(' (argument (',' argument)*)? ')'
+    ;
 
 argument
     : (Identifier ':')? expression
@@ -477,8 +484,8 @@ WS
     ;
 
 Terminator
-	: [\r\n]+ -> channel(HIDDEN)
-	;
+    : [\r\n]+ -> channel(HIDDEN)
+    ;
 
 BlockComment
     : '/*' (BlockComment|.)*? '*/'	-> channel(HIDDEN) // nesting comments allowed

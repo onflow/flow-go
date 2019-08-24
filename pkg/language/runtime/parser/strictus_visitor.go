@@ -128,6 +128,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#nilCoalescingExpression.
 	VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#failableDowncastingExpression.
+	VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#additiveExpression.
 	VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{}
 

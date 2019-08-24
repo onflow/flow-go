@@ -3373,6 +3373,46 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseFailableDowncasting(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+       let x = 0 as? Int
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				Value: &FailableDowncastExpression{
+					Expression: &IntExpression{
+						Value:    big.NewInt(0),
+						StartPos: Position{Offset: 16, Line: 2, Column: 15},
+						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+					},
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "Int",
+							Pos:        Position{Offset: 22, Line: 2, Column: 21},
+						},
+					},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseInterface(t *testing.T) {
 	RegisterTestingT(t)
 

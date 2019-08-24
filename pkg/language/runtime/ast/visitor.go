@@ -47,6 +47,7 @@ type ExpressionVisitor interface {
 	VisitBinaryExpression(*BinaryExpression) Repr
 	VisitFunctionExpression(*FunctionExpression) Repr
 	VisitStringExpression(*StringExpression) Repr
+	VisitFailableDowncastExpression(*FailableDowncastExpression) Repr
 }
 
 type Visitor interface {

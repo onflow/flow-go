@@ -124,6 +124,9 @@ type StrictusListener interface {
 	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
 	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
+	// EnterFailableDowncastingExpression is called when entering the failableDowncastingExpression production.
+	EnterFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+
 	// EnterAdditiveExpression is called when entering the additiveExpression production.
 	EnterAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -330,6 +333,9 @@ type StrictusListener interface {
 
 	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
 	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
+
+	// ExitFailableDowncastingExpression is called when exiting the failableDowncastingExpression production.
+	ExitFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
 
 	// ExitAdditiveExpression is called when exiting the additiveExpression production.
 	ExitAdditiveExpression(c *AdditiveExpressionContext)

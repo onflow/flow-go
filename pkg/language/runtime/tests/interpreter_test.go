@@ -2176,6 +2176,82 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 }
 
+func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any? = nil
+      let y = x ?? true
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(
+			interpreter.AnyValue{
+				Type:  &sema.BoolType{},
+				Value: interpreter.BoolValue(true),
+			}))
+}
+
+func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any? = 2
+      let y = x ?? true
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.AnyValue{
+			Type:  &sema.IntType{},
+			Value: interpreter.IntValue{Int: big.NewInt(2)},
+		}))
+}
+
+func TestInterpretNilCoalescingOptionalRightHandSide(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Int? = 1
+      let y: Int? = 2
+      let z = x ?? y
+    `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingBothOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int?? = 1
+     let y: Int? = 2
+     let z = x ?? y
+   `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
+		}))
+}
+
+func TestInterpretNilCoalescingBothOptionalLeftNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Int?? = nil
+     let y: Int? = 2
+     let z = x ?? y
+   `)
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(2)},
+		}))
+}
+
 func TestInterpretNilsComparison(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -2730,4 +2806,137 @@ func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
 
 	Expect(inter.Globals["dict"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
 		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
+}
+
+func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any = 42
+      let y: Int? = x as? Int
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.AnyValue{
+				Type:  &sema.IntType{},
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+}
+
+func TestInterpretFailableDowncastingAnyFailure(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any = 42
+      let y: Bool? = x as? Bool
+    `)
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.NilValue{}))
+}
+
+func TestInterpretOptionalAny(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any? = 42
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.AnyValue{
+					Type:  &sema.IntType{},
+					Value: interpreter.IntValue{Int: big.NewInt(42)},
+				},
+			}))
+}
+
+func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x: Any? = 42
+      let y = (x ?? 23) as? Int
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.AnyValue{
+					Type:  &sema.IntType{},
+					Value: interpreter.IntValue{Int: big.NewInt(42)},
+				},
+			}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+}
+
+func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Any? = 23
+     let y = x ?? 42
+     let z = y as? Int
+  `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.AnyValue{
+					Type:  &sema.IntType{},
+					Value: interpreter.IntValue{Int: big.NewInt(23)},
+				},
+			}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(
+			interpreter.AnyValue{
+				Type:  &sema.IntType{},
+				Value: interpreter.IntValue{Int: big.NewInt(23)},
+			}))
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(23)},
+			}))
+}
+
+func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+     let x: Any? = nil
+     let y = x ?? 42
+     let z = y as? Int
+  `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NilValue{}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(
+			interpreter.AnyValue{
+				Type:  &sema.IntType{},
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
+
+	Expect(inter.Globals["z"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(42)},
+			}))
 }
