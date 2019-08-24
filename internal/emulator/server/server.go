@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 )
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
@@ -30,12 +31,23 @@ type Config struct {
 	Port          int
 	HTTPPort      int
 	BlockInterval time.Duration
+	Deterministic bool
 }
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
+	options := core.DefaultOptions
+	if config.Deterministic {
+		accKey, err := accounts.LoadAccountFromFile("bamboo.json")
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to load bamboo.json key")
+		}
+		options.RootAccountKey = accKey.Key
+		logger.WithField("privateKey", accKey.Key).Info("Successfully loaded root account from bamboo.json")
+	}
+
 	server := &EmulatorServer{
-		blockchain: core.NewEmulatedBlockchain(core.DefaultOptions),
+		blockchain: core.NewEmulatedBlockchain(options),
 		grpcServer: grpc.NewServer(),
 		config:     config,
 		logger:     logger,

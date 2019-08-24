@@ -16,6 +16,7 @@ type Config struct {
 	HTTPPort      int           `default:"9090" flag:"http_port" info:"port to run HTTP server"`
 	Verbose       bool          `default:"false" flag:"verbose,v" info:"enable verbose logging"`
 	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
+	Deterministic bool          `default:"false" flag:"deterministic,d" info:"start server with deterministic keypair"`
 }
 
 var (
@@ -35,6 +36,7 @@ var Cmd = &cobra.Command{
 			Port:          conf.Port,
 			HTTPPort:      conf.HTTPPort,
 			BlockInterval: conf.BlockInterval,
+			Deterministic: conf.Deterministic,
 		})
 	},
 }
