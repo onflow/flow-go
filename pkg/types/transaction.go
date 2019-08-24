@@ -38,16 +38,18 @@ type RawTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	// TODO: generate proper hash
 	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	return hasher.ComputeStructHash(tx)
+}
 
+// Encode returns the encoded transaction as bytes.
+func (tx *RawTransaction) Encode() []byte {
 	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
 	})
-
-	return hasher.ComputeBytesHash(b)
+	return b
 }
 
 // SignPayer signs the transaction with the given account and keypair.
@@ -58,12 +60,8 @@ func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *Signed
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	sig, _ := salg.SignHash(prKey, tx.Hash())
 
-	// TODO: create simpler function for encoding/decoding keys
-	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
-
 	accountSig := AccountSignature{
 		Account:   account,
-		PublicKey: pubKeyBytes,
 		Signature: sig.Bytes(),
 	}
 
@@ -89,16 +87,29 @@ type SignedTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	// TODO: generate proper hash
 	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	return hasher.ComputeStructHash(tx)
+}
 
+// RawHash computes the hash of the original unsigned transaction.
+func (tx *SignedTransaction) RawHash() crypto.Hash {
+	return (&RawTransaction{
+		tx.Script,
+		tx.Nonce,
+		tx.ComputeLimit,
+		tx.Timestamp,
+	}).Hash()
+}
+
+// Encode returns the encoded transaction as bytes.
+func (tx *SignedTransaction) Encode() []byte {
 	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
+		tx.PayerSignature.Encode(),
 	})
-
-	return hasher.ComputeBytesHash(b)
+	return b
 }
 
 // InvalidTransactionError indicates that a transaction does not contain all

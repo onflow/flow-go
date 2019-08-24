@@ -177,7 +177,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if err := b.validateSignature(tx.PayerSignature, tx.Hash()); err != nil {
+	if err := b.validateSignature(tx.PayerSignature, tx.RawHash()); err != nil {
 		return err
 	}
 
