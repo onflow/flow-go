@@ -9,14 +9,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/server"
+	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 )
 
 type Config struct {
-	Port          int           `default:"5000" flag:"port,p" info:"port to run RPC server"`
-	HTTPPort      int           `default:"9090" flag:"http_port" info:"port to run HTTP server"`
-	Verbose       bool          `default:"false" flag:"verbose,v" info:"enable verbose logging"`
-	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
-	Deterministic bool          `default:"false" flag:"deterministic,d" info:"start server with deterministic keypair"`
+	Port           int           `default:"5000" flag:"port,p" info:"port to run RPC server"`
+	HTTPPort       int           `default:"9090" flag:"http_port" info:"port to run HTTP server"`
+	Verbose        bool          `default:"false" flag:"verbose,v" info:"enable verbose logging"`
+	BlockInterval  time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
+	RootAccountKey string        `flag:"root,r" info:"path to root account"`
 }
 
 var (
@@ -32,12 +33,26 @@ var Cmd = &cobra.Command{
 			log.SetLevel(logrus.DebugLevel)
 		}
 
-		server.StartServer(log, &server.Config{
+		serverConf := &server.Config{
 			Port:          conf.Port,
 			HTTPPort:      conf.HTTPPort,
 			BlockInterval: conf.BlockInterval,
-			Deterministic: conf.Deterministic,
-		})
+		}
+
+		if conf.RootAccountKey != "" {
+			accKey, err := accounts.LoadAccountFromFile(conf.RootAccountKey)
+			if err != nil {
+				log.
+					WithError(err).
+					Fatalf("Failed to load root account from %s", conf.RootAccountKey)
+			}
+
+			serverConf.RootAccountKey = accKey
+
+			log.Infof("Loaded root account from %s", conf.RootAccountKey)
+		}
+
+		server.StartServer(log, serverConf)
 	},
 }
 
