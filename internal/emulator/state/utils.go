@@ -4,7 +4,13 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
+
+func init() {
+	gob.Register(new(crypto.Hash32))
+}
 
 // Encode serializes a World State object into bytes.
 func (ws *WorldState) Encode() []byte {

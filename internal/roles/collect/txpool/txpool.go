@@ -11,14 +11,14 @@ import (
 
 // TxPool is a thread-safe in-memory store for pending transactions.
 type TxPool struct {
-	transactions map[crypto.Hash]types.SignedTransaction
+	transactions map[string]types.SignedTransaction
 	mutex        sync.RWMutex
 }
 
 // New returns a new TxPool.
 func New() *TxPool {
 	return &TxPool{
-		transactions: make(map[crypto.Hash]types.SignedTransaction),
+		transactions: make(map[string]types.SignedTransaction),
 	}
 }
 
@@ -27,13 +27,13 @@ func (tp *TxPool) Insert(tx types.SignedTransaction) {
 	tp.mutex.Lock()
 	defer tp.mutex.Unlock()
 
-	tp.transactions[tx.Hash()] = tx
+	tp.transactions[string(tx.Hash().Bytes())] = tx
 }
 
 // Get returns the transaction with the provided hash or nil if it does not exist
 // in the pool.
 func (tp *TxPool) Get(hash crypto.Hash) types.SignedTransaction {
-	return tp.transactions[hash]
+	return tp.transactions[string(hash.Bytes())]
 }
 
 // Contains returns true if the pool contains a transaction with the provided
@@ -42,7 +42,7 @@ func (tp *TxPool) Contains(hash crypto.Hash) bool {
 	tp.mutex.RLock()
 	defer tp.mutex.RUnlock()
 
-	_, exists := tp.transactions[hash]
+	_, exists := tp.transactions[string(hash.Bytes())]
 	return exists
 }
 
@@ -52,6 +52,6 @@ func (tp *TxPool) Remove(hashes ...crypto.Hash) {
 	defer tp.mutex.Unlock()
 
 	for _, hash := range hashes {
-		delete(tp.transactions, hash)
+		delete(tp.transactions, string(hash.Bytes()))
 	}
 }

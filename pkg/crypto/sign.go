@@ -1,14 +1,13 @@
 package crypto
 
 import (
+	"crypto/elliptic"
 	"strconv"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // NewSignatureAlgo initializes and chooses a signature scheme
-func NewSignatureAlgo(name AlgoName) Signer {
+func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
 		a := &(BLS_BLS12381Algo{
 			nil,
@@ -18,10 +17,32 @@ func NewSignatureAlgo(name AlgoName) Signer {
 				pubKeyLengthBLS_BLS12381,
 				signatureLengthBLS_BLS12381}})
 		a.init()
-		return a
+		return a, nil
 	}
-	log.Errorf("the signature scheme %s is not supported.", name)
-	return nil
+
+	if name == ECDSA_P256 {
+		a := &(ECDSAalgo{
+			elliptic.P256(),
+			&SignAlgo{
+				name,
+				PrKeyLengthECDSA_P256,
+				PubKeyLengthECDSA_P256,
+				SignatureLengthECDSA_P256}})
+		return a, nil
+	}
+
+	if name == ECDSA_SECp256k1 {
+		a := &(ECDSAalgo{
+			secp256k1(),
+			&SignAlgo{
+				name,
+				PrKeyLengthECDSA_SECp256k1,
+				PubKeyLengthECDSA_SECp256k1,
+				SignatureLengthECDSA_SECp256k1}})
+		return a, nil
+	}
+
+	return nil, cryptoError{"the signature scheme " + string(name) + " is not supported."}
 }
 
 // Signer interface
@@ -30,15 +51,19 @@ type Signer interface {
 	// Size return the signature output length
 	SignatureSize() int
 	// Signature functions
-	SignHash(PrKey, Hash) Signature
-	SignBytes(PrKey, []byte, Hasher) Signature
-	SignStruct(PrKey, Encoder, Hasher) Signature
+	SignHash(PrKey, Hash) (Signature, error)
+	SignBytes(PrKey, []byte, Hasher) (Signature, error)
+	SignStruct(PrKey, Encoder, Hasher) (Signature, error)
 	// Verification functions
-	VerifyHash(PubKey, Signature, Hash) bool
-	VerifyBytes(PubKey, Signature, []byte, Hasher) bool
-	VerifyStruct(PubKey, Signature, Encoder, Hasher) bool
+	VerifyHash(PubKey, Signature, Hash) (bool, error)
+	VerifyBytes(PubKey, Signature, []byte, Hasher) (bool, error)
+	VerifyStruct(PubKey, Signature, Encoder, Hasher) (bool, error)
 	// Private key functions
-	GeneratePrKey([]byte) PrKey
+	GeneratePrKey([]byte) (PrKey, error)
+	EncodePrKey(PrKey) ([]byte, error)
+	DecodePrKey([]byte) (PrKey, error)
+	EncodePubKey(PubKey) ([]byte, error)
+	DecodePubKey([]byte) (PubKey, error)
 }
 
 // SignAlgo
@@ -61,8 +86,8 @@ func (a *SignAlgo) SignatureSize() int {
 
 // Signature type tools
 
-// ToBytes returns a byte array of the signature data
-func (s Signature) ToBytes() []byte {
+// Bytes returns a byte array of the signature data
+func (s Signature) Bytes() []byte {
 	return s[:]
 }
 
@@ -87,8 +112,6 @@ type PrKey interface {
 	AlgoName() AlgoName
 	// return the size in bytes
 	KeySize() int
-	// computes the pub key associated with the private key
-	ComputePubKey()
 	// returns the public key
 	Pubkey() PubKey
 }

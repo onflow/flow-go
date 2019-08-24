@@ -8,7 +8,9 @@ const (
 	SHA3_256 AlgoName = "SHA3_256"
 
 	// Signing supported algorithms
-	BLS_BLS12381 = "BLS_BLS12381"
+	BLS_BLS12381    = "BLS_BLS12381"
+	ECDSA_P256      = "ECDSA_P256"
+	ECDSA_SECp256k1 = "ECDSA_SECp256k1"
 )
 
 const (
@@ -26,6 +28,18 @@ const (
 	PrKeyLengthBLS_BLS12381     = 32
 	// the length is divided by 2 if compression is on
 	PubKeyLengthBLS_BLS12381 = 96 * (2 - compression)
+
+	// ECDSA
+
+	// NIST P256
+	SignatureLengthECDSA_P256 = 64
+	PrKeyLengthECDSA_P256     = 32
+	PubKeyLengthECDSA_P256    = 64
+
+	// SEC p256k1
+	SignatureLengthECDSA_SECp256k1 = 64
+	PrKeyLengthECDSA_SECp256k1     = 32
+	PubKeyLengthECDSA_SECp256k1    = 64
 )
 
 // These types should implement Hash

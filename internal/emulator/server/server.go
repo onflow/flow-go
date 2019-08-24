@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
@@ -27,17 +28,23 @@ type EmulatorServer struct {
 
 // Config for the EmulatorServer configuration settings.
 type Config struct {
-	Port          int
-	HTTPPort      int
-	BlockInterval time.Duration
+	Port           int
+	HTTPPort       int
+	BlockInterval  time.Duration
+	RootAccountKey *types.AccountKey
 }
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
-func NewEmulatorServer(logger *log.Logger, config *Config) *EmulatorServer {
+func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
+	options := core.DefaultOptions
+	if conf.RootAccountKey != nil {
+		options.RootAccountKey = conf.RootAccountKey.Key
+	}
+
 	server := &EmulatorServer{
-		blockchain: core.NewEmulatedBlockchain(core.DefaultOptions),
+		blockchain: core.NewEmulatedBlockchain(options),
 		grpcServer: grpc.NewServer(),
-		config:     config,
+		config:     conf,
 		logger:     logger,
 	}
 

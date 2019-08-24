@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
@@ -50,12 +50,11 @@ func (e *ErrDuplicateTransaction) Error() string {
 
 // ErrInvalidSignaturePublicKey indicates that signature uses an invalid public key.
 type ErrInvalidSignaturePublicKey struct {
-	Account   types.Address
-	PublicKey []byte
+	Account types.Address
 }
 
 func (e *ErrInvalidSignaturePublicKey) Error() string {
-	return fmt.Sprintf("Public key %s does not exist on account %s", e.PublicKey, e.Account)
+	return fmt.Sprintf("Public key used for signing does not exist on account %s", e.Account)
 }
 
 // ErrInvalidSignatureAccount indicates that a signature references a nonexistent account.

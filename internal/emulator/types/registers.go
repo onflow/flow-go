@@ -1,11 +1,7 @@
 package types
 
-import (
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
-)
-
 // Registers is a map of register values.
-type Registers map[crypto.Hash][]byte
+type Registers map[string][]byte
 
 func (r Registers) MergeWith(registers Registers) {
 	for key, value := range registers {
@@ -33,7 +29,7 @@ func (r *RegistersView) UpdatedRegisters() Registers {
 	return r.new
 }
 
-func (r *RegistersView) Get(key crypto.Hash) (value []byte, exists bool) {
+func (r *RegistersView) Get(key string) (value []byte, exists bool) {
 	value, exists = r.new[key]
 	if exists {
 		return value, exists
@@ -43,6 +39,6 @@ func (r *RegistersView) Get(key crypto.Hash) (value []byte, exists bool) {
 	return value, exists
 }
 
-func (r *RegistersView) Set(key crypto.Hash, value []byte) {
+func (r *RegistersView) Set(key string, value []byte) {
 	r.new[key] = value
 }

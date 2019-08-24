@@ -1,25 +1,23 @@
 package crypto
 
 import (
+	"errors"
 	"hash"
 
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/sha3"
 )
 
 // NewHashAlgo initializes and chooses a hashing algorithm
-func NewHashAlgo(name AlgoName) Hasher {
+func NewHashAlgo(name AlgoName) (Hasher, error) {
 	if name == SHA3_256 {
 		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check
 		if a.outputLength != a.Size() {
-			log.Errorf("%s requires an output length %d", SHA3_256, a.Size())
-			return nil
+			return nil, cryptoError{string(SHA3_256) + " requires an output length " + string(a.Size())}
 		}
-		return a
+		return a, nil
 	}
-	log.Errorf("the hashing algorithm %s is not supported.", name)
-	return nil
+	return nil, cryptoError{"the hashing algorithm " + string(name) + " is not supported."}
 }
 
 // Hash is the hash algorithms output types
@@ -71,4 +69,28 @@ func (a *HashAlgo) AddBytes(data []byte) {
 // AddStruct adds a structure to the current hash state
 func (a *HashAlgo) AddStruct(struc Encoder) {
 	a.Write(struc.Encode())
+}
+
+// BytesToHash converts a byte slice to a hash instance.
+func BytesToHash(b []byte) (Hash, error) {
+	if len(b) == 32 {
+		var h Hash32
+		copy(h[:], b[:])
+		return &h, nil
+	}
+
+	// TODO: add support for Hash64
+
+	return nil, errors.New("invalid hash length")
+}
+
+// HashesToBytes converts a slice of hashes to a slice of byte slices.
+func HashesToBytes(hashes []Hash) [][]byte {
+	b := make([][]byte, len(hashes))
+
+	for i, h := range hashes {
+		b[i] = h.Bytes()
+	}
+
+	return b
 }

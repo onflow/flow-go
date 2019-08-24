@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/sdk/accounts"
 	"github.com/dapperlabs/bamboo-node/sdk/client"
 )
@@ -17,15 +17,18 @@ func ExampleCreateAccount_complete() {
 	}
 
 	// generate a fresh key-pair for the new account
-	keyPair, err := crypto.KeyPairFromSeed("elephant ears")
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	prKey, err := salg.GeneratePrKey([]byte("elephant ears"))
 	if err != nil {
 		panic("failed to generate key-pair!")
 	}
 
-	// generate an account creation transaction
-	tx := accounts.CreateAccount(keyPair.PublicKey, nil)
+	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
 
-	signedTx := tx.SignPayer(myAccount.Account, myAccount.KeyPair)
+	// generate an account creation transaction
+	tx := accounts.CreateAccount(pubKeyBytes, nil)
+
+	signedTx := tx.SignPayer(myAccount.Account, myAccount.Key)
 
 	// connect to node and submit transaction
 	c, err := client.New("localhost:5000")

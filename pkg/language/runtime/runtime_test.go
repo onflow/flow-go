@@ -196,7 +196,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	Expect(value).To(Equal(42))
 
 	Expect(loggedMessage).
-		To(Equal(`"0x2a00000000000000000000000000000000000000"`))
+		To(Equal(`"2a00000000000000000000000000000000000000"`))
 }
 
 func TestRuntimeStorage(t *testing.T) {

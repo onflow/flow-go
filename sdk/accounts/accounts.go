@@ -1,13 +1,15 @@
 package accounts
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
@@ -15,8 +17,8 @@ import (
 //
 // This structure is used to load account configuration from JSON.
 type accountConfig struct {
-	Address string `json:"account"`
-	Seed    string `json:"seed"`
+	Address    string `json:"account"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // LoadAccountFromFile loads an account key from a JSON file.
@@ -43,15 +45,39 @@ func LoadAccount(r io.Reader) (*types.AccountKey, error) {
 		return nil, err
 	}
 
-	keyPair, err := crypto.KeyPairFromSeed(conf.Seed)
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	prKeyDer, err := hex.DecodeString(conf.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	prKey, err := salg.DecodePrKey(prKeyDer)
 	if err != nil {
 		return nil, err
 	}
 
 	return &types.AccountKey{
 		Account: types.HexToAddress(conf.Address),
-		KeyPair: keyPair,
+		Key:     prKey,
 	}, nil
+}
+
+// SaveAccountToFile saves an account key as a JSON file.
+func SaveAccountToFile(account *types.AccountKey, filename string) error {
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	prKeyDer, _ := salg.EncodePrKey(account.Key)
+
+	conf := accountConfig{
+		Address:    account.Account.Hex(),
+		PrivateKey: hex.EncodeToString(prKeyDer),
+	}
+
+	data, err := json.Marshal(conf)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filename, data, 0777)
 }
 
 // CreateAccount generates a transaction that creates a new account.
