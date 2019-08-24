@@ -73,7 +73,7 @@ func (a *HashAlgo) AddStruct(struc Encoder) {
 
 // BytesToHash converts a byte slice to a hash instance.
 func BytesToHash(b []byte) (Hash, error) {
-	if len(b) == HashLengthSha3_256 {
+	if len(b) == 32 {
 		var h Hash32
 		copy(h[:], b[:])
 		return &h, nil

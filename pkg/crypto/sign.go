@@ -61,9 +61,9 @@ type Signer interface {
 	// Private key functions
 	GeneratePrKey([]byte) (PrKey, error)
 	EncodePrKey(PrKey) ([]byte, error)
-	ParsePrKey([]byte) (PrKey, error)
+	DecodePrKey([]byte) (PrKey, error)
 	EncodePubKey(PubKey) ([]byte, error)
-	ParsePubKey([]byte) (PubKey, error)
+	DecodePubKey([]byte) (PubKey, error)
 }
 
 // SignAlgo

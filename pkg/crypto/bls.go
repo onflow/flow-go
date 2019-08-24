@@ -75,8 +75,8 @@ func (a *BLS_BLS12381Algo) EncodePrKey(PrKey) ([]byte, error) {
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) ParsePrKey([]byte) (PrKey, error) {
-	// TODO: implement ParsePrKey
+func (a *BLS_BLS12381Algo) DecodePrKey([]byte) (PrKey, error) {
+	// TODO: implement DecodePrKey
 	return nil, nil
 }
 
@@ -85,8 +85,8 @@ func (a *BLS_BLS12381Algo) EncodePubKey(sk PubKey) ([]byte, error) {
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) ParsePubKey([]byte) (PubKey, error) {
-	// TODO: implement ParsePubKey
+func (a *BLS_BLS12381Algo) DecodePubKey([]byte) (PubKey, error) {
+	// TODO: implement DecodePubKey
 	return nil, nil
 }
 

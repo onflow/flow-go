@@ -120,7 +120,7 @@ func (a *ECDSAalgo) EncodePrKey(sk PrKey) ([]byte, error) {
 	return x509.MarshalECPrivateKey(skECDSA.goPrKey)
 }
 
-func (a *ECDSAalgo) ParsePrKey(der []byte) (PrKey, error) {
+func (a *ECDSAalgo) DecodePrKey(der []byte) (PrKey, error) {
 	sk, err := x509.ParseECPrivateKey(der)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (a *ECDSAalgo) EncodePubKey(pk PubKey) ([]byte, error) {
 	return x509.MarshalPKIXPublicKey(&goecdsaPk)
 }
 
-func (a *ECDSAalgo) ParsePubKey(der []byte) (PubKey, error) {
+func (a *ECDSAalgo) DecodePubKey(der []byte) (PubKey, error) {
 	i, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
 		return nil, err

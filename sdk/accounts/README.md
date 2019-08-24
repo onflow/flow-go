@@ -25,7 +25,7 @@
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1917:1981#L84)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1918:1982#L84)
 ``` go
 func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
@@ -53,7 +53,7 @@ An error will be returned if the file cannot be read or if it contains invalid J
 
 
 
-## <a name="SaveAccountToFile">func</a> [SaveAccountToFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1445:1517#L66)
+## <a name="SaveAccountToFile">func</a> [SaveAccountToFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1446:1518#L66)
 ``` go
 func SaveAccountToFile(account *types.AccountKey, filename string) error
 ```
@@ -61,7 +61,7 @@ SaveAccountToFile saves an account key as a JSON file.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=2362:2442#L102)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=2363:2443#L102)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```
