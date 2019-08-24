@@ -307,7 +307,7 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 
 	for _, publicKeyBytes := range account.PublicKeys {
 		// TODO: handle errors in these functions
-		publicKey, _ := salg.ParsePubKey(publicKeyBytes)
+		publicKey, _ := salg.DecodePubKey(publicKeyBytes)
 		valid, _ := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), txHash)
 		if valid {
 			return nil
