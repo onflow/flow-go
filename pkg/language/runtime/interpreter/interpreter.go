@@ -358,7 +358,6 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 						resultValue = VoidValue{}
 					} else {
 						resultValue = blockResult.(functionReturn).Value
-						resultValue = interpreter.box(resultValue, returnType)
 					}
 
 					// if there is a return type, declare the constant `result`
@@ -481,8 +480,15 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 	}
 
 	return statement.Expression.Accept(interpreter).(Trampoline).
-		Map(func(value interface{}) interface{} {
-			return functionReturn{value.(Value)}
+		Map(func(result interface{}) interface{} {
+			value := result.(Value)
+
+			valueType := interpreter.Checker.ReturnStatementValueTypes[statement]
+			returnType := interpreter.Checker.ReturnStatementReturnTypes[statement]
+
+			value = interpreter.box(value, valueType, returnType)
+
+			return functionReturn{value}
 		})
 }
 
@@ -583,8 +589,10 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			targetType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
-			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
+			valueType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
+			targetType := interpreter.Checker.VariableDeclarationTargetTypes[declaration]
+
+			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
 				declaration.Identifier.Identifier,
@@ -607,8 +615,10 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
+			valueType := interpreter.Checker.AssignmentStatementValueTypes[assignment]
 			targetType := interpreter.Checker.AssignmentStatementTargetTypes[assignment]
-			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
+
+			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
 			return interpreter.visitAssignmentValue(assignment, valueCopy)
 		})
@@ -669,8 +679,14 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 	return Done{Result: variable.Value}
 }
 
+// valueTuple
+
+type valueTuple struct {
+	left, right Value
+}
+
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
-// the result in a TupleValue
+// the result in a valueTuple
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
@@ -679,7 +695,7 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 			// interpret the right-hand side
 			return expr.Right.Accept(interpreter).(Trampoline).
 				FlatMap(func(right interface{}) Trampoline {
-					tuple := TupleValue{
+					tuple := valueTuple{
 						left.(Value),
 						right.(Value),
 					}
@@ -693,96 +709,96 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationPlus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Plus(right)
 			})
 
 	case ast.OperationMinus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Minus(right)
 			})
 
 	case ast.OperationMod:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mod(right)
 			})
 
 	case ast.OperationMul:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mul(right)
 			})
 
 	case ast.OperationDiv:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Div(right)
 			})
 
 	case ast.OperationLess:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Less(right)
 			})
 
 	case ast.OperationLessEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
 	case ast.OperationGreater:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Greater(right)
 			})
 
 	case ast.OperationGreaterEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
 	case ast.OperationEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				return interpreter.testEqual(tuple.Left, tuple.Right)
+				tuple := result.(valueTuple)
+				return interpreter.testEqual(tuple.left, tuple.right)
 			})
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				return BoolValue(!interpreter.testEqual(tuple.Left, tuple.Right))
+				tuple := result.(valueTuple)
+				return BoolValue(!interpreter.testEqual(tuple.left, tuple.right))
 			})
 
 	case ast.OperationOr:
@@ -827,7 +843,16 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			FlatMap(func(left interface{}) Trampoline {
 				// only evaluate right-hand side if left-hand side is nil
 				if _, ok := left.(NilValue); ok {
-					return expression.Right.Accept(interpreter).(Trampoline)
+					return expression.Right.Accept(interpreter).(Trampoline).
+						Map(func(result interface{}) interface{} {
+							value := result.(Value)
+
+							rightType := interpreter.Checker.BinaryExpressionRightTypes[expression]
+							resultType := interpreter.Checker.BinaryExpressionResultTypes[expression]
+
+							// NOTE: important to box both any and optional
+							return interpreter.box(value, rightType, resultType)
+						})
 				}
 
 				value := left.(SomeValue).Value
@@ -977,11 +1002,14 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
 
+					argumentTypes := interpreter.Checker.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes := interpreter.Checker.InvocationExpressionParameterTypes[invocationExpression]
 
 					argumentCopies := make(ArrayValue, len(arguments))
 					for i, argument := range arguments {
-						argumentCopies[i] = interpreter.copyAndBox(argument, parameterTypes[i])
+						argumentType := argumentTypes[i]
+						parameterType := parameterTypes[i]
+						argumentCopies[i] = interpreter.copyAndBox(argument, argumentType, parameterType)
 					}
 
 					// TODO: optimize: only potentially used by host-functions
@@ -1272,14 +1300,20 @@ func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.Ini
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) copyAndBox(value Value, targetType sema.Type) Value {
+func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
 	result := value.Copy()
-	return interpreter.box(result, targetType)
+	return interpreter.box(result, valueType, targetType)
 }
 
-// box boxes a value in optionals, if necessary
-func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
-	inner := result
+// box boxes a value in optionals and any value, if necessary
+func (interpreter *Interpreter) box(value Value, valueType, targetType sema.Type) Value {
+	value, valueType = interpreter.boxOptional(value, valueType, targetType)
+	return interpreter.boxAny(value, valueType, targetType)
+}
+
+// boxOptional boxes a value in optionals, if necessary
+func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType sema.Type) (Value, sema.Type) {
+	inner := value
 	for {
 		optionalType, ok := targetType.(*sema.OptionalType)
 		if !ok {
@@ -1289,14 +1323,52 @@ func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
 		if some, ok := inner.(SomeValue); ok {
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
-			return inner
+			// NOTE: nested nil will be unboxed!
+			return inner, &sema.OptionalType{
+				Type: &sema.NeverType{},
+			}
 		} else {
-			result = SomeValue{Value: result}
+			value = SomeValue{Value: value}
+			valueType = &sema.OptionalType{
+				Type: valueType,
+			}
 		}
 
 		targetType = optionalType.Type
 	}
-	return result
+	return value, valueType
+}
+
+// boxOptional boxes a value in an Any value, if necessary
+func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
+	switch targetType := targetType.(type) {
+	case *sema.AnyType:
+		// no need to box already boxed value
+		if _, ok := value.(AnyValue); ok {
+			return value
+		}
+		return AnyValue{
+			Value: value,
+			Type:  valueType,
+		}
+
+	case *sema.OptionalType:
+		if _, ok := value.(NilValue); ok {
+			return value
+		}
+		some := value.(SomeValue)
+		return SomeValue{
+			Value: interpreter.boxAny(
+				some.Value,
+				valueType.(*sema.OptionalType).Type,
+				targetType.Type,
+			),
+		}
+
+	// TODO: support more types, e.g. arrays, dictionaries
+	default:
+		return value
+	}
 }
 
 func (interpreter *Interpreter) unbox(value Value) Value {
@@ -1364,6 +1436,17 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 }
 
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
-	// TODO
-	return nil
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			value := result.(Value)
+
+			anyValue := value.(AnyValue)
+			expectedType := interpreter.Checker.FailableDowncastingTypes[expression]
+
+			if !interpreter.Checker.IsSubType(anyValue.Type, expectedType) {
+				return NilValue{}
+			}
+
+			return SomeValue{Value: anyValue.Value}
+		})
 }
