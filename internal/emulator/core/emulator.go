@@ -306,9 +306,16 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 
 	for _, publicKeyBytes := range account.PublicKeys {
-		// TODO: handle errors in these functions
-		publicKey, _ := salg.DecodePubKey(publicKeyBytes)
-		valid, _ := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), txHash)
+		publicKey, err := salg.DecodePubKey(publicKeyBytes)
+		if err != nil {
+			continue
+		}
+
+		valid, err := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), txHash)
+		if err != nil {
+			continue
+		}
+
 		if valid {
 			return nil
 		}
