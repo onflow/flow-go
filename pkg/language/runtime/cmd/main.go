@@ -102,7 +102,10 @@ func prettyPrintError(err error, filename string, codes map[string]string) {
 			}
 		}
 	} else if locatedErr, ok := err.(ast.HasImportLocation); ok {
-		filename := string(locatedErr.ImportLocation().(ast.StringImportLocation))
+		location := locatedErr.ImportLocation()
+		if location != nil {
+			filename = string(location.(ast.StringImportLocation))
+		}
 		printErr(err, filename)
 	} else {
 		printErr(err, filename)
