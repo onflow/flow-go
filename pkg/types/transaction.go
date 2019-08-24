@@ -58,7 +58,8 @@ func (tx *RawTransaction) Encode() []byte {
 func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) *SignedTransaction {
 	// TODO: don't hard-code signature algo
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	sig, _ := salg.SignHash(prKey, tx.Hash())
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	sig, _ := salg.SignStruct(prKey, tx, hasher)
 
 	accountSig := AccountSignature{
 		Account:   account,
