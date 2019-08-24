@@ -223,7 +223,13 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 
 	boxedArguments := make(ArrayValue, len(arguments))
 	for i, argument := range argumentValues {
-		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
+		// TODO: value type is not known – only used for Any boxing right now, so reject for now
+		if parameterTypes[i].Equal(&sema.AnyType{}) {
+			return nil, &NotCallableError{
+				Value: variableValue,
+			}
+		}
+		boxedArguments[i] = interpreter.box(argument, nil, parameterTypes[i])
 	}
 
 	result := Run(function.invoke(boxedArguments, Location{}))
