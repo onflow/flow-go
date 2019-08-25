@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
 )
 
 type Value interface {
@@ -106,23 +107,25 @@ type IndexableValue interface {
 
 // ArrayValue
 
-type ArrayValue []Value
+type ArrayValue struct {
+	Values *[]Value
+}
 
 func (ArrayValue) isValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
-	copies := make(ArrayValue, len(v))
-	for i, value := range v {
+	copies := make([]Value, len(*v.Values))
+	for i, value := range *v.Values {
 		copies[i] = value.Copy()
 	}
-	return copies
+	return ArrayValue{Values: &copies}
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
-	values := make([]interface{}, len(v))
+	values := make([]interface{}, len(*v.Values))
 
-	for i, value := range v {
+	for i, value := range *v.Values {
 		values[i] = value.(ExportableValue).ToGoValue()
 	}
 
@@ -132,17 +135,17 @@ func (v ArrayValue) ToGoValue() interface{} {
 func (v ArrayValue) isIndexableValue() {}
 
 func (v ArrayValue) Get(key Value) Value {
-	return v[key.(IntegerValue).IntValue()]
+	return (*v.Values)[key.(IntegerValue).IntValue()]
 }
 
 func (v ArrayValue) Set(key Value, value Value) {
-	v[key.(IntegerValue).IntValue()] = value
+	(*v.Values)[key.(IntegerValue).IntValue()] = value
 }
 
 func (v ArrayValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("[")
-	for i, value := range v {
+	for i, value := range *v.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -155,7 +158,16 @@ func (v ArrayValue) String() string {
 func (v ArrayValue) GetMember(field string) Value {
 	switch field {
 	case "length":
-		return IntValue{Int: big.NewInt(int64(len(v)))}
+		return IntValue{Int: big.NewInt(int64(len(*v.Values)))}
+	case "append":
+		return NewHostFunctionValue(
+			// TODO:
+			nil,
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				*v.Values = append(*v.Values, arguments[0])
+				return trampoline.Done{Result: VoidValue{}}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}

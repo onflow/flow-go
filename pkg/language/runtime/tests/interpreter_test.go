@@ -66,10 +66,12 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 		To(Equal(interpreter.BoolValue(true)))
 
 	Expect(inter.Globals["b"].Value).
-		To(Equal(interpreter.ArrayValue([]interpreter.Value{
-			interpreter.IntValue{Int: big.NewInt(1)},
-			interpreter.IntValue{Int: big.NewInt(2)},
-		})))
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+			},
+		}))
 
 	Expect(inter.Globals["s"].Value).
 		To(Equal(interpreter.StringValue("123")))
@@ -1683,8 +1685,10 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.BoolValue(false),
-			interpreter.BoolValue(true),
+			Values: &[]interpreter.Value{
+				interpreter.BoolValue(false),
+				interpreter.BoolValue(true),
+			},
 		}))
 }
 
@@ -1714,8 +1718,10 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.BoolValue(false),
-			interpreter.BoolValue(true),
+			Values: &[]interpreter.Value{
+				interpreter.BoolValue(false),
+				interpreter.BoolValue(true),
+			},
 		}))
 }
 
@@ -1742,8 +1748,10 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.BoolValue(false),
-			interpreter.BoolValue(true),
+			Values: &[]interpreter.Value{
+				interpreter.BoolValue(false),
+				interpreter.BoolValue(true),
+			},
 		}))
 }
 
@@ -1770,8 +1778,10 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.BoolValue(false),
-			interpreter.BoolValue(true),
+			Values: &[]interpreter.Value{
+				interpreter.BoolValue(false),
+				interpreter.BoolValue(true),
+			},
 		}))
 }
 
@@ -1805,8 +1815,10 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.BoolValue(false),
-			interpreter.BoolValue(true),
+			Values: &[]interpreter.Value{
+				interpreter.BoolValue(false),
+				interpreter.BoolValue(true),
+			},
 		}))
 }
 
@@ -1859,8 +1871,10 @@ func TestInterpretArrayCopy(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
-			interpreter.IntValue{Int: big.NewInt(0)},
-			interpreter.IntValue{Int: big.NewInt(1)},
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(0)},
+				interpreter.IntValue{Int: big.NewInt(1)},
+			},
 		}))
 }
 
@@ -2975,4 +2989,99 @@ func TestInterpretLength(t *testing.T) {
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+}
+
+func TestInterpretStructureFunctionBindingInside(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        struct X {
+            fun foo(): ((): X) {
+                return self.bar
+            }
+
+            fun bar(): X {
+                return self
+            }
+        }
+
+        fun test(): X {
+            let x = X()
+            let bar = x.foo()
+            return bar()
+        }
+	`)
+
+	value, err := inter.Invoke("test")
+	Expect(value, err).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+}
+
+func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        struct X {
+            fun foo(): X {
+                return self
+            }
+        }
+
+        fun test(): X {
+            let x = X()
+            let bar = x.foo
+            return bar()
+        }
+	`)
+
+	value, err := inter.Invoke("test")
+	Expect(value, err).
+		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+}
+
+func TestInterpretArrayAppend(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.append(4)
+          return x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	Expect(value, err).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+			},
+		}))
+}
+
+func TestInterpretArrayAppendBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          let y = x.append
+          y(4)
+          return x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	Expect(value, err).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+			},
+		}))
 }

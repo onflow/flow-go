@@ -1631,6 +1631,10 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		member, ok = stringMembers[identifier]
 	case ArrayType:
 		member, ok = arrayMembers[identifier]
+		if !ok {
+			member = getArrayMember(ty, identifier)
+			ok = member != nil
+		}
 	case *DictionaryType:
 		member, ok = dictionaryMembers[identifier]
 	}
