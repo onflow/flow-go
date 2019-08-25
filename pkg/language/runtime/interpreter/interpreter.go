@@ -221,7 +221,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		}
 	}
 
-	boxedArguments := make(ArrayValue, len(arguments))
+	boxedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
 		if parameterTypes[i].Equal(&sema.AnyType{}) {
@@ -962,8 +962,8 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			structure := result.(ValueWithMembers)
-			return structure.GetMember(expression.Identifier)
+			value := result.(ValueWithMembers)
+			return value.GetMember(expression.Identifier)
 		})
 }
 
@@ -1013,8 +1013,8 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					argumentTypes := interpreter.Checker.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes := interpreter.Checker.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make(ArrayValue, len(arguments))
-					for i, argument := range arguments {
+					argumentCopies := make([]Value, len(*arguments.Values))
+					for i, argument := range *arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
 						argumentCopies[i] = interpreter.copyAndBox(argument, argumentType, parameterType)
@@ -1079,7 +1079,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 
 	// no expressions? stop
 	if count == 0 {
-		return Done{Result: ArrayValue(values)}
+		return Done{Result: ArrayValue{Values: &values}}
 	}
 
 	// interpret the first expression

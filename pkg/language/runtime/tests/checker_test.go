@@ -2293,6 +2293,25 @@ func TestCheckInvalidStructureFieldMissingVariableKind(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
 }
 
+func TestCheckStructureFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        struct X {
+            fun foo(): ((): X) {
+                return self.bar
+            }
+
+            fun bar(): X {
+                return self
+            }
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckFunctionConditions(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -4258,6 +4277,54 @@ func TestCheckLength(t *testing.T) {
 	_, err := parseAndCheck(`
       let x = "cafe\u{301}".length
       let y = [1, 2, 3].length
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArrayAppend(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.append(4)
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayAppend(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.append("4")
+          return x
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayAppendBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          let y = x.append
+          y(4)
+          return x
+      }
     `)
 
 	Expect(err).
