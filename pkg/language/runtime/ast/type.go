@@ -67,6 +67,25 @@ func (t *ConstantSizedType) EndPosition() Position {
 	return t.EndPos
 }
 
+// DictionaryType
+
+type DictionaryType struct {
+	KeyType   Type
+	ValueType Type
+	StartPos  Position
+	EndPos    Position
+}
+
+func (*DictionaryType) isType() {}
+
+func (t *DictionaryType) StartPosition() Position {
+	return t.StartPos
+}
+
+func (t *DictionaryType) EndPosition() Position {
+	return t.EndPos
+}
+
 // FunctionType
 
 type FunctionType struct {

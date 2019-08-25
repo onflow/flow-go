@@ -104,11 +104,11 @@ func (s *BaseStrictusListener) EnterFullType(ctx *FullTypeContext) {}
 // ExitFullType is called when production fullType is exited.
 func (s *BaseStrictusListener) ExitFullType(ctx *FullTypeContext) {}
 
-// EnterTypeDimension is called when production typeDimension is entered.
-func (s *BaseStrictusListener) EnterTypeDimension(ctx *TypeDimensionContext) {}
+// EnterTypeIndex is called when production typeIndex is entered.
+func (s *BaseStrictusListener) EnterTypeIndex(ctx *TypeIndexContext) {}
 
-// ExitTypeDimension is called when production typeDimension is exited.
-func (s *BaseStrictusListener) ExitTypeDimension(ctx *TypeDimensionContext) {}
+// ExitTypeIndex is called when production typeIndex is exited.
+func (s *BaseStrictusListener) ExitTypeIndex(ctx *TypeIndexContext) {}
 
 // EnterBaseType is called when production baseType is entered.
 func (s *BaseStrictusListener) EnterBaseType(ctx *BaseTypeContext) {}

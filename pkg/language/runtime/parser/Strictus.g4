@@ -116,11 +116,11 @@ parameter
     ;
 
 fullType
-    : baseType typeDimension* (optionals+=(Optional|NilCoalescing))*
+    : baseType typeIndex* (optionals+=(Optional|NilCoalescing))*
     ;
 
-typeDimension
-    : '[' DecimalLiteral? ']'
+typeIndex
+    : '[' (DecimalLiteral|fullType)? ']'
     ;
 
 baseType
