@@ -38,7 +38,7 @@ cmake -DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=nativ
 
 # compile the static library
 make clean
-make relic_s
+make relic_s -j8
 mv ./include/relic_conf.h ../include/.
 rm -f CMakeCache.txt
 cd ..
