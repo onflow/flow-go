@@ -413,6 +413,18 @@ func TestInterpretEqualOperator(t *testing.T) {
       fun testFalseAndFalse(): Bool {
           return false == false
       }
+
+      fun testEqualStrings(): Bool {
+          return "123" == "123"
+      }
+
+      fun testUnequalStrings(): Bool {
+          return "123" == "abc"
+      }
+
+      fun testUnicodeStrings(): Bool {
+          return "caf\u{E9}" == "cafe\u{301}"
+      }
 	`)
 
 	Expect(inter.Invoke("testIntegersUnequal")).
@@ -431,6 +443,15 @@ func TestInterpretEqualOperator(t *testing.T) {
 		To(Equal(interpreter.BoolValue(false)))
 
 	Expect(inter.Invoke("testFalseAndFalse")).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("testEqualStrings")).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("testUnequalStrings")).
+		To(Equal(interpreter.BoolValue(false)))
+
+	Expect(inter.Invoke("testUnicodeStrings")).
 		To(Equal(interpreter.BoolValue(true)))
 }
 
