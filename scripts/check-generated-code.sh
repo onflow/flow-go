@@ -1,6 +1,9 @@
 #!/bin/bash
-if [[ $(git status --porcelain) ]]
+IFS=
+status="$(git status --porcelain)"
+if [[ $status ]]
 then
-    printf "Generated code is not up to date"
-	exit 1
+    echo "Generated code is not up to date:"
+    echo $status
+    exit 1
 fi
