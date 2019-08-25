@@ -338,6 +338,19 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckInvalidArrayElements(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let z = [0, true]
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
 func TestCheckArrayIndexingWithInteger(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -350,21 +363,6 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidArrayElements(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      fun test() {
-          let z = [0, true]
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
@@ -4028,52 +4026,77 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
 }
 
-func TestCheckDictionaryIndexing(t *testing.T) {
+func TestCheckDictionary(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheckWithExtra(
-		`
-          let x = dict["abc"]
-	    `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		nil,
-		nil,
-	)
+	_, err := parseAndCheck(`
+      let z = {"a": 1, "b": 2}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionaryKeys(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let z = {"a": 1, true: 2}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidDictionaryValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let z = {"a": 1, "b": true}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckDictionaryIndexingString(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+      let x = {"abc": 1, "dfg": 2}
+      let y = x["abc"]
+    `)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.Globals["y"].Type).
 		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
+}
+
+func TestCheckDictionaryIndexingBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = {true: 1, false: 2}
+      let y = x[true]
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }
 
 func TestCheckInvalidDictionaryIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheckWithExtra(
-		`
-          let x = dict[true]
-	    `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		nil,
-		nil,
-	)
+	_, err := parseAndCheck(`
+      let x = {"abc": 1, "dfg": 2}
+      let y = x[true]
+	`)
 
 	errs := expectCheckerErrors(err, 1)
 
@@ -4084,24 +4107,12 @@ func TestCheckInvalidDictionaryIndexing(t *testing.T) {
 func TestCheckDictionaryIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheckWithExtra(
-		`
-          fun test() {
-              dict["abc"] = 1
-          }
-	    `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		nil,
-		nil,
-	)
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "dfg": 2}
+          x["abc"] = 3
+      }
+    `)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -4110,24 +4121,12 @@ func TestCheckDictionaryIndexingAssignment(t *testing.T) {
 func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheckWithExtra(
-		`
-          fun test() {
-              dict["abc"] = true
-          }
-	    `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		nil,
-		nil,
-	)
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "dfg": 2}
+          x["abc"] = true
+      }
+    `)
 
 	errs := expectCheckerErrors(err, 1)
 
