@@ -4251,3 +4251,15 @@ func TestCheckInvalidAnyConditional(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckLength(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let x = "cafe\u{301}".length
+      let y = [1, 2, 3].length
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

@@ -1361,13 +1361,13 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
 	Expect(inter.Invoke("callTest")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
@@ -1386,7 +1386,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 	  let test = Test()
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).Get("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 }
 
@@ -2908,10 +2908,10 @@ func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-     let x: Any? = 23
-     let y = x ?? 42
-     let z = y as? Int
-  `)
+      let x: Any? = 23
+      let y = x ?? 42
+      let z = y as? Int
+    `)
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(
@@ -2940,10 +2940,10 @@ func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-     let x: Any? = nil
-     let y = x ?? 42
-     let z = y as? Int
-  `)
+      let x: Any? = nil
+      let y = x ?? 42
+      let z = y as? Int
+    `)
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.NilValue{}))
@@ -2960,4 +2960,19 @@ func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
 			interpreter.SomeValue{
 				Value: interpreter.IntValue{Int: big.NewInt(42)},
 			}))
+}
+
+func TestInterpretLength(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = "cafe\u{301}".length
+      let y = [1, 2, 3].length
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
