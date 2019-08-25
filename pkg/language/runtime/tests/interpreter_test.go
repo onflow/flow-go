@@ -1363,13 +1363,13 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
 	Expect(inter.Invoke("callTest")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
@@ -1388,7 +1388,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 	  let test = Test()
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember("foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 }
 

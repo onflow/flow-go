@@ -83,8 +83,8 @@ func (v StringValue) Equal(other StringValue) BoolValue {
 	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
 }
 
-func (v StringValue) GetMember(field string) Value {
-	switch field {
+func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
 	case "length":
 		count := uniseg.GraphemeClusterCount(string(v))
 		return IntValue{Int: big.NewInt(int64(count))}
@@ -93,7 +93,7 @@ func (v StringValue) GetMember(field string) Value {
 	}
 }
 
-func (v StringValue) SetMember(field string, value Value) {
+func (v StringValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -155,14 +155,12 @@ func (v ArrayValue) String() string {
 	return builder.String()
 }
 
-func (v ArrayValue) GetMember(field string) Value {
-	switch field {
+func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
 	case "length":
 		return IntValue{Int: big.NewInt(int64(len(*v.Values)))}
 	case "append":
 		return NewHostFunctionValue(
-			// TODO:
-			nil,
 			func(arguments []Value, location Location) trampoline.Trampoline {
 				*v.Values = append(*v.Values, arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
@@ -173,7 +171,7 @@ func (v ArrayValue) GetMember(field string) Value {
 	}
 }
 
-func (v ArrayValue) SetMember(field string, value Value) {
+func (v ArrayValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -771,35 +769,54 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 
 // StructureValue
 
-type StructureValue map[string]Value
+type StructureValue struct {
+	Fields    map[string]Value
+	Functions map[string]FunctionValue
+}
 
 func (StructureValue) isValue() {}
 
 func (v StructureValue) Copy() Value {
-	newStructure := make(StructureValue, len(v))
-	for field, value := range v {
-		var copiedValue Value
-		if f, ok := value.(*StructureFunctionValue); ok {
-			copiedValue = f.CopyWithStructure(newStructure)
-		} else {
-			copiedValue = value.Copy()
-		}
-		newStructure[field] = copiedValue
+	newFields := make(map[string]Value, len(v.Fields))
+	for field, value := range v.Fields {
+		newFields[field] = value.Copy()
 	}
-	return newStructure
+
+	newFunctions := make(map[string]FunctionValue, len(v.Functions))
+	for name, function := range v.Functions {
+		newFunctions[name] = function.Copy().(FunctionValue)
+	}
+
+	return StructureValue{
+		Fields:    newFields,
+		Functions: newFunctions,
+	}
 }
 
 func (v StructureValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
-	return v
+	return v.Fields
 }
 
-func (v StructureValue) GetMember(field string) Value {
-	return v[field]
+func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
+	value, ok := v.Fields[name]
+	if ok {
+		return value
+	}
+
+	function, ok := v.Functions[name]
+	if ok {
+		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
+			function = interpreter.bindSelf(interpretedFunction, v)
+		}
+		return function
+	}
+
+	return nil
 }
 
-func (v StructureValue) SetMember(field string, value Value) {
-	v[field] = value
+func (v StructureValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	v.Fields[name] = value
 }
 
 // DictionaryValue
@@ -864,8 +881,8 @@ func (v DictionaryValue) String() string {
 	return builder.String()
 }
 
-func (v DictionaryValue) GetMember(field string) Value {
-	switch field {
+func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
 	case "length":
 		return IntValue{Int: big.NewInt(int64(len(v)))}
 	default:
@@ -873,7 +890,7 @@ func (v DictionaryValue) GetMember(field string) Value {
 	}
 }
 
-func (v DictionaryValue) SetMember(field string, value Value) {
+func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -1002,8 +1019,8 @@ func (v AnyValue) String() string {
 // ValueWithMembers
 
 type ValueWithMembers interface {
-	GetMember(field string) Value
-	SetMember(field string, value Value)
+	GetMember(interpreter *Interpreter, name string) Value
+	SetMember(interpreter *Interpreter, name string, value Value)
 }
 
 //

@@ -104,6 +104,7 @@ func NewChecker(
 
 	for _, declaration := range predeclaredValues {
 		checker.declareValue(declaration)
+		checker.declareGlobal(declaration.ValueDeclarationName())
 	}
 
 	for _, declaration := range predeclaredTypes {
@@ -334,7 +335,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.Declarations {
 		declaration.Accept(checker)
-		checker.declareGlobal(declaration)
+		checker.declareGlobalDeclaration(declaration)
 	}
 
 	return nil
@@ -620,11 +621,15 @@ func (checker *Checker) declareVariable(
 	return variable
 }
 
-func (checker *Checker) declareGlobal(declaration ast.Declaration) {
+func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if name == "" {
 		return
 	}
+	checker.declareGlobal(name)
+}
+
+func (checker *Checker) declareGlobal(name string) {
 	checker.Globals[name] = checker.findVariable(name)
 }
 

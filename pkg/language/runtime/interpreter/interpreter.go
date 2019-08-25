@@ -197,22 +197,23 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 
 	// ensures the invocation's argument count matches the function's parameter count
 
-	parameterTypes := function.functionType().ParameterTypes
+	ty := interpreter.Checker.Globals[functionName].Type
+
+	functionType, ok := ty.(*sema.FunctionType)
+	if !ok {
+		return nil, &NotCallableError{
+			Value: variableValue,
+		}
+	}
+
+	parameterTypes := functionType.ParameterTypes
 	parameterCount := len(parameterTypes)
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
 
-		var functionType *sema.FunctionType
-
-		if hostFunction, ok := function.(HostFunctionValue); ok {
-			functionType = hostFunction.Type
-		}
-
-		// TODO: improve
-		if functionType == nil ||
-			(functionType.RequiredArgumentCount == nil ||
-				argumentCount < *functionType.RequiredArgumentCount) {
+		if functionType.RequiredArgumentCount == nil ||
+			argumentCount < *functionType.RequiredArgumentCount {
 
 			return nil, &ArgumentCountError{
 				ParameterCount: parameterCount,
@@ -667,7 +668,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(StructureValue)
 
-			structure.SetMember(target.Identifier, value)
+			structure.SetMember(interpreter, target.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -967,7 +968,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(ValueWithMembers)
-			return value.GetMember(expression.Identifier)
+			return value.GetMember(interpreter, expression.Identifier)
 		})
 }
 
@@ -1186,25 +1187,20 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 
 	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
 
-	// TODO: function type
 	variable.Value = NewHostFunctionValue(
-		nil,
-		func(values []Value, location Location) Trampoline {
-			structure := StructureValue{}
-
-			for name, function := range functions {
-				structFunction := NewStructFunction(function, structure)
-				structure.SetMember(name, structFunction)
+		func(arguments []Value, location Location) Trampoline {
+			structure := StructureValue{
+				Fields:    map[string]Value{},
+				Functions: functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
 
 			if initializerFunction != nil {
-				initializationTrampoline = interpreter.invokeStructureFunction(
-					*initializerFunction,
-					values,
-					structure,
-				)
+				// NOTE: arguments are already properly boxed by invocation expression
+
+				initializationTrampoline = interpreter.bindSelf(*initializerFunction, structure).
+					invoke(arguments, location)
 			}
 
 			return initializationTrampoline.
@@ -1213,6 +1209,25 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 				})
 		},
 	)
+}
+
+// bindSelf returns a function which binds `self` to the structure
+//
+func (interpreter *Interpreter) bindSelf(
+	function InterpretedFunctionValue,
+	structure StructureValue,
+) FunctionValue {
+	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
+		// start a new activation record
+		// lexical scope: use the function declaration's activation record,
+		// not the current one (which would be dynamic scope)
+		interpreter.activations.Push(function.Activation)
+
+		// make `self` available
+		interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+	})
 }
 
 func (interpreter *Interpreter) initializerFunction(
@@ -1254,33 +1269,12 @@ func (interpreter *Interpreter) initializerFunction(
 	)
 }
 
-// invokeStructureFunction calls the given function with the values.
-//
-// Inside the function, `self` is bound to the structure,
-// and the constructor for the structure is bound
-//
-func (interpreter *Interpreter) invokeStructureFunction(
-	function InterpretedFunctionValue,
-	arguments []Value,
-	structure StructureValue,
-) Trampoline {
-	// start a new activation record
-	// lexical scope: use the function declaration's activation record,
-	// not the current one (which would be dynamic scope)
-	interpreter.activations.Push(function.Activation)
-
-	// make `self` available in the initializer
-	interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
-}
-
 func (interpreter *Interpreter) structureFunctions(
 	structureDeclaration *ast.StructureDeclaration,
 	lexicalScope hamt.Map,
-) map[string]InterpretedFunctionValue {
+) map[string]FunctionValue {
 
-	functions := map[string]InterpretedFunctionValue{}
+	functions := map[string]FunctionValue{}
 
 	for _, functionDeclaration := range structureDeclaration.Functions {
 		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]

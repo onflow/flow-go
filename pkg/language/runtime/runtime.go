@@ -345,8 +345,10 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		}
 
 		signingAccounts[i] = interpreter.StructureValue{
-			"address": interpreter.StringValue(address.String()),
-			"storage": storedValue,
+			Fields: map[string]interpreter.Value{
+				"address": interpreter.StringValue(address.String()),
+				"storage": storedValue,
+			},
 		}
 
 		storedValues[i] = storedValue

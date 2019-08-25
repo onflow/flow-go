@@ -12,6 +12,7 @@ import (
 
 type StandardLibraryFunction struct {
 	Name           string
+	Type           *sema.FunctionType
 	Function       interpreter.HostFunctionValue
 	ArgumentLabels []string
 }
@@ -21,7 +22,7 @@ func (f StandardLibraryFunction) ValueDeclarationName() string {
 }
 
 func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
-	return f.Function.Type
+	return f.Type
 }
 
 func (StandardLibraryFunction) ValueDeclarationKind() common.DeclarationKind {
@@ -46,12 +47,10 @@ func NewStandardLibraryFunction(
 	function interpreter.HostFunction,
 	argumentLabels []string,
 ) StandardLibraryFunction {
-	functionValue := interpreter.NewHostFunctionValue(
-		functionType,
-		function,
-	)
+	functionValue := interpreter.NewHostFunctionValue(function)
 	return StandardLibraryFunction{
 		Name:           name,
+		Type:           functionType,
 		Function:       functionValue,
 		ArgumentLabels: argumentLabels,
 	}
