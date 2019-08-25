@@ -50,7 +50,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		case *core.ErrTransactionReverted:
 			s.logger.
 				WithField("txHash", tx.Hash()).
-				Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+				Infof("💸  Transaction #%d mined", tx.Nonce)
 			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *core.ErrDuplicateTransaction:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -64,7 +64,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	} else {
 		s.logger.
 			WithField("txHash", tx.Hash()).
-			Infof("💸  Transaction #%d submitted to network", tx.Nonce)
+			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
 	block := s.blockchain.CommitBlock()

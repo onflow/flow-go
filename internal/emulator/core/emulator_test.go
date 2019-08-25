@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,24 +23,6 @@ const addTwoScript = `
 	}
 `
 
-// createAccountScriptA runs a script that creates an account.
-const createAccountScriptA = `
-	fun main(account: Account) {
-		let publicKey = [1,2,3]
-		let code = [4,5,6]
-		createAccount(publicKey, code)
-	}
-`
-
-// createAccountScriptB runs a script that creates an account.
-const createAccountScriptB = `
-	fun main(account: Account) {
-		let publicKey = [7,8,9]
-		let code = [10,11,12]
-		createAccount(publicKey, code)
-	}
-`
-
 // updateAccountCodeScript runs a script that updates the code for an account.
 const updateAccountCodeScript = `
 	fun main(account: Account) {
@@ -53,6 +37,15 @@ const sampleCall = `
 		return getValue([1], [2], [3])
 	}
 `
+
+func generateCreateAccountScript(publicKey, code []byte) []byte {
+	script := fmt.Sprintf(`
+		fun main(account: Account) {
+			createAccount(%s, %s)
+		}
+	`, bytesToString(publicKey), bytesToString(code))
+	return []byte(script)
+}
 
 func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
@@ -317,8 +310,10 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
+	createAccountScriptA := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+
 	tx1, _ := (&types.RawTransaction{
-		Script:       []byte(createAccountScriptA),
+		Script:       createAccountScriptA,
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -337,8 +332,10 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
+	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
+
 	tx2, _ := (&types.RawTransaction{
-		Script:       []byte(createAccountScriptB),
+		Script:       createAccountScriptB,
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -362,8 +359,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
+	createAccountScript := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+
 	tx1, _ := (&types.RawTransaction{
-		Script:       []byte(createAccountScriptA),
+		Script:       createAccountScript,
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
@@ -394,6 +393,54 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
+}
+
+func TestImportAccountCode(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	accountScript := []byte(`
+		fun answer(): Int {
+			return 42
+		}
+	`)
+
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
+
+	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
+
+	tx1, _ := (&types.RawTransaction{
+		Script:       createAccountScript,
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).SignPayer(b.RootAccount(), b.RootKey())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
+	script := []byte(`
+		import 0x0000000000000000000000000000000000000002
+
+		fun main(account: Account) {
+			let answer = answer()
+			if answer != 42 {
+				panic("?!")
+			}
+		}
+	`)
+
+	tx2, _ := (&types.RawTransaction{
+		Script:       script,
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}).SignPayer(b.RootAccount(), b.RootKey())
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func TestCallScript(t *testing.T) {
@@ -498,4 +545,29 @@ func TestQueryByVersion(t *testing.T) {
 
 	// Pending state does not change after call scripts/get transactions
 	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))
+}
+
+func TestRuntimeLogger(t *testing.T) {
+	RegisterTestingT(t)
+
+	loggedMessages := make([]string, 0)
+
+	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+		RuntimeLogger: func(msg string) {
+			loggedMessages = append(loggedMessages, msg)
+		},
+	})
+
+	_, err := b.CallScript([]byte(`
+		fun main() {
+			log("elephant ears")
+		}
+	`))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(loggedMessages).To(Equal([]string{"\"elephant ears\""}))
+}
+
+// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
+func bytesToString(b []byte) string {
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
