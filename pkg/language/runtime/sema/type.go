@@ -297,6 +297,24 @@ var arrayMembers = map[string]*Member{
 	},
 }
 
+func getArrayMember(ty ArrayType, field string) *Member {
+	switch field {
+	case "append":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					ty.elementType(),
+				},
+				ReturnType: &VoidType{},
+			},
+			IsInitialized: true,
+		}
+	default:
+		return nil
+	}
+}
+
 // VariableSizedType is a variable sized array type
 type VariableSizedType struct {
 	Type

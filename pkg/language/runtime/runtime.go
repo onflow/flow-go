@@ -494,8 +494,8 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(array))
-	for i, arrayValue := range array {
+	result := make([]byte, len(*array.Values))
+	for i, arrayValue := range *array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
