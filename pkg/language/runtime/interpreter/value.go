@@ -216,6 +216,10 @@ func (v IntValue) IntValue() int {
 	return int(v.Int64())
 }
 
+func (v IntValue) KeyString() string {
+	return v.Int.String()
+}
+
 func (v IntValue) Negate() IntegerValue {
 	return IntValue{big.NewInt(0).Neg(v.Int)}
 }
@@ -800,7 +804,7 @@ func (v StructureValue) SetMember(field string, value Value) {
 
 // DictionaryValue
 
-type DictionaryValue map[Value]Value
+type DictionaryValue map[interface{}]Value
 
 func (DictionaryValue) isValue() {}
 
@@ -819,16 +823,28 @@ func (v DictionaryValue) ToGoValue() interface{} {
 
 func (v DictionaryValue) isIndexableValue() {}
 
-func (v DictionaryValue) Get(key Value) Value {
-	value, ok := v[key]
+func (v DictionaryValue) Get(keyValue Value) Value {
+	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
 	}
 	return SomeValue{Value: value}
 }
 
-func (v DictionaryValue) Set(key Value, value Value) {
-	v[key] = value
+func dictionaryKey(keyValue Value) interface{} {
+	var key interface{} = keyValue
+	if keyValue, ok := keyValue.(HasKeyString); ok {
+		return keyValue.KeyString()
+	}
+	return key
+}
+
+type HasKeyString interface {
+	KeyString() string
+}
+
+func (v DictionaryValue) Set(keyValue Value, value Value) {
+	v[dictionaryKey(keyValue)] = value
 }
 
 func (v DictionaryValue) String() string {

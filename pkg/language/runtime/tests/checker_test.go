@@ -4067,7 +4067,7 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
 	RegisterTestingT(t)
 
 	checker, err := parseAndCheck(`
-      let x = {"abc": 1, "dfg": 2}
+      let x = {"abc": 1, "def": 2}
       let y = x["abc"]
     `)
 
@@ -4094,7 +4094,7 @@ func TestCheckInvalidDictionaryIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let x = {"abc": 1, "dfg": 2}
+      let x = {"abc": 1, "def": 2}
       let y = x[true]
 	`)
 
@@ -4109,7 +4109,7 @@ func TestCheckDictionaryIndexingAssignment(t *testing.T) {
 
 	_, err := parseAndCheck(`
       fun test() {
-          let x = {"abc": 1, "dfg": 2}
+          let x = {"abc": 1, "def": 2}
           x["abc"] = 3
       }
     `)
@@ -4123,7 +4123,7 @@ func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 
 	_, err := parseAndCheck(`
       fun test() {
-          let x = {"abc": 1, "dfg": 2}
+          let x = {"abc": 1, "def": 2}
           x["abc"] = true
       }
     `)

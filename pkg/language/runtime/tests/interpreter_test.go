@@ -2756,90 +2756,109 @@ func TestInterpretImportError(t *testing.T) {
 		To(Equal("?!"))
 }
 
-func TestInterpretDictionaryIndexing(t *testing.T) {
+func TestInterpretDictionary(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpretWithExtra(
-		`
-          let x = dict["abc"]
-        `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		map[string]interpreter.Value{
-			"dict": interpreter.DictionaryValue{
-				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
-			},
-		},
-	)
+	inter := parseCheckAndInterpret(`
+      let x = {"a": 1, "b": 2}
+	`)
 
 	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.DictionaryValue{
+			interpreter.StringValue("a"): interpreter.IntValue{Int: big.NewInt(1)},
+			interpreter.StringValue("b"): interpreter.IntValue{Int: big.NewInt(2)},
+		}))
+}
+
+func TestInterpretDictionaryIndexingString(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = {"abc": 1, "def": 2}
+      let a = x["abc"]
+      let b = x["def"]
+      let c = x["ghi"]
+    `)
+
+	Expect(inter.Globals["a"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.IntValue{Int: big.NewInt(1)},
+			}))
+
+	Expect(inter.Globals["b"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
+			}))
+
+	Expect(inter.Globals["c"].Value).
+		To(Equal(
+			interpreter.NilValue{}))
+}
+
+func TestInterpretDictionaryIndexingBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      let x = {true: 1, false: 2}
+      let a = x[true]
+      let b = x[false]
+    `)
+
+	Expect(inter.Globals["a"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(1)},
+			}))
+
+	Expect(inter.Globals["b"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.IntValue{Int: big.NewInt(2)},
 			}))
 }
 
-func TestInterpretDictionaryIndexingNotFound(t *testing.T) {
+func TestInterpretDictionaryIndexingInt(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpretWithExtra(
-		`
-          let x = dict["xyz"]
-        `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		map[string]interpreter.Value{
-			"dict": interpreter.DictionaryValue{},
-		},
-	)
+	inter := parseCheckAndInterpret(`
+      let x = {23: "a", 42: "b"}
+      let a = x[23]
+      let b = x[42]
+      let c = x[100]
+    `)
 
-	Expect(inter.Globals["x"].Value).
+	Expect(inter.Globals["a"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.StringValue("a"),
+			}))
+
+	Expect(inter.Globals["b"].Value).
+		To(Equal(
+			interpreter.SomeValue{
+				Value: interpreter.StringValue("b"),
+			}))
+
+	Expect(inter.Globals["c"].Value).
 		To(Equal(interpreter.NilValue{}))
 }
 
-func TestInterpretDictionaryIndexingAssignment(t *testing.T) {
+func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpretWithExtra(
-		`
-           fun test() {
-               dict["abc"] = 23
-           }
-        `,
-		[]sema.ValueDeclaration{
-			stdlib.StandardLibraryValue{
-				Name: "dict",
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.StringType{},
-					ValueType: &sema.IntType{},
-				},
-			},
-		},
-		map[string]interpreter.Value{
-			"dict": interpreter.DictionaryValue{
-				interpreter.StringValue("abc"): interpreter.IntValue{Int: big.NewInt(42)},
-			},
-		},
-	)
+	inter := parseCheckAndInterpret(`
+      let x = {"abc": 42}
+      fun test() {
+          x["abc"] = 23
+      }
+    `)
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["dict"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
+	Expect(inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
 		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
 }
 
