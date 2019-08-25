@@ -351,6 +351,7 @@ literal
     : integerLiteral
     | booleanLiteral
     | arrayLiteral
+    | dictionaryLiteral
     | stringLiteral
     | nilLiteral
     ;
@@ -378,6 +379,14 @@ integerLiteral
 
 arrayLiteral
     : '[' ( expression (',' expression)* )? ']'
+    ;
+
+dictionaryLiteral
+    : '{' ( dictionaryEntry (',' dictionaryEntry)* )? '}'
+    ;
+
+dictionaryEntry
+    : key=expression ':' value=expression
     ;
 
 OpenParen: '(' ;

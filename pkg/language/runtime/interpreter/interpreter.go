@@ -959,6 +959,10 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
+func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
+	return interpreter.visitEntries(expression.Entries, DictionaryValue{})
+}
+
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
@@ -1089,6 +1093,36 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 
 			// interpret the remaining expressions
 			return interpreter.visitExpressions(expressions[1:], append(values, value))
+		})
+}
+
+func (interpreter *Interpreter) visitEntries(entries []ast.Entry, result DictionaryValue) Trampoline {
+	count := len(entries)
+
+	// no entries? stop
+	if count == 0 {
+		return Done{Result: result}
+	}
+
+	entry := entries[0]
+
+	// interpret the key expression
+	return entry.Key.Accept(interpreter).(Trampoline).
+		FlatMap(func(keyResult interface{}) Trampoline {
+			key := keyResult.(Value)
+
+			// interpret the value expression
+			return entry.Value.Accept(interpreter).(Trampoline).
+				FlatMap(func(valueResult interface{}) Trampoline {
+					value := valueResult.(Value)
+
+					// NOTE: not setting using indexing,
+					// as key might need special handling
+					result.Set(key, value)
+
+					// interpret the remaining entries
+					return interpreter.visitEntries(entries[1:], result)
+				})
 		})
 }
 

@@ -283,6 +283,14 @@ func (v *BaseStrictusVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitDictionaryLiteral(ctx *DictionaryLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitEos(ctx *EosContext) interface{} {
 	return v.VisitChildren(ctx)
 }

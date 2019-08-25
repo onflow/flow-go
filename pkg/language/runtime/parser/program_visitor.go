@@ -1363,6 +1363,34 @@ func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 	}
 }
 
+func (v *ProgramVisitor) VisitDictionaryLiteral(ctx *DictionaryLiteralContext) interface{} {
+	var entries []ast.Entry
+	for _, entry := range ctx.AllDictionaryEntry() {
+		entries = append(
+			entries,
+			entry.Accept(v).(ast.Entry),
+		)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.DictionaryExpression{
+		Entries:  entries,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{} {
+	key := ctx.key.Accept(v).(ast.Expression)
+	value := ctx.value.Accept(v).(ast.Expression)
+
+	return ast.Entry{
+		Key:   key,
+		Value: value,
+	}
+}
+
 func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
 	identifierNode := ctx.Identifier()
 
