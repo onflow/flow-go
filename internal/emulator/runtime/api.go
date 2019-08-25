@@ -14,10 +14,14 @@ import (
 type EmulatorRuntimeAPI struct {
 	registers *etypes.RegistersView
 	Accounts  []types.Address
+	Logger    func(string)
 }
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
-	return &EmulatorRuntimeAPI{registers: registers}
+	return &EmulatorRuntimeAPI{
+		registers: registers,
+		Logger:    func(string) {},
+	}
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -102,7 +106,7 @@ func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
 }
 
 func (i *EmulatorRuntimeAPI) Log(message string) {
-	// TODO:
+	i.Logger(message)
 }
 
 const (

@@ -37,8 +37,13 @@ type Config struct {
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	options := core.DefaultOptions
+
 	if conf.RootAccountKey != nil {
 		options.RootAccountKey = conf.RootAccountKey.Key
+	}
+
+	options.RuntimeLogger = func(msg string) {
+		logger.Debug(msg)
 	}
 
 	server := &EmulatorServer{

@@ -547,6 +547,26 @@ func TestQueryByVersion(t *testing.T) {
 	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))
 }
 
+func TestRuntimeLogger(t *testing.T) {
+	RegisterTestingT(t)
+
+	loggedMessages := make([]string, 0)
+
+	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+		RuntimeLogger: func(msg string) {
+			loggedMessages = append(loggedMessages, msg)
+		},
+	})
+
+	_, err := b.CallScript([]byte(`
+		fun main() {
+			log("elephant ears")
+		}
+	`))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(loggedMessages).To(Equal([]string{"\"elephant ears\""}))
+}
+
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
