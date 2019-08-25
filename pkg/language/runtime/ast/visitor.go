@@ -38,6 +38,7 @@ type ExpressionVisitor interface {
 	VisitNilExpression(*NilExpression) Repr
 	VisitIntExpression(*IntExpression) Repr
 	VisitArrayExpression(*ArrayExpression) Repr
+	VisitDictionaryExpression(*DictionaryExpression) Repr
 	VisitIdentifierExpression(*IdentifierExpression) Repr
 	VisitInvocationExpression(*InvocationExpression) Repr
 	VisitMemberExpression(*MemberExpression) Repr

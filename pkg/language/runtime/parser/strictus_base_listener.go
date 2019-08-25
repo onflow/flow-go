@@ -436,6 +436,18 @@ func (s *BaseStrictusListener) EnterArrayLiteral(ctx *ArrayLiteralContext) {}
 // ExitArrayLiteral is called when production arrayLiteral is exited.
 func (s *BaseStrictusListener) ExitArrayLiteral(ctx *ArrayLiteralContext) {}
 
+// EnterDictionaryLiteral is called when production dictionaryLiteral is entered.
+func (s *BaseStrictusListener) EnterDictionaryLiteral(ctx *DictionaryLiteralContext) {}
+
+// ExitDictionaryLiteral is called when production dictionaryLiteral is exited.
+func (s *BaseStrictusListener) ExitDictionaryLiteral(ctx *DictionaryLiteralContext) {}
+
+// EnterDictionaryEntry is called when production dictionaryEntry is entered.
+func (s *BaseStrictusListener) EnterDictionaryEntry(ctx *DictionaryEntryContext) {}
+
+// ExitDictionaryEntry is called when production dictionaryEntry is exited.
+func (s *BaseStrictusListener) ExitDictionaryEntry(ctx *DictionaryEntryContext) {}
+
 // EnterEos is called when production eos is entered.
 func (s *BaseStrictusListener) EnterEos(ctx *EosContext) {}
 

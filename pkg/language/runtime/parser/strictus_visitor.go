@@ -218,6 +218,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#arrayLiteral.
 	VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#dictionaryLiteral.
+	VisitDictionaryLiteral(ctx *DictionaryLiteralContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#dictionaryEntry.
+	VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#eos.
 	VisitEos(ctx *EosContext) interface{}
 }

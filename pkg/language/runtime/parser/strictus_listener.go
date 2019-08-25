@@ -214,6 +214,12 @@ type StrictusListener interface {
 	// EnterArrayLiteral is called when entering the arrayLiteral production.
 	EnterArrayLiteral(c *ArrayLiteralContext)
 
+	// EnterDictionaryLiteral is called when entering the dictionaryLiteral production.
+	EnterDictionaryLiteral(c *DictionaryLiteralContext)
+
+	// EnterDictionaryEntry is called when entering the dictionaryEntry production.
+	EnterDictionaryEntry(c *DictionaryEntryContext)
+
 	// EnterEos is called when entering the eos production.
 	EnterEos(c *EosContext)
 
@@ -423,6 +429,12 @@ type StrictusListener interface {
 
 	// ExitArrayLiteral is called when exiting the arrayLiteral production.
 	ExitArrayLiteral(c *ArrayLiteralContext)
+
+	// ExitDictionaryLiteral is called when exiting the dictionaryLiteral production.
+	ExitDictionaryLiteral(c *DictionaryLiteralContext)
+
+	// ExitDictionaryEntry is called when exiting the dictionaryEntry production.
+	ExitDictionaryEntry(c *DictionaryEntryContext)
 
 	// ExitEos is called when exiting the eos production.
 	ExitEos(c *EosContext)

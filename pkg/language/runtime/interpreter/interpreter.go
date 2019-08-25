@@ -959,6 +959,11 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
+func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
+	// TODO
+	panic(errors.UnreachableError{})
+}
+
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {

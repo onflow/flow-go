@@ -209,6 +209,62 @@ func TestParseArrayExpression(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseDictionaryExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+	    let x = {"a": 1, "b": 2}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	x := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{Identifier: "x",
+			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Value: &DictionaryExpression{
+			Entries: []Entry{
+				{
+					Key: &StringExpression{
+						Value:    "a",
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+						EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+					},
+					Value: &IntExpression{
+						Value:    big.NewInt(1),
+						StartPos: Position{Offset: 20, Line: 2, Column: 19},
+						EndPos:   Position{Offset: 20, Line: 2, Column: 19},
+					},
+				},
+				{
+					Key: &StringExpression{
+						Value:    "b",
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+					},
+					Value: &IntExpression{
+						Value:    big.NewInt(2),
+						StartPos: Position{Offset: 28, Line: 2, Column: 27},
+						EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+					},
+				},
+			},
+			StartPos: Position{Offset: 14, Line: 2, Column: 13},
+			EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{x},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	RegisterTestingT(t)
 

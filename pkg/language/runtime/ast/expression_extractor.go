@@ -26,6 +26,10 @@ type ArrayExtractor interface {
 	ExtractArray(extractor *ExpressionExtractor, expression *ArrayExpression) ExpressionExtraction
 }
 
+type DictionaryExtractor interface {
+	ExtractDictionary(extractor *ExpressionExtractor, expression *DictionaryExpression) ExpressionExtraction
+}
+
 type IdentifierExtractor interface {
 	ExtractIdentifier(extractor *ExpressionExtractor, expression *IdentifierExpression) ExpressionExtraction
 }
@@ -69,6 +73,7 @@ type ExpressionExtractor struct {
 	IntExtractor              IntExtractor
 	StringExtractor           StringExtractor
 	ArrayExtractor            ArrayExtractor
+	DictionaryExtractor       DictionaryExtractor
 	IdentifierExtractor       IdentifierExtractor
 	InvocationExtractor       InvocationExtractor
 	MemberExtractor           MemberExtractor
@@ -251,6 +256,50 @@ func (extractor *ExpressionExtractor) VisitExpressions(
 	}
 
 	return rewrittenExpressions, extractedExpressions
+}
+
+func (extractor *ExpressionExtractor) VisitDictionaryExpression(expression *DictionaryExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.DictionaryExtractor != nil {
+		return extractor.DictionaryExtractor.ExtractDictionary(extractor, expression)
+	} else {
+		return extractor.ExtractDictionary(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractDictionary(expression *DictionaryExpression) ExpressionExtraction {
+
+	var extractedExpressions []ExtractedExpression
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite all value expressions
+
+	rewrittenEntries := make([]Entry, len(expression.Entries))
+
+	for i, entry := range expression.Entries {
+		keyResult := extractor.Extract(entry.Key)
+		extractedExpressions = append(extractedExpressions, keyResult.ExtractedExpressions...)
+
+		valueResult := extractor.Extract(entry.Value)
+		extractedExpressions = append(extractedExpressions, valueResult.ExtractedExpressions...)
+
+		rewrittenEntries[i] = Entry{
+			Key:   keyResult.RewrittenExpression,
+			Value: valueResult.RewrittenExpression,
+		}
+	}
+
+	newExpression.Entries = rewrittenEntries
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: extractedExpressions,
+	}
 }
 
 func (extractor *ExpressionExtractor) VisitIdentifierExpression(expression *IdentifierExpression) Repr {

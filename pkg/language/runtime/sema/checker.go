@@ -1602,6 +1602,10 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 }
 
+func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
+
+}
+
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 
 	member := checker.visitMember(expression)
