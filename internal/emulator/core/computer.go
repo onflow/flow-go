@@ -1,22 +1,23 @@
 package core
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-
 	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"
 	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
+	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // Computer provides an interface to execute scripts against the world state.
 type Computer struct {
 	runtime runtime.Runtime
+	logger  func(string)
 }
 
 // NewComputer returns a new computer instance.
-func NewComputer(runtime runtime.Runtime) *Computer {
+func NewComputer(runtime runtime.Runtime, logger func(string)) *Computer {
 	return &Computer{
 		runtime: runtime,
+		logger:  logger,
 	}
 }
 
@@ -33,7 +34,10 @@ func (c *Computer) ExecuteTransaction(
 	}
 
 	inter := eruntime.NewEmulatorRuntimeAPI(registers)
+
 	inter.Accounts = accounts
+	inter.Logger = c.logger
+
 	_, err = c.ExecuteScript(tx.Script, inter)
 	return err
 }
