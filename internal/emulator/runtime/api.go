@@ -14,10 +14,14 @@ import (
 type EmulatorRuntimeAPI struct {
 	registers *etypes.RegistersView
 	Accounts  []types.Address
+	Logger    func(string)
 }
 
 func NewEmulatorRuntimeAPI(registers *etypes.RegistersView) *EmulatorRuntimeAPI {
-	return &EmulatorRuntimeAPI{registers: registers}
+	return &EmulatorRuntimeAPI{
+		registers: registers,
+		Logger:    func(string) {},
+	}
 }
 
 func (i *EmulatorRuntimeAPI) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -82,8 +86,19 @@ func (i *EmulatorRuntimeAPI) GetAccount(address types.Address) *types.Account {
 }
 
 func (i *EmulatorRuntimeAPI) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
-	// TODO:
-	return nil, errors.New("not supported")
+	addressLocation, ok := location.(runtime.AddressImportLocation)
+	if !ok {
+		return nil, errors.New("import location must be an account address")
+	}
+
+	accountID := []byte(addressLocation)
+
+	code, exists := i.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	if !exists {
+		return nil, fmt.Errorf("no code deployed at address %x", accountID)
+	}
+
+	return code, nil
 }
 
 func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
@@ -91,7 +106,7 @@ func (i *EmulatorRuntimeAPI) GetSigningAccounts() []types.Address {
 }
 
 func (i *EmulatorRuntimeAPI) Log(message string) {
-	// TODO:
+	i.Logger(message)
 }
 
 const (
