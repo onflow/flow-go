@@ -63,7 +63,7 @@ func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface{} {
+func (v *BaseStrictusVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

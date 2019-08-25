@@ -1618,6 +1618,52 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseDictionaryType(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+	    let x: Int[String] = {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	x := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{Identifier: "x",
+			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Type: &DictionaryType{
+			ValueType: &NominalType{
+				Identifier: Identifier{
+					Identifier: "Int",
+					Pos:        Position{Offset: 13, Line: 2, Column: 12},
+				},
+			},
+			KeyType: &NominalType{
+				Identifier: Identifier{
+					Identifier: "String",
+					Pos:        Position{Offset: 17, Line: 2, Column: 16},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+			EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+		},
+		Value: &DictionaryExpression{
+			StartPos: Position{Offset: 27, Line: 2, Column: 26},
+			EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{x},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseIntegerLiterals(t *testing.T) {
 	RegisterTestingT(t)
 

@@ -2012,6 +2012,15 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	case *ast.OptionalType:
 		result := checker.ConvertType(t.Type)
 		return &OptionalType{result}
+
+	case *ast.DictionaryType:
+		keyType := checker.ConvertType(t.KeyType)
+		valueType := checker.ConvertType(t.ValueType)
+
+		return &DictionaryType{
+			KeyType:   keyType,
+			ValueType: valueType,
+		}
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})

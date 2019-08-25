@@ -447,24 +447,35 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	result := baseTypeResult.(ast.Type)
 
 	// reduce in reverse
-	dimensions := ctx.AllTypeDimension()
-	lastDimensionIndex := len(dimensions) - 1
-	for i := range dimensions {
-		dimensionContext := dimensions[lastDimensionIndex-i]
-		dimension := dimensionContext.Accept(v).(*int)
-		startPosition, endPosition := ast.PositionRangeFromContext(dimensionContext)
-		if dimension == nil {
-			result = &ast.VariableSizedType{
-				Type:     result,
-				StartPos: startPosition,
-				EndPos:   endPosition,
+	indices := ctx.AllTypeIndex()
+	lastIndex := len(indices) - 1
+	for i := range indices {
+		indexContext := indices[lastIndex-i]
+		startPosition, endPosition :=
+			ast.PositionRangeFromContext(indexContext)
+
+		switch index := indexContext.Accept(v).(type) {
+		case *int:
+			if index == nil {
+				result = &ast.VariableSizedType{
+					Type:     result,
+					StartPos: startPosition,
+					EndPos:   endPosition,
+				}
+			} else {
+				result = &ast.ConstantSizedType{
+					Type:     result,
+					Size:     *index,
+					StartPos: startPosition,
+					EndPos:   endPosition,
+				}
 			}
-		} else {
-			result = &ast.ConstantSizedType{
-				Type:     result,
-				Size:     *dimension,
-				StartPos: startPosition,
-				EndPos:   endPosition,
+		case ast.Type:
+			result = &ast.DictionaryType{
+				ValueType: result,
+				KeyType:   index,
+				StartPos:  startPosition,
+				EndPos:    endPosition,
 			}
 		}
 	}
@@ -495,7 +506,14 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return result
 }
 
-func (v *ProgramVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface{} {
+func (v *ProgramVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
+	// type?
+	typeContext := ctx.FullType()
+	if typeContext != nil {
+		return typeContext.Accept(v).(ast.Type)
+	}
+
+	// dimension
 	var result *int
 
 	literalNode := ctx.DecimalLiteral()

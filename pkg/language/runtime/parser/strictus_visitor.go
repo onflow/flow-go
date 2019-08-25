@@ -53,8 +53,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#fullType.
 	VisitFullType(ctx *FullTypeContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#typeDimension.
-	VisitTypeDimension(ctx *TypeDimensionContext) interface{}
+	// Visit a parse tree produced by StrictusParser#typeIndex.
+	VisitTypeIndex(ctx *TypeIndexContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}

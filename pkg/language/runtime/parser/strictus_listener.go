@@ -49,8 +49,8 @@ type StrictusListener interface {
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
-	// EnterTypeDimension is called when entering the typeDimension production.
-	EnterTypeDimension(c *TypeDimensionContext)
+	// EnterTypeIndex is called when entering the typeIndex production.
+	EnterTypeIndex(c *TypeIndexContext)
 
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
@@ -265,8 +265,8 @@ type StrictusListener interface {
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
 
-	// ExitTypeDimension is called when exiting the typeDimension production.
-	ExitTypeDimension(c *TypeDimensionContext)
+	// ExitTypeIndex is called when exiting the typeIndex production.
+	ExitTypeIndex(c *TypeIndexContext)
 
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
