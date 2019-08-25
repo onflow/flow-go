@@ -3276,9 +3276,9 @@ impl FungibleToken for ExampleToken {
             return create Vault(balance: amount)
         }
 
-        pub fun deposit(_ token: <-Vault) {
-            self.balance = self.balance + amount
-            destroy token
+        pub fun deposit(_ vault: <-Vault) {
+            self.balance = self.balance + vault.balance
+            destroy vault
         }
     }
 
