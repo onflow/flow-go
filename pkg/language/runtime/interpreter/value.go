@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/unicode/norm"
+
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
@@ -72,6 +74,10 @@ func (v StringValue) ToGoValue() interface{} {
 func (v StringValue) String() string {
 	// TODO: quote like in string literal
 	return strconv.Quote(string(v))
+}
+
+func (v StringValue) Equal(other StringValue) BoolValue {
+	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
 }
 
 // IndexableValue

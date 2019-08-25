@@ -1274,6 +1274,7 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
 					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 				}},
+				{&sema.StringType{}, `test`, `test`, nil},
 			},
 		},
 	}

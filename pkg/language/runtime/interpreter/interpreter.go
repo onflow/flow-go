@@ -887,6 +887,15 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	case NilValue:
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
+
+	case StringValue:
+		// NOTE: might be NilValue
+		right, ok := right.(StringValue)
+		if !ok {
+			return false
+		}
+		return left.Equal(right)
+
 	}
 
 	panic(&errors.UnreachableError{})
