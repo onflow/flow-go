@@ -20,8 +20,8 @@ func parseAndCheck(code string) (*sema.Checker, error) {
 
 func parseAndCheckWithExtra(
 	code string,
-	values []sema.ValueDeclaration,
-	types []sema.TypeDeclaration,
+	values map[string]sema.ValueDeclaration,
+	types map[string]sema.TypeDeclaration,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
 	program, err := parser.ParseProgram(code)
@@ -2769,9 +2769,11 @@ func TestCheckNever(t *testing.T) {
                 return panic("XXX")
             }
         `,
-		[]sema.ValueDeclaration{
-			stdlib.PanicFunction,
-		},
+		stdlib.ToValueDeclarations(
+			[]stdlib.StandardLibraryFunction{
+				stdlib.PanicFunction,
+			},
+		),
 		nil,
 		nil,
 	)
@@ -3140,9 +3142,11 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		[]sema.ValueDeclaration{
-			stdlib.PanicFunction,
-		},
+		stdlib.ToValueDeclarations(
+			[]stdlib.StandardLibraryFunction{
+				stdlib.PanicFunction,
+			},
+		),
 		nil,
 		nil,
 	)
@@ -3344,9 +3348,11 @@ func TestCheckInterfaceUse(t *testing.T) {
 
           let test: Test = panic("")
         `,
-		[]sema.ValueDeclaration{
-			stdlib.PanicFunction,
-		},
+		stdlib.ToValueDeclarations(
+			[]stdlib.StandardLibraryFunction{
+				stdlib.PanicFunction,
+			},
+		),
 		nil,
 		nil,
 	)

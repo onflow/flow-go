@@ -188,9 +188,8 @@ var accountType = sema.StructureType{
 	},
 }
 
-var typeDeclarations = []sema.TypeDeclaration{
-	stdlib.StandardLibraryType{
-		Name: accountType.Identifier,
+var typeDeclarations = map[string]sema.TypeDeclaration{
+	accountType.Identifier: stdlib.StandardLibraryType{
 		Type: &accountType,
 		Kind: common.DeclarationKindStructure,
 	},

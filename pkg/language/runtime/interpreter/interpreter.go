@@ -1466,6 +1466,11 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 			// set variables for all imported values
 			for name, variable := range variables {
+				// don't import predeclared values
+				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+					continue
+				}
+
 				interpreter.setVariable(name, variable)
 			}
 		})

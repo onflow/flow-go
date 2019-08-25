@@ -20,7 +20,7 @@ func parseCheckAndInterpret(code string) *interpreter.Interpreter {
 
 func parseCheckAndInterpretWithExtra(
 	code string,
-	predefinedValueTypes []sema.ValueDeclaration,
+	predefinedValueTypes map[string]sema.ValueDeclaration,
 	predefinedValues map[string]interpreter.Value,
 ) *interpreter.Interpreter {
 
@@ -1099,7 +1099,11 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		[]sema.ValueDeclaration{testFunction},
+		stdlib.ToValueDeclarations(
+			[]stdlib.StandardLibraryFunction{
+				testFunction,
+			},
+		),
 		nil,
 	)
 	Expect(err).
@@ -2699,9 +2703,11 @@ func TestInterpretImport(t *testing.T) {
 func TestInterpretImportError(t *testing.T) {
 	RegisterTestingT(t)
 
-	valueDeclarations := []sema.ValueDeclaration{
-		stdlib.PanicFunction,
-	}
+	valueDeclarations := stdlib.ToValueDeclarations(
+		[]stdlib.StandardLibraryFunction{
+			stdlib.PanicFunction,
+		},
+	)
 
 	checkerImported, err := parseAndCheckWithExtra(
 		`

@@ -17,10 +17,6 @@ type StandardLibraryFunction struct {
 	ArgumentLabels []string
 }
 
-func (f StandardLibraryFunction) ValueDeclarationName() string {
-	return f.Name
-}
-
 func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
 	return f.Type
 }
