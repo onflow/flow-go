@@ -272,7 +272,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, Error{[]error{err}}
 	}
 
-	main, ok := checker.Globals["main"]
+	main, ok := checker.GlobalValues["main"]
 	if !ok {
 		// TODO: error because no main?
 		return nil, nil
@@ -344,7 +344,8 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		}
 
 		signingAccounts[i] = interpreter.StructureValue{
-			Fields: map[string]interpreter.Value{
+			Identifier: accountType.Identifier,
+			Fields: &map[string]interpreter.Value{
 				"address": interpreter.StringValue(address.String()),
 				"storage": storedValue,
 			},

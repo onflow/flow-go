@@ -133,7 +133,7 @@ func TestRuntimeImport(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(value).To(Equal(42))
+	Expect(value).To(Equal(big.NewInt(42)))
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
@@ -193,7 +193,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(value).To(Equal(42))
+	Expect(value).To(Equal(big.NewInt(42)))
 
 	Expect(loggedMessage).
 		To(Equal(`"2a00000000000000000000000000000000000000"`))

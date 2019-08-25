@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"math/big"
@@ -206,7 +207,7 @@ func (v IntValue) Copy() Value {
 }
 
 func (v IntValue) ToGoValue() interface{} {
-	return v.IntValue()
+	return big.NewInt(0).Set(v.Int)
 }
 
 func (v IntValue) IntValue() int {
@@ -770,41 +771,46 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 // StructureValue
 
 type StructureValue struct {
-	Fields    map[string]Value
-	Functions map[string]FunctionValue
+	Identifier string
+	Fields     *map[string]Value
+	Functions  *map[string]FunctionValue
 }
 
 func (StructureValue) isValue() {}
 
 func (v StructureValue) Copy() Value {
-	newFields := make(map[string]Value, len(v.Fields))
-	for field, value := range v.Fields {
+	newFields := make(map[string]Value, len(*v.Fields))
+	for field, value := range *v.Fields {
 		newFields[field] = value.Copy()
 	}
 
-	newFunctions := make(map[string]FunctionValue, len(v.Functions))
-	for name, function := range v.Functions {
-		newFunctions[name] = function.Copy().(FunctionValue)
-	}
+	// NOTE: not copying functions – linked in
 
 	return StructureValue{
-		Fields:    newFields,
-		Functions: newFunctions,
+		Identifier: v.Identifier,
+		Fields:     &newFields,
+		Functions:  v.Functions,
 	}
 }
 
 func (v StructureValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
-	return v.Fields
+	return *v.Fields
 }
 
 func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
-	value, ok := v.Fields[name]
+	value, ok := (*v.Fields)[name]
 	if ok {
 		return value
 	}
 
-	function, ok := v.Functions[name]
+	// if structure was deserialized, dynamically link in the functions
+	if v.Functions == nil {
+		functions := interpreter.StructureFunctions[v.Identifier]
+		v.Functions = &functions
+	}
+
+	function, ok := (*v.Functions)[name]
 	if ok {
 		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
 			function = interpreter.bindSelf(interpretedFunction, v)
@@ -816,7 +822,37 @@ func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
 }
 
 func (v StructureValue) SetMember(interpreter *Interpreter, name string, value Value) {
-	v.Fields[name] = value
+	(*v.Fields)[name] = value
+}
+
+func (v StructureValue) GobEncode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(v.Identifier)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Fields)
+	if err != nil {
+		return nil, err
+	}
+	// NOTE: *not* encoding functions – linked in on-demand
+	return w.Bytes(), nil
+}
+
+func (v *StructureValue) GobDecode(buf []byte) error {
+	r := bytes.NewBuffer(buf)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&v.Identifier)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Fields)
+	if err != nil {
+		return err
+	}
+	// NOTE: *not* decoding functions – linked in on-demand
+	return nil
 }
 
 // DictionaryValue
