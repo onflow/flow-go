@@ -38,10 +38,8 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		ComputeLimit: txMsg.GetComputeLimit(),
 		Timestamp:    time.Now(),
 		PayerSignature: types.AccountSignature{
-			Account: types.BytesToAddress(payerSig.GetAccount()),
-			// TODO: update this (default signature for now)
-			PublicKey: []byte{},
-			Signature: []byte{},
+			Account:   types.BytesToAddress(payerSig.GetAccount()),
+			Signature: payerSig.GetSignature(),
 		},
 		Status: types.TransactionPending,
 	}

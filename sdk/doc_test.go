@@ -28,7 +28,10 @@ func ExampleCreateAccount_complete() {
 	// generate an account creation transaction
 	tx := accounts.CreateAccount(pubKeyBytes, nil)
 
-	signedTx := tx.SignPayer(myAccount.Account, myAccount.Key)
+	signedTx, err := tx.SignPayer(myAccount.Account, myAccount.Key)
+	if err != nil {
+		panic("failed to sign transaction!")
+	}
 
 	// connect to node and submit transaction
 	c, err := client.New("localhost:5000")

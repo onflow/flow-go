@@ -61,21 +61,21 @@ func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2. tx3)
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).SignPayer(b.RootAccount(), b.RootKey())
 
-	tx2 := (&types.RawTransaction{
+	tx2, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).SignPayer(b.RootAccount(), b.RootKey())
 
-	tx3 := (&types.RawTransaction{
+	tx3, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        3,
 		ComputeLimit: 10,
@@ -166,7 +166,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -188,7 +188,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -211,7 +211,7 @@ func TestSubmitTransactionInvalidAccount(t *testing.T) {
 
 	invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -232,7 +232,7 @@ func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -253,7 +253,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte("invalid script"),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -275,7 +275,7 @@ func TestCommitBlock(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -288,7 +288,7 @@ func TestCommitBlock(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 
-	tx2 := (&types.RawTransaction{
+	tx2, _ := (&types.RawTransaction{
 		Script:       []byte("invalid script"),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -317,7 +317,7 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(createAccountScriptA),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -337,7 +337,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	tx2 := (&types.RawTransaction{
+	tx2, _ := (&types.RawTransaction{
 		Script:       []byte(createAccountScriptB),
 		Nonce:        2,
 		ComputeLimit: 10,
@@ -362,7 +362,7 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(createAccountScriptA),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -380,7 +380,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	tx2 := (&types.RawTransaction{
+	tx2, _ := (&types.RawTransaction{
 		Script:       []byte(updateAccountCodeScript),
 		Nonce:        2,
 		ComputeLimit: 10,
@@ -401,7 +401,7 @@ func TestCallScript(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
@@ -428,14 +428,14 @@ func TestQueryByVersion(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := (&types.RawTransaction{
+	tx1, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        1,
 		ComputeLimit: 10,
 		Timestamp:    time.Now(),
 	}).SignPayer(b.RootAccount(), b.RootKey())
 
-	tx2 := (&types.RawTransaction{
+	tx2, _ := (&types.RawTransaction{
 		Script:       []byte(addTwoScript),
 		Nonce:        2,
 		ComputeLimit: 10,
