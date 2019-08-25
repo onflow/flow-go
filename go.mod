@@ -3,11 +3,8 @@ module github.com/dapperlabs/bamboo-node
 go 1.12
 
 require (
-	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
-	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
 	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
-	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/go-pg/migrations v6.7.3+incompatible
 	github.com/go-pg/pg v8.0.4+incompatible
@@ -22,12 +19,12 @@ require (
 	github.com/psiemens/godoc2md v1.0.1 // indirect
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
+	github.com/rivo/uniseg v0.1.0
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/segmentio/fasthash v1.0.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
 	github.com/spf13/cobra v0.0.5
-	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/uber/prototool v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect

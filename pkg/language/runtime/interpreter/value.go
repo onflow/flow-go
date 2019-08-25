@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rivo/uniseg"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
 )
 
@@ -80,6 +82,20 @@ func (v StringValue) Equal(other StringValue) BoolValue {
 	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
 }
 
+func (v StringValue) GetMember(field string) Value {
+	switch field {
+	case "length":
+		count := uniseg.GraphemeClusterCount(string(v))
+		return IntValue{Int: big.NewInt(int64(count))}
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v StringValue) SetMember(field string, value Value) {
+	panic(&errors.UnreachableError{})
+}
+
 // IndexableValue
 
 type IndexableValue interface {
@@ -134,6 +150,19 @@ func (v ArrayValue) String() string {
 	}
 	builder.WriteString("]")
 	return builder.String()
+}
+
+func (v ArrayValue) GetMember(field string) Value {
+	switch field {
+	case "length":
+		return IntValue{Int: big.NewInt(int64(len(v)))}
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v ArrayValue) SetMember(field string, value Value) {
+	panic(&errors.UnreachableError{})
 }
 
 // IntegerValue
@@ -749,11 +778,11 @@ func (v StructureValue) ToGoValue() interface{} {
 	return v
 }
 
-func (v StructureValue) Get(field string) Value {
+func (v StructureValue) GetMember(field string) Value {
 	return v[field]
 }
 
-func (v StructureValue) Set(field string, value Value) {
+func (v StructureValue) SetMember(field string, value Value) {
 	v[field] = value
 }
 
@@ -805,6 +834,19 @@ func (v DictionaryValue) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
+}
+
+func (v DictionaryValue) GetMember(field string) Value {
+	switch field {
+	case "length":
+		return IntValue{Int: big.NewInt(int64(len(v)))}
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v DictionaryValue) SetMember(field string, value Value) {
+	panic(&errors.UnreachableError{})
 }
 
 // ToValue
@@ -927,6 +969,13 @@ func (v AnyValue) Copy() Value {
 
 func (v AnyValue) String() string {
 	return fmt.Sprint(v.Value)
+}
+
+// ValueWithMembers
+
+type ValueWithMembers interface {
+	GetMember(field string) Value
+	SetMember(field string, value Value)
 }
 
 //

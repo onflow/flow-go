@@ -1627,6 +1627,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		member, ok = ty.Members[identifier]
 	case *InterfaceType:
 		member, ok = ty.Members[identifier]
+	case *StringType:
+		member, ok = stringMembers[identifier]
+	case ArrayType:
+		member, ok = arrayMembers[identifier]
+	case *DictionaryType:
+		member, ok = dictionaryMembers[identifier]
 	}
 
 	if !ok {

@@ -667,7 +667,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(StructureValue)
 
-			structure.Set(target.Identifier, value)
+			structure.SetMember(target.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -895,7 +895,6 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 			return false
 		}
 		return left.Equal(right)
-
 	}
 
 	panic(&errors.UnreachableError{})
@@ -963,8 +962,8 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			structure := result.(StructureValue)
-			return structure.Get(expression.Identifier)
+			structure := result.(ValueWithMembers)
+			return structure.GetMember(expression.Identifier)
 		})
 }
 
@@ -1161,7 +1160,7 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 
 			for name, function := range functions {
 				structFunction := NewStructFunction(function, structure)
-				structure.Set(name, structFunction)
+				structure.SetMember(name, structFunction)
 			}
 
 			var initializationTrampoline Trampoline = Done{}

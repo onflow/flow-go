@@ -132,6 +132,14 @@ func (*StringType) Equal(other Type) bool {
 	return ok
 }
 
+var stringMembers = map[string]*Member{
+	"length": {
+		Type:          &IntType{},
+		VariableKind:  ast.VariableKindConstant,
+		IsInitialized: true,
+	},
+}
+
 // IntegerType represents the super-type of all integer types
 type IntegerType struct{}
 
@@ -279,6 +287,14 @@ type ArrayType interface {
 	Type
 	isArrayType()
 	elementType() Type
+}
+
+var arrayMembers = map[string]*Member{
+	"length": {
+		Type:          &IntType{},
+		VariableKind:  ast.VariableKindConstant,
+		IsInitialized: true,
+	},
 }
 
 // VariableSizedType is a variable sized array type
@@ -544,6 +560,14 @@ func (t *DictionaryType) Equal(other Type) bool {
 
 	return otherDictionary.KeyType.Equal(t.KeyType) &&
 		otherDictionary.ValueType.Equal(t.ValueType)
+}
+
+var dictionaryMembers = map[string]*Member{
+	"length": {
+		Type:          &IntType{},
+		VariableKind:  ast.VariableKindConstant,
+		IsInitialized: true,
+	},
 }
 
 func init() {
