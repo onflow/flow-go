@@ -570,9 +570,6 @@
         </section>
         <section>
           <h3 id="optionals"><a href="#optionals" aria-hidden="true"><span class="icon icon-link"></span></a>Optionals</h3>
-          <blockquote>
-            <p>🚧 Status: Optionals are not implemented yet.</p>
-          </blockquote>
           <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
           <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
           <p>The value representing nothing is <code>nil</code>.</p>
@@ -776,9 +773,6 @@
         </section>
         <section>
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
-          <blockquote>
-            <p>🚧 Status: Dictionaries are not implemented yet.</p>
-          </blockquote>
           <p>Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.</p>
           <p>Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>. Keys are separated from values by a colon, and key-value associations are separated by commas.</p>
           <pre><code class="language-bamboo,file=dictionaries.bpl"><span style="color: #008000">// An empty dictionary</span><span>
@@ -2379,7 +2373,7 @@
       <section>
         <h2 id="interfaces"><a href="#interfaces" aria-hidden="true"><span class="icon icon-link"></span></a>Interfaces</h2>
         <blockquote>
-          <p>🚧 Status: Interfaces are not implemented yet.</p>
+          <p>🚧 Status: Interfaces are implemented, but have the syntax <code>struct S: Interface1, ... {}</code></p>
         </blockquote>
         <p>
           An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface.
@@ -3006,7 +3000,7 @@
           <p>🚧 Status: Accounts are not implemented yet.</p>
         </blockquote>
         <pre><code class="language-bamboo"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Account {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(at address: </span><span style="color: #0000FF">Address</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    address: Address</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
       </section>
@@ -3041,7 +3035,7 @@
         <blockquote>
           <p>🚧 Status: The usage of external types is not implemented yet.</p>
         </blockquote>
-        <p>It is possible to use external types through the <code>using</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
+        <p>It is possible to use external types through the <code>import</code> keyword, followed by the type name, the <code>from</code> keyword, and the address literal where the declaration is deployed.</p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declaration for an interface named `Counter`,</span><span>
 </span><span style="color: #008000">// declared and deployed externally</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3053,7 +3047,7 @@
 </span><span style="color: #008000">// Use the type `Counter` from address</span><span>
 </span><span style="color: #008000">// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">using Counter from </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> Counter </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x06012c8cf97BEaD5deAe237070F9587f8E7A266d</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -3156,7 +3150,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>
-            Transactions can refer to local code with the <code>using</code> keyword,
+            Transactions can refer to local code with the <code>import</code> keyword,
             followed by the name of the type, the <code>from</code> keyword,
             and the string literal for the path of the file which contains the code of the type.
           </p>
@@ -3166,16 +3160,17 @@
           </p>
           <p>Once deployed, the resource interfaces is available in the account's <code>types</code> object.</p>
           <p>The <code>publish</code> operator is used to make the resource interface type publicly available.</p>
-          <pre><code class="language-bamboo,file=deploy-resource-interface.bpl"><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
+          <pre><code class="language-bamboo,file=deploy-resource-interface.bpl"><span>
+</span><span style="color: #008000">// Refer to the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #008000">// in the local file "FungibleToken.bpl"</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"FungibleToken.bpl"</span><span>
+</span><span>
+</span><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
 </span><span style="color: #008000">// the resource interface `FungibleToken`, and makes</span><span>
 </span><span style="color: #008000">// the deployed type publicly available</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource interface type `FungibleToken`</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// in the local file "FungibleToken.bpl"</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    using FungibleToken from </span><span style="color: #A31515">"FungibleToken.bpl"</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Deploy the  resource interface type `FungibleToken`</span><span>
@@ -3208,9 +3203,9 @@
 </span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> create Vault(balance: amount)</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000">) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + amount</span><span>
-</span><span style="color: #000000">            destroy token</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ vault: &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + vault.balance</span><span>
+</span><span style="color: #000000">            destroy vault</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -3218,13 +3213,13 @@
 </span><span style="color: #000000">    impl Provider for Vault {}</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=deploy-resource.bpl"><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
+          <pre><code class="language-bamboo,file=deploy-resource.bpl"><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"ExampleToken.bpl"</span><span>
+</span><span>
+</span><span style="color: #008000">// Execute a transaction which deploys the code for</span><span>
 </span><span style="color: #008000">// the resource `ExampleToken`, and makes the deployed</span><span>
 </span><span style="color: #008000">// type publicly available</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
-</span><span>
-</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #A31515">"ExampleToken.bpl"</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        signer.deploy(ExampleToken)</span><span>
@@ -3236,7 +3231,7 @@
         <section>
           <h3 id="interacting-with-deployed-resources"><a href="#interacting-with-deployed-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Interacting with Deployed Resources</h3>
           <p>
-            Transactions can also refer to deployed code with the <code>using</code> keyword
+            Transactions can also refer to deployed code with the <code>import</code> keyword
             and the address of the account which contains the publicly available type.
           </p>
           <p>
@@ -3247,14 +3242,15 @@
             References are created by using the <code>&#x26;</code> operator, followed by the stored resource or reference,
             the <code>as</code> operator, and the resource interface type.
           </p>
-          <pre><code class="language-bamboo,file=setup-transaction.bpl"><span style="color: #008000">// Execute a transaction which creates a new example token vault</span><span>
+          <pre><code class="language-bamboo,file=setup-transaction.bpl"><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
+</span><span style="color: #008000">// at example address 0x42</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Execute a transaction which creates a new example token vault</span><span>
 </span><span style="color: #008000">// for the signing account</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// at example address 0x42</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Create a new example token vault for the signing account.</span><span>
@@ -3282,7 +3278,12 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-bamboo,file=send-transaction.bpl"><span style="color: #008000">// Execute a transaction which sends five coins from one account to another.</span><span>
+          <pre><code class="language-bamboo,file=send-transaction.bpl"><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
+</span><span style="color: #008000">// at example address 0x42</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Execute a transaction which sends five coins from one account to another.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The transaction fails unless there is a `ExampleToken.Provider` available</span><span>
 </span><span style="color: #008000">// for the sending account and there is a public `ExampleToken.Receiver`</span><span>
@@ -3293,10 +3294,6 @@
 </span><span style="color: #008000">// is published/publicly available (if it exists for the recipient)</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Refer to the resource type `ExampleToken` deployed</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// at example address 0x42</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    using ExampleToken from </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> sentFunds: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">.</span><span style="color: #0000FF">Vault</span><span>
 </span><span>
