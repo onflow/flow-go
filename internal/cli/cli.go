@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/bamboo-node/internal/cli/accounts"
 	"github.com/dapperlabs/bamboo-node/internal/cli/emulator"
 	"github.com/dapperlabs/bamboo-node/internal/cli/initialize"
 )
@@ -17,6 +18,7 @@ var cmd = &cobra.Command{
 
 func init() {
 	cmd.AddCommand(initialize.Cmd)
+	cmd.AddCommand(accounts.Cmd)
 	cmd.AddCommand(emulator.Cmd)
 }
 
