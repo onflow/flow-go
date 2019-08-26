@@ -109,7 +109,7 @@ func TestRuntimeImport(t *testing.T) {
        import "imported"
 
        fun main(): Int {
-           let answer =  answer()
+           let answer = answer()
            if answer != 42 {
                panic("?!")
            }
