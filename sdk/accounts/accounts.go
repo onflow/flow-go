@@ -14,8 +14,8 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
-			let publicKey = %s
-			let code = %s
+			let publicKey: Int[]? = %s
+			let code: Int[]? = %s
 			createAccount(publicKey, code)
 		}
 	`, publicKeyStr, codeStr)
@@ -45,5 +45,9 @@ func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
+	if b == nil || len(b) == 0 {
+		return "nil"
+	}
+
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
