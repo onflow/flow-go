@@ -1478,6 +1478,12 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				}
 
 				interpreter.setVariable(name, variable)
+
+				// if the imported name refers to a structure,
+				// also take the structure functions from the sub-interpreter
+				if structureFunctions, ok := subInterpreter.StructureFunctions[name]; ok {
+					interpreter.StructureFunctions[name] = structureFunctions
+				}
 			}
 		})
 }
