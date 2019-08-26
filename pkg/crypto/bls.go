@@ -84,6 +84,10 @@ func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
 	return sk.alg.Name()
 }
 
+func (sk *PrKeyBLS_BLS12381) Signer() Signer {
+	return sk.alg
+}
+
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
 	return prKeyLengthBLS_BLS12381
 }

@@ -106,6 +106,8 @@ func (s Signature) String() string {
 type PrKey interface {
 	// returns the name of the algorithm related to the private key
 	AlgoName() AlgoName
+	// returns the signer structure associated to the private key
+	Signer() Signer
 	// return the size in bytes
 	KeySize() int
 	// returns the public key

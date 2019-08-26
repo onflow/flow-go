@@ -123,6 +123,11 @@ func (sk *PrKeyECDSA) AlgoName() AlgoName {
 	return sk.alg.Name()
 }
 
+// Signer returns the signer structure associated to the private key
+func (sk *PrKeyECDSA) Signer() Signer {
+	return sk.alg
+}
+
 // KeySize returns the length of the private key
 func (sk *PrKeyECDSA) KeySize() int {
 	return bitToBytes((sk.alg.curve.Params().N).BitLen())
