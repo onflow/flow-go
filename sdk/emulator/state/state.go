@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
 )
 
 // WorldState represents the current state of the blockchain.
