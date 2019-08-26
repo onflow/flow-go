@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
+	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
@@ -31,7 +31,7 @@ type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey *types.AccountKey
+	RootAccountKey crypto.PrKey
 }
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
@@ -39,7 +39,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	options := core.DefaultOptions
 
 	if conf.RootAccountKey != nil {
-		options.RootAccountKey = conf.RootAccountKey.Key
+		options.RootAccountKey = conf.RootAccountKey
 	}
 
 	options.RuntimeLogger = func(msg string) {
