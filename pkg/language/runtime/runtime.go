@@ -91,6 +91,21 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
+var accountType = sema.StructureType{
+	Identifier: "Account",
+	Members: map[string]*sema.Member{
+		"address": {
+			Type: &sema.StringType{},
+		},
+		"storage": {
+			Type: &sema.DictionaryType{
+				KeyType:   &sema.AnyType{},
+				ValueType: &sema.AnyType{},
+			},
+		},
+	},
+}
+
 // TODO: improve types
 var setValueFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
@@ -168,24 +183,17 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	ReturnType: &sema.VoidType{},
 }
 
+var getAccountFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// address
+		&sema.StringType{},
+	},
+	ReturnType: &accountType,
+}
+
 var logFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{&sema.AnyType{}},
 	ReturnType:     &sema.VoidType{},
-}
-
-var accountType = sema.StructureType{
-	Identifier: "Account",
-	Members: map[string]*sema.Member{
-		"address": {
-			Type: &sema.StringType{},
-		},
-		"storage": {
-			Type: &sema.DictionaryType{
-				KeyType:   &sema.AnyType{},
-				ValueType: &sema.AnyType{},
-			},
-		},
-	},
 }
 
 var typeDeclarations = map[string]sema.TypeDeclaration{
@@ -251,6 +259,12 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			"updateAccountCode",
 			&updateAccountCodeFunctionType,
 			r.newUpdateAccountCodeFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"getAccount",
+			&getAccountFunctionType,
+			r.newGetAccountFunction(runtimeInterface),
 			nil,
 		),
 		stdlib.NewStandardLibraryFunction(
@@ -324,33 +338,13 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	signingAccounts := make([]interface{}, signingAccountsCount)
 	storedValues := make([]interpreter.DictionaryValue, signingAccountsCount)
 
-	storageKey := []byte("storage")
-
 	for i, address := range signingAccountAddresses {
-
-		// TODO: fix controller and key
-		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, storageKey)
+		signingAccount, storedValue, err := loadAccount(runtimeInterface, address)
 		if err != nil {
 			return nil, Error{[]error{err}}
 		}
 
-		storedValue := interpreter.DictionaryValue{}
-		if len(storedData) > 0 {
-			decoder := gob.NewDecoder(bytes.NewReader(storedData))
-			err = decoder.Decode(&storedValue)
-			if err != nil {
-				return nil, Error{[]error{err}}
-			}
-		}
-
-		signingAccounts[i] = interpreter.StructureValue{
-			Identifier: accountType.Identifier,
-			Fields: &map[string]interpreter.Value{
-				"address": interpreter.StringValue(address.String()),
-				"storage": storedValue,
-			},
-		}
-
+		signingAccounts[i] = signingAccount
 		storedValues[i] = storedValue
 	}
 
@@ -370,13 +364,47 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		}
 
 		// TODO: fix controller and key
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, storageKey, newStoredData.Bytes())
+		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, []byte("storage"), newStoredData.Bytes())
 		if err != nil {
 			return nil, Error{[]error{err}}
 		}
 	}
 
 	return value.ToGoValue(), nil
+}
+
+func loadAccount(runtimeInterface Interface, address types.Address) (
+	interface{},
+	interpreter.DictionaryValue,
+	error,
+) {
+	// TODO: fix controller and key
+	storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte("storage"))
+	if err != nil {
+		return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+	}
+
+	storedValue := interpreter.DictionaryValue{}
+	if len(storedData) > 0 {
+		fmt.Println("err 1")
+		decoder := gob.NewDecoder(bytes.NewReader(storedData))
+		fmt.Println("err 2")
+		err = decoder.Decode(&storedValue)
+		fmt.Println("err 3")
+		if err != nil {
+			return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+		}
+	}
+
+	account := interpreter.StructureValue{
+		Identifier: accountType.Identifier,
+		Fields: &map[string]interpreter.Value{
+			"address": interpreter.StringValue(address.String()),
+			"storage": storedValue,
+		},
+	}
+
+	return account, storedValue, nil
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
@@ -436,13 +464,6 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 	}
 }
 
-func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		runtimeInterface.Log(fmt.Sprint(arguments[0]))
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
-	}
-}
-
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		if len(arguments) != 2 {
@@ -466,6 +487,35 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 1 {
+			panic(fmt.Sprintf("getAccount requires 1 parameter"))
+		}
+
+		stringValue, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
+		}
+
+		address := types.HexToAddress(string(stringValue))
+
+		account, _, err := loadAccount(runtimeInterface, address)
+		if err != nil {
+			panic(err)
+		}
+
+		return trampoline.Done{Result: account}
+	}
+}
+
+func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		runtimeInterface.Log(fmt.Sprint(arguments[0]))
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
 }
 
