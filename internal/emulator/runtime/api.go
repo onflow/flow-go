@@ -50,6 +50,10 @@ func (i *EmulatorRuntimeAPI) CreateAccount(publicKey, code []byte) (id []byte, e
 
 	i.registers.Set(keyLatestAccount, accountID)
 
+	i.Log("Creating new account\n")
+	i.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
+	i.Log(fmt.Sprintf("Code:\n%s", string(code)))
+
 	return accountID, nil
 }
 
