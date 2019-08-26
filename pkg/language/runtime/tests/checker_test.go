@@ -56,10 +56,10 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.GlobalValues["x"].Type).
 		To(Equal(&sema.IntType{}))
 
-	Expect(checker.Globals["y"].Type).
+	Expect(checker.GlobalValues["y"].Type).
 		To(Equal(&sema.IntType{}))
 }
 
@@ -73,7 +73,7 @@ func TestCheckBoolean(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.GlobalValues["x"].Type).
 		To(Equal(&sema.BoolType{}))
 }
 
@@ -87,7 +87,7 @@ func TestCheckString(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.GlobalValues["x"].Type).
 		To(Equal(&sema.StringType{}))
 }
 
@@ -3031,7 +3031,7 @@ func TestCheckNilCoalescingOptionalRightHandSide(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["z"].Type).
+	Expect(checker.GlobalValues["z"].Type).
 		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
 }
 
@@ -3047,7 +3047,7 @@ func TestCheckNilCoalescingBothOptional(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["z"].Type).
+	Expect(checker.GlobalValues["z"].Type).
 		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
 }
 
@@ -3737,7 +3737,7 @@ func TestCheckInterfaceTypeAsValue(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.GlobalValues["x"].Type).
 		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
 }
 
@@ -4032,6 +4032,33 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
 }
 
+func TestCheckImportTypes(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+	   struct Test {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	_, err = parseAndCheckWithExtra(
+		`
+           import "imported"
+
+           let x: Test = Test()
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			return checker.Program, nil
+		},
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckDictionary(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -4130,7 +4157,7 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["y"].Type).
+	Expect(checker.GlobalValues["y"].Type).
 		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
 }
 
@@ -4300,14 +4327,14 @@ func TestCheckOptionalAnyFailableDowncastingNil(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.Globals["x"].Type).
+	Expect(checker.GlobalValues["x"].Type).
 		To(Equal(&sema.OptionalType{Type: &sema.AnyType{}}))
 
 	// TODO: record result type of conditional and box to any in interpreter
-	Expect(checker.Globals["y"].Type).
+	Expect(checker.GlobalValues["y"].Type).
 		To(Equal(&sema.AnyType{}))
 
-	Expect(checker.Globals["z"].Type).
+	Expect(checker.GlobalValues["z"].Type).
 		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
 }
 

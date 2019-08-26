@@ -609,6 +609,7 @@ func init() {
 	gob.Register(&DictionaryType{})
 	gob.Register(&VariableSizedType{})
 	gob.Register(&ConstantSizedType{})
+	gob.Register(&FunctionType{})
 	gob.Register(&StructureType{})
 	gob.Register(&InterfaceType{})
 	gob.Register(&InterfaceMetaType{})

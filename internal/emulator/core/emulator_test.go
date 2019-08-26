@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -458,7 +459,7 @@ func TestCallScript(t *testing.T) {
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
 	Expect(err).ToNot(HaveOccurred())
-	Expect(value).To(Equal(0))
+	Expect(value).To(Equal(big.NewInt(0)))
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx1)
@@ -467,7 +468,7 @@ func TestCallScript(t *testing.T) {
 	// Sample call (value is 2)
 	value, err = b.CallScript([]byte(sampleCall))
 	Expect(err).ToNot(HaveOccurred())
-	Expect(value).To(Equal(2))
+	Expect(value).To(Equal(big.NewInt(2)))
 }
 
 func TestQueryByVersion(t *testing.T) {
@@ -531,17 +532,17 @@ func TestQueryByVersion(t *testing.T) {
 	// Value at ws1 is 0
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(value).To(Equal(0))
+	Expect(value).To(Equal(big.NewInt(0)))
 
 	// Value at ws2 is 2 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(value).To(Equal(2))
+	Expect(value).To(Equal(big.NewInt(2)))
 
 	// Value at ws3 is 4 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(value).To(Equal(4))
+	Expect(value).To(Equal(big.NewInt(4)))
 
 	// Pending state does not change after call scripts/get transactions
 	Expect(b.pendingWorldState.Hash()).To(Equal(ws3))

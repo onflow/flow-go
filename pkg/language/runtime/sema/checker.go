@@ -39,7 +39,8 @@ type Checker struct {
 	valueActivations  *activations.Activations
 	typeActivations   *activations.Activations
 	functionContexts  []*functionContext
-	Globals           map[string]*Variable
+	GlobalValues      map[string]*Variable
+	GlobalTypes       map[string]Type
 	inCondition       bool
 	Origins           *Origins
 	seenImports       map[ast.ImportLocation]bool
@@ -81,7 +82,8 @@ func NewChecker(
 		ImportCheckers:                     map[ast.ImportLocation]*Checker{},
 		valueActivations:                   valueActivations,
 		typeActivations:                    typeActivations,
-		Globals:                            map[string]*Variable{},
+		GlobalValues:                       map[string]*Variable{},
+		GlobalTypes:                        map[string]Type{},
 		Origins:                            NewOrigins(),
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
@@ -104,7 +106,7 @@ func NewChecker(
 
 	for name, declaration := range predeclaredValues {
 		checker.declareValue(name, declaration)
-		checker.declareGlobal(name)
+		checker.declareGlobalValue(name)
 	}
 
 	for name, declaration := range predeclaredTypes {
@@ -150,10 +152,17 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 		Identifier: name,
 		Pos:        declaration.TypeDeclarationPosition(),
 	}
-	checker.declareType(
-		identifier,
-		declaration.TypeDeclarationType(),
-		declaration.TypeDeclarationKind(),
+
+	ty := declaration.TypeDeclarationType()
+	checker.declareType(identifier, ty)
+	checker.recordVariableOrigin(
+		identifier.Identifier,
+		&Variable{
+			Kind:       declaration.TypeDeclarationKind(),
+			IsConstant: true,
+			Type:       ty,
+			Pos:        &identifier.Pos,
+		},
 	)
 }
 
@@ -534,7 +543,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = checker.ConvertType(declaration.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !isInvalidType(valueType) {
+		if declarationType != nil && valueType != nil && !isInvalidType(valueType) && !isInvalidType(declarationType) {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -623,11 +632,24 @@ func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	if name == "" {
 		return
 	}
-	checker.declareGlobal(name)
+	checker.declareGlobalValue(name)
+	checker.declareGlobalType(name)
 }
 
-func (checker *Checker) declareGlobal(name string) {
-	checker.Globals[name] = checker.findVariable(name)
+func (checker *Checker) declareGlobalValue(name string) {
+	variable := checker.findVariable(name)
+	if variable == nil {
+		return
+	}
+	checker.GlobalValues[name] = variable
+}
+
+func (checker *Checker) declareGlobalType(name string) {
+	ty := checker.FindType(name)
+	if ty == nil {
+		return
+	}
+	checker.GlobalTypes[name] = ty
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
@@ -1697,7 +1719,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		member, ok = dictionaryMembers[identifier]
 	}
 
-	if !ok {
+	if !isInvalidType(expressionType) && !ok {
 		checker.report(
 			&NotDeclaredMemberError{
 				Type:     expressionType,
@@ -2177,10 +2199,15 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 
 	identifier := structure.Identifier
 
-	checker.declareType(
-		identifier,
-		structureType,
-		common.DeclarationKindStructure,
+	checker.declareType(identifier, structureType)
+	checker.recordVariableOrigin(
+		identifier.Identifier,
+		&Variable{
+			Kind:       common.DeclarationKindStructure,
+			IsConstant: true,
+			Type:       structureType,
+			Pos:        &identifier.Pos,
+		},
 	)
 
 	conformances := checker.conformances(structure)
@@ -2604,7 +2631,6 @@ func (checker *Checker) checkMemberIdentifier(
 func (checker *Checker) declareType(
 	identifier ast.Identifier,
 	newType Type,
-	kind common.DeclarationKind,
 ) {
 	name := identifier.Identifier
 
@@ -2622,15 +2648,6 @@ func (checker *Checker) declareType(
 
 	// type with this identifier is not declared in current scope, declare it
 	checker.setType(name, newType)
-	checker.recordVariableOrigin(
-		name,
-		&Variable{
-			Kind:       kind,
-			IsConstant: true,
-			Type:       newType,
-			Pos:        &identifier.Pos,
-		},
-	)
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -2699,12 +2716,17 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 	interfaceType := &InterfaceType{}
 
-	name := declaration.Identifier
+	identifier := declaration.Identifier
 
-	checker.declareType(
-		name,
-		interfaceType,
-		common.DeclarationKindInterface,
+	checker.declareType(identifier, interfaceType)
+	checker.recordVariableOrigin(
+		identifier.Identifier,
+		&Variable{
+			Kind:       common.DeclarationKindInterface,
+			IsConstant: true,
+			Type:       interfaceType,
+			Pos:        &identifier.Pos,
+		},
 	)
 
 	members := checker.members(
@@ -2714,7 +2736,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	)
 
 	*interfaceType = InterfaceType{
-		Identifier: name.Identifier,
+		Identifier: identifier.Identifier,
 		Members:    members,
 	}
 
@@ -2844,37 +2866,65 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		return nil
 	}
 
+	missing := make(map[ast.Identifier]bool, len(declaration.Identifiers))
+	for _, identifier := range declaration.Identifiers {
+		missing[identifier] = true
+	}
+
+	checker.importValues(declaration, importChecker, missing)
+	checker.importTypes(declaration, importChecker, missing)
+
+	for identifier, _ := range missing {
+		checker.report(
+			&NotExportedError{
+				Name:           identifier.Identifier,
+				ImportLocation: declaration.Location,
+				Pos:            identifier.Pos,
+			},
+		)
+
+		// NOTE: declare constant variable with invalid type to silence rest of program
+		checker.declareVariable(
+			identifier.Identifier,
+			&InvalidType{},
+			common.DeclarationKindValue,
+			identifier.Pos,
+			true,
+			nil,
+		)
+
+		// NOTE: declare type with invalid type to silence rest of program
+		checker.declareType(identifier, &InvalidType{})
+	}
+
+	return nil
+}
+
+func (checker *Checker) importValues(
+	declaration *ast.ImportDeclaration,
+	importChecker *Checker,
+	missing map[ast.Identifier]bool,
+) {
 	// TODO: consider access modifiers
 
 	// determine which identifiers are imported /
 	// which variables need to be declared
+
 	var variables map[string]*Variable
 	identifierLength := len(declaration.Identifiers)
 	if identifierLength > 0 {
 		variables = make(map[string]*Variable, identifierLength)
 		for _, identifier := range declaration.Identifiers {
-			variable := importChecker.Globals[identifier.Identifier]
-
+			name := identifier.Identifier
+			variable := importChecker.GlobalValues[name]
 			if variable == nil {
-				checker.report(
-					&NotExportedError{
-						Name:           identifier.Identifier,
-						ImportLocation: declaration.Location,
-						Pos:            identifier.Pos,
-					},
-				)
-
-				// NOTE: creating variable to silence rest of program
-				variable = &Variable{
-					Type:       &InvalidType{},
-					IsConstant: true,
-				}
+				continue
 			}
-
-			variables[identifier.Identifier] = variable
+			variables[name] = variable
+			delete(missing, identifier)
 		}
 	} else {
-		variables = importChecker.Globals
+		variables = importChecker.GlobalValues
 	}
 
 	for name, variable := range variables {
@@ -2896,8 +2946,51 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			variable.ArgumentLabels,
 		)
 	}
+}
 
-	return nil
+func (checker *Checker) importTypes(
+	declaration *ast.ImportDeclaration,
+	importChecker *Checker,
+	missing map[ast.Identifier]bool,
+) {
+	// TODO: consider access modifiers
+
+	// determine which identifiers are imported /
+	// which types need to be declared
+
+	var types map[string]Type
+	identifierLength := len(declaration.Identifiers)
+	if identifierLength > 0 {
+		types = make(map[string]Type, identifierLength)
+		for _, identifier := range declaration.Identifiers {
+			name := identifier.Identifier
+			ty := importChecker.GlobalTypes[name]
+			if ty == nil {
+				continue
+			}
+			types[name] = ty
+			delete(missing, identifier)
+		}
+	} else {
+		types = importChecker.GlobalTypes
+	}
+
+	for name, ty := range types {
+
+		// TODO: improve position
+		// TODO: allow cross-module types?
+
+		// don't import predeclared values
+		if _, ok := importChecker.PredeclaredValues[name]; ok {
+			continue
+		}
+
+		identifier := ast.Identifier{
+			Identifier: name,
+			Pos:        declaration.LocationPos,
+		}
+		checker.declareType(identifier, ty)
+	}
 }
 
 func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {

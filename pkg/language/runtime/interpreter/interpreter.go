@@ -24,21 +24,23 @@ type functionReturn struct {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Checker          *sema.Checker
-	PredefinedValues map[string]Value
-	activations      *activations.Activations
-	Globals          map[string]*Variable
-	interfaces       map[string]*ast.InterfaceDeclaration
-	ImportLocation   ast.ImportLocation
+	Checker            *sema.Checker
+	PredefinedValues   map[string]Value
+	activations        *activations.Activations
+	Globals            map[string]*Variable
+	interfaces         map[string]*ast.InterfaceDeclaration
+	ImportLocation     ast.ImportLocation
+	StructureFunctions map[string]map[string]FunctionValue
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:          checker,
-		PredefinedValues: predefinedValues,
-		activations:      &activations.Activations{},
-		Globals:          map[string]*Variable{},
-		interfaces:       map[string]*ast.InterfaceDeclaration{},
+		Checker:            checker,
+		PredefinedValues:   predefinedValues,
+		activations:        &activations.Activations{},
+		Globals:            map[string]*Variable{},
+		interfaces:         map[string]*ast.InterfaceDeclaration{},
+		StructureFunctions: map[string]map[string]FunctionValue{},
 	}
 
 	for name, value := range predefinedValues {
@@ -197,7 +199,7 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 
 	// ensures the invocation's argument count matches the function's parameter count
 
-	ty := interpreter.Checker.Globals[functionName].Type
+	ty := interpreter.Checker.GlobalValues[functionName].Type
 
 	functionType, ok := ty.(*sema.FunctionType)
 	if !ok {
@@ -1187,11 +1189,15 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 
 	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
 
+	interpreter.StructureFunctions[identifier] = functions
+
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location Location) Trampoline {
+
 			structure := StructureValue{
-				Fields:    map[string]Value{},
-				Functions: functions,
+				Identifier: identifier,
+				Fields:     &map[string]Value{},
+				Functions:  &functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1472,6 +1478,12 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				}
 
 				interpreter.setVariable(name, variable)
+
+				// if the imported name refers to a structure,
+				// also take the structure functions from the sub-interpreter
+				if structureFunctions, ok := subInterpreter.StructureFunctions[name]; ok {
+					interpreter.StructureFunctions[name] = structureFunctions
+				}
 			}
 		})
 }
