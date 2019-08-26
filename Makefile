@@ -72,5 +72,9 @@ check-generated-code:
 build-cli:
 	go build -o bamboo ./cmd/bamboo/
 
+.PHONY: install-cli
+install-cli: build-relic
+	go install ./cmd/bamboo
+
 .PHONY: ci
 ci: install-tools generate check-generated-code test-unit test-integrate
