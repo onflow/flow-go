@@ -30,7 +30,7 @@ CreateAccount generates a transaction that creates a new account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=610:690#L29)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=626:706#L29)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```
