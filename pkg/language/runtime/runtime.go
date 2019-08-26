@@ -498,6 +498,11 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 		return nil, nil
 	}
 
+	someValue, ok := value.(interpreter.SomeValue)
+	if ok {
+		value = someValue.Value
+	}
+
 	array, ok := value.(interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
