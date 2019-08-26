@@ -32,8 +32,8 @@ var beforeType = &FunctionType{
 
 type Checker struct {
 	Program           *ast.Program
-	PredeclaredValues []ValueDeclaration
-	PredeclaredTypes  []TypeDeclaration
+	PredeclaredValues map[string]ValueDeclaration
+	PredeclaredTypes  map[string]TypeDeclaration
 	ImportCheckers    map[ast.ImportLocation]*Checker
 	errors            []error
 	valueActivations  *activations.Activations
@@ -65,8 +65,8 @@ type Checker struct {
 
 func NewChecker(
 	program *ast.Program,
-	predeclaredValues []ValueDeclaration,
-	predeclaredTypes []TypeDeclaration,
+	predeclaredValues map[string]ValueDeclaration,
+	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
 	typeActivations := &activations.Activations{}
 	typeActivations.Push(baseTypes)
@@ -102,12 +102,13 @@ func NewChecker(
 		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
 	}
 
-	for _, declaration := range predeclaredValues {
-		checker.declareValue(declaration)
+	for name, declaration := range predeclaredValues {
+		checker.declareValue(name, declaration)
+		checker.declareGlobal(name)
 	}
 
-	for _, declaration := range predeclaredTypes {
-		checker.declareTypeDeclaration(declaration)
+	for name, declaration := range predeclaredTypes {
+		checker.declareTypeDeclaration(name, declaration)
 	}
 
 	err := checker.checkerError()
@@ -119,7 +120,6 @@ func NewChecker(
 }
 
 type ValueDeclaration interface {
-	ValueDeclarationName() string
 	ValueDeclarationType() Type
 	ValueDeclarationKind() common.DeclarationKind
 	ValueDeclarationPosition() ast.Position
@@ -128,28 +128,26 @@ type ValueDeclaration interface {
 }
 
 type TypeDeclaration interface {
-	TypeDeclarationName() string
 	TypeDeclarationType() Type
 	TypeDeclarationKind() common.DeclarationKind
 	TypeDeclarationPosition() ast.Position
 }
 
-func (checker *Checker) declareValue(declaration ValueDeclaration) {
-	identifier := declaration.ValueDeclarationName()
+func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
 	variable := checker.declareVariable(
-		identifier,
+		name,
 		declaration.ValueDeclarationType(),
 		declaration.ValueDeclarationKind(),
 		declaration.ValueDeclarationPosition(),
 		declaration.ValueDeclarationIsConstant(),
 		declaration.ValueDeclarationArgumentLabels(),
 	)
-	checker.recordVariableOrigin(identifier, variable)
+	checker.recordVariableOrigin(name, variable)
 }
 
-func (checker *Checker) declareTypeDeclaration(declaration TypeDeclaration) {
+func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
 	identifier := ast.Identifier{
-		Identifier: declaration.TypeDeclarationName(),
+		Identifier: name,
 		Pos:        declaration.TypeDeclarationPosition(),
 	}
 	checker.declareType(
@@ -334,7 +332,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.Declarations {
 		declaration.Accept(checker)
-		checker.declareGlobal(declaration)
+		checker.declareGlobalDeclaration(declaration)
 	}
 
 	return nil
@@ -620,11 +618,15 @@ func (checker *Checker) declareVariable(
 	return variable
 }
 
-func (checker *Checker) declareGlobal(declaration ast.Declaration) {
+func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if name == "" {
 		return
 	}
+	checker.declareGlobal(name)
+}
+
+func (checker *Checker) declareGlobal(name string) {
 	checker.Globals[name] = checker.findVariable(name)
 }
 
@@ -2879,6 +2881,11 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 
 		// TODO: improve position
 		// TODO: allow cross-module variables?
+
+		// don't import predeclared values
+		if _, ok := importChecker.PredeclaredValues[name]; ok {
+			continue
+		}
 
 		checker.declareVariable(
 			name,

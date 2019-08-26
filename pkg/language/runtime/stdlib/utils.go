@@ -7,10 +7,10 @@ import (
 
 // ToValueDeclarations
 
-func ToValueDeclarations(functions []StandardLibraryFunction) []sema.ValueDeclaration {
-	valueDeclarations := make([]sema.ValueDeclaration, len(functions))
-	for i, function := range functions {
-		valueDeclarations[i] = function
+func ToValueDeclarations(functions []StandardLibraryFunction) map[string]sema.ValueDeclaration {
+	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
+	for _, function := range functions {
+		valueDeclarations[function.Name] = function
 	}
 	return valueDeclarations
 }
@@ -18,7 +18,7 @@ func ToValueDeclarations(functions []StandardLibraryFunction) []sema.ValueDeclar
 // ToValues
 
 func ToValues(functions []StandardLibraryFunction) map[string]interpreter.Value {
-	values := map[string]interpreter.Value{}
+	values := make(map[string]interpreter.Value, len(functions))
 	for _, function := range functions {
 		values[function.Name] = function.Function
 	}

@@ -12,10 +12,6 @@ type StandardLibraryType struct {
 	Kind common.DeclarationKind
 }
 
-func (t StandardLibraryType) TypeDeclarationName() string {
-	return t.Name
-}
-
 func (t StandardLibraryType) TypeDeclarationType() sema.Type {
 	return t.Type
 }

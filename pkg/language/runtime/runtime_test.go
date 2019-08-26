@@ -278,6 +278,9 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
+	Expect(err).
+		To(Not(HaveOccurred()))
+
 	_, err = runtime.ExecuteScript(script, runtimeInterface)
 
 	Expect(err).

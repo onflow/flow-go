@@ -13,10 +13,6 @@ type StandardLibraryValue struct {
 	IsConstant bool
 }
 
-func (v StandardLibraryValue) ValueDeclarationName() string {
-	return v.Name
-}
-
 func (v StandardLibraryValue) ValueDeclarationType() sema.Type {
 	return v.Type
 }

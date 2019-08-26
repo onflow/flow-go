@@ -188,9 +188,8 @@ var accountType = sema.StructureType{
 	},
 }
 
-var typeDeclarations = []sema.TypeDeclaration{
-	stdlib.StandardLibraryType{
-		Name: accountType.Identifier,
+var typeDeclarations = map[string]sema.TypeDeclaration{
+	accountType.Identifier: stdlib.StandardLibraryType{
 		Type: &accountType,
 		Kind: common.DeclarationKindStructure,
 	},
@@ -345,8 +344,10 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		}
 
 		signingAccounts[i] = interpreter.StructureValue{
-			"address": interpreter.StringValue(address.String()),
-			"storage": storedValue,
+			Fields: map[string]interpreter.Value{
+				"address": interpreter.StringValue(address.String()),
+				"storage": storedValue,
+			},
 		}
 
 		storedValues[i] = storedValue
