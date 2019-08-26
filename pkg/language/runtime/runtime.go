@@ -183,7 +183,6 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	ReturnType: &sema.VoidType{},
 }
 
-// TODO: improve types
 var getAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// address
