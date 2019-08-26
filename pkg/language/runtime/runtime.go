@@ -154,12 +154,16 @@ var getValueFunctionType = sema.FunctionType{
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+		&sema.OptionalType{
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
 		},
 		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+		&sema.OptionalType{
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
 		},
 	},
 	// value
@@ -541,6 +545,16 @@ func (r *interpreterRuntime) getOwnerControllerKey(
 }
 
 func toByteArray(value interpreter.Value) ([]byte, error) {
+	_, isNil := value.(interpreter.NilValue)
+	if isNil {
+		return nil, nil
+	}
+
+	someValue, ok := value.(interpreter.SomeValue)
+	if ok {
+		value = someValue.Value
+	}
+
 	array, ok := value.(interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
