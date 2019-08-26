@@ -16,8 +16,8 @@ var cmd = &cobra.Command{
 }
 
 func init() {
-	cmd.AddCommand(emulator.Cmd)
 	cmd.AddCommand(initialize.Cmd)
+	cmd.AddCommand(emulator.Cmd)
 }
 
 func Execute() {
