@@ -12,9 +12,6 @@
 
 ## <a name="pkg-index">Index</a>
 * [func CreateAccount(publicKey, code []byte) *types.RawTransaction](#CreateAccount)
-* [func LoadAccount(r io.Reader) (*types.AccountKey, error)](#LoadAccount)
-* [func LoadAccountFromFile(filename string) (*types.AccountKey, error)](#LoadAccountFromFile)
-* [func SaveAccountToFile(account *types.AccountKey, filename string) error](#SaveAccountToFile)
 * [func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction](#UpdateAccountCode)
 
 
@@ -25,7 +22,7 @@
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1918:1982#L84)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=165:229#L11)
 ``` go
 func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
@@ -33,35 +30,7 @@ CreateAccount generates a transaction that creates a new account.
 
 
 
-## <a name="LoadAccount">func</a> [LoadAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=887:943#L39)
-``` go
-func LoadAccount(r io.Reader) (*types.AccountKey, error)
-```
-LoadAccount parses an account key from a JSON reader.
-
-An error will be returned if the reader contains invalid JSON.
-
-
-
-## <a name="LoadAccountFromFile">func</a> [LoadAccountFromFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=596:664#L27)
-``` go
-func LoadAccountFromFile(filename string) (*types.AccountKey, error)
-```
-LoadAccountFromFile loads an account key from a JSON file.
-
-An error will be returned if the file cannot be read or if it contains invalid JSON.
-
-
-
-## <a name="SaveAccountToFile">func</a> [SaveAccountToFile](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=1446:1518#L66)
-``` go
-func SaveAccountToFile(account *types.AccountKey, filename string) error
-```
-SaveAccountToFile saves an account key as a JSON file.
-
-
-
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=2363:2443#L102)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=610:690#L29)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```
