@@ -11,16 +11,16 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator"
 )
 
 // EmulatorServer is a local server that runs a Bamboo Emulator instance.
 //
 // The server wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
-	blockchain *core.EmulatedBlockchain
+	blockchain *emulator.EmulatedBlockchain
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
@@ -36,7 +36,7 @@ type Config struct {
 
 // NewEmulatorServer creates a new instance of a Bamboo Emulator server.
 func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
-	options := core.DefaultOptions
+	options := emulator.DefaultOptions
 
 	if conf.RootAccountKey != nil {
 		options.RootAccountKey = conf.RootAccountKey
@@ -47,7 +47,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}
 
 	server := &EmulatorServer{
-		blockchain: core.NewEmulatedBlockchain(options),
+		blockchain: emulator.NewEmulatedBlockchain(options),
 		grpcServer: grpc.NewServer(),
 		config:     conf,
 		logger:     logger,

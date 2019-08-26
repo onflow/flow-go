@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
