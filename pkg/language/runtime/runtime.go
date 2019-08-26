@@ -390,11 +390,8 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 
 	storedValue := interpreter.DictionaryValue{}
 	if len(storedData) > 0 {
-		fmt.Println("err 1")
 		decoder := gob.NewDecoder(bytes.NewReader(storedData))
-		fmt.Println("err 2")
 		err = decoder.Decode(&storedValue)
-		fmt.Println("err 3")
 		if err != nil {
 			return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
 		}
