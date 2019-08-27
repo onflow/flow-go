@@ -597,10 +597,12 @@ func getDictionaryMember(ty *DictionaryType, field string) *Member {
 				ParameterTypes: []Type{
 					ty.KeyType,
 				},
-				ReturnType: &VoidType{},
+				ReturnType: &OptionalType{
+					Type: ty.ValueType,
+				},
 			},
 			IsInitialized:  true,
-			ArgumentLabels: []string{"at"},
+			ArgumentLabels: []string{"key"},
 		}
 	default:
 		return dictionaryMembers[field]
