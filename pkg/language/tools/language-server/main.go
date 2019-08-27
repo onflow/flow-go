@@ -43,7 +43,8 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	}
 }
 
-var standardLibraryFunctions = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+var valueDeclarations = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...).ToValueDeclarations()
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
@@ -157,8 +158,7 @@ func (s server) DidChangeTextDocument(
 
 		// check program
 
-		valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
-		checker, err := sema.NewChecker(program, valueDeclarations, nil)
+		checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 		if err != nil {
 			panic(err)
 		}

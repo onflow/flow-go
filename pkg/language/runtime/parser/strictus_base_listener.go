@@ -448,6 +448,12 @@ func (s *BaseStrictusListener) EnterDictionaryEntry(ctx *DictionaryEntryContext)
 // ExitDictionaryEntry is called when production dictionaryEntry is exited.
 func (s *BaseStrictusListener) ExitDictionaryEntry(ctx *DictionaryEntryContext) {}
 
+// EnterIdentifier is called when production identifier is entered.
+func (s *BaseStrictusListener) EnterIdentifier(ctx *IdentifierContext) {}
+
+// ExitIdentifier is called when production identifier is exited.
+func (s *BaseStrictusListener) ExitIdentifier(ctx *IdentifierContext) {}
+
 // EnterEos is called when production eos is entered.
 func (s *BaseStrictusListener) EnterEos(ctx *EosContext) {}
 

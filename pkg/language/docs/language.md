@@ -368,8 +368,6 @@ fun crashAndBurn(): Never {
 
 ### Optionals
 
-> 🚧 Status: Optionals are not implemented yet.
-
 Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
 
 An optional type is declared using the `?` suffix for another type. For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
@@ -634,8 +632,6 @@ TODO
 
 
 ### Dictionaries
-
-> 🚧 Status: Dictionaries are not implemented yet.
 
 Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
 
@@ -2405,7 +2401,7 @@ some.e = 5
 
 ## Interfaces
 
-> 🚧 Status: Interfaces are not implemented yet.
+> 🚧 Status: Interfaces are implemented, but have the syntax `struct S: Interface1, ... {}`
 
 An interface is an abstract type that specifies the behavior of types that *implement* the interface.
 Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
@@ -3054,7 +3050,7 @@ Like resources, attestations are associated with an [account](#accounts).
 
 ```bamboo
 struct interface Account {
-    pub init(at address: Address)
+    address: Address
 }
 ```
 
@@ -3093,7 +3089,7 @@ account.storage[Counter] <- create Counter(count: 0)
 
 > 🚧 Status: The usage of external types is not implemented yet.
 
-It is possible to use external types through the `using` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
+It is possible to use external types through the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
 
 ```bamboo
 // Declaration for an interface named `Counter`,
@@ -3107,7 +3103,7 @@ resource interface Counter {
 // Use the type `Counter` from address
 // 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
 //
-using Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
+import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
 
 ## Transactions
@@ -3214,7 +3210,7 @@ resource interface FungibleToken {
 }
 ```
 
-Transactions can refer to local code with the `using` keyword,
+Transactions can refer to local code with the `import` keyword,
 followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
 
@@ -3231,16 +3227,17 @@ Once deployed, the resource interfaces is available in the account's `types` obj
 The `publish` operator is used to make the resource interface type publicly available.
 
 ```bamboo,file=deploy-resource-interface.bpl
+
+// Refer to the resource interface type `FungibleToken`
+// in the local file "FungibleToken.bpl"
+//
+import FungibleToken from "FungibleToken.bpl"
+
 // Execute a transaction which deploys the code for
 // the resource interface `FungibleToken`, and makes
 // the deployed type publicly available
 //
 transaction {
-
-    // Refer to the resource interface type `FungibleToken`
-    // in the local file "FungibleToken.bpl"
-    //
-    using FungibleToken from "FungibleToken.bpl"
 
     prepare(signer: Account) {
         // Deploy the  resource interface type `FungibleToken`
@@ -3288,13 +3285,13 @@ impl FungibleToken for ExampleToken {
 ```
 
 ```bamboo,file=deploy-resource.bpl
+import ExampleToken from "ExampleToken.bpl"
+
 // Execute a transaction which deploys the code for
 // the resource `ExampleToken`, and makes the deployed
 // type publicly available
 //
 transaction {
-
-    using ExampleToken from "ExampleToken.bpl"
 
     prepare(signer: Account) {
         signer.deploy(ExampleToken)
@@ -3305,7 +3302,7 @@ transaction {
 
 ### Interacting with Deployed Resources
 
-Transactions can also refer to deployed code with the `using` keyword
+Transactions can also refer to deployed code with the `import` keyword
 and the address of the account which contains the publicly available type.
 
 <!-- TODO:
@@ -3320,14 +3317,15 @@ References are created by using the `&` operator, followed by the stored resourc
 the `as` operator, and the resource interface type.
 
 ```bamboo,file=setup-transaction.bpl
+// Refer to the resource type `ExampleToken` deployed
+// at example address 0x42
+//
+import ExampleToken from 0x42
+
 // Execute a transaction which creates a new example token vault
 // for the signing account
 //
 transaction {
-    // Refer to the resource type `ExampleToken` deployed
-    // at example address 0x42
-    //
-    using ExampleToken from 0x42
 
     prepare(signer: Account) {
         // Create a new example token vault for the signing account.
@@ -3357,6 +3355,11 @@ transaction {
 ```
 
 ```bamboo,file=send-transaction.bpl
+// Refer to the resource type `ExampleToken` deployed
+// at example address 0x42
+//
+import ExampleToken from 0x42
+
 // Execute a transaction which sends five coins from one account to another.
 //
 // The transaction fails unless there is a `ExampleToken.Provider` available
@@ -3368,10 +3371,6 @@ transaction {
 // is published/publicly available (if it exists for the recipient)
 //
 transaction {
-    // Refer to the resource type `ExampleToken` deployed
-    // at example address 0x42
-    //
-    using ExampleToken from 0x42
 
     let sentFunds: ExampleToken.Vault
 

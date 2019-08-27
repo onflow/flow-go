@@ -291,6 +291,10 @@ func (v *BaseStrictusVisitor) VisitDictionaryEntry(ctx *DictionaryEntryContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitEos(ctx *EosContext) interface{} {
 	return v.VisitChildren(ctx)
 }

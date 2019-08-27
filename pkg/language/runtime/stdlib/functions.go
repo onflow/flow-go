@@ -52,6 +52,26 @@ func NewStandardLibraryFunction(
 	}
 }
 
+// StandardLibraryFunctions
+
+type StandardLibraryFunctions []StandardLibraryFunction
+
+func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
+	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
+	for _, function := range functions {
+		valueDeclarations[function.Name] = function
+	}
+	return valueDeclarations
+}
+
+func (functions StandardLibraryFunctions) ToValues() map[string]interpreter.Value {
+	values := make(map[string]interpreter.Value, len(functions))
+	for _, function := range functions {
+		values[function.Name] = function.Function
+	}
+	return values
+}
+
 // AssertionError
 
 type AssertionError struct {
@@ -156,7 +176,7 @@ var PanicFunction = NewStandardLibraryFunction(
 
 // BuiltinFunctions
 
-var BuiltinFunctions = []StandardLibraryFunction{
+var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
 }
@@ -178,6 +198,6 @@ var LogFunction = NewStandardLibraryFunction(
 
 // HelperFunctions
 
-var HelperFunctions = []StandardLibraryFunction{
+var HelperFunctions = StandardLibraryFunctions{
 	LogFunction,
 }

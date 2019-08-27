@@ -10,11 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/bamboo-node/internal/emulator/core"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator"
 )
 
 // Ping the Observation API server for a response.
@@ -47,16 +47,16 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	err := s.blockchain.SubmitTransaction(tx)
 	if err != nil {
 		switch err.(type) {
-		case *core.ErrTransactionReverted:
+		case *emulator.ErrTransactionReverted:
 			s.logger.
 				WithField("txHash", tx.Hash()).
 				Infof("💸  Transaction #%d mined", tx.Nonce)
 			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
-		case *core.ErrDuplicateTransaction:
+		case *emulator.ErrDuplicateTransaction:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
-		case *core.ErrInvalidSignaturePublicKey:
+		case *emulator.ErrInvalidSignaturePublicKey:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
-		case *core.ErrInvalidSignatureAccount:
+		case *emulator.ErrInvalidSignatureAccount:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -92,7 +92,7 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 	block, err := s.blockchain.GetBlockByHash(hash)
 	if err != nil {
 		switch err.(type) {
-		case *core.ErrBlockNotFound:
+		case *emulator.ErrBlockNotFound:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -118,7 +118,7 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 	block, err := s.blockchain.GetBlockByNumber(number)
 	if err != nil {
 		switch err.(type) {
-		case *core.ErrBlockNotFound:
+		case *emulator.ErrBlockNotFound:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -165,7 +165,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	tx, err := s.blockchain.GetTransaction(hash)
 	if err != nil {
 		switch err.(type) {
-		case *core.ErrTransactionNotFound:
+		case *emulator.ErrTransactionNotFound:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -203,7 +203,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 	account, err := s.blockchain.GetAccount(address)
 	if err != nil {
 		switch err.(type) {
-		case *core.ErrAccountNotFound:
+		case *emulator.ErrAccountNotFound:
 			return nil, status.Error(codes.NotFound, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())

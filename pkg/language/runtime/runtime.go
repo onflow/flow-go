@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	runtimeErrors "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
@@ -89,21 +88,6 @@ type interpreterRuntime struct {
 // NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
-}
-
-var accountType = sema.StructureType{
-	Identifier: "Account",
-	Members: map[string]*sema.Member{
-		"address": {
-			Type: &sema.StringType{},
-		},
-		"storage": {
-			Type: &sema.DictionaryType{
-				KeyType:   &sema.AnyType{},
-				ValueType: &sema.AnyType{},
-			},
-		},
-	},
 }
 
 // TODO: improve types
@@ -187,12 +171,14 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	ReturnType: &sema.VoidType{},
 }
 
+var accountType = stdlib.AccountType.Type
+
 var getAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// address
 		&sema.StringType{},
 	},
-	ReturnType: &accountType,
+	ReturnType: accountType,
 }
 
 var logFunctionType = sema.FunctionType{
@@ -200,12 +186,7 @@ var logFunctionType = sema.FunctionType{
 	ReturnType:     &sema.VoidType{},
 }
 
-var typeDeclarations = map[string]sema.TypeDeclaration{
-	accountType.Identifier: stdlib.StandardLibraryType{
-		Type: &accountType,
-		Kind: common.DeclarationKindStructure,
-	},
-}
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
 	return parser.ParseProgram(string(script))
@@ -279,7 +260,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		),
 	)
 
-	valueDeclarations := stdlib.ToValueDeclarations(functions)
+	valueDeclarations := functions.ToValueDeclarations()
 
 	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	if err != nil {
@@ -320,17 +301,17 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	// check parameter types
 
 	for _, parameterType := range mainFunctionType.ParameterTypes {
-		if !parameterType.Equal(&accountType) {
+		if !parameterType.Equal(accountType) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				&accountType,
+				accountType,
 				parameterType,
 			)
 			return nil, Error{[]error{err}}
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, stdlib.ToValues(functions))
+	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -390,18 +371,15 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 
 	storedValue := interpreter.DictionaryValue{}
 	if len(storedData) > 0 {
-		fmt.Println("err 1")
 		decoder := gob.NewDecoder(bytes.NewReader(storedData))
-		fmt.Println("err 2")
 		err = decoder.Decode(&storedValue)
-		fmt.Println("err 3")
 		if err != nil {
 			return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
 		}
 	}
 
 	account := interpreter.StructureValue{
-		Identifier: accountType.Identifier,
+		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.StringValue(address.String()),
 			"storage": storedValue,

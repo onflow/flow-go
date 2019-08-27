@@ -11,7 +11,7 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/cli/project"
 	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/server"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator/server"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 )
 

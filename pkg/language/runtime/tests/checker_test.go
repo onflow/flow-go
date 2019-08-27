@@ -2769,11 +2769,9 @@ func TestCheckNever(t *testing.T) {
                 return panic("XXX")
             }
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3142,11 +3140,9 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3348,11 +3344,9 @@ func TestCheckInterfaceUse(t *testing.T) {
 
           let test: Test = panic("")
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3739,6 +3733,36 @@ func TestCheckInterfaceTypeAsValue(t *testing.T) {
 
 	Expect(checker.GlobalValues["x"].Type).
 		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+}
+
+func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      interface I {
+          s: S
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      interface I {
+          fun s(): S
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }
 
 // TODO: field declaration, member access, type references

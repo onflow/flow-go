@@ -1,4 +1,4 @@
-package core
+package emulator
 
 import (
 	"sync"
@@ -8,9 +8,9 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	eruntime "github.com/dapperlabs/bamboo-node/internal/emulator/runtime"
-	"github.com/dapperlabs/bamboo-node/internal/emulator/state"
-	etypes "github.com/dapperlabs/bamboo-node/internal/emulator/types"
+	eruntime "github.com/dapperlabs/bamboo-node/sdk/emulator/runtime"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator/state"
+	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.

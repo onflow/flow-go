@@ -1,4 +1,4 @@
-package create
+package send
 
 import (
 	"context"
@@ -6,28 +6,25 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/dapperlabs/bamboo-node/sdk/client"
-
-	"github.com/psiemens/sconfig"
-	"github.com/spf13/cobra"
-
 	"github.com/dapperlabs/bamboo-node/internal/cli/project"
 	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/sdk/accounts"
+	"github.com/dapperlabs/bamboo-node/sdk/client"
+	"github.com/psiemens/sconfig"
+	"github.com/spf13/cobra"
 )
 
 type Config struct {
 	Signer string `default:"root" flag:"signer,s"`
-	Key    string `flag:"key,k"`
 	Code   string `flag:"code,c"`
+	Nonce  uint64 `flag:"nonce,n"`
 }
 
 var conf Config
 
 var Cmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new account",
+	Use:   "send",
+	Short: "Send a transaction",
 	Run: func(cmd *cobra.Command, args []string) {
 		projectConf := project.LoadConfig()
 
@@ -38,20 +35,7 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to load signer key", 1)
 		}
 
-		var publicKey []byte
 		var code []byte
-
-		if conf.Key != "" {
-			accountKey, err := utils.DecodePrivateKey(conf.Key)
-			if err != nil {
-				utils.Exit("Failed to decode private key", 1)
-			}
-
-			publicKey, err = utils.EncodePublicKey(accountKey.Pubkey())
-			if err != nil {
-				utils.Exit("Failed to encode public key", 1)
-			}
-		}
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -60,7 +44,11 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := accounts.CreateAccount(publicKey, code)
+		tx := types.RawTransaction{
+			Script:       code,
+			Nonce:        conf.Nonce,
+			ComputeLimit: 10,
+		}
 		signedTx, err := tx.SignPayer(signerAddr, signerKey)
 		if err != nil {
 			utils.Exit("Failed to sign transaction", 1)
@@ -73,7 +61,7 @@ var Cmd = &cobra.Command{
 
 		err = client.SendTransaction(context.Background(), *signedTx)
 		if err != nil {
-			utils.Exit("Failed to send account creation transaction", 1)
+			utils.Exit("Failed to send transaction", 1)
 		}
 	},
 }

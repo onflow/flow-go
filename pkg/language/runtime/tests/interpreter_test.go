@@ -1099,11 +1099,9 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				testFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			testFunction,
+		}.ToValueDeclarations(),
 		nil,
 	)
 	Expect(err).
@@ -2703,11 +2701,10 @@ func TestInterpretImport(t *testing.T) {
 func TestInterpretImportError(t *testing.T) {
 	RegisterTestingT(t)
 
-	valueDeclarations := stdlib.ToValueDeclarations(
-		[]stdlib.StandardLibraryFunction{
+	valueDeclarations :=
+		stdlib.StandardLibraryFunctions{
 			stdlib.PanicFunction,
-		},
-	)
+		}.ToValueDeclarations()
 
 	checkerImported, err := parseAndCheckWithExtra(
 		`
@@ -2740,9 +2737,10 @@ func TestInterpretImportError(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	values := stdlib.ToValues([]stdlib.StandardLibraryFunction{
+	values := stdlib.StandardLibraryFunctions{
 		stdlib.PanicFunction,
-	})
+	}.ToValues()
+
 	inter, err := interpreter.NewInterpreter(checkerImporting, values)
 
 	Expect(err).
