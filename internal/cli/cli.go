@@ -7,9 +7,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/bamboo-node/internal/cli/accounts"
+	"github.com/dapperlabs/bamboo-node/internal/cli/bpl"
 	"github.com/dapperlabs/bamboo-node/internal/cli/emulator"
 	"github.com/dapperlabs/bamboo-node/internal/cli/initialize"
 	"github.com/dapperlabs/bamboo-node/internal/cli/keys"
+	"github.com/dapperlabs/bamboo-node/internal/cli/transactions"
 )
 
 var cmd = &cobra.Command{
@@ -22,6 +24,8 @@ func init() {
 	cmd.AddCommand(accounts.Cmd)
 	cmd.AddCommand(keys.Cmd)
 	cmd.AddCommand(emulator.Cmd)
+	cmd.AddCommand(bpl.Cmd)
+	cmd.AddCommand(transactions.Cmd)
 }
 
 func Execute() {
