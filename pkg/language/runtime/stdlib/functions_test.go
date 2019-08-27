@@ -15,11 +15,11 @@ func TestAssert(t *testing.T) {
 
 	program := &ast.Program{}
 
-	checker, err := sema.NewChecker(program, ToValueDeclarations(BuiltinFunctions), nil)
+	checker, err := sema.NewChecker(program, BuiltinFunctions.ToValueDeclarations(), nil)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltinFunctions))
+	inter, err := interpreter.NewInterpreter(checker, BuiltinFunctions.ToValues())
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -50,11 +50,11 @@ func TestAssert(t *testing.T) {
 func TestPanic(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := sema.NewChecker(&ast.Program{}, ToValueDeclarations(BuiltinFunctions), nil)
+	checker, err := sema.NewChecker(&ast.Program{}, BuiltinFunctions.ToValueDeclarations(), nil)
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	inter, err := interpreter.NewInterpreter(checker, ToValues(BuiltinFunctions))
+	inter, err := interpreter.NewInterpreter(checker, BuiltinFunctions.ToValues())
 
 	Expect(err).
 		To(Not(HaveOccurred()))
