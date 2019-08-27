@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 )
 
 var (
-	path     = "/Users/axiomzen/dev/src/github.com/dapperlabs/dapper-flow-working-session/bpl-contract/scripts/"
+	path     = "/Users/navidtehranifar/go/src/github.com/dapperlabs/dapper-flow-working-session/bpl-contract/scripts/"
 	nextAcct = 2
 )
 
@@ -33,7 +34,13 @@ func newTransaction(script []byte) *types.RawTransaction {
 	}
 }
 
-func sendTransaction(b *emulator.EmulatedBlockchain, tx *types.RawTransaction, senderAddr types.Address, senderKey crypto.PrKey) error {
+func sendTransaction(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey, code []byte) error {
+	tx := &types.RawTransaction{
+		Script:       code,
+		Nonce:        1,
+		ComputeLimit: 10,
+		Timestamp:    time.Now(),
+	}
 	signedTx, err := tx.SignPayer(senderAddr, senderKey)
 	if err != nil {
 		return err
@@ -42,37 +49,119 @@ func sendTransaction(b *emulator.EmulatedBlockchain, tx *types.RawTransaction, s
 	return b.SubmitTransaction(signedTx)
 }
 
-func deployToken(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) error {
-	code := getCode("token.bpl")
-	tx := newTransaction(code)
-	return sendTransaction(b, tx, senderAddr, senderKey)
+func sendToken(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) error {
+	code := getCode("transaction1.bpl")
+	return sendTransaction(b, senderAddr, senderKey, code)
 }
 
-func createAccount(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) {
+func deployToken(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) (crypto.PrKey, error) {
+	code := getCode("token.bpl")
+	// tx := newTransaction(code)
+	return createAccount(b, senderAddr, senderKey, code)
+	// return sendTransaction(b, tx, senderAddr, senderKey)
+}
+
+func addTokenToAccount(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) error {
+	code := getCode("setup.bpl")
+	return sendTransaction(b, senderAddr, senderKey, code)
+}
+
+func addTokenToAccountWithToken(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey) error {
+	code := getCode("setup_with_token.bpl")
+	return sendTransaction(b, senderAddr, senderKey, code)
+}
+
+func createAccount(b *emulator.EmulatedBlockchain, senderAddr types.Address, senderKey crypto.PrKey, code []byte) (crypto.PrKey, error) {
 	// generate new private key
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	accountPrivateKey, _ := salg.GeneratePrKey([]byte(nextAcct))
+	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	if err != nil {
+		return nil, err
+	}
+	accountPrivateKey, err := salg.GeneratePrKey([]byte{byte(nextAcct)})
+	if err != nil {
+		return nil, err
+	}
 
 	// encode public key to bytes
-	publicKey, _ := salg.EncodePubKey(accountPrivateKey.Pubkey())
+	publicKey, err := salg.EncodePubKey(accountPrivateKey.Pubkey())
+	if err != nil {
+		return nil, err
+	}
 
 	// generate an account creation transaction
-	createAccountTx := accounts.CreateAccount(publicKey, nil)
+	createAccountTx := accounts.CreateAccount(publicKey, code)
 
 	// sign account creation transaction as root account
-	signedCreateAccountTx, _ := createAccountTx.SignPayer(rootAddress, rootPrivateKey)
+	signedCreateAccountTx, err := createAccountTx.SignPayer(senderAddr, senderKey)
+	if err != nil {
+		return nil, err
+	}
 
-	b.SubmitTransaction(signedCreateAccountTx)
+	err = b.SubmitTransaction(signedCreateAccountTx)
+	if err != nil {
+		return nil, err
+	}
+
 	b.CommitBlock()
+
+	return accountPrivateKey, nil
 }
 
-func TestDeployTokenContract(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+func TestTokenContract(t *testing.T) {
+	options := emulator.DefaultOptions
+	options.RuntimeLogger = func(msg string) { fmt.Println(msg) }
+
+	b := emulator.NewEmulatedBlockchain(options)
 
 	rootAddr := b.RootAccount()
 	rootKey := b.RootKey()
 
-	if err := deployToken(b, rootAddr, rootKey); err != nil {
+	accountA := types.HexToAddress("03")
+	accountB := types.HexToAddress("04")
+
+	// token deployed at 02
+	if _, err := deployToken(b, rootAddr, rootKey); err != nil {
+		t.Error(err.Error())
+	}
+
+	// make an account with token support and no tokens at 03
+	keyA, err := createAccount(b, rootAddr, rootKey, nil)
+	err = addTokenToAccount(b, accountA, keyA)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	// make another account with token support and a token at 04
+	keyB, err := createAccount(b, rootAddr, rootKey, nil)
+	err = addTokenToAccountWithToken(b, accountB, keyB)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	// 04 gives token to 03
+	if err := sendToken(b, accountB, keyB); err != nil {
+		t.Error(err.Error())
+	}
+
+	b.CommitBlock()
+
+	_, err = b.CallScript([]byte(`
+		import Token, TokenContainer from 0x0000000000000000000000000000000000000002
+
+		fun logTokens(_ acc: String) {
+			let receiver = getAccount(acc)
+			let receiverTcAny = receiver.storage["tc"] ?? panic("receiver does not have a TokenContainer") 
+			let receiverTc = (receiverTcAny as? TokenContainer) ?? panic("could not cast receiver tc to TokenContainer")
+
+			log(receiverTc._tokens)
+		}
+
+		fun main() {
+			logTokens("03")
+			logTokens("04")
+		}
+	`))
+	if err != nil {
 		t.Error(err.Error())
 	}
 }
