@@ -2769,11 +2769,9 @@ func TestCheckNever(t *testing.T) {
                 return panic("XXX")
             }
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3142,11 +3140,9 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3348,11 +3344,9 @@ func TestCheckInterfaceUse(t *testing.T) {
 
           let test: Test = panic("")
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)

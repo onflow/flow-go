@@ -17,7 +17,6 @@ import (
 // If after the interpretation a global function `main` is defined, it will be called.
 // The program may call the function `log` to print a value.
 func Execute(args []string) {
-	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
 
 	if len(args) < 1 {
 		exitWithError("no input file")
@@ -53,14 +52,16 @@ func Execute(args []string) {
 	})
 	must(err, filename)
 
-	valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
+	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, nil)
+	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	must(err, filename)
 
 	must(checker.Check(), filename)
 
-	values := stdlib.ToValues(standardLibraryFunctions)
+	values := standardLibraryFunctions.ToValues()
 
 	inter, err := interpreter.NewInterpreter(checker, values)
 	must(err, filename)
