@@ -2182,9 +2182,16 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 
 	if structureType != nil {
 		checker.checkFieldsInitialized(structure, structureType)
-	}
 
-	checker.checkStructureFunctions(structure.Functions, structureType)
+		checker.checkStructureFunctions(structure.Functions, structureType)
+
+		// check structure conforms to interfaces.
+		// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
+
+		for _, interfaceType := range structureType.Conformances {
+			checker.checkStructureConformance(structureType, interfaceType, structure.Identifier.Pos)
+		}
+	}
 
 	return nil
 }
@@ -2237,13 +2244,6 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	// declare constructor
 
 	checker.declareStructureConstructor(structure, structureType, parameterTypes)
-
-	// check structure conforms to interfaces.
-	// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
-
-	for _, interfaceType := range conformances {
-		checker.checkStructureConformance(structureType, interfaceType, identifier.Pos)
-	}
 }
 
 func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*InterfaceType {
@@ -2668,6 +2668,12 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	interfaceType := checker.InterfaceDeclarationTypes[declaration]
 
+	interfaceType.Members = checker.members(
+		declaration.Fields,
+		declaration.Functions,
+		common.DeclarationKindInterface,
+	)
+
 	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
 
 	checker.checkInitializer(
@@ -2729,15 +2735,10 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		},
 	)
 
-	members := checker.members(
-		declaration.Fields,
-		declaration.Functions,
-		common.DeclarationKindInterface,
-	)
-
+	// NOTE: members are added in `VisitInterfaceDeclaration` –
+	//   left out for now, as field and function requirements could refer to e.g. structures
 	*interfaceType = InterfaceType{
 		Identifier: identifier.Identifier,
-		Members:    members,
 	}
 
 	initializer := declaration.Initializer

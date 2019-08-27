@@ -3741,6 +3741,36 @@ func TestCheckInterfaceTypeAsValue(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
 }
 
+func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      interface I {
+          s: S
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      interface I {
+          fun s(): S
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 // TODO: field declaration, member access, type references
 //
 func TestCheckOrigins(t *testing.T) {
