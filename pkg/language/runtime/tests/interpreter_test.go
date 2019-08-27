@@ -3109,9 +3109,11 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
+      var removed: Int? = nil
+
       fun test(): Int[String] {
           let x = {"abc": 1, "def": 2}
-          x.remove(at: "abc")
+          removed = x.remove(key: "abc")
           return x
       }
     `)
@@ -3119,5 +3121,10 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.DictionaryValue{
 			interpreter.StringValue("def"): interpreter.IntValue{Int: big.NewInt(2)},
+		}))
+
+	Expect(inter.Globals["removed"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
 		}))
 }

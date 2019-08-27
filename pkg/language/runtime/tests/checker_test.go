@@ -4247,7 +4247,7 @@ func TestCheckDictionaryRemove(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(at: "abc")
+          x.remove(key: "abc")
       }
     `)
 
@@ -4261,7 +4261,7 @@ func TestCheckInvalidDictionaryRemove(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(at: true)
+          x.remove(key: true)
       }
     `)
 
