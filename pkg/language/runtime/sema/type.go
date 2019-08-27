@@ -311,7 +311,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		}
 	default:
-		return nil
+		return arrayMembers[field]
 	}
 }
 
@@ -586,6 +586,27 @@ var dictionaryMembers = map[string]*Member{
 		VariableKind:  ast.VariableKindConstant,
 		IsInitialized: true,
 	},
+}
+
+func getDictionaryMember(ty *DictionaryType, field string) *Member {
+	switch field {
+	case "remove":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					ty.KeyType,
+				},
+				ReturnType: &OptionalType{
+					Type: ty.ValueType,
+				},
+			},
+			IsInitialized:  true,
+			ArgumentLabels: []string{"key"},
+		}
+	default:
+		return dictionaryMembers[field]
+	}
 }
 
 func init() {

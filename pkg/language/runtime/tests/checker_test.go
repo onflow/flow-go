@@ -4241,6 +4241,36 @@ func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckDictionaryRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          x.remove(key: "abc")
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionaryRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          x.remove(key: true)
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
 func TestCheckFailableDowncastingAny(t *testing.T) {
 	RegisterTestingT(t)
 

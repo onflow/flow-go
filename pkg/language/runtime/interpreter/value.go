@@ -921,6 +921,18 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 	switch name {
 	case "length":
 		return IntValue{Int: big.NewInt(int64(len(v)))}
+	case "remove":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				key := dictionaryKey(arguments[0])
+				value, ok := v[key]
+				if !ok {
+					return trampoline.Done{Result: NilValue{}}
+				}
+				delete(v, key)
+				return trampoline.Done{Result: SomeValue{Value: value}}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
