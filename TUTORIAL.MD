@@ -1,3 +1,30 @@
+# General Feedback and Questions
+
+- For all the set-up instructions it would be great to have this aggregated into one source of truth with very explicit (Explain it to me like I'm 5 instructions). Eg. For the instructions for the VSCode extension, state clearly that you need to clone this repo, cd into this folder, etc.
+- It would be good to have a format for the examples something to the effect of:
+    - Here is how to download all the tools necessary
+    - Here's some example code
+    - Here's how you can run it
+    - Here's some code you can add to this.
+- If the aim of Flow is to be accessible (ie. As a developer who knows nothing about Flow, I should be able to pick up Flow quickly and be able to write a Blockchain with it). I think it would be really important to have a very thorough walk through of how to create a blockchain. This should be really ELI5 and a step by step walk through, not just explaining how to do things but also explaining Blockchain concepts.
+- The language docs are very good for programming language concepts, however to appeal to the masses, I think it would be really useful to have a very detailed walk through on how to go from absolute zero, to making something, and explaining the concepts along the way. For example, a Javascript developer isn't necessarily going to be familiar with the concept of Interfaces at all. The docs are very good at explaining what an interface is and how to use it in *theory*, which will totally work for some people, but to really appeal to those who learn better by creating something and experimenting with it, it would be great to have this explained by building on a project step by step. Sure, I can go to the docs about interfaces, but then I see code using the term 'resources' and my brain is like 'What? What's a resource??'.
+- 
+
+Questions:
+
+- What exactly is a Vault? Is it a type, or just a naming convention?
+- What is the benefit to using a Struct over a Resource or a Resource over a Struct?
+- Struct syntax - are we returning a Vault?
+- What is mean by 'Deployment' in this context. ie. What does it mean to deploy a resource?
+
+
+Below is a rough idea of how I think you might be able to structure a tutorial around Flow in order to build on each concept and finish with something that a user could write and run themselves and in doing so, learn Blockchain concepts while also learning Flow.
+
+I've borrowed and adapted explanations for these concepts from around the web and combining them with some examples of code from the Flow Language Documentation. I've approached this as someone learning Blockchain for the first time.
+
+---
+
+
 # Instructions
 These instructions are intended to walk you through how to set up an example sandbox to test out and play with the BPL.
 
@@ -290,3 +317,41 @@ To build and run this program we use the same command as before but with the vau
 go build cmd/main.go
 ./main examples/vault.bpl
 ```
+
+Congratulations! You've written your first Flow programs. Happy Coding!
+
+---
+
+
+## Accounts
+
+Accounts are a way to store funds. They are essentially public/private key pairs which you use to sign transactions.
+
+In Flow an account would look like this:
+
+```bpl
+struct interface Account {
+    pub init(at address: Address)
+}
+```
+
+**Public/Private Keys**
+Private and Public keys encode informaiton. 
+
+Public keys convert messages into a format that can't be read. If you only had a public key you would not be able to decode a message.
+
+Private keys are secret keys that are used to decrypt the messages.
+
+[Here](https://www.freecodecamp.org/news/https-explained-with-carrier-pigeons-7029d2193351/) is a really useful analogy that explains private and public keys in the context of HTTPS and carrier pigeons.
+
+**Transactions**
+
+Transactions are objects that get signed by an account(or accounts) and get sent to the chain to interact with it. 
+
+
+## Create an Account
+// TODO: Code example that would create an account
+
+
+## Create a Transaction
+// TODO: Code example that would create a transaction for that account
