@@ -46,7 +46,7 @@ grammar Strictus;
 }
 
 program
-    : declaration* EOF
+    : (declaration ';'?)* EOF
     ;
 
 declaration

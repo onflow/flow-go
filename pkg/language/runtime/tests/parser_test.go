@@ -3755,3 +3755,15 @@ func TestParseImportWithFromIdentifier(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parser.ParseProgram(`
+        import from from 0x0;
+        fun foo() {}; 
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
