@@ -4349,8 +4349,6 @@ func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
 }
 
-// TODO: requires array subtyping
-
 // TODO: add support for "wrapped" Any: optional, array, dictionary
 func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
 	RegisterTestingT(t)
@@ -4360,12 +4358,9 @@ func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
       let y: Int[]? = x as? Int[]
     `)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-
-	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
 }
 
@@ -4465,4 +4460,110 @@ func TestCheckArrayAppendBound(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: Int[] = []
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyArrayCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun foo(xs: Int[]) {
+          foo(xs: [])
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: Int[String] = {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyDictionaryCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun foo(xs: Int[String]) {
+          foo(xs: {})
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArraySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface I {}
+      struct S: I {}
+
+      let xs: S[] = []
+      let ys: I[] = xs
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArraySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: Bool[] = []
+      let ys: Int[] = xs
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckDictionarySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      interface I {}
+      struct S: I {}
+
+      let xs: S[String] = {}
+      let ys: I[String] = xs
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionarySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+     let xs: Bool[String] = {}
+     let ys: Int[String] = xs
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }

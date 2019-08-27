@@ -243,6 +243,41 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 			}
 		}
 		return false
+
+	case *DictionaryType:
+		typedSubType, ok := subType.(*DictionaryType)
+		if !ok {
+			return false
+		}
+
+		return checker.IsSubType(typedSubType.KeyType, typedSuperType.KeyType) &&
+			checker.IsSubType(typedSubType.ValueType, typedSuperType.ValueType)
+
+	case *VariableSizedType:
+		typedSubType, ok := subType.(*VariableSizedType)
+		if !ok {
+			return false
+		}
+
+		return checker.IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
+
+	case *ConstantSizedType:
+		typedSubType, ok := subType.(*ConstantSizedType)
+		if !ok {
+			return false
+		}
+
+		if typedSubType.Size != typedSuperType.Size {
+			return false
+		}
+
+		return checker.IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
 	}
 
 	// TODO: functions
@@ -1616,9 +1651,8 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 		}
 	}
 
-	// TODO: use bottom type
 	if elementType == nil {
-		elementType = &AnyType{}
+		elementType = &NeverType{}
 	}
 
 	return &VariableSizedType{
@@ -1668,12 +1702,11 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 		}
 	}
 
-	// TODO: use bottom type
 	if keyType == nil {
-		keyType = &AnyType{}
+		keyType = &NeverType{}
 	}
 	if valueType == nil {
-		valueType = &AnyType{}
+		valueType = &NeverType{}
 	}
 
 	return &DictionaryType{
