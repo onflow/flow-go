@@ -3035,8 +3035,7 @@ func TestInterpretStructureFunctionBindingInside(t *testing.T) {
         }
 	`)
 
-	value, err := inter.Invoke("test")
-	Expect(value, err).
+	Expect(inter.Invoke("test")).
 		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 }
 
@@ -3057,8 +3056,7 @@ func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
         }
 	`)
 
-	value, err := inter.Invoke("test")
-	Expect(value, err).
+	Expect(inter.Invoke("test")).
 		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 }
 
@@ -3073,8 +3071,7 @@ func TestInterpretArrayAppend(t *testing.T) {
       }
     `)
 
-	value, err := inter.Invoke("test")
-	Expect(value, err).
+	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
 				interpreter.IntValue{Int: big.NewInt(1)},
@@ -3097,8 +3094,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
       }
     `)
 
-	value, err := inter.Invoke("test")
-	Expect(value, err).
+	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
 				interpreter.IntValue{Int: big.NewInt(1)},
@@ -3106,5 +3102,29 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 				interpreter.IntValue{Int: big.NewInt(3)},
 				interpreter.IntValue{Int: big.NewInt(4)},
 			},
+		}))
+}
+
+func TestInterpretDictionaryRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      var removed: Int? = nil
+
+      fun test(): Int[String] {
+          let x = {"abc": 1, "def": 2}
+          removed = x.remove(key: "abc")
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.DictionaryValue{
+			interpreter.StringValue("def"): interpreter.IntValue{Int: big.NewInt(2)},
+		}))
+
+	Expect(inter.Globals["removed"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.IntValue{Int: big.NewInt(1)},
 		}))
 }

@@ -1701,25 +1701,20 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifier := expression.Identifier
 
 	var member *Member
-	var ok bool
 	switch ty := expressionType.(type) {
 	case *StructureType:
-		member, ok = ty.Members[identifier]
+		member = ty.Members[identifier]
 	case *InterfaceType:
-		member, ok = ty.Members[identifier]
+		member = ty.Members[identifier]
 	case *StringType:
-		member, ok = stringMembers[identifier]
+		member = stringMembers[identifier]
 	case ArrayType:
-		member, ok = arrayMembers[identifier]
-		if !ok {
-			member = getArrayMember(ty, identifier)
-			ok = member != nil
-		}
+		member = getArrayMember(ty, identifier)
 	case *DictionaryType:
-		member, ok = dictionaryMembers[identifier]
+		member = getDictionaryMember(ty, identifier)
 	}
 
-	if !isInvalidType(expressionType) && !ok {
+	if !isInvalidType(expressionType) && member == nil {
 		checker.report(
 			&NotDeclaredMemberError{
 				Type:     expressionType,
