@@ -224,6 +224,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#dictionaryEntry.
 	VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#identifier.
+	VisitIdentifier(ctx *IdentifierContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#eos.
 	VisitEos(ctx *EosContext) interface{}
 }

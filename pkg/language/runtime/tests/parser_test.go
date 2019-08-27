@@ -65,7 +65,7 @@ func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 		To(Equal(Position{Offset: 11, Line: 3, Column: 1}))
 
 	Expect(syntaxError1.Message).
-		To(ContainSubstring("expecting Identifier"))
+		To(ContainSubstring("mismatched input"))
 }
 
 func TestParseIncompleteConstantDeclaration2(t *testing.T) {
@@ -91,7 +91,7 @@ func TestParseIncompleteConstantDeclaration2(t *testing.T) {
 		To(Equal(Position{Offset: 10, Line: 2, Column: 9}))
 
 	Expect(syntaxError1.Message).
-		To(ContainSubstring("missing Identifier"))
+		To(ContainSubstring("missing"))
 
 	syntaxError2 := errors[1].(*parser.SyntaxError)
 
@@ -3719,4 +3719,51 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 
 	Expect(actual).
 		To(Equal(expected))
+}
+
+func TestParseFieldWithFromIdentifier(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parser.ParseProgram(`
+      struct S {
+          let from: String
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestParseFunctionWithFromIdentifier(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parser.ParseProgram(`
+        fun send(from: String, to: String) {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestParseImportWithFromIdentifier(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parser.ParseProgram(`
+        import from from 0x0
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parser.ParseProgram(`
+        import from from 0x0;
+        fun foo() {}; 
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
 }
