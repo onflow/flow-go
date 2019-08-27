@@ -83,7 +83,8 @@ message SignedTransaction {
   uint64 compute_used = 4;
   google.protobuf.Timestamp timestamp = 5;
   AccountSignature payer_signature = 6;
-  TransactionStatus status = 7;
+  repeated AccountSignature script_signatures = 7;
+  TransactionStatus status = 8;
 }
 
 message Collection {
