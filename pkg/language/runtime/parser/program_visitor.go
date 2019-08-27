@@ -62,7 +62,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
 
 	return &ast.FunctionDeclaration{
 		Access: access,
@@ -150,7 +150,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	identifiers := make([]ast.Identifier, len(allIdentifierNodes))
 	for i, identifierNode := range allIdentifierNodes {
 		identifier := identifierNode.GetText()
-		symbol := identifierNode.GetSymbol()
+		symbol := identifierNode.GetStart()
 		identifierPos := ast.PositionFromToken(symbol)
 		identifiers[i] = ast.Identifier{
 			Identifier: identifier,
@@ -193,7 +193,7 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
 
 	return &ast.StructureDeclaration{
 		Identifier: ast.Identifier{
@@ -214,7 +214,7 @@ func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{}
 	conformances := make([]*ast.NominalType, len(identifierNodes()))
 	for i, identifierNode := range identifierNodes() {
 		identifier := identifierNode.GetText()
-		pos := ast.PositionFromToken(identifierNode.GetSymbol())
+		pos := ast.PositionFromToken(identifierNode.GetStart())
 		conformances[i] = &ast.NominalType{
 			Identifier: ast.Identifier{
 				Identifier: identifier,
@@ -236,7 +236,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
 
 	typeContext := ctx.FullType()
 	fullType := typeContext.Accept(v).(ast.Type)
@@ -260,7 +260,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -313,7 +313,7 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
 
 	return &ast.InterfaceDeclaration{
 		Identifier: ast.Identifier{
@@ -372,7 +372,7 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 
 	// identifier
 	identifier := ctx.parameterName.GetText()
-	identifierPos := ast.PositionFromToken(ctx.parameterName)
+	identifierPos := ast.PositionFromToken(ctx.parameterName.GetStart())
 
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 
@@ -395,7 +395,7 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	// identifier?
 	if identifierNode != nil {
 		identifier := identifierNode.GetText()
-		position := ast.PositionFromToken(identifierNode.GetSymbol())
+		position := ast.PositionFromToken(identifierNode.GetStart())
 		return &ast.NominalType{
 			Identifier: ast.Identifier{
 				Identifier: identifier,
@@ -718,7 +718,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	identifierPosition := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifierPosition := ast.PositionFromToken(identifierNode.GetStart())
 
 	return &ast.VariableDeclaration{
 		IsConstant: isConstant,
@@ -799,7 +799,7 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
-	identifierSymbol := identifierNode.GetSymbol()
+	identifierSymbol := identifierNode.GetStart()
 
 	targetStartPosition := ast.PositionFromToken(identifierSymbol)
 
@@ -1122,7 +1122,7 @@ func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{}
 	identifier := identifierNode.GetText()
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	endPosition := ast.EndPosition(startPosition, identifierNode.GetSymbol().GetStop())
+	endPosition := ast.EndPosition(startPosition, identifierNode.GetStart().GetStop())
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
@@ -1413,7 +1413,7 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 	identifierNode := ctx.Identifier()
 
 	identifier := identifierNode.GetText()
-	identifierSymbol := identifierNode.GetSymbol()
+	identifierSymbol := identifierNode.GetStart()
 	identifierPos := ast.PositionFromToken(identifierSymbol)
 
 	return &ast.IdentifierExpression{
@@ -1448,7 +1448,7 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 	var labelStartPos, labelEndPos *ast.Position
 	if identifierNode != nil {
 		label = identifierNode.GetText()
-		symbol := identifierNode.GetSymbol()
+		symbol := identifierNode.GetStart()
 		startPos := ast.PositionFromToken(symbol)
 		endPos := ast.EndPosition(startPos, symbol.GetStop())
 		labelStartPos = &startPos

@@ -58,7 +58,7 @@ declaration
     ;
 
 importDeclaration
-    : 'import' (Identifier (',' Identifier)* 'from')? (stringLiteral | HexadecimalLiteral)
+    : Import (identifier (',' identifier)* From)? (stringLiteral | HexadecimalLiteral)
     ;
 
 access
@@ -68,7 +68,7 @@ access
     ;
 
 structureDeclaration
-    : Struct Identifier conformances '{'
+    : Struct identifier conformances '{'
         field*
         initializer[true]?
         functionDeclaration[true]*
@@ -76,7 +76,7 @@ structureDeclaration
     ;
 
 conformances
-    : (':' Identifier (',' Identifier)*)?
+    : (':' identifier (',' identifier)*)?
     ;
 
 variableKind
@@ -85,24 +85,24 @@ variableKind
     ;
 
 field
-    : access variableKind? Identifier ':' fullType
+    : access variableKind? identifier ':' fullType
     ;
 
 interfaceDeclaration
-    : Interface Identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
+    : Interface identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
 initializer[bool functionBlockRequired]
-    : Identifier parameterList
+    : identifier parameterList
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 functionDeclaration[bool functionBlockRequired]
-    : access Fun Identifier parameterList (':' returnType=fullType)?
+    : access Fun identifier parameterList (':' returnType=fullType)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
@@ -112,7 +112,7 @@ parameterList
     ;
 
 parameter
-    : (argumentLabel=Identifier)? parameterName=Identifier ':' fullType
+    : (argumentLabel=identifier)? parameterName=identifier ':' fullType
     ;
 
 fullType
@@ -124,7 +124,7 @@ typeIndex
     ;
 
 baseType
-    : Identifier
+    : identifier
     | functionType
     ;
 
@@ -198,11 +198,11 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind Identifier (':' fullType)? '=' expression
+    : variableKind identifier (':' fullType)? '=' expression
     ;
 
 assignment
-    : Identifier expressionAccess* '=' expression
+    : identifier expressionAccess* '=' expression
     ;
 
 expression
@@ -320,7 +320,7 @@ NilCoalescing : '??' ;
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : Identifier                                                  # IdentifierExpression
+    : identifier                                                  # IdentifierExpression
     | literal                                                     # LiteralExpression
     | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
     | '(' expression ')'                                          # NestedExpression
@@ -332,7 +332,7 @@ expressionAccess
     ;
 
 memberAccess
-    : '.' Identifier
+    : '.' identifier
     ;
 
 bracketExpression
@@ -344,7 +344,7 @@ invocation
     ;
 
 argument
-    : (Identifier ':')? expression
+    : (identifier ':')? expression
     ;
 
 literal
@@ -423,6 +423,14 @@ True : 'true' ;
 False : 'false' ;
 
 Nil : 'nil' ;
+
+Import : 'import' ;
+From : 'from' ;
+
+identifier
+    : Identifier
+    | From
+    ;
 
 Identifier
     : IdentifierHead IdentifierCharacter*

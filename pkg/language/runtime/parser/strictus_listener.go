@@ -220,6 +220,9 @@ type StrictusListener interface {
 	// EnterDictionaryEntry is called when entering the dictionaryEntry production.
 	EnterDictionaryEntry(c *DictionaryEntryContext)
 
+	// EnterIdentifier is called when entering the identifier production.
+	EnterIdentifier(c *IdentifierContext)
+
 	// EnterEos is called when entering the eos production.
 	EnterEos(c *EosContext)
 
@@ -435,6 +438,9 @@ type StrictusListener interface {
 
 	// ExitDictionaryEntry is called when exiting the dictionaryEntry production.
 	ExitDictionaryEntry(c *DictionaryEntryContext)
+
+	// ExitIdentifier is called when exiting the identifier production.
+	ExitIdentifier(c *IdentifierContext)
 
 	// ExitEos is called when exiting the eos production.
 	ExitEos(c *EosContext)
