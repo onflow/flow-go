@@ -4558,8 +4558,8 @@ func TestCheckInvalidDictionarySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-     let xs: Bool[String] = {}
-     let ys: Int[String] = xs
+      let xs: Bool[String] = {}
+      let ys: Int[String] = xs
 	`)
 
 	errs := expectCheckerErrors(err, 1)
