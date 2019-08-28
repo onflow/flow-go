@@ -58,7 +58,7 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
 // Exponentiation of fixed g1 in G1
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
 void _G1scalarGenMult(ep_st* res, bn_st *expo) {
-#define GENERIC_POINT 1
+#define GENERIC_POINT 0
 #define FIXED_MULT    (GENERIC_POINT^1)
 
 #if GENERIC_POINT
