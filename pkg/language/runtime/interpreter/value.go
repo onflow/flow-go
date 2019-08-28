@@ -197,7 +197,7 @@ type IntegerValue interface {
 // IntValue
 
 type IntValue struct {
-	*big.Int
+	Int *big.Int
 }
 
 func (v IntValue) isValue() {}
@@ -212,7 +212,11 @@ func (v IntValue) ToGoValue() interface{} {
 
 func (v IntValue) IntValue() int {
 	// TODO: handle overflow
-	return int(v.Int64())
+	return int(v.Int.Int64())
+}
+
+func (v IntValue) String() string {
+	return v.Int.String()
 }
 
 func (v IntValue) KeyString() string {

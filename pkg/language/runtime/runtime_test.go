@@ -371,3 +371,49 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	Expect(answer).
 		To(Equal(big.NewInt(42)))
 }
+
+func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script1 := []byte(`
+	  fun main(account: Account) {
+	      account.storage["count"] = 42
+	  }
+	`)
+
+	script2 := []byte(`
+	  fun main(account: Account): Int {
+	      let count = account.storage["count"] ?? panic("stored value is nil")
+	      return (count as? Int) ?? panic("not an Int")
+	  }
+	`)
+
+	var loggedMessages []string
+	var storedValue []byte
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValue, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValue = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(runtime.ExecuteScript(script2, runtimeInterface)).
+		To(Equal(big.NewInt(42)))
+}

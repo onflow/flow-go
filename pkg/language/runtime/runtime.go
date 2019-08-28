@@ -398,7 +398,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 		if !ok {
 			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
 		}
-		value := intValue.Bytes()
+		value := intValue.Int.Bytes()
 
 		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
 			panic(err)
@@ -545,7 +545,7 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 			return nil, errors.New("array value is not an Int")
 		}
 		// check 0 <= value < 256
-		if intValue.Cmp(big.NewInt(-1)) != 1 || intValue.Cmp(big.NewInt(256)) != -1 {
+		if intValue.Int.Cmp(big.NewInt(-1)) != 1 || intValue.Int.Cmp(big.NewInt(256)) != -1 {
 			return nil, errors.New("array value is not in byte range (0-255)")
 		}
 
