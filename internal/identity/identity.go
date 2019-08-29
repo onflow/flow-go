@@ -44,10 +44,31 @@ type Table interface {
 
 	TotalStake() *big.Int
 
-	FilterByID([]uint) (Table, error)
-	FilterByAddress([]string) (Table, error)
-	FilterByRole(NodeRole) (Table, error)
-	FilterByIndex([]uint) (Table, error)
+	// FilterByID returns a new Table that contains only nodes that are listed in ids.
+	// Note that the new Table is only populated with the SUBSET of nodes that are known.
+	// Nodes with unknown IDs are skipped. In this case, an error is returned along side
+	// the Table with the known nodes. The error lists all nodes that are unknown.
+	// The error is nil, if all nodes foe all desired IDs were found.
+	FilterByID(ids []uint) (Table, error)
+
+	// FilterByAddress returns a new Table that contains only nodes that are listed in addresses.
+	// Note that the new Table is only populated with the SUBSET of nodes that are known.
+	// Nodes with unknown addresses are skipped. In this case, an error is returned along side
+	// the Table with the known nodes. The error lists all nodes that are unknown.
+	// The error is nil, if all nodes foe all desired addresses were found.
+	FilterByAddress(addresses []string) (Table, error)
+
+	// FilterByRole returns a new Table that contains only nodes with the given role.
+	// If there are no nodes in the table with the given role, an error is returned
+	// and the returned table is empty. (this behaviour is consistewnt with the other FilterBy methods)
+	FilterByRole(role NodeRole) (Table, error)
+
+	// FilterByIndex returns a new Table that contains only nodes that are listed in indices.
+	// Note that the new Table is only populated with the SUBSET of nodes that are known.
+	// Nodes with unknown indices are skipped. In this case, an error is returned along side
+	// the Table withg the known nodes. The error lists all nodes that are unknown.
+	// The error is nil, if all nodes foe all desired indices were found.
+	FilterByIndex(indices []uint) (Table, error)
 }
 
 // NodeRecord provides information about one Node that (independent of potential other nodes)
@@ -153,10 +174,11 @@ func (t InMemoryIdentityTable) FilterByID(ids []uint) (Table, error) {
 			missing = append(missing, id)
 		}
 	}
+	tnew := NewInMemoryIdentityTable(nodes[0:idx])
 	if len(missing) > 0 {
-		return NewInMemoryIdentityTable(nodes[0:idx]), &NodeNotFoundError{fmt.Sprint(missing)}
+		return tnew, &NodeNotFoundError{fmt.Sprint(missing)}
 	}
-	return NewInMemoryIdentityTable(nodes[0:idx]), nil
+	return tnew, nil
 }
 
 func (t InMemoryIdentityTable) FilterByAddress(addresses []string) (Table, error) {
@@ -174,10 +196,11 @@ func (t InMemoryIdentityTable) FilterByAddress(addresses []string) (Table, error
 			missing = append(missing, addr)
 		}
 	}
+	tnew := NewInMemoryIdentityTable(nodes[0:idx])
 	if len(missing) > 0 {
-		return NewInMemoryIdentityTable(nodes[0:idx]), &NodeNotFoundError{fmt.Sprint(missing)}
+		return tnew, &NodeNotFoundError{fmt.Sprint(missing)}
 	}
-	return NewInMemoryIdentityTable(nodes[0:idx]), nil
+	return tnew, nil
 }
 
 func (t InMemoryIdentityTable) FilterByRole(role NodeRole) (Table, error) {
@@ -189,10 +212,11 @@ func (t InMemoryIdentityTable) FilterByRole(role NodeRole) (Table, error) {
 			idx++
 		}
 	}
+	tnew := NewInMemoryIdentityTable(nodes[0:idx])
 	if idx == 0 {
-		return nil, &NodeNotFoundError{fmt.Sprint(role)}
+		return tnew, &NodeNotFoundError{fmt.Sprint(role)}
 	}
-	return NewInMemoryIdentityTable(nodes[0:idx]), nil
+	return tnew, nil
 }
 
 func (t InMemoryIdentityTable) FilterByIndex(indices []uint) (Table, error) {
@@ -209,10 +233,11 @@ func (t InMemoryIdentityTable) FilterByIndex(indices []uint) (Table, error) {
 			missing = append(missing, i)
 		}
 	}
+	tnew := NewInMemoryIdentityTable(nodes[0:idx])
 	if len(missing) > 0 {
-		return NewInMemoryIdentityTable(nodes[0:idx]), &NodeNotFoundError{fmt.Sprint(missing)}
+		return tnew, &NodeNotFoundError{fmt.Sprint(missing)}
 	}
-	return NewInMemoryIdentityTable(nodes[0:idx]), nil
+	return tnew, nil
 }
 
 type NodeNotFoundError struct {
