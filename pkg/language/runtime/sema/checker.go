@@ -1113,7 +1113,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
-					Name:     target.Identifier,
+					Name:     target.Identifier.Identifier,
 					StartPos: assignment.Value.StartPosition(),
 					EndPos:   assignment.Value.EndPosition(),
 				},
@@ -1731,7 +1731,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	expressionType := expression.Expression.Accept(checker).(Type)
 
-	identifier := expression.Identifier
+	identifier := expression.Identifier.Identifier
 
 	var member *Member
 	switch ty := expressionType.(type) {
@@ -1752,8 +1752,8 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 			&NotDeclaredMemberError{
 				Type:     expressionType,
 				Name:     identifier,
-				StartPos: expression.StartPos,
-				EndPos:   expression.EndPos,
+				StartPos: expression.Identifier.StartPosition(),
+				EndPos:   expression.Identifier.EndPosition(),
 			},
 		)
 	}

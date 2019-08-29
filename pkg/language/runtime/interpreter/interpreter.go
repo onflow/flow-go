@@ -670,7 +670,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(StructureValue)
 
-			structure.SetMember(interpreter, target.Identifier, value)
+			structure.SetMember(interpreter, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -970,7 +970,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(ValueWithMembers)
-			return value.GetMember(interpreter, expression.Identifier)
+			return value.GetMember(interpreter, expression.Identifier.Identifier)
 		})
 }
 

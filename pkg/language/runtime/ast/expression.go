@@ -310,9 +310,7 @@ type AccessExpression interface {
 
 type MemberExpression struct {
 	Expression Expression
-	Identifier string
-	StartPos   Position
-	EndPos     Position
+	Identifier Identifier
 }
 
 func (e *MemberExpression) String() string {
@@ -323,11 +321,11 @@ func (e *MemberExpression) String() string {
 }
 
 func (e *MemberExpression) StartPosition() Position {
-	return e.StartPos
+	return e.Expression.StartPosition()
 }
 
 func (e *MemberExpression) EndPosition() Position {
-	return e.EndPos
+	return e.Identifier.EndPosition()
 }
 
 func (*MemberExpression) isIfStatementTest() {}

@@ -16,7 +16,7 @@ func init() {
 	format.MaxDepth = 100
 }
 
-func TestParseIncompleteConstKeyword(t *testing.T) {
+func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
@@ -42,7 +42,7 @@ func TestParseIncompleteConstKeyword(t *testing.T) {
 		To(ContainSubstring("extraneous input"))
 }
 
-func TestParseIncompleteConstantDeclaration1(t *testing.T) {
+func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
@@ -68,7 +68,7 @@ func TestParseIncompleteConstantDeclaration1(t *testing.T) {
 		To(ContainSubstring("mismatched input"))
 }
 
-func TestParseIncompleteConstantDeclaration2(t *testing.T) {
+func TestParseInvalidIncompleteConstantDeclaration2(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
@@ -400,9 +400,10 @@ func TestParseMemberExpression(t *testing.T) {
 					Pos:        Position{Offset: 14, Line: 2, Column: 13},
 				},
 			},
-			Identifier: "c",
-			StartPos:   Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:     Position{Offset: 16, Line: 2, Column: 15},
+			Identifier: Identifier{
+				Identifier: "c",
+				Pos:        Position{Offset: 16, Line: 2, Column: 15},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -1383,13 +1384,15 @@ func TestParseAccessAssignment(t *testing.T) {
 													Pos:        Position{Offset: 31, Line: 3, Column: 12},
 												},
 											},
-											Identifier: "foo",
-											StartPos:   Position{Offset: 32, Line: 3, Column: 13},
-											EndPos:     Position{Offset: 35, Line: 3, Column: 16},
+											Identifier: Identifier{
+												Identifier: "foo",
+												Pos:        Position{Offset: 33, Line: 3, Column: 14},
+											},
 										},
-										Identifier: "bar",
-										StartPos:   Position{Offset: 36, Line: 3, Column: 17},
-										EndPos:     Position{Offset: 39, Line: 3, Column: 20},
+										Identifier: Identifier{
+											Identifier: "bar",
+											Pos:        Position{Offset: 37, Line: 3, Column: 18},
+										},
 									},
 									Index: &IntExpression{
 										Value:    big.NewInt(0),
@@ -1407,9 +1410,10 @@ func TestParseAccessAssignment(t *testing.T) {
 								StartPos: Position{Offset: 43, Line: 3, Column: 24},
 								EndPos:   Position{Offset: 45, Line: 3, Column: 26},
 							},
-							Identifier: "baz",
-							StartPos:   Position{Offset: 46, Line: 3, Column: 27},
-							EndPos:     Position{Offset: 49, Line: 3, Column: 30},
+							Identifier: Identifier{
+								Identifier: "baz",
+								Pos:        Position{Offset: 47, Line: 3, Column: 28},
+							},
 						},
 						Value: &IntExpression{
 							Value:    big.NewInt(1),
@@ -1469,13 +1473,15 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 													Pos:        Position{Offset: 19, Line: 2, Column: 18},
 												},
 											},
-											Identifier: "foo",
-											StartPos:   Position{Offset: 20, Line: 2, Column: 19},
-											EndPos:     Position{Offset: 23, Line: 2, Column: 22},
+											Identifier: Identifier{
+												Identifier: "foo",
+												Pos:        Position{Offset: 21, Line: 2, Column: 20},
+											},
 										},
-										Identifier: "bar",
-										StartPos:   Position{Offset: 24, Line: 2, Column: 23},
-										EndPos:     Position{Offset: 27, Line: 2, Column: 26},
+										Identifier: Identifier{
+											Identifier: "bar",
+											Pos:        Position{Offset: 25, Line: 2, Column: 24},
+										},
 									},
 									Index: &IntExpression{
 										Value:    big.NewInt(0),
@@ -1493,9 +1499,10 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 								StartPos: Position{Offset: 31, Line: 2, Column: 30},
 								EndPos:   Position{Offset: 33, Line: 2, Column: 32},
 							},
-							Identifier: "baz",
-							StartPos:   Position{Offset: 34, Line: 2, Column: 33},
-							EndPos:     Position{Offset: 37, Line: 2, Column: 36},
+							Identifier: Identifier{
+								Identifier: "baz",
+								Pos:        Position{Offset: 35, Line: 2, Column: 34},
+							},
 						},
 					},
 				},
@@ -2877,9 +2884,10 @@ func TestParseStructure(t *testing.T) {
 										Pos:        Position{Offset: 103, Line: 6, Column: 16},
 									},
 								},
-								Identifier: "foo",
-								StartPos:   Position{Offset: 107, Line: 6, Column: 20},
-								EndPos:     Position{Offset: 110, Line: 6, Column: 23},
+								Identifier: Identifier{
+									Identifier: "foo",
+									Pos:        Position{Offset: 108, Line: 6, Column: 21},
+								},
 							},
 							Value: &IdentifierExpression{
 								Identifier: Identifier{
@@ -2921,9 +2929,10 @@ func TestParseStructure(t *testing.T) {
 											Pos:        Position{Offset: 192, Line: 10, Column: 23},
 										},
 									},
-									Identifier: "foo",
-									StartPos:   Position{Offset: 196, Line: 10, Column: 27},
-									EndPos:     Position{Offset: 199, Line: 10, Column: 30},
+									Identifier: Identifier{
+										Identifier: "foo",
+										Pos:        Position{Offset: 197, Line: 10, Column: 28},
+									},
 								},
 								StartPos: Position{Offset: 185, Line: 10, Column: 16},
 								EndPos:   Position{Offset: 199, Line: 10, Column: 30},
@@ -3766,4 +3775,30 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestParseInvalidTypeWithWhitespace(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+	    let x: Int ? = 1
+	`)
+
+	Expect(actual).
+		To(BeNil())
+
+	Expect(err).
+		To(BeAssignableToTypeOf(parser.Error{}))
+
+	errors := err.(parser.Error).Errors
+	Expect(errors).
+		To(HaveLen(1))
+
+	syntaxError := errors[0].(*parser.SyntaxError)
+
+	Expect(syntaxError.Pos).
+		To(Equal(Position{Offset: 17, Line: 2, Column: 16}))
+
+	Expect(syntaxError.Message).
+		To(ContainSubstring("no viable alternative"))
 }

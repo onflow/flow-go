@@ -481,25 +481,10 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 
 	for _, optional := range ctx.optionals {
-		switch optional.GetTokenType() {
-		case StrictusLexerOptional:
-			endPos := ast.PositionFromToken(optional)
-			result = &ast.OptionalType{
-				Type:   result,
-				EndPos: endPos,
-			}
-			continue
-		case StrictusLexerNilCoalescing:
-			endPosInner := ast.PositionFromToken(optional)
-			endPosOuter := endPosInner.Shifted(1)
-			result = &ast.OptionalType{
-				Type: &ast.OptionalType{
-					Type:   result,
-					EndPos: endPosInner,
-				},
-				EndPos: endPosOuter,
-			}
-			continue
+		endPos := ast.PositionFromToken(optional)
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
 		}
 	}
 
@@ -1101,8 +1086,6 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 		return &ast.MemberExpression{
 			Expression: wrapped,
 			Identifier: partialAccessExpression.Identifier,
-			StartPos:   partialAccessExpression.StartPos,
-			EndPos:     partialAccessExpression.EndPos,
 		}
 	}
 
@@ -1119,16 +1102,17 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
 	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
-	endPosition := ast.EndPosition(startPosition, identifierNode.GetStart().GetStop())
+	identifier := identifierNode.GetText()
+	identifierSymbol := identifierNode.GetStart()
+	identifierPos := ast.PositionFromToken(identifierSymbol)
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
-		Identifier: identifier,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		Identifier: ast.Identifier{
+			Identifier: identifier,
+			Pos:        identifierPos,
+		},
 	}
 }
 
