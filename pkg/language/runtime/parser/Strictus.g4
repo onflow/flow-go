@@ -44,7 +44,7 @@ grammar Strictus;
             (_type == StrictusParserTerminator)
     }
 
-    func (p *StrictusParser) whiteSpaceBehind() bool {
+    func (p *StrictusParser) noWhitespace() bool {
     	index := p.GetCurrentToken().GetTokenIndex()
     	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
     }
@@ -122,8 +122,8 @@ parameter
 
 fullType
     : baseType
-      ({p.whiteSpaceBehind()}? typeIndex)*
-      ({p.whiteSpaceBehind()}? optionals+=Optional)*
+      ({p.noWhitespace()}? typeIndex)*
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 typeIndex

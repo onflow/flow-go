@@ -408,7 +408,7 @@ func (p *StrictusParser) lineTerminatorAhead() bool {
 		(_type == StrictusParserTerminator)
 }
 
-func (p *StrictusParser) whiteSpaceBehind() bool {
+func (p *StrictusParser) noWhitespace() bool {
 	index := p.GetCurrentToken().GetTokenIndex()
 	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
 }
@@ -2995,8 +2995,8 @@ func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
 		if _alt == 1 {
 			p.SetState(275)
 
-			if !(p.whiteSpaceBehind()) {
-				panic(antlr.NewFailedPredicateException(p, "p.whiteSpaceBehind()", ""))
+			if !(p.noWhitespace()) {
+				panic(antlr.NewFailedPredicateException(p, "p.noWhitespace()", ""))
 			}
 			{
 				p.SetState(276)
@@ -3016,8 +3016,8 @@ func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
 		if _alt == 1 {
 			p.SetState(282)
 
-			if !(p.whiteSpaceBehind()) {
-				panic(antlr.NewFailedPredicateException(p, "p.whiteSpaceBehind()", ""))
+			if !(p.noWhitespace()) {
+				panic(antlr.NewFailedPredicateException(p, "p.noWhitespace()", ""))
 			}
 			{
 				p.SetState(283)
@@ -11162,10 +11162,10 @@ func (p *StrictusParser) FunctionDeclaration_Sempred(localctx antlr.RuleContext,
 func (p *StrictusParser) FullType_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 2:
-		return p.whiteSpaceBehind()
+		return p.noWhitespace()
 
 	case 3:
-		return p.whiteSpaceBehind()
+		return p.noWhitespace()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
