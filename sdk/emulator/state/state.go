@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
+	"github.com/dapperlabs/bamboo-node/sdk/emulator/execution"
 	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
 )
 
@@ -17,7 +18,7 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	Transactions      map[string]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	Registers         etypes.Registers
+	Registers         execution.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -28,7 +29,7 @@ func NewWorldState() *WorldState {
 	blocks := make(map[string]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[string]*types.SignedTransaction)
-	registers := make(etypes.Registers)
+	registers := make(execution.Registers)
 
 	genesis := etypes.GenesisBlock()
 	blocks[string(genesis.Hash().Bytes())] = genesis
@@ -103,8 +104,8 @@ func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
 	return exists
 }
 
-// SetRegisters commmits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers etypes.Registers) {
+// SetRegisters commits a set of registers to the state.
+func (ws *WorldState) SetRegisters(registers execution.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 

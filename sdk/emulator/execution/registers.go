@@ -1,4 +1,4 @@
-package types
+package execution
 
 // Registers is a map of register values.
 type Registers map[string][]byte
