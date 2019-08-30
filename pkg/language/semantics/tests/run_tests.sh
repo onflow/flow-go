@@ -30,4 +30,5 @@ for f in parser/invalid/*.bpl; do
     printf "FAIL %s\n" "$f" 
   fi
 done
+if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
 echo DONE

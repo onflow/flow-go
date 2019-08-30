@@ -1,31 +1,33 @@
-module BPL-LITERALS
-  imports INT-SYNTAX
+module BPL-TOKENS
+  /* This module defines concrete token syntax that
+     we want to allow in programs but not in rules
+     of this semantics, to avoid ambiguity with K syntax.
+   */
+  imports BPL-TERMS
   syntax IntLit ::=
-     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [prec(1),token]
-   | r"-?0o[0-7]([_0-7]*[0-7])?" [prec(1),token]
-   | r"-?0b[01]([_01]*[01])?" [prec(1),token]
-   | Int [token]
-   | r"-?[0-9]+_[_0-9]*[0-9]" [prec(1),token]
-  syntax Id ::=
-     r"(?<![A-Za-z0-9\\_])[_a-zA-Z][_a-zA-Z0-9]*" [prec(1), token, notInRules, autoReject]
-     /*
-  syntax BPLString ::= r"[\\\"](([^\\\"\\n\\r\\\\])|([\\\\][nrtf\\\"\\\\])|([\\\\][x][0-9a-fA-F]{2})|([\\\\][u][0-9a-fA-F]{4})|([\\\\][U][0-9a-fA-F]{8}))*[\\\"]"      [token]
-    */
+     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
+   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
+   | r"-?0b[01]([_01]*[01])?" [token]
+   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
+  syntax Ident ::=
+     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
   syntax BPLString ::=
      r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
 endmodule
 
-module BPL-SYNTAX
+module BPL-TERMS
   imports INT-SYNTAX
-  imports STRING-SYNTAX
-  imports BPL-LITERALS
+
+  syntax IntLit ::= Int [token]
+  syntax Ident
+  syntax BPLString
 
   syntax Definition ::=
      FunDef
    | VarDef
-   | "struct" Id OptConformances "{" CompositeItems "}"
-   | "resource" Id OptConformances "{" CompositeItems "}"
-   | "interface" Id "{" InterfaceItems "}"
+   | "struct" Ident OptConformances "{" CompositeItems "}"
+   | "resource" Ident OptConformances "{" CompositeItems "}"
+   | "interface" Ident "{" InterfaceItems "}"
    // should there be separate "struct interface" and "resource interface"?
    | "impl" TypeId "for" TypeId "{" ImplBody "}"
 //   | "using" TypeId "from" AddressLiteral
@@ -43,11 +45,10 @@ module BPL-SYNTAX
      "}"
   syntax Fields ::= List{FieldDecl,""}
 
-  syntax AddressLiteral ::= r"0x[0-9a-fA-F]+" [token]
   syntax FileName ::= BPLString
   syntax ImportSource ::= IntLit | BPLString
 
-  syntax FunDef ::= "fun" Id "(" Formals ")" OptAnnot "{" FunBody "}"
+  syntax FunDef ::= "fun" Ident "(" Formals ")" OptAnnot "{" FunBody "}"
 
   syntax CompositeItems ::= List{CompositeItem,""}
   syntax CompositeItem ::= Access Definition
@@ -64,18 +65,18 @@ module BPL-SYNTAX
                          | Access InterfaceFieldDecl
                          | Access InterfaceFunDecl
                          | Access "init" "(" Formals ")"
-  syntax InterfaceFieldDecl ::= "var" Id ":" Type OptFieldContracts
-                              | "let" Id ":" Type OptFieldContracts
-                              |       Id ":" Type OptFieldContracts
+  syntax InterfaceFieldDecl ::= "var" Ident ":" Type OptFieldContracts
+                              | "let" Ident ":" Type OptFieldContracts
+                              |       Ident ":" Type OptFieldContracts
   syntax OptFieldContracts ::= "{" AccessorContracts "}"
                              | ""
-  syntax InterfaceFunDecl ::= "fun" Id "(" Formals ")" OptAnnot
-                            | "fun" Id "(" Formals ")" OptAnnot "{" Contract "}"
+  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")" OptAnnot
+                            | "fun" Ident "(" Formals ")" OptAnnot "{" Contract "}"
 
   syntax AccessorContracts ::= List{AccessorContract,""}
   syntax AccessorContract ::=
      "get" "{" Contract "}"
-   | "set" "(" Id ")" "{" Contract "}"
+   | "set" "(" Ident ")" "{" Contract "}"
 
   syntax ImplBody ::= List{ImplItem,";"}
   syntax ImplItem ::= Access Definition
@@ -83,22 +84,22 @@ module BPL-SYNTAX
                     | Access FieldDecl // must be a synthetic field
 
   syntax FieldDecl ::=
-     "let" Id ":" Type
-   | "var" Id ":" Type
-   | "synthetic" Id "{" AccessorDefs "}"
+     "let" Ident ":" Type
+   | "var" Ident ":" Type
+   | "synthetic" Ident "{" AccessorDefs "}"
   syntax AccessorDefs ::= List{AccessorDef,""}
   syntax AccessorDef ::= "get" "{" FunBody "}"
-                       | "set" "(" Id ")" "{" FunBody "}"
+                       | "set" "(" Ident ")" "{" FunBody "}"
   // Nesting left out for now
 
   syntax VarDef ::=
-     "let" Id OptAnnot "=" Exp
-   | "let" Id OptAnnot "<-" Exp
-   | "var" Id OptAnnot "=" Exp
-   | "var" Id OptAnnot "<-" Exp
+     "let" Ident OptAnnot "=" Exp
+   | "let" Ident OptAnnot "<-" Exp
+   | "var" Ident OptAnnot "=" Exp
+   | "var" Ident OptAnnot "<-" Exp
 
-  syntax Formal ::= Id Id ":" Type
-                  |    Id ":" Type
+  syntax Formal ::= Ident Ident ":" Type
+                  |       Ident ":" Type
   syntax Formals ::= List{Formal,","}
 
   syntax FunBody ::= Contract Block
@@ -132,17 +133,17 @@ module BPL-SYNTAX
                  | "else" "{" Block "}"
                  | "else" "if" IfCond "{" Block "}" Elses
   syntax IfCond ::= Exp
-                  | "var" Id "=" Exp
+                  | "var" Ident "=" Exp
   syntax Block ::= List{Stmt,";"}
 
-  syntax Path ::= Id
+  syntax Path ::= Ident
                 | "self"
                 | Path "[" Exp "]"
-                | Path "." Id
+                | Path "." Ident
 
   syntax Exp ::= IntLit
                | BPLString
-               | Id
+               | Ident
                | "self"
                | "nil"
                | "true"
@@ -153,9 +154,9 @@ module BPL-SYNTAX
                | "{" DictEntries "}" [strict(1)]
                | "fun" "(" Formals ")" OptAnnot "{" FunBody "}"
                | Exp "[" Exp "]" [left, seqstrict]
-               | Exp "." Id    [left, strict(1)] // field access
-               | Id "(" Actuals ")" [strict(2)]
-               | Exp "." Id "(" Actuals ")" [seqstrict(1,3)]
+               | Exp "." Ident    [left, strict(1)] // field access
+               | Ident "(" Actuals ")" [strict(2)]
+               | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
                | TypeId "(" Actuals ")"          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
                > "-" Exp       [      strict]
@@ -184,14 +185,14 @@ module BPL-SYNTAX
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
 
-  syntax Actual ::= Id ":" Exp [strict(2)]
+  syntax Actual ::= Ident ":" Exp [strict(2)]
                   | Exp
   syntax Actuals ::= List{Actual,","}
 
-  syntax TypeId ::= Id // plus fully qualified names
+  syntax TypeId ::= Ident // plus fully qualified names
   syntax TypeIds ::= List{TypeId,","}
 
-  syntax Type ::= Id
+  syntax Type ::= Ident
                 | "Self"
                 | "(" "(" Types ")" ":" Type ")"
                 | Type "?"
@@ -202,14 +203,18 @@ module BPL-SYNTAX
   syntax Types ::= List{Type,","}
 
   syntax Pgm ::= List{TopDefinition,";"}
+endmodule
 
-  syntax KResult ::= Int
+module BPL-SYNTAX
+  imports BPL-TERMS
+  imports BPL-TOKENS
 endmodule
 
 module BPL
   imports DOMAINS
-  imports BPL-SYNTAX
+  imports BPL-TERMS
 
+  syntax KResult ::= Int
   configuration
     <k>$PGM:Pgm</k>
 endmodule

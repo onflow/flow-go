@@ -9,4 +9,4 @@ test: kompiled
 	tests/run_tests.sh
 
 clean:
-	rm -r bpl-kompiled/
+	rm -rf bpl-kompiled/
