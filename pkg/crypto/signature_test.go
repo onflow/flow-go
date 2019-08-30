@@ -61,7 +61,7 @@ func benchSign(b *testing.B, salg Signer, halg Hasher) {
 
 	input := []byte("Bench input")
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = salg.SignBytes(sk, input, halg)
 	}
@@ -76,7 +76,7 @@ func benchVerify(b *testing.B, salg Signer, halg Hasher) {
 	input := []byte("Bench input")
 	s, _ := salg.SignBytes(sk, input, halg)
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = salg.VerifyBytes(pk, s, input, halg)
 	}

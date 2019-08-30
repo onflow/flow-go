@@ -22,7 +22,7 @@ func BenchmarkG1(b *testing.B) {
 	randZr(&expo, []byte{0})
 	var res pointG1
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_G1scalarGenMult(&res, &expo)
 	}
@@ -49,7 +49,7 @@ func BenchmarkG2(b *testing.B) {
 	randZr(&expo, []byte{0})
 	var res pointG2
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_G2scalarGenMult(&res, &expo)
 	}
@@ -59,8 +59,9 @@ func BenchmarkG2(b *testing.B) {
 
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
+	NewSignatureAlgo(BLS_BLS12381)
 	input := []byte("Bench input")
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		hashToG1(input)
 	}

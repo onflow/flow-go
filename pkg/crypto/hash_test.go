@@ -44,6 +44,7 @@ func checkBytes(t *testing.T, input, expected, result []byte) {
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
 	alg, _ := NewHashAlgo(SHA3_256)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		alg.ComputeBytesHash(a)
 	}
