@@ -43,6 +43,11 @@ grammar Strictus;
         return (_type == StrictusParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
             (_type == StrictusParserTerminator)
     }
+
+    func (p *StrictusParser) noWhitespace() bool {
+    	index := p.GetCurrentToken().GetTokenIndex()
+    	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
+    }
 }
 
 program
@@ -116,7 +121,9 @@ parameter
     ;
 
 fullType
-    : baseType typeIndex* (optionals+=(Optional|NilCoalescing))*
+    : baseType
+      ({p.noWhitespace()}? typeIndex)*
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 typeIndex
@@ -315,7 +322,7 @@ Negate : '!' ;
 
 Optional : '?' ;
 
-NilCoalescing : '??' ;
+NilCoalescing : WS '??';
 
 FailableDowncasting : 'as?' ;
 
