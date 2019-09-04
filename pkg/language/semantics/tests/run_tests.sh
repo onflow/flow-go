@@ -1,4 +1,6 @@
 #!/bin/bash
+trap 'exit 0' INT
+
 export OPAMROOT=/usr/lib/kframework/lib/opamroot
 cd $(dirname $0)
 export KRUN_COMPILED_DEF="$(cd ..;pwd)"
