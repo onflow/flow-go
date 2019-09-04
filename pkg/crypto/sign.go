@@ -10,35 +10,40 @@ import (
 func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
 		a := &(BLS_BLS12381Algo{
-			nil,
-			&SignAlgo{
+			SignAlgo: &SignAlgo{
 				name,
 				prKeyLengthBLS_BLS12381,
 				pubKeyLengthBLS_BLS12381,
-				signatureLengthBLS_BLS12381}})
+				signatureLengthBLS_BLS12381,
+			},
+		})
 		a.init()
 		return a, nil
 	}
 
 	if name == ECDSA_P256 {
 		a := &(ECDSAalgo{
-			elliptic.P256(),
-			&SignAlgo{
+			curve: elliptic.P256(),
+			SignAlgo: &SignAlgo{
 				name,
 				PrKeyLengthECDSA_P256,
 				PubKeyLengthECDSA_P256,
-				SignatureLengthECDSA_P256}})
+				SignatureLengthECDSA_P256,
+			},
+		})
 		return a, nil
 	}
 
 	if name == ECDSA_SECp256k1 {
 		a := &(ECDSAalgo{
-			secp256k1(),
-			&SignAlgo{
+			curve: secp256k1(),
+			SignAlgo: &SignAlgo{
 				name,
 				PrKeyLengthECDSA_SECp256k1,
 				PubKeyLengthECDSA_SECp256k1,
-				SignatureLengthECDSA_SECp256k1}})
+				SignatureLengthECDSA_SECp256k1,
+			},
+		})
 		return a, nil
 	}
 
