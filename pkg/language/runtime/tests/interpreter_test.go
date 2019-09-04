@@ -3128,3 +3128,25 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 			Value: interpreter.IntValue{Int: big.NewInt(1)},
 		}))
 }
+
+func TestInterpretUnaryMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      resource X {}
+
+      fun foo(x: <-X): <-X {
+          return x
+      }
+
+      var x <- foo(x: <-X())
+
+      fun bar() {
+          x <- X()
+      }
+	`)
+
+	_, err := inter.Invoke("bar")
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

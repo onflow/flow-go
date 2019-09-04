@@ -44,11 +44,11 @@ func (s *BaseStrictusListener) EnterAccess(ctx *AccessContext) {}
 // ExitAccess is called when production access is exited.
 func (s *BaseStrictusListener) ExitAccess(ctx *AccessContext) {}
 
-// EnterStructureDeclaration is called when production structureDeclaration is entered.
-func (s *BaseStrictusListener) EnterStructureDeclaration(ctx *StructureDeclarationContext) {}
+// EnterCompositeDeclaration is called when production compositeDeclaration is entered.
+func (s *BaseStrictusListener) EnterCompositeDeclaration(ctx *CompositeDeclarationContext) {}
 
-// ExitStructureDeclaration is called when production structureDeclaration is exited.
-func (s *BaseStrictusListener) ExitStructureDeclaration(ctx *StructureDeclarationContext) {}
+// ExitCompositeDeclaration is called when production compositeDeclaration is exited.
+func (s *BaseStrictusListener) ExitCompositeDeclaration(ctx *CompositeDeclarationContext) {}
 
 // EnterConformances is called when production conformances is entered.
 func (s *BaseStrictusListener) EnterConformances(ctx *ConformancesContext) {}

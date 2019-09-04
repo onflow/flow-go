@@ -4567,3 +4567,24 @@ func TestCheckInvalidDictionarySubtyping(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckUnaryMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun foo(x: <-X): <-X {
+          return x
+      }
+
+      var x <- foo(x: <-X())
+
+      fun bar() {
+          x <- X()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}

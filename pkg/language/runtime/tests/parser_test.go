@@ -3802,3 +3802,213 @@ func TestParseInvalidTypeWithWhitespace(t *testing.T) {
 	Expect(syntaxError.Message).
 		To(ContainSubstring("no viable alternative"))
 }
+
+func TestParseResource(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+        resource Test {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &StructureDeclaration{
+		Identifier: Identifier{
+			Identifier: "Test",
+			Pos:        Position{Offset: 18, Line: 2, Column: 17},
+		},
+
+		Conformances: []*NominalType{},
+		StartPos:     Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:       Position{Offset: 24, Line: 2, Column: 23},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseMoveType(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+        fun test(): <-X {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &FunctionDeclaration{
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		ReturnType: &NominalType{
+			Identifier: Identifier{
+				Identifier: "X",
+				Pos:        Position{Offset: 23, Line: 2, Column: 22},
+			},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				StartPos: Position{Offset: 25, Line: 2, Column: 24},
+				EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseMovingVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+        let x <- y
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "x",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Value: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "y",
+				Pos:        Position{Offset: 18, Line: 2, Column: 17},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseMoveStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+        fun test() {
+            x <- y
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &FunctionDeclaration{
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		ReturnType: &NominalType{
+			Identifier: Identifier{
+				Identifier: "",
+				Pos:        Position{Offset: 18, Line: 2, Column: 17},
+			},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&AssignmentStatement{
+						Target: &IdentifierExpression{
+							Identifier: Identifier{
+								Identifier: "x",
+								Pos:        Position{Offset: 34, Line: 3, Column: 12},
+							},
+						},
+						Value: &IdentifierExpression{
+							Identifier: Identifier{
+								Identifier: "y",
+								Pos:        Position{Offset: 39, Line: 3, Column: 17},
+							},
+						},
+					},
+				},
+				StartPos: Position{Offset: 20, Line: 2, Column: 19},
+				EndPos:   Position{Offset: 49, Line: 4, Column: 8},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseMoveOperator(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+      let x = foo(<-y)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "x",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Value: &InvocationExpression{
+			InvokedExpression: &IdentifierExpression{
+				Identifier: Identifier{
+					Identifier: "foo",
+					Pos:        Position{Offset: 15, Line: 2, Column: 14},
+				},
+			},
+			Arguments: []*Argument{
+				{
+					Label:         "",
+					LabelStartPos: nil,
+					LabelEndPos:   nil,
+					Expression: &UnaryExpression{
+						Operation: OperationMove,
+						Expression: &IdentifierExpression{
+							Identifier: Identifier{
+								Identifier: "y",
+								Pos:        Position{Offset: 21, Line: 2, Column: 20},
+							},
+						},
+						StartPos: Position{Offset: 19, Line: 2, Column: 18},
+						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					},
+				},
+			},
+			EndPos: Position{Offset: 22, Line: 2, Column: 21},
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}

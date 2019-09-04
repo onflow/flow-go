@@ -23,6 +23,7 @@ const (
 	OperationMod
 	OperationNegate
 	OperationNilCoalesce
+	OperationMove
 )
 
 func (s Operation) Symbol() string {
@@ -57,6 +58,8 @@ func (s Operation) Symbol() string {
 		return "!"
 	case OperationNilCoalesce:
 		return "??"
+	case OperationMove:
+		return "<-"
 	}
 
 	panic(&errors.UnreachableError{})
