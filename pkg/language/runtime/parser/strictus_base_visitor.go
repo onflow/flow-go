@@ -23,7 +23,7 @@ func (v *BaseStrictusVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+func (v *BaseStrictusVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

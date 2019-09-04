@@ -55,7 +55,7 @@ program
     ;
 
 declaration
-    : structureDeclaration
+    : compositeDeclaration
     | interfaceDeclaration
     | functionDeclaration[true]
     | variableDeclaration
@@ -72,8 +72,8 @@ access
     | PubSet
     ;
 
-structureDeclaration
-    : Struct identifier conformances '{'
+compositeDeclaration
+    : (Struct | Resource) identifier conformances '{'
         field*
         initializer[true]?
         functionDeclaration[true]*
@@ -121,7 +121,8 @@ parameter
     ;
 
 fullType
-    : baseType
+    : Move?
+      baseType
       ({p.noWhitespace()}? typeIndex)*
       ({p.noWhitespace()}? optionals+=Optional)*
     ;
@@ -205,11 +206,11 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' fullType)? '=' expression
+    : variableKind identifier (':' fullType)? ('='| Move) expression
     ;
 
 assignment
-    : identifier expressionAccess* '=' expression
+    : identifier expressionAccess* ('=' | Move) expression
     ;
 
 expression
@@ -316,9 +317,11 @@ Mod : '%' ;
 unaryOp
     : Minus
     | Negate
+    | Move
     ;
 
 Negate : '!' ;
+Move : '<-' ;
 
 Optional : '?' ;
 
@@ -402,6 +405,7 @@ CloseParen: ')' ;
 Transaction : 'transaction' ;
 
 Struct : 'struct' ;
+Resource : 'resource' ;
 
 Interface : 'interface' ;
 

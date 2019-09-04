@@ -167,7 +167,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
-func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	identifierNode := ctx.Identifier()
 	identifier := identifierNode.GetText()
 
@@ -194,6 +194,8 @@ func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationCont
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 	identifierPos := ast.PositionFromToken(identifierNode.GetStart())
+
+	// TODO: return resource declaration if resource keyword is used
 
 	return &ast.StructureDeclaration{
 		Identifier: ast.Identifier{
@@ -1043,6 +1045,10 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 
 	if ctx.Minus() != nil {
 		return ast.OperationMinus
+	}
+
+	if ctx.Move() != nil {
+		return ast.OperationMove
 	}
 
 	panic(&errors.UnreachableError{})

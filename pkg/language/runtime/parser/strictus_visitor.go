@@ -23,8 +23,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#access.
 	VisitAccess(ctx *AccessContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#structureDeclaration.
-	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
+	// Visit a parse tree produced by StrictusParser#compositeDeclaration.
+	VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#conformances.
 	VisitConformances(ctx *ConformancesContext) interface{}

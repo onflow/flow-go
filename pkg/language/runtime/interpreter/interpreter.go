@@ -1016,6 +1016,9 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			case ast.OperationMinus:
 				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
+
+			case ast.OperationMove:
+				return value
 			}
 
 			panic(&unsupportedOperation{

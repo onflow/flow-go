@@ -1592,6 +1592,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 			)
 		}
 		return valueType
+
+	// TODO: check
+	case ast.OperationMove:
+		return valueType
 	}
 
 	panic(&unsupportedOperation{
