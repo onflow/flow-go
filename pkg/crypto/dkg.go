@@ -1,13 +1,20 @@
 package crypto
 
-// AlgoName is the supported algos type
+import (
+	"fmt"
+)
+
+// DKGtype is the supported DKG type
 type DKGtype int
 
+// Supported DKG protocols
 const (
-	// Supported DKG protocols
+	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	FeldmanVSS DKGtype = iota
+	// Joit Feldman
 	JointFeldman
-	JGKR
+	// Gennaro et.al protocl
+	GJKR
 )
 
 type DKGinput struct { // should be protobuff
@@ -29,40 +36,49 @@ type DKGstate interface {
 	// Threshold returns the threshold value t
 	Threshold() int
 	// PrivateKey returns the private key share of the current node
-	PrivateKey() PrivateKey
+	PrivateKey() PrKey
 	// StartDKG starts running a DKG
-	StartDKG() (DKGoutput, Error)
-}	
+	StartDKG() (*DKGoutput, error)
+	// EndDKG ends a DKG protocol, the public data and node private key are computed
+	EndDKG() error
+}
 
-
-func NewDKG(type DKGtype, size int, myIndex int, leaderIndex int) (DKGstate, Error) {
+func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	// assuming the protocol requires:
 	//   m<=t for unforgeability
 	//   n-m<=t+1 for robustness
-	threshold := (size-1)/2
-	if type == FeldmanVSS {
-		common := &(DKGcommon{size, threshold, myIndex})
-		fvss := &(FeldmanVSS{common, leaderIndex, nil})
+	threshold := (size - 1) / 2
+	if dkg == FeldmanVSS {
+		common := &(DKGcommon{
+			size:         size,
+			threshold:    threshold,
+			currentIndex: currentIndex,
+		})
+		fvss := &(feldmanVSSstate{
+			DKGcommon:   common,
+			leaderIndex: leaderIndex,
+		})
 		fvss.init()
 		return fvss, nil
 	}
 
-	return nil, cryptoError{Sprintf("The Distributed Key Generation %d is not supported.", type)}
+	return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 }
-
-
 
 type DKGcommon struct {
-	size int
-	threshold int
-	myIndex int
+	size         int
+	threshold    int
+	currentIndex int
+	running      bool
 }
 
-func (s *DKGcommon) Size() {
+// Size returns the size of the DKG group n
+func (s *DKGcommon) Size() int {
 	return s.size
 }
 
-func (s *DKGcommon) Threshold() {
+// Threshold returns the threshold value t
+func (s *DKGcommon) Threshold() int {
 	return s.threshold
 }
