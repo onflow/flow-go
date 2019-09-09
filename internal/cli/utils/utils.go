@@ -27,6 +27,20 @@ func DecodePrivateKey(derHex string) (crypto.PrKey, error) {
 	return salg.DecodePrKey(prKeyDer)
 }
 
+func EncodePrKey(sk crypto.PrKey) (string, error) {
+	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	if err != nil {
+		return "", err
+	}
+
+	skBytes, err := salg.EncodePrKey(sk)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(skBytes), nil
+}
+
 func EncodePublicKey(pubKey crypto.PubKey) ([]byte, error) {
 	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	if err != nil {
