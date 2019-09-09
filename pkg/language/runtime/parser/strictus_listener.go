@@ -19,8 +19,8 @@ type StrictusListener interface {
 	// EnterAccess is called when entering the access production.
 	EnterAccess(c *AccessContext)
 
-	// EnterStructureDeclaration is called when entering the structureDeclaration production.
-	EnterStructureDeclaration(c *StructureDeclarationContext)
+	// EnterCompositeDeclaration is called when entering the compositeDeclaration production.
+	EnterCompositeDeclaration(c *CompositeDeclarationContext)
 
 	// EnterConformances is called when entering the conformances production.
 	EnterConformances(c *ConformancesContext)
@@ -45,6 +45,9 @@ type StrictusListener interface {
 
 	// EnterParameter is called when entering the parameter production.
 	EnterParameter(c *ParameterContext)
+
+	// EnterTypeAnnotation is called when entering the typeAnnotation production.
+	EnterTypeAnnotation(c *TypeAnnotationContext)
 
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
@@ -238,8 +241,8 @@ type StrictusListener interface {
 	// ExitAccess is called when exiting the access production.
 	ExitAccess(c *AccessContext)
 
-	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
-	ExitStructureDeclaration(c *StructureDeclarationContext)
+	// ExitCompositeDeclaration is called when exiting the compositeDeclaration production.
+	ExitCompositeDeclaration(c *CompositeDeclarationContext)
 
 	// ExitConformances is called when exiting the conformances production.
 	ExitConformances(c *ConformancesContext)
@@ -264,6 +267,9 @@ type StrictusListener interface {
 
 	// ExitParameter is called when exiting the parameter production.
 	ExitParameter(c *ParameterContext)
+
+	// ExitTypeAnnotation is called when exiting the typeAnnotation production.
+	ExitTypeAnnotation(c *TypeAnnotationContext)
 
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)

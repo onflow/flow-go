@@ -20,6 +20,33 @@ type functionReturn struct {
 	Value
 }
 
+// StatementTrampoline
+
+type StatementTrampoline struct {
+	F    func() Trampoline
+	Line int
+}
+
+func (m StatementTrampoline) Resume() interface{} {
+	return m.F
+}
+
+func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
+	return FlatMap{Subroutine: m, Continuation: f}
+}
+
+func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
+	return MapTrampoline(m, f)
+}
+
+func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
+	return ThenTrampoline(m, f)
+}
+
+func (m StatementTrampoline) Continue() Trampoline {
+	return m.F()
+}
+
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
@@ -91,9 +118,66 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
-	Run(interpreter.interpret())
+	interpreter.runAllStatements(interpreter.interpret())
 
 	return nil
+}
+
+type Statement struct {
+	Trampoline Trampoline
+	Line       int
+}
+
+func (interpreter *Interpreter) runUntilNextStatement(t Trampoline) (result interface{}, statement *Statement) {
+	for {
+		statement := getStatement(t)
+
+		if statement != nil {
+			return nil, &Statement{
+				// NOTE: resumption using outer trampoline,
+				// not just inner statement trampoline
+				Trampoline: t,
+				Line:       statement.Line,
+			}
+		}
+
+		result := t.Resume()
+
+		if continuation, ok := result.(func() Trampoline); ok {
+
+			t = continuation()
+			continue
+		}
+
+		return result, nil
+	}
+}
+
+func (interpreter *Interpreter) runAllStatements(t Trampoline) interface{} {
+	for {
+		result, statement := interpreter.runUntilNextStatement(t)
+		if statement == nil {
+			return result
+		}
+		result = statement.Trampoline.Resume()
+		if continuation, ok := result.(func() Trampoline); ok {
+			t = continuation()
+			continue
+		}
+
+		return result
+	}
+}
+
+func getStatement(t Trampoline) *StatementTrampoline {
+	switch t := t.(type) {
+	case FlatMap:
+		return getStatement(t.Subroutine)
+	case StatementTrampoline:
+		return &t
+	default:
+		return nil
+	}
 }
 
 func (interpreter *Interpreter) interpret() Trampoline {
@@ -157,7 +241,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []interface{}) (trampoline Trampoline, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -180,22 +264,6 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 	if err != nil {
 		return nil, err
 	}
-
-	// recover internal panics and return them as an error
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			// don't recover Go errors
-			err, ok = r.(goRuntime.Error)
-			if ok {
-				panic(err)
-			}
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("%v", r)
-			}
-		}
-	}()
 
 	// ensures the invocation's argument count matches the function's parameter count
 
@@ -235,7 +303,32 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		boxedArguments[i] = interpreter.box(argument, nil, parameterTypes[i])
 	}
 
-	result := Run(function.invoke(boxedArguments, Location{}))
+	trampoline = function.invoke(boxedArguments, Location{})
+	return trampoline, nil
+}
+
+func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			// don't recover Go errors
+			err, ok = r.(goRuntime.Error)
+			if ok {
+				panic(err)
+			}
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
+
+	trampoline, err := interpreter.prepareInvoke(functionName, arguments)
+	if err != nil {
+		return nil, err
+	}
+	result := interpreter.runAllStatements(trampoline)
 	if result == nil {
 		return nil, nil
 	}
@@ -323,14 +416,21 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 		return Done{}
 	}
 
+	statement := statements[0]
+	line := statement.StartPosition().Line
+
 	// interpret the first statement, then the remaining ones
-	return statements[0].Accept(interpreter).(Trampoline).
-		FlatMap(func(returnValue interface{}) Trampoline {
-			if returnValue != nil {
-				return Done{Result: returnValue}
-			}
-			return interpreter.visitStatements(statements[1:])
-		})
+	return StatementTrampoline{
+		F: func() Trampoline {
+			return statement.Accept(interpreter).(Trampoline)
+		},
+		Line: line,
+	}.FlatMap(func(returnValue interface{}) Trampoline {
+		if returnValue != nil {
+			return Done{Result: returnValue}
+		}
+		return interpreter.visitStatements(statements[1:])
+	})
 }
 
 func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
@@ -670,7 +770,7 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(StructureValue)
 
-			structure.SetMember(interpreter, target.Identifier, value)
+			structure.SetMember(interpreter, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -916,6 +1016,9 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			case ast.OperationMinus:
 				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
+
+			case ast.OperationMove:
+				return value
 			}
 
 			panic(&unsupportedOperation{
@@ -970,7 +1073,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(ValueWithMembers)
-			return value.GetMember(interpreter, expression.Identifier)
+			return value.GetMember(interpreter, expression.Identifier.Identifier)
 		})
 }
 

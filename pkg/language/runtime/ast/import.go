@@ -13,6 +13,10 @@ type Identifier struct {
 	Pos        Position
 }
 
+func (i Identifier) String() string {
+	return i.Identifier
+}
+
 func (i Identifier) StartPosition() Position {
 	return i.Pos
 }

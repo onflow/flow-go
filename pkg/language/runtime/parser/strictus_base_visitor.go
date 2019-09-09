@@ -23,7 +23,7 @@ func (v *BaseStrictusVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+func (v *BaseStrictusVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -56,6 +56,10 @@ func (v *BaseStrictusVisitor) VisitParameterList(ctx *ParameterListContext) inte
 }
 
 func (v *BaseStrictusVisitor) VisitParameter(ctx *ParameterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

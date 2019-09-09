@@ -404,7 +404,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
 
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
@@ -574,8 +574,8 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 	declarationType := valueType
 
 	// does the declaration have an explicit type annotation?
-	if declaration.Type != nil {
-		declarationType = checker.ConvertType(declaration.Type)
+	if declaration.TypeAnnotation != nil {
+		declarationType = checker.ConvertType(declaration.TypeAnnotation.Type)
 
 		// check the value type is a subtype of the declaration type
 		if declarationType != nil && valueType != nil && !isInvalidType(valueType) && !isInvalidType(declarationType) {
@@ -1113,7 +1113,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
-					Name:     target.Identifier,
+					Name:     target.Identifier.Identifier,
 					StartPos: assignment.Value.StartPosition(),
 					EndPos:   assignment.Value.EndPosition(),
 				},
@@ -1592,6 +1592,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 			)
 		}
 		return valueType
+
+	// TODO: check
+	case ast.OperationMove:
+		return valueType
 	}
 
 	panic(&unsupportedOperation{
@@ -1731,7 +1735,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	expressionType := expression.Expression.Accept(checker).(Type)
 
-	identifier := expression.Identifier
+	identifier := expression.Identifier.Identifier
 
 	var member *Member
 	switch ty := expressionType.(type) {
@@ -1752,8 +1756,8 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 			&NotDeclaredMemberError{
 				Type:     expressionType,
 				Name:     identifier,
-				StartPos: expression.StartPos,
-				EndPos:   expression.EndPos,
+				StartPos: expression.Identifier.StartPosition(),
+				EndPos:   expression.Identifier.EndPosition(),
 			},
 		)
 	}
@@ -1992,7 +1996,7 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
+	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
 
 	checker.FunctionExpressionFunctionType[expression] = functionType
 
@@ -2049,12 +2053,12 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 
 	case *ast.FunctionType:
 		var parameterTypes []Type
-		for _, parameterType := range t.ParameterTypes {
-			parameterType := checker.ConvertType(parameterType)
+		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+			parameterType := checker.ConvertType(parameterTypeAnnotation.Type)
 			parameterTypes = append(parameterTypes, parameterType)
 		}
 
-		returnType := checker.ConvertType(t.ReturnType)
+		returnType := checker.ConvertType(t.ReturnTypeAnnotation.Type)
 
 		return &FunctionType{
 			ParameterTypes: parameterTypes,
@@ -2135,10 +2139,13 @@ func (checker *Checker) currentFunction() *functionContext {
 	return checker.functionContexts[lastIndex]
 }
 
-func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) *FunctionType {
+func (checker *Checker) functionType(
+	parameters []*ast.Parameter,
+	returnTypeAnnotation *ast.TypeAnnotation,
+) *FunctionType {
 
 	parameterTypes := checker.parameterTypes(parameters)
-	convertedReturnType := checker.ConvertType(returnType)
+	convertedReturnType := checker.ConvertType(returnTypeAnnotation.Type)
 
 	return &FunctionType{
 		ParameterTypes: parameterTypes,
@@ -2151,7 +2158,7 @@ func (checker *Checker) parameterTypes(parameters []*ast.Parameter) []Type {
 	parameterTypes := make([]Type, len(parameters))
 
 	for i, parameter := range parameters {
-		parameterType := checker.ConvertType(parameter.Type)
+		parameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypes[i] = parameterType
 	}
 
@@ -2459,7 +2466,7 @@ func (checker *Checker) members(
 
 	// declare a member for each field
 	for _, field := range fields {
-		fieldType := checker.ConvertType(field.Type)
+		fieldType := checker.ConvertType(field.TypeAnnotation.Type)
 
 		members[field.Identifier.Identifier] = &Member{
 			Type:          fieldType,
@@ -2482,7 +2489,7 @@ func (checker *Checker) members(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnType)
+		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
 
@@ -3026,7 +3033,7 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 
 	leftHandExpression := expression.Expression
 	leftHandType := leftHandExpression.Accept(checker).(Type)
-	rightHandType := checker.ConvertType(expression.Type)
+	rightHandType := checker.ConvertType(expression.TypeAnnotation.Type)
 	checker.FailableDowncastingTypes[expression] = rightHandType
 
 	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now

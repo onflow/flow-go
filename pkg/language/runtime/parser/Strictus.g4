@@ -43,6 +43,11 @@ grammar Strictus;
         return (_type == StrictusParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
             (_type == StrictusParserTerminator)
     }
+
+    func (p *StrictusParser) noWhitespace() bool {
+    	index := p.GetCurrentToken().GetTokenIndex()
+    	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
+    }
 }
 
 program
@@ -50,7 +55,7 @@ program
     ;
 
 declaration
-    : structureDeclaration
+    : compositeDeclaration
     | interfaceDeclaration
     | functionDeclaration[true]
     | variableDeclaration
@@ -67,8 +72,8 @@ access
     | PubSet
     ;
 
-structureDeclaration
-    : Struct identifier conformances '{'
+compositeDeclaration
+    : (Struct | Resource) identifier conformances '{'
         field*
         initializer[true]?
         functionDeclaration[true]*
@@ -85,7 +90,7 @@ variableKind
     ;
 
 field
-    : access variableKind? identifier ':' fullType
+    : access variableKind? identifier ':' typeAnnotation
     ;
 
 interfaceDeclaration
@@ -102,7 +107,7 @@ initializer[bool functionBlockRequired]
     ;
 
 functionDeclaration[bool functionBlockRequired]
-    : access Fun identifier parameterList (':' returnType=fullType)?
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
@@ -112,11 +117,17 @@ parameterList
     ;
 
 parameter
-    : (argumentLabel=identifier)? parameterName=identifier ':' fullType
+    : (argumentLabel=identifier)? parameterName=identifier ':' typeAnnotation
+    ;
+
+typeAnnotation
+    : Move? fullType
     ;
 
 fullType
-    : baseType typeIndex* (optionals+=(Optional|NilCoalescing))*
+    : baseType
+      ({p.noWhitespace()}? typeIndex)*
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 typeIndex
@@ -129,7 +140,7 @@ baseType
     ;
 
 functionType
-    : '(' '(' (parameterTypes+=fullType (',' parameterTypes+=fullType)*)? ')' ':' returnType=fullType ')'
+    : '(' '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')' ':' returnType=typeAnnotation ')'
     ;
 
 block
@@ -198,11 +209,11 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' fullType)? '=' expression
+    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
     ;
 
 assignment
-    : identifier expressionAccess* '=' expression
+    : identifier expressionAccess* ('=' | Move) expression
     ;
 
 expression
@@ -240,7 +251,7 @@ nilCoalescingExpression
 
 failableDowncastingExpression
     : additiveExpression
-    | failableDowncastingExpression FailableDowncasting fullType
+    | failableDowncastingExpression FailableDowncasting typeAnnotation
     ;
 
 additiveExpression
@@ -309,21 +320,23 @@ Mod : '%' ;
 unaryOp
     : Minus
     | Negate
+    | Move
     ;
 
 Negate : '!' ;
+Move : '<-' ;
 
 Optional : '?' ;
 
-NilCoalescing : '??' ;
+NilCoalescing : WS '??';
 
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : identifier                                                  # IdentifierExpression
-    | literal                                                     # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                          # NestedExpression
+    : identifier                                                        # IdentifierExpression
+    | literal                                                           # LiteralExpression
+    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                                # NestedExpression
     ;
 
 expressionAccess
@@ -395,6 +408,7 @@ CloseParen: ')' ;
 Transaction : 'transaction' ;
 
 Struct : 'struct' ;
+Resource : 'resource' ;
 
 Interface : 'interface' ;
 

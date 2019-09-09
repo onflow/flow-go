@@ -4,27 +4,26 @@ package gossip
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
-// Defines mode of the gossip based on the set of recipients
-type GossipMode int
+// Mode defines mode of the gossip based on the set of recipients
+type Mode int
 
-// The legitimate values for the GossipMode
+// The legitimate values for the a gossip Mode
 const (
-	ONE_TO_ONE GossipMode = iota
-	ONE_TO_MANY
-	ONE_TO_ALL
+	ModeOneToOne Mode = iota
+	ModeOneToMany
+	ModeOneToAll
 )
 
-func (gm GossipMode) String() string {
-	return [...]string{"one_to_one", "one_to_many", "one_to_all"}[gm]
+func (m Mode) String() string {
+	return [...]string{"ModeOneToOne", "ModeOneToMany", "ModeOneToAll"}[m]
 }
 
-// GossipService is the interface of the network package and hence the networking streams with all
+// Service is the interface of the network package and hence the networking streams with all
 // other streams of the system. It defines the function call, the type of input arguments, and the output result
-type GossipService interface {
-	Gossip(ctx context.Context, request *shared.GossipMessage) ([]proto.Message, error)
+type Service interface {
+	SyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*shared.GossipReply, error)
+	AsyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*shared.GossipReply, error)
 }

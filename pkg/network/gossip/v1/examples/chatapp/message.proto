@@ -1,0 +1,15 @@
+syntax="proto3";
+
+package main;
+
+message Message {
+  string sender = 1;
+  bytes content = 2;
+}
+
+
+message Void {}
+
+service Reciever {
+  rpc DisplayMessage(Message) returns (Void);
+}

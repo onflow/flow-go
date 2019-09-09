@@ -1,15 +1,13 @@
-package async
+package gnode
 
 import (
 	"fmt"
-
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 )
 
 // returnParams are the return parameters of functions in the node registry
 type returnParams struct {
 	err   error
-	reply *shared.MessageReply
+	reply []byte
 
 	done chan bool
 }
@@ -30,7 +28,7 @@ func (m *messageTracker) TrackMessage(uuid string) error {
 }
 
 // FillMessageReply fills the contect of the reply of a gossip message
-func (m *messageTracker) FillMessageReply(uuid string, reply *shared.MessageReply, err error) error {
+func (m *messageTracker) FillMessageReply(uuid string, reply []byte, err error) error {
 	if !m.ContainsID(uuid) {
 		return fmt.Errorf("cannot fill message %v: Message is not tracked", uuid)
 	}
@@ -54,7 +52,7 @@ func (m *messageTracker) Done(uuid string) chan bool {
 }
 
 // RetrieveReply returns the reply params of a gossip message and then deletes the entry
-func (m *messageTracker) RetrieveReply(uuid string) (*shared.MessageReply, error, error) {
+func (m *messageTracker) RetrieveReply(uuid string) ([]byte, error, error) {
 	if !m.ContainsID(uuid) {
 		return nil, nil, fmt.Errorf("message %v is not tracked", uuid)
 	}
