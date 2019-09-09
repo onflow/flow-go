@@ -12,11 +12,9 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
-
 ## Syntax and Behavior
 
 The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
-
 
 ## Comments
 
@@ -77,7 +75,6 @@ let a
 ```
 
 Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
-
 
 ```bamboo
 // Declare a constant named `a`
@@ -148,7 +145,8 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`).
+This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
 ```bamboo
@@ -180,7 +178,6 @@ account2
 ### Conventions
 
 By convention, variables, constants, and functions have lowercase names; and types have title-case names.
-
 
 ## Semicolons
 
@@ -261,13 +258,13 @@ Integers are whole numbers without a fractional part. They are either *signed* (
 
 The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
 
- - **`Int8`**: -128 through 127
- - **`Int16`**: -32768 through 32767
- - **`Int32`**: -2147483648 through 2147483647
- - **`Int64`**: -9223372036854775808 through 9223372036854775807
- - **`UInt16`**: 0 through 65535
- - **`UInt32`**: 0 through 4294967295
- - **`UInt64`**: 0 through 18446744073709551615
+- **`Int8`**: -128 through 127
+- **`Int16`**: -32768 through 32767
+- **`Int32`**: -2147483648 through 2147483647
+- **`Int64`**: -9223372036854775808 through 9223372036854775807
+- **`UInt16`**: 0 through 65535
+- **`UInt32`**: 0 through 4294967295
+- **`UInt64`**: 0 through 18446744073709551615
 
 ```bamboo
 // Declare a constant that has type `UInt8` and the value 10
@@ -323,7 +320,6 @@ Integer literals are not inferred to be an address.
 let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
-
 
 ### Any
 
@@ -441,13 +437,16 @@ let b = a ?? false
 
 #### Conditional Downcasting Operator
 
+> 🚧 Status: The conditional downcasting operator `as?` is implemented,
+> but it only supports values that have the type `Any`.
+
 The conditional downcasting operator `as?` can be used to type cast a value to a type.
 The operator returns an optional.
 If the value has a type that is a subtype of the given type that should be casted to,
 the operator returns the value as the given type,
 otherwise the result is `nil`.
 
-```bamboo,file=conditional-downcasting.bpl
+```bamboo,file=conditional-downcasting-any.bpl
 // Declare a constant named `something` which has type `Any`,
 // with an initial value which has type `Int`
 //
@@ -465,6 +464,21 @@ let number = something as? Int
 //
 let boolean = something as? Bool
 // `boolean` is nil and has type `Bool?`
+```
+
+Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.
+
+```bamboo,file=conditional-downcasting-any-array.bpl
+// Declare a constant named `numbers` which has type `[Any]`,
+// i.e. an array of arbitrarily typed values
+//
+let values: [Any] = [1, true]
+
+let first = values[0] as? Int
+// `first` is `1` and has type `Int?`
+
+let second = values[1] as? Bool
+// `second` is `true` and has type `Bool?`
 ```
 
 ### Strings and Characters
@@ -618,18 +632,20 @@ numbers[1] = 2
 // `numbers` is [42, 2]
 ```
 
+#### Array Fields and Functions
+
+- `length: Int`: Returns the number of elements in the array.
+- `append(_ value: V)`: Adds a value of type `V` to the array.
+
 <!--
 
 TODO
 
-#### Array Functions
-
-- Length, concatenate, filter, etc. for all array types
-- Append, remove, etc. for variable-size arrays
+- concatenate, filter, etc. for all array types
+- remove, etc. for variable-size arrays
 - Document and link to array concatenation operator `+` in operators section
 
 -->
-
 
 ### Dictionaries
 
@@ -732,14 +748,10 @@ booleans[0] = true
 // `booleans` is `{1: false, 0: true}`
 ```
 
-<!--
+#### Dictionary Fields and Functions
 
-TODO
-
-#### Dictionary Functions
-
--->
-
+- `length: Int`: Returns the number of elements in the dictionary.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the dictionary as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -751,12 +763,11 @@ Most of the built-in types, like booleans, integers, are hashable and equatable,
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
 
-  - Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
+- Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
 
-  - Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
+- Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
 
-  - Ternary operators operate on three values. The operator symbols appear between the three values (infix).
-
+- Ternary operators operate on three values. The operator symbols appear between the three values (infix).
 
 ### Negation
 
@@ -848,9 +859,9 @@ let c = a * b
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
 
-  - Overflow addition: `&+`
-  - Overflow subtraction: `&-`
-  - Overflow multiplication: `&*`
+- Overflow addition: `&+`
+- Overflow subtraction: `&-`
+- Overflow multiplication: `&*`
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
@@ -895,7 +906,7 @@ c &- 1 // is 127
 
 Logical operators work with the boolean values `true` and `false`.
 
-  - Logical AND: `a && b`
+- Logical AND: `a && b`
 
     ```bamboo,file=operator-and.bpl
     true && true
@@ -913,7 +924,7 @@ Logical operators work with the boolean values `true` and `false`.
 
     If the left-hand side is true, the right-hand side is not evaluated.
 
-  - Logical OR: `a || b`
+- Logical OR: `a || b`
 
     ```bamboo,file=operator-or.bpl
     true || true
@@ -935,7 +946,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 Comparison operators work with boolean and integer values.
 
-  - Equality: `==`, for booleans and integers (possibly optional)
+- Equality: `==`, for booleans and integers (possibly optional)
 
     ```bamboo,file=operator-equal-int.bpl
     1 == 1
@@ -979,7 +990,7 @@ Comparison operators work with boolean and integer values.
     // is true
     ```
 
-  - Inequality: `!=`, for booleans and integers (possibly optional)
+- Inequality: `!=`, for booleans and integers (possibly optional)
 
     ```bamboo,file=operator-not-equal-int.bpl
     1 != 1
@@ -1023,7 +1034,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Less than: `<`, for integers
+- Less than: `<`, for integers
 
     ```bamboo,file=operator-less.bpl
     1 < 1
@@ -1036,7 +1047,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Less or equal than: `<=`, for integers
+- Less or equal than: `<=`, for integers
 
     ```bamboo,file=operator-less-equals.bpl
     1 <= 1
@@ -1049,7 +1060,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Greater than: `>`, for integers
+- Greater than: `>`, for integers
 
     ```bamboo,file=operator-greater.bpl
     1 > 1
@@ -1062,7 +1073,7 @@ Comparison operators work with boolean and integer values.
     // is true
     ```
 
-  - Greater or equal than: `>=`, for integers
+- Greater or equal than: `>=`, for integers
 
     ```bamboo,file=operator-greater-equals.bpl
     1 >= 1
@@ -1074,7 +1085,6 @@ Comparison operators work with boolean and integer values.
     2 >= 1
     // is true
     ```
-
 
 ### Ternary Conditional Operator
 
@@ -1102,7 +1112,6 @@ Operators have the following precedences, highest to lowest:
 All operators are left-associative, except for the ternary operator, which is right-associative.
 
 Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
-
 
 ## Functions
 
@@ -1467,8 +1476,8 @@ Control flow statements control the flow of execution in a function.
 
 If-statements allow a certain piece of code to be executed only when a given condition is true.
 
-The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
-
+The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+The condition must be boolean and the braces are required.
 
 ```bamboo,file=control-flow-if.bpl
 let a = 0
@@ -1655,7 +1664,6 @@ fun f(): Int {
 f() // returns 2
 ```
 
-
 ## Type Safety
 
 The Bamboo programming language is a *type-safe* language.
@@ -1687,7 +1695,6 @@ nand(0, 0)
 
 Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
 
-
 ```bamboo,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
@@ -1704,7 +1711,6 @@ let b: Int32 = 3_000_000_000
 //
 add(a, b)
 ```
-
 
 ## Type Inference
 
@@ -1785,9 +1791,9 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+- [**Structures**](#structures) are **copied**, i.e. they are value types.
     Structures are useful when copies with independent state are desired.
-  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+- [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
 
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
@@ -2041,7 +2047,6 @@ tracker.left = 8
 
 It is invalid to declare a synthetic field with only a setter.
 
-
 ### Composite Data Type Functions
 
 Composite data types may contain functions.
@@ -2068,7 +2073,6 @@ rectangle.scale(factor: 4)
 // `rectangle.width` is 8
 // `rectangle.height` is 12
 ```
-
 
 ### Composite Data Type Behaviour
 
@@ -2294,7 +2298,6 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 |:------------------------------------------------------------------------|:----------------------|:------------------|
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
-
 
 ```bamboo,file=access-control-globals.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
@@ -2935,7 +2938,6 @@ impl Equatable for Cat {
 Cat(1) == Cat(2) // is false
 Cat(3) == Cat(3) // is true
 ```
-
 
 ### `Hashable` Interface
 

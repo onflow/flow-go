@@ -76,6 +76,7 @@
                 <ul>
                   <li><a href="#array-types">Array Types</a></li>
                   <li><a href="#array-indexing">Array Indexing</a></li>
+                  <li><a href="#array-fields-and-functions">Array Fields and Functions</a></li>
                 </ul>
               </li>
               <li>
@@ -83,6 +84,7 @@
                 <ul>
                   <li><a href="#dictionary-types">Dictionary Types</a></li>
                   <li><a href="#dictionary-access">Dictionary Access</a></li>
+                  <li><a href="#dictionary-fields-and-functions">Dictionary Fields and Functions</a></li>
                   <li><a href="#dictionary-keys">Dictionary Keys</a></li>
                 </ul>
               </li>
@@ -359,7 +361,8 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
+          This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Valid, title-case</span><span>
@@ -631,6 +634,12 @@
           </section>
           <section>
             <h4 id="conditional-downcasting-operator"><a href="#conditional-downcasting-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional Downcasting Operator</h4>
+            <blockquote>
+              <p>
+                🚧 Status: The conditional downcasting operator <code>as?</code> is implemented,
+                but it only supports values that have the type <code>Any</code>.
+              </p>
+            </blockquote>
             <p>
               The conditional downcasting operator <code>as?</code> can be used to type cast a value to a type.
               The operator returns an optional.
@@ -638,7 +647,7 @@
               the operator returns the value as the given type,
               otherwise the result is <code>nil</code>.
             </p>
-            <pre><code class="language-bamboo,file=conditional-downcasting.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
 </span><span style="color: #008000">// with an initial value which has type `Int`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
@@ -655,6 +664,18 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
 </span><span style="color: #008000">// `boolean` is nil and has type `Bool?`</span><span>
+</span></code></pre>
+            <p>Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.</p>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any-array.bpl"><span style="color: #008000">// Declare a constant named `numbers` which has type `[Any]`,</span><span>
+</span><span style="color: #008000">// i.e. an array of arbitrarily typed values</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first = values[</span><span style="color: #09885A">0</span><span style="color: #000000">] as? Int</span><span>
+</span><span style="color: #008000">// `first` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> second = values[</span><span style="color: #09885A">1</span><span style="color: #000000">] as? Bool</span><span>
+</span><span style="color: #008000">// `second` is `true` and has type `Bool?`</span><span>
 </span></code></pre>
           </section>
         </section>
@@ -770,6 +791,13 @@
 </span><span style="color: #008000">// `numbers` is [42, 2]</span><span>
 </span></code></pre>
           </section>
+          <section>
+            <h4 id="array-fields-and-functions"><a href="#array-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Array Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the array.</li>
+              <li><code>append(_ value: V)</code>: Adds a value of type <code>V</code> to the array.</li>
+            </ul>
+          </section>
         </section>
         <section>
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
@@ -857,6 +885,13 @@
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #0000FF">true</span><span>
 </span><span style="color: #008000">// `booleans` is `{1: false, 0: true}`</span><span>
 </span></code></pre>
+          </section>
+          <section>
+            <h4 id="dictionary-fields-and-functions"><a href="#dictionary-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the dictionary.</li>
+              <li><code>remove(key: K): V?</code>: Removes the value for the given key of type <code>K</code> from the dictionary. Returns the value of type <code>V</code> if the dictionary contained the dictionary as an optional, otherwise <code>nil</code>.</li>
+            </ul>
           </section>
           <section>
             <h4 id="dictionary-keys"><a href="#dictionary-keys" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Keys</h4>
@@ -1473,7 +1508,10 @@
         <section>
           <h3 id="conditional-branching-if-statement"><a href="#conditional-branching-if-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional branching: if-statement</h3>
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
-          <p>The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.</p>
+          <p>
+            The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+            The condition must be boolean and the braces are required.
+          </p>
           <pre><code class="language-bamboo,file=control-flow-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
