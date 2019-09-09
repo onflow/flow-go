@@ -54,13 +54,13 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger:     logger,
 	}
 
-	account := server.blockchain.RootAccount().String()
+	address := server.blockchain.RootAccount().String()
 	prKey, _ := utils.EncodePrKey(server.blockchain.RootKey())
 
 	logger.WithFields(log.Fields{
-		"account": account,
+		"address": address,
 		"prKey":   prKey,
-	}).Infof("⚙️   Using root account 0x%s", account)
+	}).Infof("⚙️   Using root account 0x%s", address)
 
 	observe.RegisterObserveServiceServer(server.grpcServer, server)
 	return server
