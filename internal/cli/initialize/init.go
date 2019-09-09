@@ -3,6 +3,7 @@ package initialize
 import (
 	"encoding/hex"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/bamboo-node/internal/cli/project"
@@ -18,16 +19,21 @@ var Cmd = &cobra.Command{
 		prKey, _ := salg.GeneratePrKey([]byte{})
 		prKeyBytes, _ := salg.EncodePrKey(prKey)
 		prKeyHex := hex.EncodeToString(prKeyBytes)
+		address := types.HexToAddress("01").Hex()
 
 		conf := &project.Config{
 			Accounts: map[string]*project.AccountConfig{
 				"root": &project.AccountConfig{
-					Address:    types.HexToAddress("01").Hex(),
+					Address:    address,
 					PrivateKey: prKeyHex,
 				},
 			},
 		}
 
 		project.SaveConfig(conf)
+		log.WithFields(log.Fields{
+			"address": address,
+			"prKey":   prKeyHex,
+		}).Infof("⚙️   Bamboo Project initialized with root account 0x%s", address)
 	},
 }
