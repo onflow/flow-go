@@ -1,11 +1,11 @@
 package ast
 
 type Parameter struct {
-	Label      string
-	Identifier Identifier
-	Type       Type
-	StartPos   Position
-	EndPos     Position
+	Label          string
+	Identifier     Identifier
+	TypeAnnotation *TypeAnnotation
+	StartPos       Position
+	EndPos         Position
 }
 
 func (p *Parameter) StartPosition() Position {

@@ -44,12 +44,12 @@ func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
 // FieldDeclaration
 
 type FieldDeclaration struct {
-	Access       Access
-	VariableKind VariableKind
-	Identifier   Identifier
-	Type         Type
-	StartPos     Position
-	EndPos       Position
+	Access         Access
+	VariableKind   VariableKind
+	Identifier     Identifier
+	TypeAnnotation *TypeAnnotation
+	StartPos       Position
+	EndPos         Position
 }
 
 func (f *FieldDeclaration) Accept(visitor Visitor) Repr {

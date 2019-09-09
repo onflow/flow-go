@@ -1,5 +1,32 @@
 package ast
 
+import "fmt"
+
+// TypeAnnotation
+
+type TypeAnnotation struct {
+	Move bool
+	Type Type
+}
+
+func (e *TypeAnnotation) String() string {
+	if e.Move {
+		return fmt.Sprintf("<-%s", e.Type)
+	} else {
+		return fmt.Sprint(e.Type)
+	}
+}
+
+func (e *TypeAnnotation) StartPosition() Position {
+	return e.Type.StartPosition()
+}
+
+func (e *TypeAnnotation) EndPosition() Position {
+	return e.Type.EndPosition()
+}
+
+// Type
+
 type Type interface {
 	HasPosition
 	isType()
@@ -89,10 +116,10 @@ func (t *DictionaryType) EndPosition() Position {
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypes []Type
-	ReturnType     Type
-	StartPos       Position
-	EndPos         Position
+	ParameterTypeAnnotations []*TypeAnnotation
+	ReturnTypeAnnotation     *TypeAnnotation
+	StartPos                 Position
+	EndPos                   Position
 }
 
 func (*FunctionType) isType() {}

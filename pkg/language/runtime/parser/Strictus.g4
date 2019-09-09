@@ -90,7 +90,7 @@ variableKind
     ;
 
 field
-    : access variableKind? identifier ':' fullType
+    : access variableKind? identifier ':' typeAnnotation
     ;
 
 interfaceDeclaration
@@ -107,7 +107,7 @@ initializer[bool functionBlockRequired]
     ;
 
 functionDeclaration[bool functionBlockRequired]
-    : access Fun identifier parameterList (':' returnType=fullType)?
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
@@ -117,12 +117,15 @@ parameterList
     ;
 
 parameter
-    : (argumentLabel=identifier)? parameterName=identifier ':' fullType
+    : (argumentLabel=identifier)? parameterName=identifier ':' typeAnnotation
+    ;
+
+typeAnnotation
+    : Move? fullType
     ;
 
 fullType
-    : Move?
-      baseType
+    : baseType
       ({p.noWhitespace()}? typeIndex)*
       ({p.noWhitespace()}? optionals+=Optional)*
     ;
@@ -137,7 +140,7 @@ baseType
     ;
 
 functionType
-    : '(' '(' (parameterTypes+=fullType (',' parameterTypes+=fullType)*)? ')' ':' returnType=fullType ')'
+    : '(' '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')' ':' returnType=typeAnnotation ')'
     ;
 
 block
@@ -206,7 +209,7 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' fullType)? ('='| Move) expression
+    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
     ;
 
 assignment
@@ -248,7 +251,7 @@ nilCoalescingExpression
 
 failableDowncastingExpression
     : additiveExpression
-    | failableDowncastingExpression FailableDowncasting fullType
+    | failableDowncastingExpression FailableDowncasting typeAnnotation
     ;
 
 additiveExpression
@@ -330,10 +333,10 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : identifier                                                  # IdentifierExpression
-    | literal                                                     # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                          # NestedExpression
+    : identifier                                                        # IdentifierExpression
+    | literal                                                           # LiteralExpression
+    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                                # NestedExpression
     ;
 
 expressionAccess
