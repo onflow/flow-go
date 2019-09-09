@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-
 	"net"
+
+	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
 	"github.com/dapperlabs/bamboo-node/pkg/network/gossip"
-	"google.golang.org/grpc"
 )
 
 // QueueSize is the buffer size for holding incoming Gossip Messages
