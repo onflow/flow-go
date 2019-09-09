@@ -489,10 +489,10 @@ func (e *BinaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters    []*Parameter
-	ReturnType    Type
-	FunctionBlock *FunctionBlock
-	StartPos      Position
+	Parameters           []*Parameter
+	ReturnTypeAnnotation *TypeAnnotation
+	FunctionBlock        *FunctionBlock
+	StartPos             Position
 }
 
 func (e *FunctionExpression) String() string {
@@ -523,14 +523,14 @@ func (e *FunctionExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 // FailableDowncastExpression
 
 type FailableDowncastExpression struct {
-	Expression Expression
-	Type       Type
+	Expression     Expression
+	TypeAnnotation *TypeAnnotation
 }
 
 func (e *FailableDowncastExpression) String() string {
 	return fmt.Sprintf(
 		"(%s as? %s)",
-		e.Expression, e.Type,
+		e.Expression, e.TypeAnnotation,
 	)
 }
 
@@ -539,7 +539,7 @@ func (e *FailableDowncastExpression) StartPosition() Position {
 }
 
 func (e *FailableDowncastExpression) EndPosition() Position {
-	return e.Type.EndPosition()
+	return e.TypeAnnotation.EndPosition()
 }
 
 func (*FailableDowncastExpression) isIfStatementTest() {}
