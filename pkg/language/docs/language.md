@@ -1527,6 +1527,37 @@ if a == 1 {
 // `b` is 3
 ```
 
+### Optional Binding
+
+Optional binding allows getting the value inside an optional.
+It is a variant of the if-statment.
+
+If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.
+
+Optional bindings are declared using the `if` keyword like an if-statement, but instead of the boolean test value, it is followed by the `let` or `var` keywords, to either introduce a constant or variable, followed by a name, the equal sign (`=`), and the optional value.
+
+```bamboo,file=control-flow-optional-binding-not-nil.bpl
+let maybeNumber: Int? = 1
+
+if let number = maybeNumber {
+    // branch is executed as `maybeNumber` is not `nil`.
+    // `number` is `1` and has type `Int`
+} else {
+    // branch is not executed as `maybeNumber` is not `nil`
+}
+```
+
+```bamboo,file=control-flow-optional-binding-nil.bpl
+let noNumber: Int? = nil
+
+if let number = noNumber {
+    // branch is not executed as `noNumber` is `nil`.
+} else {
+    // branch is executed as `noNumber` is `nil`.
+    // constant `number` is *not* available
+}
+```
+
 ### Looping: while-statement
 
 While-statements allow a certain piece of code to be executed repeatedly, as long as a condition remains true.

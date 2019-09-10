@@ -129,6 +129,7 @@
             <p><a href="#control-flow">Control flow</a></p>
             <ul>
               <li><a href="#conditional-branching-if-statement">Conditional branching: if-statement</a></li>
+              <li><a href="#optional-binding">Optional Binding</a></li>
               <li><a href="#looping-while-statement">Looping: while-statement</a></li>
               <li><a href="#immediate-function-return-return-statement">Immediate function return: return-statement</a></li>
             </ul>
@@ -1553,6 +1554,33 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// `b` is 3</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="optional-binding"><a href="#optional-binding" aria-hidden="true"><span class="icon icon-link"></span></a>Optional Binding</h3>
+          <p>
+            Optional binding allows getting the value inside an optional.
+            It is a variant of the if-statment.
+          </p>
+          <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
+          <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-not-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `maybeNumber` is not `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `number` is `1` and has type `Int`</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `maybeNumber` is not `nil`</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// constant `number` is *not* available</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
