@@ -74,8 +74,11 @@ func (e CheckerError) Error() string {
 		if err, ok := err.(errors.ParentError); ok {
 			for _, childErr := range err.ChildErrors() {
 				sb.WriteString("\n")
-				sb.WriteString("        ")
-				sb.WriteString(childErr.Error())
+				for _, line := range strings.Split(childErr.Error(), "\n") {
+					sb.WriteString("        ")
+					sb.WriteString(line)
+					sb.WriteString("\n")
+				}
 			}
 		}
 
