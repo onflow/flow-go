@@ -62,28 +62,14 @@ type CheckerError struct {
 
 func (e CheckerError) Error() string {
 	var sb strings.Builder
+
 	sb.WriteString("Checking failed:\n")
+
 	for _, err := range e.Errors {
-		sb.WriteString("    ")
-		sb.WriteString(err.Error())
-		if err, ok := err.(errors.SecondaryError); ok {
-			sb.WriteString(". ")
-			sb.WriteString(err.SecondaryError())
-		}
-
-		if err, ok := err.(errors.ParentError); ok {
-			for _, childErr := range err.ChildErrors() {
-				sb.WriteString("\n")
-				for _, line := range strings.Split(childErr.Error(), "\n") {
-					sb.WriteString("        ")
-					sb.WriteString(line)
-					sb.WriteString("\n")
-				}
-			}
-		}
-
+		sb.WriteString(errors.UnrollChildErrors(err))
 		sb.WriteString("\n")
 	}
+
 	return sb.String()
 }
 
