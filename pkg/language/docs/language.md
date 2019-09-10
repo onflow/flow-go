@@ -370,7 +370,7 @@ An optional type is declared using the `?` suffix for another type. For example,
 
 The value representing nothing is `nil`.
 
-```bamboo
+```bamboo,file=optional.bpl
 // Declare a constant which has an optional integer type,
 // with nil as its initial value
 //
@@ -380,6 +380,20 @@ let a: Int? = nil
 // with 42 as its initial value
 //
 let b: Int? = 42
+```
+
+Optionals can be created for any value, not just for literals.
+
+```bamboo,file=optional-wrapping.bpl
+// Declare a constant which has a non-optional integer type,
+// with 1 as its initial value
+//
+let x = 1
+
+// Declare a constant which has an optional integer type.
+// An optional with the value of `x` is created
+//
+let y: Int? = x
 ```
 
 #### Nil-Coalescing Operator
@@ -1833,8 +1847,10 @@ and when the value is returned from a function:
 
     We think resources are a great way to represent such assets.
 
-Two composite daya types are compatible if and only if they refer to the same declaration by name,
+Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
+
+Composite data types can only be declared globally, i.e. not inside of functions.
 
 ## Composite Data Type Declaration and Creation
 
@@ -2571,6 +2587,8 @@ resource interface FungibleToken {
 
 Note that the required initializer and functions do not have any executable code.
 
+Interfaces can only be declared globally, i.e. not inside of functions.
+
 ### Interface Implementation
 
 Implementations for interfaces are declared using the `impl` keyword,
@@ -3045,9 +3063,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Attestations are not implemented yet.
 
-Attestations are values that proof ownership.
-Attestations can be created for resources and reflect their current state, which is read-only.
-They cannot be stored.
+Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.
 
 Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
 
@@ -3055,7 +3071,11 @@ As an analogy, a bank statement is a proof of ownership of money.
 However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
 but it reflects the current state of the underlying resource.
 
-Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.
+Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+and can be safely handed to untrusted parties.
+
+An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+It is not possible to change the ownership of a resource through an attestation, or store an attestation.
 
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.

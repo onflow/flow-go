@@ -577,7 +577,7 @@
           <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
           <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
           <p>The value representing nothing is <code>nil</code>.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+          <pre><code class="language-bamboo,file=optional.bpl"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -586,6 +586,17 @@
 </span><span style="color: #008000">// with 42 as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span></code></pre>
+          <p>Optionals can be created for any value, not just for literals.</p>
+          <pre><code class="language-bamboo,file=optional-wrapping.bpl"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
+</span><span style="color: #008000">// with 1 as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type.</span><span>
+</span><span style="color: #008000">// An optional with the value of `x` is created</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int? = x</span><span>
 </span></code></pre>
           <section>
             <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
@@ -1816,9 +1827,10 @@
           </li>
         </ul>
         <p>
-          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          Two composite data types are compatible if and only if they refer to the same declaration by name,
           i.e., nominal typing applies instead of structural typing.
         </p>
+        <p>Composite data types can only be declared globally, i.e. not inside of functions.</p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -2578,6 +2590,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Note that the required initializer and functions do not have any executable code.</p>
+          <p>Interfaces can only be declared globally, i.e. not inside of functions.</p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
@@ -3029,18 +3042,21 @@
         <blockquote>
           <p>🚧 Status: Attestations are not implemented yet.</p>
         </blockquote>
-        <p>
-          Attestations are values that proof ownership.
-          Attestations can be created for resources and reflect their current state, which is read-only.
-          They cannot be stored.
-        </p>
+        <p>Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.</p>
         <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
         <p>
           As an analogy, a bank statement is a proof of ownership of money.
           However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
           but it reflects the current state of the underlying resource.
         </p>
-        <p>Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.</p>
+        <p>
+          Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+          and can be safely handed to untrusted parties.
+        </p>
+        <p>
+          An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+          It is not possible to change the ownership of a resource through an attestation, or store an attestation.
+        </p>
         <p>
           Attestations of resources are created using the <code>@</code> operator.
           Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
