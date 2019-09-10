@@ -64,11 +64,21 @@ func (e CheckerError) Error() string {
 	var sb strings.Builder
 	sb.WriteString("Checking failed:\n")
 	for _, err := range e.Errors {
+		sb.WriteString("    ")
 		sb.WriteString(err.Error())
 		if err, ok := err.(errors.SecondaryError); ok {
 			sb.WriteString(". ")
 			sb.WriteString(err.SecondaryError())
 		}
+
+		if err, ok := err.(errors.ParentError); ok {
+			for _, childErr := range err.ChildErrors() {
+				sb.WriteString("\n")
+				sb.WriteString("        ")
+				sb.WriteString(childErr.Error())
+			}
+		}
+
 		sb.WriteString("\n")
 	}
 	return sb.String()
@@ -940,6 +950,10 @@ type ImportedProgramError struct {
 
 func (e *ImportedProgramError) Error() string {
 	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
+}
+
+func (e *ImportedProgramError) ChildErrors() []error {
+	return e.CheckerError.Errors
 }
 
 func (*ImportedProgramError) isSemanticError() {}

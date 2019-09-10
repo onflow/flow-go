@@ -21,3 +21,8 @@ func (UnreachableError) Error() string {
 type SecondaryError interface {
 	SecondaryError() string
 }
+
+// ParentError is an error that contains one or more child errors.
+type ParentError interface {
+	ChildErrors() []error
+}
