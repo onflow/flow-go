@@ -2,11 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 // astTypeConversionError
@@ -61,17 +59,11 @@ type CheckerError struct {
 }
 
 func (e CheckerError) Error() string {
-	var sb strings.Builder
-	sb.WriteString("Checking failed:\n")
-	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
-		if err, ok := err.(errors.SecondaryError); ok {
-			sb.WriteString(". ")
-			sb.WriteString(err.SecondaryError())
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
+	return "Checking failed"
+}
+
+func (e CheckerError) ChildErrors() []error {
+	return e.Errors
 }
 
 // SemanticError
@@ -940,6 +932,10 @@ type ImportedProgramError struct {
 
 func (e *ImportedProgramError) Error() string {
 	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
+}
+
+func (e *ImportedProgramError) ChildErrors() []error {
+	return e.CheckerError.Errors
 }
 
 func (*ImportedProgramError) isSemanticError() {}

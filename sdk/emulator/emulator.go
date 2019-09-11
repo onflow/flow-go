@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 
-	eruntime "github.com/dapperlabs/bamboo-node/sdk/emulator/runtime"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator/execution"
 	"github.com/dapperlabs/bamboo-node/sdk/emulator/state"
 	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
 )
@@ -28,8 +28,7 @@ type EmulatedBlockchain struct {
 	// pool of pending transactions waiting to be commmitted (already executed)
 	txPool             map[string]*types.SignedTransaction
 	mutex              sync.RWMutex
-	runtime            runtime.Runtime
-	runtimeLogger      func(string)
+	computer           *execution.Computer
 	rootAccountAddress types.Address
 	rootAccountKey     crypto.PrKey
 }
@@ -50,8 +49,13 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[string][]byte)
 	intermediateWorldStates := make(map[string][]byte)
 	txPool := make(map[string]*types.SignedTransaction)
-	runtime := runtime.NewInterpreterRuntime()
 	ws := state.NewWorldState()
+
+	runtime := runtime.NewInterpreterRuntime()
+	computer := execution.NewComputer(
+		runtime,
+		opt.RuntimeLogger,
+	)
 
 	rootAccountAddress, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
 
@@ -63,8 +67,7 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 		intermediateWorldStates: intermediateWorldStates,
 		pendingWorldState:       ws,
 		txPool:                  txPool,
-		runtime:                 runtime,
-		runtimeLogger:           opt.RuntimeLogger,
+		computer:                computer,
 		rootAccountAddress:      rootAccountAddress,
 		rootAccountKey:          rootAccountKey,
 	}
@@ -140,8 +143,8 @@ func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash
 // GetAccount gets account information associated with an address identifier.
 func (b *EmulatedBlockchain) GetAccount(address types.Address) (*types.Account, error) {
 	registers := b.pendingWorldState.Registers.NewView()
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	account := runtimeAPI.GetAccount(address)
+	runtimeContext := execution.NewRuntimeContext(registers)
+	account := runtimeContext.GetAccount(address)
 	if account == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
@@ -157,8 +160,8 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 	}
 
 	registers := ws.Registers.NewView()
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	account := runtimeAPI.GetAccount(address)
+	runtimeContext := execution.NewRuntimeContext(registers)
+	account := runtimeContext.GetAccount(address)
 	if account == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
@@ -190,12 +193,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	b.pendingWorldState.InsertTransaction(tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	// TODO: support multiple accounts
-	runtimeAPI.Accounts = []types.Address{tx.PayerSignature.Account}
-	runtimeAPI.Logger = b.runtimeLogger
 
-	_, err := b.runtime.ExecuteScript(tx.Script, runtimeAPI)
+	err := b.computer.ExecuteTransaction(registers, tx)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
 
@@ -224,9 +223,7 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 // CallScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 	registers := b.pendingWorldState.Registers.NewView()
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	runtimeAPI.Logger = b.runtimeLogger
-	return b.runtime.ExecuteScript(script, runtimeAPI)
+	return b.computer.ExecuteScript(registers, script)
 }
 
 // CallScriptAtVersion executes a read-only script against a specified world state and returns the result.
@@ -237,9 +234,7 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 	}
 
 	registers := ws.Registers.NewView()
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	runtimeAPI.Logger = b.runtimeLogger
-	return b.runtime.ExecuteScript(script, runtimeAPI)
+	return b.computer.ExecuteScript(registers, script)
 }
 
 // CommitBlock takes all pending transactions and commits them into a block.
@@ -269,6 +264,7 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 
 	b.pendingWorldState.InsertBlock(block)
 	b.commitWorldState(block.Hash())
+
 	return block
 }
 
@@ -350,8 +346,8 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address,
 
 	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
 
-	runtimeAPI := eruntime.NewEmulatorRuntimeAPI(registers)
-	accountID, _ := runtimeAPI.CreateAccount(pubKeyBytes, []byte{})
+	runtimeContext := execution.NewRuntimeContext(registers)
+	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 

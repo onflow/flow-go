@@ -230,6 +230,32 @@ Each PR that you open should include necessary tests to ensure the correctness a
 
 The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](code-style.md).
 
+
+To develop in _production level_ standard of the Flow project, the following best practice set is recommended:
+- Please think as a user of your code, and optimize the interface for as easy and error-prone experience as possible.
+	- TODO: add example(s)
+- Please optimize the time, memory, and communication overhead of our code.
+	- TODO: add example(s) 
+- Please properly identify the possible errors and make sure that they are handled.
+	- TODO: add example(s)
+- Please properly identify the corner cases and edge cases and handle them on our happy path.
+	- TODO: add example(s)
+- Please make sure that the packages you developed are independent and portable.
+	- TODO: add example(s)
+- Please make sure that variables, functions, packages, etc, are well-named.
+	- TODO: add example(s)
+- Please write tests for your code that covers all possible range of inputs. 
+	- TODO: add example(s)
+- Please test each (tiny) module individually, and then move to the composability testing. 
+	- TODO: add example(s)
+- Please break your implementation into as concise and precise modules, functions, and methods as possible.
+	- TODO: add example(s)
+- Please make sure that your code is well-documented with a proper quick start that helps other engineers to quickly utilize your code without any hard effort. 
+	- TODO: add example(s)
+- Please append your suggestions to this list, advertise them within the team, and replace the _"TODO: add example"_ parts with the code pieces you think are exemplary and worthy to share. 
+
+
+
 TODO: add style guide
 
 ### Code documentation

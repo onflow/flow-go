@@ -55,7 +55,7 @@ func (e Error) Error() string {
 	var sb strings.Builder
 	sb.WriteString("Execution failed:\n")
 	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
+		sb.WriteString(runtimeErrors.UnrollChildErrors(err))
 		sb.WriteString("\n")
 	}
 	return sb.String()
