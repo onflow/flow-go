@@ -1274,16 +1274,17 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	lexicalScope = lexicalScope.
 		Insert(common.StringKey(identifier), variable)
 
-	initializer := structureDeclaration.Initializer
+	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if initializer != nil {
+	if len(structureDeclaration.Initializers) > 0 {
+		firstInitializer := structureDeclaration.Initializers[0]
 
-		functionType := interpreter.Checker.InitializerFunctionTypes[initializer]
+		functionType := interpreter.Checker.InitializerFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
 			structureDeclaration,
-			initializer,
+			firstInitializer,
 			functionType,
 			lexicalScope,
 		)
@@ -1354,19 +1355,26 @@ func (interpreter *Interpreter) initializerFunction(
 
 	for _, conformance := range structureDeclaration.Conformances {
 		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
-		initializer := interfaceDeclaration.Initializer
-		if initializer == nil || initializer.FunctionBlock == nil {
+
+		// TODO: support multiple overloaded initializers
+
+		if len(interfaceDeclaration.Initializers) == 0 {
+			continue
+		}
+
+		firstInitializer := interfaceDeclaration.Initializers[0]
+		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}
 
 		functionBlockCopy.PreConditions = append(
 			functionBlockCopy.PreConditions,
-			initializer.FunctionBlock.PreConditions...,
+			firstInitializer.FunctionBlock.PreConditions...,
 		)
 
 		functionBlockCopy.PostConditions = append(
 			functionBlockCopy.PostConditions,
-			initializer.FunctionBlock.PostConditions...,
+			firstInitializer.FunctionBlock.PostConditions...,
 		)
 	}
 

@@ -73,10 +73,8 @@ access
     ;
 
 compositeDeclaration
-    : (Struct | Resource) identifier conformances '{'
-        field*
-        initializer[true]?
-        functionDeclaration[true]*
+    : compositeDeclarationKind identifier conformances '{'
+        (field | initializer[true] | functionDeclaration[true])*
       '}'
     ;
 
@@ -94,7 +92,15 @@ field
     ;
 
 interfaceDeclaration
-    : Interface identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
+    : compositeDeclarationKind Interface identifier '{'
+        (field | initializer[false] | functionDeclaration[false])*
+      '}'
+    ;
+
+compositeDeclarationKind
+    : Struct
+    | Resource
+    | Contract
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -409,6 +415,7 @@ Transaction : 'transaction' ;
 
 Struct : 'struct' ;
 Resource : 'resource' ;
+Contract : 'contract' ;
 
 Interface : 'interface' ;
 

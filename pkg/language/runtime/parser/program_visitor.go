@@ -171,10 +171,11 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 		fields = append(fields, field)
 	}
 
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	var initializers []*ast.InitializerDeclaration
+	for _, initializerNode := range ctx.AllInitializer() {
+		initializers = append(initializers,
+			initializerNode.Accept(v).(*ast.InitializerDeclaration),
+		)
 	}
 
 	var functions []*ast.FunctionDeclaration
@@ -186,13 +187,13 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	// TODO: return resource declaration if resource keyword is used
+	// TODO: consider kind: return resource / contract declaration
 
 	return &ast.StructureDeclaration{
 		Identifier:   identifier,
 		Conformances: conformances,
 		Fields:       fields,
-		Initializer:  initializer,
+		Initializers: initializers,
 		Functions:    functions,
 		StartPos:     startPosition,
 		EndPos:       endPosition,
@@ -274,10 +275,11 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 		fields = append(fields, field)
 	}
 
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	var initializers []*ast.InitializerDeclaration
+	for _, initializerNode := range ctx.AllInitializer() {
+		initializers = append(initializers,
+			initializerNode.Accept(v).(*ast.InitializerDeclaration),
+		)
 	}
 
 	var functions []*ast.FunctionDeclaration
@@ -290,12 +292,12 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Identifier:  identifier,
-		Fields:      fields,
-		Initializer: initializer,
-		Functions:   functions,
-		StartPos:    startPosition,
-		EndPos:      endPosition,
+		Identifier:   identifier,
+		Fields:       fields,
+		Initializers: initializers,
+		Functions:    functions,
+		StartPos:     startPosition,
+		EndPos:       endPosition,
 	}
 }
 

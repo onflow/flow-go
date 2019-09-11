@@ -2206,8 +2206,8 @@ func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclar
 
 	checker.checkMemberIdentifiers(structure.Fields, structure.Functions)
 
-	checker.checkInitializer(
-		structure.Initializer,
+	checker.checkInitializers(
+		structure.Initializers,
 		structure.Fields,
 		structureType,
 		structure.Identifier.Identifier,
@@ -2266,10 +2266,12 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		Conformances: conformances,
 	}
 
-	initializer := structure.Initializer
+	// TODO: support multiple overloaded initializers
+
 	var parameterTypes []Type
-	if initializer != nil {
-		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	if len(structure.Initializers) > 0 {
+		firstInitializer := structure.Initializers[0]
+		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 	}
 
 	structureType.ConstructorParameterTypes = parameterTypes
@@ -2433,17 +2435,20 @@ func (checker *Checker) declareStructureConstructor(
 
 	var argumentLabels []string
 
-	initializer := structure.Initializer
-	if initializer != nil {
-		argumentLabels = checker.argumentLabels(initializer.Parameters)
+	// TODO: support multiple overloaded initializers
+
+	if len(structure.Initializers) > 0 {
+		firstInitializer := structure.Initializers[0]
+
+		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
 
 		functionType = &FunctionType{
 			ParameterTypes: parameterTypes,
 			ReturnType:     structureType,
 		}
-	}
 
-	checker.InitializerFunctionTypes[initializer] = functionType
+		checker.InitializerFunctionTypes[firstInitializer] = functionType
+	}
 
 	checker.declareFunction(
 		structure.Identifier,
@@ -2504,38 +2509,73 @@ func (checker *Checker) members(
 	return members
 }
 
-func (checker *Checker) checkInitializer(
-	initializer *ast.InitializerDeclaration,
+func (checker *Checker) checkInitializers(
+	initializers []*ast.InitializerDeclaration,
 	fields []*ast.FieldDeclaration,
-	ty Type,
+	structureType Type,
 	typeIdentifier string,
 	initializerParameterTypes []Type,
-	kind initializerKind,
+	initializerKind initializerKind,
 ) {
-	if initializer == nil {
-		// no initializer, inside a structure, but fields?
-		if kind != initializerKindInterface && len(fields) > 0 {
-			firstField := fields[0]
+	count := len(initializers)
 
-			// structure has fields, but no initializer
-			checker.report(
-				&MissingInitializerError{
-					TypeIdentifier: typeIdentifier,
-					FirstFieldName: firstField.Identifier.Identifier,
-					FirstFieldPos:  firstField.Identifier.Pos,
-				},
-			)
-		}
+	if count == 0 {
+		checker.checkNoInitializerNoFields(fields, initializerKind, typeIdentifier)
 		return
 	}
 
+	for _, initializer := range initializers {
+		checker.checkInitializer(
+			initializer,
+			fields,
+			structureType,
+			typeIdentifier,
+			initializerParameterTypes,
+			initializerKind,
+		)
+	}
+}
+
+// checkNoInitializerNoFields checks that if there are no initializers
+// there are also no fields – otherwise the fields will be uninitialized.
+// In interfaces this is allowed.
+//
+func (checker *Checker) checkNoInitializerNoFields(
+	fields []*ast.FieldDeclaration,
+	initializerKind initializerKind,
+	typeIdentifier string,
+) {
+	if len(fields) == 0 || initializerKind == initializerKindInterface {
+		return
+	}
+
+	// report error for first field
+	firstField := fields[0]
+
+	checker.report(
+		&MissingInitializerError{
+			TypeIdentifier: typeIdentifier,
+			FirstFieldName: firstField.Identifier.Identifier,
+			FirstFieldPos:  firstField.Identifier.Pos,
+		},
+	)
+}
+
+func (checker *Checker) checkInitializer(
+	initializer *ast.InitializerDeclaration,
+	fields []*ast.FieldDeclaration,
+	structureType Type,
+	typeIdentifier string,
+	initializerParameterTypes []Type,
+	initializerKind initializerKind,
+) {
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	checker.declareSelfValue(ty)
+	checker.declareSelfValue(structureType)
 
 	// check the initializer is named properly
 	identifier := initializer.Identifier.Identifier
@@ -2559,7 +2599,7 @@ func (checker *Checker) checkInitializer(
 		initializer.FunctionBlock,
 	)
 
-	if kind == initializerKindInterface &&
+	if initializerKind == initializerKindInterface &&
 		initializer.FunctionBlock != nil {
 
 		checker.checkInterfaceFunctionBlock(
@@ -2711,8 +2751,8 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
 
-	checker.checkInitializer(
-		declaration.Initializer,
+	checker.checkInitializers(
+		declaration.Initializers,
 		declaration.Fields,
 		interfaceType,
 		declaration.Identifier.Identifier,
@@ -2776,10 +2816,12 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		Identifier: identifier.Identifier,
 	}
 
-	initializer := declaration.Initializer
+	// TODO: support multiple overloaded initializers
+
 	var parameterTypes []Type
-	if initializer != nil {
-		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	if len(declaration.Initializers) > 0 {
+		firstInitializer := declaration.Initializers[0]
+		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 	}
 
 	interfaceType.InitializerParameterTypes = parameterTypes

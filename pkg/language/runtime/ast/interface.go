@@ -7,7 +7,7 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 type InterfaceDeclaration struct {
 	Identifier            Identifier
 	Fields                []*FieldDeclaration
-	Initializer           *InitializerDeclaration
+	Initializers          []*InitializerDeclaration
 	Functions             []*FunctionDeclaration
 	functionsByIdentifier map[string]*FunctionDeclaration
 	StartPos              Position
