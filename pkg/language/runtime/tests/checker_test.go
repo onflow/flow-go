@@ -1298,6 +1298,17 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	}
 }
 
+func TestCheckConcatenatingExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+		let a = "abc" & "def"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 

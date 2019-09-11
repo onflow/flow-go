@@ -1280,6 +1280,13 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		checker.BinaryExpressionRightTypes[expression] = rightType
 
 		return resultType
+
+	case BinaryOperationKindConcatenation:
+		return checker.checkBinaryExpressionConcatenation(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 	}
 
 	panic(&unsupportedOperation{
@@ -1558,6 +1565,72 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 		}
 		return leftInner
 	}
+}
+
+func (checker *Checker) checkBinaryExpressionConcatenation(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+	// check both types are string subtypes
+	leftIsString := checker.IsSubType(leftType, &StringType{})
+	rightIsString := checker.IsSubType(rightType, &StringType{})
+
+	if !leftIsString && !rightIsString {
+		if !anyInvalid {
+			checker.report(
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
+		}
+	} else if !leftIsString {
+		if !leftIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: &StringType{},
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
+		}
+	} else if !rightIsString {
+		if !rightIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: &StringType{},
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
+		}
+	}
+	// check both types are equal
+	if !leftType.Equal(rightType) {
+		checker.report(
+			&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  leftType,
+				RightType: rightType,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			},
+		)
+	}
+
+	return leftType
 }
 
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {

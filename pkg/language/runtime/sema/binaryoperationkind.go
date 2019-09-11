@@ -16,6 +16,7 @@ const (
 	BinaryOperationKindBooleanLogic
 	BinaryOperationKindEquality
 	BinaryOperationKindNilCoalescing
+	BinaryOperationKindConcatenation
 )
 
 func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
@@ -47,6 +48,9 @@ func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
 
 	case ast.OperationNilCoalesce:
 		return BinaryOperationKindNilCoalescing
+
+	case ast.OperationConcat:
+		return BinaryOperationKindConcatenation
 	}
 
 	panic(&errors.UnreachableError{})
