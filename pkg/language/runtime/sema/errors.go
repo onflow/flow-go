@@ -2,11 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
 	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 // astTypeConversionError
@@ -61,16 +59,11 @@ type CheckerError struct {
 }
 
 func (e CheckerError) Error() string {
-	var sb strings.Builder
+	return "Checking failed"
+}
 
-	sb.WriteString("Checking failed:\n")
-
-	for _, err := range e.Errors {
-		sb.WriteString(errors.UnrollChildErrors(err))
-		sb.WriteString("\n")
-	}
-
-	return sb.String()
+func (e CheckerError) ChildErrors() []error {
+	return e.Errors
 }
 
 // SemanticError
