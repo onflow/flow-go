@@ -388,6 +388,17 @@ func TestInterpretModOperator(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
+func TestInterpretConcatOperator(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+       let x = "abc" & "def"
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.StringValue("abcdef")))
+}
+
 func TestInterpretEqualOperator(t *testing.T) {
 	RegisterTestingT(t)
 
