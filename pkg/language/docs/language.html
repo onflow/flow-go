@@ -76,6 +76,7 @@
                 <ul>
                   <li><a href="#array-types">Array Types</a></li>
                   <li><a href="#array-indexing">Array Indexing</a></li>
+                  <li><a href="#array-fields-and-functions">Array Fields and Functions</a></li>
                 </ul>
               </li>
               <li>
@@ -83,6 +84,7 @@
                 <ul>
                   <li><a href="#dictionary-types">Dictionary Types</a></li>
                   <li><a href="#dictionary-access">Dictionary Access</a></li>
+                  <li><a href="#dictionary-fields-and-functions">Dictionary Fields and Functions</a></li>
                   <li><a href="#dictionary-keys">Dictionary Keys</a></li>
                 </ul>
               </li>
@@ -127,6 +129,7 @@
             <p><a href="#control-flow">Control flow</a></p>
             <ul>
               <li><a href="#conditional-branching-if-statement">Conditional branching: if-statement</a></li>
+              <li><a href="#optional-binding">Optional Binding</a></li>
               <li><a href="#looping-while-statement">Looping: while-statement</a></li>
               <li><a href="#immediate-function-return-return-statement">Immediate function return: return-statement</a></li>
             </ul>
@@ -359,7 +362,8 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
+          This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Valid, title-case</span><span>
@@ -573,7 +577,7 @@
           <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
           <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
           <p>The value representing nothing is <code>nil</code>.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+          <pre><code class="language-bamboo,file=optional.bpl"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -582,6 +586,17 @@
 </span><span style="color: #008000">// with 42 as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span></code></pre>
+          <p>Optionals can be created for any value, not just for literals.</p>
+          <pre><code class="language-bamboo,file=optional-wrapping.bpl"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
+</span><span style="color: #008000">// with 1 as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type.</span><span>
+</span><span style="color: #008000">// An optional with the value of `x` is created</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int? = x</span><span>
 </span></code></pre>
           <section>
             <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
@@ -631,6 +646,12 @@
           </section>
           <section>
             <h4 id="conditional-downcasting-operator"><a href="#conditional-downcasting-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional Downcasting Operator</h4>
+            <blockquote>
+              <p>
+                🚧 Status: The conditional downcasting operator <code>as?</code> is implemented,
+                but it only supports values that have the type <code>Any</code>.
+              </p>
+            </blockquote>
             <p>
               The conditional downcasting operator <code>as?</code> can be used to type cast a value to a type.
               The operator returns an optional.
@@ -638,7 +659,7 @@
               the operator returns the value as the given type,
               otherwise the result is <code>nil</code>.
             </p>
-            <pre><code class="language-bamboo,file=conditional-downcasting.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
 </span><span style="color: #008000">// with an initial value which has type `Int`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
@@ -655,6 +676,18 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
 </span><span style="color: #008000">// `boolean` is nil and has type `Bool?`</span><span>
+</span></code></pre>
+            <p>Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.</p>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any-array.bpl"><span style="color: #008000">// Declare a constant named `numbers` which has type `[Any]`,</span><span>
+</span><span style="color: #008000">// i.e. an array of arbitrarily typed values</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first = values[</span><span style="color: #09885A">0</span><span style="color: #000000">] as? Int</span><span>
+</span><span style="color: #008000">// `first` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> second = values[</span><span style="color: #09885A">1</span><span style="color: #000000">] as? Bool</span><span>
+</span><span style="color: #008000">// `second` is `true` and has type `Bool?`</span><span>
 </span></code></pre>
           </section>
         </section>
@@ -770,6 +803,13 @@
 </span><span style="color: #008000">// `numbers` is [42, 2]</span><span>
 </span></code></pre>
           </section>
+          <section>
+            <h4 id="array-fields-and-functions"><a href="#array-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Array Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the array.</li>
+              <li><code>append(_ value: V)</code>: Adds a value of type <code>V</code> to the array.</li>
+            </ul>
+          </section>
         </section>
         <section>
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
@@ -857,6 +897,13 @@
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #0000FF">true</span><span>
 </span><span style="color: #008000">// `booleans` is `{1: false, 0: true}`</span><span>
 </span></code></pre>
+          </section>
+          <section>
+            <h4 id="dictionary-fields-and-functions"><a href="#dictionary-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the dictionary.</li>
+              <li><code>remove(key: K): V?</code>: Removes the value for the given key of type <code>K</code> from the dictionary. Returns the value of type <code>V</code> if the dictionary contained the dictionary as an optional, otherwise <code>nil</code>.</li>
+            </ul>
           </section>
           <section>
             <h4 id="dictionary-keys"><a href="#dictionary-keys" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Keys</h4>
@@ -1473,7 +1520,10 @@
         <section>
           <h3 id="conditional-branching-if-statement"><a href="#conditional-branching-if-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional branching: if-statement</h3>
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
-          <p>The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.</p>
+          <p>
+            The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+            The condition must be boolean and the braces are required.
+          </p>
           <pre><code class="language-bamboo,file=control-flow-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
@@ -1515,6 +1565,33 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// `b` is 3</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="optional-binding"><a href="#optional-binding" aria-hidden="true"><span class="icon icon-link"></span></a>Optional Binding</h3>
+          <p>
+            Optional binding allows getting the value inside an optional.
+            It is a variant of the if-statment.
+          </p>
+          <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
+          <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-not-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `maybeNumber` is not `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `number` is `1` and has type `Int`</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `maybeNumber` is not `nil`</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// constant `number` is *not* available</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1750,9 +1827,10 @@
           </li>
         </ul>
         <p>
-          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          Two composite data types are compatible if and only if they refer to the same declaration by name,
           i.e., nominal typing applies instead of structural typing.
         </p>
+        <p>Composite data types can only be declared globally, i.e. not inside of functions.</p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -2512,6 +2590,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Note that the required initializer and functions do not have any executable code.</p>
+          <p>Interfaces can only be declared globally, i.e. not inside of functions.</p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
@@ -2963,18 +3042,21 @@
         <blockquote>
           <p>🚧 Status: Attestations are not implemented yet.</p>
         </blockquote>
-        <p>
-          Attestations are values that proof ownership.
-          Attestations can be created for resources and reflect their current state, which is read-only.
-          They cannot be stored.
-        </p>
+        <p>Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.</p>
         <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
         <p>
           As an analogy, a bank statement is a proof of ownership of money.
           However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
           but it reflects the current state of the underlying resource.
         </p>
-        <p>Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.</p>
+        <p>
+          Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+          and can be safely handed to untrusted parties.
+        </p>
+        <p>
+          An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+          It is not possible to change the ownership of a resource through an attestation, or store an attestation.
+        </p>
         <p>
           Attestations of resources are created using the <code>@</code> operator.
           Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
