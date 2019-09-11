@@ -287,7 +287,7 @@ Negative integers are encoded in two's complement representation.
 
 ### Floating-Point Numbers
 
-There is no support for floating point numbers.
+There is **no** support for floating point numbers.
 
 Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
 
@@ -1208,7 +1208,8 @@ let clamped = clamp(123, min: 0, max: 100)
 // `clamped` is 100
 ```
 
-Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+Argument labels make code more explicit and readable.
+For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
@@ -1297,6 +1298,31 @@ fun doubleAndAddOne(_ x: Int): Int {
 }
 
 doubleAndAddOne(2) // is 5
+```
+
+There is **no** support for optional parameters, i.e. default values for parameters.
+
+### Function overloading
+
+> 🚧 Status: Function overloading is not implemented.
+
+It is possible to declare functions with the same name, as long as they have different sets of argument labels.
+This is known as function overloading.
+
+```bamboo,file=function-overloading.bpl
+// Declare a function named "assert" which requires a test value
+// and a message argument
+//
+fun assert(_ test: Bool, message: String) {
+    // ...
+}
+
+// Declare a function named "assert" which only requires a test value.
+// The function calls the `assert` function declared abov
+//
+fun assert(_ test: Bool) {
+    assert(test, message: "test is false")
+}
 ```
 
 ### Function Expressions
@@ -1936,6 +1962,33 @@ token.balance = 1
 token.id = 23
 ```
 
+Initializers support overloading. This allows for example providing default values for certain parameters.
+
+```bamboo,file=composite-data-type-initializer-overloading.bpl
+// Declare a structure named `Token`, which has a constant field
+// named `id` and a variable field named `balance`.
+//
+// The first initializer allows initializing both fields with a given value.
+//
+// A second initializer is provided for convenience to initialize the `id` field
+// with a given value, and the `balance` field with the default value `0`
+//
+struct Token {
+    let id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        self.id = id
+        self.balance = balance
+    }
+
+    init(id: Int) {
+        self.id = id
+        self.balance = 0
+    }
+}
+```
+
 ### Composite Data Type Field Getters and Setters
 
 Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
@@ -1976,7 +2029,8 @@ example.balance = -50
 // `example.balance` is 0. without the getter it would be -50
 ```
 
-Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses.
+The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
 
@@ -2009,7 +2063,8 @@ example.balance = -50
 
 ### Synthetic Composite Data Type Fields
 
-Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
+Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed.
+Synthetic can be either read-only, or readable and writable.
 
 Synthetic fields are declared using the `synthetic` keyword.
 
@@ -2100,6 +2155,9 @@ Composite data types may contain functions.
 Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
 ```bamboo,file=composite-data-type-function.bpl
+// Declare a structure named "Rectangle", which represents a rectangle
+// and has variable fields for the width and height
+//
 struct Rectangle {
     var width: Int
     var height: Int
@@ -2109,6 +2167,9 @@ struct Rectangle {
         self.height = height
     }
 
+    // Declare a function named "scale", which scales
+    // the rectangle by the given factor
+    //
     fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -2119,6 +2180,42 @@ let rectangle = Rectangle(width: 2, height: 3)
 rectangle.scale(factor: 4)
 // `rectangle.width` is 8
 // `rectangle.height` is 12
+```
+
+Functions support overloading.
+
+```bamboo,file=composite-data-type-function-overloading.bpl
+// Declare a structure named "Rectangle", which represents a rectangle
+// and has variable fields for the width and height
+//
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+
+    // Declare a function named "scale", which independently scales
+    // the width by a given factor and the height by a given factor
+    //
+    fun scale(widthFactor: Int, heightFactor: Int) {
+        self.width = self.width * widthFactor
+        self.height = self.height * heightFactor
+    }
+
+    // Declare a another function also named "scale", which scales
+    // both width and height by a given factor.
+    // The function calls the `scale` function declared above
+    //
+    fun scale(factor: Int) {
+        self.scale(
+            widthFactor: factor,
+            heightFactor: factor
+        )
+    }
+}
 ```
 
 ### Composite Data Type Behaviour
@@ -2303,7 +2400,7 @@ resource[1]
 
 ### Unbound References / Nulls
 
-There is **no** support for nulls`.
+There is **no** support for `null`s.
 
 ### Inheritance and Abstract Types
 
@@ -3485,88 +3582,3 @@ fun assert(_ condition: Bool, message: String)
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
 The message argument is optional.
-
-## Open questions
-
-### Shared Mutable State
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/264>
-
-Do we need a means to model shared mutable state, i.e. reference types?
-
-### Error Handling
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/65>
-
-How should errors be handled?
-Should we make the distinction between exceptional and unexceptional errors?
-Should we provide means to handle errors (exception handlers)? Should exceptions be values and typed?
-Would a value-less throw-catch/panic-recover be suitable for a first version?
-
-### On-chain Storage
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/101>
-
-How do we store programs on-chain?
-
-### Fixed-Point Numbers and Arithmetic
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/67>
-
-We do not allow floating-point numbers.
-Should we add fixed-point arithmetic to support fractional numbers?
-
-### Enums with Exhaustiveness Check
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/59>
-
-Should we allow the definition of enumerations?
-Is an exhaustiveness check in switch statements useful and feasible?
-
-### Switch-Case Statement
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/60>
-
-Should we add a switch-case statement?
-What kind of pattern matching should it support?
-
-### Distinct/New Types
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/45>
-
-Should we add support for distinct types, i.e., types that are derived from an existing type, but are not compatible with them?
-
-### Set Data Structure
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/266>
-
-Should the standard library provide a set data structure?
-
-### Generics
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/44>
-
-Should we add generics? In what form? Is it OK to add them in a later version?
-
-### Calls of Pure Functions in Preconditions and Postconditions
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/70>
-
-It might be useful to call pure functions preconditions and postconditons.
-How do we ensure preconditions and postconditions are side-effect free?
-
-### Late Initialization of Variables and Constants
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/71>
-
-Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
-
-Should we allow the late initialization of variables and constants?
-
-Are there good examples for cases where late initialization would be useful or even essential?
-
-### Arbitrary Argument Order Based on Argument Labels
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/76>
-
-Should arbitrary argument order be supported in function calls as long as the argument labels match?
