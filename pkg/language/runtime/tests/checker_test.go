@@ -4019,7 +4019,7 @@ func TestCheckOrigins(t *testing.T) {
 		{
 			sema.Position{Line: 18, Column: 25},
 			sema.Position{Line: 18, Column: 26},
-			common.DeclarationKindInterface,
+			common.DeclarationKindStructureInterface,
 		},
 		{
 			sema.Position{Line: 20, Column: 12},
@@ -4744,4 +4744,22 @@ func TestCheckUnaryMove(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s X {
+              init() {}
+              init(y: Int) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedOverloadingError{}))
+	}
 }

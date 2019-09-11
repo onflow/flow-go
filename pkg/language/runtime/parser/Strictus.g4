@@ -73,7 +73,7 @@ access
     ;
 
 compositeDeclaration
-    : compositeDeclarationKind identifier conformances '{'
+    : compositeKind identifier conformances '{'
         (field | initializer[true] | functionDeclaration[true])*
       '}'
     ;
@@ -92,12 +92,12 @@ field
     ;
 
 interfaceDeclaration
-    : compositeDeclarationKind Interface identifier '{'
+    : compositeKind Interface identifier '{'
         (field | initializer[false] | functionDeclaration[false])*
       '}'
     ;
 
-compositeDeclarationKind
+compositeKind
     : Struct
     | Resource
     | Contract

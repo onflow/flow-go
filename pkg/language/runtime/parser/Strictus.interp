@@ -140,7 +140,7 @@ conformances
 variableKind
 field
 interfaceDeclaration
-compositeDeclarationKind
+compositeKind
 initializer
 functionDeclaration
 parameterList

@@ -334,7 +334,7 @@ var symbolicNames = []string{
 
 var ruleNames = []string{
 	"program", "declaration", "importDeclaration", "access", "compositeDeclaration",
-	"conformances", "variableKind", "field", "interfaceDeclaration", "compositeDeclarationKind",
+	"conformances", "variableKind", "field", "interfaceDeclaration", "compositeKind",
 	"initializer", "functionDeclaration", "parameterList", "parameter", "typeAnnotation",
 	"fullType", "typeIndex", "baseType", "functionType", "block", "functionBlock",
 	"preConditions", "postConditions", "conditions", "condition", "statements",
@@ -493,7 +493,7 @@ const (
 	StrictusParserRULE_variableKind                  = 6
 	StrictusParserRULE_field                         = 7
 	StrictusParserRULE_interfaceDeclaration          = 8
-	StrictusParserRULE_compositeDeclarationKind      = 9
+	StrictusParserRULE_compositeKind                 = 9
 	StrictusParserRULE_initializer                   = 10
 	StrictusParserRULE_functionDeclaration           = 11
 	StrictusParserRULE_parameterList                 = 12
@@ -1242,14 +1242,14 @@ func NewCompositeDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 
 func (s *CompositeDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *CompositeDeclarationContext) CompositeDeclarationKind() ICompositeDeclarationKindContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICompositeDeclarationKindContext)(nil)).Elem(), 0)
+func (s *CompositeDeclarationContext) CompositeKind() ICompositeKindContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICompositeKindContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(ICompositeDeclarationKindContext)
+	return t.(ICompositeKindContext)
 }
 
 func (s *CompositeDeclarationContext) Identifier() IIdentifierContext {
@@ -1395,7 +1395,7 @@ func (p *StrictusParser) CompositeDeclaration() (localctx ICompositeDeclarationC
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(176)
-		p.CompositeDeclarationKind()
+		p.CompositeKind()
 	}
 	{
 		p.SetState(177)
@@ -1911,14 +1911,14 @@ func NewInterfaceDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 
 func (s *InterfaceDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *InterfaceDeclarationContext) CompositeDeclarationKind() ICompositeDeclarationKindContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICompositeDeclarationKindContext)(nil)).Elem(), 0)
+func (s *InterfaceDeclarationContext) CompositeKind() ICompositeKindContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICompositeKindContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(ICompositeDeclarationKindContext)
+	return t.(ICompositeKindContext)
 }
 
 func (s *InterfaceDeclarationContext) Interface() antlr.TerminalNode {
@@ -2058,7 +2058,7 @@ func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationC
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(211)
-		p.CompositeDeclarationKind()
+		p.CompositeKind()
 	}
 	{
 		p.SetState(212)
@@ -2112,89 +2112,89 @@ func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationC
 	return localctx
 }
 
-// ICompositeDeclarationKindContext is an interface to support dynamic dispatch.
-type ICompositeDeclarationKindContext interface {
+// ICompositeKindContext is an interface to support dynamic dispatch.
+type ICompositeKindContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsCompositeDeclarationKindContext differentiates from other interfaces.
-	IsCompositeDeclarationKindContext()
+	// IsCompositeKindContext differentiates from other interfaces.
+	IsCompositeKindContext()
 }
 
-type CompositeDeclarationKindContext struct {
+type CompositeKindContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyCompositeDeclarationKindContext() *CompositeDeclarationKindContext {
-	var p = new(CompositeDeclarationKindContext)
+func NewEmptyCompositeKindContext() *CompositeKindContext {
+	var p = new(CompositeKindContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_compositeDeclarationKind
+	p.RuleIndex = StrictusParserRULE_compositeKind
 	return p
 }
 
-func (*CompositeDeclarationKindContext) IsCompositeDeclarationKindContext() {}
+func (*CompositeKindContext) IsCompositeKindContext() {}
 
-func NewCompositeDeclarationKindContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CompositeDeclarationKindContext {
-	var p = new(CompositeDeclarationKindContext)
+func NewCompositeKindContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CompositeKindContext {
+	var p = new(CompositeKindContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_compositeDeclarationKind
+	p.RuleIndex = StrictusParserRULE_compositeKind
 
 	return p
 }
 
-func (s *CompositeDeclarationKindContext) GetParser() antlr.Parser { return s.parser }
+func (s *CompositeKindContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *CompositeDeclarationKindContext) Struct() antlr.TerminalNode {
+func (s *CompositeKindContext) Struct() antlr.TerminalNode {
 	return s.GetToken(StrictusParserStruct, 0)
 }
 
-func (s *CompositeDeclarationKindContext) Resource() antlr.TerminalNode {
+func (s *CompositeKindContext) Resource() antlr.TerminalNode {
 	return s.GetToken(StrictusParserResource, 0)
 }
 
-func (s *CompositeDeclarationKindContext) Contract() antlr.TerminalNode {
+func (s *CompositeKindContext) Contract() antlr.TerminalNode {
 	return s.GetToken(StrictusParserContract, 0)
 }
 
-func (s *CompositeDeclarationKindContext) GetRuleContext() antlr.RuleContext {
+func (s *CompositeKindContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *CompositeDeclarationKindContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *CompositeKindContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CompositeDeclarationKindContext) EnterRule(listener antlr.ParseTreeListener) {
+func (s *CompositeKindContext) EnterRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(StrictusListener); ok {
-		listenerT.EnterCompositeDeclarationKind(s)
+		listenerT.EnterCompositeKind(s)
 	}
 }
 
-func (s *CompositeDeclarationKindContext) ExitRule(listener antlr.ParseTreeListener) {
+func (s *CompositeKindContext) ExitRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(StrictusListener); ok {
-		listenerT.ExitCompositeDeclarationKind(s)
+		listenerT.ExitCompositeKind(s)
 	}
 }
 
-func (s *CompositeDeclarationKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *CompositeKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case StrictusVisitor:
-		return t.VisitCompositeDeclarationKind(s)
+		return t.VisitCompositeKind(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *StrictusParser) CompositeDeclarationKind() (localctx ICompositeDeclarationKindContext) {
-	localctx = NewCompositeDeclarationKindContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, StrictusParserRULE_compositeDeclarationKind)
+func (p *StrictusParser) CompositeKind() (localctx ICompositeKindContext) {
+	localctx = NewCompositeKindContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 18, StrictusParserRULE_compositeKind)
 	var _la int
 
 	defer func() {

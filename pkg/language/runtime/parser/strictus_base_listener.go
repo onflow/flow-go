@@ -74,11 +74,11 @@ func (s *BaseStrictusListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarati
 // ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
 func (s *BaseStrictusListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 
-// EnterCompositeDeclarationKind is called when production compositeDeclarationKind is entered.
-func (s *BaseStrictusListener) EnterCompositeDeclarationKind(ctx *CompositeDeclarationKindContext) {}
+// EnterCompositeKind is called when production compositeKind is entered.
+func (s *BaseStrictusListener) EnterCompositeKind(ctx *CompositeKindContext) {}
 
-// ExitCompositeDeclarationKind is called when production compositeDeclarationKind is exited.
-func (s *BaseStrictusListener) ExitCompositeDeclarationKind(ctx *CompositeDeclarationKindContext) {}
+// ExitCompositeKind is called when production compositeKind is exited.
+func (s *BaseStrictusListener) ExitCompositeKind(ctx *CompositeKindContext) {}
 
 // EnterInitializer is called when production initializer is entered.
 func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}

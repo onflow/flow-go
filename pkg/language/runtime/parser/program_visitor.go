@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
 	"strings"
@@ -267,6 +268,8 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
+
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var fields []*ast.FieldDeclaration
@@ -292,6 +295,7 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
+		Kind:         kind,
 		Identifier:   identifier,
 		Fields:       fields,
 		Initializers: initializers,
@@ -299,6 +303,22 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 		StartPos:     startPosition,
 		EndPos:       endPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
+	if ctx.Struct() != nil {
+		return common.CompositeKindStructure
+	}
+
+	if ctx.Resource() != nil {
+		return common.CompositeKindResource
+	}
+
+	if ctx.Contract() != nil {
+		return common.CompositeKindContract
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {

@@ -972,3 +972,53 @@ func (e *UnsupportedTypeError) StartPosition() ast.Position {
 func (e *UnsupportedTypeError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// UnsupportedDeclarationError
+
+type UnsupportedDeclarationError struct {
+	DeclarationKind common.DeclarationKind
+	StartPos        ast.Position
+	EndPos          ast.Position
+}
+
+func (e *UnsupportedDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations are not supported yet",
+		e.DeclarationKind.String(),
+	)
+}
+
+func (*UnsupportedDeclarationError) isSemanticError() {}
+
+func (e *UnsupportedDeclarationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedDeclarationError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnsupportedOverloadingError
+
+type UnsupportedOverloadingError struct {
+	DeclarationKind common.DeclarationKind
+	StartPos        ast.Position
+	EndPos          ast.Position
+}
+
+func (e *UnsupportedOverloadingError) Error() string {
+	return fmt.Sprintf(
+		"%s overloading is not supported yet",
+		e.DeclarationKind.String(),
+	)
+}
+
+func (*UnsupportedOverloadingError) isSemanticError() {}
+
+func (e *UnsupportedOverloadingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedOverloadingError) EndPosition() ast.Position {
+	return e.EndPos
+}

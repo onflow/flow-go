@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"math/big"
 	"testing"
 
@@ -3703,6 +3704,7 @@ func TestParseInterface(t *testing.T) {
 		}
 
 		test := &InterfaceDeclaration{
+			Kind: common.CompositeKindStructure,
 			Identifier: Identifier{
 				Identifier: "Test",
 				Pos:        Position{Offset: 30, Line: 2, Column: 29},

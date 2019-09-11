@@ -716,10 +716,10 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 			continue
 		}
 
-		if _, ok := statement.(*ast.InterfaceDeclaration); ok {
+		if interfaceDeclaration, ok := statement.(*ast.InterfaceDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind:     common.DeclarationKindInterface,
+					Kind:     interfaceDeclaration.DeclarationKind(),
 					StartPos: statement.StartPosition(),
 					EndPos:   statement.EndPosition(),
 				},
@@ -2257,7 +2257,7 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	members := checker.members(
 		structure.Fields,
 		structure.Functions,
-		common.DeclarationKindStructure,
+		true,
 	)
 
 	*structureType = StructureType{
@@ -2269,9 +2269,20 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
-	if len(structure.Initializers) > 0 {
+	initializerCount := len(structure.Initializers)
+	if initializerCount > 0 {
 		firstInitializer := structure.Initializers[0]
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
+
+		if initializerCount > 1 {
+			checker.report(
+				&UnsupportedOverloadingError{
+					DeclarationKind: common.DeclarationKindInitializer,
+					StartPos:        firstInitializer.StartPosition(),
+					EndPos:          firstInitializer.EndPosition(),
+				},
+			)
+		}
 	}
 
 	structureType.ConstructorParameterTypes = parameterTypes
@@ -2461,7 +2472,7 @@ func (checker *Checker) declareStructureConstructor(
 func (checker *Checker) members(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
-	declarationKind common.DeclarationKind,
+	requireVariableKind bool,
 ) map[string]*Member {
 
 	fieldCount := len(fields)
@@ -2479,8 +2490,8 @@ func (checker *Checker) members(
 			IsInitialized: false,
 		}
 
-		if field.VariableKind == ast.VariableKindNotSpecified &&
-			declarationKind != common.DeclarationKindInterface {
+		if requireVariableKind &&
+			field.VariableKind == ast.VariableKindNotSpecified {
 
 			checker.report(
 				&InvalidVariableKindError{
@@ -2524,16 +2535,18 @@ func (checker *Checker) checkInitializers(
 		return
 	}
 
-	for _, initializer := range initializers {
-		checker.checkInitializer(
-			initializer,
-			fields,
-			structureType,
-			typeIdentifier,
-			initializerParameterTypes,
-			initializerKind,
-		)
-	}
+	// TODO: check all initializers:
+	//  parameter initializerParameterTypes needs to be a slice
+
+	initializer := initializers[0]
+	checker.checkInitializer(
+		initializer,
+		fields,
+		structureType,
+		typeIdentifier,
+		initializerParameterTypes,
+		initializerKind,
+	)
 }
 
 // checkNoInitializerNoFields checks that if there are no initializers
@@ -2602,8 +2615,10 @@ func (checker *Checker) checkInitializer(
 	if initializerKind == initializerKindInterface &&
 		initializer.FunctionBlock != nil {
 
+		// TODO: use correct container declaration kind
 		checker.checkInterfaceFunctionBlock(
 			initializer.FunctionBlock,
+			common.DeclarationKindStructure,
 			common.DeclarationKindInitializer,
 		)
 	}
@@ -2746,7 +2761,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	interfaceType.Members = checker.members(
 		declaration.Fields,
 		declaration.Functions,
-		common.DeclarationKindInterface,
+		false,
 	)
 
 	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
@@ -2760,12 +2775,20 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		initializerKindInterface,
 	)
 
-	checker.checkInterfaceFunctions(declaration.Functions, interfaceType)
+	checker.checkInterfaceFunctions(
+		declaration.Functions,
+		interfaceType,
+		declaration.DeclarationKind(),
+	)
 
 	return nil
 }
 
-func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclaration, interfaceType Type) {
+func (checker *Checker) checkInterfaceFunctions(
+	functions []*ast.FunctionDeclaration,
+	interfaceType Type,
+	declarationKind common.DeclarationKind,
+) {
 	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
@@ -2782,6 +2805,7 @@ func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclara
 			if function.FunctionBlock != nil {
 				checker.checkInterfaceFunctionBlock(
 					function.FunctionBlock,
+					declarationKind,
 					common.DeclarationKindFunction,
 				)
 			}
@@ -2803,7 +2827,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.recordVariableOrigin(
 		identifier.Identifier,
 		&Variable{
-			Kind:       common.DeclarationKindInterface,
+			Kind:       declaration.DeclarationKind(),
 			IsConstant: true,
 			Type:       interfaceType,
 			Pos:        &identifier.Pos,
@@ -2819,9 +2843,20 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
-	if len(declaration.Initializers) > 0 {
+	initializerCount := len(declaration.Initializers)
+	if initializerCount > 0 {
 		firstInitializer := declaration.Initializers[0]
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
+
+		if initializerCount > 1 {
+			checker.report(
+				&UnsupportedOverloadingError{
+					DeclarationKind: common.DeclarationKindInitializer,
+					StartPos:        firstInitializer.StartPosition(),
+					EndPos:          firstInitializer.EndPosition(),
+				},
+			)
+		}
 	}
 
 	interfaceType.InitializerParameterTypes = parameterTypes
@@ -2833,14 +2868,18 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.declareInterfaceMetaType(declaration, interfaceType)
 }
 
-func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, kind common.DeclarationKind) {
+func (checker *Checker) checkInterfaceFunctionBlock(
+	block *ast.FunctionBlock,
+	containerKind common.DeclarationKind,
+	implementedKind common.DeclarationKind,
+) {
 
 	if len(block.Statements) > 0 {
 		checker.report(
 			&InvalidImplementationError{
 				Pos:             block.Statements[0].StartPosition(),
-				ContainerKind:   common.DeclarationKindInterface,
-				ImplementedKind: kind,
+				ContainerKind:   containerKind,
+				ImplementedKind: implementedKind,
 			},
 		)
 	} else if len(block.PreConditions) == 0 &&
@@ -2849,8 +2888,8 @@ func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, ki
 		checker.report(
 			&InvalidImplementationError{
 				Pos:             block.StartPos,
-				ContainerKind:   common.DeclarationKindInterface,
-				ImplementedKind: kind,
+				ContainerKind:   containerKind,
+				ImplementedKind: implementedKind,
 			},
 		)
 	}
@@ -2868,7 +2907,7 @@ func (checker *Checker) declareInterfaceMetaType(
 		declaration.Identifier.Identifier,
 		metaType,
 		// TODO: check
-		common.DeclarationKindInterface,
+		declaration.DeclarationKind(),
 		declaration.Identifier.Pos,
 		true,
 		nil,
