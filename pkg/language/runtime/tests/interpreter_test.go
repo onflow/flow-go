@@ -1142,7 +1142,7 @@ func TestInterpretStructureDeclaration(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 }
 
 func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
@@ -1165,7 +1165,7 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	Expect(inter.Invoke("test", newValue)).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Globals["value"].Value).
 		To(Equal(interpreter.IntValue{Int: newValue}))
@@ -1218,10 +1218,10 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Invoke("test2")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 }
 
 func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
@@ -1366,13 +1366,13 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
 	Expect(inter.Invoke("callTest")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
@@ -1391,7 +1391,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 	  let test = Test()
 	`)
 
-	Expect(inter.Globals["test"].Value.(interpreter.StructureValue).GetMember(inter, "foo")).
+	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
 }
 
@@ -1930,13 +1930,13 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Globals["tests"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Globals["tests"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
@@ -2517,7 +2517,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 	    `, kind, kind))
 
 		Expect(inter.Globals["test"].Value).
-			To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+			To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 	}
 }
 
@@ -2648,7 +2648,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
 		Expect(inter.Invoke("test", big.NewInt(1))).
-			To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+			To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 		_, err = inter.Invoke("test", big.NewInt(2))
 		Expect(err).
@@ -3053,7 +3053,7 @@ func TestInterpretStructureFunctionBindingInside(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 }
 
 func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
@@ -3074,7 +3074,7 @@ func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 }
 
 func TestInterpretArrayAppend(t *testing.T) {

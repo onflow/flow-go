@@ -1,10 +1,14 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+import (
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+)
 
-// StructureDeclaration
+// CompositeDeclaration
 
-type StructureDeclaration struct {
+type CompositeDeclaration struct {
+	Kind         common.CompositeKind
 	Identifier   Identifier
 	Conformances []*NominalType
 	Fields       []*FieldDeclaration
@@ -14,31 +18,40 @@ type StructureDeclaration struct {
 	EndPos       Position
 }
 
-func (s *StructureDeclaration) StartPosition() Position {
-	return s.StartPos
+func (d *CompositeDeclaration) StartPosition() Position {
+	return d.StartPos
 }
 
-func (s *StructureDeclaration) EndPosition() Position {
-	return s.EndPos
+func (d *CompositeDeclaration) EndPosition() Position {
+	return d.EndPos
 }
 
-func (s *StructureDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitStructureDeclaration(s)
+func (d *CompositeDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitCompositeDeclaration(d)
 }
 
-func (*StructureDeclaration) isDeclaration() {}
+func (*CompositeDeclaration) isDeclaration() {}
 
 // NOTE: statement, so it can be represented in the AST,
 // but will be rejected in semantic analysis
 //
-func (*StructureDeclaration) isStatement() {}
+func (*CompositeDeclaration) isStatement() {}
 
-func (s *StructureDeclaration) DeclarationName() string {
-	return s.Identifier.Identifier
+func (d *CompositeDeclaration) DeclarationName() string {
+	return d.Identifier.Identifier
 }
 
-func (s *StructureDeclaration) DeclarationKind() common.DeclarationKind {
-	return common.DeclarationKindStructure
+func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
+	switch d.Kind {
+	case common.CompositeKindStructure:
+		return common.DeclarationKindStructure
+	case common.CompositeKindResource:
+		return common.DeclarationKindResource
+	case common.CompositeKindContract:
+		return common.DeclarationKindContract
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 // FieldDeclaration

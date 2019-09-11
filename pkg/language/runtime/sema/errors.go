@@ -657,7 +657,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 
 type FieldUninitializedError struct {
 	Name          string
-	StructureType *StructureType
+	CompositeType *CompositeType
 	Pos           ast.Position
 }
 
@@ -665,7 +665,7 @@ func (e *FieldUninitializedError) Error() string {
 	return fmt.Sprintf(
 		"field `%s` of type `%s` is not initialized",
 		e.Name,
-		e.StructureType.Identifier,
+		e.CompositeType.Identifier,
 	)
 }
 
@@ -784,17 +784,17 @@ func (e *InvalidConformanceError) EndPosition() ast.Position {
 // TODO: report each missing member and mismatch as note
 
 type MemberMismatch struct {
-	StructureMember *Member
+	CompositeMember *Member
 	InterfaceMember *Member
 }
 
 type InitializerMismatch struct {
-	StructureParameterTypes []Type
+	CompositeParameterTypes []Type
 	InterfaceParameterTypes []Type
 }
 
 type ConformanceError struct {
-	StructureType       *StructureType
+	CompositeType       *CompositeType
 	InterfaceType       *InterfaceType
 	InitializerMismatch *InitializerMismatch
 	MissingMembers      []*Member
@@ -805,7 +805,7 @@ type ConformanceError struct {
 func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` does not conform to interface `%s`",
-		e.StructureType.Identifier,
+		e.CompositeType.Identifier,
 		e.InterfaceType.Identifier,
 	)
 }
@@ -825,14 +825,14 @@ func (e *ConformanceError) EndPosition() ast.Position {
 // TODO: just make this a warning?
 
 type DuplicateConformanceError struct {
-	StructureIdentifier string
+	CompositeIdentifier string
 	Conformance         *ast.NominalType
 }
 
 func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` repeats conformance for interface `%s`",
-		e.StructureIdentifier,
+		e.CompositeIdentifier,
 		e.Conformance.Identifier.Identifier,
 	)
 }

@@ -2332,9 +2332,9 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 		testType := checker.FindType("Test")
 
 		Expect(testType).
-			To(BeAssignableToTypeOf(&sema.StructureType{}))
+			To(BeAssignableToTypeOf(&sema.CompositeType{}))
 
-		structureType := testType.(*sema.StructureType)
+		structureType := testType.(*sema.CompositeType)
 
 		Expect(structureType.Identifier).
 			To(Equal("Test"))

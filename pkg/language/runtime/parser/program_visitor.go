@@ -162,6 +162,8 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
+
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
@@ -190,7 +192,8 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 
 	// TODO: consider kind: return resource / contract declaration
 
-	return &ast.StructureDeclaration{
+	return &ast.CompositeDeclaration{
+		Kind:         kind,
 		Identifier:   identifier,
 		Conformances: conformances,
 		Fields:       fields,
@@ -295,13 +298,13 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Kind:         kind,
-		Identifier:   identifier,
-		Fields:       fields,
-		Initializers: initializers,
-		Functions:    functions,
-		StartPos:     startPosition,
-		EndPos:       endPosition,
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Fields:        fields,
+		Initializers:  initializers,
+		Functions:     functions,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 

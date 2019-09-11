@@ -8,7 +8,7 @@ import (
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
-	Kind                  common.CompositeKind
+	CompositeKind         common.CompositeKind
 	Identifier            Identifier
 	Fields                []*FieldDeclaration
 	Initializers          []*InitializerDeclaration
@@ -53,7 +53,7 @@ func (d *InterfaceDeclaration) DeclarationName() string {
 }
 
 func (d *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
-	switch d.Kind {
+	switch d.CompositeKind {
 	case common.CompositeKindStructure:
 		return common.DeclarationKindStructureInterface
 	case common.CompositeKindResource:

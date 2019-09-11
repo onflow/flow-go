@@ -51,7 +51,7 @@ type Checker struct {
 	VariableDeclarationTargetTypes     map[*ast.VariableDeclaration]Type
 	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
-	StructureDeclarationTypes          map[*ast.StructureDeclaration]*StructureType
+	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
 	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
@@ -91,7 +91,7 @@ func NewChecker(
 		VariableDeclarationTargetTypes:     map[*ast.VariableDeclaration]Type{},
 		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
-		StructureDeclarationTypes:          map[*ast.StructureDeclaration]*StructureType{},
+		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
 		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
@@ -232,12 +232,12 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		return checker.IsSubType(optionalSubType.Type, typedSuperType.Type)
 
 	case *InterfaceType:
-		structureSubType, ok := subType.(*StructureType)
+		compositeSubType, ok := subType.(*CompositeType)
 		if !ok {
 			return false
 		}
 		// TODO: optimize, use set
-		for _, conformance := range structureSubType.Conformances {
+		for _, conformance := range compositeSubType.Conformances {
 			if typedSuperType.Equal(conformance) {
 				return true
 			}
@@ -358,14 +358,14 @@ func (checker *Checker) popActivations() {
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
-	// pre-declare interfaces, structures, and functions (check afterwards)
+	// pre-declare interfaces, composites, and functions (check afterwards)
 
 	for _, declaration := range program.InterfaceDeclarations() {
 		checker.declareInterfaceDeclaration(declaration)
 	}
 
-	for _, declaration := range program.StructureDeclarations() {
-		checker.declareStructureDeclaration(declaration)
+	for _, declaration := range program.CompositeDeclarations() {
+		checker.declareCompositeDeclaration(declaration)
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
@@ -702,12 +702,12 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 	// check all statements
 	for _, statement := range statements {
 
-		// check statement is not a local structure or interface declaration
+		// check statement is not a local composite or interface declaration
 
-		if _, ok := statement.(*ast.StructureDeclaration); ok {
+		if compositeDeclaration, ok := statement.(*ast.CompositeDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind:     common.DeclarationKindStructure,
+					Kind:     compositeDeclaration.DeclarationKind(),
 					StartPos: statement.StartPosition(),
 					EndPos:   statement.EndPosition(),
 				},
@@ -1739,7 +1739,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	var member *Member
 	switch ty := expressionType.(type) {
-	case *StructureType:
+	case *CompositeType:
 		member = ty.Members[identifier]
 	case *InterfaceType:
 		member = ty.Members[identifier]
@@ -1820,7 +1820,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
 
 		// if the invocation refers directly to the name of the function as stated in the declaration,
-		// or the invocation refers to a function of a structure (member),
+		// or the invocation refers to a function of a composite (member),
 		// check that the correct argument labels are supplied in the invocation
 
 		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
@@ -2200,67 +2200,69 @@ func (checker *Checker) visitConditional(
 	return
 }
 
-func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
+func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	structureType := checker.StructureDeclarationTypes[structure]
+	compositeType := checker.CompositeDeclarationTypes[declaration]
 
-	checker.checkMemberIdentifiers(structure.Fields, structure.Functions)
+	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
 
 	checker.checkInitializers(
-		structure.Initializers,
-		structure.Fields,
-		structureType,
-		structure.Identifier.Identifier,
-		structureType.ConstructorParameterTypes,
-		initializerKindStructure,
+		declaration.Initializers,
+		declaration.Fields,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		compositeType.ConstructorParameterTypes,
+		initializerKindComposite,
 	)
 
-	if structureType != nil {
-		checker.checkFieldsInitialized(structure, structureType)
+	if compositeType != nil {
+		checker.checkFieldsInitialized(declaration, compositeType)
 
-		checker.checkStructureFunctions(structure.Functions, structureType)
+		checker.checkCompositeFunctions(declaration.Functions, compositeType)
 
-		// check structure conforms to interfaces.
-		// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
+		// check composite conforms to interfaces.
+		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
-		for _, interfaceType := range structureType.Conformances {
-			checker.checkStructureConformance(structureType, interfaceType, structure.Identifier.Pos)
+		for _, interfaceType := range compositeType.Conformances {
+			checker.checkCompositeConformance(compositeType, interfaceType, declaration.Identifier.Pos)
 		}
 	}
 
 	return nil
 }
 
-func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDeclaration) {
+func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) {
 
-	// NOTE: fields and functions might already refer to structure itself.
+	// NOTE: fields and functions might already refer to declaration itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	structureType := &StructureType{}
+	compositeType := &CompositeType{}
 
-	identifier := structure.Identifier
+	identifier := declaration.Identifier
 
-	checker.declareType(identifier, structureType)
+	checker.declareType(identifier, compositeType)
 	checker.recordVariableOrigin(
 		identifier.Identifier,
 		&Variable{
-			Kind:       common.DeclarationKindStructure,
+			Kind:       declaration.DeclarationKind(),
 			IsConstant: true,
-			Type:       structureType,
+			Type:       compositeType,
 			Pos:        &identifier.Pos,
 		},
 	)
 
-	conformances := checker.conformances(structure)
+	conformances := checker.conformances(declaration)
 
 	members := checker.members(
-		structure.Fields,
-		structure.Functions,
+		declaration.Fields,
+		declaration.Functions,
 		true,
 	)
 
-	*structureType = StructureType{
+	*compositeType = CompositeType{
+		Kind:         declaration.Kind,
 		Identifier:   identifier.Identifier,
 		Members:      members,
 		Conformances: conformances,
@@ -2269,9 +2271,9 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
-	initializerCount := len(structure.Initializers)
+	initializerCount := len(declaration.Initializers)
 	if initializerCount > 0 {
-		firstInitializer := structure.Initializers[0]
+		firstInitializer := declaration.Initializers[0]
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
@@ -2285,23 +2287,23 @@ func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDecl
 		}
 	}
 
-	structureType.ConstructorParameterTypes = parameterTypes
+	compositeType.ConstructorParameterTypes = parameterTypes
 
-	checker.StructureDeclarationTypes[structure] = structureType
+	checker.CompositeDeclarationTypes[declaration] = compositeType
 
 	// declare constructor
 
-	checker.declareStructureConstructor(structure, structureType, parameterTypes)
+	checker.declareCompositeConstructor(declaration, compositeType, parameterTypes)
 }
 
-func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*InterfaceType {
+func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*InterfaceType {
 
 	var interfaceTypes []*InterfaceType
 	seenConformances := map[string]bool{}
 
-	structureIdentifier := structure.Identifier.Identifier
+	compositeIdentifier := declaration.Identifier.Identifier
 
-	for _, conformance := range structure.Conformances {
+	for _, conformance := range declaration.Conformances {
 		convertedType := checker.ConvertType(conformance)
 
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
@@ -2321,7 +2323,7 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 		if seenConformances[conformanceIdentifier] {
 			checker.report(
 				&DuplicateConformanceError{
-					StructureIdentifier: structureIdentifier,
+					CompositeIdentifier: compositeIdentifier,
 					Conformance:         conformance,
 				},
 			)
@@ -2332,8 +2334,8 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 	return interfaceTypes
 }
 
-func (checker *Checker) checkStructureConformance(
-	structureType *StructureType,
+func (checker *Checker) checkCompositeConformance(
+	compositeType *CompositeType,
 	interfaceType *InterfaceType,
 	pos ast.Position,
 ) {
@@ -2343,8 +2345,8 @@ func (checker *Checker) checkStructureConformance(
 
 	if interfaceType.InitializerParameterTypes != nil {
 
-		structureInitializerType := &FunctionType{
-			ParameterTypes: structureType.ConstructorParameterTypes,
+		initializerType := &FunctionType{
+			ParameterTypes: compositeType.ConstructorParameterTypes,
 			ReturnType:     &VoidType{},
 		}
 		interfaceInitializerType := &FunctionType{
@@ -2353,9 +2355,9 @@ func (checker *Checker) checkStructureConformance(
 		}
 
 		// TODO: subtype?
-		if !structureInitializerType.Equal(interfaceInitializerType) {
+		if !initializerType.Equal(interfaceInitializerType) {
 			initializerMismatch = &InitializerMismatch{
-				StructureParameterTypes: structureType.ConstructorParameterTypes,
+				CompositeParameterTypes: compositeType.ConstructorParameterTypes,
 				InterfaceParameterTypes: interfaceType.InitializerParameterTypes,
 			}
 		}
@@ -2363,16 +2365,16 @@ func (checker *Checker) checkStructureConformance(
 
 	for name, interfaceMember := range interfaceType.Members {
 
-		structureMember, ok := structureType.Members[name]
+		compositeMember, ok := compositeType.Members[name]
 		if !ok {
 			missingMembers = append(missingMembers, interfaceMember)
 			continue
 		}
 
-		if !checker.memberSatisfied(structureMember, interfaceMember) {
+		if !checker.memberSatisfied(compositeMember, interfaceMember) {
 			memberMismatches = append(memberMismatches,
 				MemberMismatch{
-					StructureMember: structureMember,
+					CompositeMember: compositeMember,
 					InterfaceMember: interfaceMember,
 				},
 			)
@@ -2385,7 +2387,7 @@ func (checker *Checker) checkStructureConformance(
 
 		checker.report(
 			&ConformanceError{
-				StructureType:       structureType,
+				CompositeType:       compositeType,
 				InterfaceType:       interfaceType,
 				Pos:                 pos,
 				InitializerMismatch: initializerMismatch,
@@ -2396,14 +2398,14 @@ func (checker *Checker) checkStructureConformance(
 	}
 }
 
-func (checker *Checker) memberSatisfied(structureMember, interfaceMember *Member) bool {
+func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
 	// TODO: subtype?
-	if !structureMember.Type.Equal(interfaceMember.Type) {
+	if !compositeMember.Type.Equal(interfaceMember.Type) {
 		return false
 	}
 
 	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
-		structureMember.VariableKind != interfaceMember.VariableKind {
+		compositeMember.VariableKind != interfaceMember.VariableKind {
 
 		return false
 	}
@@ -2415,54 +2417,54 @@ func (checker *Checker) memberSatisfied(structureMember, interfaceMember *Member
 //  perform proper definite assignment analysis
 //
 func (checker *Checker) checkFieldsInitialized(
-	structure *ast.StructureDeclaration,
-	structureType *StructureType,
+	declaration *ast.CompositeDeclaration,
+	compositeType *CompositeType,
 ) {
 
-	for _, field := range structure.Fields {
+	for _, field := range declaration.Fields {
 		name := field.Identifier.Identifier
-		member := structureType.Members[name]
+		member := compositeType.Members[name]
 
 		if !member.IsInitialized {
 			checker.report(
 				&FieldUninitializedError{
 					Name:          name,
 					Pos:           field.Identifier.Pos,
-					StructureType: structureType,
+					CompositeType: compositeType,
 				},
 			)
 		}
 	}
 }
 
-func (checker *Checker) declareStructureConstructor(
-	structure *ast.StructureDeclaration,
-	structureType *StructureType,
+func (checker *Checker) declareCompositeConstructor(
+	compositeDeclaration *ast.CompositeDeclaration,
+	compositeType *CompositeType,
 	parameterTypes []Type,
 ) {
 	functionType := &FunctionType{
-		ReturnType: structureType,
+		ReturnType: compositeType,
 	}
 
 	var argumentLabels []string
 
 	// TODO: support multiple overloaded initializers
 
-	if len(structure.Initializers) > 0 {
-		firstInitializer := structure.Initializers[0]
+	if len(compositeDeclaration.Initializers) > 0 {
+		firstInitializer := compositeDeclaration.Initializers[0]
 
 		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
 
 		functionType = &FunctionType{
 			ParameterTypes: parameterTypes,
-			ReturnType:     structureType,
+			ReturnType:     compositeType,
 		}
 
 		checker.InitializerFunctionTypes[firstInitializer] = functionType
 	}
 
 	checker.declareFunction(
-		structure.Identifier,
+		compositeDeclaration.Identifier,
 		functionType,
 		argumentLabels,
 		false,
@@ -2523,7 +2525,8 @@ func (checker *Checker) members(
 func (checker *Checker) checkInitializers(
 	initializers []*ast.InitializerDeclaration,
 	fields []*ast.FieldDeclaration,
-	structureType Type,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
 	typeIdentifier string,
 	initializerParameterTypes []Type,
 	initializerKind initializerKind,
@@ -2542,7 +2545,8 @@ func (checker *Checker) checkInitializers(
 	checker.checkInitializer(
 		initializer,
 		fields,
-		structureType,
+		containerType,
+		containerDeclarationKind,
 		typeIdentifier,
 		initializerParameterTypes,
 		initializerKind,
@@ -2577,7 +2581,8 @@ func (checker *Checker) checkNoInitializerNoFields(
 func (checker *Checker) checkInitializer(
 	initializer *ast.InitializerDeclaration,
 	fields []*ast.FieldDeclaration,
-	structureType Type,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
 	typeIdentifier string,
 	initializerParameterTypes []Type,
 	initializerKind initializerKind,
@@ -2588,7 +2593,7 @@ func (checker *Checker) checkInitializer(
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	checker.declareSelfValue(structureType)
+	checker.declareSelfValue(containerType)
 
 	// check the initializer is named properly
 	identifier := initializer.Identifier.Identifier
@@ -2615,18 +2620,17 @@ func (checker *Checker) checkInitializer(
 	if initializerKind == initializerKindInterface &&
 		initializer.FunctionBlock != nil {
 
-		// TODO: use correct container declaration kind
 		checker.checkInterfaceFunctionBlock(
 			initializer.FunctionBlock,
-			common.DeclarationKindStructure,
+			containerDeclarationKind,
 			common.DeclarationKindInitializer,
 		)
 	}
 }
 
-func (checker *Checker) checkStructureFunctions(
+func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
-	selfType *StructureType,
+	selfType *CompositeType,
 ) {
 	for _, function := range functions {
 		func() {
@@ -2742,7 +2746,7 @@ func (checker *Checker) declareType(
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 
-	// NOTE: field type is already checked when determining structure function in `structureType`
+	// NOTE: field type is already checked when determining composite function in `compositeType`
 
 	panic(&errors.UnreachableError{})
 }
@@ -2770,6 +2774,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Initializers,
 		declaration.Fields,
 		interfaceType,
+		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypes,
 		initializerKindInterface,
@@ -2815,7 +2820,7 @@ func (checker *Checker) checkInterfaceFunctions(
 
 func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDeclaration) {
 
-	// NOTE: fields and functions might already refer to structure itself.
+	// NOTE: fields and functions might already refer to interface itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
@@ -2835,9 +2840,10 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	)
 
 	// NOTE: members are added in `VisitInterfaceDeclaration` –
-	//   left out for now, as field and function requirements could refer to e.g. structures
+	//   left out for now, as field and function requirements could refer to e.g. composites
 	*interfaceType = InterfaceType{
-		Identifier: identifier.Identifier,
+		CompositeKind: declaration.CompositeKind,
+		Identifier:    identifier.Identifier,
 	}
 
 	// TODO: support multiple overloaded initializers

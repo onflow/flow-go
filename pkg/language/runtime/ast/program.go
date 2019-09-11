@@ -6,7 +6,7 @@ type Program struct {
 	// all declarations, in the order they are defined
 	Declarations          []Declaration
 	interfaceDeclarations []*InterfaceDeclaration
-	structureDeclarations []*StructureDeclaration
+	compositeDeclarations []*CompositeDeclaration
 	functionDeclarations  []*FunctionDeclaration
 	imports               map[ImportLocation]*Program
 }
@@ -27,16 +27,16 @@ func (p *Program) InterfaceDeclarations() []*InterfaceDeclaration {
 	return p.interfaceDeclarations
 }
 
-func (p *Program) StructureDeclarations() []*StructureDeclaration {
-	if p.structureDeclarations == nil {
-		p.structureDeclarations = make([]*StructureDeclaration, 0)
+func (p *Program) CompositeDeclarations() []*CompositeDeclaration {
+	if p.compositeDeclarations == nil {
+		p.compositeDeclarations = make([]*CompositeDeclaration, 0)
 		for _, declaration := range p.Declarations {
-			if structureDeclaration, ok := declaration.(*StructureDeclaration); ok {
-				p.structureDeclarations = append(p.structureDeclarations, structureDeclaration)
+			if compositeDeclaration, ok := declaration.(*CompositeDeclaration); ok {
+				p.compositeDeclarations = append(p.compositeDeclarations, compositeDeclaration)
 			}
 		}
 	}
-	return p.structureDeclarations
+	return p.compositeDeclarations
 }
 
 func (p *Program) FunctionDeclarations() []*FunctionDeclaration {
