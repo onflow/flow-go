@@ -20,7 +20,7 @@ pub contract interface FungibleToken {
         pub fun deposit(vault: <-Vault)
     }
 
-    pub resource Vault implements Provider, Receiver {
+    pub resource Vault: Provider, Receiver {
 
         pub balance: Int {
             get {
@@ -69,7 +69,7 @@ pub contract interface FungibleToken {
     }
 }
 
-pub abstract contract BasicToken implements FungibleToken {
+pub abstract contract BasicToken: FungibleToken {
 
     pub resource Vault {
 
@@ -101,7 +101,7 @@ pub abstract contract BasicToken implements FungibleToken {
 
 pub contract DeteToken includes BasicToken {
 
-    pub resource Minter implements Provider {
+    pub resource Minter: Provider {
 
         init() {}
 
@@ -113,7 +113,7 @@ pub contract DeteToken includes BasicToken {
 
 import Timestamp from "time"
 
-pub resource Faucet implements FungibleToken.Provider {
+pub resource Faucet: FungibleToken.Provider {
 
     private let source: <-FungibleToken.Provider
     private let dailyLimit: Int
