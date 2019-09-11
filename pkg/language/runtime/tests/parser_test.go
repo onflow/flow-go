@@ -736,6 +736,68 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		To(Equal(expected))
 }
 
+func TestParseConcatenatingExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, err := parser.ParseProgram(`
+        let a = [1, 2] & [3, 4]
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "a",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Value: &BinaryExpression{
+			Operation: OperationConcat,
+			Left: &ArrayExpression{
+				Values: []Expression{
+					&IntExpression{
+						Value:    big.NewInt(1),
+						StartPos: Position{Offset: 18, Line: 2, Column: 17},
+						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					},
+					&IntExpression{
+						Value:    big.NewInt(2),
+						StartPos: Position{Offset: 21, Line: 2, Column: 20},
+						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					},
+				},
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+			},
+			Right: &ArrayExpression{
+				Values: []Expression{
+					&IntExpression{
+						Value:    big.NewInt(3),
+						StartPos: Position{Offset: 27, Line: 2, Column: 26},
+						EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+					},
+					&IntExpression{
+						Value:    big.NewInt(4),
+						StartPos: Position{Offset: 30, Line: 2, Column: 29},
+						EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+					},
+				},
+				StartPos: Position{Offset: 26, Line: 2, Column: 25},
+				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
