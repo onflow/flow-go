@@ -268,6 +268,12 @@ func (s *BaseStrictusListener) EnterFailableDowncastingExpression(ctx *FailableD
 func (s *BaseStrictusListener) ExitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
 }
 
+// EnterConcatenatingExpression is called when production concatenatingExpression is entered.
+func (s *BaseStrictusListener) EnterConcatenatingExpression(ctx *ConcatenatingExpressionContext) {}
+
+// ExitConcatenatingExpression is called when production concatenatingExpression is exited.
+func (s *BaseStrictusListener) ExitConcatenatingExpression(ctx *ConcatenatingExpressionContext) {}
+
 // EnterAdditiveExpression is called when production additiveExpression is entered.
 func (s *BaseStrictusListener) EnterAdditiveExpression(ctx *AdditiveExpressionContext) {}
 
