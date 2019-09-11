@@ -145,7 +145,7 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`).
+Names may start with any upper or lowercase letter (A-Z, a-z) or an underscore (`_`).
 This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
@@ -1544,7 +1544,7 @@ if a == 1 {
 ### Optional Binding
 
 Optional binding allows getting the value inside an optional.
-It is a variant of the if-statment.
+It is a variant of the if-statement.
 
 If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.
 
@@ -3063,7 +3063,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Attestations are not implemented yet.
 
-Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.
+Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.
 
 Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
 
