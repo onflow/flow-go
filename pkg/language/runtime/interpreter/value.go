@@ -61,11 +61,27 @@ func (v BoolValue) Negate() BoolValue {
 	return !v
 }
 
+// IndexableValue
+
+type IndexableValue interface {
+	isIndexableValue()
+	Get(key Value) Value
+	Set(key Value, value Value)
+}
+
+// ConcatenatableValue
+
+type ConcatenatableValue interface {
+	isConcatenatableValue()
+	Concat(other ConcatenatableValue) Value
+}
+
 // StringValue
 
 type StringValue string
 
-func (StringValue) isValue() {}
+func (StringValue) isValue()               {}
+func (StringValue) isConcatenatableValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
@@ -84,10 +100,10 @@ func (v StringValue) Equal(other StringValue) BoolValue {
 	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
 }
 
-func (v StringValue) Concat(other StringValue) StringValue {
+func (v StringValue) Concat(other ConcatenatableValue) Value {
 	var sb strings.Builder
 	sb.WriteString(string(v))
-	sb.WriteString(string(other))
+	sb.WriteString(string(other.(StringValue)))
 	return StringValue(sb.String())
 }
 
@@ -105,21 +121,15 @@ func (v StringValue) SetMember(interpreter *Interpreter, name string, value Valu
 	panic(&errors.UnreachableError{})
 }
 
-// IndexableValue
-
-type IndexableValue interface {
-	isIndexableValue()
-	Get(key Value) Value
-	Set(key Value, value Value)
-}
-
 // ArrayValue
 
 type ArrayValue struct {
 	Values *[]Value
 }
 
-func (ArrayValue) isValue() {}
+func (ArrayValue) isValue()               {}
+func (ArrayValue) isIndexableValue()      {}
+func (ArrayValue) isConcatenatableValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -140,7 +150,11 @@ func (v ArrayValue) ToGoValue() interface{} {
 	return values
 }
 
-func (v ArrayValue) isIndexableValue() {}
+func (v ArrayValue) Concat(other ConcatenatableValue) Value {
+	otherArray := other.(ArrayValue)
+	values := append(*v.Values, *otherArray.Values...)
+	return ArrayValue{Values: &values}
+}
 
 func (v ArrayValue) Get(key Value) Value {
 	return (*v.Values)[key.(IntegerValue).IntValue()]
