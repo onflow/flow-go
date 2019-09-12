@@ -171,6 +171,10 @@ func (v *BaseStrictusVisitor) VisitFailableDowncastingExpression(ctx *FailableDo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

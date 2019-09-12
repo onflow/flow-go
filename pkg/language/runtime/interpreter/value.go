@@ -84,6 +84,13 @@ func (v StringValue) Equal(other StringValue) BoolValue {
 	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
 }
 
+func (v StringValue) Concat(other StringValue) StringValue {
+	var sb strings.Builder
+	sb.WriteString(string(v))
+	sb.WriteString(string(other))
+	return StringValue(sb.String())
+}
+
 func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":

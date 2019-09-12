@@ -21,6 +21,7 @@ const (
 	OperationMul
 	OperationDiv
 	OperationMod
+	OperationConcat
 	OperationNegate
 	OperationNilCoalesce
 	OperationMove
@@ -54,6 +55,8 @@ func (s Operation) Symbol() string {
 		return "/"
 	case OperationMod:
 		return "%"
+	case OperationConcat:
+		return "&"
 	case OperationNegate:
 		return "!"
 	case OperationNilCoalesce:
