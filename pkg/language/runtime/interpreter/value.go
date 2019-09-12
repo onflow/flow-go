@@ -188,6 +188,14 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+	case "concat":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				otherValue := arguments[0].(ConcatenatableValue)
+				result := v.Concat(otherValue)
+				return trampoline.Done{Result: result}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
