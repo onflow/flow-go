@@ -327,6 +327,54 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			},
 			IsInitialized: true,
 		}
+	case "insert":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					&IntegerType{},
+					ty.elementType(),
+				},
+				ReturnType: &VoidType{},
+			},
+			IsInitialized: true,
+		}
+	case "remove":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{&IntegerType{}},
+				ReturnType:     ty.elementType(),
+			},
+			IsInitialized: true,
+		}
+	case "removeFirst":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{},
+				ReturnType:     ty.elementType(),
+			},
+			IsInitialized: true,
+		}
+	case "removeLast":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{},
+				ReturnType:     ty.elementType(),
+			},
+			IsInitialized: true,
+		}
+	case "contains":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{ty.elementType()},
+				ReturnType:     &BoolType{},
+			},
+			IsInitialized: true,
+		}
 	default:
 		return arrayMembers[field]
 	}
