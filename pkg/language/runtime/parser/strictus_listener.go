@@ -34,6 +34,9 @@ type StrictusListener interface {
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
+	// EnterCompositeKind is called when entering the compositeKind production.
+	EnterCompositeKind(c *CompositeKindContext)
+
 	// EnterInitializer is called when entering the initializer production.
 	EnterInitializer(c *InitializerContext)
 
@@ -258,6 +261,9 @@ type StrictusListener interface {
 
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
+
+	// ExitCompositeKind is called when exiting the compositeKind production.
+	ExitCompositeKind(c *CompositeKindContext)
 
 	// ExitInitializer is called when exiting the initializer production.
 	ExitInitializer(c *InitializerContext)

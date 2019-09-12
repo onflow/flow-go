@@ -43,6 +43,10 @@ func (v *BaseStrictusVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclaratio
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	return v.VisitChildren(ctx)
 }

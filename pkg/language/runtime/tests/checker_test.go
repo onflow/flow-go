@@ -1529,602 +1529,664 @@ func TestCheckInvalidFunctionAccess(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.InvalidAccessModifierError{}))
 }
 
-func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Int {}
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Int {}
+        `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
 }
 
-func TestCheckStructure(t *testing.T) {
+func TestCheckComposite(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            pub(set) var foo: Int
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              pub(set) var foo: Int
+  
+              init(foo: Int) {
+                  self.foo = foo
+              }
+  
+              pub fun getFoo(): Int {
+                  return self.foo
+              }
+          }
+	    `, kind))
 
-            init(foo: Int) {
-                self.foo = foo
-            }
-
-            pub fun getFoo(): Int {
-                return self.foo
-            }
-        }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInitializerName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            init() {}
-        }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {}
+          }
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInitializerName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            initializer() {}
-        }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              initializer() {}
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidInitializerNameError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidInitializerNameError{}))
+	}
 }
 
-func TestCheckInvalidStructureFieldName(t *testing.T) {
+func TestCheckInvalidCompositeFieldName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            let init: Int
-        }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let init: Int
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 3)
+		errs := expectCheckerErrors(err, 3)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[2]).
+			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+	}
 }
 
-func TestCheckInvalidStructureFunctionName(t *testing.T) {
+func TestCheckInvalidCompositeFunctionName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            fun init() {}
-        }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun init() {}
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFields(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
-           let x: Int
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
+              let x: Int
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 4)
+		errs := expectCheckerErrors(err, 4)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[2]).
+			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
 
-	Expect(errs[3]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[3]).
+			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFunctions(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           fun x() {}
-           fun x() {}
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun x() {}
+              fun x() {}
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFieldsAndFunctions(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
-           fun x() {}
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
+              fun x() {}
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 2)
+		errs := expectCheckerErrors(err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+	}
 }
 
-func TestCheckStructureFieldsAndFunctions(t *testing.T) {
+func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
 
-           init() {
-               self.x = 1
+              init() {
+                  self.x = 1
+              }
+
+              fun y() {}
+          }
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckInvalidCompositeFieldType(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: X
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 3)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		Expect(errs[2]).
+			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+	}
+}
+
+func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init(x: X) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	}
+}
+
+func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init(x: Int, x: Int) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
+}
+
+func TestCheckInvalidCompositeInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() { X }
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	}
+}
+
+func TestCheckInvalidCompositeFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun test() { X }
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	}
+}
+
+func TestCheckCompositeInitializerSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() { self }
+          }
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckCompositeFunctionSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun test() { self }
+          }
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckInvalidLocalComposite(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          fun test() {
+              %s Test {}
+          }
+        `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+	}
+}
+
+func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+           %s Test {
+               let foo: Int
            }
+        `, kind))
 
-           fun y() {}
-       }
-	`)
+		errs := expectCheckerErrors(err, 2)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+	}
 }
 
-func TestCheckInvalidStructureFieldType(t *testing.T) {
+func TestCheckCompositeFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: X
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let foo: Int
 
-	errs := expectCheckerErrors(err, 3)
+              init() {
+                  self.foo = 1
+              }
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+              fun test() {
+                  self.foo
+              }
+          }
+        `, kind))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
-
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
-func TestCheckInvalidStructureInitializerParameterType(t *testing.T) {
+func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init(x: X) {}
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {
+                  self.foo
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              fun test() {
+                  self.bar
+              }
+          }
+	    `, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("bar"))
+	}
 }
 
-func TestCheckInvalidStructureInitializerParameters(t *testing.T) {
+func TestCheckCompositeFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init(x: Int, x: Int) {}
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              var foo: Int
 
-	errs := expectCheckerErrors(err, 1)
+              init() {
+                  self.foo = 1
+                  let alsoSelf = self
+                  alsoSelf.foo = 2
+              }
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+              fun test() {
+                  self.foo = 3
+                  let alsoSelf = self
+                  alsoSelf.foo = 4
+              }
+          }
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
-func TestCheckInvalidStructureInitializer(t *testing.T) {
+func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init() { X }
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {
+                  self = Test()
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              fun test() {
+                  self = Test()
+              }
+          }
+	    `, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+	}
 }
 
-func TestCheckInvalidStructureFunction(t *testing.T) {
+func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           fun test() { X }
-       }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {
+                  self.foo = 1
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              fun test() {
+                  self.bar = 2
+              }
+          }
+	    `, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("bar"))
+	}
 }
 
-func TestCheckStructureInitializerSelfReference(t *testing.T) {
+func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() { self }
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              var foo: Int
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              init() {
+                  self.foo = true
+              }
+
+              fun test() {
+                  self.foo = false
+              }
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	}
 }
 
-func TestCheckStructureFunctionSelfReference(t *testing.T) {
+func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          fun test() { self }
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let foo: Int
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              init() {
+                  // initialization is fine
+                  self.foo = 1
+              }
+
+              fun test() {
+                  // assignment is invalid
+                  self.foo = 2
+              }
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+	}
 }
 
-func TestCheckInvalidLocalStructure(t *testing.T) {
+func TestCheckCompositeFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-	  fun test() {
-          struct Test {}
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-	errs := expectCheckerErrors(err, 1)
+              fun bar() {
+                  self.foo()
+              }
+          }
+	    `, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
-func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
+func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-	errs := expectCheckerErrors(err, 2)
+              fun bar() {
+                  self.baz()
+              }
+          }
+	    `, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	}
 }
 
-func TestCheckStructureFieldAccess(t *testing.T) {
+func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-          init() {
-              self.foo = 1
+              fun bar() {
+                  self.foo = 2
+              }
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+		Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	}
+}
+
+func TestCheckCompositeInstantiation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              init(x: Int) {
+                  let test: Test = Test(x: 1)
+              }
+
+              fun test() {
+                  let test: Test = Test(x: 2)
+              }
           }
 
-          fun test() {
-              self.foo
-          }
-      }
-	`)
+          let test: Test = Test(x: 3)
+    	`, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
-func TestCheckInvalidStructureFieldAccess(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self.foo
-          }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          let x = 1
+          %s Foo {}
+          %s Foo {}
+	    `, kind, kind))
 
-          fun test() {
-              self.bar
-          }
-      }
-	`)
+		errs := expectCheckerErrors(err, 2)
 
-	errs := expectCheckerErrors(err, 2)
+		// NOTE: two errors: one because type is redeclared,
+		// the other because the global is redeclared
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("foo"))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("bar"))
-}
-
-func TestCheckStructureFieldAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          var foo: Int
-
-          init() {
-              self.foo = 1
-              let alsoSelf = self
-              alsoSelf.foo = 2
-          }
-
-          fun test() {
-              self.foo = 3
-              let alsoSelf = self
-              alsoSelf.foo = 4
-          }
-      }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureSelfAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self = Test()
-          }
-
-          fun test() {
-              self = Test()
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
-}
-
-func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self.foo = 1
-          }
-
-          fun test() {
-              self.bar = 2
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("foo"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("bar"))
-}
-
-func TestCheckInvalidStructureFieldAssignmentWrongType(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          var foo: Int
-
-          init() {
-              self.foo = true
-          }
-
-          fun test() {
-              self.foo = false
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-}
-
-func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-
-          init() {
-              // initialization is fine
-              self.foo = 1
-          }
-
-          fun test() {
-              // assignment is invalid
-              self.foo = 2
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-}
-
-func TestCheckStructureFunctionCall(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.foo()
-          }
-      }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureFunctionCall(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.baz()
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-}
-
-func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.foo = 2
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-	Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
-		To(Equal("foo"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-}
-
-func TestCheckStructureInstantiation(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          init(x: Int) {
-              let test: Test = Test(x: 1)
-          }
-
-          fun test() {
-              let test: Test = Test(x: 2)
-          }
-      }
-
-      let test: Test = Test(x: 3)
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      let x = 1
-      struct Foo {}
-      struct Foo {}
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	// NOTE: two errors: one because type is redeclared,
-	// the other because the global is redeclared
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
 }
 
 func TestCheckInvalidForwardReference(t *testing.T) {
@@ -2141,231 +2203,252 @@ func TestCheckInvalidForwardReference(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
-func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
-	// tests that structure typing is nominal, not structural
+func TestCheckInvalidIncompatibleCompositeTypes(t *testing.T) {
+	// tests that composite typing is nominal, not structural
 
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Foo {
-          init() {}
-      }
-
-      struct Bar {
-          init() {}
-      }
-
-      let foo: Foo = Bar()
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-}
-
-func TestCheckInvalidStructureFunctionWithSelfParameter(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Foo {
-          fun test(self: Int) {}
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-}
-
-func TestCheckInvalidStructureInitializerWithSelfParameter(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Foo {
-          init(self: Int) {}
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-}
-
-func TestCheckStructureInitializesConstant(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-
-          init() {
-              self.foo = 42
-          }
-      }
-
-	  let test = Test()
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckStructureInitializerWithArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          init(x: Int) {}
-      }
-
-	  let test = Test(x: 1)
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureInitializerCallWithMissingArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          init(x: Int) {}
-      }
-
-	  let test = Test(1)
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
-}
-
-func TestCheckStructureFunctionWithArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          fun test(x: Int) {}
-      }
-
-	  let test = Test().test(x: 1)
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-     struct Test {
-
-         fun test(x: Int) {}
-     }
-
-	  let test = Test().test(1)
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
-}
-
-func TestCheckStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
-	RegisterTestingT(t)
-
-	checker, err := parseAndCheck(`
-
-      struct Test {
-
-          init() {
-              Test
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Foo {
+              init() {}
           }
 
+          %s Bar {
+              init() {}
+          }
+
+          let foo: Foo = Bar()
+    	`, kind, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	}
+}
+
+func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Foo {
+              fun test(self: Int) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
+}
+
+func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Foo {
+              init(self: Int) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	}
+}
+
+func TestCheckCompositeInitializesConstant(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let foo: Int
+
+              init() {
+                  self.foo = 42
+              }
+          }
+
+	      let test = Test()
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              init(x: Int) {}
+          }
+
+	      let test = Test(x: 1)
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              init(x: Int) {}
+          }
+
+	      let test = Test(1)
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	}
+}
+
+func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              fun test(x: Int) {}
+          }
+
+	      let test = Test().test(x: 1)
+	    `, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}
+
+func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+     
+              fun test(x: Int) {}
+          }
+
+	      let test = Test().test(1)
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	}
+}
+
+func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		checker, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              init() {
+                  Test
+              }
+    
+              fun test(): Test {
+                  return Test()
+              }
+          }
+    
           fun test(): Test {
-              return Test()
+             return Test()
           }
-      }
+    
+          fun test2(): Test {
+             return Test().test()
+          }
+	    `, kind))
 
-      fun test(): Test {
-         return Test()
-      }
+		Expect(err).
+			To(Not(HaveOccurred()))
 
-      fun test2(): Test {
-         return Test().test()
-      }
-	`)
+		testType := checker.FindType("Test")
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(testType).
+			To(BeAssignableToTypeOf(&sema.StructureType{}))
 
-	testType := checker.FindType("Test")
+		structureType := testType.(*sema.StructureType)
 
-	Expect(testType).
-		To(BeAssignableToTypeOf(&sema.StructureType{}))
+		Expect(structureType.Identifier).
+			To(Equal("Test"))
 
-	structureType := testType.(*sema.StructureType)
+		testFunctionMember := structureType.Members["test"]
 
-	Expect(structureType.Identifier).
-		To(Equal("Test"))
+		Expect(testFunctionMember.Type).
+			To(BeAssignableToTypeOf(&sema.FunctionType{}))
 
-	testFunctionMember := structureType.Members["test"]
+		testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
 
-	Expect(testFunctionMember.Type).
-		To(BeAssignableToTypeOf(&sema.FunctionType{}))
-
-	testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
-
-	Expect(testFunctionType.ReturnType).
-		To(BeIdenticalTo(structureType))
+		Expect(testFunctionType.ReturnType).
+			To(BeIdenticalTo(structureType))
+	}
 }
 
-func TestCheckInvalidStructureFieldMissingVariableKind(t *testing.T) {
+func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct X {
-            x: Int
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s X {
+              x: Int
 
-            init(x: Int) {
-                self.x = x
-            }
-        }
-	`)
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+	}
 }
 
-func TestCheckStructureFunction(t *testing.T) {
+func TestCheckCompositeFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct X {
-            fun foo(): ((): X) {
-                return self.bar
-            }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+            %s X {
+                fun foo(): ((): X) {
+                    return self.bar
+                }
 
-            fun bar(): X {
-                return self
+                fun bar(): X {
+                    return self
+                }
             }
-        }
-	`)
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckFunctionConditions(t *testing.T) {
@@ -2797,25 +2880,27 @@ func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckReferenceBeforeDeclaration(t *testing.T) {
+func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      var tests = 0
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          var tests = 0
 
-      fun test(): Test {
-          return Test()
-      }
+          fun test(): Test {
+              return Test()
+          }
 
-      struct Test {
-         init() {
-             tests = tests + 1
-         }
-      }
-    `)
+          %s Test {
+             init() {
+                 tests = tests + 1
+             }
+          }
+        `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckNever(t *testing.T) {
@@ -3255,572 +3340,637 @@ func TestCheckInvalidNonOptionalReturn(t *testing.T) {
 func TestCheckInvalidLocalInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-	  fun test() {
-          interface Test {}
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          fun test() {
+              %s interface Test {}
+          }
+        `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+	}
 }
 
 func TestCheckInterfaceWithFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test()
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test()
+          }
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(x: Int) {
-              pre {
-                x == 0
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(x: Int) {
+                  pre {
+                    x == 0
+                  }
               }
           }
-      }
-	`)
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int {
-             return 1
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int {
+                 return 1
+              }
           }
-      }
-	`)
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test() {
-            // ...
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test() {
+                // ...
+              }
           }
-      }
-	`)
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+	}
 }
 
 func TestCheckInterfaceWithInitializer(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init()
-      }
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init()
+          }
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init() {
-            // ...
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init() {
+                // ...
+              }
           }
-      }
-	`)
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+	}
 }
 
 func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int) {
-              pre {
-                x == 0
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init(x: Int) {
+                  pre {
+                    x == 0
+                  }
               }
           }
-      }
-	`)
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      let test = Test()
-	`)
+          let test = Test()
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+	}
 }
 
 func TestCheckInterfaceUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheckWithExtra(
-		`
-          interface Test {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheckWithExtra(
+			fmt.Sprintf(`
+              %s interface Test {}
 
-          let test: Test = panic("")
-        `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.PanicFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
-	)
+              let test: Test = panic("")
+            `, kind),
+			stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}.ToValueDeclarations(),
+			nil,
+			nil,
+		)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      struct TestImpl: Test {}
+          %s TestImpl: Test {}
 
-      let test: Test = TestImpl()
-	`)
+          let test: Test = TestImpl()
+	    `, kind, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      // NOTE: not declaring conformance
-      struct TestImpl {}
+          // NOTE: not declaring conformance
+          %s TestImpl {}
 
-      let test: Test = TestImpl()
-	`)
+          let test: Test = TestImpl()
+	  `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	}
 }
 
-func TestCheckInvalidInterfaceConformanceNonInterface(t *testing.T) {
+func TestCheckInvalidCompositeInterfaceConformanceNonInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct TestImpl: Int {}
-	`)
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s TestImpl: Int {}
+	    `, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+	}
 }
 
 func TestCheckInterfaceFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Int
-      }
-
-      struct TestImpl: Test {
-          var x: Int
-
-          init(x: Int) {
-              self.x = x
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              x: Int
           }
-      }
 
-      let test: Test = TestImpl(x: 1)
+          %s TestImpl: Test {
+              var x: Int
 
-      let x = test.x
-	`)
+              init(x: Int) {
+                  self.x = x
+              }
+          }
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          let test: Test = TestImpl(x: 1)
+
+          let x = test.x
+        `, kind, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      struct TestImpl: Test {
-          var x: Int
+          %s TestImpl: Test {
+              var x: Int
 
-          init(x: Int) {
-              self.x = x
+              init(x: Int) {
+                  self.x = x
+              }
           }
-      }
 
-      let test: Test = TestImpl(x: 1)
+          let test: Test = TestImpl(x: 1)
 
-      let x = test.x
-	`)
+          let x = test.x
+    	`, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	}
 }
 
 func TestCheckInterfaceFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
-
-      struct TestImpl: Test {
-          fun test(): Int {
-              return 2
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int
           }
-      }
 
-      let test: Test = TestImpl()
+          %s TestImpl: Test {
+              fun test(): Int {
+                  return 2
+              }
+          }
 
-      let val = test.test()
-	`)
+          let test: Test = TestImpl()
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          let val = test.test()
+	    `, kind, kind))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-      }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      struct TestImpl: Test {
-          fun test(): Int {
-              return 2
+          %s TestImpl: Test {
+              fun test(): Int {
+                  return 2
+              }
           }
-      }
 
-      let test: Test = TestImpl()
+          let test: Test = TestImpl()
 
-      let val = test.test()
-	`)
+          let val = test.test()
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int)
-      }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init(x: Int)
+          }
 
-      struct TestImpl: Test {
-          init(x: Bool) {}
-      }
-	`)
+          %s TestImpl: Test {
+              init(x: Bool) {}
+          }
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int)
-      }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init(x: Int)
+          }
 
-      struct TestImpl: Test {
-      }
-	`)
+          %s TestImpl: Test {
+          }
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int
+          }
 
-      struct TestImpl: Test {}
-	`)
+          %s TestImpl: Test {}
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
-
-      struct TestImpl: Test {
-          fun test(): Bool {
-              return true
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int
           }
-      }
-	`)
+    
+          %s TestImpl: Test {
+              fun test(): Bool {
+                  return true
+              }
+          }
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-           x: Int
-      }
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+               x: Int
+          }
 
-      struct TestImpl: Test {}
-	`)
+          %s TestImpl: Test {}
+	    `, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Int
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              x: Int
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %s TestImpl: Test {
+              var x: Bool
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Bool
-      }
-
-      struct TestImpl: Test {
-          fun x(): Bool {
-              return true
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %s TestImpl: Test {
+              fun x(): Bool {
+                  return true
+              }
+          }
+	    `, kind, kind))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun x(): Bool
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun x(): Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %s TestImpl: Test {
+              var x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          let x: Bool
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              let x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %s TestImpl: Test {
+              var x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          var x: Bool
-      }
-
-      struct TestImpl: Test {
-          let x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              var x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %s TestImpl: Test {
+              let x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface X {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface X {}
 
-      interface Y {}
+          %s interface Y {}
 
-      struct TestImpl: X, Y, X {}
-	`)
+          %s TestImpl: X, Y, X {}
+	    `, kind, kind, kind))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+	}
 }
 
 func TestCheckInterfaceTypeAsValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`
-      interface X {}
+	for _, kind := range compositeKeywords {
+		checker, err := parseAndCheck(fmt.Sprintf(`
+          %s interface X {}
 
-      let x = X
-	`)
+          let x = X
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+		Expect(checker.GlobalValues["x"].Type).
+			To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+	}
 }
 
 func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, firstKind := range compositeKeywords {
+		for _, secondKind := range compositeKeywords {
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s S {}
+    
+              %s interface I {
+                  s: S
+              }
+	        `, firstKind, secondKind))
 
-      interface I {
-          s: S
-      }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
+			Expect(err).
+				To(Not(HaveOccurred()))
+		}
+	}
 }
 
 func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, firstKind := range compositeKeywords {
+		for _, secondKind := range compositeKeywords {
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s S {}
+    
+              %s interface I {
+                  fun s(): S
+              }
+	        `, firstKind, secondKind))
 
-      interface I {
-          fun s(): S
-      }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
+			Expect(err).
+				To(Not(HaveOccurred()))
+		}
+	}
 }
 
 // TODO: field declaration, member access, type references
@@ -3845,7 +3995,7 @@ func TestCheckOrigins(t *testing.T) {
             fun test() {}
         }
 
-        interface I1 {}
+        struct interface I1 {}
 
         fun f3(): S1 {
             f1(paramX: 1, paramY: true)
@@ -3925,9 +4075,9 @@ func TestCheckOrigins(t *testing.T) {
 			common.DeclarationKindFunction,
 		},
 		{
-			sema.Position{Line: 18, Column: 18},
-			sema.Position{Line: 18, Column: 19},
-			common.DeclarationKindInterface,
+			sema.Position{Line: 18, Column: 25},
+			sema.Position{Line: 18, Column: 26},
+			common.DeclarationKindStructureInterface,
 		},
 		{
 			sema.Position{Line: 20, Column: 12},
@@ -4117,28 +4267,30 @@ func TestCheckInvalidImportedError(t *testing.T) {
 func TestCheckImportTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`
-	   struct Test {}
-	`)
+	for _, kind := range compositeKeywords {
+		checker, err := parseAndCheck(fmt.Sprintf(`
+	       %s Test {}
+	    `, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
 
-	_, err = parseAndCheckWithExtra(
-		`
-           import "imported"
+		_, err = parseAndCheckWithExtra(
+			`
+               import "imported"
 
-           let x: Test = Test()
-        `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
-		},
-	)
+               let x: Test = Test()
+            `,
+			nil,
+			nil,
+			func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
+		)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckDictionary(t *testing.T) {
@@ -4374,11 +4526,12 @@ func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
 }
 
 // TODO: add support for interfaces
+// TODO: add test this is *INVALID* for resources
 func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      interface I {}
+      struct interface I {}
 
       struct S: I {}
 
@@ -4571,16 +4724,18 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
 func TestCheckArraySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface I {}
-      struct S: I {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface I {}
+          %s S: I {}
 
-      let xs: S[] = []
-      let ys: I[] = xs
-	`)
+          let xs: S[] = []
+          let ys: I[] = xs
+	    `, kind, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidArraySubtyping(t *testing.T) {
@@ -4600,16 +4755,18 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 func TestCheckDictionarySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface I {}
-      struct S: I {}
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface I {}
+          %s S: I {}
 
-      let xs: S[String] = {}
-      let ys: I[String] = xs
-	`)
+          let xs: S[String] = {}
+          let ys: I[String] = xs
+	    `, kind, kind))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }
 
 func TestCheckInvalidDictionarySubtyping(t *testing.T) {
@@ -4645,4 +4802,22 @@ func TestCheckUnaryMove(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range compositeKeywords {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s X {
+              init() {}
+              init(y: Int) {}
+          }
+	    `, kind))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedOverloadingError{}))
+	}
 }

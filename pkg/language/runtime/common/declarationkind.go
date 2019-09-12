@@ -16,9 +16,13 @@ const (
 	DeclarationKindParameter
 	DeclarationKindArgumentLabel
 	DeclarationKindStructure
+	DeclarationKindResource
+	DeclarationKindContract
 	DeclarationKindField
 	DeclarationKindInitializer
-	DeclarationKindInterface
+	DeclarationKindStructureInterface
+	DeclarationKindResourceInterface
+	DeclarationKindContractInterface
 	DeclarationKindImport
 )
 
@@ -40,12 +44,20 @@ func (k DeclarationKind) Name() string {
 		return "argument label"
 	case DeclarationKindStructure:
 		return "structure"
+	case DeclarationKindResource:
+		return "resource"
+	case DeclarationKindContract:
+		return "contract"
 	case DeclarationKindField:
 		return "field"
 	case DeclarationKindInitializer:
 		return "initializer"
-	case DeclarationKindInterface:
-		return "interface"
+	case DeclarationKindStructureInterface:
+		return "structure interface"
+	case DeclarationKindResourceInterface:
+		return "resource interface"
+	case DeclarationKindContractInterface:
+		return "contract interface"
 	case DeclarationKindImport:
 		return "import"
 	}

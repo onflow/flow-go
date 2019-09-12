@@ -8,7 +8,7 @@ type StructureDeclaration struct {
 	Identifier   Identifier
 	Conformances []*NominalType
 	Fields       []*FieldDeclaration
-	Initializer  *InitializerDeclaration
+	Initializers []*InitializerDeclaration
 	Functions    []*FunctionDeclaration
 	StartPos     Position
 	EndPos       Position

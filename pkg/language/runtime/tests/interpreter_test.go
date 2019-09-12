@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -2561,154 +2562,170 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface Test {}
+	for _, kind := range compositeKeywords {
 
-      struct TestImpl: Test {}
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface Test {}
 
-      let test: Test = TestImpl()
-	`)
+          %s TestImpl: Test {}
 
-	Expect(inter.Globals["test"].Value).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+          let test: Test = TestImpl()
+	    `, kind, kind))
+
+		Expect(inter.Globals["test"].Value).
+			To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+	}
 }
 
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface Test {
-          x: Int
-      }
+	for _, kind := range compositeKeywords {
 
-      struct TestImpl: Test {
-          var x: Int
-
-          init(x: Int) {
-              self.x = x
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface Test {
+              x: Int
           }
-      }
 
-      let test: Test = TestImpl(x: 1)
+          %s TestImpl: Test {
+              var x: Int
+    
+              init(x: Int) {
+                  self.x = x
+              }
+          }
 
-      let x = test.x
-	`)
+          let test: Test = TestImpl(x: 1)
 
-	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+          let x = test.x
+	    `, kind, kind))
+
+		Expect(inter.Globals["x"].Value).
+			To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+	}
 }
 
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface Test {
-          fun test(): Int
-      }
-
-      struct TestImpl: Test {
-          fun test(): Int {
-              return 2
+	for _, kind := range compositeKeywords {
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int
           }
-      }
 
-      let test: Test = TestImpl()
+          %s TestImpl: Test {
+              fun test(): Int {
+                  return 2
+              }
+          }
 
-      let val = test.test()
-	`)
+          let test: Test = TestImpl()
 
-	Expect(inter.Globals["val"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+          let val = test.test()
+	    `, kind, kind))
+
+		Expect(inter.Globals["val"].Value).
+			To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+	}
 }
 
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface Test {
-          fun test(x: Int): Int {
-              pre {
-                  x > 0: "x must be positive"
+	for _, kind := range compositeKeywords {
+
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface Test {
+              fun test(x: Int): Int {
+                  pre {
+                      x > 0: "x must be positive"
+                  }
               }
           }
-      }
 
-      struct TestImpl: Test {
-          fun test(x: Int): Int {
-              pre {
-                  x < 2: "x must be smaller than 2"
+          %s TestImpl: Test {
+              fun test(x: Int): Int {
+                  pre {
+                      x < 2: "x must be smaller than 2"
+                  }
+                  return x
               }
-              return x
           }
-      }
 
-      let test: Test = TestImpl()
+          let test: Test = TestImpl()
 
-      fun callTest(x: Int): Int {
-          return test.test(x: x)
-      }
-	`)
+          fun callTest(x: Int): Int {
+              return test.test(x: x)
+          }
+	    `, kind, kind))
 
-	_, err := inter.Invoke("callTest", big.NewInt(0))
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		_, err := inter.Invoke("callTest", big.NewInt(0))
+		Expect(err).
+			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
-	Expect(inter.Invoke("callTest", big.NewInt(1))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		Expect(inter.Invoke("callTest", big.NewInt(1))).
+			To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
 
-	_, err = inter.Invoke("callTest", big.NewInt(2))
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		_, err = inter.Invoke("callTest", big.NewInt(2))
+		Expect(err).
+			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+	}
 }
 
 func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface Test {
-          init(x: Int) {
-              pre {
-                  x > 0: "x must be positive"
+	for _, kind := range compositeKeywords {
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface Test {
+              init(x: Int) {
+                  pre {
+                      x > 0: "x must be positive"
+                  }
               }
           }
-      }
 
-      struct TestImpl: Test {
-          init(x: Int) {
-              pre {
-                  x < 2: "x must be smaller than 2"
+          %s TestImpl: Test {
+              init(x: Int) {
+                  pre {
+                      x < 2: "x must be smaller than 2"
+                  }
               }
           }
-      }
 
-      fun test(x: Int): Test {
-          return TestImpl(x: x)
-      }
-	`)
+          fun test(x: Int): Test {
+              return TestImpl(x: x)
+          }
+	    `, kind, kind))
 
-	_, err := inter.Invoke("test", big.NewInt(0))
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		_, err := inter.Invoke("test", big.NewInt(0))
+		Expect(err).
+			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
-	Expect(inter.Invoke("test", big.NewInt(1))).
-		To(BeAssignableToTypeOf(interpreter.StructureValue{}))
+		Expect(inter.Invoke("test", big.NewInt(1))).
+			To(BeAssignableToTypeOf(interpreter.StructureValue{}))
 
-	_, err = inter.Invoke("test", big.NewInt(2))
-	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		_, err = inter.Invoke("test", big.NewInt(2))
+		Expect(err).
+			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+	}
 }
 
 func TestInterpretInterfaceTypeAsValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	inter := parseCheckAndInterpret(`
-      interface X {}
+	for _, kind := range compositeKeywords {
 
-      let x = X
-	`)
+		inter := parseCheckAndInterpret(fmt.Sprintf(`
+          %s interface X {}
 
-	Expect(inter.Globals["x"].Value).
-		To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+          let x = X
+	    `, kind))
+
+		Expect(inter.Globals["x"].Value).
+			To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+	}
 }
 
 func TestInterpretImport(t *testing.T) {

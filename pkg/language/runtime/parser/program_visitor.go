@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
 	"strings"
@@ -171,10 +172,11 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 		fields = append(fields, field)
 	}
 
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	var initializers []*ast.InitializerDeclaration
+	for _, initializerNode := range ctx.AllInitializer() {
+		initializers = append(initializers,
+			initializerNode.Accept(v).(*ast.InitializerDeclaration),
+		)
 	}
 
 	var functions []*ast.FunctionDeclaration
@@ -186,13 +188,13 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	// TODO: return resource declaration if resource keyword is used
+	// TODO: consider kind: return resource / contract declaration
 
 	return &ast.StructureDeclaration{
 		Identifier:   identifier,
 		Conformances: conformances,
 		Fields:       fields,
-		Initializer:  initializer,
+		Initializers: initializers,
 		Functions:    functions,
 		StartPos:     startPosition,
 		EndPos:       endPosition,
@@ -266,6 +268,8 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
+
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var fields []*ast.FieldDeclaration
@@ -274,10 +278,11 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 		fields = append(fields, field)
 	}
 
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
+	var initializers []*ast.InitializerDeclaration
+	for _, initializerNode := range ctx.AllInitializer() {
+		initializers = append(initializers,
+			initializerNode.Accept(v).(*ast.InitializerDeclaration),
+		)
 	}
 
 	var functions []*ast.FunctionDeclaration
@@ -290,13 +295,30 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Identifier:  identifier,
-		Fields:      fields,
-		Initializer: initializer,
-		Functions:   functions,
-		StartPos:    startPosition,
-		EndPos:      endPosition,
+		Kind:         kind,
+		Identifier:   identifier,
+		Fields:       fields,
+		Initializers: initializers,
+		Functions:    functions,
+		StartPos:     startPosition,
+		EndPos:       endPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
+	if ctx.Struct() != nil {
+		return common.CompositeKindStructure
+	}
+
+	if ctx.Resource() != nil {
+		return common.CompositeKindResource
+	}
+
+	if ctx.Contract() != nil {
+		return common.CompositeKindContract
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
