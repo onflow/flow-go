@@ -92,7 +92,7 @@ func TestCheckString(t *testing.T) {
 }
 
 func expectCheckerErrors(err error, len int) []error {
-	if len <= 0 {
+	if len <= 0 && err == nil {
 		return nil
 	}
 
@@ -1199,8 +1199,6 @@ type operationTests struct {
 }
 
 func TestCheckIntegerBinaryOperations(t *testing.T) {
-	RegisterTestingT(t)
-
 	allOperationTests := []operationTests{
 		{
 			operations: []ast.Operation{
@@ -1272,7 +1270,7 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
 					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 				}},
-				{&sema.StringType{}, `test`, `test`, nil},
+				{&sema.BoolType{}, `"test"`, `"test"`, nil},
 			},
 		},
 	}
@@ -1280,38 +1278,40 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	for _, operationTests := range allOperationTests {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
-				_, err := parseAndCheck(
-					fmt.Sprintf(
-						`fun test(): %s { return %s %s %s }`,
-						test.ty, test.left, operation.Symbol(), test.right,
-					),
-				)
+				t.Run("", func(t *testing.T) {
+					RegisterTestingT(t)
 
-				errs := expectCheckerErrors(err, len(test.matchers))
+					_, err := parseAndCheck(
+						fmt.Sprintf(
+							`fun test(): %s { return %s %s %s }`,
+							test.ty, test.left, operation.Symbol(), test.right,
+						),
+					)
 
-				for i, matcher := range test.matchers {
-					Expect(errs[i]).
-						To(matcher)
-				}
+					errs := expectCheckerErrors(err, len(test.matchers))
+
+					for i, matcher := range test.matchers {
+						Expect(errs[i]).
+							To(matcher)
+					}
+				})
 			}
 		}
 	}
 }
 
 func TestCheckConcatenatingExpression(t *testing.T) {
-	RegisterTestingT(t)
-
 	tests := []operationTest{
-		{&sema.StringType{}, "\"abc\"", "\"def\"", nil},
-		{&sema.StringType{}, "\"\"", "\"def\"", nil},
-		{&sema.StringType{}, "\"abc\"", "\"\"", nil},
-		{&sema.StringType{}, "\"\"", "\"\"", nil},
-		{&sema.StringType{}, "1", "\"def\"", []types.GomegaMatcher{
+		{&sema.StringType{}, `"abc"`, `"def"`, nil},
+		{&sema.StringType{}, `""`, `"def"`, nil},
+		{&sema.StringType{}, `"abc"`, `""`, nil},
+		{&sema.StringType{}, `""`, `""`, nil},
+		{&sema.StringType{}, "1", `"def"`, []types.GomegaMatcher{
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
 		}},
-		{&sema.StringType{}, "\"abc\"", "2", []types.GomegaMatcher{
+		{&sema.StringType{}, `"abc"`, "2", []types.GomegaMatcher{
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 		}},
@@ -1319,21 +1319,36 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
 		}},
+
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[3, 4]", nil},
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "1", "[3, 4]", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		}},
 	}
 
 	for _, test := range tests {
-		_, err := parseAndCheck(
-			fmt.Sprintf(
-				`fun test(): %s { return %s %s %s }`,
-				test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
-			),
-		)
+		t.Run("", func(t *testing.T) {
+			RegisterTestingT(t)
 
-		errs := expectCheckerErrors(err, len(test.matchers))
+			_, err := parseAndCheck(
+				fmt.Sprintf(
+					`fun test(): %s { return %s %s %s }`,
+					test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
+				),
+			)
 
-		for i, matcher := range test.matchers {
-			Expect(errs[i]).To(matcher)
-		}
+			errs := expectCheckerErrors(err, len(test.matchers))
+
+			for i, matcher := range test.matchers {
+				Expect(errs[i]).To(matcher)
+			}
+		})
 	}
 }
 
