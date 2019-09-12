@@ -1321,6 +1321,10 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 		}},
 
 		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[3, 4]", nil},
+		// TODO: support empty arrays
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[]", nil},
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[3, 4]", nil},
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[]", nil},
 		{&sema.VariableSizedType{Type: &sema.IntType{}}, "1", "[3, 4]", []types.GomegaMatcher{
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
 			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
