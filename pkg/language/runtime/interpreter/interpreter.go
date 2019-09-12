@@ -966,8 +966,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(StringValue)
-				right := tuple.right.(StringValue)
+				left := tuple.left.(ConcatenatableValue)
+				right := tuple.right.(ConcatenatableValue)
 				return left.Concat(right)
 			})
 	}

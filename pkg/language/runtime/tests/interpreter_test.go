@@ -398,6 +398,12 @@ func TestInterpretConcatOperator(t *testing.T) {
 		let b = "" & "def"
 		let c = "abc" & ""
 		let d = "" & ""
+
+		let e = [1, 2] & [3, 4]
+		// TODO: support empty arrays
+		// let f = [1, 2] & []
+		// let g = [] & [3, 4]
+		// let h = [] & []
 	`)
 
 	Expect(inter.Globals["a"].Value).
@@ -408,6 +414,36 @@ func TestInterpretConcatOperator(t *testing.T) {
 		To(Equal(interpreter.StringValue("abc")))
 	Expect(inter.Globals["d"].Value).
 		To(Equal(interpreter.StringValue("")))
+
+	Expect(inter.Globals["e"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+			},
+		}))
+
+	// TODO: support empty arrays
+	// Expect(inter.Globals["f"].Value).
+	// 	To(Equal(interpreter.ArrayValue{
+	// 		Values: &[]interpreter.Value{
+	// 			interpreter.IntValue{Int: big.NewInt(1)},
+	// 			interpreter.IntValue{Int: big.NewInt(2)},
+	// 		},
+	// 	}))
+	// Expect(inter.Globals["g"].Value).
+	// 	To(Equal(interpreter.ArrayValue{
+	// 		Values: &[]interpreter.Value{
+	// 			interpreter.IntValue{Int: big.NewInt(3)},
+	// 			interpreter.IntValue{Int: big.NewInt(4)},
+	// 		},
+	// 	}))
+	// Expect(inter.Globals["h"].Value).
+	// 	To(Equal(interpreter.ArrayValue{
+	// 		Values: &[]interpreter.Value{},
+	// 	}))
 }
 
 func TestInterpretEqualOperator(t *testing.T) {

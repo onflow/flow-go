@@ -314,6 +314,11 @@ func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool
 	return false
 }
 
+func (checker *Checker) IsConcatenatableType(ty Type) bool {
+	_, isArrayType := ty.(ArrayType)
+	return checker.IsSubType(ty, &StringType{}) || isArrayType
+}
+
 func (checker *Checker) setVariable(name string, variable *Variable) {
 	checker.valueActivations.Set(name, variable)
 }
@@ -1574,11 +1579,12 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 	leftType, rightType Type,
 	leftIsInvalid, rightIsInvalid, anyInvalid bool,
 ) Type {
-	// check both types are string subtypes
-	leftIsString := checker.IsSubType(leftType, &StringType{})
-	rightIsString := checker.IsSubType(rightType, &StringType{})
 
-	if !leftIsString && !rightIsString {
+	// check both types are concatenatable
+	leftIsConcat := checker.IsConcatenatableType(leftType)
+	rightIsConcat := checker.IsConcatenatableType(rightType)
+
+	if !leftIsConcat && !rightIsConcat {
 		if !anyInvalid {
 			checker.report(
 				&InvalidBinaryOperandsError{
@@ -1590,26 +1596,26 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 				},
 			)
 		}
-	} else if !leftIsString {
+	} else if !leftIsConcat {
 		if !leftIsInvalid {
 			checker.report(
 				&InvalidBinaryOperandError{
 					Operation:    operation,
 					Side:         common.OperandSideLeft,
-					ExpectedType: &StringType{},
+					ExpectedType: rightType,
 					ActualType:   leftType,
 					StartPos:     expression.Left.StartPosition(),
 					EndPos:       expression.Left.EndPosition(),
 				},
 			)
 		}
-	} else if !rightIsString {
+	} else if !rightIsConcat {
 		if !rightIsInvalid {
 			checker.report(
 				&InvalidBinaryOperandError{
 					Operation:    operation,
 					Side:         common.OperandSideRight,
-					ExpectedType: &StringType{},
+					ExpectedType: leftType,
 					ActualType:   rightType,
 					StartPos:     expression.Right.StartPosition(),
 					EndPos:       expression.Right.EndPosition(),
@@ -1617,6 +1623,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 			)
 		}
 	}
+
 	// check both types are equal
 	if !leftType.Equal(rightType) {
 		checker.report(
