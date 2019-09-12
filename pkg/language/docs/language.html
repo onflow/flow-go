@@ -76,6 +76,7 @@
                 <ul>
                   <li><a href="#array-types">Array Types</a></li>
                   <li><a href="#array-indexing">Array Indexing</a></li>
+                  <li><a href="#array-fields-and-functions">Array Fields and Functions</a></li>
                 </ul>
               </li>
               <li>
@@ -83,6 +84,7 @@
                 <ul>
                   <li><a href="#dictionary-types">Dictionary Types</a></li>
                   <li><a href="#dictionary-access">Dictionary Access</a></li>
+                  <li><a href="#dictionary-fields-and-functions">Dictionary Fields and Functions</a></li>
                   <li><a href="#dictionary-keys">Dictionary Keys</a></li>
                 </ul>
               </li>
@@ -107,6 +109,9 @@
                 <p><a href="#function-declarations">Function Declarations</a></p>
               </li>
               <li>
+                <p><a href="#function-overloading">Function overloading</a></p>
+              </li>
+              <li>
                 <p><a href="#function-expressions">Function Expressions</a></p>
               </li>
               <li>
@@ -127,6 +132,7 @@
             <p><a href="#control-flow">Control flow</a></p>
             <ul>
               <li><a href="#conditional-branching-if-statement">Conditional branching: if-statement</a></li>
+              <li><a href="#optional-binding">Optional Binding</a></li>
               <li><a href="#looping-while-statement">Looping: while-statement</a></li>
               <li><a href="#immediate-function-return-return-statement">Immediate function return: return-statement</a></li>
             </ul>
@@ -221,23 +227,6 @@
               <li>
                 <p><a href="#assert"><code>assert</code></a></p>
               </li>
-            </ul>
-          </li>
-          <li>
-            <p><a href="#open-questions">Open questions</a></p>
-            <ul>
-              <li><a href="#shared-mutable-state">Shared Mutable State</a></li>
-              <li><a href="#error-handling">Error Handling</a></li>
-              <li><a href="#on-chain-storage">On-chain Storage</a></li>
-              <li><a href="#fixed-point-numbers-and-arithmetic">Fixed-Point Numbers and Arithmetic</a></li>
-              <li><a href="#enums-with-exhaustiveness-check">Enums with Exhaustiveness Check</a></li>
-              <li><a href="#switch-case-statement">Switch-Case Statement</a></li>
-              <li><a href="#distinctnew-types">Distinct/New Types</a></li>
-              <li><a href="#set-data-structure">Set Data Structure</a></li>
-              <li><a href="#generics">Generics</a></li>
-              <li><a href="#calls-of-pure-functions-in-preconditions-and-postconditions">Calls of Pure Functions in Preconditions and Postconditions</a></li>
-              <li><a href="#late-initialization-of-variables-and-constants">Late Initialization of Variables and Constants</a></li>
-              <li><a href="#arbitrary-argument-order-based-on-argument-labels">Arbitrary Argument Order Based on Argument Labels</a></li>
             </ul>
           </li>
         </ul>
@@ -359,7 +348,8 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
+          This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Valid, title-case</span><span>
@@ -506,7 +496,7 @@
         </section>
         <section>
           <h3 id="floating-point-numbers"><a href="#floating-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Floating-Point Numbers</h3>
-          <p>There is no support for floating point numbers.</p>
+          <p>There is <strong>no</strong> support for floating point numbers.</p>
           <p>Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.</p>
         </section>
         <section>
@@ -573,7 +563,7 @@
           <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
           <p>An optional type is declared using the <code>?</code> suffix for another type. For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.</p>
           <p>The value representing nothing is <code>nil</code>.</p>
-          <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+          <pre><code class="language-bamboo,file=optional.bpl"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -582,6 +572,17 @@
 </span><span style="color: #008000">// with 42 as its initial value</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span></code></pre>
+          <p>Optionals can be created for any value, not just for literals.</p>
+          <pre><code class="language-bamboo,file=optional-wrapping.bpl"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
+</span><span style="color: #008000">// with 1 as its initial value</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type.</span><span>
+</span><span style="color: #008000">// An optional with the value of `x` is created</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int? = x</span><span>
 </span></code></pre>
           <section>
             <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
@@ -631,6 +632,12 @@
           </section>
           <section>
             <h4 id="conditional-downcasting-operator"><a href="#conditional-downcasting-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional Downcasting Operator</h4>
+            <blockquote>
+              <p>
+                🚧 Status: The conditional downcasting operator <code>as?</code> is implemented,
+                but it only supports values that have the type <code>Any</code>.
+              </p>
+            </blockquote>
             <p>
               The conditional downcasting operator <code>as?</code> can be used to type cast a value to a type.
               The operator returns an optional.
@@ -638,7 +645,7 @@
               the operator returns the value as the given type,
               otherwise the result is <code>nil</code>.
             </p>
-            <pre><code class="language-bamboo,file=conditional-downcasting.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
 </span><span style="color: #008000">// with an initial value which has type `Int`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
@@ -655,6 +662,18 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
 </span><span style="color: #008000">// `boolean` is nil and has type `Bool?`</span><span>
+</span></code></pre>
+            <p>Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.</p>
+            <pre><code class="language-bamboo,file=conditional-downcasting-any-array.bpl"><span style="color: #008000">// Declare a constant named `numbers` which has type `[Any]`,</span><span>
+</span><span style="color: #008000">// i.e. an array of arbitrarily typed values</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first = values[</span><span style="color: #09885A">0</span><span style="color: #000000">] as? Int</span><span>
+</span><span style="color: #008000">// `first` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> second = values[</span><span style="color: #09885A">1</span><span style="color: #000000">] as? Bool</span><span>
+</span><span style="color: #008000">// `second` is `true` and has type `Bool?`</span><span>
 </span></code></pre>
           </section>
         </section>
@@ -770,6 +789,13 @@
 </span><span style="color: #008000">// `numbers` is [42, 2]</span><span>
 </span></code></pre>
           </section>
+          <section>
+            <h4 id="array-fields-and-functions"><a href="#array-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Array Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the array.</li>
+              <li><code>append(_ value: V)</code>: Adds a value of type <code>V</code> to the array.</li>
+            </ul>
+          </section>
         </section>
         <section>
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
@@ -857,6 +883,13 @@
 </span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #0000FF">true</span><span>
 </span><span style="color: #008000">// `booleans` is `{1: false, 0: true}`</span><span>
 </span></code></pre>
+          </section>
+          <section>
+            <h4 id="dictionary-fields-and-functions"><a href="#dictionary-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Fields and Functions</h4>
+            <ul>
+              <li><code>length: Int</code>: Returns the number of elements in the dictionary.</li>
+              <li><code>remove(key: K): V?</code>: Removes the value for the given key of type <code>K</code> from the dictionary. Returns the value of type <code>V</code> if the dictionary contained the dictionary as an optional, otherwise <code>nil</code>.</li>
+            </ul>
           </section>
           <section>
             <h4 id="dictionary-keys"><a href="#dictionary-keys" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Keys</h4>
@@ -1234,7 +1267,10 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// `clamped` is 100</span><span>
 </span></code></pre>
-          <p>Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.</p>
+          <p>
+            Argument labels make code more explicit and readable.
+            For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+          </p>
           <p>Argument labels should be named so they make sense from the perspective of the function call.</p>
           <pre><code class="language-bamboo,file=function-send.bpl"><span style="color: #008000">// Declare a function named `send`, which transfers an amount</span><span>
 </span><span style="color: #008000">// from one account to another.</span><span>
@@ -1314,6 +1350,31 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #000000">doubleAndAddOne(</span><span style="color: #09885A">2</span><span style="color: #000000">) </span><span style="color: #008000">// is 5</span><span>
+</span></code></pre>
+          <p>There is <strong>no</strong> support for optional parameters, i.e. default values for parameters.</p>
+        </section>
+        <section>
+          <h3 id="function-overloading"><a href="#function-overloading" aria-hidden="true"><span class="icon icon-link"></span></a>Function overloading</h3>
+          <blockquote>
+            <p>🚧 Status: Function overloading is not implemented.</p>
+          </blockquote>
+          <p>
+            It is possible to declare functions with the same name, as long as they have different sets of argument labels.
+            This is known as function overloading.
+          </p>
+          <pre><code class="language-bamboo,file=function-overloading.bpl"><span style="color: #008000">// Declare a function named "assert" which requires a test value</span><span>
+</span><span style="color: #008000">// and a message argument</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ test: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function named "assert" which only requires a test value.</span><span>
+</span><span style="color: #008000">// The function calls the `assert` function declared abov</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ test: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    assert(test, message: </span><span style="color: #A31515">"test is false"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1473,7 +1534,10 @@
         <section>
           <h3 id="conditional-branching-if-statement"><a href="#conditional-branching-if-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional branching: if-statement</h3>
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
-          <p>The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.</p>
+          <p>
+            The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+            The condition must be boolean and the braces are required.
+          </p>
           <pre><code class="language-bamboo,file=control-flow-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
@@ -1515,6 +1579,33 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// `b` is 3</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="optional-binding"><a href="#optional-binding" aria-hidden="true"><span class="icon icon-link"></span></a>Optional Binding</h3>
+          <p>
+            Optional binding allows getting the value inside an optional.
+            It is a variant of the if-statment.
+          </p>
+          <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
+          <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-not-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `maybeNumber` is not `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `number` is `1` and has type `Int`</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `maybeNumber` is not `nil`</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <pre><code class="language-bamboo,file=control-flow-optional-binding-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is not executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// branch is executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// constant `number` is *not* available</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -1750,9 +1841,10 @@
           </li>
         </ul>
         <p>
-          Two composite daya types are compatible if and only if they refer to the same declaration by name,
+          Two composite data types are compatible if and only if they refer to the same declaration by name,
           i.e., nominal typing applies instead of structural typing.
         </p>
+        <p>Composite data types can only be declared globally, i.e. not inside of functions.</p>
       </section>
       <section>
         <h2 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h2>
@@ -1842,6 +1934,30 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
 </span></code></pre>
+          <p>Initializers support overloading. This allows for example providing default values for certain parameters.</p>
+          <pre><code class="language-bamboo,file=composite-data-type-initializer-overloading.bpl"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+</span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The first initializer allows initializing both fields with a given value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// A second initializer is provided for convenience to initialize the `id` field</span><span>
+</span><span style="color: #008000">// with a given value, and the `balance` field with the default value `0`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
         </section>
         <section>
           <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
@@ -1878,7 +1994,10 @@
 </span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
 </span><span style="color: #008000">// `example.balance` is 0. without the getter it would be -50</span><span>
 </span></code></pre>
-          <p>Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.</p>
+          <p>
+            Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses.
+            The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
+          </p>
           <p>The types of values assigned to setters must always match the field's type.</p>
           <pre><code class="language-bamboo,file=composite-data-type-field-setter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
 </span><span>
@@ -1908,7 +2027,10 @@
         </section>
         <section>
           <h3 id="synthetic-composite-data-type-fields"><a href="#synthetic-composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Data Type Fields</h3>
-          <p>Fields which are not stored in the composite value are <em>synthetic</em>, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.</p>
+          <p>
+            Fields which are not stored in the composite value are <em>synthetic</em>, i.e., the field value is computed.
+            Synthetic can be either read-only, or readable and writable.
+          </p>
           <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
           <p>Synthetic fields are read-only when only a getter is provided.</p>
           <pre><code class="language-bamboo,file=composite-type-synthetic-field-getter-only.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
@@ -1991,7 +2113,10 @@
             Composite data types may contain functions.
             Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
           </p>
-          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+          <pre><code class="language-bamboo,file=composite-data-type-function.bpl"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+</span><span style="color: #008000">// and has variable fields for the width and height</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
 </span><span>
@@ -2000,6 +2125,9 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the rectangle by the given factor</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
@@ -2010,6 +2138,39 @@
 </span><span style="color: #000000">rectangle.scale(factor: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// `rectangle.width` is 8</span><span>
 </span><span style="color: #008000">// `rectangle.height` is 12</span><span>
+</span></code></pre>
+          <p>Functions support overloading.</p>
+          <pre><code class="language-bamboo,file=composite-data-type-function-overloading.bpl"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+</span><span style="color: #008000">// and has variable fields for the width and height</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which independently scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the width by a given factor and the height by a given factor</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(widthFactor: Int, heightFactor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * widthFactor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * heightFactor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a another function also named "scale", which scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// both width and height by a given factor.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function calls the `scale` function declared above</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.scale(</span><span>
+</span><span style="color: #000000">            widthFactor: factor,</span><span>
+</span><span style="color: #000000">            heightFactor: factor</span><span>
+</span><span style="color: #000000">        )</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -2185,7 +2346,7 @@
         </section>
         <section>
           <h3 id="unbound-references--nulls"><a href="#unbound-references--nulls" aria-hidden="true"><span class="icon icon-link"></span></a>Unbound References / Nulls</h3>
-          <p>There is <strong>no</strong> support for nulls`.</p>
+          <p>There is <strong>no</strong> support for <code>null</code>s.</p>
         </section>
         <section>
           <h3 id="inheritance-and-abstract-types"><a href="#inheritance-and-abstract-types" aria-hidden="true"><span class="icon icon-link"></span></a>Inheritance and Abstract Types</h3>
@@ -2512,6 +2673,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Note that the required initializer and functions do not have any executable code.</p>
+          <p>Interfaces can only be declared globally, i.e. not inside of functions.</p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
@@ -2963,18 +3125,21 @@
         <blockquote>
           <p>🚧 Status: Attestations are not implemented yet.</p>
         </blockquote>
-        <p>
-          Attestations are values that proof ownership.
-          Attestations can be created for resources and reflect their current state, which is read-only.
-          They cannot be stored.
-        </p>
+        <p>Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.</p>
         <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
         <p>
           As an analogy, a bank statement is a proof of ownership of money.
           However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
           but it reflects the current state of the underlying resource.
         </p>
-        <p>Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.</p>
+        <p>
+          Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+          and can be safely handed to untrusted parties.
+        </p>
+        <p>
+          An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+          It is not possible to change the ownership of a resource through an attestation, or store an attestation.
+        </p>
         <p>
           Attestations of resources are created using the <code>@</code> operator.
           Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
@@ -3350,112 +3515,6 @@
 </span></code></pre>
           <p>Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.</p>
           <p>The message argument is optional.</p>
-        </section>
-      </section>
-      <section>
-        <h2 id="open-questions"><a href="#open-questions" aria-hidden="true"><span class="icon icon-link"></span></a>Open questions</h2>
-        <section>
-          <h3 id="shared-mutable-state"><a href="#shared-mutable-state" aria-hidden="true"><span class="icon icon-link"></span></a>Shared Mutable State</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/264">https://github.com/dapperlabs/bamboo-node/issues/264</a></p>
-          </blockquote>
-          <p>Do we need a means to model shared mutable state, i.e. reference types?</p>
-        </section>
-        <section>
-          <h3 id="error-handling"><a href="#error-handling" aria-hidden="true"><span class="icon icon-link"></span></a>Error Handling</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/65">https://github.com/dapperlabs/bamboo-node/issues/65</a></p>
-          </blockquote>
-          <p>
-            How should errors be handled?
-            Should we make the distinction between exceptional and unexceptional errors?
-            Should we provide means to handle errors (exception handlers)? Should exceptions be values and typed?
-            Would a value-less throw-catch/panic-recover be suitable for a first version?
-          </p>
-        </section>
-        <section>
-          <h3 id="on-chain-storage"><a href="#on-chain-storage" aria-hidden="true"><span class="icon icon-link"></span></a>On-chain Storage</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/101">https://github.com/dapperlabs/bamboo-node/issues/101</a></p>
-          </blockquote>
-          <p>How do we store programs on-chain?</p>
-        </section>
-        <section>
-          <h3 id="fixed-point-numbers-and-arithmetic"><a href="#fixed-point-numbers-and-arithmetic" aria-hidden="true"><span class="icon icon-link"></span></a>Fixed-Point Numbers and Arithmetic</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/67">https://github.com/dapperlabs/bamboo-node/issues/67</a></p>
-          </blockquote>
-          <p>
-            We do not allow floating-point numbers.
-            Should we add fixed-point arithmetic to support fractional numbers?
-          </p>
-        </section>
-        <section>
-          <h3 id="enums-with-exhaustiveness-check"><a href="#enums-with-exhaustiveness-check" aria-hidden="true"><span class="icon icon-link"></span></a>Enums with Exhaustiveness Check</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/59">https://github.com/dapperlabs/bamboo-node/issues/59</a></p>
-          </blockquote>
-          <p>
-            Should we allow the definition of enumerations?
-            Is an exhaustiveness check in switch statements useful and feasible?
-          </p>
-        </section>
-        <section>
-          <h3 id="switch-case-statement"><a href="#switch-case-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Switch-Case Statement</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/60">https://github.com/dapperlabs/bamboo-node/issues/60</a></p>
-          </blockquote>
-          <p>
-            Should we add a switch-case statement?
-            What kind of pattern matching should it support?
-          </p>
-        </section>
-        <section>
-          <h3 id="distinctnew-types"><a href="#distinctnew-types" aria-hidden="true"><span class="icon icon-link"></span></a>Distinct/New Types</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/45">https://github.com/dapperlabs/bamboo-node/issues/45</a></p>
-          </blockquote>
-          <p>Should we add support for distinct types, i.e., types that are derived from an existing type, but are not compatible with them?</p>
-        </section>
-        <section>
-          <h3 id="set-data-structure"><a href="#set-data-structure" aria-hidden="true"><span class="icon icon-link"></span></a>Set Data Structure</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/266">https://github.com/dapperlabs/bamboo-node/issues/266</a></p>
-          </blockquote>
-          <p>Should the standard library provide a set data structure?</p>
-        </section>
-        <section>
-          <h3 id="generics"><a href="#generics" aria-hidden="true"><span class="icon icon-link"></span></a>Generics</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/44">https://github.com/dapperlabs/bamboo-node/issues/44</a></p>
-          </blockquote>
-          <p>Should we add generics? In what form? Is it OK to add them in a later version?</p>
-        </section>
-        <section>
-          <h3 id="calls-of-pure-functions-in-preconditions-and-postconditions"><a href="#calls-of-pure-functions-in-preconditions-and-postconditions" aria-hidden="true"><span class="icon icon-link"></span></a>Calls of Pure Functions in Preconditions and Postconditions</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/70">https://github.com/dapperlabs/bamboo-node/issues/70</a></p>
-          </blockquote>
-          <p>
-            It might be useful to call pure functions preconditions and postconditons.
-            How do we ensure preconditions and postconditions are side-effect free?
-          </p>
-        </section>
-        <section>
-          <h3 id="late-initialization-of-variables-and-constants"><a href="#late-initialization-of-variables-and-constants" aria-hidden="true"><span class="icon icon-link"></span></a>Late Initialization of Variables and Constants</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/71">https://github.com/dapperlabs/bamboo-node/issues/71</a></p>
-          </blockquote>
-          <p>Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.</p>
-          <p>Should we allow the late initialization of variables and constants?</p>
-          <p>Are there good examples for cases where late initialization would be useful or even essential?</p>
-        </section>
-        <section>
-          <h3 id="arbitrary-argument-order-based-on-argument-labels"><a href="#arbitrary-argument-order-based-on-argument-labels" aria-hidden="true"><span class="icon icon-link"></span></a>Arbitrary Argument Order Based on Argument Labels</h3>
-          <blockquote>
-            <p>➡️ <a href="https://github.com/dapperlabs/bamboo-node/issues/76">https://github.com/dapperlabs/bamboo-node/issues/76</a></p>
-          </blockquote>
-          <p>Should arbitrary argument order be supported in function calls as long as the argument labels match?</p>
         </section>
       </section>
     </section>

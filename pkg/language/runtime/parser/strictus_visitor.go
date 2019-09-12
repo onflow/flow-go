@@ -50,6 +50,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#parameter.
 	VisitParameter(ctx *ParameterContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#typeAnnotation.
+	VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#fullType.
 	VisitFullType(ctx *FullTypeContext) interface{}
 

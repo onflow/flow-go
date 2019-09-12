@@ -12,11 +12,9 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
-
 ## Syntax and Behavior
 
 The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
-
 
 ## Comments
 
@@ -77,7 +75,6 @@ let a
 ```
 
 Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
-
 
 ```bamboo
 // Declare a constant named `a`
@@ -148,7 +145,8 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (`_`). This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+Names may start with any upper or lowercase letter (A-Z, a-z) or an underscore (`_`).
+This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
 ```bamboo
@@ -180,7 +178,6 @@ account2
 ### Conventions
 
 By convention, variables, constants, and functions have lowercase names; and types have title-case names.
-
 
 ## Semicolons
 
@@ -261,13 +258,13 @@ Integers are whole numbers without a fractional part. They are either *signed* (
 
 The names for the integer types follow this naming convention: Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix, i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
 
- - **`Int8`**: -128 through 127
- - **`Int16`**: -32768 through 32767
- - **`Int32`**: -2147483648 through 2147483647
- - **`Int64`**: -9223372036854775808 through 9223372036854775807
- - **`UInt16`**: 0 through 65535
- - **`UInt32`**: 0 through 4294967295
- - **`UInt64`**: 0 through 18446744073709551615
+- **`Int8`**: -128 through 127
+- **`Int16`**: -32768 through 32767
+- **`Int32`**: -2147483648 through 2147483647
+- **`Int64`**: -9223372036854775808 through 9223372036854775807
+- **`UInt16`**: 0 through 65535
+- **`UInt32`**: 0 through 4294967295
+- **`UInt64`**: 0 through 18446744073709551615
 
 ```bamboo
 // Declare a constant that has type `UInt8` and the value 10
@@ -290,7 +287,7 @@ Negative integers are encoded in two's complement representation.
 
 ### Floating-Point Numbers
 
-There is no support for floating point numbers.
+There is **no** support for floating point numbers.
 
 Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here. Fixed point numbers should be simulated using integers and a scale factor for now.
 
@@ -323,7 +320,6 @@ Integer literals are not inferred to be an address.
 let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
-
 
 ### Any
 
@@ -374,7 +370,7 @@ An optional type is declared using the `?` suffix for another type. For example,
 
 The value representing nothing is `nil`.
 
-```bamboo
+```bamboo,file=optional.bpl
 // Declare a constant which has an optional integer type,
 // with nil as its initial value
 //
@@ -384,6 +380,20 @@ let a: Int? = nil
 // with 42 as its initial value
 //
 let b: Int? = 42
+```
+
+Optionals can be created for any value, not just for literals.
+
+```bamboo,file=optional-wrapping.bpl
+// Declare a constant which has a non-optional integer type,
+// with 1 as its initial value
+//
+let x = 1
+
+// Declare a constant which has an optional integer type.
+// An optional with the value of `x` is created
+//
+let y: Int? = x
 ```
 
 #### Nil-Coalescing Operator
@@ -441,13 +451,16 @@ let b = a ?? false
 
 #### Conditional Downcasting Operator
 
+> 🚧 Status: The conditional downcasting operator `as?` is implemented,
+> but it only supports values that have the type `Any`.
+
 The conditional downcasting operator `as?` can be used to type cast a value to a type.
 The operator returns an optional.
 If the value has a type that is a subtype of the given type that should be casted to,
 the operator returns the value as the given type,
 otherwise the result is `nil`.
 
-```bamboo,file=conditional-downcasting.bpl
+```bamboo,file=conditional-downcasting-any.bpl
 // Declare a constant named `something` which has type `Any`,
 // with an initial value which has type `Int`
 //
@@ -465,6 +478,21 @@ let number = something as? Int
 //
 let boolean = something as? Bool
 // `boolean` is nil and has type `Bool?`
+```
+
+Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.
+
+```bamboo,file=conditional-downcasting-any-array.bpl
+// Declare a constant named `numbers` which has type `[Any]`,
+// i.e. an array of arbitrarily typed values
+//
+let values: [Any] = [1, true]
+
+let first = values[0] as? Int
+// `first` is `1` and has type `Int?`
+
+let second = values[1] as? Bool
+// `second` is `true` and has type `Bool?`
 ```
 
 ### Strings and Characters
@@ -618,18 +646,20 @@ numbers[1] = 2
 // `numbers` is [42, 2]
 ```
 
+#### Array Fields and Functions
+
+- `length: Int`: Returns the number of elements in the array.
+- `append(_ value: V)`: Adds a value of type `V` to the array.
+
 <!--
 
 TODO
 
-#### Array Functions
-
-- Length, concatenate, filter, etc. for all array types
-- Append, remove, etc. for variable-size arrays
+- concatenate, filter, etc. for all array types
+- remove, etc. for variable-size arrays
 - Document and link to array concatenation operator `+` in operators section
 
 -->
-
 
 ### Dictionaries
 
@@ -732,14 +762,10 @@ booleans[0] = true
 // `booleans` is `{1: false, 0: true}`
 ```
 
-<!--
+#### Dictionary Fields and Functions
 
-TODO
-
-#### Dictionary Functions
-
--->
-
+- `length: Int`: Returns the number of elements in the dictionary.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the dictionary as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -751,12 +777,11 @@ Most of the built-in types, like booleans, integers, are hashable and equatable,
 
 Operators are special symbols that perform a computation for one or more values. They are either unary, binary, or ternary.
 
-  - Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
+- Unary operators perform an operation for a single value. The unary operator symbol appears before the value.
 
-  - Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
+- Binary operators operate on two values. The binary operator symbol appears between the two values (infix).
 
-  - Ternary operators operate on three values. The operator symbols appear between the three values (infix).
-
+- Ternary operators operate on three values. The operator symbols appear between the three values (infix).
 
 ### Negation
 
@@ -848,9 +873,9 @@ let c = a * b
 
 If overflow behavior is intended, overflowing operators are available, which are prefixed with an `&`:
 
-  - Overflow addition: `&+`
-  - Overflow subtraction: `&-`
-  - Overflow multiplication: `&*`
+- Overflow addition: `&+`
+- Overflow subtraction: `&-`
+- Overflow multiplication: `&*`
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
@@ -895,7 +920,7 @@ c &- 1 // is 127
 
 Logical operators work with the boolean values `true` and `false`.
 
-  - Logical AND: `a && b`
+- Logical AND: `a && b`
 
     ```bamboo,file=operator-and.bpl
     true && true
@@ -913,7 +938,7 @@ Logical operators work with the boolean values `true` and `false`.
 
     If the left-hand side is true, the right-hand side is not evaluated.
 
-  - Logical OR: `a || b`
+- Logical OR: `a || b`
 
     ```bamboo,file=operator-or.bpl
     true || true
@@ -935,7 +960,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 Comparison operators work with boolean and integer values.
 
-  - Equality: `==`, for booleans and integers (possibly optional)
+- Equality: `==`, for booleans and integers (possibly optional)
 
     ```bamboo,file=operator-equal-int.bpl
     1 == 1
@@ -979,7 +1004,7 @@ Comparison operators work with boolean and integer values.
     // is true
     ```
 
-  - Inequality: `!=`, for booleans and integers (possibly optional)
+- Inequality: `!=`, for booleans and integers (possibly optional)
 
     ```bamboo,file=operator-not-equal-int.bpl
     1 != 1
@@ -1023,7 +1048,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Less than: `<`, for integers
+- Less than: `<`, for integers
 
     ```bamboo,file=operator-less.bpl
     1 < 1
@@ -1036,7 +1061,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Less or equal than: `<=`, for integers
+- Less or equal than: `<=`, for integers
 
     ```bamboo,file=operator-less-equals.bpl
     1 <= 1
@@ -1049,7 +1074,7 @@ Comparison operators work with boolean and integer values.
     // is false
     ```
 
-  - Greater than: `>`, for integers
+- Greater than: `>`, for integers
 
     ```bamboo,file=operator-greater.bpl
     1 > 1
@@ -1062,7 +1087,7 @@ Comparison operators work with boolean and integer values.
     // is true
     ```
 
-  - Greater or equal than: `>=`, for integers
+- Greater or equal than: `>=`, for integers
 
     ```bamboo,file=operator-greater-equals.bpl
     1 >= 1
@@ -1074,7 +1099,6 @@ Comparison operators work with boolean and integer values.
     2 >= 1
     // is true
     ```
-
 
 ### Ternary Conditional Operator
 
@@ -1102,7 +1126,6 @@ Operators have the following precedences, highest to lowest:
 All operators are left-associative, except for the ternary operator, which is right-associative.
 
 Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
-
 
 ## Functions
 
@@ -1185,7 +1208,8 @@ let clamped = clamp(123, min: 0, max: 100)
 // `clamped` is 100
 ```
 
-Argument labels make code more explicit and readable. For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+Argument labels make code more explicit and readable.
+For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
@@ -1274,6 +1298,31 @@ fun doubleAndAddOne(_ x: Int): Int {
 }
 
 doubleAndAddOne(2) // is 5
+```
+
+There is **no** support for optional parameters, i.e. default values for parameters.
+
+### Function overloading
+
+> 🚧 Status: Function overloading is not implemented.
+
+It is possible to declare functions with the same name, as long as they have different sets of argument labels.
+This is known as function overloading.
+
+```bamboo,file=function-overloading.bpl
+// Declare a function named "assert" which requires a test value
+// and a message argument
+//
+fun assert(_ test: Bool, message: String) {
+    // ...
+}
+
+// Declare a function named "assert" which only requires a test value.
+// The function calls the `assert` function declared abov
+//
+fun assert(_ test: Bool) {
+    assert(test, message: "test is false")
+}
 ```
 
 ### Function Expressions
@@ -1467,8 +1516,8 @@ Control flow statements control the flow of execution in a function.
 
 If-statements allow a certain piece of code to be executed only when a given condition is true.
 
-The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces. The condition must be boolean and the braces are required.
-
+The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+The condition must be boolean and the braces are required.
 
 ```bamboo,file=control-flow-if.bpl
 let a = 0
@@ -1516,6 +1565,37 @@ if a == 1 {
 }
 
 // `b` is 3
+```
+
+### Optional Binding
+
+Optional binding allows getting the value inside an optional.
+It is a variant of the if-statement.
+
+If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.
+
+Optional bindings are declared using the `if` keyword like an if-statement, but instead of the boolean test value, it is followed by the `let` or `var` keywords, to either introduce a constant or variable, followed by a name, the equal sign (`=`), and the optional value.
+
+```bamboo,file=control-flow-optional-binding-not-nil.bpl
+let maybeNumber: Int? = 1
+
+if let number = maybeNumber {
+    // branch is executed as `maybeNumber` is not `nil`.
+    // `number` is `1` and has type `Int`
+} else {
+    // branch is not executed as `maybeNumber` is not `nil`
+}
+```
+
+```bamboo,file=control-flow-optional-binding-nil.bpl
+let noNumber: Int? = nil
+
+if let number = noNumber {
+    // branch is not executed as `noNumber` is `nil`.
+} else {
+    // branch is executed as `noNumber` is `nil`.
+    // constant `number` is *not* available
+}
 ```
 
 ### Looping: while-statement
@@ -1655,7 +1735,6 @@ fun f(): Int {
 f() // returns 2
 ```
 
-
 ## Type Safety
 
 The Bamboo programming language is a *type-safe* language.
@@ -1687,7 +1766,6 @@ nand(0, 0)
 
 Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
 
-
 ```bamboo,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
@@ -1704,7 +1782,6 @@ let b: Int32 = 3_000_000_000
 //
 add(a, b)
 ```
-
 
 ## Type Inference
 
@@ -1785,9 +1862,9 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+- [**Structures**](#structures) are **copied**, i.e. they are value types.
     Structures are useful when copies with independent state are desired.
-  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+- [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
 
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
@@ -1796,8 +1873,10 @@ and when the value is returned from a function:
 
     We think resources are a great way to represent such assets.
 
-Two composite daya types are compatible if and only if they refer to the same declaration by name,
+Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
+
+Composite data types can only be declared globally, i.e. not inside of functions.
 
 ## Composite Data Type Declaration and Creation
 
@@ -1883,6 +1962,33 @@ token.balance = 1
 token.id = 23
 ```
 
+Initializers support overloading. This allows for example providing default values for certain parameters.
+
+```bamboo,file=composite-data-type-initializer-overloading.bpl
+// Declare a structure named `Token`, which has a constant field
+// named `id` and a variable field named `balance`.
+//
+// The first initializer allows initializing both fields with a given value.
+//
+// A second initializer is provided for convenience to initialize the `id` field
+// with a given value, and the `balance` field with the default value `0`
+//
+struct Token {
+    let id: Int
+    var balance: Int
+
+    init(id: Int, balance: Int) {
+        self.id = id
+        self.balance = balance
+    }
+
+    init(id: Int) {
+        self.id = id
+        self.balance = 0
+    }
+}
+```
+
 ### Composite Data Type Field Getters and Setters
 
 Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
@@ -1923,7 +2029,8 @@ example.balance = -50
 // `example.balance` is 0. without the getter it would be -50
 ```
 
-Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses. The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
+Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses.
+The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
 
@@ -1956,7 +2063,8 @@ example.balance = -50
 
 ### Synthetic Composite Data Type Fields
 
-Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed. Synthetic can be either read-only, or readable and writable.
+Fields which are not stored in the composite value are *synthetic*, i.e., the field value is computed.
+Synthetic can be either read-only, or readable and writable.
 
 Synthetic fields are declared using the `synthetic` keyword.
 
@@ -2041,13 +2149,15 @@ tracker.left = 8
 
 It is invalid to declare a synthetic field with only a setter.
 
-
 ### Composite Data Type Functions
 
 Composite data types may contain functions.
 Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
 ```bamboo,file=composite-data-type-function.bpl
+// Declare a structure named "Rectangle", which represents a rectangle
+// and has variable fields for the width and height
+//
 struct Rectangle {
     var width: Int
     var height: Int
@@ -2057,6 +2167,9 @@ struct Rectangle {
         self.height = height
     }
 
+    // Declare a function named "scale", which scales
+    // the rectangle by the given factor
+    //
     fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -2069,6 +2182,41 @@ rectangle.scale(factor: 4)
 // `rectangle.height` is 12
 ```
 
+Functions support overloading.
+
+```bamboo,file=composite-data-type-function-overloading.bpl
+// Declare a structure named "Rectangle", which represents a rectangle
+// and has variable fields for the width and height
+//
+struct Rectangle {
+    var width: Int
+    var height: Int
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+
+    // Declare a function named "scale", which independently scales
+    // the width by a given factor and the height by a given factor
+    //
+    fun scale(widthFactor: Int, heightFactor: Int) {
+        self.width = self.width * widthFactor
+        self.height = self.height * heightFactor
+    }
+
+    // Declare a another function also named "scale", which scales
+    // both width and height by a given factor.
+    // The function calls the `scale` function declared above
+    //
+    fun scale(factor: Int) {
+        self.scale(
+            widthFactor: factor,
+            heightFactor: factor
+        )
+    }
+}
+```
 
 ### Composite Data Type Behaviour
 
@@ -2252,7 +2400,7 @@ resource[1]
 
 ### Unbound References / Nulls
 
-There is **no** support for nulls`.
+There is **no** support for `null`s.
 
 ### Inheritance and Abstract Types
 
@@ -2294,7 +2442,6 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 |:------------------------------------------------------------------------|:----------------------|:------------------|
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
-
 
 ```bamboo,file=access-control-globals.bpl
 // Declare a private constant, inaccessible/invisible in outer scope
@@ -2536,6 +2683,8 @@ resource interface FungibleToken {
 ```
 
 Note that the required initializer and functions do not have any executable code.
+
+Interfaces can only be declared globally, i.e. not inside of functions.
 
 ### Interface Implementation
 
@@ -2936,7 +3085,6 @@ Cat(1) == Cat(2) // is false
 Cat(3) == Cat(3) // is true
 ```
 
-
 ### `Hashable` Interface
 
 > 🚧 Status: The `Hashable` interface is not implemented yet.
@@ -3012,9 +3160,7 @@ impl Hashable for Point {
 
 > 🚧 Status: Attestations are not implemented yet.
 
-Attestations are values that proof ownership.
-Attestations can be created for resources and reflect their current state, which is read-only.
-They cannot be stored.
+Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.
 
 Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
 
@@ -3022,7 +3168,11 @@ As an analogy, a bank statement is a proof of ownership of money.
 However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
 but it reflects the current state of the underlying resource.
 
-Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource, and can be safely handed to untrusted parties.
+Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+and can be safely handed to untrusted parties.
+
+An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+It is not possible to change the ownership of a resource through an attestation, or store an attestation.
 
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
@@ -3432,88 +3582,3 @@ fun assert(_ condition: Bool, message: String)
 Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
 
 The message argument is optional.
-
-## Open questions
-
-### Shared Mutable State
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/264>
-
-Do we need a means to model shared mutable state, i.e. reference types?
-
-### Error Handling
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/65>
-
-How should errors be handled?
-Should we make the distinction between exceptional and unexceptional errors?
-Should we provide means to handle errors (exception handlers)? Should exceptions be values and typed?
-Would a value-less throw-catch/panic-recover be suitable for a first version?
-
-### On-chain Storage
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/101>
-
-How do we store programs on-chain?
-
-### Fixed-Point Numbers and Arithmetic
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/67>
-
-We do not allow floating-point numbers.
-Should we add fixed-point arithmetic to support fractional numbers?
-
-### Enums with Exhaustiveness Check
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/59>
-
-Should we allow the definition of enumerations?
-Is an exhaustiveness check in switch statements useful and feasible?
-
-### Switch-Case Statement
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/60>
-
-Should we add a switch-case statement?
-What kind of pattern matching should it support?
-
-### Distinct/New Types
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/45>
-
-Should we add support for distinct types, i.e., types that are derived from an existing type, but are not compatible with them?
-
-### Set Data Structure
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/266>
-
-Should the standard library provide a set data structure?
-
-### Generics
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/44>
-
-Should we add generics? In what form? Is it OK to add them in a later version?
-
-### Calls of Pure Functions in Preconditions and Postconditions
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/70>
-
-It might be useful to call pure functions preconditions and postconditons.
-How do we ensure preconditions and postconditions are side-effect free?
-
-### Late Initialization of Variables and Constants
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/71>
-
-Currently we do not allow variables and constants to be initialized after they are declared. This improves readability, as the reader of the code can always be sure the initial value can be found where the variable or constant was declared, not somewhere else in the code following the declaration.
-
-Should we allow the late initialization of variables and constants?
-
-Are there good examples for cases where late initialization would be useful or even essential?
-
-### Arbitrary Argument Order Based on Argument Labels
-
-> ➡️ <https://github.com/dapperlabs/bamboo-node/issues/76>
-
-Should arbitrary argument order be supported in function calls as long as the argument labels match?

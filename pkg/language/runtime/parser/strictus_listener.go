@@ -46,6 +46,9 @@ type StrictusListener interface {
 	// EnterParameter is called when entering the parameter production.
 	EnterParameter(c *ParameterContext)
 
+	// EnterTypeAnnotation is called when entering the typeAnnotation production.
+	EnterTypeAnnotation(c *TypeAnnotationContext)
+
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
@@ -264,6 +267,9 @@ type StrictusListener interface {
 
 	// ExitParameter is called when exiting the parameter production.
 	ExitParameter(c *ParameterContext)
+
+	// ExitTypeAnnotation is called when exiting the typeAnnotation production.
+	ExitTypeAnnotation(c *TypeAnnotationContext)
 
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)

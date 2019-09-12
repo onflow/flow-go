@@ -59,6 +59,10 @@ func (v *BaseStrictusVisitor) VisitParameter(ctx *ParameterContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }

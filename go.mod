@@ -19,9 +19,8 @@ require (
 	github.com/fullstorydev/grpcurl v1.3.2 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-pg/migrations v6.7.3+incompatible
-	github.com/go-pg/pg v8.0.6+incompatible
-	github.com/gobuffalo/flect v0.1.6 // indirect
-	github.com/gogo/protobuf v1.3.0 // indirect
+	github.com/go-pg/pg v8.0.4+incompatible
+	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1 // indirect
@@ -60,9 +59,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/stretchr/testify v1.4.0 // indirect
+	github.com/twinj/uuid v1.0.0
 	github.com/uber/prototool v1.8.0 // indirect
 	github.com/ugorji/go v1.1.7 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect

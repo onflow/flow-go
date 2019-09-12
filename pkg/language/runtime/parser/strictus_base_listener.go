@@ -98,6 +98,12 @@ func (s *BaseStrictusListener) EnterParameter(ctx *ParameterContext) {}
 // ExitParameter is called when production parameter is exited.
 func (s *BaseStrictusListener) ExitParameter(ctx *ParameterContext) {}
 
+// EnterTypeAnnotation is called when production typeAnnotation is entered.
+func (s *BaseStrictusListener) EnterTypeAnnotation(ctx *TypeAnnotationContext) {}
+
+// ExitTypeAnnotation is called when production typeAnnotation is exited.
+func (s *BaseStrictusListener) ExitTypeAnnotation(ctx *TypeAnnotationContext) {}
+
 // EnterFullType is called when production fullType is entered.
 func (s *BaseStrictusListener) EnterFullType(ctx *FullTypeContext) {}
 
