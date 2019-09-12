@@ -1298,6 +1298,45 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	}
 }
 
+func TestCheckConcatenatingExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	tests := []operationTest{
+		{&sema.StringType{}, "\"abc\"", "\"def\"", nil},
+		{&sema.StringType{}, "\"\"", "\"def\"", nil},
+		{&sema.StringType{}, "\"abc\"", "\"\"", nil},
+		{&sema.StringType{}, "\"\"", "\"\"", nil},
+		{&sema.StringType{}, "1", "\"def\"", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+		{&sema.StringType{}, "\"abc\"", "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		}},
+		{&sema.StringType{}, "1", "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+	}
+
+	for _, test := range tests {
+		_, err := parseAndCheck(
+			fmt.Sprintf(
+				`fun test(): %s { return %s %s %s }`,
+				test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
+			),
+		)
+
+		errs := expectCheckerErrors(err, len(test.matchers))
+
+		for i, matcher := range test.matchers {
+			Expect(errs[i]).To(matcher)
+		}
+	}
+}
+
 func TestCheckFunctionExpressionsAndScope(t *testing.T) {
 	RegisterTestingT(t)
 

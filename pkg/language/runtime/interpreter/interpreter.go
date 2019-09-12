@@ -961,6 +961,15 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 				value := left.(SomeValue).Value
 				return Done{Result: value}
 			})
+
+	case ast.OperationConcat:
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(valueTuple)
+				left := tuple.left.(StringValue)
+				right := tuple.right.(StringValue)
+				return left.Concat(right)
+			})
 	}
 
 	panic(&unsupportedOperation{

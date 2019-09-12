@@ -137,6 +137,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#failableDowncastingExpression.
 	VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#concatenatingExpression.
+	VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#additiveExpression.
 	VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{}
 

@@ -22,14 +22,15 @@ func _() {
 	_ = x[OperationMul-11]
 	_ = x[OperationDiv-12]
 	_ = x[OperationMod-13]
-	_ = x[OperationNegate-14]
-	_ = x[OperationNilCoalesce-15]
-	_ = x[OperationMove-16]
+	_ = x[OperationConcat-14]
+	_ = x[OperationNegate-15]
+	_ = x[OperationNilCoalesce-16]
+	_ = x[OperationMove-17]
 }
 
-const _Operation_name = "OperationUnknownOperationOrOperationAndOperationEqualOperationUnequalOperationLessOperationGreaterOperationLessEqualOperationGreaterEqualOperationPlusOperationMinusOperationMulOperationDivOperationModOperationNegateOperationNilCoalesceOperationMove"
+const _Operation_name = "OperationUnknownOperationOrOperationAndOperationEqualOperationUnequalOperationLessOperationGreaterOperationLessEqualOperationGreaterEqualOperationPlusOperationMinusOperationMulOperationDivOperationModOperationConcatOperationNegateOperationNilCoalesceOperationMove"
 
-var _Operation_index = [...]uint8{0, 16, 27, 39, 53, 69, 82, 98, 116, 137, 150, 164, 176, 188, 200, 215, 235, 248}
+var _Operation_index = [...]uint16{0, 16, 27, 39, 53, 69, 82, 98, 116, 137, 150, 164, 176, 188, 200, 215, 230, 250, 263}
 
 func (i Operation) String() string {
 	if i < 0 || i >= Operation(len(_Operation_index)-1) {
