@@ -929,7 +929,7 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext == nil {
-		return ctx.AdditiveExpression().Accept(v)
+		return ctx.ConcatenatingExpression().Accept(v)
 	}
 
 	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
@@ -938,6 +938,27 @@ func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncas
 	return &ast.FailableDowncastExpression{
 		Expression:     expression,
 		TypeAnnotation: typeAnnotation,
+	}
+}
+
+func (v *ProgramVisitor) VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{} {
+	right := ctx.AdditiveExpression().Accept(v)
+	if right == nil {
+		return nil
+	}
+	rightExpression := right.(ast.Expression)
+
+	leftContext := ctx.ConcatenatingExpression()
+	if leftContext == nil {
+		return rightExpression
+	}
+
+	leftExpression := leftContext.Accept(v).(ast.Expression)
+
+	return &ast.BinaryExpression{
+		Operation: ast.OperationConcat,
+		Left:      leftExpression,
+		Right:     rightExpression,
 	}
 }
 

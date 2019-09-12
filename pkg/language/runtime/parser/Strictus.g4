@@ -256,8 +256,13 @@ nilCoalescingExpression
     ;
 
 failableDowncastingExpression
-    : additiveExpression
+    : concatenatingExpression
     | failableDowncastingExpression FailableDowncasting typeAnnotation
+    ;
+
+concatenatingExpression
+    : additiveExpression
+    | concatenatingExpression Concat additiveExpression
     ;
 
 additiveExpression
@@ -322,6 +327,7 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Concat : '&';
 
 unaryOp
     : Minus

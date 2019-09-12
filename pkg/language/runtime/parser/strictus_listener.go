@@ -133,6 +133,9 @@ type StrictusListener interface {
 	// EnterFailableDowncastingExpression is called when entering the failableDowncastingExpression production.
 	EnterFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
 
+	// EnterConcatenatingExpression is called when entering the concatenatingExpression production.
+	EnterConcatenatingExpression(c *ConcatenatingExpressionContext)
+
 	// EnterAdditiveExpression is called when entering the additiveExpression production.
 	EnterAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -357,6 +360,9 @@ type StrictusListener interface {
 
 	// ExitFailableDowncastingExpression is called when exiting the failableDowncastingExpression production.
 	ExitFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+
+	// ExitConcatenatingExpression is called when exiting the concatenatingExpression production.
+	ExitConcatenatingExpression(c *ConcatenatingExpressionContext)
 
 	// ExitAdditiveExpression is called when exiting the additiveExpression production.
 	ExitAdditiveExpression(c *AdditiveExpressionContext)
