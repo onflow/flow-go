@@ -310,6 +310,15 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			},
 			IsInitialized: true,
 		}
+	case "concat":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{ty},
+				ReturnType:     ty,
+			},
+			IsInitialized: true,
+		}
 	default:
 		return arrayMembers[field]
 	}
