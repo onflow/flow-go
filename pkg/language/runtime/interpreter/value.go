@@ -112,6 +112,14 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	case "length":
 		count := uniseg.GraphemeClusterCount(string(v))
 		return IntValue{Int: big.NewInt(int64(count))}
+	case "concat":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				otherValue := arguments[0].(ConcatenatableValue)
+				result := v.Concat(otherValue)
+				return trampoline.Done{Result: result}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}

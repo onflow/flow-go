@@ -3221,6 +3221,35 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 		}))
 }
 
+func TestInterpretStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+          let a = "abc"
+          return a.concat("def")
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.StringValue("abcdef")))
+}
+
+func TestInterpretStringConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+          let a = "abc"
+          let b = a.concat
+          return b("def")
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.StringValue("abcdef")))
+}
+
 func TestInterpretDictionaryRemove(t *testing.T) {
 	RegisterTestingT(t)
 
