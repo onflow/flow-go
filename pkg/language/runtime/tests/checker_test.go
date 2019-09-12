@@ -4673,6 +4673,56 @@ func TestCheckArrayAppendBound(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): Int[] {
+	 	  let a = [1, 2]
+		  let b = [3, 4]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+		  let a = [1, 2]
+		  let b = ["a", "b"]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+		  let a = [1, 2]
+		  let b = [3, 4]
+		  let c = a.concat
+		  return c(b)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckEmptyArray(t *testing.T) {
 	RegisterTestingT(t)
 
