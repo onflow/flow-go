@@ -3,6 +3,7 @@ package initialize
 import (
 	"encoding/hex"
 
+	"github.com/psiemens/sconfig"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -11,11 +12,19 @@ import (
 	"github.com/dapperlabs/bamboo-node/pkg/types"
 )
 
+type Config struct {
+	Reset bool `default:"false" flag:"reset" info:"reset bamboo.json config file"`
+}
+
+var (
+	conf Config
+)
+
 var Cmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new account profile",
 	Run: func(cmd *cobra.Command, args []string) {
-		if !project.ConfigExists() {
+		if !project.ConfigExists() || conf.Reset {
 			salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 			prKey, _ := salg.GeneratePrKey([]byte{})
 			prKeyBytes, _ := salg.EncodePrKey(prKey)
@@ -41,4 +50,18 @@ var Cmd = &cobra.Command{
 			log.Warn("⚙️   Bamboo configuration file already exists! Begin by running: bamboo emulator start")
 		}
 	},
+}
+
+func init() {
+	initConfig()
+}
+
+func initConfig() {
+	err := sconfig.New(&conf).
+		FromEnvironment("BAM").
+		BindFlags(Cmd.PersistentFlags()).
+		Parse()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
