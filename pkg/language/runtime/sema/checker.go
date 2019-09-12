@@ -2224,8 +2224,15 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		// check composite conforms to interfaces.
 		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
-		for _, interfaceType := range compositeType.Conformances {
-			checker.checkCompositeConformance(compositeType, interfaceType, declaration.Identifier.Pos)
+		for i, interfaceType := range compositeType.Conformances {
+			conformance := declaration.Conformances[i]
+
+			checker.checkCompositeConformance(
+				compositeType,
+				interfaceType,
+				declaration.Identifier.Pos,
+				conformance.Identifier,
+			)
 		}
 	}
 
@@ -2349,11 +2356,26 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 func (checker *Checker) checkCompositeConformance(
 	compositeType *CompositeType,
 	interfaceType *InterfaceType,
-	pos ast.Position,
+	compositeIdentifierPos ast.Position,
+	interfaceIdentifier ast.Identifier,
 ) {
 	var missingMembers []*Member
 	var memberMismatches []MemberMismatch
 	var initializerMismatch *InitializerMismatch
+
+	// ensure the composite kinds match, e.g. a structure shouldn't be able
+	// to conform to a resource interface
+
+	if interfaceType.CompositeKind != compositeType.Kind {
+		checker.report(
+			&CompositeKindMismatchError{
+				ExpectedKind: compositeType.Kind,
+				ActualKind:   interfaceType.CompositeKind,
+				StartPos:     interfaceIdentifier.StartPosition(),
+				EndPos:       interfaceIdentifier.EndPosition(),
+			},
+		)
+	}
 
 	if interfaceType.InitializerParameterTypes != nil {
 
@@ -2401,7 +2423,7 @@ func (checker *Checker) checkCompositeConformance(
 			&ConformanceError{
 				CompositeType:       compositeType,
 				InterfaceType:       interfaceType,
-				Pos:                 pos,
+				Pos:                 compositeIdentifierPos,
 				InitializerMismatch: initializerMismatch,
 				MissingMembers:      missingMembers,
 				MemberMismatches:    memberMismatches,

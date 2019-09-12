@@ -1022,3 +1022,34 @@ func (e *UnsupportedOverloadingError) StartPosition() ast.Position {
 func (e *UnsupportedOverloadingError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// CompositeKindMismatchError
+
+type CompositeKindMismatchError struct {
+	ExpectedKind common.CompositeKind
+	ActualKind   common.CompositeKind
+	StartPos     ast.Position
+	EndPos       ast.Position
+}
+
+func (e *CompositeKindMismatchError) Error() string {
+	return "mismatched composite kinds"
+}
+
+func (*CompositeKindMismatchError) isSemanticError() {}
+
+func (e *CompositeKindMismatchError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedKind.Name(),
+		e.ActualKind.Name(),
+	)
+}
+
+func (e *CompositeKindMismatchError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *CompositeKindMismatchError) EndPosition() ast.Position {
+	return e.EndPos
+}
