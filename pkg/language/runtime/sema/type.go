@@ -138,6 +138,14 @@ var stringMembers = map[string]*Member{
 		VariableKind:  ast.VariableKindConstant,
 		IsInitialized: true,
 	},
+	"concat": {
+		Type: &FunctionType{
+			ParameterTypes: []Type{
+				&StringType{},
+			},
+			ReturnType: &StringType{},
+		},
+	},
 }
 
 // IntegerType represents the super-type of all integer types
