@@ -49,3 +49,11 @@ func LoadConfig() *Config {
 
 	return &conf
 }
+
+func ConfigExists() bool {
+	info, err := os.Stat(ConfigPath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
