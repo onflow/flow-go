@@ -984,7 +984,7 @@ type UnsupportedDeclarationError struct {
 func (e *UnsupportedDeclarationError) Error() string {
 	return fmt.Sprintf(
 		"%s declarations are not supported yet",
-		e.DeclarationKind.String(),
+		e.DeclarationKind.Name(),
 	)
 }
 
@@ -1009,7 +1009,7 @@ type UnsupportedOverloadingError struct {
 func (e *UnsupportedOverloadingError) Error() string {
 	return fmt.Sprintf(
 		"%s overloading is not supported yet",
-		e.DeclarationKind.String(),
+		e.DeclarationKind.Name(),
 	)
 }
 

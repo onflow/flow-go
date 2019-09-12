@@ -2956,7 +2956,7 @@ func TestParseStructure(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	test := &CompositeDeclaration{
-		Kind: common.CompositeKindStructure,
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},
@@ -3108,7 +3108,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	test := &CompositeDeclaration{
-		Kind: common.CompositeKindStructure,
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},
@@ -3683,7 +3683,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 func TestParseInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	for _, kind := range compositeKeywords {
+	for _, kind := range common.CompositeKinds {
 		actual, err := parser.ParseProgram(fmt.Sprintf(`
             %s interface Test {
                 foo: Int
@@ -3692,14 +3692,14 @@ func TestParseInterface(t *testing.T) {
 
                 fun getFoo(): Int
             }
-	    `, kind))
+	    `, kind.Keyword()))
 
 		Expect(err).
 			To(Not(HaveOccurred()))
 
 		// only compare AST for one kind: structs
 
-		if kind != "struct" {
+		if kind != common.CompositeKindStructure {
 			continue
 		}
 
@@ -3990,7 +3990,7 @@ func TestParseResource(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	test := &CompositeDeclaration{
-		Kind: common.CompositeKindResource,
+		CompositeKind: common.CompositeKindResource,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 18, Line: 2, Column: 17},
@@ -4310,7 +4310,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	test := &CompositeDeclaration{
-		Kind: common.CompositeKindStructure,
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "X",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},

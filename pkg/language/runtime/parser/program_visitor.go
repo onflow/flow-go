@@ -193,14 +193,14 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 	// TODO: consider kind: return resource / contract declaration
 
 	return &ast.CompositeDeclaration{
-		Kind:         kind,
-		Identifier:   identifier,
-		Conformances: conformances,
-		Fields:       fields,
-		Initializers: initializers,
-		Functions:    functions,
-		StartPos:     startPosition,
-		EndPos:       endPosition,
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Conformances:  conformances,
+		Fields:        fields,
+		Initializers:  initializers,
+		Functions:     functions,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 

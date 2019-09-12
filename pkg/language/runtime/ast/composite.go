@@ -8,14 +8,14 @@ import (
 // CompositeDeclaration
 
 type CompositeDeclaration struct {
-	Kind         common.CompositeKind
-	Identifier   Identifier
-	Conformances []*NominalType
-	Fields       []*FieldDeclaration
-	Initializers []*InitializerDeclaration
-	Functions    []*FunctionDeclaration
-	StartPos     Position
-	EndPos       Position
+	CompositeKind common.CompositeKind
+	Identifier    Identifier
+	Conformances  []*NominalType
+	Fields        []*FieldDeclaration
+	Initializers  []*InitializerDeclaration
+	Functions     []*FunctionDeclaration
+	StartPos      Position
+	EndPos        Position
 }
 
 func (d *CompositeDeclaration) StartPosition() Position {
@@ -42,7 +42,7 @@ func (d *CompositeDeclaration) DeclarationName() string {
 }
 
 func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
-	switch d.Kind {
+	switch d.CompositeKind {
 	case common.CompositeKindStructure:
 		return common.DeclarationKindStructure
 	case common.CompositeKindResource:

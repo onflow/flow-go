@@ -2229,6 +2229,18 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		}
 	}
 
+	// TODO: support non-structure composites, such as contracts and resources
+
+	if declaration.CompositeKind != common.CompositeKindStructure {
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: declaration.DeclarationKind(),
+				StartPos:        declaration.Identifier.StartPosition(),
+				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
 	return nil
 }
 
@@ -2262,7 +2274,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	)
 
 	*compositeType = CompositeType{
-		Kind:         declaration.Kind,
+		Kind:         declaration.CompositeKind,
 		Identifier:   identifier.Identifier,
 		Members:      members,
 		Conformances: conformances,
@@ -2785,6 +2797,18 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType,
 		declaration.DeclarationKind(),
 	)
+
+	// TODO: support non-structure interfaces, such as contracts and resources
+
+	if declaration.CompositeKind != common.CompositeKindStructure {
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: declaration.DeclarationKind(),
+				StartPos:        declaration.Identifier.StartPosition(),
+				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
 
 	return nil
 }
