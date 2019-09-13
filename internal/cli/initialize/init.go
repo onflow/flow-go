@@ -43,12 +43,12 @@ var Cmd = &cobra.Command{
 
 			project.SaveConfig(conf)
 
-			fmt.Println("⚙️   Bamboo Client initialized with root account:\n")
+			fmt.Printf("⚙️   Bamboo Client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", address)
 			fmt.Printf("🔑  PrivateKey: %s\n\n", prKeyHex)
-			fmt.Println("ℹ️   Start the emulator with this root account by running: bamboo emulator start")
+			fmt.Printf("ℹ️   Start the emulator with this root account by running: bamboo emulator start\n")
 		} else {
-			fmt.Println("⚠️   Bamboo configuration file already exists! Begin by running: bamboo emulator start")
+			fmt.Printf("⚠️   Bamboo configuration file already exists! Begin by running: bamboo emulator start\n")
 		}
 	},
 }
