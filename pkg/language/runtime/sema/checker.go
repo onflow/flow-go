@@ -319,6 +319,12 @@ func (checker *Checker) IsConcatenatableType(ty Type) bool {
 	return checker.IsSubType(ty, &StringType{}) || isArrayType
 }
 
+func (checker *Checker) IsEquatableType(ty Type) bool {
+	return checker.IsSubType(ty, &StringType{}) ||
+		checker.IsSubType(ty, &BoolType{}) ||
+		checker.IsSubType(ty, &IntType{})
+}
+
 func (checker *Checker) setVariable(name string, variable *Variable) {
 	checker.valueActivations.Set(name, variable)
 }
@@ -1800,7 +1806,6 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 }
 
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
-
 	member := checker.visitMember(expression)
 
 	var memberType Type = &InvalidType{}
@@ -1827,6 +1832,23 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		member = stringMembers[identifier]
 	case ArrayType:
 		member = getArrayMember(ty, identifier)
+
+		// TODO: implement Equatable interface: https://github.com/dapperlabs/bamboo-node/issues/78
+		if identifier == "contains" {
+			functionType := member.Type.(*FunctionType)
+
+			if !checker.IsEquatableType(functionType.ParameterTypes[0]) {
+				checker.report(
+					&NotEquatableTypeError{
+						Type:     expressionType,
+						StartPos: expression.Identifier.StartPosition(),
+						EndPos:   expression.Identifier.EndPosition(),
+					},
+				)
+
+				return nil
+			}
+		}
 	case *DictionaryType:
 		member = getDictionaryMember(ty, identifier)
 	}
