@@ -338,7 +338,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				ReturnType: &VoidType{},
 			},
 			IsInitialized:  true,
-			ArgumentLabels: []string{"at"},
+			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		}
 	case "remove":
 		return &Member{
