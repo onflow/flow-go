@@ -91,6 +91,56 @@ func TestCheckString(t *testing.T) {
 		To(Equal(&sema.StringType{}))
 }
 
+func TestCheckStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): String {
+	 	  let a = "abc"
+		  let b = "def"
+		  let c = a.concat(b)
+		  return c
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abc"
+		  let b = [1, 2]
+		  let c = a.concat(b)
+		  return c
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckStringConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abc"
+		  let b = "def"
+		  let c = a.concat
+		  return c(b)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func expectCheckerErrors(err error, len int) []error {
 	if len <= 0 && err == nil {
 		return nil
@@ -4666,6 +4716,56 @@ func TestCheckArrayAppendBound(t *testing.T) {
           let y = x.append
           y(4)
           return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): Int[] {
+	 	  let a = [1, 2]
+		  let b = [3, 4]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+		  let a = [1, 2]
+		  let b = ["a", "b"]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+		  let a = [1, 2]
+		  let b = [3, 4]
+		  let c = a.concat
+		  return c(b)
       }
     `)
 

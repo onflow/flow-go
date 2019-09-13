@@ -3178,6 +3178,78 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 		}))
 }
 
+func TestInterpretArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let a = [1, 2]
+          return a.concat([3, 4])
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+			},
+		}))
+}
+
+func TestInterpretArrayConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let a = [1, 2]
+          let b = a.concat
+          return b([3, 4])
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+			},
+		}))
+}
+
+func TestInterpretStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+          let a = "abc"
+          return a.concat("def")
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.StringValue("abcdef")))
+}
+
+func TestInterpretStringConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+          let a = "abc"
+          let b = a.concat
+          return b("def")
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.StringValue("abcdef")))
+}
+
 func TestInterpretDictionaryRemove(t *testing.T) {
 	RegisterTestingT(t)
 

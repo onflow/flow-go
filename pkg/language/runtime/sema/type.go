@@ -138,6 +138,14 @@ var stringMembers = map[string]*Member{
 		VariableKind:  ast.VariableKindConstant,
 		IsInitialized: true,
 	},
+	"concat": {
+		Type: &FunctionType{
+			ParameterTypes: []Type{
+				&StringType{},
+			},
+			ReturnType: &StringType{},
+		},
+	},
 }
 
 // IntegerType represents the super-type of all integer types
@@ -307,6 +315,15 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					ty.elementType(),
 				},
 				ReturnType: &VoidType{},
+			},
+			IsInitialized: true,
+		}
+	case "concat":
+		return &Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypes: []Type{ty},
+				ReturnType:     ty,
 			},
 			IsInitialized: true,
 		}
