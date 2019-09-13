@@ -3227,7 +3227,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	inter := parseCheckAndInterpret(`
       fun test(): Int[] {
           let x = [1, 2, 3]
-          x.insert(1, 4)
+          x.insert(at: 1, 4)
           return x
       }
     `)
@@ -3248,7 +3248,7 @@ func TestInterpretArrayRemove(t *testing.T) {
 
 	inter := parseCheckAndInterpret(`
           let x = [1, 2, 3]
-          let y = x.remove(1)
+          let y = x.remove(at: 1)
     `)
 
 	Expect(inter.Globals["x"].Value).

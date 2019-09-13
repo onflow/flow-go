@@ -337,7 +337,8 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				},
 				ReturnType: &VoidType{},
 			},
-			IsInitialized: true,
+			IsInitialized:  true,
+			ArgumentLabels: []string{"at"},
 		}
 	case "remove":
 		return &Member{
@@ -346,7 +347,8 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				ParameterTypes: []Type{&IntegerType{}},
 				ReturnType:     ty.elementType(),
 			},
-			IsInitialized: true,
+			IsInitialized:  true,
+			ArgumentLabels: []string{"at"},
 		}
 	case "removeFirst":
 		return &Member{

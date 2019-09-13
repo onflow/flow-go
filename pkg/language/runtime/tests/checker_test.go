@@ -4779,7 +4779,7 @@ func TestCheckArrayInsert(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test(): Int[] {
           let x = [1, 2, 3]
-          x.insert(1, 4)
+          x.insert(at: 1, 4)
           return x
       }
     `)
@@ -4794,7 +4794,7 @@ func TestCheckInvalidArrayInsert(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test(): Int[] {
           let x = [1, 2, 3]
-          x.insert(1, "4")
+          x.insert(at: 1, "4")
           return x
       }
     `)
@@ -4811,7 +4811,7 @@ func TestCheckArrayRemove(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test(): Int[] {
           let x = [1, 2, 3]
-          x.remove(1)
+          x.remove(at: 1)
           return x
       }
     `)
@@ -4826,7 +4826,7 @@ func TestCheckInvalidArrayRemove(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test(): Int[] {
           let x = [1, 2, 3]
-          x.remove("1")
+          x.remove(at: "1")
           return x
       }
     `)
