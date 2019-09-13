@@ -593,6 +593,52 @@ func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
 }
 
+func TestCheckStringIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+		  let z = "abc"
+		  let y: Character = "d"
+          z[0] = y
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[0] = "d"
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO: prevent assignment with invalid character literal
+// func TestCheckStringIndexingAssignmentWithInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//       fun test() {
+//           let z = "abc"
+//           z[0] = "def"
+//       }
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
+
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
