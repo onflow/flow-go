@@ -185,6 +185,28 @@ func (v ArrayValue) String() string {
 	return builder.String()
 }
 
+func (v ArrayValue) Append(x Value) {
+	*v.Values = append(*v.Values, x)
+}
+
+func (v ArrayValue) Insert(i int, x Value) {
+	*v.Values = append((*v.Values)[:i], append([]Value{x}, (*v.Values)[i:]...)...)
+}
+
+func (v ArrayValue) Remove(i int) Value {
+	values := *v.Values
+	result := values[i]
+
+	copy(values[i:], values[i+1:])
+
+	// avoid memory leaks by explicitly setting value to nil
+	values[len(values)-1] = nil
+
+	*v.Values = values[:len(values)-1]
+
+	return result
+}
+
 func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
@@ -192,15 +214,15 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	case "append":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
-				*v.Values = append(*v.Values, arguments[0])
+				v.Append(arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
-				otherValue := arguments[0].(ConcatenatableValue)
-				result := v.Concat(otherValue)
+				x := arguments[0].(ConcatenatableValue)
+				result := v.Concat(x)
 				return trampoline.Done{Result: result}
 			},
 		)
@@ -209,9 +231,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 			func(arguments []Value, location Location) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				x := arguments[1]
-
-				*v.Values = append((*v.Values)[:i], append([]Value{x}, (*v.Values)[i:]...)...)
-
+				v.Insert(i, x)
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
@@ -219,14 +239,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
-
-				values := *v.Values
-				result := values[i]
-
-				copy(values[i:], values[i+1:])
-				values[len(values)-1] = nil
-				*v.Values = values[:len(values)-1]
-
+				result := v.Remove(i)
 				return trampoline.Done{Result: result}
 			},
 		)
