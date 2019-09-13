@@ -8,7 +8,7 @@ lint:
       - ENUM_ZERO_VALUES_INVALID_EXCEPT_MESSAGE
 generate:
   go_options:
-    import_path: github.com/dapperlabs/bamboo-node/proto
+    import_path: github.com/dapperlabs/flow-go/proto
   plugins:
     - name: go
       type: go

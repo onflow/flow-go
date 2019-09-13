@@ -4,7 +4,7 @@ package gossip
 import (
 	"context"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 )
 
 // Mode defines mode of the gossip based on the set of recipients

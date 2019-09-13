@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type RuntimeContext struct {

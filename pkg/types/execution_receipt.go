@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 type ExecutionReceipt struct {

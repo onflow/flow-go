@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const ConfigPath = "bamboo.json"
+const ConfigPath = "flow.json"
 
 type AccountConfig struct {
 	Address    string `json:"address"`

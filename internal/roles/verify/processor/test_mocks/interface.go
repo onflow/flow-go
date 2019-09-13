@@ -1,8 +1,8 @@
 package testmocks
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/compute"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // Mock interface provides a set of common methods to introspect the mock instance

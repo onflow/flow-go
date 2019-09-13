@@ -24,27 +24,27 @@ const verifyProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(VE
 const observeProtoDescriptor = grpc.loadPackageDefinition(protoLoader.loadSync(OBSERVE_PROTO_PATH, options));
 
 function createNewCollectStub(address) {
-  const stub = new collectProtoDescriptor.bamboo.services.collect.CollectService(address, grpc.credentials.createInsecure());
+  const stub = new collectProtoDescriptor.flow.services.collect.CollectService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
 function createNewConsensusStub(address) {
-  const stub = new consensusProtoDescriptor.bamboo.services.consensus.ConsensusService(address, grpc.credentials.createInsecure());
+  const stub = new consensusProtoDescriptor.flow.services.consensus.ConsensusService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
 function createNewExecuteStub(address) {
-  const stub = new executeProtoDescriptor.bamboo.services.execute.ExecuteService(address, grpc.credentials.createInsecure());
+  const stub = new executeProtoDescriptor.flow.services.execute.ExecuteService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
 function createNewVerifyStub(address) {
-  const stub = new verifyProtoDescriptor.bamboo.services.verify.VerifyService(address, grpc.credentials.createInsecure());
+  const stub = new verifyProtoDescriptor.flow.services.verify.VerifyService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 
 function createNewObserveStub(address) {
-  const stub = new observeProtoDescriptor.bamboo.services.observe.ObserveService(address, grpc.credentials.createInsecure());
+  const stub = new observeProtoDescriptor.flow.services.observe.ObserveService(address, grpc.credentials.createInsecure());
   return promisifyStub(stub);
 }
 

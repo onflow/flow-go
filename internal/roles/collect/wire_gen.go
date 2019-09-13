@@ -6,9 +6,9 @@
 package collect
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/controller"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/storage"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/txpool"
 	"github.com/sirupsen/logrus"
 )
 

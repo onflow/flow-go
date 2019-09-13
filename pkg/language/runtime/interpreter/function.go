@@ -3,9 +3,9 @@ package interpreter
 import (
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 // FunctionValue

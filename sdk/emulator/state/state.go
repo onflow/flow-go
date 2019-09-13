@@ -3,11 +3,11 @@ package state
 import (
 	"sync"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 
-	"github.com/dapperlabs/bamboo-node/sdk/emulator/execution"
-	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // WorldState represents the current state of the blockchain.

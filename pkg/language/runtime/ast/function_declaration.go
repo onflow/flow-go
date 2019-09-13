@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 type FunctionDeclaration struct {
 	Access               Access

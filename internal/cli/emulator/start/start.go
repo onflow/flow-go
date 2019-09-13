@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/project"
-	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator/server"
+	"github.com/dapperlabs/flow-go/internal/cli/project"
+	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
 type Config struct {
@@ -30,7 +30,7 @@ var (
 
 var Cmd = &cobra.Command{
 	Use:   "start",
-	Short: "Starts the Bamboo emulator server",
+	Short: "Starts the Flow emulator server",
 	Run: func(cmd *cobra.Command, args []string) {
 		projectConf := project.LoadConfig()
 

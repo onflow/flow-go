@@ -8,7 +8,7 @@ import (
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 type Config struct {

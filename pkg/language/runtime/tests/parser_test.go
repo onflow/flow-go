@@ -2,15 +2,15 @@ package tests
 
 import (
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
 func init() {

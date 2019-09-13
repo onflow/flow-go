@@ -3,8 +3,8 @@ package storage
 import (
 	"errors"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // MockStorage is an in-memory storage implementation.

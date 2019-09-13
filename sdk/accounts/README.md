@@ -1,7 +1,7 @@
 
 
 # accounts
-`import "github.com/dapperlabs/bamboo-node/sdk/accounts"`
+`import "github.com/dapperlabs/flow-go/sdk/accounts"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -16,13 +16,13 @@
 
 
 #### <a name="pkg-files">Package files</a>
-[accounts.go](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go)
+[accounts.go](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go)
 
 
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=165:229#L11)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=161:225#L11)
 ``` go
 func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
@@ -30,7 +30,7 @@ CreateAccount generates a transaction that creates a new account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/accounts/accounts.go?s=642:722#L29)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=638:718#L29)
 ``` go
 func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```

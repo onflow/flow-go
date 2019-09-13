@@ -2,8 +2,8 @@
 package routing
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/clusters"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/clusters"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // TransactionRouter routes transactions to clusters using a deterministic transaction routing algorithm.

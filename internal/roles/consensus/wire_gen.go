@@ -6,7 +6,7 @@
 package consensus
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/consensus/config"
+	"github.com/dapperlabs/flow-go/internal/roles/consensus/config"
 )
 
 // Injectors from wire.go:

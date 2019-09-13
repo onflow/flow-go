@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 	"log"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 func init() {
