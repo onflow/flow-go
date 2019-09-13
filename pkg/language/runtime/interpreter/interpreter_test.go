@@ -5,7 +5,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
 
 func TestInterpreterOptionalBoxing(t *testing.T) {

@@ -8,14 +8,14 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	runtimeErrors "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	runtimeErrors "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type ImportLocation interface {
@@ -61,7 +61,7 @@ func (e Error) Error() string {
 	return sb.String()
 }
 
-// Runtime is a runtime capable of executing the Bamboo programming language.
+// Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
@@ -69,10 +69,10 @@ type Runtime interface {
 	ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error)
 }
 
-// mockRuntime is a mocked version of the Bamboo runtime
+// mockRuntime is a mocked version of the Flow runtime
 type mockRuntime struct{}
 
-// NewMockRuntime returns a mocked version of the Bamboo runtime.
+// NewMockRuntime returns a mocked version of the Flow runtime.
 func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
@@ -81,11 +81,11 @@ func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (
 	return nil, nil
 }
 
-// interpreterRuntime is a interpreter-based version of the Bamboo runtime.
+// interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct {
 }
 
-// NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime.
+// NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }

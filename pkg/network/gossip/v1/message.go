@@ -3,7 +3,7 @@ package gnode
 import (
 	"github.com/twinj/uuid"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 )
 
 func generateGossipMessage(payloadBytes []byte, recipients []string, method string) (*shared.GossipMessage, error) {

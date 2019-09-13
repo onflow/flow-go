@@ -3,8 +3,8 @@ package emulator
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // ErrBlockNotFound indicates that a block specified by hash or number cannot be found.

@@ -1,6 +1,6 @@
 package types
 
-import "github.com/dapperlabs/bamboo-node/pkg/crypto"
+import "github.com/dapperlabs/flow-go/pkg/crypto"
 
 type Registers map[crypto.Hash][]byte
 

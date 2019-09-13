@@ -6,10 +6,10 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
-	. "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor/test_mocks"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/processor"
+	. "github.com/dapperlabs/flow-go/internal/roles/verify/processor/test_mocks"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type test struct {

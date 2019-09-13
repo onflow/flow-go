@@ -3,7 +3,7 @@ package bpl
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/cmd/execute"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/cmd/execute"
 )
 
 var Cmd = &cobra.Command{

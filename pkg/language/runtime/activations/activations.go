@@ -3,7 +3,7 @@ package activations
 import (
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 // Activations is a stack of activation records.

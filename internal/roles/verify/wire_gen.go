@@ -6,8 +6,8 @@
 package verify
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/config"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/processor"
 )
 
 // Injectors from wire.go:

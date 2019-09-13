@@ -3,10 +3,10 @@ package sema
 import (
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -1833,7 +1833,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	case ArrayType:
 		member = getArrayMember(ty, identifier)
 
-		// TODO: implement Equatable interface: https://github.com/dapperlabs/bamboo-node/issues/78
+		// TODO: implement Equatable interface: https://github.com/dapperlabs/flow-go/issues/78
 		if identifier == "contains" {
 			functionType := member.Type.(*FunctionType)
 

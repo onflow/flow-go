@@ -9,10 +9,10 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
-	"github.com/dapperlabs/bamboo-node/sdk/client"
-	"github.com/dapperlabs/bamboo-node/sdk/client/mocks"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
+	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/client/mocks"
 )
 
 func TestSendTransaction(t *testing.T) {

@@ -3,7 +3,7 @@ package unittest
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 func AddressFixture() types.Address {

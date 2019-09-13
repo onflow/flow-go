@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/consensus"
+	"github.com/dapperlabs/flow-go/internal/roles/consensus"
 )
 
 func main() {

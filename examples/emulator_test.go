@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/sdk/accounts"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/accounts"
+	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
 func TestSubmitTransaction(t *testing.T) {

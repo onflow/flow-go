@@ -1,7 +1,7 @@
 package transactions
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/cli/transactions/send"
+	"github.com/dapperlabs/flow-go/internal/cli/transactions/send"
 	"github.com/spf13/cobra"
 )
 

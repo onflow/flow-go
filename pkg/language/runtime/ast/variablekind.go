@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 //go:generate stringer -type=VariableKind
 

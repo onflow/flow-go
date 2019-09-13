@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 

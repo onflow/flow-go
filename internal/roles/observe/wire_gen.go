@@ -6,7 +6,7 @@
 package observe
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/observe/config"
+	"github.com/dapperlabs/flow-go/internal/roles/observe/config"
 )
 
 // Injectors from wire.go:

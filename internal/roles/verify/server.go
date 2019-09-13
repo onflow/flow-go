@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/verify"
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
+	svc "github.com/dapperlabs/flow-go/pkg/grpc/services/verify"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/config"
 )
 
 type Server struct {

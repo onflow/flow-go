@@ -1,8 +1,8 @@
 package processor
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/compute"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // Effects is an interface for external encapuslated funcs with side-effects to be used in the receipt processor. It follows the template pattern.

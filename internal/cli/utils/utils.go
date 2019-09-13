@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 func Exit(msg string, code int) {

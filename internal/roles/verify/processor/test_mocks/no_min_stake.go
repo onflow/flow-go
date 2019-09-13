@@ -1,6 +1,6 @@
 package testmocks
 
-import "github.com/dapperlabs/bamboo-node/pkg/types"
+import "github.com/dapperlabs/flow-go/pkg/types"
 
 func NewMockEffectsNoMinStake(m *MockEffectsHappyPath) *MockEffectsNoMinStake {
 	return &MockEffectsNoMinStake{m, 0}

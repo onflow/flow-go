@@ -8,13 +8,13 @@ import (
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/project"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/cli/project"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type Config struct {
-	Reset bool `default:"false" flag:"reset" info:"reset bamboo.json config file"`
+	Reset bool `default:"false" flag:"reset" info:"reset flow.json config file"`
 }
 
 var (
@@ -43,12 +43,12 @@ var Cmd = &cobra.Command{
 
 			project.SaveConfig(conf)
 
-			fmt.Printf("⚙️   Bamboo Client initialized with root account:\n\n")
+			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", address)
 			fmt.Printf("🔑  PrivateKey: %s\n\n", prKeyHex)
-			fmt.Printf("ℹ️   Start the emulator with this root account by running: bamboo emulator start\n")
+			fmt.Printf("ℹ️   Start the emulator with this root account by running: flow emulator start\n")
 		} else {
-			fmt.Printf("⚠️   Bamboo configuration file already exists! Begin by running: bamboo emulator start\n")
+			fmt.Printf("⚠️   Flow configuration file already exists! Begin by running: flow emulator start\n")
 		}
 	},
 }

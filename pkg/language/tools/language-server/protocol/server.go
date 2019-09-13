@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/jsonrpc2"
+import "github.com/dapperlabs/flow-go/pkg/language/tools/language-server/jsonrpc2"
 
 type Server struct {
 	Handler        Handler

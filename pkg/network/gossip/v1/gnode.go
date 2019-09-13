@@ -8,8 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
-	"github.com/dapperlabs/bamboo-node/pkg/network/gossip"
+	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip"
 )
 
 // QueueSize is the buffer size for holding incoming Gossip Messages

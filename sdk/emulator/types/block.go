@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 )
 
 type Block struct {

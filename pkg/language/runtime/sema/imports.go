@@ -3,7 +3,7 @@ package sema
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
 type ImportResolver func(location ast.ImportLocation) (*Checker, error)

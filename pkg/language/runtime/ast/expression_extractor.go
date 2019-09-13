@@ -3,7 +3,7 @@ package ast
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 type BoolExtractor interface {

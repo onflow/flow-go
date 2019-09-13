@@ -1,4 +1,4 @@
-module github.com/dapperlabs/bamboo-node
+module github.com/dapperlabs/flow-go
 
 go 1.12
 

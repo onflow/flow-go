@@ -1,6 +1,6 @@
 package trampoline
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 // Based on "Stackless Scala With Free" by Rúnar Óli Bjarnason:
 // http://blog.higher-order.com/assets/trampolines.pdf

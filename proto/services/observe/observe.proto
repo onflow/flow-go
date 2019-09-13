@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package bamboo.services.observe;
+package flow.services.observe;
 
 option go_package = "observe";
 
@@ -35,7 +35,7 @@ message PingResponse {
 }
 
 message SendTransactionRequest {
-  bamboo.shared.messages.SignedTransaction transaction = 1;
+  flow.shared.messages.SignedTransaction transaction = 1;
 }
 
 message SendTransactionResponse {
@@ -84,7 +84,7 @@ message GetTransactionRequest {
 }
 
 message GetTransactionResponse {
-  bamboo.shared.messages.SignedTransaction transaction = 1;
+  flow.shared.messages.SignedTransaction transaction = 1;
 }
 
 message GetAccountRequest {

@@ -12,7 +12,7 @@ Use the following import path in your go file:
 ```go
 import (
 	...
-	gnode "github.com/dapperlabs/bamboo-node/pkg/network/gossip/v1"
+	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	...
 )
 ```

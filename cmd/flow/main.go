@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dapperlabs/bamboo-node/internal/cli"
+	"github.com/dapperlabs/flow-go/internal/cli"
 )
 
 func main() {

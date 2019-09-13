@@ -1,6 +1,6 @@
 package interpreter
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 type Location struct {
 	ImportLocation ast.ImportLocation

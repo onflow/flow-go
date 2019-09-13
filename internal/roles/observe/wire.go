@@ -5,7 +5,7 @@ package observe
 import (
 	"github.com/google/wire"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/observe/config"
+	"github.com/dapperlabs/flow-go/internal/roles/observe/config"
 )
 
 // InitializeServer resolves all dependencies for dependency injection and returns the server object
