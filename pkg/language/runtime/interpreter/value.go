@@ -25,6 +25,27 @@ type ExportableValue interface {
 	ToGoValue() interface{}
 }
 
+// IndexableValue
+
+type IndexableValue interface {
+	isIndexableValue()
+	Get(key Value) Value
+	Set(key Value, value Value)
+}
+
+// ConcatenatableValue
+
+type ConcatenatableValue interface {
+	isConcatenatableValue()
+	Concat(other ConcatenatableValue) Value
+}
+
+// EquatableValue
+
+type EquatableValue interface {
+	Equal(other Value) BoolValue
+}
+
 // VoidValue
 
 type VoidValue struct{}
@@ -61,19 +82,8 @@ func (v BoolValue) Negate() BoolValue {
 	return !v
 }
 
-// IndexableValue
-
-type IndexableValue interface {
-	isIndexableValue()
-	Get(key Value) Value
-	Set(key Value, value Value)
-}
-
-// ConcatenatableValue
-
-type ConcatenatableValue interface {
-	isConcatenatableValue()
-	Concat(other ConcatenatableValue) Value
+func (v BoolValue) Equal(other Value) BoolValue {
+	return bool(v) == bool(other.(BoolValue))
 }
 
 // StringValue
@@ -96,8 +106,9 @@ func (v StringValue) String() string {
 	return strconv.Quote(string(v))
 }
 
-func (v StringValue) Equal(other StringValue) BoolValue {
-	return norm.NFC.String(string(v)) == norm.NFC.String(string(other))
+func (v StringValue) Equal(other Value) BoolValue {
+	otherString := other.(StringValue)
+	return norm.NFC.String(string(v)) == norm.NFC.String(string(otherString))
 }
 
 func (v StringValue) Concat(other ConcatenatableValue) Value {
@@ -225,6 +236,18 @@ func (v ArrayValue) RemoveLast() Value {
 	return x
 }
 
+func (v ArrayValue) Contains(x Value) BoolValue {
+	y := x.(EquatableValue)
+
+	for _, z := range *v.Values {
+		if y.Equal(z) {
+			return BoolValue(true)
+		}
+	}
+
+	return BoolValue(false)
+}
+
 func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
@@ -275,6 +298,13 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 				return trampoline.Done{Result: result}
 			},
 		)
+	case "contains":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.Contains(arguments[0])
+				return trampoline.Done{Result: result}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
@@ -299,7 +329,7 @@ type IntegerValue interface {
 	LessEqual(other IntegerValue) BoolValue
 	Greater(other IntegerValue) BoolValue
 	GreaterEqual(other IntegerValue) BoolValue
-	Equal(other IntegerValue) BoolValue
+	Equal(other Value) BoolValue
 }
 
 // IntValue
@@ -380,7 +410,7 @@ func (v IntValue) GreaterEqual(other IntegerValue) BoolValue {
 	return BoolValue(cmp >= 0)
 }
 
-func (v IntValue) Equal(other IntegerValue) BoolValue {
+func (v IntValue) Equal(other Value) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
 	return BoolValue(cmp == 0)
 }
@@ -443,7 +473,7 @@ func (v Int8Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int8Value)
 }
 
-func (v Int8Value) Equal(other IntegerValue) BoolValue {
+func (v Int8Value) Equal(other Value) BoolValue {
 	return v == other.(Int8Value)
 }
 
@@ -505,7 +535,7 @@ func (v Int16Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int16Value)
 }
 
-func (v Int16Value) Equal(other IntegerValue) BoolValue {
+func (v Int16Value) Equal(other Value) BoolValue {
 	return v == other.(Int16Value)
 }
 
@@ -567,7 +597,7 @@ func (v Int32Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int32Value)
 }
 
-func (v Int32Value) Equal(other IntegerValue) BoolValue {
+func (v Int32Value) Equal(other Value) BoolValue {
 	return v == other.(Int32Value)
 }
 
@@ -629,7 +659,7 @@ func (v Int64Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int64Value)
 }
 
-func (v Int64Value) Equal(other IntegerValue) BoolValue {
+func (v Int64Value) Equal(other Value) BoolValue {
 	return v == other.(Int64Value)
 }
 
@@ -691,7 +721,7 @@ func (v UInt8Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt8Value)
 }
 
-func (v UInt8Value) Equal(other IntegerValue) BoolValue {
+func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == other.(UInt8Value)
 }
 
@@ -752,7 +782,7 @@ func (v UInt16Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt16Value)
 }
 
-func (v UInt16Value) Equal(other IntegerValue) BoolValue {
+func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == other.(UInt16Value)
 }
 
@@ -814,7 +844,7 @@ func (v UInt32Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt32Value)
 }
 
-func (v UInt32Value) Equal(other IntegerValue) BoolValue {
+func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == other.(UInt32Value)
 }
 
@@ -876,7 +906,7 @@ func (v UInt64Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt64Value)
 }
 
-func (v UInt64Value) Equal(other IntegerValue) BoolValue {
+func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == other.(UInt64Value)
 }
 

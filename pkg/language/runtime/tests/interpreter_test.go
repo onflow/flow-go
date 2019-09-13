@@ -3261,6 +3261,8 @@ func TestInterpretArrayRemove(t *testing.T) {
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
 func TestInterpretArrayRemoveFirst(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -3299,6 +3301,28 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+}
+
+func TestInterpretArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun doesContain(): Bool {
+		  let a = [1, 2]
+		  return a.contains(1)
+	  }
+	  
+	  fun doesNotContain(): Bool {
+		  let a = [1, 2]
+		  return a.contains(3)
+	  }
+    `)
+
+	Expect(inter.Invoke("doesContain")).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("doesNotContain")).
+		To(Equal(interpreter.BoolValue(false)))
 }
 
 func TestInterpretStringConcat(t *testing.T) {

@@ -4914,6 +4914,22 @@ func TestCheckInvalidArrayContains(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckInvalidArrayContainsNotEquatable(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let z = [[1], [2], [3]]
+          return z.contains([1, 2])
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotEquatableTypeError{}))
+}
+
 func TestCheckEmptyArray(t *testing.T) {
 	RegisterTestingT(t)
 
