@@ -1,8 +1,8 @@
-# Bamboo
+# Flow
 
 [![Build Status](https://travis-ci.com/dapperlabs/bamboo-node.svg?token=MYJ5scBoBxhZRGvDecen&branch=master)](https://travis-ci.com/dapperlabs/bamboo-node)
 
-Bamboo is a highly-performant blockchain designed to power the next generation of decentralized applications.
+Flow is a highly-performant blockchain designed to power the next generation of decentralized applications.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -51,7 +51,7 @@ Bamboo is a highly-performant blockchain designed to power the next generation o
 
 ## Documentation
 
-You can find a high-level overview of the Bamboo architecture on the [documentation website](https://bamboo-docs.herokuapp.com/). Application-level documentation lives [within the packages of this repository](#code-documentation).
+You can find a high-level overview of the Flow architecture on the [documentation website](https://bamboo-docs.herokuapp.com/). Application-level documentation lives [within the packages of this repository](#code-documentation).
 
 ## Installation
 
@@ -166,9 +166,9 @@ This guide provides a comprehensive overview of our development processes, guide
 
 ### Work streams
 
-Bamboo development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
+Flow development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
 
-Each stream is owned by a Bamboo core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarily with your stream owner.
+Each stream is owned by a Flow core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarily with your stream owner.
 
 Stream owners will assign tasks to contributors and ensure that all TODOs are tracked.
 
@@ -228,7 +228,7 @@ Each PR that you open should include necessary tests to ensure the correctness a
 
 ### Code standards
 
-The Bamboo project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](code-style.md).
+The Flow project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](code-style.md).
 
 
 To develop in _production level_ standard of the Flow project, the following best practice set is recommended:
@@ -260,7 +260,7 @@ TODO: add style guide
 
 ### Code documentation
 
-The application-level documentation for Bamboo lives inside each of the sub-packages of this repository.
+The application-level documentation for Flow lives inside each of the sub-packages of this repository.
 
 #### Documentation instructions for stream owners
 
