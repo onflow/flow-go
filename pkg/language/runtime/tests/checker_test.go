@@ -563,7 +563,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
-func TestCheckStringIndexingWithInteger(t *testing.T) {
+func TestCheckStringIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
