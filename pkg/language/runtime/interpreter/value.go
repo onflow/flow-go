@@ -97,6 +97,7 @@ func NewStringValue(str string) StringValue {
 }
 
 func (StringValue) isValue()               {}
+func (StringValue) isIndexableValue()      {}
 func (StringValue) isConcatenatableValue() {}
 
 func (v StringValue) Copy() Value {
@@ -104,12 +105,12 @@ func (v StringValue) Copy() Value {
 }
 
 func (v StringValue) ToGoValue() interface{} {
-	return *v.Str
+	return v.StrValue()
 }
 
 func (v StringValue) String() string {
 	// TODO: quote like in string literal
-	return strconv.Quote(*v.Str)
+	return strconv.Quote(v.StrValue())
 }
 
 func (v StringValue) StrValue() string {
@@ -122,20 +123,63 @@ func (v StringValue) KeyString() string {
 
 func (v StringValue) Equal(other Value) BoolValue {
 	otherString := other.(StringValue)
-	return norm.NFC.String(*v.Str) == norm.NFC.String(*otherString.Str)
+	return norm.NFC.String(v.StrValue()) == norm.NFC.String(otherString.StrValue())
 }
 
 func (v StringValue) Concat(other ConcatenatableValue) Value {
+	otherString := other.(StringValue)
+
 	var sb strings.Builder
-	sb.WriteString(string(v))
-	sb.WriteString(string(other.(StringValue)))
-	return StringValue(sb.String())
+
+	sb.WriteString(v.StrValue())
+	sb.WriteString(otherString.StrValue())
+
+	return NewStringValue(sb.String())
+}
+
+func (v StringValue) Get(key Value) Value {
+	i := key.(IntegerValue).IntValue()
+
+	graphemes := uniseg.NewGraphemes(v.StrValue())
+	graphemes.Next()
+
+	for j := 0; j < i; j++ {
+		graphemes.Next()
+	}
+
+	char := graphemes.Str()
+
+	return NewStringValue(char)
+}
+
+func (v StringValue) Set(key Value, value Value) {
+	i := key.(IntegerValue).IntValue()
+	char := value.(StringValue).StrValue()
+
+	str := v.StrValue()
+
+	graphemes := uniseg.NewGraphemes(str)
+	graphemes.Next()
+
+	for j := 0; j < i; j++ {
+		graphemes.Next()
+	}
+
+	start, end := graphemes.Positions()
+
+	var sb strings.Builder
+
+	sb.WriteString(str[:start])
+	sb.WriteString(char)
+	sb.WriteString(str[end:])
+
+	*v.Str = sb.String()
 }
 
 func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
-		count := uniseg.GraphemeClusterCount(*v.Str)
+		count := uniseg.GraphemeClusterCount(v.StrValue())
 		return IntValue{Int: big.NewInt(int64(count))}
 	case "concat":
 		return NewHostFunctionValue(
@@ -1128,7 +1172,7 @@ func ToValue(value interface{}) (Value, error) {
 	case bool:
 		return BoolValue(value), nil
 	case string:
-		return StringValue{&value}, nil
+		return NewStringValue(value), nil
 	case nil:
 		return NilValue{}, nil
 	}
