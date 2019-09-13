@@ -2,9 +2,10 @@ package initialize
 
 import (
 	"encoding/hex"
+	"fmt"
+	"log"
 
 	"github.com/psiemens/sconfig"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/bamboo-node/internal/cli/project"
@@ -41,13 +42,13 @@ var Cmd = &cobra.Command{
 			}
 
 			project.SaveConfig(conf)
-			log.WithFields(log.Fields{
-				"address": address,
-				"prKey":   prKeyHex,
-			}).Infof("⚙️   Bamboo Client initialized with root account 0x%s", address)
-			log.Info("⚙️   Bamboo Client setup finished! Begin by running: bamboo emulator start")
+
+			fmt.Println("⚙️   Bamboo Client initialized with root account:\n")
+			fmt.Printf("👤  Address: 0x%s\n", address)
+			fmt.Printf("🔑  PrivateKey: %s\n\n", prKeyHex)
+			fmt.Println("ℹ️   Start the emulator with this root account by running: bamboo emulator start")
 		} else {
-			log.Warn("⚙️   Bamboo configuration file already exists! Begin by running: bamboo emulator start")
+			fmt.Println("⚠️   Bamboo configuration file already exists! Begin by running: bamboo emulator start")
 		}
 	},
 }
