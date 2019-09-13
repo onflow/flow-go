@@ -307,6 +307,57 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
 }
 
+func TestInterpretStringIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+	  let a = "abc"
+	  let x = a[0]
+	  let y = a[1]
+	  let z = a[2]
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NewStringValue("a")))
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.NewStringValue("b")))
+	Expect(inter.Globals["z"].Value).
+		To(Equal(interpreter.NewStringValue("c")))
+}
+
+func TestInterpretStringIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+		  let z = "abc"
+		  let y: Character = "d"
+		  z[0] = y
+		  return z
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.NewStringValue("dbc")))
+}
+
+func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): String {
+          let z = "abc"
+		  z[0] = "d"
+		  z[1] = "e"
+		  z[2] = "f"
+		  return z
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.NewStringValue("def")))
+}
+
 func TestInterpretReturnWithoutExpression(t *testing.T) {
 	RegisterTestingT(t)
 
