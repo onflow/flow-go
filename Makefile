@@ -12,27 +12,8 @@ install-tools: build-relic
 	go get github.com/uber/prototool/cmd/prototool@v1.8.0
 	go get github.com/golang/mock/mockgen@v1.3.1
 
-.PHONY: test-integrate-setup
-test-integrate-setup:
-	docker-compose up --build start_collect_dependencies
-	docker-compose up --build start_consensus_dependencies
-	docker-compose up --build start_execute_dependencies
-	docker-compose up --build start_verify_dependencies
-	docker-compose up --build start_test_dependencies
-
-.PHONY: test-integrate-run
-test-integrate-run:
-	docker-compose up --build --exit-code-from test test
-
-.PHONY: test-integrate-teardown
-test-integrate-teardown:
-	docker-compose down
-
-.PHONY: test-integrate
-test-integrate: test-integrate-setup test-integrate-run test-integrate-teardown
-
-.PHONY: test-unit
-test-unit:
+.PHONY: test
+test:
 	go test ./...
 
 .PHONY: generate-godoc
@@ -77,4 +58,4 @@ install-cli: build-relic
 	go install ./cmd/flow
 
 .PHONY: ci
-ci: install-tools generate check-generated-code test-unit test-integrate
+ci: install-tools generate check-generated-code test

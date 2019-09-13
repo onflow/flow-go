@@ -13,22 +13,19 @@ Flow is a fast, secure, and developer-friendly blockchain built to support the n
 - [Installation](#installation)
   - [Setting up your environment](#setting-up-your-environment)
     - [Install Go](#install-go)
-    - [Install Docker](#install-docker)
     - [Install tooling dependencies](#install-tooling-dependencies)
   - [Generating code](#generating-code)
     - [Dependency injection using Wire](#dependency-injection-using-wire)
     - [Generate gRPC stubs from protobuf files](#generate-grpc-stubs-from-protobuf-files)
     - [Generate all code](#generate-all-code)
 - [Testing](#testing)
-  - [Unit tests](#unit-tests)
-  - [Integration tests](#integration-tests)
 - [Contributing](#contributing)
   - [Work streams](#work-streams)
   - [Workflow](#workflow)
   - [Issues](#issues)
     - [Branches](#branches)
-      - [Feature Branches](#feature-branches)
-    - [Pull Requests](#pull-requests)
+      - [Feature branches](#feature-branches)
+    - [Pull requests](#pull-requests)
       - [Reviews](#reviews)
       - [Work-In-Progress PRs](#work-in-progress-prs)
     - [Testing](#testing-1)
@@ -81,17 +78,6 @@ git submodule update --init --recursive
 
 _Note: since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo anywhere you want._
 
-#### Install Docker
-
-- Download and install [Docker CE](https://docs.docker.com/install/)
-- Test Docker by running the integration tests for this repository:
-
-```bash
-make test
-```
-
-The first run will take a while because some base layers will be downloaded and built for the first time. See our [testing instructions](#testing) for more details.
-
 #### Install tooling dependencies
 
 First, install [CMake](https://cmake.org/install/) as it is used for code generation of some tools.
@@ -128,36 +114,10 @@ make generate
 
 ## Testing
 
-### Unit tests
+The following command will run all unit tests for this repository:
 
 ```bash
-make test-unit
-```
-
-### Integration tests
-
-Initialize all containers:
-
-```bash
-make test-integrate-setup
-```
-
-Run the test suite:
-
-```bash
-make test-integrate-run
-```
-
-Cleanup:
-
-```bash
-make test-integrate-teardown
-```
-
-The following command will run the three steps above:
-
-```bash
-make test-integrate
+make test
 ```
 
 ## Contributing
@@ -202,11 +162,11 @@ When creating a new branch, use the following convention: `<your-name>/<issue-nu
 
 For example, `peter/125-update-transaction` is the name of a branch Peter is working on, and corresponds to issue 125 regarding transaction updates.
 
-##### Feature Branches
+##### Feature branches
 
 When working on a larger feature, feel free to create a feature branch with the following format: `feature/<feature-name>`.
 
-#### Pull Requests
+#### Pull requests
 
 You should open a pull request when you have completed work for a task and would like to receive a review from teammates and stream owners. Please use the provided pull request template when opening a PR.
 
@@ -230,7 +190,6 @@ Each PR that you open should include necessary tests to ensure the correctness a
 
 The Flow project has a high standard for code quality and expects all submitted PRs to meet the guidelines outlined in our [code style guide](code-style.md).
 
-
 To develop in _production level_ standard of the Flow project, the following best practice set is recommended:
 - Please think as a user of your code, and optimize the interface for as easy and error-prone experience as possible.
 	- TODO: add example(s)
@@ -253,8 +212,6 @@ To develop in _production level_ standard of the Flow project, the following bes
 - Please make sure that your code is well-documented with a proper quick start that helps other engineers to quickly utilize your code without any hard effort. 
 	- TODO: add example(s)
 - Please append your suggestions to this list, advertise them within the team, and replace the _"TODO: add example"_ parts with the code pieces you think are exemplary and worthy to share. 
-
-
 
 TODO: add style guide
 
