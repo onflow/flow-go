@@ -231,7 +231,8 @@ func (v ArrayValue) RemoveLast() Value {
 	values := *v.Values
 	var x Value
 
-	x, *v.Values = values[len(values)-1], values[:len(values)-1]
+	lastIndex := len(values)-1
+	x, *v.Values = values[lastIndex], values[:lastIndex]
 
 	return x
 }
