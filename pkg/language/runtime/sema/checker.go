@@ -1359,8 +1359,9 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 			)
 		}
 	}
+
 	// check both types are equal
-	if !leftType.Equal(rightType) {
+	if !anyInvalid && !leftType.Equal(rightType) {
 		checker.report(
 			&InvalidBinaryOperandsError{
 				Operation: operation,
