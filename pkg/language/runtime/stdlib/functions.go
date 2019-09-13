@@ -127,7 +127,10 @@ var AssertFunction = NewStandardLibraryFunction(
 		}
 		return trampoline.Done{}
 	},
-	[]string{"", "message"},
+	[]string{
+		sema.ArgumentLabelNotRequired,
+		"message",
+	},
 )
 
 // PanicError
