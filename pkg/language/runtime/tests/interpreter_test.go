@@ -3255,6 +3255,110 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 		}))
 }
 
+func TestInterpretArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.insert(at: 1, 4)
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+}
+
+func TestInterpretArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.remove(at: 1)
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+}
+
+func TestInterpretArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.removeFirst()
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretArrayRemoveLast(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.removeLast()
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+}
+
+func TestInterpretArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun doesContain(): Bool {
+		  let a = [1, 2]
+		  return a.contains(1)
+	  }
+	  
+	  fun doesNotContain(): Bool {
+		  let a = [1, 2]
+		  return a.contains(3)
+	  }
+    `)
+
+	Expect(inter.Invoke("doesContain")).
+		To(Equal(interpreter.BoolValue(true)))
+
+	Expect(inter.Invoke("doesNotContain")).
+		To(Equal(interpreter.BoolValue(false)))
+}
+
 func TestInterpretStringConcat(t *testing.T) {
 	RegisterTestingT(t)
 

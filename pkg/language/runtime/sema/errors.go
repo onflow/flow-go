@@ -227,6 +227,28 @@ func (e *NotIndexingTypeError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// NotEquatableTypeError
+
+type NotEquatableTypeError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *NotEquatableTypeError) Error() string {
+	return fmt.Sprintf("cannot compare value which has type: `%s`", e.Type.String())
+}
+
+func (*NotEquatableTypeError) isSemanticError() {}
+
+func (e *NotEquatableTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *NotEquatableTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // NotCallableError
 
 type NotCallableError struct {

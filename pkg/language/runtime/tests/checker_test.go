@@ -5769,6 +5769,163 @@ func TestCheckArrayConcatBound(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.insert(at: 1, 4)
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.insert(at: 1, "4")
+          return x
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.remove(at: 1)
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.remove(at: "1")
+          return x
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.removeFirst()
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.removeFirst(1)
+          return x
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckArrayRemoveLast(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.removeLast()
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let x = [1, 2, 3]
+          return x.contains(2)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let x = [1, 2, 3]
+          return x.contains("abc")
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidArrayContainsNotEquatable(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let z = [[1], [2], [3]]
+          return z.contains([1, 2])
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotEquatableTypeError{}))
+}
+
 func TestCheckEmptyArray(t *testing.T) {
 	RegisterTestingT(t)
 
