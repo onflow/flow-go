@@ -3243,6 +3243,27 @@ func TestInterpretArrayInsert(t *testing.T) {
 		}))
 }
 
+func TestInterpretArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.remove(1)
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+
+}
+
 func TestInterpretStringConcat(t *testing.T) {
 	RegisterTestingT(t)
 
