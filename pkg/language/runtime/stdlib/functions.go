@@ -118,7 +118,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		if !result {
 			var message string
 			if len(arguments) > 1 {
-				message = string(arguments[1].(interpreter.StringValue))
+				message = arguments[1].(interpreter.StringValue).StrValue()
 			}
 			panic(AssertionError{
 				Message:  message,
@@ -169,7 +169,7 @@ var PanicFunction = NewStandardLibraryFunction(
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
-			Message:  string(message),
+			Message:  message.StrValue(),
 			Location: location,
 		})
 		return trampoline.Done{}

@@ -88,7 +88,13 @@ func (v BoolValue) Equal(other Value) BoolValue {
 
 // StringValue
 
-type StringValue string
+type StringValue struct {
+	Str *string
+}
+
+func NewStringValue(str string) StringValue {
+	return StringValue{&str}
+}
 
 func (StringValue) isValue()               {}
 func (StringValue) isConcatenatableValue() {}
@@ -98,17 +104,25 @@ func (v StringValue) Copy() Value {
 }
 
 func (v StringValue) ToGoValue() interface{} {
-	return string(v)
+	return *v.Str
 }
 
 func (v StringValue) String() string {
 	// TODO: quote like in string literal
-	return strconv.Quote(string(v))
+	return strconv.Quote(*v.Str)
+}
+
+func (v StringValue) StrValue() string {
+	return *v.Str
+}
+
+func (v StringValue) KeyString() string {
+	return v.StrValue()
 }
 
 func (v StringValue) Equal(other Value) BoolValue {
 	otherString := other.(StringValue)
-	return norm.NFC.String(string(v)) == norm.NFC.String(string(otherString))
+	return norm.NFC.String(*v.Str) == norm.NFC.String(*otherString.Str)
 }
 
 func (v StringValue) Concat(other ConcatenatableValue) Value {
@@ -121,7 +135,7 @@ func (v StringValue) Concat(other ConcatenatableValue) Value {
 func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
-		count := uniseg.GraphemeClusterCount(string(v))
+		count := uniseg.GraphemeClusterCount(*v.Str)
 		return IntValue{Int: big.NewInt(int64(count))}
 	case "concat":
 		return NewHostFunctionValue(
@@ -1114,7 +1128,7 @@ func ToValue(value interface{}) (Value, error) {
 	case bool:
 		return BoolValue(value), nil
 	case string:
-		return StringValue(value), nil
+		return StringValue{&value}, nil
 	case nil:
 		return NilValue{}, nil
 	}
@@ -1221,7 +1235,7 @@ type ValueWithMembers interface {
 func init() {
 	gob.Register(VoidValue{})
 	gob.Register(BoolValue(true))
-	gob.Register(StringValue(""))
+	gob.Register(StringValue{})
 	gob.Register(ArrayValue{})
 	gob.Register(IntValue{})
 	gob.Register(Int8Value(0))

@@ -2,9 +2,10 @@ package tests
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"testing"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 	. "github.com/onsi/gomega"
 
@@ -76,7 +77,7 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 		}))
 
 	Expect(inter.Globals["s"].Value).
-		To(Equal(interpreter.StringValue("123")))
+		To(Equal(interpreter.NewStringValue("123")))
 }
 
 func TestInterpretDeclarations(t *testing.T) {
@@ -407,13 +408,13 @@ func TestInterpretConcatOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["a"].Value).
-		To(Equal(interpreter.StringValue("abcdef")))
+		To(Equal(interpreter.NewStringValue("abcdef")))
 	Expect(inter.Globals["b"].Value).
-		To(Equal(interpreter.StringValue("def")))
+		To(Equal(interpreter.NewStringValue("def")))
 	Expect(inter.Globals["c"].Value).
-		To(Equal(interpreter.StringValue("abc")))
+		To(Equal(interpreter.NewStringValue("abc")))
 	Expect(inter.Globals["d"].Value).
-		To(Equal(interpreter.StringValue("")))
+		To(Equal(interpreter.NewStringValue("")))
 
 	Expect(inter.Globals["e"].Value).
 		To(Equal(interpreter.ArrayValue{
@@ -1680,7 +1681,7 @@ func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
 
 	zero := big.NewInt(0)
 	Expect(inter.Invoke("test", zero)).
-		To(Equal(interpreter.StringValue("return value")))
+		To(Equal(interpreter.NewStringValue("return value")))
 }
 
 func TestInterpretFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
@@ -2876,8 +2877,8 @@ func TestInterpretDictionary(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.DictionaryValue{
-			interpreter.StringValue("a"): interpreter.IntValue{Int: big.NewInt(1)},
-			interpreter.StringValue("b"): interpreter.IntValue{Int: big.NewInt(2)},
+			"a": interpreter.IntValue{Int: big.NewInt(1)},
+			"b": interpreter.IntValue{Int: big.NewInt(2)},
 		}))
 }
 
@@ -2943,13 +2944,13 @@ func TestInterpretDictionaryIndexingInt(t *testing.T) {
 	Expect(inter.Globals["a"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.StringValue("a"),
+				Value: interpreter.NewStringValue("a"),
 			}))
 
 	Expect(inter.Globals["b"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.StringValue("b"),
+				Value: interpreter.NewStringValue("b"),
 			}))
 
 	Expect(inter.Globals["c"].Value).
@@ -2969,7 +2970,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.VoidValue{}))
 
-	Expect(inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
+	Expect(inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.NewStringValue("abc"))).
 		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
 }
 
@@ -3370,7 +3371,7 @@ func TestInterpretStringConcat(t *testing.T) {
     `)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.StringValue("abcdef")))
+		To(Equal(interpreter.NewStringValue("abcdef")))
 }
 
 func TestInterpretStringConcatBound(t *testing.T) {
@@ -3385,7 +3386,7 @@ func TestInterpretStringConcatBound(t *testing.T) {
     `)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.StringValue("abcdef")))
+		To(Equal(interpreter.NewStringValue("abcdef")))
 }
 
 func TestInterpretDictionaryRemove(t *testing.T) {
@@ -3403,7 +3404,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.DictionaryValue{
-			interpreter.StringValue("def"): interpreter.IntValue{Int: big.NewInt(2)},
+			"def": interpreter.IntValue{Int: big.NewInt(2)},
 		}))
 
 	Expect(inter.Globals["removed"].Value).
