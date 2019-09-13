@@ -3261,7 +3261,44 @@ func TestInterpretArrayRemove(t *testing.T) {
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+func TestInterpretArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
 
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.removeFirst()
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+}
+
+func TestInterpretArrayRemoveLast(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+          let x = [1, 2, 3]
+          let y = x.removeLast()
+    `)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+			},
+		}))
+
+	Expect(inter.Globals["y"].Value).
+		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
 }
 
 func TestInterpretStringConcat(t *testing.T) {

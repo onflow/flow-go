@@ -207,6 +207,24 @@ func (v ArrayValue) Remove(i int) Value {
 	return result
 }
 
+func (v ArrayValue) RemoveFirst() Value {
+	values := *v.Values
+	var x Value
+
+	x, *v.Values = values[0], values[1:]
+
+	return x
+}
+
+func (v ArrayValue) RemoveLast() Value {
+	values := *v.Values
+	var x Value
+
+	x, *v.Values = values[len(values)-1], values[:len(values)-1]
+
+	return x
+}
+
 func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
@@ -240,6 +258,20 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 			func(arguments []Value, location Location) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				result := v.Remove(i)
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "removeFirst":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.RemoveFirst()
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "removeLast":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.RemoveLast()
 				return trampoline.Done{Result: result}
 			},
 		)
