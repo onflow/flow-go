@@ -809,17 +809,17 @@ func (v UInt64Value) Equal(other IntegerValue) BoolValue {
 	return v == other.(UInt64Value)
 }
 
-// StructureValue
+// CompositeValue
 
-type StructureValue struct {
+type CompositeValue struct {
 	Identifier string
 	Fields     *map[string]Value
 	Functions  *map[string]FunctionValue
 }
 
-func (StructureValue) isValue() {}
+func (CompositeValue) isValue() {}
 
-func (v StructureValue) Copy() Value {
+func (v CompositeValue) Copy() Value {
 	newFields := make(map[string]Value, len(*v.Fields))
 	for field, value := range *v.Fields {
 		newFields[field] = value.Copy()
@@ -827,19 +827,19 @@ func (v StructureValue) Copy() Value {
 
 	// NOTE: not copying functions – linked in
 
-	return StructureValue{
+	return CompositeValue{
 		Identifier: v.Identifier,
 		Fields:     &newFields,
 		Functions:  v.Functions,
 	}
 }
 
-func (v StructureValue) ToGoValue() interface{} {
+func (v CompositeValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
 	return *v.Fields
 }
 
-func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 	value, ok := (*v.Fields)[name]
 	if ok {
 		return value
@@ -847,7 +847,7 @@ func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
 
 	// if structure was deserialized, dynamically link in the functions
 	if v.Functions == nil {
-		functions := interpreter.StructureFunctions[v.Identifier]
+		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = &functions
 	}
 
@@ -862,11 +862,11 @@ func (v StructureValue) GetMember(interpreter *Interpreter, name string) Value {
 	return nil
 }
 
-func (v StructureValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	(*v.Fields)[name] = value
 }
 
-func (v StructureValue) GobEncode() ([]byte, error) {
+func (v CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	err := encoder.Encode(v.Identifier)
@@ -881,7 +881,7 @@ func (v StructureValue) GobEncode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func (v *StructureValue) GobDecode(buf []byte) error {
+func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
 	err := decoder.Decode(&v.Identifier)
@@ -1128,7 +1128,7 @@ func init() {
 	gob.Register(UInt16Value(0))
 	gob.Register(UInt32Value(0))
 	gob.Register(UInt64Value(0))
-	gob.Register(StructureValue{})
+	gob.Register(CompositeValue{})
 	gob.Register(DictionaryValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})

@@ -57,7 +57,7 @@ type Interpreter struct {
 	Globals            map[string]*Variable
 	interfaces         map[string]*ast.InterfaceDeclaration
 	ImportLocation     ast.ImportLocation
-	StructureFunctions map[string]map[string]FunctionValue
+	CompositeFunctions map[string]map[string]FunctionValue
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -67,7 +67,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		activations:        &activations.Activations{},
 		Globals:            map[string]*Variable{},
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
-		StructureFunctions: map[string]map[string]FunctionValue{},
+		CompositeFunctions: map[string]map[string]FunctionValue{},
 	}
 
 	for name, value := range predefinedValues {
@@ -195,7 +195,7 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-	for _, declaration := range program.StructureDeclarations() {
+	for _, declaration := range program.CompositeDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
 	for _, declaration := range program.FunctionDeclarations() {
@@ -768,7 +768,7 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(StructureValue)
+			structure := result.(CompositeValue)
 
 			structure.SetMember(interpreter, target.Identifier.Identifier, value)
 
@@ -1253,30 +1253,30 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	return Done{Result: function}
 }
 
-func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
+func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	interpreter.declareStructureConstructor(declaration)
+	interpreter.declareCompositeConstructor(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareStructureConstructor creates a constructor function
-// for the given structure, bound in a variable.
+// declareCompositeConstructor creates a constructor function
+// for the given composite, bound in a variable.
 //
-// The constructor is a host function which creates a new structure,
+// The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
-// and then returns the structure.
+// and then returns the composite.
 //
 // Inside the initializer and all functions, `self` is bound to
-// the new structure value, and the constructor itself is bound
+// the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration *ast.StructureDeclaration) {
+func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.CompositeDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	identifier := structureDeclaration.Identifier.Identifier
+	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// make the constructor available in the initializer
@@ -1286,13 +1286,13 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if len(structureDeclaration.Initializers) > 0 {
-		firstInitializer := structureDeclaration.Initializers[0]
+	if len(declaration.Initializers) > 0 {
+		firstInitializer := declaration.Initializers[0]
 
 		functionType := interpreter.Checker.InitializerFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
-			structureDeclaration,
+			declaration,
 			firstInitializer,
 			functionType,
 			lexicalScope,
@@ -1300,14 +1300,14 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 		initializerFunction = &f
 	}
 
-	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
+	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 
-	interpreter.StructureFunctions[identifier] = functions
+	interpreter.CompositeFunctions[identifier] = functions
 
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location Location) Trampoline {
 
-			structure := StructureValue{
+			value := CompositeValue{
 				Identifier: identifier,
 				Fields:     &map[string]Value{},
 				Functions:  &functions,
@@ -1318,13 +1318,13 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = interpreter.bindSelf(*initializerFunction, structure).
+				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
 					invoke(arguments, location)
 			}
 
 			return initializationTrampoline.
 				Map(func(_ interface{}) interface{} {
-					return structure
+					return value
 				})
 		},
 	)
@@ -1334,7 +1334,7 @@ func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration
 //
 func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
-	structure StructureValue,
+	structure CompositeValue,
 ) FunctionValue {
 	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
 		// start a new activation record
@@ -1350,7 +1350,7 @@ func (interpreter *Interpreter) bindSelf(
 }
 
 func (interpreter *Interpreter) initializerFunction(
-	structureDeclaration *ast.StructureDeclaration,
+	compositeDeclaration *ast.CompositeDeclaration,
 	initializer *ast.InitializerDeclaration,
 	functionType *sema.FunctionType,
 	lexicalScope hamt.Map,
@@ -1362,7 +1362,7 @@ func (interpreter *Interpreter) initializerFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range structureDeclaration.Conformances {
+	for _, conformance := range compositeDeclaration.Conformances {
 		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
 
 		// TODO: support multiple overloaded initializers
@@ -1395,17 +1395,17 @@ func (interpreter *Interpreter) initializerFunction(
 	)
 }
 
-func (interpreter *Interpreter) structureFunctions(
-	structureDeclaration *ast.StructureDeclaration,
+func (interpreter *Interpreter) compositeFunctions(
+	compositeDeclaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) map[string]FunctionValue {
 
 	functions := map[string]FunctionValue{}
 
-	for _, functionDeclaration := range structureDeclaration.Functions {
+	for _, functionDeclaration := range compositeDeclaration.Functions {
 		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
+		function := interpreter.compositeFunction(compositeDeclaration, functionDeclaration)
 
 		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(
@@ -1419,8 +1419,8 @@ func (interpreter *Interpreter) structureFunctions(
 	return functions
 }
 
-func (interpreter *Interpreter) structureFunction(
-	structureDeclaration *ast.StructureDeclaration,
+func (interpreter *Interpreter) compositeFunction(
+	compositeDeclaration *ast.CompositeDeclaration,
 	functionDeclaration *ast.FunctionDeclaration,
 ) *ast.FunctionExpression {
 
@@ -1432,7 +1432,7 @@ func (interpreter *Interpreter) structureFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range structureDeclaration.Conformances {
+	for _, conformance := range compositeDeclaration.Conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
 		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
 		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
@@ -1601,8 +1601,8 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 				// if the imported name refers to a structure,
 				// also take the structure functions from the sub-interpreter
-				if structureFunctions, ok := subInterpreter.StructureFunctions[name]; ok {
-					interpreter.StructureFunctions[name] = structureFunctions
+				if structureFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
+					interpreter.CompositeFunctions[name] = structureFunctions
 				}
 			}
 		})

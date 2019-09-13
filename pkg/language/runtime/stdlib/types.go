@@ -40,7 +40,8 @@ func (types StandardLibraryTypes) ToTypeDeclarations() map[string]sema.TypeDecla
 
 var AccountType = StandardLibraryType{
 	Name: "Account",
-	Type: &sema.StructureType{
+	Type: &sema.CompositeType{
+		Kind:       common.CompositeKindStructure,
 		Identifier: "Account",
 		Members: map[string]*sema.Member{
 			"address": {

@@ -3017,12 +3017,12 @@ func TestParseStructure(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	test := &StructureDeclaration{
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},
 		},
-
 		Conformances: []*NominalType{},
 		Fields: []*FieldDeclaration{
 			{
@@ -3169,12 +3169,12 @@ func TestParseStructureWithConformances(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	test := &StructureDeclaration{
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},
 		},
-
 		Conformances: []*NominalType{
 			{
 				Identifier: Identifier{
@@ -3745,7 +3745,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 func TestParseInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	for _, kind := range compositeKeywords {
+	for _, kind := range common.CompositeKinds {
 		actual, err := parser.ParseProgram(fmt.Sprintf(`
             %s interface Test {
                 foo: Int
@@ -3754,19 +3754,19 @@ func TestParseInterface(t *testing.T) {
 
                 fun getFoo(): Int
             }
-	    `, kind))
+	    `, kind.Keyword()))
 
 		Expect(err).
 			To(Not(HaveOccurred()))
 
 		// only compare AST for one kind: structs
 
-		if kind != "struct" {
+		if kind != common.CompositeKindStructure {
 			continue
 		}
 
 		test := &InterfaceDeclaration{
-			Kind: common.CompositeKindStructure,
+			CompositeKind: common.CompositeKindStructure,
 			Identifier: Identifier{
 				Identifier: "Test",
 				Pos:        Position{Offset: 30, Line: 2, Column: 29},
@@ -4051,7 +4051,8 @@ func TestParseResource(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	test := &StructureDeclaration{
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindResource,
 		Identifier: Identifier{
 			Identifier: "Test",
 			Pos:        Position{Offset: 18, Line: 2, Column: 17},
@@ -4370,7 +4371,8 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	test := &StructureDeclaration{
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindStructure,
 		Identifier: Identifier{
 			Identifier: "X",
 			Pos:        Position{Offset: 16, Line: 2, Column: 15},

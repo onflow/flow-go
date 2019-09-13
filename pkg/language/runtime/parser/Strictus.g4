@@ -73,7 +73,7 @@ access
     ;
 
 compositeDeclaration
-    : compositeKind identifier conformances '{'
+    : access compositeKind identifier conformances '{'
         (field | initializer[true] | functionDeclaration[true])*
       '}'
     ;
@@ -92,7 +92,7 @@ field
     ;
 
 interfaceDeclaration
-    : compositeKind Interface identifier '{'
+    : access compositeKind Interface identifier '{'
         (field | initializer[false] | functionDeclaration[false])*
       '}'
     ;

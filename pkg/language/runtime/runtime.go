@@ -378,7 +378,7 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 		}
 	}
 
-	account := interpreter.StructureValue{
+	account := interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.StringValue(address.String()),

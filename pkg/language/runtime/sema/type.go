@@ -497,28 +497,31 @@ func init() {
 	}
 }
 
-// StructureType
+// CompositeType
 
-type StructureType struct {
-	Identifier                string
-	Conformances              []*InterfaceType
-	Members                   map[string]*Member
+type CompositeType struct {
+	Kind         common.CompositeKind
+	Identifier   string
+	Conformances []*InterfaceType
+	Members      map[string]*Member
+	// TODO: add support for overloaded initializers
 	ConstructorParameterTypes []Type
 }
 
-func (*StructureType) isType() {}
+func (*CompositeType) isType() {}
 
-func (t *StructureType) String() string {
+func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
-func (t *StructureType) Equal(other Type) bool {
-	otherStructure, ok := other.(*StructureType)
+func (t *CompositeType) Equal(other Type) bool {
+	otherStructure, ok := other.(*CompositeType)
 	if !ok {
 		return false
 	}
 
-	return otherStructure.Identifier == t.Identifier
+	return otherStructure.Kind == t.Kind &&
+		otherStructure.Identifier == t.Identifier
 }
 
 // Member
@@ -533,6 +536,7 @@ type Member struct {
 // InterfaceType
 
 type InterfaceType struct {
+	CompositeKind             common.CompositeKind
 	Identifier                string
 	Members                   map[string]*Member
 	InitializerParameterTypes []Type
@@ -550,7 +554,8 @@ func (t *InterfaceType) Equal(other Type) bool {
 		return false
 	}
 
-	return otherInterface.Identifier == t.Identifier
+	return otherInterface.CompositeKind == t.CompositeKind &&
+		otherInterface.Identifier == t.Identifier
 }
 
 // InterfaceMetaType
@@ -648,7 +653,7 @@ func init() {
 	gob.Register(&VariableSizedType{})
 	gob.Register(&ConstantSizedType{})
 	gob.Register(&FunctionType{})
-	gob.Register(&StructureType{})
+	gob.Register(&CompositeType{})
 	gob.Register(&InterfaceType{})
 	gob.Register(&InterfaceMetaType{})
 	gob.Register(&DictionaryType{})
