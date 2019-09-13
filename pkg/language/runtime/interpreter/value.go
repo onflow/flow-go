@@ -215,6 +215,21 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+	case "remove":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				i := arguments[0].(IntegerValue).IntValue()
+
+				values := *v.Values
+				result := values[i]
+
+				copy(values[i:], values[i+1:])
+				values[len(values)-1] = nil
+				*v.Values = values[:len(values)-1]
+
+				return trampoline.Done{Result: result}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
