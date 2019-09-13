@@ -569,7 +569,7 @@ func TestCheckStringIndexingWithInteger(t *testing.T) {
 	_, err := parseAndCheck(`
       fun test() {
           let z = "abc"
-          z[0]
+          let y: Character = z[0]
       }
 	`)
 
