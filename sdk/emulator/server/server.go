@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
 	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
 	"github.com/dapperlabs/bamboo-node/sdk/emulator"
@@ -52,6 +53,14 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		config:     conf,
 		logger:     logger,
 	}
+
+	address := server.blockchain.RootAccount().String()
+	prKey, _ := utils.EncodePrKey(server.blockchain.RootKey())
+
+	logger.WithFields(log.Fields{
+		"address": address,
+		"prKey":   prKey,
+	}).Infof("⚙️   Using root account 0x%s", address)
 
 	observe.RegisterObserveServiceServer(server.grpcServer, server)
 	return server
@@ -116,7 +125,7 @@ func StartServer(logger *log.Logger, config *Config) {
 
 	logger.
 		WithField("port", config.HTTPPort).
-		Debugf("🏁  Starting HTTP Server on port %d...", config.HTTPPort)
+		Infof("🌱  Starting HTTP Server on port %d...", config.HTTPPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")

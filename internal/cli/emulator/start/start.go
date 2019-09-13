@@ -11,8 +11,8 @@ import (
 
 	"github.com/dapperlabs/bamboo-node/internal/cli/project"
 	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator/server"
 	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/bamboo-node/sdk/emulator/server"
 )
 
 type Config struct {
@@ -72,7 +72,7 @@ func getRootKey(projectConf *project.Config) crypto.PrKey {
 		return prKey
 	}
 
-	log.Infof("⚙️   No project configured, generating new root account key")
+	log.Warnf("⚙️   No project configured, generating new root account key")
 	return nil
 }
 
