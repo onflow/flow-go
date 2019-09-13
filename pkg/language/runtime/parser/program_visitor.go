@@ -188,19 +188,27 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 		functions = append(functions, functionDeclaration)
 	}
 
+	var compositeDeclarations []*ast.CompositeDeclaration
+	for _, compositeDeclarationContext := range ctx.AllCompositeDeclaration() {
+		compositeDeclaration :=
+			compositeDeclarationContext.Accept(v).(*ast.CompositeDeclaration)
+		compositeDeclarations = append(compositeDeclarations, compositeDeclaration)
+	}
+
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	// TODO: consider kind: return resource / contract declaration
 
 	return &ast.CompositeDeclaration{
-		CompositeKind: kind,
-		Identifier:    identifier,
-		Conformances:  conformances,
-		Fields:        fields,
-		Initializers:  initializers,
-		Functions:     functions,
-		StartPos:      startPosition,
-		EndPos:        endPosition,
+		CompositeKind:         kind,
+		Identifier:            identifier,
+		Conformances:          conformances,
+		Fields:                fields,
+		Initializers:          initializers,
+		Functions:             functions,
+		CompositeDeclarations: compositeDeclarations,
+		StartPos:              startPosition,
+		EndPos:                endPosition,
 	}
 }
 

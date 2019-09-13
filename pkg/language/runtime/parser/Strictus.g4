@@ -74,7 +74,7 @@ access
 
 compositeDeclaration
     : access compositeKind identifier conformances '{'
-        (field | initializer[true] | functionDeclaration[true])*
+        (field | initializer[true] | functionDeclaration[true] | compositeDeclaration)*
       '}'
     ;
 

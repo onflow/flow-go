@@ -2350,6 +2350,21 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 	}
 
+	// TODO: support nested declarations for contracts and contract interfaces
+
+	// report error for first nested composite declaration, if any
+	if len(declaration.CompositeDeclarations) > 0 {
+		firstNestedCompositeDeclaration := declaration.CompositeDeclarations[0]
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
+				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
+				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
 	return nil
 }
 
