@@ -201,19 +201,21 @@ func (v ArrayValue) Append(x Value) {
 }
 
 func (v ArrayValue) Insert(i int, x Value) {
-	*v.Values = append((*v.Values)[:i], append([]Value{x}, (*v.Values)[i:]...)...)
+	values := *v.Values
+	*v.Values = append(values[:i], append([]Value{x}, values[i:]...)...)
 }
 
 func (v ArrayValue) Remove(i int) Value {
 	values := *v.Values
 	result := values[i]
+	lastIndex := len(values) - 1
 
 	copy(values[i:], values[i+1:])
 
 	// avoid memory leaks by explicitly setting value to nil
-	values[len(values)-1] = nil
+	values[lastIndex] = nil
 
-	*v.Values = values[:len(values)-1]
+	*v.Values = values[:lastIndex]
 
 	return result
 }
@@ -231,7 +233,7 @@ func (v ArrayValue) RemoveLast() Value {
 	values := *v.Values
 	var x Value
 
-	lastIndex := len(values)-1
+	lastIndex := len(values) - 1
 	x, *v.Values = values[lastIndex], values[:lastIndex]
 
 	return x
