@@ -6115,3 +6115,43 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckAssertWithoutMessage(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+            fun test() {
+                assert(1 == 2)
+            }
+        `,
+		stdlib.StandardLibraryFunctions{
+			stdlib.AssertFunction,
+		}.ToValueDeclarations(),
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckAssertWithMessage(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+            fun test() {
+                assert(1 == 2, message: "test message")
+            }
+        `,
+		stdlib.StandardLibraryFunctions{
+			stdlib.AssertFunction,
+		}.ToValueDeclarations(),
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
