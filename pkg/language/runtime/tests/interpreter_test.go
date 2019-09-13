@@ -3221,6 +3221,28 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 		}))
 }
 
+func TestInterpretArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Int[] {
+          let x = [1, 2, 3]
+          x.insert(1, 4)
+          return x
+      }
+    `)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.ArrayValue{
+			Values: &[]interpreter.Value{
+				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.IntValue{Int: big.NewInt(3)},
+			},
+		}))
+}
+
 func TestInterpretStringConcat(t *testing.T) {
 	RegisterTestingT(t)
 
