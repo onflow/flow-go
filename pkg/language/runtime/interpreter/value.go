@@ -204,6 +204,17 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 				return trampoline.Done{Result: result}
 			},
 		)
+	case "insert":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				i := arguments[0].(IntegerValue).IntValue()
+				x := arguments[1]
+
+				*v.Values = append((*v.Values)[:i], append([]Value{x}, (*v.Values)[i:]...)...)
+
+				return trampoline.Done{Result: VoidValue{}}
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
