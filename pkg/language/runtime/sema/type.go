@@ -533,6 +533,7 @@ func init() {
 		&AnyType{},
 		&NeverType{},
 		&BoolType{},
+		&CharacterType{},
 		&IntType{},
 		&StringType{},
 		&Int8Type{},

@@ -77,6 +77,48 @@ func TestCheckBoolean(t *testing.T) {
 		To(Equal(&sema.BoolType{}))
 }
 
+func TestCheckCharacter(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "x"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+func TestCheckCharacterUnicodeScalar(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "\u{1F1FA}\u{1F1F8}"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+// TODO: prevent invalid character literals
+// func TestCheckInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//         let x: Character = "abc"
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
+
 func TestCheckString(t *testing.T) {
 	RegisterTestingT(t)
 

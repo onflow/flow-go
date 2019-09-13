@@ -221,7 +221,9 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
-
+	case *CharacterType:
+		// TODO: only allow valid character literals
+		return subType.Equal(&StringType{})
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
