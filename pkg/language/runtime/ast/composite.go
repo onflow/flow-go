@@ -8,15 +8,12 @@ import (
 // CompositeDeclaration
 
 type CompositeDeclaration struct {
-	CompositeKind         common.CompositeKind
-	Identifier            Identifier
-	Conformances          []*NominalType
-	Fields                []*FieldDeclaration
-	Initializers          []*InitializerDeclaration
-	Functions             []*FunctionDeclaration
-	CompositeDeclarations []*CompositeDeclaration
-	StartPos              Position
-	EndPos                Position
+	CompositeKind common.CompositeKind
+	Identifier    Identifier
+	Conformances  []*NominalType
+	Members       *Members
+	StartPos      Position
+	EndPos        Position
 }
 
 func (d *CompositeDeclaration) StartPosition() Position {

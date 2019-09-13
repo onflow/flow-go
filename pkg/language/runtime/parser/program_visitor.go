@@ -163,52 +163,19 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
-
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializers []*ast.InitializerDeclaration
-	for _, initializerNode := range ctx.AllInitializer() {
-		initializers = append(initializers,
-			initializerNode.Accept(v).(*ast.InitializerDeclaration),
-		)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
-
-	var compositeDeclarations []*ast.CompositeDeclaration
-	for _, compositeDeclarationContext := range ctx.AllCompositeDeclaration() {
-		compositeDeclaration :=
-			compositeDeclarationContext.Accept(v).(*ast.CompositeDeclaration)
-		compositeDeclarations = append(compositeDeclarations, compositeDeclaration)
-	}
+	members := ctx.Members().Accept(v).(*ast.Members)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	// TODO: consider kind: return resource / contract declaration
-
 	return &ast.CompositeDeclaration{
-		CompositeKind:         kind,
-		Identifier:            identifier,
-		Conformances:          conformances,
-		Fields:                fields,
-		Initializers:          initializers,
-		Functions:             functions,
-		CompositeDeclarations: compositeDeclarations,
-		StartPos:              startPosition,
-		EndPos:                endPosition,
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Conformances:  conformances,
+		Members:       members,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -222,6 +189,47 @@ func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{}
 		}
 	}
 	return conformances
+}
+
+func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
+
+	var fields []*ast.FieldDeclaration
+	var initializers []*ast.InitializerDeclaration
+	var functions []*ast.FunctionDeclaration
+	var compositeDeclarations []*ast.CompositeDeclaration
+	var interfaceDeclarations []*ast.InterfaceDeclaration
+
+	for _, memberCtx := range ctx.AllMember() {
+		member := memberCtx.Accept(v)
+
+		switch member := member.(type) {
+		case *ast.FieldDeclaration:
+			fields = append(fields, member)
+
+		case *ast.InitializerDeclaration:
+			initializers = append(initializers, member)
+
+		case *ast.FunctionDeclaration:
+			functions = append(functions, member)
+
+		case *ast.CompositeDeclaration:
+			compositeDeclarations = append(compositeDeclarations, member)
+
+		case *ast.InterfaceDeclaration:
+			interfaceDeclarations = append(interfaceDeclarations, member)
+		}
+	}
+
+	return &ast.Members{
+		Fields:                fields,
+		Initializers:          initializers,
+		Functions:             functions,
+		CompositeDeclarations: compositeDeclarations,
+	}
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
@@ -280,37 +288,14 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
-
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializers []*ast.InitializerDeclaration
-	for _, initializerNode := range ctx.AllInitializer() {
-		initializers = append(initializers,
-			initializerNode.Accept(v).(*ast.InitializerDeclaration),
-		)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
-
+	members := ctx.Members().Accept(v).(*ast.Members)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
 		CompositeKind: kind,
 		Identifier:    identifier,
-		Fields:        fields,
-		Initializers:  initializers,
-		Functions:     functions,
+		Members:       members,
 		StartPos:      startPosition,
 		EndPos:        endPosition,
 	}

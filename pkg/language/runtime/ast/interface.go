@@ -8,25 +8,11 @@ import (
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
-	CompositeKind         common.CompositeKind
-	Identifier            Identifier
-	Fields                []*FieldDeclaration
-	Initializers          []*InitializerDeclaration
-	Functions             []*FunctionDeclaration
-	functionsByIdentifier map[string]*FunctionDeclaration
-	StartPos              Position
-	EndPos                Position
-}
-
-func (d *InterfaceDeclaration) FunctionsByIdentifier() map[string]*FunctionDeclaration {
-	if d.functionsByIdentifier == nil {
-		functionsByIdentifier := make(map[string]*FunctionDeclaration, len(d.Functions))
-		for _, function := range d.Functions {
-			functionsByIdentifier[function.Identifier.Identifier] = function
-		}
-		d.functionsByIdentifier = functionsByIdentifier
-	}
-	return d.functionsByIdentifier
+	CompositeKind common.CompositeKind
+	Identifier    Identifier
+	Members       *Members
+	StartPos      Position
+	EndPos        Position
 }
 
 func (d *InterfaceDeclaration) StartPosition() Position {
