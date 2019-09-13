@@ -8,8 +8,9 @@ import (
 func TestG1(t *testing.T) {
 	NewSignatureAlgo(BLS_BLS12381)
 
+	seedRelic([]byte{0})
 	var expo scalar
-	randZr(&expo, []byte{0})
+	randZr(&expo)
 	var res pointG1
 	_G1scalarGenMult(&res, &expo)
 
@@ -18,8 +19,9 @@ func TestG1(t *testing.T) {
 // G1 bench
 func BenchmarkG1(b *testing.B) {
 	NewSignatureAlgo(BLS_BLS12381)
+	seedRelic([]byte{0})
 	var expo scalar
-	randZr(&expo, []byte{0})
+	randZr(&expo)
 	var res pointG1
 
 	b.ResetTimer()
@@ -45,8 +47,9 @@ func TestG2(t *testing.T) {
 // G2 bench
 func BenchmarkG2(b *testing.B) {
 	NewSignatureAlgo(BLS_BLS12381)
+	seedRelic([]byte{0})
 	var expo scalar
-	randZr(&expo, []byte{0})
+	randZr(&expo)
 	var res pointG2
 
 	b.ResetTimer()

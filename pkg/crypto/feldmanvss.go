@@ -9,18 +9,20 @@ type feldmanVSSstate struct {
 	leaderIndex int
 	// internal context of BLS on BLS12381A
 	blsContext *BLS_BLS12381Algo
-	// Private share of the current node
-	x scalar
-	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X]
+	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
 	// a_0 is the group private key
 	a []scalar
-	// Public keys of all the DKG nodes
+	// Public data of the group, the vector size is (t+1)
 	// A_0 is the group public key
 	A []pointG2
+	// Private share of the current node
+	x scalar
+	// Public keys of the group nodes, the vector size is (n)
+	y []pointG2
 }
 
 func (s *feldmanVSSstate) init() {
-	s.running = false
+	s.isrunning = false
 
 	// Initialize BLS context
 	s.blsContext = &(BLS_BLS12381Algo{
@@ -36,34 +38,54 @@ func (s *feldmanVSSstate) init() {
 	s.A = make([]pointG2, s.threshold+1)
 }
 
-func (s *feldmanVSSstate) StartDKG() (*DKGoutput, error) {
-	s.running = true
+func (s *feldmanVSSstate) StartDKG() *DKGoutput {
+	s.isrunning = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
-		return s.generateShares()
+		seed := []byte{1}
+		return s.generateShares(seed)
 	}
-	return new(DKGoutput), nil
+	return new(DKGoutput)
 }
 
-func (s *feldmanVSSstate) EndDKG() error {
-	s.running = false
-	return nil
-}
-
-func (s *feldmanVSSstate) PrivateKey() PrKey {
-	sk := PrKeyBLS_BLS12381{
+func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
+	s.isrunning = false
+	// private key of the current node
+	x := PrKeyBLS_BLS12381{
 		alg:    s.blsContext, // signer algo
 		scalar: s.x,          // the private share
 	}
-	return &sk
+	// Group public key
+	Y := PubKeyBLS_BLS12381{
+		point: s.A[0],
+	}
+	// The nodes public keys
+	y := make([]PubKey, s.size)
+	for i, p := range s.y {
+		y[i] = &PubKeyBLS_BLS12381{
+			point: p,
+		}
+	}
+	return &x, &Y, y, nil
 }
 
-func (s *feldmanVSSstate) generateShares() (*DKGoutput, error) {
-	// Generate a polyomial P in Zr[X]
-	s.a = make([]scalar, s.threshold+1)
-	return new(DKGoutput), nil
-}
+func (s *feldmanVSSstate) ProcessDKGmsg(orig int, msg DKGmsg) *DKGoutput {
+	out := &(DKGoutput{
+		action: []DKGToSend{},
+		err:    nil,
+	})
 
-func (s *feldmanVSSstate) receiveShare(in DKGinput) error {
-	return nil
+	msgBytes := msg[:]
+	if len(msgBytes) == 0 {
+		out.result = invalid
+		return out
+	}
+
+	switch dkgMsgTag(msgBytes[0]) {
+	case FeldmanVSSshare:
+		out.result, out.err = s.receiveShare(orig, msgBytes[1:])
+	default:
+		out.result = invalid
+	}
+	return out
 }

@@ -2,7 +2,7 @@ package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
-// #include "include.h"
+// #include "bls_include.h"
 import "C"
 
 // TODO: remove -wall after reaching a stable version
@@ -64,9 +64,16 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 }
 
 // TEST/DEBUG
+
+// seeds the internal relic random function
+func seedRelic(seed []byte) {
+	// TODO: define the length of seed
+	C._seed_relic((*C.uchar)((unsafe.Pointer)(&seed[0])), (C.int)(len(seed)))
+}
+
 // returns a random number on Z/Z.r
-func randZr(x *scalar, seed []byte) error {
-	C._bn_randZr((*C.bn_st)(x), (*C.uchar)((unsafe.Pointer)(&seed[0])), (C.int)(len(seed))) // to define the length of seed
+func randZr(x *scalar) error {
+	C._bn_randZr((*C.bn_st)(x))
 	if x == nil {
 		return cryptoError{"the memory allocation of the random number has failed"}
 	}

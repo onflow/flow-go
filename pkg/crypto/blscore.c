@@ -1,5 +1,5 @@
 
-#include "include.h"
+#include "bls_include.h"
 
 #define DOUBADD 0 
 #define SLIDW   1 
@@ -89,7 +89,6 @@ void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
 
 // Computes BLS signature
 void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
-    
     ep_st h;
     ep_new(&h);
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
@@ -97,7 +96,6 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h);
-
     ep_free(&p);
 }
 
@@ -105,9 +103,6 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
 int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) { 
     // TODO : check pk is on curve  (should be done offline)
 	// TODO : check pk is in G2 (should be done offline) 
-
-    // TODO : check s is on curve
-	// TODO : check s is in G1
 
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
@@ -117,8 +112,10 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     _ep_read_bin_compact(elemsG1[0], sig);
 
  #if MEMBERSHIP_CHECK
+    // check s is on curve
     if (!ep_is_valid(elemsG1[0]))
         return SIG_INVALID;
+    // check s is in G1
     ep_st inf;
     ep_new(&inf);
     // check s^order == infinity
@@ -163,10 +160,10 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     int res = fp12_cmp(pair1, pair2);
 #endif
     fp12_free(&one);
-    ep_new(elemsG1[0]);
-    ep_new(elemsG1[1]);
-    ep2_new(elemsG2[0]);
-    ep2_new(elemsG2[1]);
+    ep_free(elemsG1[0]);
+    ep_free(elemsG1[1]);
+    ep2_free(elemsG2[0]);
+    ep2_free(elemsG2[1]);
     
     if (res == RLC_EQ && core_get()->code == RLC_OK) 
         return SIG_VALID;

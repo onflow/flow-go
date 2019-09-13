@@ -1,4 +1,5 @@
-#include "include.h"
+#include "misc.h"
+#include "bls_include.h"
 
 // DEBUG related functions
 void _bytes_print(char* s, byte* data, int len) {
@@ -32,9 +33,13 @@ void _ep2_print(char* s, ep2_st* p) {
     g2_print(p);
 }
 
-// generates a random number less than the order r
-void _bn_randZr(bn_t x, byte* seed, int len) {
+// TODO: create a seeding function
+void _seed_relic(byte* seed, int len) {
     rand_seed(seed, len);
+}
+
+// generates a random number less than the order r
+void _bn_randZr(bn_t x) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
