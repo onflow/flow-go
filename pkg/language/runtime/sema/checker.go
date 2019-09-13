@@ -289,6 +289,8 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 	switch indexedType := indexedType.(type) {
 	case ArrayType:
 		return indexedType.elementType()
+	case *StringType:
+		return &CharacterType{}
 	case *DictionaryType:
 		valueType := indexedType.ValueType
 		if isAssignment {
@@ -303,8 +305,10 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 
 func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool {
 	switch indexedType := indexedType.(type) {
-	// arrays can be indexed with integers
+	// arrays and strings can be indexed with integers
 	case ArrayType:
+		return checker.IsSubType(indexingType, &IntegerType{})
+	case *StringType:
 		return checker.IsSubType(indexingType, &IntegerType{})
 	// dictionaries can be indexed with the dictionary type's key type
 	case *DictionaryType:

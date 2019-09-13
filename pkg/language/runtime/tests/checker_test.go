@@ -521,6 +521,36 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckStringIndexingWithInteger(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[0]
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[true]
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+}
+
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
 
