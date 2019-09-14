@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
@@ -1073,5 +1074,34 @@ func (e *CompositeKindMismatchError) StartPosition() ast.Position {
 }
 
 func (e *CompositeKindMismatchError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidIntegerLiteralRangeError
+
+type InvalidIntegerLiteralRangeError struct {
+	ExpectedType     Type
+	ExpectedRangeMin *big.Int
+	ExpectedRangeMax *big.Int
+	StartPos         ast.Position
+	EndPos           ast.Position
+}
+
+func (e *InvalidIntegerLiteralRangeError) Error() string {
+	return fmt.Sprintf(
+		"integer literal out of range: expected `%s`, in range [%s, %s]",
+		e.ExpectedType.String(),
+		e.ExpectedRangeMin,
+		e.ExpectedRangeMax,
+	)
+}
+
+func (*InvalidIntegerLiteralRangeError) isSemanticError() {}
+
+func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
 	return e.EndPos
 }

@@ -636,14 +636,40 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 }
 
 func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
-	switch expression.(type) {
+	switch typedExpression := expression.(type) {
 	case *ast.IntExpression:
-		if checker.IsSubType(checker.unwrapOptionalType(targetType), &IntegerType{}) {
+		unwrappedTargetType := checker.unwrapOptionalType(targetType)
+		if checker.IsSubType(unwrappedTargetType, &IntegerType{}) {
+			checker.checkIntegerLiteral(typedExpression, unwrappedTargetType)
+
 			return true
 		}
 	}
 
 	return checker.IsSubType(valueType, targetType)
+}
+
+// checkIntegerLiteral checks that the value of the integer literal
+// fits into range of the target integer type
+//
+func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integerType Type) {
+	intRange := integerType.(Ranged)
+	literalValue := expression.Value
+	rangeMin := intRange.Min()
+	rangeMax := intRange.Max()
+	if (rangeMin != nil && literalValue.Cmp(rangeMin) == -1) ||
+		(rangeMax != nil && literalValue.Cmp(rangeMax) == 1) {
+
+		checker.report(
+			&InvalidIntegerLiteralRangeError{
+				ExpectedType:     integerType,
+				ExpectedRangeMin: rangeMin,
+				ExpectedRangeMax: rangeMax,
+				StartPos:         expression.StartPosition(),
+				EndPos:           expression.EndPosition(),
+			},
+		)
+	}
 }
 
 func (checker *Checker) declareVariable(
