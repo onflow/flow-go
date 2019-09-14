@@ -76,7 +76,7 @@ pub abstract contract BasicToken: FungibleToken {
         pub var balance: Int
 
         pub fun withdraw(amount: Int): <-Vault {
-            self.balance -= amount
+            self.balance = self.balance - amount
             return create Vault(balance: amount)
         }
 

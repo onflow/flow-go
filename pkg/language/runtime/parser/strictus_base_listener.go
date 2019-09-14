@@ -74,6 +74,18 @@ func (s *BaseStrictusListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarati
 // ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
 func (s *BaseStrictusListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 
+// EnterMembers is called when production members is entered.
+func (s *BaseStrictusListener) EnterMembers(ctx *MembersContext) {}
+
+// ExitMembers is called when production members is exited.
+func (s *BaseStrictusListener) ExitMembers(ctx *MembersContext) {}
+
+// EnterMember is called when production member is entered.
+func (s *BaseStrictusListener) EnterMember(ctx *MemberContext) {}
+
+// ExitMember is called when production member is exited.
+func (s *BaseStrictusListener) ExitMember(ctx *MemberContext) {}
+
 // EnterCompositeKind is called when production compositeKind is entered.
 func (s *BaseStrictusListener) EnterCompositeKind(ctx *CompositeKindContext) {}
 

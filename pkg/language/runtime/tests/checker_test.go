@@ -6155,3 +6155,50 @@ func TestCheckAssertWithMessage(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+// TODO: add support for nested composite declarations
+
+func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+}
+
+func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract interface TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}

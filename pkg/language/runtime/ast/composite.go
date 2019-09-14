@@ -11,9 +11,7 @@ type CompositeDeclaration struct {
 	CompositeKind common.CompositeKind
 	Identifier    Identifier
 	Conformances  []*NominalType
-	Fields        []*FieldDeclaration
-	Initializers  []*InitializerDeclaration
-	Functions     []*FunctionDeclaration
+	Members       *Members
 	StartPos      Position
 	EndPos        Position
 }
