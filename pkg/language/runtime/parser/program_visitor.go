@@ -1140,6 +1140,14 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
+func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
+	intExpression := ctx.PositiveIntegerLiteral().Accept(v).(*ast.IntExpression)
+	if ctx.Minus() != nil {
+		intExpression.Value.Neg(intExpression.Value)
+	}
+	return intExpression
+}
+
 func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
 	startPosition := ast.PositionFromToken(token)
 	endPosition := ast.EndPosition(startPosition, token.GetStop())

@@ -395,6 +395,10 @@ stringLiteral
     ;
 
 integerLiteral
+    : Minus? positiveIntegerLiteral
+    ;
+
+positiveIntegerLiteral
     : DecimalLiteral        # DecimalLiteral
     | BinaryLiteral         # BinaryLiteral
     | OctalLiteral          # OctalLiteral
