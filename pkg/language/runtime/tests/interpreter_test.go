@@ -2600,7 +2600,7 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 
           %s TestImpl: Test {
               var x: Int
-    
+
               init(x: Int) {
                   self.x = x
               }
@@ -3345,7 +3345,7 @@ func TestInterpretArrayContains(t *testing.T) {
 		  let a = [1, 2]
 		  return a.contains(1)
 	  }
-	  
+
 	  fun doesNotContain(): Bool {
 		  let a = [1, 2]
 		  return a.contains(3)
@@ -3434,3 +3434,137 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 //	Expect(err).
 //		To(Not(HaveOccurred()))
 //}
+
+func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        let x: Int8 = 1
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NewIntValue(1)))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        let x: Int8? = 1
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		}))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        var x: Int8 = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NewIntValue(1)))
+
+	_, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NewIntValue(2)))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        var x: Int8? = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		}))
+
+	_, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.NewIntValue(2),
+		}))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun test(_ x: Int8): Int8 {
+            return x
+        }
+        let x = test(1)
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.NewIntValue(1)))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun test(_ x: Int8?): Int8? {
+            return x
+        }
+        let x = test(1)
+	`)
+
+	Expect(inter.Globals["x"].Value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		}))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun test(): Int8 {
+            return 1
+        }
+	`)
+
+	value, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+	Expect(value).
+		To(Equal(interpreter.NewIntValue(1)))
+}
+
+func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+        fun test(): Int8? {
+            return 1
+        }
+	`)
+
+	value, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+	Expect(value).
+		To(Equal(interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		}))
+}

@@ -1,12 +1,11 @@
 package sema
 
 import (
-	"github.com/raviqqe/hamt"
-
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/raviqqe/hamt"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -607,7 +606,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				}
 
 			} else {
-				if !checker.IsSubType(valueType, declarationType) {
+				if !checker.IsTypeCompatible(declaration.Value, valueType, declarationType) {
 					checker.report(
 						&TypeMismatchError{
 							ExpectedType: declarationType,
@@ -634,6 +633,17 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		nil,
 	)
 	checker.recordVariableOrigin(declaration.Identifier.Identifier, variable)
+}
+
+func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
+	switch expression.(type) {
+	case *ast.IntExpression:
+		if checker.IsSubType(checker.unwrapOptionalType(targetType), &IntegerType{}) {
+			return true
+		}
+	}
+
+	return checker.IsSubType(valueType, targetType)
 }
 
 func (checker *Checker) declareVariable(
@@ -875,32 +885,29 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	checker.ReturnStatementValueTypes[statement] = valueType
 	checker.ReturnStatementReturnTypes[statement] = returnType
 
-	if valueType != nil {
-		if valueIsInvalid {
-			// return statement has expression, but function has Void return type?
-			if _, ok := returnType.(*VoidType); ok {
-				checker.report(
-					&InvalidReturnValueError{
-						StartPos: statement.Expression.StartPosition(),
-						EndPos:   statement.Expression.EndPosition(),
-					},
-				)
-			}
-		} else {
-			if !valueIsInvalid &&
-				!isInvalidType(returnType) &&
-				!checker.IsSubType(valueType, returnType) {
-
-				checker.report(
-					&TypeMismatchError{
-						ExpectedType: returnType,
-						ActualType:   valueType,
-						StartPos:     statement.Expression.StartPosition(),
-						EndPos:       statement.Expression.EndPosition(),
-					},
-				)
-			}
+	if valueType == nil {
+		return nil
+	} else if valueIsInvalid {
+		// return statement has expression, but function has Void return type?
+		if _, ok := returnType.(*VoidType); ok {
+			checker.report(
+				&InvalidReturnValueError{
+					StartPos: statement.Expression.StartPosition(),
+					EndPos:   statement.Expression.EndPosition(),
+				},
+			)
 		}
+	} else if !isInvalidType(returnType) &&
+		!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: returnType,
+				ActualType:   valueType,
+				StartPos:     statement.Expression.StartPosition(),
+				EndPos:       statement.Expression.EndPosition(),
+			},
+		)
 	}
 
 	return nil
@@ -1062,7 +1069,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 		// check value type is subtype of variable type
 		if !isInvalidType(valueType) &&
-			!checker.IsSubType(valueType, variable.Type) {
+			!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
 
 			checker.report(
 				&TypeMismatchError{
@@ -1091,7 +1098,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	}
 
 	if !isInvalidType(elementType) &&
-		!checker.IsSubType(valueType, elementType) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -1136,7 +1143,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// if value type is valid, check value can be assigned to member
 	if !isInvalidType(valueType) &&
-		!checker.IsSubType(valueType, member.Type) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, member.Type) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -2080,7 +2087,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentTypes = append(argumentTypes, argumentType)
 
-		if !checker.IsSubType(argumentType, parameterType) {
+		if !checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
