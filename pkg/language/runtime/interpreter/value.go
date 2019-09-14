@@ -122,7 +122,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
 		count := uniseg.GraphemeClusterCount(string(v))
-		return IntValue{Int: big.NewInt(int64(count))}
+		return NewIntValue(int64(count))
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
@@ -254,7 +254,7 @@ func (v ArrayValue) Contains(x Value) BoolValue {
 func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
-		return IntValue{Int: big.NewInt(int64(len(*v.Values)))}
+		return NewIntValue(int64(len(*v.Values)))
 	case "append":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
@@ -339,6 +339,10 @@ type IntegerValue interface {
 
 type IntValue struct {
 	Int *big.Int
+}
+
+func NewIntValue(value int64) IntValue {
+	return IntValue{Int: big.NewInt(value)}
 }
 
 func (v IntValue) isValue() {}
@@ -1065,7 +1069,7 @@ func (v DictionaryValue) String() string {
 func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value {
 	switch name {
 	case "length":
-		return IntValue{Int: big.NewInt(int64(len(v)))}
+		return NewIntValue(int64(len(v)))
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {

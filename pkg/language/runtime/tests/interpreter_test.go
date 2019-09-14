@@ -56,13 +56,13 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
     `)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.BoolValue(true)))
 
 	Expect(inter.Globals["z"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 
 	Expect(inter.Globals["a"].Value).
 		To(Equal(interpreter.BoolValue(true)))
@@ -70,8 +70,8 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	Expect(inter.Globals["b"].Value).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
 			},
 		}))
 
@@ -89,7 +89,7 @@ func TestInterpretDeclarations(t *testing.T) {
     `)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretInvalidUnknownDeclarationInvocation(t *testing.T) {
@@ -133,13 +133,13 @@ func TestInterpretLexicalScope(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
+		To(Equal(interpreter.NewIntValue(10)))
 
 	Expect(inter.Invoke("f")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
+		To(Equal(interpreter.NewIntValue(10)))
 
 	Expect(inter.Invoke("g")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
+		To(Equal(interpreter.NewIntValue(10)))
 }
 
 func TestInterpretFunctionSideEffects(t *testing.T) {
@@ -178,10 +178,10 @@ func TestInterpretNoHoisting(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
@@ -195,10 +195,10 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(10)}))
+		To(Equal(interpreter.NewIntValue(10)))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretVariableAssignment(t *testing.T) {
@@ -213,7 +213,7 @@ func TestInterpretVariableAssignment(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretGlobalVariableAssignment(t *testing.T) {
@@ -229,13 +229,13 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretConstantRedeclaration(t *testing.T) {
@@ -251,10 +251,10 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretParameters(t *testing.T) {
@@ -271,10 +271,10 @@ func TestInterpretParameters(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("returnA", big.NewInt(24), big.NewInt(42))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(24)}))
+		To(Equal(interpreter.NewIntValue(24)))
 
 	Expect(inter.Invoke("returnB", big.NewInt(24), big.NewInt(42))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretArrayIndexing(t *testing.T) {
@@ -288,7 +288,7 @@ func TestInterpretArrayIndexing(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretArrayIndexingAssignment(t *testing.T) {
@@ -303,7 +303,7 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
@@ -330,7 +330,7 @@ func TestInterpretReturns(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("returnEarly")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 // TODO: perform each operator test for each integer type
@@ -343,7 +343,7 @@ func TestInterpretPlusOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+		To(Equal(interpreter.NewIntValue(6)))
 }
 
 func TestInterpretMinusOperator(t *testing.T) {
@@ -354,7 +354,7 @@ func TestInterpretMinusOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
+		To(Equal(interpreter.NewIntValue(-2)))
 }
 
 func TestInterpretMulOperator(t *testing.T) {
@@ -365,7 +365,7 @@ func TestInterpretMulOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(8)}))
+		To(Equal(interpreter.NewIntValue(8)))
 }
 
 func TestInterpretDivOperator(t *testing.T) {
@@ -376,7 +376,7 @@ func TestInterpretDivOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretModOperator(t *testing.T) {
@@ -387,7 +387,7 @@ func TestInterpretModOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretConcatOperator(t *testing.T) {
@@ -418,10 +418,10 @@ func TestInterpretConcatOperator(t *testing.T) {
 	Expect(inter.Globals["e"].Value).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
-				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
+				interpreter.NewIntValue(4),
 			},
 		}))
 
@@ -429,15 +429,15 @@ func TestInterpretConcatOperator(t *testing.T) {
 	// Expect(inter.Globals["f"].Value).
 	// 	To(Equal(interpreter.ArrayValue{
 	// 		Values: &[]interpreter.Value{
-	// 			interpreter.IntValue{Int: big.NewInt(1)},
-	// 			interpreter.IntValue{Int: big.NewInt(2)},
+	// 			interpreter.NewIntValue(1),
+	// 			interpreter.NewIntValue(2),
 	// 		},
 	// 	}))
 	// Expect(inter.Globals["g"].Value).
 	// 	To(Equal(interpreter.ArrayValue{
 	// 		Values: &[]interpreter.Value{
-	// 			interpreter.IntValue{Int: big.NewInt(3)},
-	// 			interpreter.IntValue{Int: big.NewInt(4)},
+	// 			interpreter.NewIntValue(3),
+	// 			interpreter.NewIntValue(4),
 	// 		},
 	// 	}))
 	// Expect(inter.Globals["h"].Value).
@@ -899,16 +899,16 @@ func TestInterpretIfStatement(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("testTrue")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("testFalse")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 
 	Expect(inter.Invoke("testNoElse")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("testElseIf")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretWhileStatement(t *testing.T) {
@@ -926,7 +926,7 @@ func TestInterpretWhileStatement(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+		To(Equal(interpreter.NewIntValue(6)))
 }
 
 func TestInterpretWhileStatementWithReturn(t *testing.T) {
@@ -946,7 +946,7 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+		To(Equal(interpreter.NewIntValue(6)))
 }
 
 func TestInterpretWhileStatementWithContinue(t *testing.T) {
@@ -968,7 +968,7 @@ func TestInterpretWhileStatementWithContinue(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(6)}))
+		To(Equal(interpreter.NewIntValue(6)))
 }
 
 func TestInterpretWhileStatementWithBreak(t *testing.T) {
@@ -988,7 +988,7 @@ func TestInterpretWhileStatementWithBreak(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(5)}))
+		To(Equal(interpreter.NewIntValue(5)))
 }
 
 func TestInterpretExpressionStatement(t *testing.T) {
@@ -1008,13 +1008,13 @@ func TestInterpretExpressionStatement(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+		To(Equal(interpreter.NewIntValue(0)))
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretConditionalOperator(t *testing.T) {
@@ -1031,10 +1031,10 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("testTrue")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("testFalse")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
@@ -1068,7 +1068,7 @@ func TestInterpretRecursionFib(t *testing.T) {
    `)
 
 	Expect(inter.Invoke("fib", big.NewInt(14))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(377)}))
+		To(Equal(interpreter.NewIntValue(377)))
 }
 
 func TestInterpretRecursionFactorial(t *testing.T) {
@@ -1085,7 +1085,7 @@ func TestInterpretRecursionFactorial(t *testing.T) {
    `)
 
 	Expect(inter.Invoke("factorial", big.NewInt(5))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(120)}))
+		To(Equal(interpreter.NewIntValue(120)))
 }
 
 func TestInterpretUnaryIntegerNegation(t *testing.T) {
@@ -1097,10 +1097,10 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(-2)}))
+		To(Equal(interpreter.NewIntValue(-2)))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretUnaryBooleanNegation(t *testing.T) {
@@ -1184,7 +1184,7 @@ func TestInterpretHostFunction(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	Expect(inter.Globals["a"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretStructureDeclaration(t *testing.T) {
@@ -1393,7 +1393,7 @@ func TestInterpretStructureFunctionCall(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["value"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretStructureFieldAssignment(t *testing.T) {
@@ -1424,13 +1424,13 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 
 	Expect(inter.Invoke("callTest")).
 		To(Equal(interpreter.VoidValue{}))
 
 	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretStructureInitializesConstant(t *testing.T) {
@@ -1449,7 +1449,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 	`)
 
 	Expect(inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretStructureFunctionMutatesSelf(t *testing.T) {
@@ -1477,7 +1477,7 @@ func TestInterpretStructureFunctionMutatesSelf(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretFunctionPreCondition(t *testing.T) {
@@ -1932,8 +1932,8 @@ func TestInterpretArrayCopy(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(0)},
-				interpreter.IntValue{Int: big.NewInt(1)},
+				interpreter.NewIntValue(0),
+				interpreter.NewIntValue(1),
 			},
 		}))
 }
@@ -1984,19 +1984,19 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
     `)
 
 	Expect(inter.Globals["tests"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+		To(Equal(interpreter.NewIntValue(0)))
 
 	Expect(inter.Invoke("test")).
 		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Globals["tests"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 
 	Expect(inter.Invoke("test")).
 		To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
 	Expect(inter.Globals["tests"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretOptionalVariableDeclaration(t *testing.T) {
@@ -2010,7 +2010,7 @@ func TestInterpretOptionalVariableDeclaration(t *testing.T) {
 		To(Equal(
 			interpreter.SomeValue{
 				Value: interpreter.SomeValue{
-					Value: interpreter.IntValue{Int: big.NewInt(2)},
+					Value: interpreter.NewIntValue(2),
 				},
 			}))
 }
@@ -2028,7 +2028,7 @@ func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
 		To(Equal(
 			interpreter.SomeValue{
 				Value: interpreter.SomeValue{
-					Value: interpreter.IntValue{Int: big.NewInt(2)},
+					Value: interpreter.NewIntValue(2),
 				},
 			}))
 }
@@ -2050,7 +2050,7 @@ func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
 		To(Equal(
 			interpreter.SomeValue{
 				Value: interpreter.SomeValue{
-					Value: interpreter.IntValue{Int: big.NewInt(2)},
+					Value: interpreter.NewIntValue(2),
 				},
 			}))
 }
@@ -2068,7 +2068,7 @@ func TestInterpretOptionalReturn(t *testing.T) {
 		To(Equal(
 			interpreter.SomeValue{
 				Value: interpreter.SomeValue{
-					Value: interpreter.IntValue{Int: big.NewInt(2)},
+					Value: interpreter.NewIntValue(2),
 				},
 			}))
 }
@@ -2091,7 +2091,7 @@ func TestInterpretOptionalAssignment(t *testing.T) {
 		To(Equal(
 			interpreter.SomeValue{
 				Value: interpreter.SomeValue{
-					Value: interpreter.IntValue{Int: big.NewInt(2)},
+					Value: interpreter.NewIntValue(2),
 				},
 			}))
 }
@@ -2142,7 +2142,7 @@ func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
@@ -2157,7 +2157,7 @@ func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
@@ -2171,7 +2171,7 @@ func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
@@ -2196,7 +2196,7 @@ func TestInterpretNilCoalescingNilInt(t *testing.T) {
     `)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 }
 
 func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
@@ -2208,7 +2208,7 @@ func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
     `)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 }
 
 func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
@@ -2232,7 +2232,7 @@ func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
     `)
 
 	Expect(inter.Globals["test"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.BoolValue(true)))
@@ -2262,7 +2262,7 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
     `)
 
 	Expect(inter.Globals["test"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.BoolValue(true)))
@@ -2298,7 +2298,7 @@ func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
 	Expect(inter.Globals["y"].Value).
 		To(Equal(interpreter.AnyValue{
 			Type:  &sema.IntType{},
-			Value: interpreter.IntValue{Int: big.NewInt(2)},
+			Value: interpreter.NewIntValue(2),
 		}))
 }
 
@@ -2313,7 +2313,7 @@ func TestInterpretNilCoalescingOptionalRightHandSide(t *testing.T) {
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
@@ -2328,7 +2328,7 @@ func TestInterpretNilCoalescingBothOptional(t *testing.T) {
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
@@ -2343,7 +2343,7 @@ func TestInterpretNilCoalescingBothOptionalLeftNil(t *testing.T) {
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(2)},
+			Value: interpreter.NewIntValue(2),
 		}))
 }
 
@@ -2483,10 +2483,10 @@ func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test", big.NewInt(2))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("test", nil)).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+		To(Equal(interpreter.NewIntValue(0)))
 }
 
 func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
@@ -2502,10 +2502,10 @@ func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
 	`)
 
 	Expect(inter.Invoke("test", big.NewInt(2))).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 
 	Expect(inter.Invoke("test", nil)).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(0)}))
+		To(Equal(interpreter.NewIntValue(0)))
 }
 
 func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
@@ -2524,13 +2524,13 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 	Expect(inter.Invoke("test", big.NewInt(2))).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(2)},
+				Value: interpreter.NewIntValue(2),
 			}))
 
 	Expect(inter.Invoke("test", nil)).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(0)},
+				Value: interpreter.NewIntValue(0),
 			}))
 }
 
@@ -2550,13 +2550,13 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 	Expect(inter.Invoke("test", big.NewInt(2))).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(2)},
+				Value: interpreter.NewIntValue(2),
 			}))
 
 	Expect(inter.Invoke("test", nil)).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(0)},
+				Value: interpreter.NewIntValue(0),
 			}))
 }
 
@@ -2612,7 +2612,7 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 	    `, kind.Keyword(), kind.Keyword()))
 
 		Expect(inter.Globals["x"].Value).
-			To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+			To(Equal(interpreter.NewIntValue(1)))
 	}
 }
 
@@ -2643,7 +2643,7 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 	    `, kind.Keyword(), kind.Keyword()))
 
 		Expect(inter.Globals["val"].Value).
-			To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+			To(Equal(interpreter.NewIntValue(2)))
 	}
 }
 
@@ -2687,7 +2687,7 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
 		Expect(inter.Invoke("callTest", big.NewInt(1))).
-			To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+			To(Equal(interpreter.NewIntValue(1)))
 
 		_, err = inter.Invoke("callTest", big.NewInt(2))
 		Expect(err).
@@ -2802,7 +2802,7 @@ func TestInterpretImport(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	Expect(inter.Invoke("test")).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(42)}))
+		To(Equal(interpreter.NewIntValue(42)))
 }
 
 func TestInterpretImportError(t *testing.T) {
@@ -2876,8 +2876,8 @@ func TestInterpretDictionary(t *testing.T) {
 
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.DictionaryValue{
-			interpreter.StringValue("a"): interpreter.IntValue{Int: big.NewInt(1)},
-			interpreter.StringValue("b"): interpreter.IntValue{Int: big.NewInt(2)},
+			interpreter.StringValue("a"): interpreter.NewIntValue(1),
+			interpreter.StringValue("b"): interpreter.NewIntValue(2),
 		}))
 }
 
@@ -2894,13 +2894,13 @@ func TestInterpretDictionaryIndexingString(t *testing.T) {
 	Expect(inter.Globals["a"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(1)},
+				Value: interpreter.NewIntValue(1),
 			}))
 
 	Expect(inter.Globals["b"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(2)},
+				Value: interpreter.NewIntValue(2),
 			}))
 
 	Expect(inter.Globals["c"].Value).
@@ -2920,13 +2920,13 @@ func TestInterpretDictionaryIndexingBool(t *testing.T) {
 	Expect(inter.Globals["a"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(1)},
+				Value: interpreter.NewIntValue(1),
 			}))
 
 	Expect(inter.Globals["b"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(2)},
+				Value: interpreter.NewIntValue(2),
 			}))
 }
 
@@ -2970,7 +2970,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 		To(Equal(interpreter.VoidValue{}))
 
 	Expect(inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.StringValue("abc"))).
-		To(Equal(interpreter.SomeValue{Value: interpreter.IntValue{Int: big.NewInt(23)}}))
+		To(Equal(interpreter.SomeValue{Value: interpreter.NewIntValue(23)}))
 }
 
 func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
@@ -2985,13 +2985,13 @@ func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
 		To(Equal(
 			interpreter.AnyValue{
 				Type:  &sema.IntType{},
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.NewIntValue(42),
 			}))
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.NewIntValue(42),
 			}))
 }
 
@@ -3019,7 +3019,7 @@ func TestInterpretOptionalAny(t *testing.T) {
 			interpreter.SomeValue{
 				Value: interpreter.AnyValue{
 					Type:  &sema.IntType{},
-					Value: interpreter.IntValue{Int: big.NewInt(42)},
+					Value: interpreter.NewIntValue(42),
 				},
 			}))
 }
@@ -3037,14 +3037,14 @@ func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
 			interpreter.SomeValue{
 				Value: interpreter.AnyValue{
 					Type:  &sema.IntType{},
-					Value: interpreter.IntValue{Int: big.NewInt(42)},
+					Value: interpreter.NewIntValue(42),
 				},
 			}))
 
 	Expect(inter.Globals["y"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.NewIntValue(42),
 			}))
 }
 
@@ -3062,7 +3062,7 @@ func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
 			interpreter.SomeValue{
 				Value: interpreter.AnyValue{
 					Type:  &sema.IntType{},
-					Value: interpreter.IntValue{Int: big.NewInt(23)},
+					Value: interpreter.NewIntValue(23),
 				},
 			}))
 
@@ -3070,13 +3070,13 @@ func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
 		To(Equal(
 			interpreter.AnyValue{
 				Type:  &sema.IntType{},
-				Value: interpreter.IntValue{Int: big.NewInt(23)},
+				Value: interpreter.NewIntValue(23),
 			}))
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(23)},
+				Value: interpreter.NewIntValue(23),
 			}))
 }
 
@@ -3096,13 +3096,13 @@ func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
 		To(Equal(
 			interpreter.AnyValue{
 				Type:  &sema.IntType{},
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.NewIntValue(42),
 			}))
 
 	Expect(inter.Globals["z"].Value).
 		To(Equal(
 			interpreter.SomeValue{
-				Value: interpreter.IntValue{Int: big.NewInt(42)},
+				Value: interpreter.NewIntValue(42),
 			}))
 }
 
@@ -3115,10 +3115,10 @@ func TestInterpretLength(t *testing.T) {
     `)
 
 	Expect(inter.Globals["x"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(4)}))
+		To(Equal(interpreter.NewIntValue(4)))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretStructureFunctionBindingInside(t *testing.T) {
@@ -3181,10 +3181,10 @@ func TestInterpretArrayAppend(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
-				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
+				interpreter.NewIntValue(4),
 			},
 		}))
 }
@@ -3204,10 +3204,10 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
-				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
+				interpreter.NewIntValue(4),
 			},
 		}))
 }
@@ -3225,10 +3225,10 @@ func TestInterpretArrayConcat(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
-				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
+				interpreter.NewIntValue(4),
 			},
 		}))
 }
@@ -3247,10 +3247,10 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
-				interpreter.IntValue{Int: big.NewInt(4)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
+				interpreter.NewIntValue(4),
 			},
 		}))
 }
@@ -3269,10 +3269,10 @@ func TestInterpretArrayInsert(t *testing.T) {
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(4)},
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(4),
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
 			},
 		}))
 }
@@ -3288,13 +3288,13 @@ func TestInterpretArrayRemove(t *testing.T) {
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(3),
 			},
 		}))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(2)}))
+		To(Equal(interpreter.NewIntValue(2)))
 }
 
 func TestInterpretArrayRemoveFirst(t *testing.T) {
@@ -3308,13 +3308,13 @@ func TestInterpretArrayRemoveFirst(t *testing.T) {
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(2)},
-				interpreter.IntValue{Int: big.NewInt(3)},
+				interpreter.NewIntValue(2),
+				interpreter.NewIntValue(3),
 			},
 		}))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(1)}))
+		To(Equal(interpreter.NewIntValue(1)))
 }
 
 func TestInterpretArrayRemoveLast(t *testing.T) {
@@ -3328,13 +3328,13 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
 	Expect(inter.Globals["x"].Value).
 		To(Equal(interpreter.ArrayValue{
 			Values: &[]interpreter.Value{
-				interpreter.IntValue{Int: big.NewInt(1)},
-				interpreter.IntValue{Int: big.NewInt(2)},
+				interpreter.NewIntValue(1),
+				interpreter.NewIntValue(2),
 			},
 		}))
 
 	Expect(inter.Globals["y"].Value).
-		To(Equal(interpreter.IntValue{Int: big.NewInt(3)}))
+		To(Equal(interpreter.NewIntValue(3)))
 }
 
 func TestInterpretArrayContains(t *testing.T) {
@@ -3403,12 +3403,12 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.DictionaryValue{
-			interpreter.StringValue("def"): interpreter.IntValue{Int: big.NewInt(2)},
+			interpreter.StringValue("def"): interpreter.NewIntValue(2),
 		}))
 
 	Expect(inter.Globals["removed"].Value).
 		To(Equal(interpreter.SomeValue{
-			Value: interpreter.IntValue{Int: big.NewInt(1)},
+			Value: interpreter.NewIntValue(1),
 		}))
 }
 
