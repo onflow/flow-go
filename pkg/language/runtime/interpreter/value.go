@@ -140,6 +140,7 @@ func (v StringValue) Concat(other ConcatenatableValue) Value {
 func (v StringValue) Get(key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
+	// TODO: optimize grapheme clusters to prevent unnecessary iteration
 	graphemes := uniseg.NewGraphemes(v.StrValue())
 	graphemes.Next()
 
@@ -158,6 +159,7 @@ func (v StringValue) Set(key Value, value Value) {
 
 	str := v.StrValue()
 
+	// TODO: optimize grapheme clusters to prevent unnecessary iteration
 	graphemes := uniseg.NewGraphemes(str)
 	graphemes.Next()
 
