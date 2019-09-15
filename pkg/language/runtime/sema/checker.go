@@ -1431,6 +1431,10 @@ func (checker *Checker) isValidEqualityType(ty Type) bool {
 		return true
 	}
 
+	if checker.IsSubType(ty, &CharacterType{}) {
+		return true
+	}
+
 	if _, ok := ty.(*OptionalType); ok {
 		return true
 	}
