@@ -4,47 +4,61 @@ import (
 	"crypto/elliptic"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+var BLS_BLS12381Instance *BLS_BLS12381Algo
+var ECDSA_P256Instance *ECDSAalgo
+var ECDSA_SECp256k1Instance *ECDSAalgo
+
+//  Once variables to make sure each Signer is instanciated only once
+var once [3]sync.Once
 
 // NewSignatureAlgo initializes and chooses a signature scheme
 func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
-		a := &(BLS_BLS12381Algo{
-			SignAlgo: &SignAlgo{
-				name,
-				prKeyLengthBLS_BLS12381,
-				pubKeyLengthBLS_BLS12381,
-				signatureLengthBLS_BLS12381,
-			},
+		once[0].Do(func() {
+			BLS_BLS12381Instance = &(BLS_BLS12381Algo{
+				SignAlgo: &SignAlgo{
+					name,
+					prKeyLengthBLS_BLS12381,
+					pubKeyLengthBLS_BLS12381,
+					signatureLengthBLS_BLS12381,
+				},
+			})
+			BLS_BLS12381Instance.init()
 		})
-		a.init()
-		return a, nil
+		return BLS_BLS12381Instance, nil
 	}
 
 	if name == ECDSA_P256 {
-		a := &(ECDSAalgo{
-			curve: elliptic.P256(),
-			SignAlgo: &SignAlgo{
-				name,
-				PrKeyLengthECDSA_P256,
-				PubKeyLengthECDSA_P256,
-				SignatureLengthECDSA_P256,
-			},
+		once[1].Do(func() {
+			ECDSA_P256Instance = &(ECDSAalgo{
+				curve: elliptic.P256(),
+				SignAlgo: &SignAlgo{
+					name,
+					PrKeyLengthECDSA_P256,
+					PubKeyLengthECDSA_P256,
+					SignatureLengthECDSA_P256,
+				},
+			})
 		})
-		return a, nil
+		return ECDSA_P256Instance, nil
 	}
 
 	if name == ECDSA_SECp256k1 {
-		a := &(ECDSAalgo{
-			curve: secp256k1(),
-			SignAlgo: &SignAlgo{
-				name,
-				PrKeyLengthECDSA_SECp256k1,
-				PubKeyLengthECDSA_SECp256k1,
-				SignatureLengthECDSA_SECp256k1,
-			},
+		once[2].Do(func() {
+			ECDSA_SECp256k1Instance = &(ECDSAalgo{
+				curve: secp256k1(),
+				SignAlgo: &SignAlgo{
+					name,
+					PrKeyLengthECDSA_SECp256k1,
+					PubKeyLengthECDSA_SECp256k1,
+					SignatureLengthECDSA_SECp256k1,
+				},
+			})
 		})
-		return a, nil
+		return ECDSA_SECp256k1Instance, nil
 	}
 
 	return nil, cryptoError{"the signature scheme " + string(name) + " is not supported."}

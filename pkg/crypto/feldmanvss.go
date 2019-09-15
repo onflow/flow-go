@@ -24,16 +24,8 @@ type feldmanVSSstate struct {
 func (s *feldmanVSSstate) init() {
 	s.isrunning = false
 
-	// Initialize BLS context
-	s.blsContext = &(BLS_BLS12381Algo{
-		SignAlgo: &SignAlgo{
-			name:            BLS_BLS12381,
-			PrKeyLength:     prKeyLengthBLS_BLS12381,
-			PubKeyLength:    pubKeyLengthBLS_BLS12381,
-			SignatureLength: signatureLengthBLS_BLS12381,
-		},
-	})
-	s.blsContext.init()
+	blsSigner, _ := NewSignatureAlgo(BLS_BLS12381)
+	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
 
 	s.A = make([]pointG2, s.threshold+1)
 }

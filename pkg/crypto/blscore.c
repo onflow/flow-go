@@ -12,13 +12,16 @@
 #define G1MULT RELIC
 #define G2MULT RELIC
 
+ctx_t bls_ctx;
+
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* _relic_init_BLS12_381() { 
     // check Relic was compiled with the right conf 
     if (ALLOC != AUTO) return NULL;
 
-    // init relic core
-	if (core_init() != RLC_OK) return NULL;
+    // initialize relic core with a new context
+    core_set(&bls_ctx);
+    if (core_init() != RLC_OK) return NULL;
 
     // init BLS curve
     int ret = RLC_OK;

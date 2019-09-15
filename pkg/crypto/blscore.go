@@ -40,11 +40,10 @@ func (a *BLS_BLS12381Algo) init() error {
 }
 
 // reinit the context of BLS12381 curve assuming there was a previous call to init()
-// should be called at every a. operation
+// If the implementation evolves and relic has multiple contextes,
+// reinit should be called at every a. operation.
 func (a *BLS_BLS12381Algo) reinit() {
-	if ctx(C.core_get()) != a.context {
-		C.core_set(a.context)
-	}
+	C.core_set(a.context)
 }
 
 // Exponentiation in G1 (scalar point multiplication)
