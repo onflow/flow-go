@@ -279,6 +279,10 @@ func (v *BaseStrictusVisitor) VisitStringLiteral(ctx *StringLiteralContext) inte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

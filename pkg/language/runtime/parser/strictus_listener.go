@@ -211,6 +211,9 @@ type StrictusListener interface {
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
+	// EnterIntegerLiteral is called when entering the integerLiteral production.
+	EnterIntegerLiteral(c *IntegerLiteralContext)
+
 	// EnterDecimalLiteral is called when entering the DecimalLiteral production.
 	EnterDecimalLiteral(c *DecimalLiteralContext)
 
@@ -444,6 +447,9 @@ type StrictusListener interface {
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)
+
+	// ExitIntegerLiteral is called when exiting the integerLiteral production.
+	ExitIntegerLiteral(c *IntegerLiteralContext)
 
 	// ExitDecimalLiteral is called when exiting the DecimalLiteral production.
 	ExitDecimalLiteral(c *DecimalLiteralContext)

@@ -16,6 +16,7 @@ import (
 func init() {
 	format.TruncatedDiff = false
 	format.MaxDepth = 100
+	format.UseStringerRepresentation = true
 }
 
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {

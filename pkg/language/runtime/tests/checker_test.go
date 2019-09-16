@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -120,6 +121,87 @@ func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralRanges(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, ty := range []sema.Type{
+		&sema.Int8Type{},
+		&sema.Int16Type{},
+		&sema.Int32Type{},
+		&sema.Int64Type{},
+		&sema.UInt8Type{},
+		&sema.UInt16Type{},
+		&sema.UInt32Type{},
+		&sema.UInt64Type{},
+	} {
+		t.Run(ty.String(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			code := fmt.Sprintf(`
+                let min: %s = %s
+                let max: %s = %s 
+	        `,
+				ty.String(),
+				ty.(sema.Ranged).Min(),
+				ty.String(),
+				ty.(sema.Ranged).Max(),
+			)
+
+			_, err := parseAndCheck(code)
+
+			Expect(err).
+				To(Not(HaveOccurred()))
+		})
+	}
+}
+
+func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, ty := range []sema.Type{
+		&sema.Int8Type{},
+		&sema.Int16Type{},
+		&sema.Int32Type{},
+		&sema.Int64Type{},
+		&sema.UInt8Type{},
+		&sema.UInt16Type{},
+		&sema.UInt32Type{},
+		&sema.UInt64Type{},
+	} {
+		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+                let minMinusOne: %s = %s
+	        `,
+				ty.String(),
+				big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1)),
+			))
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+		})
+
+		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+                let maxPlusOne: %s = %s
+	        `,
+				ty.String(),
+				big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1)),
+			))
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+		})
+	}
 }
 
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
