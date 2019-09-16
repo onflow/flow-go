@@ -38,6 +38,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#members.
+	VisitMembers(ctx *MembersContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#member.
+	VisitMember(ctx *MemberContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#compositeKind.
 	VisitCompositeKind(ctx *CompositeKindContext) interface{}
 

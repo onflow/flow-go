@@ -546,14 +546,14 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 				var messageTrampoline Trampoline
 
 				if condition.Message == nil {
-					messageTrampoline = Done{Result: StringValue("")}
+					messageTrampoline = Done{Result: NewStringValue("")}
 				} else {
 					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
 				}
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := string(result.(StringValue))
+						message := result.(StringValue).StrValue()
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -1065,7 +1065,7 @@ func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression
 }
 
 func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
-	value := StringValue(expression.Value)
+	value := NewStringValue(expression.Value)
 
 	return Done{Result: value}
 }
@@ -1286,8 +1286,8 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if len(declaration.Initializers) > 0 {
-		firstInitializer := declaration.Initializers[0]
+	if len(declaration.Members.Initializers) > 0 {
+		firstInitializer := declaration.Members.Initializers[0]
 
 		functionType := interpreter.Checker.InitializerFunctionTypes[firstInitializer]
 
@@ -1367,11 +1367,11 @@ func (interpreter *Interpreter) initializerFunction(
 
 		// TODO: support multiple overloaded initializers
 
-		if len(interfaceDeclaration.Initializers) == 0 {
+		if len(interfaceDeclaration.Members.Initializers) == 0 {
 			continue
 		}
 
-		firstInitializer := interfaceDeclaration.Initializers[0]
+		firstInitializer := interfaceDeclaration.Members.Initializers[0]
 		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}
@@ -1402,7 +1402,7 @@ func (interpreter *Interpreter) compositeFunctions(
 
 	functions := map[string]FunctionValue{}
 
-	for _, functionDeclaration := range compositeDeclaration.Functions {
+	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
 
 		function := interpreter.compositeFunction(compositeDeclaration, functionDeclaration)
@@ -1435,7 +1435,7 @@ func (interpreter *Interpreter) compositeFunction(
 	for _, conformance := range compositeDeclaration.Conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
 		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
-		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
+		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
 			continue
 		}

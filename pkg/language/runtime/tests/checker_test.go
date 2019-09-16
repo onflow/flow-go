@@ -268,6 +268,48 @@ func TestCheckBoolean(t *testing.T) {
 		To(Equal(&sema.BoolType{}))
 }
 
+func TestCheckCharacter(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "x"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+func TestCheckCharacterUnicodeScalar(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "\u{1F1FA}\u{1F1F8}"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+// TODO: prevent invalid character literals
+// func TestCheckInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//         let x: Character = "abc"
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
+
 func TestCheckString(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -708,6 +750,82 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckStringIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          let y: Character = z[0]
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[true]
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+}
+
+func TestCheckStringIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+		  let z = "abc"
+		  let y: Character = "d"
+          z[0] = y
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[0] = "d"
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO: prevent assignment with invalid character literal
+// func TestCheckStringIndexingAssignmentWithInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//       fun test() {
+//           let z = "abc"
+//           z[0] = "def"
+//       }
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
 
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
@@ -6505,4 +6623,51 @@ func TestCheckAssertWithMessage(t *testing.T) {
 
 	Expect(err).
 		To(Not(HaveOccurred()))
+}
+
+// TODO: add support for nested composite declarations
+
+func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+}
+
+func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract interface TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 }

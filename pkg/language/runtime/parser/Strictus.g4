@@ -73,9 +73,7 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{'
-        (field | initializer[true] | functionDeclaration[true])*
-      '}'
+    : access compositeKind identifier conformances '{' members[true] '}'
     ;
 
 conformances
@@ -92,9 +90,19 @@ field
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{'
-        (field | initializer[false] | functionDeclaration[false])*
-      '}'
+    : access compositeKind Interface identifier '{' members[false] '}'
+    ;
+
+members[bool functionBlockRequired]
+    : member[functionBlockRequired]*
+    ;
+
+member[bool functionBlockRequired]
+    : field
+    | initializer[functionBlockRequired]
+    | functionDeclaration[functionBlockRequired]
+    | interfaceDeclaration
+    | compositeDeclaration
     ;
 
 compositeKind
