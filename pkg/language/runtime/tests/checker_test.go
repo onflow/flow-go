@@ -63,6 +63,115 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 		To(Equal(&sema.IntType{}))
 }
 
+func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Int8 = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.Int8Type{}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Int8? = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.OptionalType{Type: &sema.Int8Type{}}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        var x: Int8 = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.Int8Type{}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        var x: Int8? = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(_ x: Int8) {}
+        let x = test(1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(_ x: Int8?) {}
+        let x = test(1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Int8 {
+            return 1
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Int8? {
+            return 1
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckBoolean(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -379,13 +488,10 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidArrayElements(t *testing.T) {
@@ -1613,11 +1719,11 @@ func TestCheckComposite(t *testing.T) {
 		_, err := parseAndCheck(fmt.Sprintf(`
           %s Test {
               pub(set) var foo: Int
-  
+
               init(foo: Int) {
                   self.foo = foo
               }
-  
+
               pub fun getFoo(): Int {
                   return self.foo
               }
@@ -2877,7 +2983,7 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
           %s Test {
-     
+
               fun test(x: Int) {}
           }
 
@@ -2913,16 +3019,16 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
               init() {
                   Test
               }
-    
+
               fun test(): Test {
                   return Test()
               }
           }
-    
+
           fun test(): Test {
              return Test()
           }
-    
+
           fun test2(): Test {
              return Test().test()
           }
@@ -4331,7 +4437,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
           %s interface Test {
               x: Int
           }
- 
+
           %s TestImpl: Test {
               var x: Int
 
@@ -4594,7 +4700,7 @@ func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
           %s interface Test {
               fun test(): Int
           }
-    
+
           %s TestImpl: Test {
               fun test(): Bool {
                   return true
@@ -4935,7 +5041,7 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 		for _, secondKind := range common.CompositeKinds {
 			_, err := parseAndCheck(fmt.Sprintf(`
               %s S {}
-    
+
               %s interface I {
                   s: S
               }
@@ -4971,7 +5077,7 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 		for _, secondKind := range common.CompositeKinds {
 			_, err := parseAndCheck(fmt.Sprintf(`
               %s S {}
-    
+
               %s interface I {
                   fun s(): S
               }
@@ -5204,7 +5310,7 @@ func TestCheckImportAll(t *testing.T) {
 func TestCheckInvalidImportUnexported(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`	
+	checker, err := parseAndCheck(`
        let x = 1
 	`)
 
@@ -5267,7 +5373,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 	// NOTE: only parse, don't check imported program.
 	// will be checked by checker checking importing program
 
-	imported, err := parser.ParseProgram(`	
+	imported, err := parser.ParseProgram(`
        let x: Bool = 1
 	`)
 
