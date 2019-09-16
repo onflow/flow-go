@@ -546,14 +546,14 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 				var messageTrampoline Trampoline
 
 				if condition.Message == nil {
-					messageTrampoline = Done{Result: StringValue("")}
+					messageTrampoline = Done{Result: NewStringValue("")}
 				} else {
 					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
 				}
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := string(result.(StringValue))
+						message := result.(StringValue).StrValue()
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -1065,7 +1065,7 @@ func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression
 }
 
 func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
-	value := StringValue(expression.Value)
+	value := NewStringValue(expression.Value)
 
 	return Done{Result: value}
 }

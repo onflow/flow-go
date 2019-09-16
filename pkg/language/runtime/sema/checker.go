@@ -220,7 +220,9 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
-
+	case *CharacterType:
+		// TODO: only allow valid character literals
+		return subType.Equal(&StringType{})
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
@@ -288,6 +290,8 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 	switch indexedType := indexedType.(type) {
 	case ArrayType:
 		return indexedType.elementType()
+	case *StringType:
+		return &CharacterType{}
 	case *DictionaryType:
 		valueType := indexedType.ValueType
 		if isAssignment {
@@ -302,8 +306,10 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 
 func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool {
 	switch indexedType := indexedType.(type) {
-	// arrays can be indexed with integers
+	// arrays and strings can be indexed with integers
 	case ArrayType:
+		return checker.IsSubType(indexingType, &IntegerType{})
+	case *StringType:
 		return checker.IsSubType(indexingType, &IntegerType{})
 	// dictionaries can be indexed with the dictionary type's key type
 	case *DictionaryType:
@@ -1430,6 +1436,10 @@ func (checker *Checker) isValidEqualityType(ty Type) bool {
 	}
 
 	if checker.IsSubType(ty, &StringType{}) {
+		return true
+	}
+
+	if checker.IsSubType(ty, &CharacterType{}) {
 		return true
 	}
 

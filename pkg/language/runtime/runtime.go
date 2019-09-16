@@ -381,7 +381,7 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 	account := interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
-			"address": interpreter.StringValue(address.String()),
+			"address": interpreter.NewStringValue(address.String()),
 			"storage": storedValue,
 		},
 	}
@@ -483,7 +483,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
 		}
 
-		address := types.HexToAddress(string(stringValue))
+		address := types.HexToAddress(stringValue.StrValue())
 
 		account, _, err := loadAccount(runtimeInterface, address)
 		if err != nil {

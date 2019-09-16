@@ -118,6 +118,21 @@ func (*BoolType) Equal(other Type) bool {
 	return ok
 }
 
+// CharacterType represents the character type
+
+type CharacterType struct{}
+
+func (*CharacterType) isType() {}
+
+func (*CharacterType) String() string {
+	return "Character"
+}
+
+func (*CharacterType) Equal(other Type) bool {
+	_, ok := other.(*CharacterType)
+	return ok
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -518,6 +533,7 @@ func init() {
 		&AnyType{},
 		&NeverType{},
 		&BoolType{},
+		&CharacterType{},
 		&IntType{},
 		&StringType{},
 		&Int8Type{},
