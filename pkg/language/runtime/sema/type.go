@@ -161,6 +161,16 @@ var stringMembers = map[string]*Member{
 			ReturnType: &StringType{},
 		},
 	},
+	"slice": {
+		Type: &FunctionType{
+			ParameterTypes: []Type{
+				&IntType{},
+				&IntType{},
+			},
+			ReturnType: &StringType{},
+		},
+		ArgumentLabels: []string{"from", "to"},
+	},
 }
 
 // IntegerType represents the super-type of all integer types
