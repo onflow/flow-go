@@ -3053,9 +3053,9 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
-  )
-  
-  members, origins := checker.membersAndOrigins(
+	)
+
+	members, origins := checker.membersAndOrigins(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		false,
@@ -3065,7 +3065,10 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	checker.memberOrigins[interfaceType] = origins
 
-	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+	)
 
 	checker.checkInitializers(
 		declaration.Members.Initializers,
