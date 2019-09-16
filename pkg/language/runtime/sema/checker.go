@@ -1,12 +1,11 @@
 package sema
 
 import (
-	"github.com/raviqqe/hamt"
-
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/raviqqe/hamt"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -613,7 +612,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				}
 
 			} else {
-				if !checker.IsSubType(valueType, declarationType) {
+				if !checker.IsTypeCompatible(declaration.Value, valueType, declarationType) {
 					checker.report(
 						&TypeMismatchError{
 							ExpectedType: declarationType,
@@ -640,6 +639,17 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		nil,
 	)
 	checker.recordVariableOrigin(declaration.Identifier.Identifier, variable)
+}
+
+func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
+	switch expression.(type) {
+	case *ast.IntExpression:
+		if checker.IsSubType(checker.unwrapOptionalType(targetType), &IntegerType{}) {
+			return true
+		}
+	}
+
+	return checker.IsSubType(valueType, targetType)
 }
 
 func (checker *Checker) declareVariable(
@@ -881,32 +891,29 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	checker.ReturnStatementValueTypes[statement] = valueType
 	checker.ReturnStatementReturnTypes[statement] = returnType
 
-	if valueType != nil {
-		if valueIsInvalid {
-			// return statement has expression, but function has Void return type?
-			if _, ok := returnType.(*VoidType); ok {
-				checker.report(
-					&InvalidReturnValueError{
-						StartPos: statement.Expression.StartPosition(),
-						EndPos:   statement.Expression.EndPosition(),
-					},
-				)
-			}
-		} else {
-			if !valueIsInvalid &&
-				!isInvalidType(returnType) &&
-				!checker.IsSubType(valueType, returnType) {
-
-				checker.report(
-					&TypeMismatchError{
-						ExpectedType: returnType,
-						ActualType:   valueType,
-						StartPos:     statement.Expression.StartPosition(),
-						EndPos:       statement.Expression.EndPosition(),
-					},
-				)
-			}
+	if valueType == nil {
+		return nil
+	} else if valueIsInvalid {
+		// return statement has expression, but function has Void return type?
+		if _, ok := returnType.(*VoidType); ok {
+			checker.report(
+				&InvalidReturnValueError{
+					StartPos: statement.Expression.StartPosition(),
+					EndPos:   statement.Expression.EndPosition(),
+				},
+			)
 		}
+	} else if !isInvalidType(returnType) &&
+		!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: returnType,
+				ActualType:   valueType,
+				StartPos:     statement.Expression.StartPosition(),
+				EndPos:       statement.Expression.EndPosition(),
+			},
+		)
 	}
 
 	return nil
@@ -1068,7 +1075,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 		// check value type is subtype of variable type
 		if !isInvalidType(valueType) &&
-			!checker.IsSubType(valueType, variable.Type) {
+			!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
 
 			checker.report(
 				&TypeMismatchError{
@@ -1097,7 +1104,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	}
 
 	if !isInvalidType(elementType) &&
-		!checker.IsSubType(valueType, elementType) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -1142,7 +1149,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// if value type is valid, check value can be assigned to member
 	if !isInvalidType(valueType) &&
-		!checker.IsSubType(valueType, member.Type) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, member.Type) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -1365,8 +1372,9 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 			)
 		}
 	}
+
 	// check both types are equal
-	if !leftType.Equal(rightType) {
+	if !anyInvalid && !leftType.Equal(rightType) {
 		checker.report(
 			&InvalidBinaryOperandsError{
 				Operation: operation,
@@ -2090,7 +2098,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentTypes = append(argumentTypes, argumentType)
 
-		if !checker.IsSubType(argumentType, parameterType) {
+		if !checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
@@ -2316,11 +2324,18 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	compositeType := checker.CompositeDeclarationTypes[declaration]
 
-	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
+	// TODO: also check nested composite members
+
+	// TODO: also check nested composite members' identifiers
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+	)
 
 	checker.checkInitializers(
-		declaration.Initializers,
-		declaration.Fields,
+		declaration.Members.Initializers,
+		declaration.Members.Fields,
 		compositeType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
@@ -2331,7 +2346,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	if compositeType != nil {
 		checker.checkFieldsInitialized(declaration, compositeType)
 
-		checker.checkCompositeFunctions(declaration.Functions, compositeType)
+		checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
 
 		// check composite conforms to interfaces.
 		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
@@ -2356,6 +2371,21 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 				DeclarationKind: declaration.DeclarationKind(),
 				StartPos:        declaration.Identifier.StartPosition(),
 				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: support nested declarations for contracts and contract interfaces
+
+	// report error for first nested composite declaration, if any
+	if len(declaration.Members.CompositeDeclarations) > 0 {
+		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
+				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
+				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
 			},
 		)
 	}
@@ -2387,8 +2417,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	conformances := checker.conformances(declaration)
 
 	members := checker.members(
-		declaration.Fields,
-		declaration.Functions,
+		declaration.Members.Fields,
+		declaration.Members.Functions,
 		true,
 	)
 
@@ -2402,9 +2432,9 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
-	initializerCount := len(declaration.Initializers)
+	initializerCount := len(declaration.Members.Initializers)
 	if initializerCount > 0 {
-		firstInitializer := declaration.Initializers[0]
+		firstInitializer := declaration.Members.Initializers[0]
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
@@ -2567,7 +2597,7 @@ func (checker *Checker) checkFieldsInitialized(
 	compositeType *CompositeType,
 ) {
 
-	for _, field := range declaration.Fields {
+	for _, field := range declaration.Members.Fields {
 		name := field.Identifier.Identifier
 		member := compositeType.Members[name]
 
@@ -2596,8 +2626,8 @@ func (checker *Checker) declareCompositeConstructor(
 
 	// TODO: support multiple overloaded initializers
 
-	if len(compositeDeclaration.Initializers) > 0 {
-		firstInitializer := compositeDeclaration.Initializers[0]
+	if len(compositeDeclaration.Members.Initializers) > 0 {
+		firstInitializer := compositeDeclaration.Members.Initializers[0]
 
 		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
 
@@ -2811,7 +2841,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	checker.recordVariableOrigin(SelfIdentifier, self)
 }
 
-// checkMemberIdentifiers checks the fields and functions are unique and aren'T named `init`
+// checkMemberIdentifiers checks the fields and functions are unique and aren't named `init`
 //
 func (checker *Checker) checkMemberIdentifiers(
 	fields []*ast.FieldDeclaration,
@@ -2908,17 +2938,24 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	interfaceType := checker.InterfaceDeclarationTypes[declaration]
 
+	// TODO: also check nested composite members
+
+	// TODO: also check nested composite members' identifiers
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+	)
+
 	interfaceType.Members = checker.members(
-		declaration.Fields,
-		declaration.Functions,
+		declaration.Members.Fields,
+		declaration.Members.Functions,
 		false,
 	)
 
-	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
-
 	checker.checkInitializers(
-		declaration.Initializers,
-		declaration.Fields,
+		declaration.Members.Initializers,
+		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
@@ -2927,7 +2964,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	)
 
 	checker.checkInterfaceFunctions(
-		declaration.Functions,
+		declaration.Members.Functions,
 		interfaceType,
 		declaration.DeclarationKind(),
 	)
@@ -2940,6 +2977,21 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 				DeclarationKind: declaration.DeclarationKind(),
 				StartPos:        declaration.Identifier.StartPosition(),
 				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: support nested declarations for contracts and contract interfaces
+
+	// report error for first nested composite declaration, if any
+	if len(declaration.Members.CompositeDeclarations) > 0 {
+		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
+				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
+				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
 			},
 		)
 	}
@@ -3007,9 +3059,9 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
-	initializerCount := len(declaration.Initializers)
+	initializerCount := len(declaration.Members.Initializers)
 	if initializerCount > 0 {
-		firstInitializer := declaration.Initializers[0]
+		firstInitializer := declaration.Members.Initializers[0]
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
