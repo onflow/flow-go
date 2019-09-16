@@ -317,7 +317,7 @@ func (*UInt8Type) Equal(other Type) bool {
 }
 
 var UInt8TypeMin = big.NewInt(0)
-var UInt8TypeMax = big.NewInt(0).SetInt64(math.MaxInt8)
+var UInt8TypeMax = big.NewInt(0).SetInt64(math.MaxUint8)
 
 func (*UInt8Type) Min() *big.Int {
 	return UInt8TypeMin
@@ -342,7 +342,7 @@ func (*UInt16Type) Equal(other Type) bool {
 }
 
 var UInt16TypeMin = big.NewInt(0)
-var UInt16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
+var UInt16TypeMax = big.NewInt(0).SetInt64(math.MaxUint16)
 
 func (*UInt16Type) Min() *big.Int {
 	return UInt16TypeMin
@@ -367,7 +367,7 @@ func (*UInt32Type) Equal(other Type) bool {
 }
 
 var UInt32TypeMin = big.NewInt(0)
-var UInt32TypeMax = big.NewInt(0).SetInt64(math.MaxInt32)
+var UInt32TypeMax = big.NewInt(0).SetInt64(math.MaxUint32)
 
 func (*UInt32Type) Min() *big.Int {
 	return UInt32TypeMin
@@ -392,7 +392,7 @@ func (*UInt64Type) Equal(other Type) bool {
 }
 
 var UInt64TypeMin = big.NewInt(0)
-var UInt64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
+var UInt64TypeMax = big.NewInt(0).SetInt64(math.MaxUint64)
 
 func (*UInt64Type) Min() *big.Int {
 	return UInt64TypeMin
