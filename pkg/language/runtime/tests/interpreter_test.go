@@ -325,6 +325,29 @@ func TestInterpretStringIndexing(t *testing.T) {
 		To(Equal(interpreter.NewStringValue("c")))
 }
 
+func TestInterpretStringIndexingUnicode(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+	  fun testUnicodeA(): Bool {
+		  let cafe = "caf\u{E9}"
+		  let e: Character = "\u{E9}"
+	      return cafe[3] == e
+	  }
+
+	  fun testUnicodeB(): Bool {
+		let cafe = "cafe\u{301}"
+		let e: Character = "e\u{301}"
+		return cafe[3] == e
+	  }
+	`)
+
+	Expect(inter.Invoke("testUnicodeA")).
+		To(Equal(interpreter.BoolValue(true)))
+	Expect(inter.Invoke("testUnicodeB")).
+		To(Equal(interpreter.BoolValue(true)))
+}
+
 func TestInterpretStringIndexingAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -339,6 +362,22 @@ func TestInterpretStringIndexingAssignment(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.NewStringValue("dbc")))
+}
+
+func TestInterpretStringIndexingAssignmentUnicode(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpret(`
+      fun test(): Bool {
+		  let z = "cafe chair"
+		  let y: Character = "e\u{301}"
+		  z[3] = y
+		  return z == "cafe\u{301} chair"
+      }
+	`)
+
+	Expect(inter.Invoke("test")).
+		To(Equal(interpreter.BoolValue(true)))
 }
 
 func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
