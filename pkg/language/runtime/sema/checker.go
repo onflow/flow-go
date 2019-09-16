@@ -2464,11 +2464,13 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
+			secondInitializer := declaration.Initializers[1]
+
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        firstInitializer.StartPosition(),
-					EndPos:          firstInitializer.EndPosition(),
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
 				},
 			)
 		}
@@ -3091,11 +3093,13 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
+			secondInitializer := declaration.Initializers[1]
+
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        firstInitializer.StartPosition(),
-					EndPos:          firstInitializer.EndPosition(),
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
 				},
 			)
 		}
