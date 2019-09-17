@@ -5306,127 +5306,40 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 	}
 }
 
-// TODO: field declaration, member access, type references
-//
-func TestCheckOrigins(t *testing.T) {
+func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
 	checker, err := parseAndCheck(`
         let x = 1
-        var y = 1
-
-        fun f1(paramX: Int, paramY: Bool) {
-            let x = 1
-            var y: Int? = y
-            fun f2() {
-                if let y = y {
-                }
-            }
-        }
-
-        struct S1 {
-            fun test() {}
-        }
-
-        struct interface I1 {}
-
-        fun f3(): S1 {
-            f1(paramX: 1, paramY: true)
-            return S1()
-        }
+        var y = x
     `)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	origins := checker.Origins.All()
+	occurrences := checker.Occurrences.All()
 
-	matchers := []*originMatcher{
+	matchers := []*occurrenceMatcher{
 		{
-			sema.Position{Line: 2, Column: 12},
-			sema.Position{Line: 2, Column: 12},
-			common.DeclarationKindConstant,
+			startPos:        sema.Position{Line: 2, Column: 12},
+			endPos:          sema.Position{Line: 2, Column: 12},
+			originStartPos:  &sema.Position{Line: 2, Column: 12},
+			originEndPos:    &sema.Position{Line: 2, Column: 12},
+			declarationKind: common.DeclarationKindConstant,
 		},
 		{
-			sema.Position{Line: 3, Column: 12},
-			sema.Position{Line: 3, Column: 12},
-			common.DeclarationKindVariable,
+			startPos:        sema.Position{Line: 3, Column: 12},
+			endPos:          sema.Position{Line: 3, Column: 12},
+			originStartPos:  &sema.Position{Line: 3, Column: 12},
+			originEndPos:    &sema.Position{Line: 3, Column: 12},
+			declarationKind: common.DeclarationKindVariable,
 		},
 		{
-			sema.Position{Line: 5, Column: 12},
-			sema.Position{Line: 5, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 5, Column: 15},
-			sema.Position{Line: 5, Column: 20},
-			common.DeclarationKindParameter,
-		},
-		{
-			sema.Position{Line: 5, Column: 28},
-			sema.Position{Line: 5, Column: 33},
-			common.DeclarationKindParameter,
-		},
-		{
-			sema.Position{Line: 6, Column: 16},
-			sema.Position{Line: 6, Column: 16},
-			common.DeclarationKindConstant,
-		},
-		{
-			sema.Position{Line: 7, Column: 16},
-			sema.Position{Line: 7, Column: 16},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 7, Column: 26},
-			sema.Position{Line: 7, Column: 26},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 8, Column: 16},
-			sema.Position{Line: 8, Column: 17},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 9, Column: 23},
-			sema.Position{Line: 9, Column: 23},
-			common.DeclarationKindConstant,
-		},
-		{
-			sema.Position{Line: 9, Column: 27},
-			sema.Position{Line: 9, Column: 27},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 14, Column: 15},
-			sema.Position{Line: 14, Column: 16},
-			common.DeclarationKindStructure,
-		},
-		{
-			sema.Position{Line: 15, Column: 16},
-			sema.Position{Line: 15, Column: 19},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 18, Column: 25},
-			sema.Position{Line: 18, Column: 26},
-			common.DeclarationKindStructureInterface,
-		},
-		{
-			sema.Position{Line: 20, Column: 12},
-			sema.Position{Line: 20, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 21, Column: 12},
-			sema.Position{Line: 21, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 22, Column: 19},
-			sema.Position{Line: 22, Column: 20},
-			// NOTE: function instead of structure: constructor
-			common.DeclarationKindFunction,
+			startPos:        sema.Position{Line: 3, Column: 16},
+			endPos:          sema.Position{Line: 3, Column: 16},
+			originStartPos:  &sema.Position{Line: 2, Column: 12},
+			originEndPos:    &sema.Position{Line: 2, Column: 12},
+			declarationKind: common.DeclarationKindConstant,
 		},
 	}
 
@@ -5435,12 +5348,262 @@ func TestCheckOrigins(t *testing.T) {
 		ms[i] = matchers[i]
 	}
 
-	Expect(origins).
+	Expect(occurrences).
 		To(ConsistOf(ms...))
 
 	for _, matcher := range matchers {
-		Expect(checker.Origins.Find(matcher.startPos)).To(Not(BeNil()))
-		Expect(checker.Origins.Find(matcher.endPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+func TestCheckOccurrencesFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+		fun f1(paramX: Int, paramY: Bool) {
+		   let x = 1
+		   var y: Int? = x
+		   fun f2() {
+		       if let y = y {
+		       }
+		   }
+           f1(paramX: 1, paramY: true)
+		}
+
+        fun f3() {
+            f1(paramX: 2, paramY: false)
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	occurrences := checker.Occurrences.All()
+
+	matchers := []*occurrenceMatcher{
+		{
+			startPos:        sema.Position{Line: 2, Column: 6},
+			endPos:          sema.Position{Line: 2, Column: 7},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 2, Column: 9},
+			endPos:          sema.Position{Line: 2, Column: 14},
+			originStartPos:  &sema.Position{Line: 2, Column: 9},
+			originEndPos:    &sema.Position{Line: 2, Column: 9},
+			declarationKind: common.DeclarationKindParameter,
+		},
+		{
+			startPos:        sema.Position{Line: 2, Column: 22},
+			endPos:          sema.Position{Line: 2, Column: 27},
+			originStartPos:  &sema.Position{Line: 2, Column: 22},
+			originEndPos:    &sema.Position{Line: 2, Column: 22},
+			declarationKind: common.DeclarationKindParameter,
+		},
+		{
+			startPos:        sema.Position{Line: 3, Column: 9},
+			endPos:          sema.Position{Line: 3, Column: 9},
+			originStartPos:  &sema.Position{Line: 3, Column: 9},
+			originEndPos:    &sema.Position{Line: 3, Column: 9},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 9},
+			endPos:          sema.Position{Line: 4, Column: 9},
+			originStartPos:  &sema.Position{Line: 4, Column: 9},
+			originEndPos:    &sema.Position{Line: 4, Column: 9},
+			declarationKind: common.DeclarationKindVariable,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 19},
+			endPos:          sema.Position{Line: 4, Column: 19},
+			originStartPos:  &sema.Position{Line: 3, Column: 9},
+			originEndPos:    &sema.Position{Line: 3, Column: 9},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 5, Column: 9},
+			endPos:          sema.Position{Line: 5, Column: 10},
+			originStartPos:  &sema.Position{Line: 5, Column: 9},
+			originEndPos:    &sema.Position{Line: 5, Column: 9},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 6, Column: 16},
+			endPos:          sema.Position{Line: 6, Column: 16},
+			originStartPos:  &sema.Position{Line: 6, Column: 16},
+			originEndPos:    &sema.Position{Line: 6, Column: 16},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 6, Column: 20},
+			endPos:          sema.Position{Line: 6, Column: 20},
+			originStartPos:  &sema.Position{Line: 4, Column: 9},
+			originEndPos:    &sema.Position{Line: 4, Column: 9},
+			declarationKind: common.DeclarationKindVariable,
+		},
+		{
+			startPos:        sema.Position{Line: 9, Column: 11},
+			endPos:          sema.Position{Line: 9, Column: 12},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 12, Column: 12},
+			endPos:          sema.Position{Line: 12, Column: 13},
+			originStartPos:  &sema.Position{Line: 12, Column: 12},
+			originEndPos:    &sema.Position{Line: 12, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 13, Column: 12},
+			endPos:          sema.Position{Line: 13, Column: 13},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(occurrences).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+// TODO: implement occurrences for type references
+//  (e.g. conformances, conditional casting expression)
+
+func TestCheckOccurrencesStructAndInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+		struct interface I1 {}
+
+	    struct S1: I1 {
+	       let x: Int
+	       init() {
+	          self.x = 1
+	          self.test()
+	       }
+	       fun test() {}
+	    }
+
+	    fun f(): S1 {
+	       return S1()
+	    }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	occurrences := checker.Occurrences.All()
+
+	matchers := []*occurrenceMatcher{
+		{
+			startPos:        sema.Position{Line: 2, Column: 19},
+			endPos:          sema.Position{Line: 2, Column: 20},
+			originStartPos:  &sema.Position{Line: 2, Column: 19},
+			originEndPos:    &sema.Position{Line: 2, Column: 19},
+			declarationKind: common.DeclarationKindStructureInterface,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 12},
+			endPos:          sema.Position{Line: 4, Column: 13},
+			originStartPos:  &sema.Position{Line: 4, Column: 12},
+			originEndPos:    &sema.Position{Line: 4, Column: 12},
+			declarationKind: common.DeclarationKindStructure,
+		},
+		{
+			startPos:        sema.Position{Line: 5, Column: 8},
+			endPos:          sema.Position{Line: 5, Column: 17},
+			originStartPos:  &sema.Position{Line: 5, Column: 12},
+			originEndPos:    &sema.Position{Line: 5, Column: 12},
+			declarationKind: common.DeclarationKindField,
+		},
+		// self
+		{
+			startPos:        sema.Position{Line: 7, Column: 11},
+			endPos:          sema.Position{Line: 7, Column: 14},
+			originStartPos:  nil,
+			originEndPos:    nil,
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 7, Column: 16},
+			endPos:          sema.Position{Line: 7, Column: 16},
+			originStartPos:  &sema.Position{Line: 5, Column: 12},
+			originEndPos:    &sema.Position{Line: 5, Column: 12},
+			declarationKind: common.DeclarationKindField,
+		},
+		// self
+		{
+			startPos:        sema.Position{Line: 8, Column: 11},
+			endPos:          sema.Position{Line: 8, Column: 14},
+			originStartPos:  nil,
+			originEndPos:    nil,
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 8, Column: 16},
+			endPos:          sema.Position{Line: 8, Column: 19},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 15},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 10, Column: 12},
+			endPos:          sema.Position{Line: 10, Column: 15},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		// TODO: why the duplicate?
+		{
+			startPos:        sema.Position{Line: 10, Column: 12},
+			endPos:          sema.Position{Line: 10, Column: 15},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 15},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 13, Column: 9},
+			endPos:          sema.Position{Line: 13, Column: 9},
+			originStartPos:  &sema.Position{Line: 13, Column: 9},
+			originEndPos:    &sema.Position{Line: 13, Column: 9},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 14, Column: 15},
+			endPos:          sema.Position{Line: 14, Column: 16},
+			originStartPos:  &sema.Position{Line: 4, Column: 12},
+			originEndPos:    &sema.Position{Line: 4, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(occurrences).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
 	}
 }
 
