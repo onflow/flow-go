@@ -227,6 +227,14 @@ func (v *BaseStrictusVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

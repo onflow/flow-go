@@ -3378,3 +3378,31 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 
 	return &OptionalType{Type: rightHandType}
 }
+
+func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
+	// TODO: check create expressions
+
+	checker.report(
+		&UnsupportedExpressionError{
+			common.ExpressionKindCreate,
+			expression.StartPosition(),
+			expression.EndPosition(),
+		},
+	)
+
+	return &InvalidType{}
+}
+
+func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+	// TODO: check destroy expressions
+
+	checker.report(
+		&UnsupportedExpressionError{
+			common.ExpressionKindDestroy,
+			expression.StartPosition(),
+			expression.EndPosition(),
+		},
+	)
+
+	return &InvalidType{}
+}

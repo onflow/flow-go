@@ -258,25 +258,35 @@ func (e *IdentifierExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitIdentifierExpression(e)
 }
 
-// InvocationExpression
+// Arguments
 
-type InvocationExpression struct {
-	InvokedExpression Expression
-	Arguments         []*Argument
-	EndPos            Position
-}
+type Arguments []*Argument
 
-func (e *InvocationExpression) String() string {
+func (args Arguments) String() string {
 	var builder strings.Builder
-	builder.WriteString(e.InvokedExpression.String())
 	builder.WriteString("(")
-	for i, argument := range e.Arguments {
+	for i, argument := range args {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
 		builder.WriteString(argument.String())
 	}
 	builder.WriteString(")")
+	return builder.String()
+}
+
+// InvocationExpression
+
+type InvocationExpression struct {
+	InvokedExpression Expression
+	Arguments         Arguments
+	EndPos            Position
+}
+
+func (e *InvocationExpression) String() string {
+	var builder strings.Builder
+	builder.WriteString(e.InvokedExpression.String())
+	builder.WriteString(e.Arguments.String())
 	return builder.String()
 }
 
@@ -552,4 +562,77 @@ func (e *FailableDowncastExpression) Accept(visitor Visitor) Repr {
 
 func (e *FailableDowncastExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitFailableDowncastExpression(e)
+}
+
+// CreateExpression
+
+type CreateExpression struct {
+	Identifier Identifier
+	Arguments  Arguments
+	StartPos   Position
+	EndPos     Position
+}
+
+func (e *CreateExpression) String() string {
+	return fmt.Sprintf(
+		"(create %s%s)",
+		e.Identifier, e.Arguments,
+	)
+}
+
+func (e *CreateExpression) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *CreateExpression) EndPosition() Position {
+	return e.EndPos
+}
+
+func (*CreateExpression) isIfStatementTest() {}
+
+func (*CreateExpression) isExpression() {}
+
+func (e *CreateExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *CreateExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitCreateExpression(e)
+}
+
+//return &ast.{
+//}
+
+// DestroyExpression
+
+type DestroyExpression struct {
+	Expression Expression
+	StartPos   Position
+}
+
+func (e *DestroyExpression) String() string {
+	return fmt.Sprintf(
+		"(destroy %s)",
+		e.Expression.String(),
+	)
+}
+
+func (e *DestroyExpression) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *DestroyExpression) EndPosition() Position {
+	return e.Expression.EndPosition()
+}
+
+func (*DestroyExpression) isIfStatementTest() {}
+
+func (*DestroyExpression) isExpression() {}
+
+func (e *DestroyExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *DestroyExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitDestroyExpression(e)
 }
