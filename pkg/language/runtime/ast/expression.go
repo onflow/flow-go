@@ -600,9 +600,6 @@ func (e *CreateExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitCreateExpression(e)
 }
 
-//return &ast.{
-//}
-
 // DestroyExpression
 
 type DestroyExpression struct {
