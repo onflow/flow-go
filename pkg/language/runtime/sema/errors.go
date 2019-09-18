@@ -1105,3 +1105,16 @@ func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
 func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// MissingReturnStatementError
+
+type MissingReturnStatementError struct {
+}
+
+func (e *MissingReturnStatementError) Error() string {
+	return fmt.Sprintf(
+		"missing return statement",
+	)
+}
+
+func (*MissingReturnStatementError) isSemanticError() {}

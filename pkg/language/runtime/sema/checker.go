@@ -42,6 +42,7 @@ type Checker struct {
 	GlobalTypes       map[string]Type
 	inCondition       bool
 	Origins           *Origins
+	exitDetector      *ExitDetector
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
 	// TODO: refactor into fields on AST?
@@ -84,6 +85,7 @@ func NewChecker(
 		GlobalValues:                       map[string]*Variable{},
 		GlobalTypes:                        map[string]Type{},
 		Origins:                            NewOrigins(),
+		exitDetector:                       NewExitDetector(),
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
@@ -399,7 +401,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
+	return checker.visitFunctionDeclaration(declaration, true)
+}
 
+func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclaration, mustExit bool) ast.Repr {
 	checker.checkFunctionAccessModifier(declaration)
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
@@ -413,6 +418,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 		declaration.Parameters,
 		functionType,
 		declaration.FunctionBlock,
+		mustExit,
 	)
 
 	return nil
@@ -470,6 +476,7 @@ func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
+	mustExit bool,
 ) {
 	checker.pushActivations()
 	defer checker.popActivations()
@@ -487,6 +494,14 @@ func (checker *Checker) checkFunction(
 
 			checker.visitFunctionBlock(functionBlock, functionType.ReturnType)
 		}()
+
+		if mustExit && !functionType.ReturnType.Equal(&VoidType{}) {
+			if !checker.exitDetector.Exits(functionBlock) {
+				checker.report(
+					&MissingReturnStatementError{},
+				)
+			}
+		}
 	}
 }
 
@@ -2150,6 +2165,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		expression.Parameters,
 		functionType,
 		expression.FunctionBlock,
+		true,
 	)
 
 	// function expressions are not allowed in conditions
@@ -2817,6 +2833,7 @@ func (checker *Checker) checkInitializer(
 		initializer.Parameters,
 		functionType,
 		initializer.FunctionBlock,
+		true,
 	)
 
 	if initializerKind == initializerKindInterface &&
@@ -3041,7 +3058,7 @@ func (checker *Checker) checkInterfaceFunctions(
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
-			function.Accept(checker)
+			checker.visitFunctionDeclaration(function, false)
 
 			if function.FunctionBlock != nil {
 				checker.checkInterfaceFunctionBlock(
