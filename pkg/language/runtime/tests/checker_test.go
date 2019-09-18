@@ -1079,7 +1079,9 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       fun test(x: Int?): Int {
           if var y = x {
               return y
-          }
+		  }
+		  
+		  return 0
       }
 	`)
 
@@ -1113,7 +1115,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      fun test(x: Int??): Int? {
          if var y = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -1128,7 +1132,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      fun test(x: Int??): Int? {
          if var y: Int? = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -1143,7 +1149,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
      fun test(x: Int) {
          if var y = x {
              // ...
-         }
+		 }
+		 
+		 return
      }
 	`)
 
@@ -1160,7 +1168,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
       fun test(x: Int?): Int? {
           if var y: Int? = x {
              return y
-          }
+		  }
+		  
+		  return nil
       }
 	`)
 
@@ -3646,7 +3656,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
               (fun (): Int { return 2 })() == 2
           }
@@ -3663,7 +3673,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: "nope"
           }
@@ -3678,7 +3688,7 @@ func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *test
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: true
           }
