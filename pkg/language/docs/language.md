@@ -586,14 +586,16 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
 
-Fixed-size arrays have the type suffix `[N]`, where `N` is the size of the array. For example, a fixed-size array of 3 `Int8` elements has the type `Int8[3]`.
+Fixed-size arrays have the form `[T; N]`, where `T` is the element type, and `N` is the size of the array.
+For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
 
-Variable-size arrays have the type suffix `[]`. For example, the type `Int16[]` specifies a variable-size array of elements that have type `Int16`.
+Variable-size arrays have the form `[T]`, where `T` is the element type.
+For example, the type `[Int16]` specifies a variable-size array of elements that have type `Int16`.
 
 ```bamboo,file=array-types.bpl
-let array: Int8[2] = [1, 2]
+let array: [Int8; 2] = [1, 2]
 
-let arrays: Int16[2][3] = [
+let arrays: [[Int16; 3]; 2] = [
     [1, 2, 3],
     [4, 5, 6]
 ]
@@ -689,10 +691,11 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 #### Dictionary Types
 
-Dictionaries have the type suffix `[T]`, where `T` is the type of the key. For example, a dictionary with `Int` keys and `Bool` values has type `Bool[Int]`.
+Dictionaries have the form `{K: V}`, where `K` is the type of the key, and `V` is the type of the value.
+For example, a dictionary with `Int` keys and `Bool` values has type `{Int: Bool}`.
 
 ```bamboo,file=dictionary-types.bpl
-// Declare a constant that has type `Bool[Int]`,
+// Declare a constant that has type `{Int: Bool}`,
 // a dictionary mapping integers to booleans
 //
 let booleans = {
@@ -700,7 +703,7 @@ let booleans = {
     0: false
 }
 
-// Declare a constant that has type `Int[Bool]`,
+// Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping booleans to integers
 //
 let integers = {
@@ -716,7 +719,7 @@ To get the value for a specific key from a dictionary, the access syntax can be 
 Accessing a key returns an [optional](#optionals): If the key is found in the dictionary, the value for the given key is returned, and if the key is not found, `nil` is returned.
 
 ```bamboo,file=dictionary-access-integer-keys.bpl
-// Declare a constant that has type `Bool[Int]`,
+// Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping integers to booleans
 //
 let booleans = {
@@ -736,7 +739,7 @@ booleans["1"]
 ```
 
 ```bamboo,file=dictionary-access-boolean-keys.bpl
-// Declare a constant that has type `Int[Bool]`,
+// Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping booleans to integers
 //
 let integers = {
@@ -1400,7 +1403,7 @@ Parentheses also control precedence.
 For example, a function type `((Int): ((): Int))` is the type for a function which accepts one argument with type `Int`,
 and which returns another function, that takes no arguments and returns an `Int`.
 
-The type `((Int): Int)[2]` specifies an array type of two functions, which accept one integer and return one integer.
+The type `[((Int): Int); 2]` specifies an array type of two functions, which accept one integer and return one integer.
 
 #### Argument Passing Behavior
 
@@ -1412,7 +1415,7 @@ This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?t
 // Declare a function that changes the first two elements
 // of an array of integers
 //
-fun change(_ numbers: Int[]) {
+fun change(_ numbers: [Int]) {
     // Change the elements of the passed in array.
     // The changes are only local, as the array was copied
     //
@@ -1801,7 +1804,7 @@ Array literals are inferred based on the elements of the literal, and to be vari
 
 ```bamboo,file=type-inference-intergers.bpl
 let integers = [1, 2]
-// `integers` has type `Int[]`
+// `integers` has type `[Int]`
 
 // Invalid: mixed types
 //
@@ -1815,7 +1818,7 @@ let booleans = {
     1: true,
     2: false
 }
-// `booleans` has type `Bool[Int]`
+// `booleans` has type `{Int: Bool}`
 
 // Invalid: mixed types
 //
@@ -2379,7 +2382,7 @@ let firstResource <- resources[0]
 
 // **Move** the second resource into a new constant
 //
-let secondResource <- resources[1]
+let secondResource <- resources[0]
 
 // `resources` only contains one element,
 // the initial third resource!
