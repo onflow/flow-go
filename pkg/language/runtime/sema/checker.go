@@ -41,7 +41,9 @@ type Checker struct {
 	GlobalValues      map[string]*Variable
 	GlobalTypes       map[string]Type
 	inCondition       bool
-	Origins           *Origins
+	Occurrences       *Occurrences
+	variableOrigins   map[*Variable]*Origin
+	memberOrigins     map[Type]map[string]*Origin
 	exitDetector      *ExitDetector
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
@@ -62,6 +64,7 @@ type Checker struct {
 	ReturnStatementReturnTypes         map[*ast.ReturnStatement]Type
 	BinaryExpressionResultTypes        map[*ast.BinaryExpression]Type
 	BinaryExpressionRightTypes         map[*ast.BinaryExpression]Type
+	MemberExpressionMembers            map[*ast.MemberExpression]*Member
 }
 
 func NewChecker(
@@ -84,7 +87,9 @@ func NewChecker(
 		typeActivations:                    typeActivations,
 		GlobalValues:                       map[string]*Variable{},
 		GlobalTypes:                        map[string]Type{},
-		Origins:                            NewOrigins(),
+		Occurrences:                        NewOccurrences(),
+		variableOrigins:                    map[*Variable]*Origin{},
+		memberOrigins:                      map[Type]map[string]*Origin{},
 		exitDetector:                       NewExitDetector(),
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
@@ -103,6 +108,7 @@ func NewChecker(
 		ReturnStatementReturnTypes:         map[*ast.ReturnStatement]Type{},
 		BinaryExpressionResultTypes:        map[*ast.BinaryExpression]Type{},
 		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
+		MemberExpressionMembers:            map[*ast.MemberExpression]*Member{},
 	}
 
 	for name, declaration := range predeclaredValues {
@@ -145,7 +151,7 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 		declaration.ValueDeclarationIsConstant(),
 		declaration.ValueDeclarationArgumentLabels(),
 	)
-	checker.recordVariableOrigin(name, variable)
+	checker.recordVariableDeclarationOccurrence(name, variable)
 }
 
 func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
@@ -156,7 +162,7 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 
 	ty := declaration.TypeDeclarationType()
 	checker.declareType(identifier, ty)
-	checker.recordVariableOrigin(
+	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
 			Kind:       declaration.TypeDeclarationKind(),
@@ -572,7 +578,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 			Pos:        &identifier.Pos,
 		}
 		checker.setVariable(identifier.Identifier, variable)
-		checker.recordVariableOrigin(identifier.Identifier, variable)
+		checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 	}
 }
 
@@ -656,7 +662,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.IsConstant,
 		nil,
 	)
-	checker.recordVariableOrigin(declaration.Identifier.Identifier, variable)
+	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
 }
 
 func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
@@ -842,7 +848,7 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 			true,
 			nil,
 		)
-		// TODO: record origin - but what position?
+		// TODO: record occurrence - but what position?
 	}
 
 	checker.visitConditions(functionBlock.PostConditions)
@@ -858,7 +864,7 @@ func (checker *Checker) declareBefore() {
 		true,
 		nil,
 	)
-	// TODO: record origin – but what position?
+	// TODO: record occurrence – but what position?
 }
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) {
@@ -1269,7 +1275,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	return variable.Type
 }
 
-func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOrigin bool) *Variable {
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOccurrence bool) *Variable {
 	identifier := expression.Identifier.Identifier
 	variable := checker.findVariable(identifier)
 	if variable == nil {
@@ -1283,8 +1289,8 @@ func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpressio
 		return nil
 	}
 
-	if recordOrigin {
-		checker.recordOrigin(
+	if recordOccurrence {
+		checker.recordVariableReferenceOccurrence(
 			expression.StartPosition(),
 			expression.EndPosition(),
 			variable,
@@ -1879,12 +1885,19 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
+	member, ok := checker.MemberExpressionMembers[expression]
+	if ok {
+		return member
+	}
 
 	expressionType := expression.Expression.Accept(checker).(Type)
 
-	identifier := expression.Identifier.Identifier
+	origins := checker.memberOrigins[expressionType]
 
-	var member *Member
+	identifier := expression.Identifier.Identifier
+	identifierStartPosition := expression.Identifier.StartPosition()
+	identifierEndPosition := expression.Identifier.EndPosition()
+
 	switch ty := expressionType.(type) {
 	case *CompositeType:
 		member = ty.Members[identifier]
@@ -1903,8 +1916,8 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 				checker.report(
 					&NotEquatableTypeError{
 						Type:     expressionType,
-						StartPos: expression.Identifier.StartPosition(),
-						EndPos:   expression.Identifier.EndPosition(),
+						StartPos: identifierStartPosition,
+						EndPos:   identifierEndPosition,
 					},
 				)
 
@@ -1915,16 +1928,27 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		member = getDictionaryMember(ty, identifier)
 	}
 
-	if !isInvalidType(expressionType) && member == nil {
-		checker.report(
-			&NotDeclaredMemberError{
-				Type:     expressionType,
-				Name:     identifier,
-				StartPos: expression.Identifier.StartPosition(),
-				EndPos:   expression.Identifier.EndPosition(),
-			},
+	if member == nil {
+		if !isInvalidType(expressionType) {
+			checker.report(
+				&NotDeclaredMemberError{
+					Type:     expressionType,
+					Name:     identifier,
+					StartPos: identifierStartPosition,
+					EndPos:   identifierEndPosition,
+				},
+			)
+		}
+	} else {
+		origin := origins[identifier]
+		checker.Occurrences.Put(
+			identifierStartPosition,
+			identifierEndPosition,
+			origin,
 		)
 	}
+
+	checker.MemberExpressionMembers[expression] = member
 
 	return member
 }
@@ -2251,7 +2275,7 @@ func (checker *Checker) declareFunction(
 	identifier ast.Identifier,
 	functionType *FunctionType,
 	argumentLabels []string,
-	recordOrigin bool,
+	recordOccurrence bool,
 ) {
 	name := identifier.Identifier
 
@@ -2279,8 +2303,8 @@ func (checker *Checker) declareFunction(
 		Pos:            &identifier.Pos,
 	}
 	checker.setVariable(name, variable)
-	if recordOrigin {
-		checker.recordVariableOrigin(name, variable)
+	if recordOccurrence {
+		checker.recordVariableDeclarationOccurrence(name, variable)
 	}
 }
 
@@ -2449,7 +2473,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	identifier := declaration.Identifier
 
 	checker.declareType(identifier, compositeType)
-	checker.recordVariableOrigin(
+	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
 			Kind:       declaration.DeclarationKind(),
@@ -2461,7 +2485,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	conformances := checker.conformances(declaration)
 
-	members := checker.members(
+	members, origins := checker.membersAndOrigins(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		true,
@@ -2474,6 +2498,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		Conformances: conformances,
 	}
 
+	checker.memberOrigins[compositeType] = origins
+
 	// TODO: support multiple overloaded initializers
 
 	var parameterTypes []Type
@@ -2483,11 +2509,13 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
+			secondInitializer := declaration.Members.Initializers[1]
+
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        firstInitializer.StartPosition(),
-					EndPos:          firstInitializer.EndPosition(),
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
 				},
 			)
 		}
@@ -2692,26 +2720,32 @@ func (checker *Checker) declareCompositeConstructor(
 	)
 }
 
-func (checker *Checker) members(
+func (checker *Checker) membersAndOrigins(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
 	requireVariableKind bool,
-) map[string]*Member {
-
-	fieldCount := len(fields)
-	functionCount := len(functions)
-
-	members := make(map[string]*Member, fieldCount+functionCount)
+) (
+	members map[string]*Member,
+	origins map[string]*Origin,
+) {
+	memberCount := len(fields) + len(functions)
+	members = make(map[string]*Member, memberCount)
+	origins = make(map[string]*Origin, memberCount)
 
 	// declare a member for each field
 	for _, field := range fields {
 		fieldType := checker.ConvertType(field.TypeAnnotation.Type)
 
-		members[field.Identifier.Identifier] = &Member{
+		identifier := field.Identifier.Identifier
+
+		members[identifier] = &Member{
 			Type:          fieldType,
 			VariableKind:  field.VariableKind,
 			IsInitialized: false,
 		}
+
+		origins[identifier] =
+			checker.recordFieldDeclarationOrigin(field, fieldType)
 
 		if requireVariableKind &&
 			field.VariableKind == ast.VariableKindNotSpecified {
@@ -2732,15 +2766,65 @@ func (checker *Checker) members(
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
 
-		members[function.Identifier.Identifier] = &Member{
+		identifier := function.Identifier.Identifier
+
+		members[identifier] = &Member{
 			Type:           functionType,
 			VariableKind:   ast.VariableKindConstant,
 			IsInitialized:  true,
 			ArgumentLabels: argumentLabels,
 		}
+
+		origins[identifier] =
+			checker.recordFunctionDeclarationOrigin(function, functionType)
 	}
 
-	return members
+	return members, origins
+}
+
+func (checker *Checker) recordFieldDeclarationOrigin(
+	field *ast.FieldDeclaration,
+	fieldType Type,
+) *Origin {
+	startPosition := field.Identifier.StartPosition()
+	endPosition := field.Identifier.EndPosition()
+
+	origin := &Origin{
+		Type:            fieldType,
+		DeclarationKind: common.DeclarationKindField,
+		StartPos:        &startPosition,
+		EndPos:          &endPosition,
+	}
+
+	checker.Occurrences.Put(
+		field.StartPos,
+		field.EndPos,
+		origin,
+	)
+
+	return origin
+}
+
+func (checker *Checker) recordFunctionDeclarationOrigin(
+	function *ast.FunctionDeclaration,
+	functionType *FunctionType,
+) *Origin {
+	startPosition := function.Identifier.StartPosition()
+	endPosition := function.Identifier.EndPosition()
+
+	origin := &Origin{
+		Type:            functionType,
+		DeclarationKind: common.DeclarationKindFunction,
+		StartPos:        &startPosition,
+		EndPos:          &endPosition,
+	}
+
+	checker.Occurrences.Put(
+		startPosition,
+		endPosition,
+		origin,
+	)
+	return origin
 }
 
 func (checker *Checker) checkInitializers(
@@ -2884,7 +2968,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 		Pos:        nil,
 	}
 	checker.setVariable(SelfIdentifier, self)
-	checker.recordVariableOrigin(SelfIdentifier, self)
+	checker.recordVariableDeclarationOccurrence(SelfIdentifier, self)
 }
 
 // checkMemberIdentifiers checks the fields and functions are unique and aren't named `init`
@@ -2993,10 +3077,19 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Members.Functions,
 	)
 
-	interfaceType.Members = checker.members(
+	members, origins := checker.membersAndOrigins(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		false,
+	)
+
+	interfaceType.Members = members
+
+	checker.memberOrigins[interfaceType] = origins
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
 	)
 
 	checker.checkInitializers(
@@ -3085,7 +3178,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	identifier := declaration.Identifier
 
 	checker.declareType(identifier, interfaceType)
-	checker.recordVariableOrigin(
+	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
 			Kind:       declaration.DeclarationKind(),
@@ -3111,11 +3204,13 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
+			secondInitializer := declaration.Members.Initializers[1]
+
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        firstInitializer.StartPosition(),
-					EndPos:          firstInitializer.EndPosition(),
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
 				},
 			)
 		}
@@ -3176,17 +3271,28 @@ func (checker *Checker) declareInterfaceMetaType(
 	)
 }
 
-func (checker *Checker) recordOrigin(startPos, endPos ast.Position, variable *Variable) {
-	checker.Origins.Put(startPos, endPos, variable)
+func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.Position, variable *Variable) {
+	origin, ok := checker.variableOrigins[variable]
+	if !ok {
+		origin = &Origin{
+			Type:            variable.Type,
+			DeclarationKind: variable.Kind,
+			StartPos:        variable.Pos,
+			// TODO:
+			EndPos: variable.Pos,
+		}
+		checker.variableOrigins[variable] = origin
+	}
+	checker.Occurrences.Put(startPos, endPos, origin)
 }
 
-func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
+func (checker *Checker) recordVariableDeclarationOccurrence(name string, variable *Variable) {
 	if variable.Pos == nil {
 		return
 	}
 	startPos := *variable.Pos
 	endPos := variable.Pos.Shifted(len(name) - 1)
-	checker.recordOrigin(startPos, endPos, variable)
+	checker.recordVariableReferenceOccurrence(startPos, endPos, variable)
 }
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
