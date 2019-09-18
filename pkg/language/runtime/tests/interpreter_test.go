@@ -1824,7 +1824,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.wasFed = true
@@ -1857,7 +1857,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.feed()
@@ -1886,7 +1886,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           var cat = Cat()
           let kitty = Cat()
           cat = kitty
@@ -1916,7 +1916,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cats = [Cat()]
           let kitty = Cat()
           cats[0] = kitty
@@ -1953,7 +1953,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let carrier = Carrier(cat: Cat())
           let kitty = Cat()
           carrier.cat = kitty
@@ -2003,12 +2003,12 @@ func TestInterpretArrayCopy(t *testing.T) {
 
 	inter := parseCheckAndInterpret(`
 
-      fun change(_ numbers: Int[]): Int[] {
+      fun change(_ numbers: [Int]): [Int] {
           numbers[0] = 1
           return numbers
       }
 
-      fun test(): Int[] {
+      fun test(): [Int] {
           let numbers = [0]
           let numbers2 = change(numbers)
           return [
@@ -3260,7 +3260,7 @@ func TestInterpretArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append(4)
           return x
@@ -3282,7 +3282,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           let y = x.append
           y(4)
@@ -3305,7 +3305,7 @@ func TestInterpretArrayConcat(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           return a.concat([3, 4])
       }
@@ -3326,7 +3326,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           let b = a.concat
           return b([3, 4])
@@ -3348,7 +3348,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.insert(at: 1, 4)
           return x
@@ -3483,7 +3483,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	inter := parseCheckAndInterpret(`
       var removed: Int? = nil
 
-      fun test(): Int[String] {
+      fun test(): {String: Int} {
           let x = {"abc": 1, "def": 2}
           removed = x.remove(key: "abc")
           return x

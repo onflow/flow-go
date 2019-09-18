@@ -14,7 +14,7 @@ func TestConstantSizedType_String(t *testing.T) {
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("Int[2][]"))
+	Expect(ty.String()).To(Equal("[[Int]; 2]"))
 }
 
 func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
@@ -30,7 +30,7 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("((Int8): Int16)[2]"))
+	Expect(ty.String()).To(Equal("[((Int8): Int16); 2]"))
 }
 
 func TestVariableSizedType_String(t *testing.T) {
@@ -43,7 +43,7 @@ func TestVariableSizedType_String(t *testing.T) {
 		},
 	}
 
-	Expect(ty.String()).To(Equal("Int[][2]"))
+	Expect(ty.String()).To(Equal("[[Int; 2]]"))
 }
 
 func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
@@ -58,5 +58,5 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 		},
 	}
 
-	Expect(ty.String()).To(Equal("((Int8): Int16)[]"))
+	Expect(ty.String()).To(Equal("[((Int8): Int16)]"))
 }

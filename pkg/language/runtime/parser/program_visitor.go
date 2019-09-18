@@ -375,22 +375,15 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
-	identifierNode := ctx.Identifier()
-	// identifier?
-	if identifierNode != nil {
-		identifier := identifierNode.Accept(v).(ast.Identifier)
-		return &ast.NominalType{
-			Identifier: identifier,
-		}
-	}
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
 
-	// alternative: function type
-	functionTypeContext := ctx.FunctionType()
-	if functionTypeContext != nil {
-		return functionTypeContext.Accept(v)
-	}
+func (v *ProgramVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	panic(&errors.UnreachableError{})
+	return &ast.NominalType{
+		Identifier: identifier,
+	}
 }
 
 func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
@@ -419,6 +412,50 @@ func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{}
 	}
 }
 
+func (v *ProgramVisitor) VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{} {
+	elementType := ctx.FullType().Accept(v).(ast.Type)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.VariableSizedType{
+		Type:     elementType,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitConstantSizedType(ctx *ConstantSizedTypeContext) interface{} {
+	elementType := ctx.FullType().Accept(v).(ast.Type)
+
+	size, err := strconv.Atoi(ctx.size.GetText())
+	if err != nil {
+		return nil
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.ConstantSizedType{
+		Type:     elementType,
+		Size:     size,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interface{} {
+	keyType := ctx.keyType.Accept(v).(ast.Type)
+	valueType := ctx.valueType.Accept(v).(ast.Type)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.DictionaryType{
+		KeyType:   keyType,
+		ValueType: valueType,
+		StartPos:  startPosition,
+		EndPos:    endPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
 	move := ctx.Move() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
@@ -435,40 +472,6 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 	result := baseTypeResult.(ast.Type)
 
-	// reduce in reverse
-	indices := ctx.AllTypeIndex()
-	lastIndex := len(indices) - 1
-	for i := range indices {
-		indexContext := indices[lastIndex-i]
-		startPosition, endPosition :=
-			ast.PositionRangeFromContext(indexContext)
-
-		switch index := indexContext.Accept(v).(type) {
-		case *int:
-			if index == nil {
-				result = &ast.VariableSizedType{
-					Type:     result,
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				}
-			} else {
-				result = &ast.ConstantSizedType{
-					Type:     result,
-					Size:     *index,
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				}
-			}
-		case ast.Type:
-			result = &ast.DictionaryType{
-				ValueType: result,
-				KeyType:   index,
-				StartPos:  startPosition,
-				EndPos:    endPosition,
-			}
-		}
-	}
-
 	for _, optional := range ctx.optionals {
 		endPos := ast.PositionFromToken(optional)
 		result = &ast.OptionalType{
@@ -476,31 +479,6 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 			EndPos: endPos,
 		}
 	}
-
-	return result
-}
-
-func (v *ProgramVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
-	// type?
-	typeContext := ctx.FullType()
-	if typeContext != nil {
-		return typeContext.Accept(v).(ast.Type)
-	}
-
-	// dimension
-	var result *int
-
-	literalNode := ctx.DecimalLiteral()
-	if literalNode == nil {
-		return result
-	}
-
-	value, err := strconv.Atoi(literalNode.GetText())
-	if err != nil {
-		return result
-	}
-
-	result = &value
 
 	return result
 }

@@ -16,7 +16,6 @@ import (
 func init() {
 	format.TruncatedDiff = false
 	format.MaxDepth = 100
-	format.UseStringerRepresentation = true
 }
 
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
@@ -1622,7 +1621,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
-		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
+		pub fun test(a: Int32, b: [Int32; 2], c: [[Int32; 3]]): [[Int64]] {}
 	`)
 
 	Expect(err).
@@ -1663,21 +1662,21 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int32",
-								Pos:        Position{Offset: 29, Line: 2, Column: 28},
+								Pos:        Position{Offset: 30, Line: 2, Column: 29},
 							},
 						},
 						Size:     2,
-						StartPos: Position{Offset: 34, Line: 2, Column: 33},
-						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						StartPos: Position{Offset: 29, Line: 2, Column: 28},
+						EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 					},
 				},
 				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 			},
 			{
 				Identifier: Identifier{
 					Identifier: "c",
-					Pos:        Position{Offset: 39, Line: 2, Column: 38},
+					Pos:        Position{Offset: 41, Line: 2, Column: 40},
 				},
 				TypeAnnotation: &TypeAnnotation{
 					Move: false,
@@ -1686,19 +1685,19 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
-									Pos:        Position{Offset: 42, Line: 2, Column: 41},
+									Pos:        Position{Offset: 46, Line: 2, Column: 45},
 								},
 							},
 							Size:     3,
-							StartPos: Position{Offset: 49, Line: 2, Column: 48},
-							EndPos:   Position{Offset: 51, Line: 2, Column: 50},
+							StartPos: Position{Offset: 45, Line: 2, Column: 44},
+							EndPos:   Position{Offset: 54, Line: 2, Column: 53},
 						},
-						StartPos: Position{Offset: 47, Line: 2, Column: 46},
-						EndPos:   Position{Offset: 48, Line: 2, Column: 47},
+						StartPos: Position{Offset: 44, Line: 2, Column: 43},
+						EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 					},
 				},
-				StartPos: Position{Offset: 39, Line: 2, Column: 38},
-				EndPos:   Position{Offset: 51, Line: 2, Column: 50},
+				StartPos: Position{Offset: 41, Line: 2, Column: 40},
+				EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
@@ -1707,20 +1706,20 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 				Type: &VariableSizedType{
 					Type: &NominalType{
 						Identifier: Identifier{Identifier: "Int64",
-							Pos: Position{Offset: 55, Line: 2, Column: 54},
+							Pos: Position{Offset: 61, Line: 2, Column: 60},
 						},
 					},
-					StartPos: Position{Offset: 62, Line: 2, Column: 61},
-					EndPos:   Position{Offset: 63, Line: 2, Column: 62},
+					StartPos: Position{Offset: 60, Line: 2, Column: 59},
+					EndPos:   Position{Offset: 66, Line: 2, Column: 65},
 				},
-				StartPos: Position{Offset: 60, Line: 2, Column: 59},
-				EndPos:   Position{Offset: 61, Line: 2, Column: 60},
+				StartPos: Position{Offset: 59, Line: 2, Column: 58},
+				EndPos:   Position{Offset: 67, Line: 2, Column: 66},
 			},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 65, Line: 2, Column: 64},
-				EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+				StartPos: Position{Offset: 69, Line: 2, Column: 68},
+				EndPos:   Position{Offset: 70, Line: 2, Column: 69},
 			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
@@ -1738,7 +1737,7 @@ func TestParseDictionaryType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
-	    let x: Int[String] = {}
+	    let x: {String: Int} = {}
 	`)
 
 	Expect(err).
@@ -1752,25 +1751,25 @@ func TestParseDictionaryType(t *testing.T) {
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
 			Type: &DictionaryType{
-				ValueType: &NominalType{
-					Identifier: Identifier{
-						Identifier: "Int",
-						Pos:        Position{Offset: 13, Line: 2, Column: 12},
-					},
-				},
 				KeyType: &NominalType{
 					Identifier: Identifier{
 						Identifier: "String",
-						Pos:        Position{Offset: 17, Line: 2, Column: 16},
+						Pos:        Position{Offset: 14, Line: 2, Column: 13},
 					},
 				},
-				StartPos: Position{Offset: 16, Line: 2, Column: 15},
-				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+				ValueType: &NominalType{
+					Identifier: Identifier{
+						Identifier: "Int",
+						Pos:        Position{Offset: 22, Line: 2, Column: 21},
+					},
+				},
+				StartPos: Position{Offset: 13, Line: 2, Column: 12},
+				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 			},
 		},
 		Value: &DictionaryExpression{
-			StartPos: Position{Offset: 27, Line: 2, Column: 26},
-			EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+			StartPos: Position{Offset: 29, Line: 2, Column: 28},
+			EndPos:   Position{Offset: 30, Line: 2, Column: 29},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -2481,7 +2480,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
-		let test: ((Int8): Int16)[2] = []
+		let test: [((Int8): Int16); 2] = []
 	`)
 
 	Expect(err).
@@ -2504,7 +2503,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int8",
-									Pos:        Position{Offset: 15, Line: 2, Column: 14},
+									Pos:        Position{Offset: 16, Line: 2, Column: 15},
 								},
 							},
 						},
@@ -2514,21 +2513,21 @@ func TestParseFunctionArrayType(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
+								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
 					},
-					StartPos: Position{Offset: 13, Line: 2, Column: 12},
-					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+					StartPos: Position{Offset: 14, Line: 2, Column: 13},
+					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
 				},
 				Size:     2,
-				StartPos: Position{Offset: 28, Line: 2, Column: 27},
-				EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+				StartPos: Position{Offset: 13, Line: 2, Column: 12},
+				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 			},
 		},
 		Value: &ArrayExpression{
-			StartPos: Position{Offset: 34, Line: 2, Column: 33},
-			EndPos:   Position{Offset: 35, Line: 2, Column: 34},
+			StartPos: Position{Offset: 36, Line: 2, Column: 35},
+			EndPos:   Position{Offset: 37, Line: 2, Column: 36},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -2545,7 +2544,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
 	actual, err := parser.ParseProgram(`
-		let test: ((Int8): Int16[2]) = nothing
+		let test: ((Int8): [Int16; 2]) = nothing
 	`)
 
 	Expect(err).
@@ -2578,22 +2577,22 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
+								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
 						Size:     2,
-						StartPos: Position{Offset: 27, Line: 2, Column: 26},
-						EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+						StartPos: Position{Offset: 22, Line: 2, Column: 21},
+						EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 					},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 			},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "nothing",
-				Pos:        Position{Offset: 34, Line: 2, Column: 33},
+				Pos:        Position{Offset: 36, Line: 2, Column: 35},
 			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},

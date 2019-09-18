@@ -523,7 +523,7 @@ func (t *VariableSizedType) elementType() Type {
 }
 
 func (t *VariableSizedType) String() string {
-	return ArrayTypeToString(t)
+	return fmt.Sprintf("[%s]", t.Type.String())
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -549,7 +549,7 @@ func (t *ConstantSizedType) elementType() Type {
 }
 
 func (t *ConstantSizedType) String() string {
-	return ArrayTypeToString(t)
+	return fmt.Sprintf("[%s; %d]", t.Type.String(), t.Size)
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -560,32 +560,6 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 
 	return t.Type.Equal(otherArray.Type) &&
 		t.Size == otherArray.Size
-}
-
-// ArrayTypeToString
-
-func ArrayTypeToString(arrayType ArrayType) string {
-	var arraySuffixes strings.Builder
-	var currentType Type = arrayType
-	currentTypeIsArrayType := true
-	for currentTypeIsArrayType {
-		switch arrayType := currentType.(type) {
-		case *ConstantSizedType:
-			_, err := fmt.Fprintf(&arraySuffixes, "[%d]", arrayType.Size)
-			if err != nil {
-				panic(&errors.UnreachableError{})
-			}
-			currentType = arrayType.Type
-		case *VariableSizedType:
-			arraySuffixes.WriteString("[]")
-			currentType = arrayType.Type
-		default:
-			currentTypeIsArrayType = false
-		}
-	}
-
-	baseType := currentType.String()
-	return baseType + arraySuffixes.String()
 }
 
 // FunctionType
@@ -768,7 +742,7 @@ type DictionaryType struct {
 func (*DictionaryType) isType() {}
 
 func (t *DictionaryType) String() string {
-	return fmt.Sprintf("%s[%s]", t.ValueType, t.KeyType)
+	return fmt.Sprintf("{%s: %s}", t.KeyType, t.ValueType)
 }
 
 func (t *DictionaryType) Equal(other Type) bool {

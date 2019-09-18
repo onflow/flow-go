@@ -79,15 +79,27 @@ func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseStrictusVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitConstantSizedType(ctx *ConstantSizedTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
