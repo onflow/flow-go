@@ -498,7 +498,10 @@ func (checker *Checker) checkFunction(
 		if mustExit && !functionType.ReturnType.Equal(&VoidType{}) {
 			if !checker.exitDetector.Exits(functionBlock) {
 				checker.report(
-					&MissingReturnStatementError{},
+					&MissingReturnStatementError{
+						StartPos: functionBlock.StartPosition(),
+						EndPos:   functionBlock.EndPosition(),
+					},
 				)
 			}
 		}
