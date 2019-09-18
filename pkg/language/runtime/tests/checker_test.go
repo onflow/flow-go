@@ -6531,3 +6531,45 @@ func TestCheckMissingReturnStatement(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
 }
+
+func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      	struct interface Test {
+			fun test(x: Int): Int {
+				pre {
+					x != 0
+				}
+			}
+		}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+		struct Test {
+			pub(set) var foo: Int
+		
+			init(foo: Int) {
+				self.foo = foo
+			}
+		
+			pub fun getFoo(): Int {
+				if 2 > 1 {
+					return 0
+				}
+			}
+		}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+}
