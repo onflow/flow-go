@@ -6518,3 +6518,16 @@ func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 }
+
+func TestCheckMissingReturnStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+}
