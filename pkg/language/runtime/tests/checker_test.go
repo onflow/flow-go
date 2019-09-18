@@ -298,7 +298,7 @@ func TestCheckStringSlice(t *testing.T) {
 	_, err := parseAndCheck(`
 	  fun test(): String {
 	 	  let a = "abcdef"
-		  return a.slice(from: 0, to: 1)
+		  return a.slice(from: 0, upTo: 1)
       }
     `)
 
@@ -342,7 +342,7 @@ func TestCheckInvalidStringSlice(t *testing.T) {
 
 		_, err := parseAndCheck(`
 		  let a = "abcdef"
-		  let x = a.slice(from: "a", to: "b")
+		  let x = a.slice(from: "a", upTo: "b")
 		`)
 
 		errs := expectCheckerErrors(err, 2)
@@ -361,7 +361,7 @@ func TestCheckStringSliceBound(t *testing.T) {
       fun test(): String {
 		  let a = "abcdef"
 		  let c = a.slice
-		  return c(from: 0, to: 1)
+		  return c(from: 0, upTo: 1)
       }
     `)
 

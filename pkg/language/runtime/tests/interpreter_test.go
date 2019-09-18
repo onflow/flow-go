@@ -426,7 +426,7 @@ func TestInterpretStringSlicing(t *testing.T) {
 			inter := parseCheckAndInterpret(fmt.Sprintf(`
 				fun test(): String {
 				  let s = "%s"
-				  return s.slice(from: %d, to: %d)
+				  return s.slice(from: %d, upTo: %d)
 				}
 			`, test.str, test.from, test.to))
 

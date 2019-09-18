@@ -169,7 +169,7 @@ var stringMembers = map[string]*Member{
 			},
 			ReturnType: &StringType{},
 		},
-		ArgumentLabels: []string{"from", "to"},
+		ArgumentLabels: []string{"from", "upTo"},
 	},
 }
 
