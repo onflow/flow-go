@@ -67,8 +67,10 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 // Signer interface
 type Signer interface {
 	Name() AlgoName
-	// Size return the signature output length
+	// Size returns the signature output length in bytes
 	SignatureSize() int
+	// PrKeySize() returns the private key length in bytes
+	PrKeySize() int
 	// Signature functions
 	SignHash(PrKey, Hash) (Signature, error)
 	SignBytes(PrKey, []byte, Hasher) (Signature, error)
@@ -97,6 +99,10 @@ func (a *SignAlgo) Name() AlgoName {
 // SignatureSize returns the size of a signature in bytes
 func (a *SignAlgo) SignatureSize() int {
 	return a.SignatureLength
+}
+
+func (a *SignAlgo) PrKeySize() int {
+	return a.PrKeyLength
 }
 
 // Signature type tools

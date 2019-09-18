@@ -91,7 +91,7 @@ func (sk *PrKeyBLS_BLS12381) Signer() Signer {
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return prKeyLengthBLS_BLS12381
+	return sk.alg.PrKeySize()
 }
 
 func (sk *PrKeyBLS_BLS12381) computePubKey() {

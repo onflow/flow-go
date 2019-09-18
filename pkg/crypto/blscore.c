@@ -80,7 +80,6 @@ void _G2scalarPointMult(ep2_st* res, ep2_st* p, bn_st *expo) {
     #else 
         ep2_mul_lwnaf(res, p, expo);
     #endif
-    
 }
 
 // Exponentiation of fixed g2 in G2
@@ -173,3 +172,4 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     else 
         return SIG_INVALID;
 }
+

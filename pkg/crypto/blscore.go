@@ -27,7 +27,7 @@ func (a *BLS_BLS12381Algo) init() error {
 	if a.PrKeyLength != PrKeyLengthBLS_BLS12381 ||
 		a.PubKeyLength != PubKeyLengthBLS_BLS12381 ||
 		a.SignatureLength != SignatureLengthBLS_BLS12381 {
-		return cryptoError{"BLS Lengths in types.go are not matching include.h"}
+		return cryptoError{"BLS Lengths in types.go are not matching bls_include.h"}
 	}
 
 	// Inits relic context and sets the B12_381 context

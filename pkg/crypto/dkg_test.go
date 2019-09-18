@@ -44,7 +44,7 @@ func (out *DKGoutput) processOutput(current int, network [][]dkgChan) dkgResult 
 func TestFeldmanVSS(t *testing.T) {
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
-	n := 3
+	n := 4
 	lead := 0
 
 	// Create channels
@@ -80,11 +80,11 @@ func TestFeldmanVSS(t *testing.T) {
 				case msg := <-network[orig[1]][current]:
 					out = dkg.ProcessDKGmsg(orig[1], msg)
 					_ = out.processOutput(current, network)
-				//case msg := <-network[orig[2]][current]:
-				//	out = dkg.ProcessDKGmsg(orig[2], msg)
-				//	_ = out.processOutput(current, network)
+				case msg := <-network[orig[2]][current]:
+					out = dkg.ProcessDKGmsg(orig[2], msg)
+					_ = out.processOutput(current, network)
 				// if timeout, stop and finalize
-				case <-time.After(3 * time.Second):
+				case <-time.After(time.Second):
 					_, _, _, _ = dkg.EndDKG()
 					fmt.Printf("quit %d \n", current)
 					quit <- 1
