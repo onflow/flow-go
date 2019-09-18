@@ -1,4 +1,8 @@
 
+// TODO:
+// - How to get current total supply?
+// - How to "instantiate" `Faucet` and `ApprovableProvider` for `DeteToken`?
+
 pub contract interface FungibleToken {
 
     pub resource interface Provider {
@@ -99,21 +103,9 @@ pub abstract contract BasicToken: FungibleToken {
     }
 }
 
-pub contract DeteToken includes BasicToken {
-
-    pub resource Minter: Provider {
-
-        init() {}
-
-        pub fun withdraw(amount: Int): <-Vault {
-            return create Vault(balance: amount)
-        }
-    }
-}
-
 import Timestamp from "time"
 
-pub resource Faucet: FungibleToken.Provider {
+pub abstract resource Faucet: FungibleToken.Provider {
 
     private let source: <-FungibleToken.Provider
     private let dailyLimit: Int
@@ -157,5 +149,65 @@ pub resource Faucet: FungibleToken.Provider {
 
         self.lastResetTime = system.blockTime
         self.remainingAmount = dailyLimit
+    }
+}
+
+pub abstract resource ApprovableProvider: FungibleToken.Provider {
+
+    private let source: <-FungibleToken.Provider
+    private let approvals: Int[Address]
+
+    init(source: <-FungibleToken.Provider) {
+        self.source = source
+    }
+
+    pub fun approvedAmount(for address: Address): Int {
+        return self.approvals[address] ?? 0
+    }
+
+    pub fun removeApproval(for address: Address) {
+        self.approvals.remove(key: address)
+    }
+
+    pub fun setApproval(for address: Address, amount: Int) {
+        pre {
+            amount > 0:
+                "Withdrawal amount must be positive"
+        }
+        post {
+            self.approvedAmount(for address) == amount:
+                "Approval amount must be set"
+        }
+        self.approvals[address] = amount
+    }
+
+    pub fun withdraw(amount: Int): <-Vault {
+        pre {
+            // TODO: what is with draw
+            amount <= self.approvedAmount(for: address):
+                "Withdrawal amount must be less or equal to approved amount"
+        }
+        post {
+            self.approvalAmount(for: address) == before(self.approvalAmount(for: address)) - amount:
+                "Approval amount must be decremented by amount"
+        }
+
+        let remainingApproval = self.approvals[address] ?? 0
+        self.approvals[address] = remainingApproval - amount
+
+        return self.source.withdraw(amount: amount)
+    }
+}
+
+
+pub contract DeteToken includes BasicToken {
+
+    pub resource Minter: Provider {
+
+        init() {}
+
+        pub fun withdraw(amount: Int): <-Vault {
+            return create Vault(balance: amount)
+        }
     }
 }
