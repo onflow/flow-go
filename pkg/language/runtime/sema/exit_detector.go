@@ -6,7 +6,7 @@ import (
 
 // FunctionBlockExits determines if the given function is guaranteed to terminate.
 //
-// A function block terminates if it all branches of its AST end in either a
+// A function block terminates if all branches of its AST end in either a
 // return statement or simple infinite loop (such as while(true)).
 func FunctionBlockExits(node *ast.FunctionBlock) bool {
 	detector := &ExitDetector{enclosingBlockContainsBreak: false}
