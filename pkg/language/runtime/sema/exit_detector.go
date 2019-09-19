@@ -70,6 +70,7 @@ func (detector ExitDetector) VisitIfStatement(node *ast.IfStatement) ast.Repr {
 	}
 
 	// if conditional is a boolean literal, check then/else
+	// TODO: evaluate more complex cases
 	if booleanLiteral, ok := test.(*ast.BoolExpression); ok {
 		if booleanLiteral.Value {
 			return detector.nodeExits(node.Then)
@@ -103,6 +104,7 @@ func (detector ExitDetector) VisitWhileStatement(node *ast.WhileStatement) ast.R
 	// visit enclosing block
 	node.Block.Accept(detector)
 
+	// TODO: evaluate more complex cases
 	if booleanLiteral, ok := test.(*ast.BoolExpression); ok {
 		// while(true) exits unless there is a break
 		if booleanLiteral.Value && !detector.enclosingBlockContainsBreak {
@@ -126,6 +128,7 @@ func (detector ExitDetector) VisitExpressionStatement(node *ast.ExpressionStatem
 }
 
 func (detector ExitDetector) VisitInvocationExpression(node *ast.InvocationExpression) ast.Repr {
+	// TODO: handle invocations that do not return (i.e. have a `Never` return type)
 	return false
 }
 
