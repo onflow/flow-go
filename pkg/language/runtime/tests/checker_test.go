@@ -1174,7 +1174,9 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       fun test(x: Int?): Int {
           if var y = x {
               return y
-          }
+		  }
+		  
+		  return 0
       }
 	`)
 
@@ -1208,7 +1210,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      fun test(x: Int??): Int? {
          if var y = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -1223,7 +1227,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      fun test(x: Int??): Int? {
          if var y: Int? = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -1238,7 +1244,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
      fun test(x: Int) {
          if var y = x {
              // ...
-         }
+		 }
+		 
+		 return
      }
 	`)
 
@@ -1255,7 +1263,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
       fun test(x: Int?): Int? {
           if var y: Int? = x {
              return y
-          }
+		  }
+		  
+		  return nil
       }
 	`)
 
@@ -3741,7 +3751,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
               (fun (): Int { return 2 })() == 2
           }
@@ -3758,7 +3768,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: "nope"
           }
@@ -3773,7 +3783,7 @@ func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *test
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: true
           }
@@ -6793,4 +6803,59 @@ func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckMissingReturnStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+}
+
+func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      	struct interface Test {
+			fun test(x: Int): Int {
+				pre {
+					x != 0
+				}
+			}
+		}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+		struct Test {
+			pub(set) var foo: Int
+		
+			init(foo: Int) {
+				self.foo = foo
+			}
+		
+			pub fun getFoo(): Int {
+				if 2 > 1 {
+					return 0
+				}
+			}
+		}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
 }

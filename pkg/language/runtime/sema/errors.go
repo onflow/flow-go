@@ -1106,6 +1106,27 @@ func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// MissingReturnStatementError
+
+type MissingReturnStatementError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingReturnStatementError) Error() string {
+	return "missing return statement"
+}
+
+func (*MissingReturnStatementError) isSemanticError() {}
+
+func (e *MissingReturnStatementError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingReturnStatementError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // UnsupportedExpressionError
 
 type UnsupportedExpressionError struct {
