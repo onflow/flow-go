@@ -220,3 +220,11 @@ func (detector *ExitDetector) VisitStringExpression(*ast.StringExpression) ast.R
 func (detector *ExitDetector) VisitFailableDowncastExpression(*ast.FailableDowncastExpression) ast.Repr {
 	return false
 }
+
+func (detector *ExitDetector) VisitCreateExpression(*ast.CreateExpression) ast.Repr {
+	return false
+}
+
+func (detector *ExitDetector) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+	return false
+}
