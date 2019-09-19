@@ -122,9 +122,9 @@ func testSignStruct(t *testing.T, salg Signer, halg Hasher, sk PrKey, input Enco
 	}
 
 	if result == false {
-		t.Errorf("Verification failed:\n signature is %x", s)
+		t.Errorf("Verification failed:\n signature is %s", s)
 	} else {
-		t.Logf("Verification passed:\n signature is %x", s)
+		t.Logf("Verification passed:\n signature is %s", s)
 	}
 }
 

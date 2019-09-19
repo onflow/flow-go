@@ -45,6 +45,149 @@ int _getPrKeyLengthBLS_BLS12381() {
     return SK_LEN;
 }
 
+
+static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
+	fp_t t0, t1, t2, t3;
+
+	fp_null(t0);
+	fp_null(t1);
+	fp_null(t2);
+	fp_null(t3);
+
+	TRY {
+		fp_new(t0);
+		fp_new(t1);
+		fp_new(t2);
+		fp_new(t3);
+
+		/* t0 = t^2. */
+		fp_sqr(t0, t);
+		/* Compute f(u) such that u^3 + b is a square. */
+		fp_set_dig(p->x, -u);
+		fp_neg(p->x, p->x);
+		ep_rhs(t1, p);
+		/* Compute t1 = (-f(u) + t^2), t2 = t1 * t^2 and invert if non-zero. */
+		fp_add(t1, t1, t0);
+		fp_mul(t2, t1, t0);
+		if (!fp_is_zero(t2)) {
+			/* Compute inverse of u^3 * t2 and fix later. */
+			fp_mul(t2, t2, p->x);
+			fp_mul(t2, t2, p->x);
+			fp_mul(t2, t2, p->x);
+			fp_inv(t2, t2);
+		}
+		/* Compute t0 = t^4 * u * sqrt(-3)/t2. */
+		fp_sqr(t0, t0);
+		fp_mul(t0, t0, t2);
+		fp_mul(t0, t0, p->x);
+		fp_mul(t0, t0, p->x);
+		fp_mul(t0, t0, p->x);
+		/* Compute constant u * sqrt(-3). */
+		fp_copy(t3, core_get()->srm3);
+		for (int i = 1; i < -u; i++) {
+			fp_add(t3, t3, core_get()->srm3);
+		}
+		fp_mul(t0, t0, t3);
+		/* Compute (u * sqrt(-3) + u)/2 - t0. */
+		fp_add_dig(p->x, t3, -u);
+		fp_hlv(p->y, p->x);
+		fp_sub(p->x, p->y, t0);
+		ep_rhs(p->y, p);
+		if (!fp_srt(p->y, p->y)) {
+			/* Now try t0 - (u * sqrt(-3) - u)/2. */
+			fp_sub_dig(p->x, t3, -u);
+			fp_hlv(p->y, p->x);
+			fp_sub(p->x, t0, p->y);
+			ep_rhs(p->y, p);
+			if (!fp_srt(p->y, p->y)) {
+				/* Finally, try (u - t1^2 / t2). */
+				fp_sqr(p->x, t1);
+				fp_mul(p->x, p->x, t1);
+				fp_mul(p->x, p->x, t2);
+				fp_sub_dig(p->x, p->x, -u);
+				ep_rhs(p->y, p);
+				fp_srt(p->y, p->y);
+			}
+		}
+		if (negate) {
+			fp_neg(p->y, p->y);
+		}
+		fp_set_dig(p->z, 1);
+		p->norm = 1;
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		fp_free(t0);
+		fp_free(t1);
+		fp_free(t2);
+		fp_free(t3);
+	}
+}
+
+// Maps a 384 bits number to G1
+// Optimized Shallue–van de Woestijne encoding from Section 3 of
+// "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
+// taken from Relic library
+void mapToG1_swu(ep_t p, const uint8_t *msg, int len) {
+	bn_t k, pm1o2;
+	fp_t t;
+	ep_t q;
+	uint8_t digest[RLC_MD_LEN];
+	int neg;
+
+	bn_null(k);
+	bn_null(pm1o2);
+	fp_null(t);
+	ep_null(q);
+
+	TRY {
+		bn_new(k);
+		bn_new(pm1o2);
+		fp_new(t);
+		ep_new(q);
+
+		pm1o2->sign = RLC_POS;
+		pm1o2->used = RLC_FP_DIGS;
+		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
+		bn_hlv(pm1o2, pm1o2);
+		md_map(digest, msg, len);
+		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
+		fp_prime_conv(t, k);
+		fp_prime_back(k, t);
+		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
+
+        ep_swu_b12(p, t, -3, neg);
+        md_map(digest, digest, RLC_MD_LEN);
+        bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
+        fp_prime_conv(t, k);
+        neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
+        ep_swu_b12(q, t, -3, neg);
+        ep_add(p, p, q);
+        ep_norm(p, p);
+        /* Now, multiply by cofactor to get the correct group. */
+        fp_prime_get_par(k);
+        bn_neg(k, k);
+        bn_add_dig(k, k, 1);
+        if (bn_bits(k) < RLC_DIG) {
+            ep_mul_dig(p, p, k->dp[0]);
+        } else {
+            ep_mul(p, p, k);
+        }
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(k);
+		bn_free(pm1o2);
+		fp_free(t);
+		ep_free(q);
+	}
+}
+
+
 // Exponentiation of random p in G1
 void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
     // Using window NAF of size 2
@@ -89,11 +232,10 @@ void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
 
 // Computes BLS signature
 void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
-    
     ep_st h;
     ep_new(&h);
-    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    ep_map(&h, data, len); 
+    // hash to G1
+    mapToG1_swu(&h, data, len); 
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h);
@@ -105,10 +247,6 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
 int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) { 
     // TODO : check pk is on curve  (should be done offline)
 	// TODO : check pk is in G2 (should be done offline) 
-
-    // TODO : check s is on curve
-	// TODO : check s is in G1
-
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -117,6 +255,8 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     _ep_read_bin_compact(elemsG1[0], sig);
 
  #if MEMBERSHIP_CHECK
+    // check s is on curve
+	// check s is in G1
     if (!ep_is_valid(elemsG1[0]))
         return SIG_INVALID;
     ep_st inf;
@@ -134,8 +274,8 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 
     // elemsG1[1] = h
     ep_new(elemsG1[1]);
-    // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    ep_map(elemsG1[1], data, len); 
+    // hash to G1 
+    mapToG1_swu(elemsG1[1], data, len); 
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);

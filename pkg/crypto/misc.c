@@ -43,6 +43,7 @@ void _bn_randZr(bn_t x, byte* seed, int len) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
+    bn_set_dig(x, 5);
 }
 
 // ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.
@@ -126,12 +127,74 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
     }
 }
 
+// Simple hashing to G1 as described in the original BLS paper 
+// https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
+// taken and modified from Relic library
+void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
+	bn_t k, pm1o2;
+	fp_t t;
+	uint8_t digest[RLC_MD_LEN];
+	int neg;
+
+	bn_null(k);
+	bn_null(pm1o2);
+	fp_null(t);
+	ep_null(q);
+
+	TRY {
+		bn_new(k);
+		bn_new(pm1o2);
+		fp_new(t);
+		ep_new(q);
+
+		pm1o2->sign = RLC_POS;
+		pm1o2->used = RLC_FP_DIGS;
+		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
+		bn_hlv(pm1o2, pm1o2);
+		md_map(digest, msg, len);
+		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
+		fp_prime_conv(t, k);
+		fp_prime_back(k, t);
+		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
+
+        fp_prime_conv(p->x, k);
+        fp_zero(p->y);
+        fp_set_dig(p->z, 1);
+
+        while (1) {
+            ep_rhs(t, p);
+            if (fp_srt(p->y, t)) {
+                p->norm = 1;
+                break;
+            }
+            fp_add_dig(p->x, p->x, 1);
+        }
+
+        // Now, multiply by cofactor to get the correct group. 
+        ep_curve_get_cof(k);
+        if (bn_bits(k) < RLC_DIG) {
+            ep_mul_dig(p, p, k->dp[0]);
+        } else {
+            ep_mul_basic(p, p, k);
+        }
+	}
+	CATCH_ANY {
+		THROW(ERR_CAUGHT);
+	}
+	FINALLY {
+		bn_free(k);
+		bn_free(pm1o2);
+		fp_free(t);
+		ep_free(q);
+	}
+}
+
 // computes hashing to G1 
 // DEBUG/test function
 ep_st* _hashToG1(byte* data, int len) {
     ep_st* h = (ep_st*) malloc(sizeof(ep_st));
     ep_new(h);
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    ep_map(h, data, len); 
+    mapToG1_swu(h, data, len); 
     return h;
 }
