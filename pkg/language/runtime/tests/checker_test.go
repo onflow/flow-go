@@ -204,6 +204,24 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 	}
 }
 
+// Test fix for crasher, see https://github.com/dapperlabs/flow-go/pull/675
+// Integer literal value fits range can't be checked when target is Never
+//
+func TestCheckInvalidIntegerLiteralWithNeverReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Never {
+            return 1
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
 	RegisterTestingT(t)
 
