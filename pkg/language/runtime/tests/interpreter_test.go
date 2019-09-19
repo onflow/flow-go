@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
@@ -393,6 +394,46 @@ func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.NewStringValue("def")))
+}
+
+type stringSliceTest struct {
+	str      string
+	from     int
+	to       int
+	result   string
+	matchers []types.GomegaMatcher
+}
+
+func TestInterpretStringSlicing(t *testing.T) {
+	tests := []stringSliceTest{
+		{"abcdef", 0, 6, "abcdef", nil},
+		{"abcdef", 0, 0, "", nil},
+		{"abcdef", 0, 1, "a", nil},
+		{"abcdef", 0, 2, "ab", nil},
+		{"abcdef", 1, 2, "b", nil},
+		{"abcdef", 2, 3, "c", nil},
+		{"abcdef", 5, 6, "f", nil},
+		// TODO: check invalid arguments
+		// {"abcdef", -1, 0, "", []types.GomegaMatcher{
+		// 	BeAssignableToTypeOf(InvalidIndexError),
+		// }},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+				fun test(): String {
+				  let s = "%s"
+				  return s.slice(from: %d, upTo: %d)
+				}
+			`, test.str, test.from, test.to))
+
+			Expect(inter.Invoke("test")).
+				To(Equal(interpreter.NewStringValue(test.result)))
+		})
+	}
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
