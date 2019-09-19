@@ -653,6 +653,9 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 	switch typedExpression := expression.(type) {
 	case *ast.IntExpression:
 		unwrappedTargetType := checker.unwrapOptionalType(targetType)
+
+		// check if literal value fits range can't be checked when target is Never
+		//
 		if checker.IsSubType(unwrappedTargetType, &IntegerType{}) &&
 			!checker.IsSubType(unwrappedTargetType, &NeverType{}) {
 
