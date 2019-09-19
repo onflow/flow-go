@@ -134,7 +134,6 @@ void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	uint8_t digest[RLC_MD_LEN];
-	int neg;
 
 	bn_null(k);
 	bn_null(pm1o2);
@@ -155,7 +154,6 @@ void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
 		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
 		fp_prime_conv(t, k);
 		fp_prime_back(k, t);
-		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
 
         fp_prime_conv(p->x, k);
         fp_zero(p->y);
