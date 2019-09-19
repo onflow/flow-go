@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -59,4 +60,60 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 	}
 
 	Expect(ty.String()).To(Equal("[((Int8): Int16)]"))
+}
+
+func TestIsResourceType_AnyNestedInArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &VariableSizedType{
+		Type: &AnyType{},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeFalse())
+}
+
+func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &VariableSizedType{
+		&CompositeType{
+			Kind: common.CompositeKindResource,
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeTrue())
+}
+
+func TestIsResourceType_ResourceNestedInDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &DictionaryType{
+		KeyType: &StringType{},
+		ValueType: &VariableSizedType{
+			Type: &CompositeType{
+				Kind: common.CompositeKindResource,
+			},
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeTrue())
+}
+
+func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &DictionaryType{
+		KeyType: &StringType{},
+		ValueType: &VariableSizedType{
+			Type: &CompositeType{
+				Kind: common.CompositeKindStructure,
+			},
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeFalse())
 }
