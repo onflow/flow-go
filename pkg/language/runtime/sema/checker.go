@@ -1823,16 +1823,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifier := expression.Identifier.Identifier
 
 	var member *Member
-	switch ty := expressionType.(type) {
-	case *StructureType:
-		member = ty.Members[identifier]
-	case *InterfaceType:
-		member = ty.Members[identifier]
-	case *StringType:
-		member = stringMembers[identifier]
-	case ArrayType:
-		member = getArrayMember(ty, identifier)
+	if ty, ok := expressionType.(HasMembers); ok {
+		member = ty.GetMember(identifier)
+	}
 
+	if _, isArrayType := expressionType.(ArrayType); isArrayType && member != nil {
 		// TODO: implement Equatable interface: https://github.com/dapperlabs/bamboo-node/issues/78
 		if identifier == "contains" {
 			functionType := member.Type.(*FunctionType)
@@ -1849,8 +1844,6 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 				return nil
 			}
 		}
-	case *DictionaryType:
-		member = getDictionaryMember(ty, identifier)
 	}
 
 	if !isInvalidType(expressionType) && member == nil {

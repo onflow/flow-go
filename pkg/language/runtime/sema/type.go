@@ -132,20 +132,26 @@ func (*StringType) Equal(other Type) bool {
 	return ok
 }
 
-var stringMembers = map[string]*Member{
-	"length": {
-		Type:          &IntType{},
-		VariableKind:  ast.VariableKindConstant,
-		IsInitialized: true,
-	},
-	"concat": {
-		Type: &FunctionType{
-			ParameterTypes: []Type{
-				&StringType{},
+func (t *StringType) GetMember(field string) *Member {
+	switch field {
+	case "length":
+		return NewMember(t, "length", Member{
+			Type:          &IntType{},
+			VariableKind:  ast.VariableKindConstant,
+			IsInitialized: true,
+		})
+	case "concat":
+		return NewMember(t, "concat", Member{
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					&StringType{},
+				},
+				ReturnType: &StringType{},
 			},
-			ReturnType: &StringType{},
-		},
-	},
+		})
+	default:
+		return nil
+	}
 }
 
 // IntegerType represents the super-type of all integer types
@@ -297,18 +303,10 @@ type ArrayType interface {
 	elementType() Type
 }
 
-var arrayMembers = map[string]*Member{
-	"length": {
-		Type:          &IntType{},
-		VariableKind:  ast.VariableKindConstant,
-		IsInitialized: true,
-	},
-}
-
 func getArrayMember(ty ArrayType, field string) *Member {
 	switch field {
 	case "append":
-		return &Member{
+		return NewMember(ty, "append", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
@@ -317,18 +315,18 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				ReturnType: &VoidType{},
 			},
 			IsInitialized: true,
-		}
+		})
 	case "concat":
-		return &Member{
+		return NewMember(ty, "concat", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{ty},
 				ReturnType:     ty,
 			},
 			IsInitialized: true,
-		}
+		})
 	case "insert":
-		return &Member{
+		return NewMember(ty, "insert", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
@@ -339,9 +337,9 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
-		}
+		})
 	case "remove":
-		return &Member{
+		return NewMember(ty, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{&IntegerType{}},
@@ -349,36 +347,42 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"at"},
-		}
+		})
 	case "removeFirst":
-		return &Member{
+		return NewMember(ty, "removeFirst", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{},
 				ReturnType:     ty.elementType(),
 			},
 			IsInitialized: true,
-		}
+		})
 	case "removeLast":
-		return &Member{
+		return NewMember(ty, "removeLast", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{},
 				ReturnType:     ty.elementType(),
 			},
 			IsInitialized: true,
-		}
+		})
 	case "contains":
-		return &Member{
+		return NewMember(ty, "contains", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{ty.elementType()},
 				ReturnType:     &BoolType{},
 			},
 			IsInitialized: true,
-		}
+		})
+	case "length":
+		return NewMember(ty, "length", Member{
+			Type:          &IntType{},
+			VariableKind:  ast.VariableKindConstant,
+			IsInitialized: true,
+		})
 	default:
-		return arrayMembers[field]
+		return nil
 	}
 }
 
@@ -407,6 +411,10 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
+func (t *VariableSizedType) GetMember(identifier string) *Member {
+	return getArrayMember(t, identifier)
+}
+
 // ConstantSizedType is a constant sized array type
 type ConstantSizedType struct {
 	Type
@@ -432,6 +440,10 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 
 	return t.Type.Equal(otherArray.Type) &&
 		t.Size == otherArray.Size
+}
+
+func (t *ConstantSizedType) GetMember(identifier string) *Member {
+	return getArrayMember(t, identifier)
 }
 
 // ArrayTypeToString
@@ -571,6 +583,10 @@ func (t *StructureType) Equal(other Type) bool {
 	return otherStructure.Identifier == t.Identifier
 }
 
+func (t *StructureType) GetMember(identifier string) *Member {
+	return t.Members[identifier]
+}
+
 // Member
 
 type Member struct {
@@ -578,6 +594,33 @@ type Member struct {
 	VariableKind   ast.VariableKind
 	IsInitialized  bool
 	ArgumentLabels []string
+}
+
+// NewMember initializes a new member type and panics if the member declaration is invalid.
+func NewMember(parentType Type, identifier string, member Member) *Member {
+	if functionType, ok := member.Type.(*FunctionType); ok {
+		if member.ArgumentLabels != nil && len(member.ArgumentLabels) != len(functionType.ParameterTypes) {
+			panic(fmt.Sprintf(
+				"member %s.%s has incorrect argument label count",
+				parentType.String(),
+				identifier,
+			))
+		}
+	} else {
+		if member.ArgumentLabels != nil {
+			panic(fmt.Sprintf(
+				"non-function member %s.%s should not declare argument labels",
+				parentType.String(),
+				identifier,
+			))
+		}
+	}
+
+	return &member
+}
+
+type HasMembers interface {
+	GetMember(string) *Member
 }
 
 // InterfaceType
@@ -601,6 +644,10 @@ func (t *InterfaceType) Equal(other Type) bool {
 	}
 
 	return otherInterface.Identifier == t.Identifier
+}
+
+func (t *InterfaceType) GetMember(identifier string) *Member {
+	return t.Members[identifier]
 }
 
 // InterfaceMetaType
@@ -647,32 +694,30 @@ func (t *DictionaryType) Equal(other Type) bool {
 		otherDictionary.ValueType.Equal(t.ValueType)
 }
 
-var dictionaryMembers = map[string]*Member{
-	"length": {
-		Type:          &IntType{},
-		VariableKind:  ast.VariableKindConstant,
-		IsInitialized: true,
-	},
-}
-
-func getDictionaryMember(ty *DictionaryType, field string) *Member {
-	switch field {
+func (t *DictionaryType) GetMember(identifer string) *Member {
+	switch identifer {
+	case "length":
+		return NewMember(t, "length", Member{
+			Type:          &IntType{},
+			VariableKind:  ast.VariableKindConstant,
+			IsInitialized: true,
+		})
 	case "remove":
-		return &Member{
+		return NewMember(t, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
-					ty.KeyType,
+					t.KeyType,
 				},
 				ReturnType: &OptionalType{
-					Type: ty.ValueType,
+					Type: t.ValueType,
 				},
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"key"},
-		}
+		})
 	default:
-		return dictionaryMembers[field]
+		return nil
 	}
 }
 
