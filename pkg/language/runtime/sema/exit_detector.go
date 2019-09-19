@@ -24,6 +24,7 @@ func (detector ExitDetector) visitStatements(statements []ast.Statement) bool {
 
 	for _, statement := range statements {
 		if statement.Accept(detector).(bool) {
+			// TODO: report dead code after returning statement: https://github.com/dapperlabs/flow-go/issues/682
 			return true
 		}
 	}
