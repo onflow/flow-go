@@ -1124,6 +1124,32 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := invocation.EndPos
+
+	return &ast.CreateExpression{
+		Identifier: identifier,
+		Arguments:  invocation.Arguments,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.DestroyExpression{
+		Expression: expression,
+		StartPos:   startPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
 	return ctx.Literal().Accept(v)
 }

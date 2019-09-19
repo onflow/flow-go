@@ -172,6 +172,12 @@ type StrictusListener interface {
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
 
+	// EnterCreateExpression is called when entering the CreateExpression production.
+	EnterCreateExpression(c *CreateExpressionContext)
+
+	// EnterDestroyExpression is called when entering the DestroyExpression production.
+	EnterDestroyExpression(c *DestroyExpressionContext)
+
 	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
 
@@ -408,6 +414,12 @@ type StrictusListener interface {
 
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
+
+	// ExitCreateExpression is called when exiting the CreateExpression production.
+	ExitCreateExpression(c *CreateExpressionContext)
+
+	// ExitDestroyExpression is called when exiting the DestroyExpression production.
+	ExitDestroyExpression(c *DestroyExpressionContext)
 
 	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)

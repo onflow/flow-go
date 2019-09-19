@@ -176,6 +176,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#unaryOp.
 	VisitUnaryOp(ctx *UnaryOpContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#CreateExpression.
+	VisitCreateExpression(ctx *CreateExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#DestroyExpression.
+	VisitDestroyExpression(ctx *DestroyExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#IdentifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 
