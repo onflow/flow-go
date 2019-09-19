@@ -152,13 +152,13 @@ func (*StringType) Equal(other Type) bool {
 func (t *StringType) GetMember(field string) *Member {
 	switch field {
 	case "length":
-		return NewMember(t, "length", Member{
+		return NewMemberForType(t, "length", Member{
 			Type:          &IntType{},
 			VariableKind:  ast.VariableKindConstant,
 			IsInitialized: true,
 		})
 	case "concat":
-		return NewMember(t, "concat", Member{
+		return NewMemberForType(t, "concat", Member{
 			Type: &FunctionType{
 				ParameterTypes: []Type{
 					&StringType{},
@@ -167,7 +167,7 @@ func (t *StringType) GetMember(field string) *Member {
 			},
 		})
 	case "slice":
-		return NewMember(t, "slice", Member{
+		return NewMemberForType(t, "slice", Member{
 			Type: &FunctionType{
 				ParameterTypes: []Type{
 					&IntType{},
@@ -445,7 +445,7 @@ type ArrayType interface {
 func getArrayMember(ty ArrayType, field string) *Member {
 	switch field {
 	case "append":
-		return NewMember(ty, "append", Member{
+		return NewMemberForType(ty, "append", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
@@ -456,7 +456,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "concat":
-		return NewMember(ty, "concat", Member{
+		return NewMemberForType(ty, "concat", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{ty},
@@ -465,7 +465,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "insert":
-		return NewMember(ty, "insert", Member{
+		return NewMemberForType(ty, "insert", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
@@ -478,7 +478,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 	case "remove":
-		return NewMember(ty, "remove", Member{
+		return NewMemberForType(ty, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{&IntegerType{}},
@@ -488,7 +488,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			ArgumentLabels: []string{"at"},
 		})
 	case "removeFirst":
-		return NewMember(ty, "removeFirst", Member{
+		return NewMemberForType(ty, "removeFirst", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{},
@@ -497,7 +497,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "removeLast":
-		return NewMember(ty, "removeLast", Member{
+		return NewMemberForType(ty, "removeLast", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{},
@@ -506,7 +506,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "contains":
-		return NewMember(ty, "contains", Member{
+		return NewMemberForType(ty, "contains", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{ty.elementType()},
@@ -515,7 +515,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "length":
-		return NewMember(ty, "length", Member{
+		return NewMemberForType(ty, "length", Member{
 			Type:          &IntType{},
 			VariableKind:  ast.VariableKindConstant,
 			IsInitialized: true,
@@ -739,13 +739,13 @@ type Member struct {
 	ArgumentLabels []string
 }
 
-// NewMember initializes a new member type and panics if the member declaration is invalid.
-func NewMember(parentType Type, identifier string, member Member) *Member {
+// NewMemberForType initializes a new member type and panics if the member declaration is invalid.
+func NewMemberForType(ty Type, identifier string, member Member) *Member {
 	if functionType, ok := member.Type.(*FunctionType); ok {
 		if member.ArgumentLabels != nil && len(member.ArgumentLabels) != len(functionType.ParameterTypes) {
 			panic(fmt.Sprintf(
 				"member %s.%s has incorrect argument label count",
-				parentType.String(),
+				ty.String(),
 				identifier,
 			))
 		}
@@ -753,7 +753,7 @@ func NewMember(parentType Type, identifier string, member Member) *Member {
 		if member.ArgumentLabels != nil {
 			panic(fmt.Sprintf(
 				"non-function member %s.%s should not declare argument labels",
-				parentType.String(),
+				ty.String(),
 				identifier,
 			))
 		}
@@ -842,13 +842,13 @@ func (t *DictionaryType) Equal(other Type) bool {
 func (t *DictionaryType) GetMember(identifer string) *Member {
 	switch identifer {
 	case "length":
-		return NewMember(t, "length", Member{
+		return NewMemberForType(t, "length", Member{
 			Type:          &IntType{},
 			VariableKind:  ast.VariableKindConstant,
 			IsInitialized: true,
 		})
 	case "remove":
-		return NewMember(t, "remove", Member{
+		return NewMemberForType(t, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypes: []Type{
