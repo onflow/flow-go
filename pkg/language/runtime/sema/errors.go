@@ -1119,6 +1119,14 @@ func (e *MissingReturnStatementError) Error() string {
 
 func (*MissingReturnStatementError) isSemanticError() {}
 
+func (e *MissingReturnStatementError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingReturnStatementError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // UnsupportedExpressionError
 
 type UnsupportedExpressionError struct {
