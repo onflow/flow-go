@@ -574,12 +574,14 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	checker.VariableDeclarationValueTypes[declaration] = valueType
 
+	valueIsInvalid := isInvalidType(valueType)
+
 	// if the variable declaration is a optional binding, the value must be optional
 
 	var valueIsOptional bool
 	var optionalValueType *OptionalType
 
-	if isOptionalBinding {
+	if isOptionalBinding && !valueIsInvalid {
 		optionalValueType, valueIsOptional = valueType.(*OptionalType)
 		if !valueIsOptional {
 			checker.report(
@@ -600,7 +602,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = checker.ConvertType(declaration.TypeAnnotation.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !isInvalidType(valueType) && !isInvalidType(declarationType) {
+		if declarationType != nil && valueType != nil && !valueIsInvalid && !isInvalidType(declarationType) {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -651,7 +653,9 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 	switch typedExpression := expression.(type) {
 	case *ast.IntExpression:
 		unwrappedTargetType := checker.unwrapOptionalType(targetType)
-		if checker.IsSubType(unwrappedTargetType, &IntegerType{}) {
+		if checker.IsSubType(unwrappedTargetType, &IntegerType{}) &&
+			!checker.IsSubType(unwrappedTargetType, &NeverType{}) {
+
 			checker.checkIntegerLiteral(typedExpression, unwrappedTargetType)
 
 			return true
@@ -1234,7 +1238,9 @@ func (checker *Checker) visitIndexingExpression(
 		// check indexing expression's type can be used to index
 		// into indexed expression's type
 
-		if !checker.IsIndexingType(indexingType, indexedType) {
+		if !isInvalidType(indexingType) &&
+			!checker.IsIndexingType(indexingType, indexedType) {
+
 			checker.report(
 				&NotIndexingTypeError{
 					Type:     indexingType,
