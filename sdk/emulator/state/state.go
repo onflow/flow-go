@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -18,7 +17,7 @@ type WorldState struct {
 	blockchainMutex   sync.RWMutex
 	Transactions      map[string]*types.SignedTransaction
 	transactionsMutex sync.RWMutex
-	Registers         execution.Registers
+	Registers         types.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -29,7 +28,7 @@ func NewWorldState() *WorldState {
 	blocks := make(map[string]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[string]*types.SignedTransaction)
-	registers := make(execution.Registers)
+	registers := make(types.Registers)
 
 	genesis := etypes.GenesisBlock()
 	blocks[string(genesis.Hash().Bytes())] = genesis
@@ -105,7 +104,7 @@ func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
 }
 
 // SetRegisters commits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers execution.Registers) {
+func (ws *WorldState) SetRegisters(registers types.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
