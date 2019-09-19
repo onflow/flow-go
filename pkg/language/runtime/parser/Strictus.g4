@@ -285,6 +285,8 @@ multiplicativeExpression
 
 unaryExpression
     : primaryExpression
+    // NOTE: allow multiple unary operators, but reject in visitor
+    // to provide better error for invalid juxtaposition
     | unaryOp+ unaryExpression
     ;
 
@@ -353,7 +355,9 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : identifier                                                        # IdentifierExpression
+    : Create identifier invocation                                      # CreateExpression
+    | Destroy expression                                                # DestroyExpression
+    | identifier                                                        # IdentifierExpression
     | literal                                                           # LiteralExpression
     | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
     | '(' expression ')'                                                # NestedExpression
@@ -466,9 +470,14 @@ Nil : 'nil' ;
 Import : 'import' ;
 From : 'from' ;
 
+Create : 'create' ;
+Destroy : 'destroy' ;
+
 identifier
     : Identifier
     | From
+    | Create
+    | Destroy
     ;
 
 Identifier

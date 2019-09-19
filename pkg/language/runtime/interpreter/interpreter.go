@@ -1623,3 +1623,11 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 			return SomeValue{Value: anyValue.Value}
 		})
 }
+
+func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
+	panic(&errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+	panic(&errors.UnreachableError{})
+}
