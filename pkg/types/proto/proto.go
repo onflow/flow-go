@@ -5,8 +5,8 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")

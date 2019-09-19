@@ -3,13 +3,15 @@ package sema
 import (
 	"encoding/gob"
 	"fmt"
+	"math"
+	"math/big"
 	"strings"
 
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 type Type interface {
@@ -118,6 +120,21 @@ func (*BoolType) Equal(other Type) bool {
 	return ok
 }
 
+// CharacterType represents the character type
+
+type CharacterType struct{}
+
+func (*CharacterType) isType() {}
+
+func (*CharacterType) String() string {
+	return "Character"
+}
+
+func (*CharacterType) Equal(other Type) bool {
+	_, ok := other.(*CharacterType)
+	return ok
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -149,9 +166,27 @@ func (t *StringType) GetMember(field string) *Member {
 				ReturnType: &StringType{},
 			},
 		})
+	case "slice":
+		return NewMember(t, "slice", Member{
+			Type: &FunctionType{
+				ParameterTypes: []Type{
+					&IntType{},
+					&IntType{},
+				},
+				ReturnType: &StringType{},
+			},
+			ArgumentLabels: []string{"from", "upTo"},
+		})
 	default:
 		return nil
 	}
+}
+
+// Ranged
+
+type Ranged interface {
+	Min() *big.Int
+	Max() *big.Int
 }
 
 // IntegerType represents the super-type of all integer types
@@ -168,6 +203,14 @@ func (*IntegerType) Equal(other Type) bool {
 	return ok
 }
 
+func (*IntegerType) Min() *big.Int {
+	return nil
+}
+
+func (*IntegerType) Max() *big.Int {
+	return nil
+}
+
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
@@ -180,6 +223,14 @@ func (*IntType) String() string {
 func (*IntType) Equal(other Type) bool {
 	_, ok := other.(*IntType)
 	return ok
+}
+
+func (*IntType) Min() *big.Int {
+	return nil
+}
+
+func (*IntType) Max() *big.Int {
+	return nil
 }
 
 // Int8Type represents the 8-bit signed integer type `Int8`
@@ -197,6 +248,17 @@ func (*Int8Type) Equal(other Type) bool {
 	return ok
 }
 
+var Int8TypeMin = big.NewInt(0).SetInt64(math.MinInt8)
+var Int8TypeMax = big.NewInt(0).SetInt64(math.MaxInt8)
+
+func (*Int8Type) Min() *big.Int {
+	return Int8TypeMin
+}
+
+func (*Int8Type) Max() *big.Int {
+	return Int8TypeMax
+}
+
 // Int16Type represents the 16-bit signed integer type `Int16`
 type Int16Type struct{}
 
@@ -209,6 +271,17 @@ func (*Int16Type) String() string {
 func (*Int16Type) Equal(other Type) bool {
 	_, ok := other.(*Int16Type)
 	return ok
+}
+
+var Int16TypeMin = big.NewInt(0).SetInt64(math.MinInt16)
+var Int16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
+
+func (*Int16Type) Min() *big.Int {
+	return Int16TypeMin
+}
+
+func (*Int16Type) Max() *big.Int {
+	return Int16TypeMax
 }
 
 // Int32Type represents the 32-bit signed integer type `Int32`
@@ -225,6 +298,17 @@ func (*Int32Type) Equal(other Type) bool {
 	return ok
 }
 
+var Int32TypeMin = big.NewInt(0).SetInt64(math.MinInt32)
+var Int32TypeMax = big.NewInt(0).SetInt64(math.MaxInt32)
+
+func (*Int32Type) Min() *big.Int {
+	return Int32TypeMin
+}
+
+func (*Int32Type) Max() *big.Int {
+	return Int32TypeMax
+}
+
 // Int64Type represents the 64-bit signed integer type `Int64`
 type Int64Type struct{}
 
@@ -237,6 +321,17 @@ func (*Int64Type) String() string {
 func (*Int64Type) Equal(other Type) bool {
 	_, ok := other.(*Int64Type)
 	return ok
+}
+
+var Int64TypeMin = big.NewInt(0).SetInt64(math.MinInt64)
+var Int64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
+
+func (*Int64Type) Min() *big.Int {
+	return Int64TypeMin
+}
+
+func (*Int64Type) Max() *big.Int {
+	return Int64TypeMax
 }
 
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
@@ -253,6 +348,17 @@ func (*UInt8Type) Equal(other Type) bool {
 	return ok
 }
 
+var UInt8TypeMin = big.NewInt(0)
+var UInt8TypeMax = big.NewInt(0).SetUint64(math.MaxUint8)
+
+func (*UInt8Type) Min() *big.Int {
+	return UInt8TypeMin
+}
+
+func (*UInt8Type) Max() *big.Int {
+	return UInt8TypeMax
+}
+
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
 type UInt16Type struct{}
 
@@ -265,6 +371,17 @@ func (*UInt16Type) String() string {
 func (*UInt16Type) Equal(other Type) bool {
 	_, ok := other.(*UInt16Type)
 	return ok
+}
+
+var UInt16TypeMin = big.NewInt(0)
+var UInt16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
+
+func (*UInt16Type) Min() *big.Int {
+	return UInt16TypeMin
+}
+
+func (*UInt16Type) Max() *big.Int {
+	return UInt16TypeMax
 }
 
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
@@ -281,6 +398,17 @@ func (*UInt32Type) Equal(other Type) bool {
 	return ok
 }
 
+var UInt32TypeMin = big.NewInt(0)
+var UInt32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
+
+func (*UInt32Type) Min() *big.Int {
+	return UInt32TypeMin
+}
+
+func (*UInt32Type) Max() *big.Int {
+	return UInt32TypeMax
+}
+
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
 type UInt64Type struct{}
 
@@ -293,6 +421,17 @@ func (*UInt64Type) String() string {
 func (*UInt64Type) Equal(other Type) bool {
 	_, ok := other.(*UInt64Type)
 	return ok
+}
+
+var UInt64TypeMin = big.NewInt(0)
+var UInt64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
+
+func (*UInt64Type) Min() *big.Int {
+	return UInt64TypeMin
+}
+
+func (*UInt64Type) Max() *big.Int {
+	return UInt64TypeMax
 }
 
 // ArrayType
@@ -530,6 +669,7 @@ func init() {
 		&AnyType{},
 		&NeverType{},
 		&BoolType{},
+		&CharacterType{},
 		&IntType{},
 		&StringType{},
 		&Int8Type{},
@@ -559,31 +699,34 @@ func init() {
 	}
 }
 
-// StructureType
+// CompositeType
 
-type StructureType struct {
-	Identifier                string
-	Conformances              []*InterfaceType
-	Members                   map[string]*Member
+type CompositeType struct {
+	Kind         common.CompositeKind
+	Identifier   string
+	Conformances []*InterfaceType
+	Members      map[string]*Member
+	// TODO: add support for overloaded initializers
 	ConstructorParameterTypes []Type
 }
 
-func (*StructureType) isType() {}
+func (*CompositeType) isType() {}
 
-func (t *StructureType) String() string {
+func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
-func (t *StructureType) Equal(other Type) bool {
-	otherStructure, ok := other.(*StructureType)
+func (t *CompositeType) Equal(other Type) bool {
+	otherStructure, ok := other.(*CompositeType)
 	if !ok {
 		return false
 	}
 
-	return otherStructure.Identifier == t.Identifier
+	return otherStructure.Kind == t.Kind &&
+		otherStructure.Identifier == t.Identifier
 }
 
-func (t *StructureType) GetMember(identifier string) *Member {
+func (t *CompositeType) GetMember(identifier string) *Member {
 	return t.Members[identifier]
 }
 
@@ -626,6 +769,7 @@ type HasMembers interface {
 // InterfaceType
 
 type InterfaceType struct {
+	CompositeKind             common.CompositeKind
 	Identifier                string
 	Members                   map[string]*Member
 	InitializerParameterTypes []Type
@@ -643,7 +787,8 @@ func (t *InterfaceType) Equal(other Type) bool {
 		return false
 	}
 
-	return otherInterface.Identifier == t.Identifier
+	return otherInterface.CompositeKind == t.CompositeKind &&
+		otherInterface.Identifier == t.Identifier
 }
 
 func (t *InterfaceType) GetMember(identifier string) *Member {
@@ -743,7 +888,7 @@ func init() {
 	gob.Register(&VariableSizedType{})
 	gob.Register(&ConstantSizedType{})
 	gob.Register(&FunctionType{})
-	gob.Register(&StructureType{})
+	gob.Register(&CompositeType{})
 	gob.Register(&InterfaceType{})
 	gob.Register(&InterfaceMetaType{})
 	gob.Register(&DictionaryType{})

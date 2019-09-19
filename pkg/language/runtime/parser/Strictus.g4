@@ -73,9 +73,7 @@ access
     ;
 
 compositeDeclaration
-    : compositeKind identifier conformances '{'
-        (field | initializer[true] | functionDeclaration[true])*
-      '}'
+    : access compositeKind identifier conformances '{' members[true] '}'
     ;
 
 conformances
@@ -92,9 +90,19 @@ field
     ;
 
 interfaceDeclaration
-    : compositeKind Interface identifier '{'
-        (field | initializer[false] | functionDeclaration[false])*
-      '}'
+    : access compositeKind Interface identifier '{' members[false] '}'
+    ;
+
+members[bool functionBlockRequired]
+    : member[functionBlockRequired]*
+    ;
+
+member[bool functionBlockRequired]
+    : field
+    | initializer[functionBlockRequired]
+    | functionDeclaration[functionBlockRequired]
+    | interfaceDeclaration
+    | compositeDeclaration
     ;
 
 compositeKind
@@ -277,6 +285,8 @@ multiplicativeExpression
 
 unaryExpression
     : primaryExpression
+    // NOTE: allow multiple unary operators, but reject in visitor
+    // to provide better error for invalid juxtaposition
     | unaryOp+ unaryExpression
     ;
 
@@ -345,7 +355,9 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : identifier                                                        # IdentifierExpression
+    : Create identifier invocation                                      # CreateExpression
+    | Destroy expression                                                # DestroyExpression
+    | identifier                                                        # IdentifierExpression
     | literal                                                           # LiteralExpression
     | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
     | '(' expression ')'                                                # NestedExpression
@@ -395,6 +407,10 @@ stringLiteral
     ;
 
 integerLiteral
+    : Minus? positiveIntegerLiteral
+    ;
+
+positiveIntegerLiteral
     : DecimalLiteral        # DecimalLiteral
     | BinaryLiteral         # BinaryLiteral
     | OctalLiteral          # OctalLiteral
@@ -454,9 +470,14 @@ Nil : 'nil' ;
 Import : 'import' ;
 From : 'from' ;
 
+Create : 'create' ;
+Destroy : 'destroy' ;
+
 identifier
     : Identifier
     | From
+    | Create
+    | Destroy
     ;
 
 Identifier

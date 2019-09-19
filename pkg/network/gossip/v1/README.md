@@ -1,7 +1,7 @@
 
 
 # async
-`import "github.com/dapperlabs/bamboo-node/pkg/network/gossip/v1"`
+`import "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -22,7 +22,7 @@
 
 
 #### <a name="pkg-files">Package files</a>
-[async.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go) [messageTracker.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/messageTracker.go)
+[async.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go) [messageTracker.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/messageTracker.go)
 
 
 ## <a name="pkg-constants">Constants</a>
@@ -35,7 +35,7 @@ QueueSize is the buffer size for holding incoming Gossip Messages
 
 
 
-## <a name="Node">type</a> [Node](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=357:539#L19)
+## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=357:539#L19)
 ``` go
 type Node struct {
     // contains filtered or unexported fields
@@ -50,7 +50,7 @@ Node is holding the required information for a functioning async gossip node
 
 
 
-### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=619:653#L28)
+### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=619:653#L28)
 ``` go
 func NewNode(address string) *Node
 ```
@@ -60,7 +60,7 @@ NewNode returns a new gossip async node that can be used as a grpc service
 
 
 
-### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=2588:2688#L101)
+### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2588:2688#L101)
 ``` go
 func (a *Node) AsyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.VoidReply, error)
 ```
@@ -70,7 +70,7 @@ TODO: Maybe change the name to QueueMessage? or PlaceMessage?
 
 
 
-### <a name="Node.Gossip">func</a> (\*Node) [Gossip](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=1340:1440#L51)
+### <a name="Node.Gossip">func</a> (\*Node) [Gossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=1340:1440#L51)
 ``` go
 func (a *Node) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) ([]proto.Message, error)
 ```
@@ -80,7 +80,7 @@ its only job is to place the message to the peers' queues
 
 
 
-### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=950:1061#L39)
+### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=950:1061#L39)
 ``` go
 func (a *Node) RegisterFunc(name string, f func(msg *shared.GossipMessage) (*shared.MessageReply, error)) error
 ```
@@ -89,7 +89,7 @@ RegisterFunc adds a new method to be used by GossipMessages
 
 
 
-### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=2043:2065#L82)
+### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2043:2065#L82)
 ``` go
 func (a *Node) Serve()
 ```
@@ -98,7 +98,7 @@ Serve starts the async node's grpc server, and its sweeper as well
 
 
 
-### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/v1/async.go?s=2940:3042#L111)
+### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2940:3042#L111)
 ``` go
 func (a *Node) SyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.MessageReply, error)
 ```

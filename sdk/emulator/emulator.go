@@ -4,13 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime"
+	"github.com/dapperlabs/flow-go/pkg/types"
 
-	"github.com/dapperlabs/bamboo-node/sdk/emulator/execution"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator/state"
-	etypes "github.com/dapperlabs/bamboo-node/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/emulator/state"
+	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.

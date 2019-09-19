@@ -38,6 +38,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#members.
+	VisitMembers(ctx *MembersContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#member.
+	VisitMember(ctx *MemberContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#compositeKind.
 	VisitCompositeKind(ctx *CompositeKindContext) interface{}
 
@@ -170,6 +176,12 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#unaryOp.
 	VisitUnaryOp(ctx *UnaryOpContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#CreateExpression.
+	VisitCreateExpression(ctx *CreateExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#DestroyExpression.
+	VisitDestroyExpression(ctx *DestroyExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#IdentifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 
@@ -208,6 +220,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#integerLiteral.
+	VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#DecimalLiteral.
 	VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{}

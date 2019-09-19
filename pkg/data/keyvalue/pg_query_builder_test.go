@@ -3,7 +3,7 @@ package keyvalue
 import (
 	"testing"
 
-	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
+	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 	. "github.com/onsi/gomega"
 )
 

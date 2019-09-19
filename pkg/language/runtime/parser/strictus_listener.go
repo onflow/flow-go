@@ -34,6 +34,12 @@ type StrictusListener interface {
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
+	// EnterMembers is called when entering the members production.
+	EnterMembers(c *MembersContext)
+
+	// EnterMember is called when entering the member production.
+	EnterMember(c *MemberContext)
+
 	// EnterCompositeKind is called when entering the compositeKind production.
 	EnterCompositeKind(c *CompositeKindContext)
 
@@ -166,6 +172,12 @@ type StrictusListener interface {
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
 
+	// EnterCreateExpression is called when entering the CreateExpression production.
+	EnterCreateExpression(c *CreateExpressionContext)
+
+	// EnterDestroyExpression is called when entering the DestroyExpression production.
+	EnterDestroyExpression(c *DestroyExpressionContext)
+
 	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
 
@@ -204,6 +216,9 @@ type StrictusListener interface {
 
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
+
+	// EnterIntegerLiteral is called when entering the integerLiteral production.
+	EnterIntegerLiteral(c *IntegerLiteralContext)
 
 	// EnterDecimalLiteral is called when entering the DecimalLiteral production.
 	EnterDecimalLiteral(c *DecimalLiteralContext)
@@ -261,6 +276,12 @@ type StrictusListener interface {
 
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
+
+	// ExitMembers is called when exiting the members production.
+	ExitMembers(c *MembersContext)
+
+	// ExitMember is called when exiting the member production.
+	ExitMember(c *MemberContext)
 
 	// ExitCompositeKind is called when exiting the compositeKind production.
 	ExitCompositeKind(c *CompositeKindContext)
@@ -394,6 +415,12 @@ type StrictusListener interface {
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
 
+	// ExitCreateExpression is called when exiting the CreateExpression production.
+	ExitCreateExpression(c *CreateExpressionContext)
+
+	// ExitDestroyExpression is called when exiting the DestroyExpression production.
+	ExitDestroyExpression(c *DestroyExpressionContext)
+
 	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)
 
@@ -432,6 +459,9 @@ type StrictusListener interface {
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)
+
+	// ExitIntegerLiteral is called when exiting the integerLiteral production.
+	ExitIntegerLiteral(c *IntegerLiteralContext)
 
 	// ExitDecimalLiteral is called when exiting the DecimalLiteral production.
 	ExitDecimalLiteral(c *DecimalLiteralContext)

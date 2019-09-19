@@ -1,6 +1,6 @@
 package main
 
-import "github.com/dapperlabs/bamboo-node/internal/roles/observe"
+import "github.com/dapperlabs/flow-go/internal/roles/observe"
 
 func main() {
 	server, err := observe.InitializeServer()

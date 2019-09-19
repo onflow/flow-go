@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const ConfigPath = "bamboo.json"
+const ConfigPath = "flow.json"
 
 type AccountConfig struct {
 	Address    string `json:"address"`
@@ -48,4 +48,12 @@ func LoadConfig() *Config {
 	}
 
 	return &conf
+}
+
+func ConfigExists() bool {
+	info, err := os.Stat(ConfigPath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

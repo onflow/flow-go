@@ -1,6 +1,6 @@
 package testmocks
 
-import "github.com/dapperlabs/bamboo-node/pkg/types"
+import "github.com/dapperlabs/flow-go/pkg/types"
 
 func NewMockEffectsSealWithDifferentReceipt(m *MockEffectsHappyPath) *MockEffectsSealWithDifferentReceipt {
 	return &MockEffectsSealWithDifferentReceipt{m, 0}

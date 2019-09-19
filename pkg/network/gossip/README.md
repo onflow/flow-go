@@ -1,7 +1,7 @@
 
 
 # gossip
-`import "github.com/dapperlabs/bamboo-node/pkg/network/gossip"`
+`import "github.com/dapperlabs/flow-go/pkg/network/gossip"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -20,14 +20,14 @@ Package gossip implements the functionality to epidemically dessiminate a messag
 
 
 #### <a name="pkg-files">Package files</a>
-[gossip.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go)
+[gossip.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go)
 
 
 
 
 
 
-## <a name="GossipMode">type</a> [GossipMode](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=333:352#L12)
+## <a name="GossipMode">type</a> [GossipMode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=333:352#L12)
 ``` go
 type GossipMode int
 ```
@@ -52,14 +52,14 @@ The legitimate values for the GossipMode
 
 
 
-### <a name="GossipMode.String">func</a> (GossipMode) [String](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=464:500#L21)
+### <a name="GossipMode.String">func</a> (GossipMode) [String](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=464:500#L21)
 ``` go
 func (gm GossipMode) String() string
 ```
 
 
 
-## <a name="GossipService">type</a> [GossipService](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/network/gossip/gossip.go?s=785:900#L27)
+## <a name="GossipService">type</a> [GossipService](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=785:900#L27)
 ``` go
 type GossipService interface {
     Gossip(ctx context.Context, request *shared.GossipMessage) (proto.Message, error)

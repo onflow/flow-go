@@ -1,32 +1,18 @@
 package ast
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
-	Kind                  common.CompositeKind
-	Identifier            Identifier
-	Fields                []*FieldDeclaration
-	Initializers          []*InitializerDeclaration
-	Functions             []*FunctionDeclaration
-	functionsByIdentifier map[string]*FunctionDeclaration
-	StartPos              Position
-	EndPos                Position
-}
-
-func (d *InterfaceDeclaration) FunctionsByIdentifier() map[string]*FunctionDeclaration {
-	if d.functionsByIdentifier == nil {
-		functionsByIdentifier := make(map[string]*FunctionDeclaration, len(d.Functions))
-		for _, function := range d.Functions {
-			functionsByIdentifier[function.Identifier.Identifier] = function
-		}
-		d.functionsByIdentifier = functionsByIdentifier
-	}
-	return d.functionsByIdentifier
+	CompositeKind common.CompositeKind
+	Identifier    Identifier
+	Members       *Members
+	StartPos      Position
+	EndPos        Position
 }
 
 func (d *InterfaceDeclaration) StartPosition() Position {
@@ -53,7 +39,7 @@ func (d *InterfaceDeclaration) DeclarationName() string {
 }
 
 func (d *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
-	switch d.Kind {
+	switch d.CompositeKind {
 	case common.CompositeKindStructure:
 		return common.DeclarationKindStructureInterface
 	case common.CompositeKindResource:

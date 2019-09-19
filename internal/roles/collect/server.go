@@ -7,9 +7,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
+	svc "github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/controller"
 )
 
 type Server struct {

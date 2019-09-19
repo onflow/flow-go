@@ -5,8 +5,8 @@ package txpool
 import (
 	"sync"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // TxPool is a thread-safe in-memory store for pending transactions.

@@ -1,6 +1,6 @@
-# Bamboo Observation API
+# Flow Observation API
 
-The Bamboo Observation API is the user-facing RPC API provided by Bamboo access nodes.
+The Flow Observation API is the user-facing RPC API provided by Flow access nodes.
 
 The spec for this API is defined using [Protocol Buffers](https://developers.google.com/protocol-buffers), and aims to be language agnostic 
 in order to support a variety of server and client implementations.

@@ -1,7 +1,7 @@
 
 
 # processor
-`import "github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"`
+`import "github.com/dapperlabs/flow-go/internal/roles/verify/processor"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -34,14 +34,14 @@ Note that some concurrency optimisation is possible by having a queue-per-block-
 
 
 #### <a name="pkg-files">Package files</a>
-[effects_interface.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_interface.go) [effects_provider_wip.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go) [processor.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go)
+[effects_interface.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_interface.go) [effects_provider_wip.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go) [processor.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go)
 
 
 
 
 
 
-## <a name="Effects">type</a> [Effects](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_interface.go?s=292:727#L9)
+## <a name="Effects">type</a> [Effects](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_interface.go?s=284:719#L9)
 ``` go
 type Effects interface {
     IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
@@ -61,7 +61,7 @@ Effects is an interface for external encapuslated funcs with side-effects to be 
 
 
 
-### <a name="NewEffectsProvider">func</a> [NewEffectsProvider](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=390:423#L15)
+### <a name="NewEffectsProvider">func</a> [NewEffectsProvider](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=382:415#L15)
 ``` go
 func NewEffectsProvider() Effects
 ```
@@ -69,7 +69,7 @@ func NewEffectsProvider() Effects
 
 
 
-## <a name="EffectsProvider">type</a> [EffectsProvider](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=357:388#L12)
+## <a name="EffectsProvider">type</a> [EffectsProvider](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=349:380#L12)
 ``` go
 type EffectsProvider struct {
 }
@@ -87,56 +87,56 @@ Note: this is still a WIP and blocked on progress of features outside of the ver
 
 
 
-### <a name="EffectsProvider.HandleError">func</a> (\*EffectsProvider) [HandleError](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=1146:1194#L43)
+### <a name="EffectsProvider.HandleError">func</a> (\*EffectsProvider) [HandleError](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=1138:1186#L43)
 ``` go
 func (e *EffectsProvider) HandleError(err error)
 ```
 
 
 
-### <a name="EffectsProvider.HasMinStake">func</a> (\*EffectsProvider) [HasMinStake](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=618:694#L23)
+### <a name="EffectsProvider.HasMinStake">func</a> (\*EffectsProvider) [HasMinStake](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=610:686#L23)
 ``` go
 func (e *EffectsProvider) HasMinStake(*types.ExecutionReceipt) (bool, error)
 ```
 
 
 
-### <a name="EffectsProvider.IsSealedWithDifferentReceipt">func</a> (\*EffectsProvider) [IsSealedWithDifferentReceipt](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=718:811#L27)
+### <a name="EffectsProvider.IsSealedWithDifferentReceipt">func</a> (\*EffectsProvider) [IsSealedWithDifferentReceipt](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=710:803#L27)
 ``` go
 func (e *EffectsProvider) IsSealedWithDifferentReceipt(*types.ExecutionReceipt) (bool, error)
 ```
 
 
 
-### <a name="EffectsProvider.IsValidExecutionReceipt">func</a> (\*EffectsProvider) [IsValidExecutionReceipt](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=456:564#L19)
+### <a name="EffectsProvider.IsValidExecutionReceipt">func</a> (\*EffectsProvider) [IsValidExecutionReceipt](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=448:556#L19)
 ``` go
 func (e *EffectsProvider) IsValidExecutionReceipt(*types.ExecutionReceipt) (compute.ValidationResult, error)
 ```
 
 
 
-### <a name="EffectsProvider.Send">func</a> (\*EffectsProvider) [Send](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=836:905#L31)
+### <a name="EffectsProvider.Send">func</a> (\*EffectsProvider) [Send](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=828:897#L31)
 ``` go
 func (e *EffectsProvider) Send(*types.ExecutionReceipt, []byte) error
 ```
 
 
 
-### <a name="EffectsProvider.SlashExpiredReceipt">func</a> (\*EffectsProvider) [SlashExpiredReceipt](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=923:999#L35)
+### <a name="EffectsProvider.SlashExpiredReceipt">func</a> (\*EffectsProvider) [SlashExpiredReceipt](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=915:991#L35)
 ``` go
 func (e *EffectsProvider) SlashExpiredReceipt(*types.ExecutionReceipt) error
 ```
 
 
 
-### <a name="EffectsProvider.SlashInvalidReceipt">func</a> (\*EffectsProvider) [SlashInvalidReceipt](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=1017:1128#L39)
+### <a name="EffectsProvider.SlashInvalidReceipt">func</a> (\*EffectsProvider) [SlashInvalidReceipt](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/effects_provider_wip.go?s=1009:1120#L39)
 ``` go
 func (e *EffectsProvider) SlashInvalidReceipt(*types.ExecutionReceipt, *compute.BlockPartExecutionResult) error
 ```
 
 
 
-## <a name="ReceiptProcessor">type</a> [ReceiptProcessor](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=765:893#L17)
+## <a name="ReceiptProcessor">type</a> [ReceiptProcessor](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=753:881#L17)
 ``` go
 type ReceiptProcessor struct {
     // contains filtered or unexported fields
@@ -149,7 +149,7 @@ type ReceiptProcessor struct {
 
 
 
-### <a name="NewReceiptProcessor">func</a> [NewReceiptProcessor](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=1105:1214#L31)
+### <a name="NewReceiptProcessor">func</a> [NewReceiptProcessor](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=1093:1202#L31)
 ``` go
 func NewReceiptProcessor(effects Effects, rc *ReceiptProcessorConfig, hasher crypto.Hasher) *ReceiptProcessor
 ```
@@ -160,7 +160,7 @@ A go routine is initialised and waiting to process new items.
 
 
 
-### <a name="ReceiptProcessor.Submit">func</a> (\*ReceiptProcessor) [Submit](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=1624:1706#L45)
+### <a name="ReceiptProcessor.Submit">func</a> (\*ReceiptProcessor) [Submit](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=1612:1694#L45)
 ``` go
 func (p *ReceiptProcessor) Submit(receipt *types.ExecutionReceipt, done chan bool)
 ```
@@ -170,7 +170,7 @@ The done chan is optional. If caller is not interested to be notified when proce
 
 
 
-## <a name="ReceiptProcessorConfig">type</a> [ReceiptProcessorConfig](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/verify/processor/processor.go?s=3951:4023#L123)
+## <a name="ReceiptProcessorConfig">type</a> [ReceiptProcessorConfig](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=3939:4011#L123)
 ``` go
 type ReceiptProcessorConfig struct {
     QueueBuffer int

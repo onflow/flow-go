@@ -1,4 +1,4 @@
-module github.com/dapperlabs/bamboo-node
+module github.com/dapperlabs/flow-go
 
 go 1.12
 
@@ -15,6 +15,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
+	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/psiemens/godoc2md v1.0.1 // indirect

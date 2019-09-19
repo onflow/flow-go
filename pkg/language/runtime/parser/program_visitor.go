@@ -3,15 +3,15 @@ package parser
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 type ProgramVisitor struct {
@@ -162,42 +162,20 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializers []*ast.InitializerDeclaration
-	for _, initializerNode := range ctx.AllInitializer() {
-		initializers = append(initializers,
-			initializerNode.Accept(v).(*ast.InitializerDeclaration),
-		)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
+	members := ctx.Members().Accept(v).(*ast.Members)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	// TODO: consider kind: return resource / contract declaration
-
-	return &ast.StructureDeclaration{
-		Identifier:   identifier,
-		Conformances: conformances,
-		Fields:       fields,
-		Initializers: initializers,
-		Functions:    functions,
-		StartPos:     startPosition,
-		EndPos:       endPosition,
+	return &ast.CompositeDeclaration{
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Conformances:  conformances,
+		Members:       members,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -211,6 +189,47 @@ func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{}
 		}
 	}
 	return conformances
+}
+
+func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
+
+	var fields []*ast.FieldDeclaration
+	var initializers []*ast.InitializerDeclaration
+	var functions []*ast.FunctionDeclaration
+	var compositeDeclarations []*ast.CompositeDeclaration
+	var interfaceDeclarations []*ast.InterfaceDeclaration
+
+	for _, memberCtx := range ctx.AllMember() {
+		member := memberCtx.Accept(v)
+
+		switch member := member.(type) {
+		case *ast.FieldDeclaration:
+			fields = append(fields, member)
+
+		case *ast.InitializerDeclaration:
+			initializers = append(initializers, member)
+
+		case *ast.FunctionDeclaration:
+			functions = append(functions, member)
+
+		case *ast.CompositeDeclaration:
+			compositeDeclarations = append(compositeDeclarations, member)
+
+		case *ast.InterfaceDeclaration:
+			interfaceDeclarations = append(interfaceDeclarations, member)
+		}
+	}
+
+	return &ast.Members{
+		Fields:                fields,
+		Initializers:          initializers,
+		Functions:             functions,
+		CompositeDeclarations: compositeDeclarations,
+	}
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
@@ -269,39 +288,16 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
-
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializers []*ast.InitializerDeclaration
-	for _, initializerNode := range ctx.AllInitializer() {
-		initializers = append(initializers,
-			initializerNode.Accept(v).(*ast.InitializerDeclaration),
-		)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
-
+	members := ctx.Members().Accept(v).(*ast.Members)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Kind:         kind,
-		Identifier:   identifier,
-		Fields:       fields,
-		Initializers: initializers,
-		Functions:    functions,
-		StartPos:     startPosition,
-		EndPos:       endPosition,
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Members:       members,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -1128,6 +1124,32 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+	endPosition := invocation.EndPos
+
+	return &ast.CreateExpression{
+		Identifier: identifier,
+		Arguments:  invocation.Arguments,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.DestroyExpression{
+		Expression: expression,
+		StartPos:   startPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
 	return ctx.Literal().Accept(v)
 }
@@ -1135,6 +1157,14 @@ func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) i
 // NOTE: manually go over all child rules and find a match
 func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
+	intExpression := ctx.PositiveIntegerLiteral().Accept(v).(*ast.IntExpression)
+	if ctx.Minus() != nil {
+		intExpression.Value.Neg(intExpression.Value)
+	}
+	return intExpression
 }
 
 func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {

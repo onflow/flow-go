@@ -74,6 +74,18 @@ func (s *BaseStrictusListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarati
 // ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
 func (s *BaseStrictusListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 
+// EnterMembers is called when production members is entered.
+func (s *BaseStrictusListener) EnterMembers(ctx *MembersContext) {}
+
+// ExitMembers is called when production members is exited.
+func (s *BaseStrictusListener) ExitMembers(ctx *MembersContext) {}
+
+// EnterMember is called when production member is entered.
+func (s *BaseStrictusListener) EnterMember(ctx *MemberContext) {}
+
+// ExitMember is called when production member is exited.
+func (s *BaseStrictusListener) ExitMember(ctx *MemberContext) {}
+
 // EnterCompositeKind is called when production compositeKind is entered.
 func (s *BaseStrictusListener) EnterCompositeKind(ctx *CompositeKindContext) {}
 
@@ -340,6 +352,18 @@ func (s *BaseStrictusListener) EnterUnaryOp(ctx *UnaryOpContext) {}
 // ExitUnaryOp is called when production unaryOp is exited.
 func (s *BaseStrictusListener) ExitUnaryOp(ctx *UnaryOpContext) {}
 
+// EnterCreateExpression is called when production CreateExpression is entered.
+func (s *BaseStrictusListener) EnterCreateExpression(ctx *CreateExpressionContext) {}
+
+// ExitCreateExpression is called when production CreateExpression is exited.
+func (s *BaseStrictusListener) ExitCreateExpression(ctx *CreateExpressionContext) {}
+
+// EnterDestroyExpression is called when production DestroyExpression is entered.
+func (s *BaseStrictusListener) EnterDestroyExpression(ctx *DestroyExpressionContext) {}
+
+// ExitDestroyExpression is called when production DestroyExpression is exited.
+func (s *BaseStrictusListener) ExitDestroyExpression(ctx *DestroyExpressionContext) {}
+
 // EnterIdentifierExpression is called when production IdentifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
 
@@ -417,6 +441,12 @@ func (s *BaseStrictusListener) EnterStringLiteral(ctx *StringLiteralContext) {}
 
 // ExitStringLiteral is called when production stringLiteral is exited.
 func (s *BaseStrictusListener) ExitStringLiteral(ctx *StringLiteralContext) {}
+
+// EnterIntegerLiteral is called when production integerLiteral is entered.
+func (s *BaseStrictusListener) EnterIntegerLiteral(ctx *IntegerLiteralContext) {}
+
+// ExitIntegerLiteral is called when production integerLiteral is exited.
+func (s *BaseStrictusListener) ExitIntegerLiteral(ctx *IntegerLiteralContext) {}
 
 // EnterDecimalLiteral is called when production DecimalLiteral is entered.
 func (s *BaseStrictusListener) EnterDecimalLiteral(ctx *DecimalLiteralContext) {}

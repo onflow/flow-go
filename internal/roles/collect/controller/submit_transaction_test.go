@@ -7,13 +7,13 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/storage"
-	"github.com/dapperlabs/bamboo-node/internal/roles/collect/txpool"
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
-	"github.com/dapperlabs/bamboo-node/pkg/utils/unittest"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/controller"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/storage"
+	"github.com/dapperlabs/flow-go/internal/roles/collect/txpool"
+	svc "github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types/proto"
+	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 )
 
 type transactionTestCase struct {

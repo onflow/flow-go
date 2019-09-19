@@ -3,7 +3,7 @@ package accounts
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/accounts/create"
+	"github.com/dapperlabs/flow-go/internal/cli/accounts/create"
 )
 
 var Cmd = &cobra.Command{

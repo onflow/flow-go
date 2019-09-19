@@ -3,11 +3,11 @@ package stdlib
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 type StandardLibraryFunction struct {
@@ -118,7 +118,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		if !result {
 			var message string
 			if len(arguments) > 1 {
-				message = string(arguments[1].(interpreter.StringValue))
+				message = arguments[1].(interpreter.StringValue).StrValue()
 			}
 			panic(AssertionError{
 				Message:  message,
@@ -127,7 +127,10 @@ var AssertFunction = NewStandardLibraryFunction(
 		}
 		return trampoline.Done{}
 	},
-	[]string{"", "message"},
+	[]string{
+		sema.ArgumentLabelNotRequired,
+		"message",
+	},
 )
 
 // PanicError
@@ -166,7 +169,7 @@ var PanicFunction = NewStandardLibraryFunction(
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
-			Message:  string(message),
+			Message:  message.StrValue(),
 			Location: location,
 		})
 		return trampoline.Done{}

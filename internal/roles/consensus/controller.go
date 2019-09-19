@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	consensusSvc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/consensus"
+	consensusSvc "github.com/dapperlabs/flow-go/pkg/grpc/services/consensus"
 )
 
 type Controller struct {

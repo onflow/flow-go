@@ -11,12 +11,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator"
+	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
-// EmulatorServer is a local server that runs a Bamboo Emulator instance.
+// EmulatorServer is a local server that runs a Flow Emulator instance.
 //
 // The server wraps the Emulator Core Library with the Observation gRPC interface.
 type EmulatorServer struct {
@@ -34,7 +35,7 @@ type Config struct {
 	RootAccountKey crypto.PrKey
 }
 
-// NewEmulatorServer creates a new instance of a Bamboo Emulator server.
+// NewEmulatorServer creates a new instance of a Flow Emulator server.
 func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	options := emulator.DefaultOptions
 
@@ -53,14 +54,22 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger:     logger,
 	}
 
+	address := server.blockchain.RootAccount().String()
+	prKey, _ := utils.EncodePrKey(server.blockchain.RootKey())
+
+	logger.WithFields(log.Fields{
+		"address": address,
+		"prKey":   prKey,
+	}).Infof("⚙️   Using root account 0x%s", address)
+
 	observe.RegisterObserveServiceServer(server.grpcServer, server)
 	return server
 }
 
-// Start spins up the Bamboo Emulator server instance.
+// Start spins up the Flow Emulator server instance.
 //
 // This function starts a gRPC server to listen for requests and process incoming transactions.
-// By default, the Bamboo Emulator server automatically mines a block every BlockInterval.
+// By default, the Flow Emulator server automatically mines a block every BlockInterval.
 func (s *EmulatorServer) Start(ctx context.Context) {
 	s.logger.WithFields(log.Fields{
 		"port": s.config.Port,
@@ -96,7 +105,7 @@ func (s *EmulatorServer) startGrpcServer() {
 	s.grpcServer.Serve(lis)
 }
 
-// StartServer sets up a wrapped instance of the Bamboo Emulator server and starts it.
+// StartServer sets up a wrapped instance of the Flow Emulator server and starts it.
 func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -116,7 +125,7 @@ func StartServer(logger *log.Logger, config *Config) {
 
 	logger.
 		WithField("port", config.HTTPPort).
-		Debugf("🏁  Starting HTTP Server on port %d...", config.HTTPPort)
+		Infof("🌱  Starting HTTP Server on port %d...", config.HTTPPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")

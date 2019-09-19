@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package bamboo.services.execute;
+package flow.services.execute;
 
 option go_package = "execute";
 
@@ -28,11 +28,11 @@ message PingResponse {
 }
 
 message ExecuteBlockRequest {
-  bamboo.shared.messages.Block block = 1;
+  flow.shared.messages.Block block = 1;
 }
 
 message NotifyBlockExecutedRequest {
-  bamboo.shared.messages.Block block = 1;
+  flow.shared.messages.Block block = 1;
 }
 
 message ReceiptsByBlockHeightRequest {
@@ -40,7 +40,7 @@ message ReceiptsByBlockHeightRequest {
 }
 
 message ReceiptsByBlockHeightResponse {
-  repeated bamboo.shared.messages.ExecutionReceipt executionReceipts = 1;
+  repeated flow.shared.messages.ExecutionReceipt executionReceipts = 1;
 }
 
 message GetRegistersRequest {
@@ -53,5 +53,5 @@ message GetRegistersAtBlockHeightRequest {
 }
 
 message GetRegistersResponse {
-  repeated bamboo.shared.messages.Register registers = 1;
+  repeated flow.shared.messages.Register registers = 1;
 }

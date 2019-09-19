@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package bamboo.shared.gossip;
+package flow.shared.gossip;
 
 option go_package = "shared";
 
