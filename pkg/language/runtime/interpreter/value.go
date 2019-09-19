@@ -137,6 +137,13 @@ func (v StringValue) Concat(other ConcatenatableValue) Value {
 	return NewStringValue(sb.String())
 }
 
+func (v StringValue) Slice(from IntValue, to IntValue) Value {
+	fromInt := from.IntValue()
+	toInt := to.IntValue()
+	str := v.StrValue()
+	return NewStringValue(str[fromInt:toInt])
+}
+
 func (v StringValue) Get(key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
@@ -188,6 +195,15 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 			func(arguments []Value, location Location) trampoline.Trampoline {
 				otherValue := arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherValue)
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "slice":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				from := arguments[0].(IntValue)
+				to := arguments[1].(IntValue)
+				result := v.Slice(from, to)
 				return trampoline.Done{Result: result}
 			},
 		)

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common/intervalst"
@@ -42,12 +43,19 @@ func (pos Position) CompareTo(other intervalst.Position) int {
 	return 0
 }
 
-type Origins struct {
+type Origin struct {
+	Type            Type
+	DeclarationKind common.DeclarationKind
+	StartPos        *ast.Position
+	EndPos          *ast.Position
+}
+
+type Occurrences struct {
 	T *intervalst.IntervalST
 }
 
-func NewOrigins() *Origins {
-	return &Origins{
+func NewOccurrences() *Occurrences {
+	return &Occurrences{
 		T: &intervalst.IntervalST{},
 	}
 }
@@ -59,39 +67,39 @@ func ToPosition(position ast.Position) Position {
 	}
 }
 
-func (o *Origins) Put(startPos, endPos ast.Position, variable *Variable) {
-	origin := Origin{
+func (o *Occurrences) Put(startPos, endPos ast.Position, origin *Origin) {
+	occurrence := Occurrence{
 		StartPos: ToPosition(startPos),
 		EndPos:   ToPosition(endPos),
-		Variable: variable,
+		Origin:   origin,
 	}
 	interval := intervalst.NewInterval(
-		origin.StartPos,
-		origin.EndPos,
+		occurrence.StartPos,
+		occurrence.EndPos,
 	)
-	o.T.Put(interval, origin)
+	o.T.Put(interval, occurrence)
 }
 
-type Origin struct {
+type Occurrence struct {
 	StartPos Position
 	EndPos   Position
-	Variable *Variable
+	Origin   *Origin
 }
 
-func (o *Origins) All() []Origin {
+func (o *Occurrences) All() []Occurrence {
 	values := o.T.Values()
-	origins := make([]Origin, len(values))
+	occurrences := make([]Occurrence, len(values))
 	for i, value := range values {
-		origins[i] = value.(Origin)
+		occurrences[i] = value.(Occurrence)
 	}
-	return origins
+	return occurrences
 }
 
-func (o *Origins) Find(pos Position) *Origin {
+func (o *Occurrences) Find(pos Position) *Occurrence {
 	interval, value := o.T.Search(pos)
 	if interval == nil {
 		return nil
 	}
-	origin := value.(Origin)
-	return &origin
+	occurrence := value.(Occurrence)
+	return &occurrence
 }
