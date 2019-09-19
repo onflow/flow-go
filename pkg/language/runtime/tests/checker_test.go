@@ -6632,6 +6632,34 @@ func TestCheckUnaryMove(t *testing.T) {
 
 }
 
+func TestCheckUnaryCreateAndDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          var x <- create X()
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+	// TODO: add support for create expressions
+	// TODO: add support for destroy expressions
+
+	errs := expectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+}
+
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 	RegisterTestingT(t)
 
