@@ -61,14 +61,23 @@ type StrictusListener interface {
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
-	// EnterTypeIndex is called when entering the typeIndex production.
-	EnterTypeIndex(c *TypeIndexContext)
-
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
 
+	// EnterNominalType is called when entering the nominalType production.
+	EnterNominalType(c *NominalTypeContext)
+
 	// EnterFunctionType is called when entering the functionType production.
 	EnterFunctionType(c *FunctionTypeContext)
+
+	// EnterVariableSizedType is called when entering the variableSizedType production.
+	EnterVariableSizedType(c *VariableSizedTypeContext)
+
+	// EnterConstantSizedType is called when entering the constantSizedType production.
+	EnterConstantSizedType(c *ConstantSizedTypeContext)
+
+	// EnterDictionaryType is called when entering the dictionaryType production.
+	EnterDictionaryType(c *DictionaryTypeContext)
 
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
@@ -304,14 +313,23 @@ type StrictusListener interface {
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
 
-	// ExitTypeIndex is called when exiting the typeIndex production.
-	ExitTypeIndex(c *TypeIndexContext)
-
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
 
+	// ExitNominalType is called when exiting the nominalType production.
+	ExitNominalType(c *NominalTypeContext)
+
 	// ExitFunctionType is called when exiting the functionType production.
 	ExitFunctionType(c *FunctionTypeContext)
+
+	// ExitVariableSizedType is called when exiting the variableSizedType production.
+	ExitVariableSizedType(c *VariableSizedTypeContext)
+
+	// ExitConstantSizedType is called when exiting the constantSizedType production.
+	ExitConstantSizedType(c *ConstantSizedTypeContext)
+
+	// ExitDictionaryType is called when exiting the dictionaryType production.
+	ExitDictionaryType(c *DictionaryTypeContext)
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)

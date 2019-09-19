@@ -5900,7 +5900,7 @@ func TestCheckDictionaryType(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: Int[String] = {"a": 1, "b": 2}
+      let z: {String: Int} = {"a": 1, "b": 2}
 	`)
 
 	Expect(err).
@@ -5911,7 +5911,7 @@ func TestCheckInvalidDictionaryTypeKey(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: Int[Int] = {"a": 1, "b": 2}
+      let z: {Int: Int} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -5924,7 +5924,7 @@ func TestCheckInvalidDictionaryTypeValue(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: String[String] = {"a": 1, "b": 2}
+      let z: {String: String} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -5937,7 +5937,7 @@ func TestCheckInvalidDictionaryTypeSwapped(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: String[Int] = {"a": 1, "b": 2}
+      let z: {Int: String} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -6157,8 +6157,8 @@ func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let x: Any[] = [1]
-      let y: Int[]? = x as? Int[]
+      let x: [Any] = [1]
+      let y: [Int]? = x as? [Int]
     `)
 
 	errs := expectCheckerErrors(err, 1)
@@ -6221,7 +6221,7 @@ func TestCheckArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append(4)
           return x
@@ -6236,7 +6236,7 @@ func TestCheckInvalidArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append("4")
           return x
@@ -6253,7 +6253,7 @@ func TestCheckArrayAppendBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           let y = x.append
           y(4)
@@ -6269,7 +6269,7 @@ func TestCheckArrayConcat(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-	  fun test(): Int[] {
+	  fun test(): [Int] {
 	 	  let a = [1, 2]
 		  let b = [3, 4]
           let c = a.concat(b)
@@ -6285,7 +6285,7 @@ func TestCheckInvalidArrayConcat(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
 		  let a = [1, 2]
 		  let b = ["a", "b"]
           let c = a.concat(b)
@@ -6303,7 +6303,7 @@ func TestCheckArrayConcatBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
 		  let a = [1, 2]
 		  let b = [3, 4]
 		  let c = a.concat
@@ -6319,7 +6319,7 @@ func TestCheckArrayInsert(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.insert(at: 1, 4)
           return x
@@ -6334,7 +6334,7 @@ func TestCheckInvalidArrayInsert(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.insert(at: 1, "4")
           return x
@@ -6351,7 +6351,7 @@ func TestCheckArrayRemove(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.remove(at: 1)
           return x
@@ -6366,7 +6366,7 @@ func TestCheckInvalidArrayRemove(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.remove(at: "1")
           return x
@@ -6383,7 +6383,7 @@ func TestCheckArrayRemoveFirst(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.removeFirst()
           return x
@@ -6398,7 +6398,7 @@ func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.removeFirst(1)
           return x
@@ -6415,7 +6415,7 @@ func TestCheckArrayRemoveLast(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.removeLast()
           return x
@@ -6476,7 +6476,7 @@ func TestCheckEmptyArray(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let xs: Int[] = []
+      let xs: [Int] = []
 	`)
 
 	Expect(err).
@@ -6487,7 +6487,7 @@ func TestCheckEmptyArrayCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun foo(xs: Int[]) {
+      fun foo(xs: [Int]) {
           foo(xs: [])
       }
 	`)
@@ -6500,7 +6500,7 @@ func TestCheckEmptyDictionary(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let xs: Int[String] = {}
+      let xs: {String: Int} = {}
 	`)
 
 	Expect(err).
@@ -6511,7 +6511,7 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun foo(xs: Int[String]) {
+      fun foo(xs: {String: Int}) {
           foo(xs: {})
       }
 	`)
@@ -6528,8 +6528,8 @@ func TestCheckArraySubtyping(t *testing.T) {
           %s interface I {}
           %s S: I {}
 
-          let xs: S[] = []
-          let ys: I[] = xs
+          let xs: [S] = []
+          let ys: [I] = xs
 	    `, kind.Keyword(), kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
@@ -6553,8 +6553,8 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let xs: Bool[] = []
-      let ys: Int[] = xs
+      let xs: [Bool] = []
+      let ys: [Int] = xs
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -6571,8 +6571,8 @@ func TestCheckDictionarySubtyping(t *testing.T) {
           %s interface I {}
           %s S: I {}
 
-          let xs: S[String] = {}
-          let ys: I[String] = xs
+          let xs: {String: S} = {}
+          let ys: {String: I} = xs
 	    `, kind.Keyword(), kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
@@ -6596,8 +6596,8 @@ func TestCheckInvalidDictionarySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let xs: Bool[String] = {}
-      let ys: Int[String] = xs
+      let xs: {String: Bool} = {}
+      let ys: {String: Int} = xs
 	`)
 
 	errs := expectCheckerErrors(err, 1)

@@ -65,14 +65,23 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#fullType.
 	VisitFullType(ctx *FullTypeContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#typeIndex.
-	VisitTypeIndex(ctx *TypeIndexContext) interface{}
-
 	// Visit a parse tree produced by StrictusParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#nominalType.
+	VisitNominalType(ctx *NominalTypeContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#functionType.
 	VisitFunctionType(ctx *FunctionTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#variableSizedType.
+	VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#constantSizedType.
+	VisitConstantSizedType(ctx *ConstantSizedTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#dictionaryType.
+	VisitDictionaryType(ctx *DictionaryTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}

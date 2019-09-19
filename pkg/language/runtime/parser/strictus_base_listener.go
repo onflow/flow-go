@@ -128,23 +128,41 @@ func (s *BaseStrictusListener) EnterFullType(ctx *FullTypeContext) {}
 // ExitFullType is called when production fullType is exited.
 func (s *BaseStrictusListener) ExitFullType(ctx *FullTypeContext) {}
 
-// EnterTypeIndex is called when production typeIndex is entered.
-func (s *BaseStrictusListener) EnterTypeIndex(ctx *TypeIndexContext) {}
-
-// ExitTypeIndex is called when production typeIndex is exited.
-func (s *BaseStrictusListener) ExitTypeIndex(ctx *TypeIndexContext) {}
-
 // EnterBaseType is called when production baseType is entered.
 func (s *BaseStrictusListener) EnterBaseType(ctx *BaseTypeContext) {}
 
 // ExitBaseType is called when production baseType is exited.
 func (s *BaseStrictusListener) ExitBaseType(ctx *BaseTypeContext) {}
 
+// EnterNominalType is called when production nominalType is entered.
+func (s *BaseStrictusListener) EnterNominalType(ctx *NominalTypeContext) {}
+
+// ExitNominalType is called when production nominalType is exited.
+func (s *BaseStrictusListener) ExitNominalType(ctx *NominalTypeContext) {}
+
 // EnterFunctionType is called when production functionType is entered.
 func (s *BaseStrictusListener) EnterFunctionType(ctx *FunctionTypeContext) {}
 
 // ExitFunctionType is called when production functionType is exited.
 func (s *BaseStrictusListener) ExitFunctionType(ctx *FunctionTypeContext) {}
+
+// EnterVariableSizedType is called when production variableSizedType is entered.
+func (s *BaseStrictusListener) EnterVariableSizedType(ctx *VariableSizedTypeContext) {}
+
+// ExitVariableSizedType is called when production variableSizedType is exited.
+func (s *BaseStrictusListener) ExitVariableSizedType(ctx *VariableSizedTypeContext) {}
+
+// EnterConstantSizedType is called when production constantSizedType is entered.
+func (s *BaseStrictusListener) EnterConstantSizedType(ctx *ConstantSizedTypeContext) {}
+
+// ExitConstantSizedType is called when production constantSizedType is exited.
+func (s *BaseStrictusListener) ExitConstantSizedType(ctx *ConstantSizedTypeContext) {}
+
+// EnterDictionaryType is called when production dictionaryType is entered.
+func (s *BaseStrictusListener) EnterDictionaryType(ctx *DictionaryTypeContext) {}
+
+// ExitDictionaryType is called when production dictionaryType is exited.
+func (s *BaseStrictusListener) ExitDictionaryType(ctx *DictionaryTypeContext) {}
 
 // EnterBlock is called when production block is entered.
 func (s *BaseStrictusListener) EnterBlock(ctx *BlockContext) {}
