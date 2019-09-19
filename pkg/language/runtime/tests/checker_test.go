@@ -374,6 +374,83 @@ func TestCheckStringConcatBound(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckStringSlice(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): String {
+	 	  let a = "abcdef"
+		  return a.slice(from: 0, upTo: 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringSlice(t *testing.T) {
+	t.Run("MissingBothArgumentLabels", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(0, 1)
+		`)
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	})
+
+	t.Run("MissingOneArgumentLabel", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(from: 0, 1)
+		`)
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	})
+
+	t.Run("InvalidArgumentType", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(from: "a", upTo: "b")
+		`)
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	})
+}
+
+func TestCheckStringSliceBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abcdef"
+		  let c = a.slice
+		  return c(from: 0, upTo: 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func expectCheckerErrors(err error, len int) []error {
 	if len <= 0 && err == nil {
 		return nil
@@ -6553,6 +6630,34 @@ func TestCheckUnaryMove(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
+}
+
+func TestCheckUnaryCreateAndDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          var x <- create X()
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+	// TODO: add support for create expressions
+	// TODO: add support for destroy expressions
+
+	errs := expectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
 }
 
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {

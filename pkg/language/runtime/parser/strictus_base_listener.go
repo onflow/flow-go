@@ -352,6 +352,18 @@ func (s *BaseStrictusListener) EnterUnaryOp(ctx *UnaryOpContext) {}
 // ExitUnaryOp is called when production unaryOp is exited.
 func (s *BaseStrictusListener) ExitUnaryOp(ctx *UnaryOpContext) {}
 
+// EnterCreateExpression is called when production CreateExpression is entered.
+func (s *BaseStrictusListener) EnterCreateExpression(ctx *CreateExpressionContext) {}
+
+// ExitCreateExpression is called when production CreateExpression is exited.
+func (s *BaseStrictusListener) ExitCreateExpression(ctx *CreateExpressionContext) {}
+
+// EnterDestroyExpression is called when production DestroyExpression is entered.
+func (s *BaseStrictusListener) EnterDestroyExpression(ctx *DestroyExpressionContext) {}
+
+// ExitDestroyExpression is called when production DestroyExpression is exited.
+func (s *BaseStrictusListener) ExitDestroyExpression(ctx *DestroyExpressionContext) {}
+
 // EnterIdentifierExpression is called when production IdentifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
 

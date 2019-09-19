@@ -1105,3 +1105,28 @@ func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
 func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// UnsupportedExpressionError
+
+type UnsupportedExpressionError struct {
+	ExpressionKind common.ExpressionKind
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *UnsupportedExpressionError) Error() string {
+	return fmt.Sprintf(
+		"%s expressions are not supported yet",
+		e.ExpressionKind.Name(),
+	)
+}
+
+func (*UnsupportedExpressionError) isSemanticError() {}
+
+func (e *UnsupportedExpressionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
