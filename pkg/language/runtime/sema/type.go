@@ -18,6 +18,7 @@ type Type interface {
 	isType()
 	String() string
 	Equal(other Type) bool
+	IsResourceType() bool
 }
 
 // AnyType represents the top type
@@ -34,6 +35,10 @@ func (*AnyType) Equal(other Type) bool {
 	return ok
 }
 
+func (*AnyType) IsResourceType() bool {
+	return false
+}
+
 // NeverType represents the bottom type
 type NeverType struct{}
 
@@ -48,6 +53,10 @@ func (*NeverType) Equal(other Type) bool {
 	return ok
 }
 
+func (*NeverType) IsResourceType() bool {
+	return false
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -60,6 +69,10 @@ func (*VoidType) String() string {
 func (*VoidType) Equal(other Type) bool {
 	_, ok := other.(*VoidType)
 	return ok
+}
+
+func (*VoidType) IsResourceType() bool {
+	return false
 }
 
 // InvalidType represents a type that is invalid.
@@ -77,6 +90,10 @@ func (*InvalidType) String() string {
 func (*InvalidType) Equal(other Type) bool {
 	_, ok := other.(*InvalidType)
 	return ok
+}
+
+func (*InvalidType) IsResourceType() bool {
+	return false
 }
 
 func isInvalidType(ty Type) bool {
@@ -106,6 +123,10 @@ func (t *OptionalType) Equal(other Type) bool {
 	return t.Type.Equal(otherOptional.Type)
 }
 
+func (t *OptionalType) IsResourceType() bool {
+	return t.Type.IsResourceType()
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
@@ -118,6 +139,10 @@ func (*BoolType) String() string {
 func (*BoolType) Equal(other Type) bool {
 	_, ok := other.(*BoolType)
 	return ok
+}
+
+func (*BoolType) IsResourceType() bool {
+	return false
 }
 
 // CharacterType represents the character type
@@ -135,6 +160,10 @@ func (*CharacterType) Equal(other Type) bool {
 	return ok
 }
 
+func (*CharacterType) IsResourceType() bool {
+	return false
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -147,6 +176,10 @@ func (*StringType) String() string {
 func (*StringType) Equal(other Type) bool {
 	_, ok := other.(*StringType)
 	return ok
+}
+
+func (*StringType) IsResourceType() bool {
+	return false
 }
 
 func (t *StringType) GetMember(field string) *Member {
@@ -203,6 +236,10 @@ func (*IntegerType) Equal(other Type) bool {
 	return ok
 }
 
+func (*IntegerType) IsResourceType() bool {
+	return false
+}
+
 func (*IntegerType) Min() *big.Int {
 	return nil
 }
@@ -223,6 +260,10 @@ func (*IntType) String() string {
 func (*IntType) Equal(other Type) bool {
 	_, ok := other.(*IntType)
 	return ok
+}
+
+func (*IntType) IsResourceType() bool {
+	return false
 }
 
 func (*IntType) Min() *big.Int {
@@ -246,6 +287,10 @@ func (*Int8Type) String() string {
 func (*Int8Type) Equal(other Type) bool {
 	_, ok := other.(*Int8Type)
 	return ok
+}
+
+func (*Int8Type) IsResourceType() bool {
+	return false
 }
 
 var Int8TypeMin = big.NewInt(0).SetInt64(math.MinInt8)
@@ -273,6 +318,10 @@ func (*Int16Type) Equal(other Type) bool {
 	return ok
 }
 
+func (*Int16Type) IsResourceType() bool {
+	return false
+}
+
 var Int16TypeMin = big.NewInt(0).SetInt64(math.MinInt16)
 var Int16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
 
@@ -296,6 +345,10 @@ func (*Int32Type) String() string {
 func (*Int32Type) Equal(other Type) bool {
 	_, ok := other.(*Int32Type)
 	return ok
+}
+
+func (*Int32Type) IsResourceType() bool {
+	return false
 }
 
 var Int32TypeMin = big.NewInt(0).SetInt64(math.MinInt32)
@@ -323,6 +376,10 @@ func (*Int64Type) Equal(other Type) bool {
 	return ok
 }
 
+func (*Int64Type) IsResourceType() bool {
+	return false
+}
+
 var Int64TypeMin = big.NewInt(0).SetInt64(math.MinInt64)
 var Int64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
 
@@ -346,6 +403,10 @@ func (*UInt8Type) String() string {
 func (*UInt8Type) Equal(other Type) bool {
 	_, ok := other.(*UInt8Type)
 	return ok
+}
+
+func (*UInt8Type) IsResourceType() bool {
+	return false
 }
 
 var UInt8TypeMin = big.NewInt(0)
@@ -373,6 +434,10 @@ func (*UInt16Type) Equal(other Type) bool {
 	return ok
 }
 
+func (*UInt16Type) IsResourceType() bool {
+	return false
+}
+
 var UInt16TypeMin = big.NewInt(0)
 var UInt16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
 
@@ -398,6 +463,10 @@ func (*UInt32Type) Equal(other Type) bool {
 	return ok
 }
 
+func (*UInt32Type) IsResourceType() bool {
+	return false
+}
+
 var UInt32TypeMin = big.NewInt(0)
 var UInt32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
 
@@ -421,6 +490,10 @@ func (*UInt64Type) String() string {
 func (*UInt64Type) Equal(other Type) bool {
 	_, ok := other.(*UInt64Type)
 	return ok
+}
+
+func (*UInt64Type) IsResourceType() bool {
+	return false
 }
 
 var UInt64TypeMin = big.NewInt(0)
@@ -553,6 +626,10 @@ func (t *VariableSizedType) Equal(other Type) bool {
 func (t *VariableSizedType) GetMember(identifier string) *Member {
 	return getArrayMember(t, identifier)
 }
+ 
+func (t *VariableSizedType) IsResourceType() bool {
+	return t.Type.IsResourceType()
+}
 
 // ConstantSizedType is a constant sized array type
 type ConstantSizedType struct {
@@ -583,6 +660,10 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 
 func (t *ConstantSizedType) GetMember(identifier string) *Member {
 	return getArrayMember(t, identifier)
+}
+
+func (t *ConstantSizedType) IsResourceType() bool {
+	return t.Type.IsResourceType()
 }
 
 // ArrayTypeToString
@@ -652,6 +733,10 @@ func (t *FunctionType) Equal(other Type) bool {
 	}
 
 	return t.ReturnType.Equal(otherFunction.ReturnType)
+}
+
+func (*FunctionType) IsResourceType() bool {
+	return false
 }
 
 // BaseTypes
@@ -730,6 +815,10 @@ func (t *CompositeType) GetMember(identifier string) *Member {
 	return t.Members[identifier]
 }
 
+func (t *CompositeType) IsResourceType() bool {
+	return t.Kind == common.CompositeKindResource
+}
+
 // Member
 
 type Member struct {
@@ -795,6 +884,10 @@ func (t *InterfaceType) GetMember(identifier string) *Member {
 	return t.Members[identifier]
 }
 
+func (t *InterfaceType) IsResourceType() bool {
+	return t.CompositeKind == common.CompositeKindResource
+}
+
 // InterfaceMetaType
 
 type InterfaceMetaType struct {
@@ -814,6 +907,10 @@ func (t *InterfaceMetaType) Equal(other Type) bool {
 	}
 
 	return otherInterface.InterfaceType.Equal(t.InterfaceType)
+}
+
+func (*InterfaceMetaType) IsResourceType() bool {
+	return false
 }
 
 // DictionaryType
@@ -837,6 +934,11 @@ func (t *DictionaryType) Equal(other Type) bool {
 
 	return otherDictionary.KeyType.Equal(t.KeyType) &&
 		otherDictionary.ValueType.Equal(t.ValueType)
+}
+
+func (t *DictionaryType) IsResourceType() bool {
+	return t.KeyType.IsResourceType() ||
+		t.ValueType.IsResourceType()
 }
 
 func (t *DictionaryType) GetMember(identifer string) *Member {
