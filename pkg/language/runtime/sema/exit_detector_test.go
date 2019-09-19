@@ -31,8 +31,7 @@ func assertExits(t *testing.T, code string, expected bool) {
 		t.Fatalf("Unable to parse function block: %s", err.Error())
 	}
 
-	exitDetector := &ExitDetector{}
-	exits := exitDetector.Exits(functionBlock)
+	exits := FunctionBlockExits(functionBlock)
 
 	Expect(exits).To(Equal(expected))
 }
@@ -86,7 +85,7 @@ func TestIfStatementExits(t *testing.T) {
 			}
 			`,
 			true,
-		},	
+		},
 		{
 			`
 			if true {
@@ -96,7 +95,7 @@ func TestIfStatementExits(t *testing.T) {
 			}
 			`,
 			true,
-		},	
+		},
 		{
 			`
 			if 2 > 1 {
@@ -220,6 +219,6 @@ func TestFunctionIfWhileExits(t *testing.T) {
 			}
 			`,
 			false,
-		},		
+		},
 	})
 }

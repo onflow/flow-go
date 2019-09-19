@@ -44,7 +44,6 @@ type Checker struct {
 	Occurrences       *Occurrences
 	variableOrigins   map[*Variable]*Origin
 	memberOrigins     map[Type]map[string]*Origin
-	exitDetector      *ExitDetector
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
 	// TODO: refactor into fields on AST?
@@ -90,7 +89,6 @@ func NewChecker(
 		Occurrences:                        NewOccurrences(),
 		variableOrigins:                    map[*Variable]*Origin{},
 		memberOrigins:                      map[Type]map[string]*Origin{},
-		exitDetector:                       NewExitDetector(),
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
@@ -502,7 +500,7 @@ func (checker *Checker) checkFunction(
 		}()
 
 		if mustExit && !functionType.ReturnType.Equal(&VoidType{}) {
-			if !checker.exitDetector.Exits(functionBlock) {
+			if !FunctionBlockExits(functionBlock) {
 				checker.report(
 					&MissingReturnStatementError{
 						StartPos: functionBlock.StartPosition(),
