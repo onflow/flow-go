@@ -6,11 +6,13 @@ build-relic:
 
 .PHONY: install-tools
 install-tools: build-relic
-	go get github.com/psiemens/godoc2md@v1.0.1
-	go get github.com/google/wire/cmd/wire@v0.3.0
-	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
-	go get github.com/uber/prototool/cmd/prototool@v1.8.0
-	go get github.com/golang/mock/mockgen@v1.3.1
+	cd ${GOPATH}
+	GO111MODULE=on go get github.com/psiemens/godoc2md@v1.0.1
+	GO111MODULE=on go get github.com/google/wire/cmd/wire@v0.3.0
+	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
+	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.8.0
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1
+	cd -
 
 .PHONY: test
 test:
