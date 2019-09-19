@@ -174,11 +174,12 @@ func TestBLS_BLS12381(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
+	halg, err := NewHashAlgo(SHA3_384)
 	input := []byte("test")
-	testSignBytes(t, salg, nil, sk, input)
+	testSignBytes(t, salg, halg, sk, input)
 
 	inputStruct := &testStruct{"te", "st"}
-	testSignStruct(t, salg, nil, sk, inputStruct)
+	testSignStruct(t, salg, halg, sk, inputStruct)
 }
 
 // TestG1 helps debugging but is not a unit test

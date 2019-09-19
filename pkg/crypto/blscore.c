@@ -129,12 +129,12 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 // Maps a 384 bits number to G1
 // Optimized Shallue–van de Woestijne encoding from Section 3 of
 // "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
-// taken from Relic library
-void mapToG1_swu(ep_t p, const uint8_t *msg, int len) {
+// taken and modified from Relic library
+void mapToG1_swu(ep_t p, const uint8_t *digest, int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	ep_t q;
-	uint8_t digest[RLC_MD_LEN];
+	uint8_t sec_digest[RLC_MD_LEN_SH384];
 	int neg;
 
 	bn_null(k);
@@ -152,15 +152,14 @@ void mapToG1_swu(ep_t p, const uint8_t *msg, int len) {
 		pm1o2->used = RLC_FP_DIGS;
 		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
 		bn_hlv(pm1o2, pm1o2);
-		md_map(digest, msg, len);
-		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
+		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, len));
 		fp_prime_conv(t, k);
 		fp_prime_back(k, t);
 		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
 
         ep_swu_b12(p, t, -3, neg);
-        md_map(digest, digest, RLC_MD_LEN);
-        bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
+        md_map_sh384(sec_digest, digest, len);
+        bn_read_bin(k, sec_digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN_SH384));
         fp_prime_conv(t, k);
         neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
         ep_swu_b12(q, t, -3, neg);
