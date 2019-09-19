@@ -68,14 +68,19 @@ type Hasher interface {
 
 // HashAlgo
 type HashAlgo struct {
-	name         AlgoName
-	outputLength int
+	name       AlgoName
+	outputSize int
 	hash.Hash
 }
 
 // Name returns the name of the algorithm
 func (a *HashAlgo) Name() AlgoName {
 	return a.name
+}
+
+// Name returns the size of the output
+func (a *HashAlgo) Size() int {
+	return a.outputSize
 }
 
 // AddBytes adds bytes to the current hash state
