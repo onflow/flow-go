@@ -1,5 +1,5 @@
 
-interface Vault  {
+struct interface Vault {
     balance: Int
 
     init(balance: Int) {
@@ -44,7 +44,7 @@ struct ExampleVault: Vault {
     }
 
     pub fun deposit(vault: Vault) {
-         self.balance = self.balance + vault.balance
+        self.balance = self.balance + vault.balance
     }
 }
 

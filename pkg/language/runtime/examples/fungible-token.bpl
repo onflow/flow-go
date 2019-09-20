@@ -1,4 +1,8 @@
 
+// TODO:
+// - How to get current total supply?
+// - How to "instantiate" `Faucet` and `ApprovableProvider` for `DeteToken`?
+
 pub contract interface FungibleToken {
 
     pub resource interface Provider {
@@ -99,23 +103,11 @@ pub abstract contract BasicToken: FungibleToken {
     }
 }
 
-pub contract DeteToken includes BasicToken {
-
-    pub resource Minter: Provider {
-
-        init() {}
-
-        pub fun withdraw(amount: Int): <-Vault {
-            return create Vault(balance: amount)
-        }
-    }
-}
-
 import Timestamp from "time"
 
-pub resource Faucet: FungibleToken.Provider {
+pub abstract resource Faucet: FungibleToken.Provider {
 
-    private let source: <-FungibleToken.Provider
+    private let source: &FungibleToken.Provider
     private let dailyLimit: Int
 
     private var lastResetTime: Timestamp
@@ -146,7 +138,7 @@ pub resource Faucet: FungibleToken.Provider {
         self.remainingAmount = self.dailyLimit
     }
 
-    init(source: <-FungibleToken.Provider, dailyLimit: Int) {
+    init(source: &FungibleToken.Provider, dailyLimit: Int) {
         pre {
             dailyLimit > 0:
                 "Daily limit must be positive"
@@ -157,5 +149,50 @@ pub resource Faucet: FungibleToken.Provider {
 
         self.lastResetTime = system.blockTime
         self.remainingAmount = dailyLimit
+    }
+}
+
+pub abstract resource LimitedProvider: FungibleToken.Provider {
+
+    private let source: &FungibleToken.Provider
+
+    // Allow the owner of the limited provider
+    // to change the allowance
+    pub(set) var allowance: Int {
+        pre {
+            allowance > 0:
+                "Withdrawal amount must be positive"
+        }
+    }
+
+    init(source: &FungibleToken.Provider, allowance: Int) {
+        self.source = source
+        self.allowance = allowance
+    }
+
+    pub fun withdraw(amount: Int): <-Vault {
+        pre {
+            amount <= self.allowance:
+                "Withdrawal amount must be less or equal to approved amount"
+        }
+        post {
+            self.allowance == before(self.allowance) - amount:
+                "Approval amount must be decremented by amount"
+        }
+
+        self.allowance = self.allowance - amount
+        return self.source.withdraw(amount: amount)
+    }
+}
+
+pub contract DeteToken includes BasicToken {
+
+    pub resource Minter: Provider {
+
+        init() {}
+
+        pub fun withdraw(amount: Int): <-Vault {
+            return create Vault(balance: amount)
+        }
     }
 }
