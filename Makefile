@@ -33,10 +33,10 @@ generate-proto:
 
 .PHONY: generate-wire
 generate-wire:
-	wire ./internal/roles/collect/
-	wire ./internal/roles/consensus/
-	wire ./internal/roles/execute/
-	wire ./internal/roles/verify/
+	GO111MODULE=on wire ./internal/roles/collect/
+	GO111MODULE=on wire ./internal/roles/consensus/
+	GO111MODULE=on wire ./internal/roles/execute/
+	GO111MODULE=on wire ./internal/roles/verify/
 
 .PHONY: generate-mocks
 generate-mocks:
