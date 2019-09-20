@@ -8,6 +8,7 @@ type BLS_BLS12381Algo struct {
 	*SignAlgo
 }
 
+// SignHash implements BLS signature on BLS12381 curve
 func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) (Signature, error) {
 	blsPrKey, ok := sk.(*PrKeyBLS_BLS12381)
 	if !ok {
@@ -18,14 +19,12 @@ func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) (Signature, error) {
 }
 
 // SignBytes signs an array of bytes
-// Hasher is not used in the specific case of BLS
 func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) (Signature, error) {
 	h := alg.ComputeBytesHash(data)
 	return a.SignHash(sk, h)
 }
 
 // SignStruct signs a structure
-// Hasher is not used in the specific case of BLS
 func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) (Signature, error) {
 	h := alg.ComputeStructHash(data)
 	return a.SignHash(sk, h)
