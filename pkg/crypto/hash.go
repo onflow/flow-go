@@ -30,18 +30,12 @@ func NewHashAlgo(name AlgoName) (Hasher, error) {
 // Hash is the hash algorithms output types
 type Hash []byte
 
-// Hash32 implements Hash
-func (h Hash) Bytes() []byte {
-	return h
-}
-
 func (h Hash) IsEqual(input Hash) bool {
-	inputBytes := input.Bytes()
-	if len(h) != len(inputBytes) {
+	if len(h) != len(input) {
 		return false
 	}
 	for i := 0; i < len(h); i++ {
-		if h[i] != inputBytes[i] {
+		if h[i] != input[i] {
 			return false
 		}
 	}
@@ -104,7 +98,7 @@ func HashesToBytes(hashes []Hash) [][]byte {
 	b := make([][]byte, len(hashes))
 
 	for i, h := range hashes {
-		b[i] = h.Bytes()
+		b[i] = h
 	}
 
 	return b

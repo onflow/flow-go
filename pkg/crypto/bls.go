@@ -14,8 +14,7 @@ func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) (Signature, error) {
 		return nil, cryptoError{"BLS sigature can only be called using a BLS private key"}
 	}
 	skScalar := blsPrKey.scalar
-	hashBytes := h.Bytes()
-	return a.blsSign(&skScalar, hashBytes), nil
+	return a.blsSign(&skScalar, h), nil
 }
 
 // SignBytes signs an array of bytes
@@ -40,8 +39,7 @@ func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) (bool, err
 	}
 
 	pkPoint := &(blsPubKey.point)
-	hashBytes := h.Bytes()
-	return a.blsVerify(pkPoint, s, hashBytes), nil
+	return a.blsVerify(pkPoint, s, h), nil
 }
 
 // VerifyBytes verifies a signature of a byte array

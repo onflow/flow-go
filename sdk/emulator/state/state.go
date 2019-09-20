@@ -31,7 +31,7 @@ func NewWorldState() *WorldState {
 	registers := make(types.Registers)
 
 	genesis := etypes.GenesisBlock()
-	blocks[string(genesis.Hash().Bytes())] = genesis
+	blocks[string(genesis.Hash())] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
@@ -64,7 +64,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
-	if block, ok := ws.Blocks[string(hash.Bytes())]; ok {
+	if block, ok := ws.Blocks[string(hash)]; ok {
 		return block
 	}
 
@@ -90,7 +90,7 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
-	if tx, ok := ws.Transactions[string(hash.Bytes())]; ok {
+	if tx, ok := ws.Transactions[string(hash)]; ok {
 		return tx
 	}
 
@@ -99,7 +99,7 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 
 // ContainsTransaction returns true if the transaction exists in the state, false otherwise.
 func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
-	_, exists := ws.Transactions[string(hash.Bytes())]
+	_, exists := ws.Transactions[string(hash)]
 	return exists
 }
 
@@ -118,11 +118,11 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	defer ws.blocksMutex.Unlock()
 	defer ws.blockchainMutex.Unlock()
 
-	if _, exists := ws.Blocks[string(block.Hash().Bytes())]; exists {
+	if _, exists := ws.Blocks[string(block.Hash())]; exists {
 		return
 	}
 
-	ws.Blocks[string(block.Hash().Bytes())] = block
+	ws.Blocks[string(block.Hash())] = block
 
 	ws.Blockchain = append(ws.Blockchain, block.Hash())
 
@@ -137,11 +137,11 @@ func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
-	if _, exists := ws.Transactions[string(tx.Hash().Bytes())]; exists {
+	if _, exists := ws.Transactions[string(tx.Hash())]; exists {
 		return
 	}
 
-	ws.Transactions[string(tx.Hash().Bytes())] = tx
+	ws.Transactions[string(tx.Hash())] = tx
 
 	ws.latestStateMutex.Lock()
 	defer ws.latestStateMutex.Unlock()
@@ -160,5 +160,5 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.Transa
 	defer ws.transactionsMutex.Unlock()
 
 	tx.Status = status
-	ws.Transactions[string(tx.Hash().Bytes())] = tx
+	ws.Transactions[string(tx.Hash())] = tx
 }

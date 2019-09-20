@@ -28,17 +28,17 @@ func TestSha3_256(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
-	hash := alg.ComputeBytesHash(input).Bytes()
+	hash := alg.ComputeBytesHash(input)
 	checkBytes(t, input, expected, hash)
 
-	hash = alg.ComputeStructHash(&testStruct{"te", "st"}).Bytes()
+	hash = alg.ComputeStructHash(&testStruct{"te", "st"})
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
 	alg.AddBytes([]byte("te"))
 	alg.AddBytes([]byte("s"))
 	alg.AddBytes([]byte("t"))
-	hash = alg.SumHash().Bytes()
+	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
 
@@ -51,17 +51,17 @@ func TestSha3_384(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
-	hash := alg.ComputeBytesHash(input).Bytes()
+	hash := alg.ComputeBytesHash(input)
 	checkBytes(t, input, expected, hash)
 
-	hash = alg.ComputeStructHash(&testStruct{"te", "st"}).Bytes()
+	hash = alg.ComputeStructHash(&testStruct{"te", "st"})
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
 	alg.AddBytes([]byte("te"))
 	alg.AddBytes([]byte("s"))
 	alg.AddBytes([]byte("t"))
-	hash = alg.SumHash().Bytes()
+	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
 
