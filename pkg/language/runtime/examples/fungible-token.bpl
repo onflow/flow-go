@@ -107,7 +107,7 @@ import Timestamp from "time"
 
 pub abstract resource Faucet: FungibleToken.Provider {
 
-    private let source: <-FungibleToken.Provider
+    private let source: &FungibleToken.Provider
     private let dailyLimit: Int
 
     private var lastResetTime: Timestamp
@@ -138,7 +138,7 @@ pub abstract resource Faucet: FungibleToken.Provider {
         self.remainingAmount = self.dailyLimit
     }
 
-    init(source: <-FungibleToken.Provider, dailyLimit: Int) {
+    init(source: &FungibleToken.Provider, dailyLimit: Int) {
         pre {
             dailyLimit > 0:
                 "Daily limit must be positive"
@@ -152,53 +152,38 @@ pub abstract resource Faucet: FungibleToken.Provider {
     }
 }
 
-pub abstract resource ApprovableProvider: FungibleToken.Provider {
+pub abstract resource LimitedProvider: FungibleToken.Provider {
 
-    private let source: <-FungibleToken.Provider
-    private let approvals: Int[Address]
+    private let source: &FungibleToken.Provider
 
-    init(source: <-FungibleToken.Provider) {
-        self.source = source
-    }
-
-    pub fun approvedAmount(for address: Address): Int {
-        return self.approvals[address] ?? 0
-    }
-
-    pub fun removeApproval(for address: Address) {
-        self.approvals.remove(key: address)
-    }
-
-    pub fun setApproval(for address: Address, amount: Int) {
+    // Allow the owner of the limited provider
+    // to change the allowance
+    pub(set) var allowance: Int {
         pre {
-            amount > 0:
+            allowance > 0:
                 "Withdrawal amount must be positive"
         }
-        post {
-            self.approvedAmount(for address) == amount:
-                "Approval amount must be set"
-        }
-        self.approvals[address] = amount
+    }
+
+    init(source: &FungibleToken.Provider, allowance: Int) {
+        self.source = source
+        self.allowance = allowance
     }
 
     pub fun withdraw(amount: Int): <-Vault {
         pre {
-            // TODO: what is with draw
-            amount <= self.approvedAmount(for: address):
+            amount <= self.allowance:
                 "Withdrawal amount must be less or equal to approved amount"
         }
         post {
-            self.approvalAmount(for: address) == before(self.approvalAmount(for: address)) - amount:
+            self.allowance == before(self.allowance) - amount:
                 "Approval amount must be decremented by amount"
         }
 
-        let remainingApproval = self.approvals[address] ?? 0
-        self.approvals[address] = remainingApproval - amount
-
+        self.allowance = self.allowance - amount
         return self.source.withdraw(amount: amount)
     }
 }
-
 
 pub contract DeteToken includes BasicToken {
 
