@@ -15,6 +15,3 @@ flow.json
 
 # IDE related files
 .vscode
-
-#relic submodule
-pkg/crypto/relic/*
