@@ -426,6 +426,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	checker.checkFunction(
 		declaration.Parameters,
+		declaration.ReturnValue,
 		functionType,
 		declaration.FunctionBlock,
 		mustExit,
@@ -436,7 +437,11 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
 
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+	functionType := checker.functionType(
+		declaration.Parameters,
+		declaration.ReturnValue.TypeAnnotation,
+	)
+
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
@@ -484,6 +489,7 @@ func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
 
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
+	returnValue *ast.ReturnValue,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
@@ -494,11 +500,22 @@ func (checker *Checker) checkFunction(
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
 
-	checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
+	checker.declareParameters(
+		parameters,
+		functionType.ParameterTypeAnnotations,
+	)
 
-	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
-	// TODO: position
-	checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, ast.Position{})
+	checker.checkParameters(
+		parameters,
+		functionType.ParameterTypeAnnotations,
+	)
+
+	if returnValue != nil {
+		checker.checkTypeAnnotation(
+			functionType.ReturnTypeAnnotation,
+			returnValue.StartPos,
+		)
+	}
 
 	if functionBlock != nil {
 		func() {
@@ -2229,12 +2246,16 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
+	functionType := checker.functionType(
+		expression.Parameters,
+		expression.ReturnValue.TypeAnnotation,
+	)
 
 	checker.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
 		expression.Parameters,
+		expression.ReturnValue,
 		functionType,
 		expression.FunctionBlock,
 		true,
@@ -2826,7 +2847,10 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
+		functionType := checker.functionType(
+			function.Parameters,
+			function.ReturnValue.TypeAnnotation,
+		)
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
 
@@ -2982,6 +3006,7 @@ func (checker *Checker) checkInitializer(
 
 	checker.checkFunction(
 		initializer.Parameters,
+		nil,
 		functionType,
 		initializer.FunctionBlock,
 		true,
