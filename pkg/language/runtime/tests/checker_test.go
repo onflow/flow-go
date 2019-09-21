@@ -6859,3 +6859,41 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
 }
+
+func TestCheckResourceParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(r: <-R) {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceParameter(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(r: R) {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+}
+
