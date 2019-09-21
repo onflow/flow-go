@@ -3362,7 +3362,7 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
 			testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
 
-			Expect(testFunctionType.ReturnType).
+			Expect(testFunctionType.ReturnTypeAnnotation.Type).
 				To(BeIdenticalTo(structureType))
 		} else {
 			errs := expectCheckerErrors(err, 1)
