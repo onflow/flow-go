@@ -1174,3 +1174,23 @@ func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
 func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// InvalidMoveAnnotationError
+
+type InvalidMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidMoveAnnotationError) Error() string {
+	return "invalid move annotation: `<-`"
+}
+
+func (*InvalidMoveAnnotationError) isSemanticError() {}
+
+func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}

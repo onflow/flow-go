@@ -497,6 +497,8 @@ func (checker *Checker) checkFunction(
 	checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
 
 	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
+	// TODO: position
+	checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, ast.Position{})
 
 	if functionBlock != nil {
 		func() {
@@ -523,21 +525,27 @@ func (checker *Checker) checkFunction(
 func (checker *Checker) checkParameters(parameters []*ast.Parameter, parameterTypeAnnotations []*TypeAnnotation) {
 	for i, parameter := range parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		checker.checkParameter(parameter, parameterTypeAnnotation)
+		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.StartPos)
 	}
 }
 
-func (checker *Checker) checkParameter(parameter *ast.Parameter, parameterTypeAnnotation *TypeAnnotation) {
-	parameterType := parameterTypeAnnotation.Type
-
-	if parameterType.IsResourceType() &&
-		!parameterTypeAnnotation.Move {
-
-		checker.report(
-			&MissingMoveAnnotationError{
-				Pos: parameter.StartPos,
-			},
-		)
+func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
+	if typeAnnotation.Type.IsResourceType() {
+		if !typeAnnotation.Move {
+			checker.report(
+				&MissingMoveAnnotationError{
+					Pos: pos,
+				},
+			)
+		}
+	} else {
+		if typeAnnotation.Move {
+			checker.report(
+				&InvalidMoveAnnotationError{
+					Pos: pos,
+				},
+			)
+		}
 	}
 }
 
