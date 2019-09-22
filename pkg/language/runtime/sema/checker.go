@@ -533,8 +533,16 @@ func (checker *Checker) checkParameters(parameters []*ast.Parameter, parameterTy
 }
 
 func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	if typeAnnotation.Type.IsResourceType() {
-		if !typeAnnotation.Move {
+	checker.checkMoveAnnotation(
+		typeAnnotation.Type,
+		typeAnnotation.Move,
+		pos,
+	)
+}
+
+func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position) {
+	if ty.IsResourceType() {
+		if !move {
 			checker.report(
 				&MissingMoveAnnotationError{
 					Pos: pos,
@@ -542,7 +550,7 @@ func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos 
 			)
 		}
 	} else {
-		if typeAnnotation.Move {
+		if move {
 			checker.report(
 				&InvalidMoveAnnotationError{
 					Pos: pos,
@@ -696,6 +704,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = optionalValueType.Type
 	}
 
+	if declarationType != nil {
+		checker.checkTransfer(declaration.Transfer, declarationType)
+	}
+
 	checker.VariableDeclarationTargetTypes[declaration] = declarationType
 
 	variable := checker.declareVariable(
@@ -707,6 +719,30 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		nil,
 	)
 	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
+}
+
+func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
+	if valueType.IsResourceType() {
+		if transfer.Operation != ast.TransferOperationMove {
+			checker.report(
+				&IncorrectTransferOperationError{
+					ActualOperation:   transfer.Operation,
+					ExpectedOperation: ast.TransferOperationMove,
+					Pos:               transfer.Pos,
+				},
+			)
+		}
+	} else {
+		if transfer.Operation == ast.TransferOperationMove {
+			checker.report(
+				&IncorrectTransferOperationError{
+					ActualOperation:   transfer.Operation,
+					ExpectedOperation: ast.TransferOperationCopy,
+					Pos:               transfer.Pos,
+				},
+			)
+		}
+	}
 }
 
 func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
@@ -1119,6 +1155,8 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 
 	targetType := checker.visitAssignmentValueType(assignment, valueType)
 	checker.AssignmentStatementTargetTypes[assignment] = targetType
+
+	checker.checkTransfer(assignment.Transfer, valueType)
 
 	return nil
 }

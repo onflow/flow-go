@@ -128,9 +128,9 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 // AssignmentStatement
 
 type AssignmentStatement struct {
-	Move   bool
-	Target Expression
-	Value  Expression
+	Target   Expression
+	Transfer *Transfer
+	Value    Expression
 }
 
 func (s *AssignmentStatement) StartPosition() Position {

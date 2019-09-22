@@ -7,7 +7,7 @@ type VariableDeclaration struct {
 	Identifier     Identifier
 	TypeAnnotation *TypeAnnotation
 	Value          Expression
-	Move           bool
+	Transfer       *Transfer
 	StartPos       Position
 }
 

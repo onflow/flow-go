@@ -124,6 +124,9 @@ type StrictusListener interface {
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
+	// EnterTransfer is called when entering the transfer production.
+	EnterTransfer(c *TransferContext)
+
 	// EnterExpression is called when entering the expression production.
 	EnterExpression(c *ExpressionContext)
 
@@ -375,6 +378,9 @@ type StrictusListener interface {
 
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
+
+	// ExitTransfer is called when exiting the transfer production.
+	ExitTransfer(c *TransferContext)
 
 	// ExitExpression is called when exiting the expression production.
 	ExitExpression(c *ExpressionContext)
