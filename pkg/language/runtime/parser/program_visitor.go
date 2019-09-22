@@ -45,7 +45,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	parameterListEnd := ctx.ParameterList().GetStop()
-	returnValue := v.visitReturnValue(ctx.returnType, parameterListEnd)
+	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -64,20 +64,18 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionDeclaration{
-		Access:        access,
-		Identifier:    identifier,
-		Parameters:    parameters,
-		ReturnValue:   returnValue,
-		FunctionBlock: functionBlock,
-		StartPos:      startPosition,
+		Access:               access,
+		Identifier:           identifier,
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+		FunctionBlock:        functionBlock,
+		StartPos:             startPosition,
 	}
 }
 
-// visitReturnValue returns the return value.
-// If no return type annotation was  was given in the program, this function
-// returns a return value with an empty type, with the position of `tokenBefore`
-//
-func (v *ProgramVisitor) visitReturnValue(ctx ITypeAnnotationContext, tokenBefore antlr.Token) *ast.ReturnValue {
+// visitReturnTypeAnnotation returns the return type annotation.
+// if none was given in the program, return a type annotation with an empty type, with the position of tokenBefore
+func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, tokenBefore antlr.Token) *ast.TypeAnnotation {
 	if ctx == nil {
 		positionBeforeMissingReturnType :=
 			ast.PositionFromToken(tokenBefore)
@@ -86,27 +84,16 @@ func (v *ProgramVisitor) visitReturnValue(ctx ITypeAnnotationContext, tokenBefor
 				Pos: positionBeforeMissingReturnType,
 			},
 		}
-		return &ast.ReturnValue{
-			TypeAnnotation: &ast.TypeAnnotation{
-				Move: false,
-				Type: returnType,
-			},
-			StartPos: positionBeforeMissingReturnType,
-			EndPos:   positionBeforeMissingReturnType,
+		return &ast.TypeAnnotation{
+			Move: false,
+			Type: returnType,
 		}
 	}
 	result := ctx.Accept(v)
 	if result == nil {
 		return nil
 	}
-	typeAnnotation := result.(*ast.TypeAnnotation)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-
-	return &ast.ReturnValue{
-		TypeAnnotation: typeAnnotation,
-		StartPos:       startPosition,
-		EndPos:         endPosition,
-	}
+	return result.(*ast.TypeAnnotation)
 }
 
 func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
@@ -332,7 +319,7 @@ func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
 	parameterListEnd := ctx.ParameterList().GetStop()
-	returnValue := v.visitReturnValue(ctx.returnType, parameterListEnd)
+	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -345,10 +332,10 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
-		Parameters:    parameters,
-		ReturnValue:   returnValue,
-		FunctionBlock: functionBlock,
-		StartPos:      startPosition,
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+		FunctionBlock:        functionBlock,
+		StartPos:             startPosition,
 	}
 }
 

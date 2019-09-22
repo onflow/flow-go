@@ -3,12 +3,12 @@ package ast
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 type FunctionDeclaration struct {
-	Access        Access
-	Identifier    Identifier
-	Parameters    []*Parameter
-	ReturnValue   *ReturnValue
-	FunctionBlock *FunctionBlock
-	StartPos      Position
+	Access               Access
+	Identifier           Identifier
+	Parameters           []*Parameter
+	ReturnTypeAnnotation *TypeAnnotation
+	FunctionBlock        *FunctionBlock
+	StartPos             Position
 }
 
 func (f *FunctionDeclaration) StartPosition() Position {
@@ -36,9 +36,9 @@ func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
 
 func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
 	return &FunctionExpression{
-		Parameters:    f.Parameters,
-		ReturnValue:   f.ReturnValue,
-		FunctionBlock: f.FunctionBlock,
-		StartPos:      f.StartPos,
+		Parameters:           f.Parameters,
+		ReturnTypeAnnotation: f.ReturnTypeAnnotation,
+		FunctionBlock:        f.FunctionBlock,
+		StartPos:             f.StartPos,
 	}
 }
