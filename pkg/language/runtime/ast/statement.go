@@ -128,6 +128,7 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 // AssignmentStatement
 
 type AssignmentStatement struct {
+	Move   bool
 	Target Expression
 	Value  Expression
 }

@@ -673,6 +673,8 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		}
 	}
 
+	move := ctx.Move() != nil
+
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.VariableDeclaration{
@@ -680,6 +682,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		Identifier:     identifier,
 		Value:          expression,
 		TypeAnnotation: typeAnnotation,
+		Move:           move,
 		StartPos:       startPosition,
 	}
 }
@@ -755,15 +758,18 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 		Identifier: identifier,
 	}
 
-	value := ctx.Expression().Accept(v).(ast.Expression)
-
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
 		accessExpression := expression.(ast.AccessExpression)
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
+	move := ctx.Move() != nil
+
+	value := ctx.Expression().Accept(v).(ast.Expression)
+
 	return &ast.AssignmentStatement{
+		Move:   move,
 		Target: target,
 		Value:  value,
 	}

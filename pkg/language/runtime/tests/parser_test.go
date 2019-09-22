@@ -4195,6 +4195,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 				Pos:        Position{Offset: 18, Line: 2, Column: 17},
 			},
 		},
+		Move:     true,
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
 
@@ -4249,6 +4250,7 @@ func TestParseMoveStatement(t *testing.T) {
 								Pos:        Position{Offset: 39, Line: 3, Column: 17},
 							},
 						},
+						Move: true,
 					},
 				},
 				StartPos: Position{Offset: 20, Line: 2, Column: 19},
@@ -4415,6 +4417,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 				Pos:        Position{Offset: 23, Line: 2, Column: 22},
 			},
 		},
+		Move:     true,
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
 
