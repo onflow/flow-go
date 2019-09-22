@@ -2309,20 +2309,13 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	case *ast.FunctionType:
 		var parameterTypeAnnotations []*TypeAnnotation
 		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-			parameterType := checker.ConvertType(parameterTypeAnnotation.Type)
+			parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
 			parameterTypeAnnotations = append(parameterTypeAnnotations,
-				&TypeAnnotation{
-					Move: parameterTypeAnnotation.Move,
-					Type: parameterType,
-				},
+				parameterTypeAnnotation,
 			)
 		}
 
-		returnType := checker.ConvertType(t.ReturnTypeAnnotation.Type)
-		returnTypeAnnotation := &TypeAnnotation{
-			Move: t.ReturnTypeAnnotation.Move,
-			Type: returnType,
-		}
+		returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
 
 		return &FunctionType{
 			ParameterTypeAnnotations: parameterTypeAnnotations,
@@ -2344,6 +2337,17 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+// ConvertTypeAnnotation converts an AST type annotation representation
+// to a sema type annotation
+//
+func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation) *TypeAnnotation {
+	convertedType := checker.ConvertType(typeAnnotation.Type)
+	return &TypeAnnotation{
+		Move: typeAnnotation.Move,
+		Type: convertedType,
+	}
 }
 
 func (checker *Checker) declareFunction(
@@ -2407,17 +2411,14 @@ func (checker *Checker) functionType(
 	parameters []*ast.Parameter,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
+	convertedParameterTypeAnnotations :=
+		checker.parameterTypeAnnotations(parameters)
 
-	parameterTypeAnnotations := checker.parameterTypeAnnotations(parameters)
-	convertedReturnType := checker.ConvertType(returnTypeAnnotation.Type)
-
-	convertedReturnTypeAnnotation := &TypeAnnotation{
-		Move: returnTypeAnnotation.Move,
-		Type: convertedReturnType,
-	}
+	convertedReturnTypeAnnotation :=
+		checker.ConvertTypeAnnotation(returnTypeAnnotation)
 
 	return &FunctionType{
-		ParameterTypeAnnotations: parameterTypeAnnotations,
+		ParameterTypeAnnotations: convertedParameterTypeAnnotations,
 		ReturnTypeAnnotation:     convertedReturnTypeAnnotation,
 	}
 }
