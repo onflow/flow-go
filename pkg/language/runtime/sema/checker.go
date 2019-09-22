@@ -426,6 +426,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	checker.checkFunction(
 		declaration.Parameters,
+		declaration.ReturnTypeAnnotation.StartPos,
 		functionType,
 		declaration.FunctionBlock,
 		mustExit,
@@ -484,6 +485,7 @@ func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
 
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
+	returnTypePosition ast.Position,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
@@ -497,8 +499,9 @@ func (checker *Checker) checkFunction(
 	checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
 
 	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
-	// TODO: position
-	checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, ast.Position{})
+	if functionType.ReturnTypeAnnotation != nil {
+		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
+	}
 
 	if functionBlock != nil {
 		func() {
@@ -2235,6 +2238,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 
 	checker.checkFunction(
 		expression.Parameters,
+		expression.ReturnTypeAnnotation.StartPos,
 		functionType,
 		expression.FunctionBlock,
 		true,
@@ -2983,6 +2987,7 @@ func (checker *Checker) checkInitializer(
 
 	checker.checkFunction(
 		initializer.Parameters,
+		ast.Position{},
 		functionType,
 		initializer.FunctionBlock,
 		true,
