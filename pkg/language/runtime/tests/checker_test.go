@@ -2913,20 +2913,22 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
 
               init(x: Int) {
-                  let test: Test = Test(x: 1)
+                  let test: %[2]sTest = Test(x: 1)
               }
 
               fun test() {
-                  let test: Test = Test(x: 2)
+                  let test: %[2]sTest = Test(x: 2)
               }
           }
 
-          let test: Test = Test(x: 3)
-    	`, kind.Keyword()))
+          let test: %[2]sTest = Test(x: 3)
+    	`, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -3060,17 +3062,19 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
 
+			annotation := getCompositeKindAnnotation(firstKind)
+
 			_, err := parseAndCheck(fmt.Sprintf(`
-              %s Foo {
+              %[1]s Foo {
                   init() {}
               }
 
-              %s Bar {
+              %[2]s Bar {
                   init() {}
               }
 
-              let foo: Foo = Bar()
-    	    `, firstKind.Keyword(), secondKind.Keyword()))
+              let foo: %[3]sFoo = Bar()
+    	    `, firstKind.Keyword(), secondKind.Keyword(), annotation))
 
 			// TODO: add support for non-structure declarations
 
@@ -3318,10 +3322,7 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		annotation := ""
-		if kind == common.CompositeKindResource {
-			annotation = "<-"
-		}
+		annotation := getCompositeKindAnnotation(kind)
 
 		checker, err := parseAndCheck(fmt.Sprintf(`
           %s Test {
@@ -3336,13 +3337,13 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
           }
 
           fun test(): %[2]sTest {
-             return Test()
+              return Test()
           }
 
           fun test2(): %[2]sTest {
-             return Test().test()
+              return Test().test()
           }
-	    `, kind.Keyword(), annotation))
+        `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -3376,6 +3377,13 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
+}
+
+func getCompositeKindAnnotation(kind common.CompositeKind) string {
+	if kind != common.CompositeKindResource {
+		return ""
+	}
+	return "<-"
 }
 
 func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
@@ -3415,10 +3423,7 @@ func TestCheckCompositeFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		annotation := ""
-		if kind == common.CompositeKindResource {
-			annotation = "<-"
-		}
+		annotation := getCompositeKindAnnotation(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
             %[1]s X {
@@ -3879,10 +3884,7 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		annotation := ""
-		if kind == common.CompositeKindResource {
-			annotation = "<-"
-		}
+		annotation := getCompositeKindAnnotation(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           var tests = 0
@@ -4592,12 +4594,14 @@ func TestCheckInterfaceUse(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheckWithExtra(
 			fmt.Sprintf(`
               %s interface Test {}
 
-              let test: Test = panic("")
-            `, kind.Keyword()),
+              let test: %sTest = panic("")
+            `, kind.Keyword(), annotation),
 			stdlib.StandardLibraryFunctions{
 				stdlib.PanicFunction,
 			}.ToValueDeclarations(),
@@ -4623,13 +4627,15 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
 
           %[1]s TestImpl: Test {}
 
-          let test: Test = TestImpl()
-	    `, kind.Keyword()))
+          let test: %[2]sTest = TestImpl()
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -4659,13 +4665,15 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 				continue
 			}
 
+			annotation := getCompositeKindAnnotation(firstKind)
+
 			_, err := parseAndCheck(fmt.Sprintf(`
               %s interface Test {}
 
               %s TestImpl: Test {}
 
-              let test: Test = TestImpl()
-	        `, firstKind.Keyword(), secondKind.Keyword()))
+              let test: %sTest = TestImpl()
+	        `, firstKind.Keyword(), secondKind.Keyword(), annotation))
 
 			// TODO: add support for non-structure declarations
 
@@ -4691,14 +4699,16 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
 
           // NOTE: not declaring conformance
           %[1]s TestImpl {}
 
-          let test: Test = TestImpl()
-	  `, kind.Keyword()))
+          let test: %[2]sTest = TestImpl()
+	  `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -4753,6 +4763,8 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {
               x: Int
@@ -4766,10 +4778,10 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
               }
           }
 
-          let test: Test = TestImpl(x: 1)
+          let test: %[2]sTest = TestImpl(x: 1)
 
           let x = test.x
-        `, kind.Keyword()))
+        `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -4792,6 +4804,8 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
 
@@ -4803,10 +4817,10 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
               }
           }
 
-          let test: Test = TestImpl(x: 1)
+          let test: %[2]sTest = TestImpl(x: 1)
 
           let x = test.x
-    	`, kind.Keyword()))
+    	`, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -4834,6 +4848,8 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {
               fun test(): Int
@@ -4845,10 +4861,10 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
               }
           }
 
-          let test: Test = TestImpl()
+          let test: %[2]sTest = TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword()))
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -4871,6 +4887,8 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
 
@@ -4880,10 +4898,10 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
               }
           }
 
-          let test: Test = TestImpl()
+          let test: %sTest = TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword()))
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -5396,10 +5414,7 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
-			annotation := ""
-			if firstKind == common.CompositeKindResource {
-				annotation = "<-"
-			}
+			annotation := getCompositeKindAnnotation(firstKind)
 
 			_, err := parseAndCheck(fmt.Sprintf(`
               %s S {}
@@ -6573,13 +6588,15 @@ func TestCheckArraySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface I {}
           %[1]s S: I {}
 
-          let xs: [S] = []
-          let ys: [I] = xs
-	    `, kind.Keyword()))
+          let xs: %[2]s[S] = []
+          let ys: %[2]s[I] = xs
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -6616,13 +6633,15 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface I {}
           %[1]s S: I {}
 
-          let xs: {String: S} = {}
-          let ys: {String: I} = xs
-	    `, kind.Keyword()))
+          let xs: %[2]s{String: S} = {}
+          let ys: %[2]s{String: I} = xs
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -6862,11 +6881,11 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 	_, err := parseAndCheck(`
 		struct Test {
 			pub(set) var foo: Int
-		
+
 			init(foo: Int) {
 				self.foo = foo
 			}
-		
+
 			pub fun getFoo(): Int {
 				if 2 > 1 {
 					return 0
@@ -6881,141 +6900,253 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
 }
 
-func TestCheckResourceParameterWithMoveAnnotation(t *testing.T) {
+func TestCheckParameterWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      resource R {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s T {}
 
-      fun test(r: <-R) {}
-	`)
+          fun test(r: <-T) {}
+	    `, kind.Keyword()))
 
-	// TODO: add support for resources
+		switch kind {
+		case common.CompositeKindResource:
 
-	errs := expectCheckerErrors(err, 1)
+			// TODO: add support for resources
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindContract:
+
+			// TODO: add support for contracts
+
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+		case common.CompositeKindStructure:
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidResourceParameterWithoutMoveAnnotation(t *testing.T) {
+func TestCheckParameterWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      resource R {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s T {}
 
-      fun test(r: R) {}
-	`)
+          fun test(r: T) {}
+	    `, kind.Keyword()))
 
-	// TODO: add support for resources
+		switch kind {
+		case common.CompositeKindResource:
 
-	errs := expectCheckerErrors(err, 2)
+			// TODO: add support for resources
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			errs := expectCheckerErrors(err, 2)
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+		case common.CompositeKindContract:
+
+			// TODO: add support for contracts
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindStructure:
+
+			Expect(err).
+				To(Not(HaveOccurred()))
+		}
+	}
 }
 
-func TestCheckStructParameterWithoutMoveAnnotation(t *testing.T) {
+func TestCheckReturnTypeWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s T {}
 
-      fun test(r: S) {}
-	`)
+          fun test(): <-T {
+              return T()
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		switch kind {
+		case common.CompositeKindResource:
+
+			// TODO: add support for resources
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindContract:
+
+			// TODO: add support for contracts
+
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+		case common.CompositeKindStructure:
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructParameterWithMoveAnnotation(t *testing.T) {
+func TestCheckReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s T {}
 
-      fun test(r: <-S) {}
-	`)
+          fun test(): T {
+              return T()
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		switch kind {
+		case common.CompositeKindResource:
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			// TODO: add support for resources
+
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+		case common.CompositeKindContract:
+
+			// TODO: add support for contracts
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindStructure:
+
+			Expect(err).
+				To(Not(HaveOccurred()))
+		}
+	}
 }
 
-func TestCheckResourceReturnTypeWithMoveAnnotation(t *testing.T) {
+func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      resource R {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s R {}
 
-      fun test(): <-R {
-          return R()
-      }
-	`)
+          let test: <-R <- R()
+	    `, kind.Keyword()))
 
-	// TODO: add support for resources
+		switch kind {
+		case common.CompositeKindResource:
 
-	errs := expectCheckerErrors(err, 1)
+			// TODO: add support for resources
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindContract:
+
+			// TODO: add support for contracts
+
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+		case common.CompositeKindStructure:
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidResourceReturnTypeWithoutMoveAnnotation(t *testing.T) {
+func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      resource R {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s T {}
 
-      fun test(): R {
-          return R()
-      }
-	`)
+          let test: T <- T()
+	    `, kind.Keyword()))
 
-	// TODO: add support for resources
+		switch kind {
+		case common.CompositeKindResource:
 
-	errs := expectCheckerErrors(err, 2)
+			// TODO: add support for resources
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			errs := expectCheckerErrors(err, 2)
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
-}
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-func TestCheckStructReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	RegisterTestingT(t)
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-	_, err := parseAndCheck(`
-      struct S {}
+		case common.CompositeKindContract:
 
-      fun test(): S {
-          return S()
-      }
-	`)
+			// TODO: add support for contracts
 
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
+			errs := expectCheckerErrors(err, 1)
 
-func TestCheckInvalidStructReturnTypeWithMoveAnnotation(t *testing.T) {
-	RegisterTestingT(t)
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-	_, err := parseAndCheck(`
-      struct S {}
+		case common.CompositeKindStructure:
 
-      fun test(): <-S {
-          return S()
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			Expect(err).
+				To(Not(HaveOccurred()))
+		}
+	}
 }
 

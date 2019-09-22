@@ -656,7 +656,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	// does the declaration have an explicit type annotation?
 	if declaration.TypeAnnotation != nil {
-		declarationType = checker.ConvertType(declaration.TypeAnnotation.Type)
+		typeAnnotation := checker.ConvertTypeAnnotation(declaration.TypeAnnotation)
+		declarationType = typeAnnotation.Type
+
+		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation.StartPos)
 
 		// check the value type is a subtype of the declaration type
 		if declarationType != nil && valueType != nil && !valueIsInvalid && !isInvalidType(declarationType) {
