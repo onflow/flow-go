@@ -6906,41 +6906,45 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          fun test(r: <-T) {}
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              fun test(r: <-T) {}
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindContract:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			errs := expectCheckerErrors(err, 1)
+			case common.CompositeKindStructure:
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -6948,39 +6952,43 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          fun test(r: T) {}
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              fun test(r: T) {}
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindStructure:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
@@ -6988,43 +6996,47 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          fun test(): <-T {
-              return T()
-          }
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              fun test(): <-T {
+                  return T()
+              }
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindContract:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			errs := expectCheckerErrors(err, 1)
+			case common.CompositeKindStructure:
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -7032,41 +7044,45 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          fun test(): T {
-              return T()
-          }
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              fun test(): T {
+                  return T()
+              }
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindStructure:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
@@ -7074,41 +7090,45 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test: <-T <- T()
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test: <-T <- T()
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindContract:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			errs := expectCheckerErrors(err, 1)
+			case common.CompositeKindStructure:
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -7116,39 +7136,43 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test: T <- T()
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test: T <- T()
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindStructure:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
@@ -7156,62 +7180,66 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %[1]s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          %[1]s U {
-              let t: <-T
-              init(t: <-T) {
-                  self.t = t
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              %[1]s U {
+                  let t: <-T
+                  init(t: <-T) {
+                      self.t = t
+                  }
               }
-          }
-	    `, kind.Keyword()))
+	        `, kind.Keyword()))
 
-		switch kind {
-		case common.CompositeKindResource:
+			switch kind {
+			case common.CompositeKindResource:
 
-			// TODO: add support for resources
+				// TODO: add support for resources
 
-			errs := expectCheckerErrors(err, 2)
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+			case common.CompositeKindContract:
 
-			// TODO: add support for contracts
+				// TODO: add support for contracts
 
-			errs := expectCheckerErrors(err, 4)
+				errs := expectCheckerErrors(err, 4)
 
-			// NOTE: one invalid move annotation error for field, one for parameter
+				// NOTE: one invalid move annotation error for field, one for parameter
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(errs[2]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			Expect(errs[3]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[3]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+			case common.CompositeKindStructure:
 
-			errs := expectCheckerErrors(err, 2)
+				errs := expectCheckerErrors(err, 2)
 
-			// NOTE: one invalid move annotation error for field, one for parameter
+				// NOTE: one invalid move annotation error for field, one for parameter
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -7219,55 +7247,59 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %[1]s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          %[1]s U {
-              let t: T
-              init(t: T) {
-                  self.t = t
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              %[1]s U {
+                  let t: T
+                  init(t: T) {
+                      self.t = t
+                  }
               }
-          }
-	    `, kind.Keyword()))
+	        `, kind.Keyword()))
 
-		switch kind {
-		case common.CompositeKindResource:
+			switch kind {
+			case common.CompositeKindResource:
 
-			// TODO: add support for resources
+				// TODO: add support for resources
 
-			// NOTE: one missing move annotation error for field, one for parameter
+				// NOTE: one missing move annotation error for field, one for parameter
 
-			errs := expectCheckerErrors(err, 4)
+				errs := expectCheckerErrors(err, 4)
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(errs[2]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			Expect(errs[3]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[3]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+			case common.CompositeKindContract:
 
-			// TODO: add support for contracts
+				// TODO: add support for contracts
 
-			errs := expectCheckerErrors(err, 2)
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+			case common.CompositeKindStructure:
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
@@ -7275,41 +7307,45 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test = fun (r: <-T) {}
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test = fun (r: <-T) {}
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindContract:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			errs := expectCheckerErrors(err, 1)
+			case common.CompositeKindStructure:
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -7317,39 +7353,43 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test = fun (r: T) {}
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test = fun (r: T) {}
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindStructure:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
@@ -7357,43 +7397,47 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test = fun (): <-T {
-              return T()
-          }
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test = fun (): <-T {
+                  return T()
+              }
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindContract:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindStructure:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
 
-			errs := expectCheckerErrors(err, 1)
+			case common.CompositeKindStructure:
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
-		}
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
 	}
 }
 
@@ -7401,41 +7445,45 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := parseAndCheck(fmt.Sprintf(`
-          %s T {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
 
-          let test = fun (): T {
-              return T()
-          }
-	    `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
 
-		switch kind {
-		case common.CompositeKindResource:
+              let test = fun (): T {
+                  return T()
+              }
+	        `, kind.Keyword()))
 
-			// TODO: add support for resources
+			switch kind {
+			case common.CompositeKindResource:
 
-			errs := expectCheckerErrors(err, 2)
+				// TODO: add support for resources
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-		case common.CompositeKindContract:
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
 
-			// TODO: add support for contracts
+			case common.CompositeKindContract:
 
-			errs := expectCheckerErrors(err, 1)
+				// TODO: add support for contracts
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				errs := expectCheckerErrors(err, 1)
 
-		case common.CompositeKindStructure:
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-			Expect(err).
-				To(Not(HaveOccurred()))
-		}
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
 	}
 }
 
