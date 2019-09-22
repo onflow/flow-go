@@ -7671,3 +7671,122 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
+func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = T() as? <-T
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 3)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = T() as? T
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 3)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindStructure:
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+			}
+		})
+	}
+}
+
