@@ -9,7 +9,7 @@ type sha3_256Algo struct {
 func (s *sha3_256Algo) ComputeBytesHash(data []byte) Hash {
 	s.Reset()
 	s.Write(data)
-	digest := make([]byte, HashLengthSha3_256)
+	digest := make(Hash, HashLengthSha3_256)
 	s.Sum(digest[:0])
 	return digest
 }
@@ -18,14 +18,14 @@ func (s *sha3_256Algo) ComputeBytesHash(data []byte) Hash {
 func (s *sha3_256Algo) ComputeStructHash(struc Encoder) Hash {
 	s.Reset()
 	s.Write(struc.Encode())
-	digest := make([]byte, HashLengthSha3_256)
+	digest := make(Hash, HashLengthSha3_256)
 	s.Sum(digest[:0])
 	return digest
 }
 
 // SumHash returns the SHA3-256 output and resets the hash state
 func (s *sha3_256Algo) SumHash() Hash {
-	digest := make([]byte, HashLengthSha3_256)
+	digest := make(Hash, HashLengthSha3_256)
 	s.Sum(digest[:0])
 	s.Reset()
 	return digest
@@ -40,7 +40,7 @@ type sha3_384Algo struct {
 func (s *sha3_384Algo) ComputeBytesHash(data []byte) Hash {
 	s.Reset()
 	s.Write(data)
-	digest := make([]byte, HashLengthSha3_384)
+	digest := make(Hash, HashLengthSha3_384)
 	s.Sum(digest[:0])
 	return digest
 }
@@ -49,14 +49,14 @@ func (s *sha3_384Algo) ComputeBytesHash(data []byte) Hash {
 func (s *sha3_384Algo) ComputeStructHash(struc Encoder) Hash {
 	s.Reset()
 	s.Write(struc.Encode())
-	digest := make([]byte, HashLengthSha3_384)
+	digest := make(Hash, HashLengthSha3_384)
 	s.Sum(digest[:0])
 	return digest
 }
 
 // SumHash returns the SHA3-256 output and resets the hash state
 func (s *sha3_384Algo) SumHash() Hash {
-	digest := make([]byte, HashLengthSha3_384)
+	digest := make(Hash, HashLengthSha3_384)
 	s.Sum(digest[:0])
 	s.Reset()
 	return digest

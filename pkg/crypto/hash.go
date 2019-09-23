@@ -46,7 +46,7 @@ func (h Hash) IsEqual(input Hash) bool {
 
 type Hasher interface {
 	Name() AlgoName
-	// Size return the hash output length
+	// Size returns the hash output length
 	Size() int
 	// Compute hash
 	ComputeBytesHash([]byte) Hash
