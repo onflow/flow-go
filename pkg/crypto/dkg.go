@@ -2,6 +2,8 @@ package crypto
 
 import (
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // DKGtype is the supported DKG type
@@ -23,7 +25,7 @@ type DKGstate interface {
 	// Threshold returns the threshold value t
 	Threshold() int
 	// StartDKG starts running a DKG
-	StartDKG() *DKGoutput
+	StartDKG() (*DKGoutput, error)
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrKey, PubKey, []PubKey, error)
 	// ProcessDKGmsg processes a new DKG message received by the current node
@@ -47,7 +49,7 @@ func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate,
 			leaderIndex: leaderIndex,
 		})
 		fvss.init()
-		fmt.Printf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
+		log.Debug(fmt.Sprintf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex))
 		return fvss, nil
 	}
 
@@ -76,6 +78,7 @@ type dkgMsgTag byte
 
 const (
 	FeldmanVSSshare dkgMsgTag = iota
+	FeldmanVSSVerifVec
 )
 
 type DKGToSend struct {
@@ -100,11 +103,10 @@ type DKGoutput struct {
 	err    error
 }
 
-// this is a utility function that returns a real node index when running a loop
-// by the node current
-func index(current int, loop int) int {
+// maps the interval [1..c-1,c+1..n] into [1..n-1]
+func indexOrder(current int, loop int) int {
 	if loop < current {
 		return loop
 	}
-	return loop + 1
+	return loop - 1
 }

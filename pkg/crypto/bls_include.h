@@ -6,14 +6,21 @@
 
 // Fp length
 
-#define FP_BITS  381
+#define Fp_BITS  381
+#define Fr_BITS  256  
+
+#define Fp_BYTES BITS_TO_BYTES(Fp_BITS)
+#define Fr_BYTES BITS_TO_BYTES(Fr_BITS)
+
+#define G1_BYTES (2*Fp_BYTES)
+#define G2_BYTES (4*Fp_BYTES)
 
 // Signature, Public key and Private key lengths 
-#define FULL_SIGNATURE_LEN  (2*FP_BYTES)
-#define FULL_PK_LEN         (4*FP_BYTES)
+#define FULL_SIGNATURE_LEN  G1_BYTES
+#define FULL_PK_LEN         G2_BYTES
 #define SIGNATURE_LEN       (FULL_SIGNATURE_LEN/(SERIALIZATION+1))
 #define PK_LEN              (FULL_PK_LEN/(SERIALIZATION+1))
-#define SK_BITS             256
+#define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
 #define SIG_VALID   1

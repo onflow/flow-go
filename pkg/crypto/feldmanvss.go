@@ -16,7 +16,8 @@ type feldmanVSSstate struct {
 	// A_0 is the group public key
 	A []pointG2
 	// Private share of the current node
-	x scalar
+	x         scalar
+	xReceived bool
 	// Public keys of the group nodes, the vector size is (n)
 	y []pointG2
 }
@@ -27,38 +28,56 @@ func (s *feldmanVSSstate) init() {
 	blsSigner, _ := NewSignatureAlgo(BLS_BLS12381)
 	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
 
-	s.A = make([]pointG2, s.threshold+1)
+	s.A = nil
+	s.y = nil
+	s.xReceived = false
 }
 
-func (s *feldmanVSSstate) StartDKG() *DKGoutput {
+func (s *feldmanVSSstate) StartDKG() (*DKGoutput, error) {
 	s.isrunning = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
-		seed := []byte{1}
-		return s.generateShares(seed)
+		seed := []byte{1, 2, 3}
+		return s.generateShares(seed), nil
 	}
-	return new(DKGoutput)
+	return new(DKGoutput), nil
 }
 
 func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
 	s.isrunning = false
 	// private key of the current node
-	x := PrKeyBLS_BLS12381{
-		alg:    s.blsContext, // signer algo
-		scalar: s.x,          // the private share
+	var x PrKey
+	if s.xReceived {
+		x = &PrKeyBLS_BLS12381{
+			alg:    s.blsContext, // signer algo
+			scalar: s.x,          // the private share
+		}
+	} else {
+		x = nil
 	}
 	// Group public key
-	Y := PubKeyBLS_BLS12381{
-		point: s.A[0],
+	var Y PubKey
+	if s.A != nil {
+		Y = &PubKeyBLS_BLS12381{
+			point: s.A[0],
+		}
+	} else {
+		Y = nil
 	}
 	// The nodes public keys
 	y := make([]PubKey, s.size)
-	for i, p := range s.y {
-		y[i] = &PubKeyBLS_BLS12381{
-			point: p,
+	if s.y != nil {
+		for i, p := range s.y {
+			y[i] = &PubKeyBLS_BLS12381{
+				point: p,
+			}
+		}
+	} else {
+		for i := 0; i < s.size; i++ {
+			y[i] = nil
 		}
 	}
-	return &x, &Y, y, nil
+	return x, Y, y, nil
 }
 
 func (s *feldmanVSSstate) ProcessDKGmsg(orig int, msg DKGmsg) *DKGoutput {
@@ -67,15 +86,16 @@ func (s *feldmanVSSstate) ProcessDKGmsg(orig int, msg DKGmsg) *DKGoutput {
 		err:    nil,
 	})
 
-	msgBytes := msg[:]
-	if len(msgBytes) == 0 {
+	if !s.isrunning || len(msg) == 0 {
 		out.result = invalid
 		return out
 	}
 
-	switch dkgMsgTag(msgBytes[0]) {
+	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result, out.err = s.receiveShare(orig, msgBytes[1:])
+		out.result, out.err = s.receiveShare(orig, msg[1:])
+	case FeldmanVSSVerifVec:
+		out.result, out.err = s.receiveVerifVector(orig, msg[1:])
 	default:
 		out.result = invalid
 	}

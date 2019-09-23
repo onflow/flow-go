@@ -6,7 +6,6 @@
 typedef uint8_t byte;
 
 #define BITS_TO_BYTES(x) ((x+7)/8)
-#define FP_BYTES BITS_TO_BYTES(FP_BITS)
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
 
