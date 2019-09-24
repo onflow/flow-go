@@ -1067,7 +1067,6 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 }
 
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
-
 	valueType := assignment.Value.Accept(checker).(Type)
 	checker.AssignmentStatementValueTypes[assignment] = valueType
 
@@ -2662,27 +2661,28 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 	return true
 }
 
-// TODO: very simple field initialization check for now.
-//  perform proper definite assignment analysis
-//
 func (checker *Checker) checkFieldsInitialized(
 	declaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 ) {
+	for _, initializer := range declaration.Members.Initializers {
+		unassigned, errors := CheckFieldAssignments(
+			declaration.Members.Fields,
+			initializer.FunctionBlock,
+		)
 
-	for _, field := range declaration.Members.Fields {
-		name := field.Identifier.Identifier
-		member := compositeType.Members[name]
-
-		if !member.IsInitialized {
+		for _, field := range unassigned {
 			checker.report(
 				&FieldUninitializedError{
-					Name:          name,
+					Name:          field.Identifier.Identifier,
 					Pos:           field.Identifier.Pos,
 					CompositeType: compositeType,
+					Initializer:   initializer,
 				},
 			)
 		}
+
+		checker.report(errors...)
 	}
 }
 

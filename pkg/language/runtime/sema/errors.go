@@ -681,6 +681,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
+	Initializer   *ast.InitializerDeclaration
 	Pos           ast.Position
 }
 
