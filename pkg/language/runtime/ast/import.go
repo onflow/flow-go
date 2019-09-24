@@ -2,6 +2,8 @@ package ast
 
 import (
 	"fmt"
+	"github.com/raviqqe/hamt"
+	"hash/fnv"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
@@ -11,6 +13,16 @@ import (
 type Identifier struct {
 	Identifier string
 	Pos        Position
+}
+
+func (i Identifier) Hash() uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(i.Identifier))
+	return h.Sum32()
+}
+
+func (i Identifier) Equal(other hamt.Entry) bool {
+	return i.Identifier == other.(Identifier).Identifier
 }
 
 func (i Identifier) String() string {

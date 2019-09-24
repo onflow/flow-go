@@ -1151,3 +1151,25 @@ func (e *UnsupportedExpressionError) StartPosition() ast.Position {
 func (e *UnsupportedExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// UnassignedFieldError
+
+type UnassignedFieldError struct {
+	Identifier ast.Identifier
+	StartPos   ast.Position
+	EndPos     ast.Position
+}
+
+func (e *UnassignedFieldError) Error() string {
+	return fmt.Sprintf("%s is unassigned", e.Identifier.String())
+}
+
+func (*UnassignedFieldError) isSemanticError() {}
+
+func (e *UnassignedFieldError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnassignedFieldError) EndPosition() ast.Position {
+	return e.EndPos
+}
