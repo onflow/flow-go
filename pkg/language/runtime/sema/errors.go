@@ -1219,3 +1219,24 @@ func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
 func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// InvalidDestructionError
+
+type InvalidDestructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructionError) Error() string {
+	return "cannot destroy value: not a resource"
+}
+
+func (*InvalidDestructionError) isSemanticError() {}
+
+func (e *InvalidDestructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructionError) EndPosition() ast.Position {
+	return e.EndPos
+}

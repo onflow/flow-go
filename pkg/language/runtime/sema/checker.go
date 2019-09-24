@@ -3635,16 +3635,25 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 	return &InvalidType{}
 }
 
-func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	// TODO: check destroy expressions
+func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) (resultType ast.Repr) {
+	resultType = &VoidType{}
 
-	checker.report(
-		&UnsupportedExpressionError{
-			common.ExpressionKindDestroy,
-			expression.StartPosition(),
-			expression.EndPosition(),
-		},
-	)
+	valueType := expression.Expression.Accept(checker).(Type)
 
-	return &InvalidType{}
+	if !valueType.IsResourceType() {
+		checker.report(
+			&InvalidDestructionError{
+				StartPos: expression.Expression.StartPosition(),
+				EndPos:   expression.Expression.EndPosition(),
+			},
+		)
+
+		return
+	}
+
+	if _, ok := expression.Expression.(*ast.IdentifierExpression); ok {
+		// TODO: record destruction of resource
+	}
+
+	return
 }

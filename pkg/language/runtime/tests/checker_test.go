@@ -6769,6 +6769,66 @@ func TestCheckUnaryMove(t *testing.T) {
 
 }
 
+func TestCheckImmediateDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- X()
+          destroy x
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDestructionError{}))
+}
+
 func TestCheckUnaryCreateAndDestroy(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -6795,7 +6855,7 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
 
 	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+		To(BeAssignableToTypeOf(&sema.InvalidDestructionError{}))
 }
 
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
