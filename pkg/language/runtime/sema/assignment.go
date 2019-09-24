@@ -156,7 +156,9 @@ func (analyzer *AssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitVariableDeclaration(*ast.VariableDeclaration) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitVariableDeclaration(node *ast.VariableDeclaration) ast.Repr {
+	analyzer.visitNode(node.Value)
+
 	return analyzer.assignments
 }
 
