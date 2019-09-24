@@ -1133,18 +1133,24 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 	}
 }
 
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	invocation.InvokedExpression =
+		&ast.IdentifierExpression{
+			Identifier: identifier,
+		}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	endPosition := invocation.EndPos
 
 	return &ast.CreateExpression{
-		Identifier: identifier,
-		Arguments:  invocation.Arguments,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		InvocationExpression: invocation,
+		StartPos:             startPosition,
 	}
 }
 

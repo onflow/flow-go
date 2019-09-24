@@ -567,16 +567,14 @@ func (e *FailableDowncastExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 // CreateExpression
 
 type CreateExpression struct {
-	Identifier Identifier
-	Arguments  Arguments
-	StartPos   Position
-	EndPos     Position
+	InvocationExpression *InvocationExpression
+	StartPos             Position
 }
 
 func (e *CreateExpression) String() string {
 	return fmt.Sprintf(
-		"(create %s%s)",
-		e.Identifier, e.Arguments,
+		"(create %s)",
+		e.InvocationExpression.String(),
 	)
 }
 
@@ -585,7 +583,7 @@ func (e *CreateExpression) StartPosition() Position {
 }
 
 func (e *CreateExpression) EndPosition() Position {
-	return e.EndPos
+	return e.InvocationExpression.EndPos
 }
 
 func (*CreateExpression) isIfStatementTest() {}

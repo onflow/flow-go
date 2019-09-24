@@ -619,24 +619,19 @@ func (extractor *ExpressionExtractor) VisitCreateExpression(expression *CreateEx
 }
 
 func (extractor *ExpressionExtractor) ExtractCreate(expression *CreateExpression) ExpressionExtraction {
-	var extractedExpressions []ExtractedExpression
 
 	// copy the expression
 	newExpression := *expression
 
-	// rewrite all arguments
+	// rewrite the sub-expression
 
-	newArguments, argumentExtractedExpressions := extractor.extractArguments(expression.Arguments)
-	extractedExpressions = append(
-		extractedExpressions,
-		argumentExtractedExpressions...,
-	)
+	result := extractor.Extract(newExpression.InvocationExpression)
 
-	newExpression.Arguments = newArguments
+	newExpression.InvocationExpression = result.RewrittenExpression.(*InvocationExpression)
 
 	return ExpressionExtraction{
 		RewrittenExpression:  &newExpression,
-		ExtractedExpressions: extractedExpressions,
+		ExtractedExpressions: result.ExtractedExpressions,
 	}
 }
 
