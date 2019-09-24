@@ -2114,7 +2114,7 @@ func TestCheckInvalidCompositeFieldName(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		expectedErrorCount := 3
+		expectedErrorCount := 2
 		if kind != common.CompositeKindStructure {
 			expectedErrorCount += 1
 		}
@@ -2127,11 +2127,8 @@ func TestCheckInvalidCompositeFieldName(t *testing.T) {
 		Expect(errs[1]).
 			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-		Expect(errs[2]).
-			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
-
 		if kind != common.CompositeKindStructure {
-			Expect(errs[3]).
+			Expect(errs[2]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -2179,7 +2176,7 @@ func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		expectedErrorCount := 4
+		expectedErrorCount := 2
 		if kind != common.CompositeKindStructure {
 			expectedErrorCount += 1
 		}
@@ -2192,14 +2189,8 @@ func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 		Expect(errs[1]).
 			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-		Expect(errs[2]).
-			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
-
-		Expect(errs[3]).
-			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
-
 		if kind != common.CompositeKindStructure {
-			Expect(errs[4]).
+			Expect(errs[2]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -2309,7 +2300,7 @@ func TestCheckInvalidCompositeFieldType(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		expectedErrorCount := 3
+		expectedErrorCount := 2
 		if kind != common.CompositeKindStructure {
 			expectedErrorCount += 1
 		}
@@ -2321,11 +2312,8 @@ func TestCheckInvalidCompositeFieldType(t *testing.T) {
 		Expect(errs[1]).
 			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-		Expect(errs[2]).
-			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
-
 		if kind != common.CompositeKindStructure {
-			Expect(errs[3]).
+			Expect(errs[2]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -2524,7 +2512,7 @@ func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		expectedErrorCount := 2
+		expectedErrorCount := 1
 		if kind != common.CompositeKindStructure {
 			expectedErrorCount += 1
 		}
@@ -2534,11 +2522,8 @@ func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 		Expect(errs[0]).
 			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
 
-		Expect(errs[1]).
-			To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
-
 		if kind != common.CompositeKindStructure {
-			Expect(errs[2]).
+			Expect(errs[1]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -2594,7 +2579,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		expectedErrorCount := 2
+		expectedErrorCount := 3
 		if kind != common.CompositeKindStructure {
 			expectedErrorCount += 1
 		}
@@ -2607,12 +2592,15 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 			To(Equal("foo"))
 
 		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.UnassignedFieldAccessError{}))
+
+		Expect(errs[2]).
 			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-		Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+		Expect(errs[2].(*sema.NotDeclaredMemberError).Name).
 			To(Equal("bar"))
 
 		if kind != common.CompositeKindStructure {
-			Expect(errs[2]).
+			Expect(errs[3]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
