@@ -21,6 +21,41 @@ type Type interface {
 	IsResourceType() bool
 }
 
+// TypeAnnotation
+
+type TypeAnnotation struct {
+	Move bool
+	Type Type
+}
+
+func (a *TypeAnnotation) String() string {
+	if a.Move {
+		return fmt.Sprintf("<-%s", a.Type)
+	} else {
+		return fmt.Sprint(a.Type)
+	}
+}
+
+func (a *TypeAnnotation) Equal(other *TypeAnnotation) bool {
+	return a.Move == other.Move &&
+		a.Type.Equal(other.Type)
+}
+
+func NewTypeAnnotation(ty Type) *TypeAnnotation {
+	return &TypeAnnotation{
+		Move: ty.IsResourceType(),
+		Type: ty,
+	}
+}
+
+func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
+	typeAnnotations := make([]*TypeAnnotation, len(types))
+	for i, ty := range types {
+		typeAnnotations[i] = NewTypeAnnotation(ty)
+	}
+	return typeAnnotations
+}
+
 // AnyType represents the top type
 type AnyType struct{}
 
@@ -193,20 +228,24 @@ func (t *StringType) GetMember(field string) *Member {
 	case "concat":
 		return NewMemberForType(t, "concat", Member{
 			Type: &FunctionType{
-				ParameterTypes: []Type{
+				ParameterTypeAnnotations: NewTypeAnnotations(
 					&StringType{},
-				},
-				ReturnType: &StringType{},
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&StringType{},
+				),
 			},
 		})
 	case "slice":
 		return NewMemberForType(t, "slice", Member{
 			Type: &FunctionType{
-				ParameterTypes: []Type{
+				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntType{},
 					&IntType{},
-				},
-				ReturnType: &StringType{},
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&StringType{},
+				),
 			},
 			ArgumentLabels: []string{"from", "upTo"},
 		})
@@ -518,72 +557,102 @@ type ArrayType interface {
 func getArrayMember(ty ArrayType, field string) *Member {
 	switch field {
 	case "append":
+		elementType := ty.elementType()
 		return NewMemberForType(ty, "append", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{
-					ty.elementType(),
-				},
-				ReturnType: &VoidType{},
+				ParameterTypeAnnotations: NewTypeAnnotations(
+					elementType,
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
 			},
 			IsInitialized: true,
 		})
 	case "concat":
+		typeAnnotation := NewTypeAnnotation(ty)
 		return NewMemberForType(ty, "concat", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{ty},
-				ReturnType:     ty,
+				ParameterTypeAnnotations: []*TypeAnnotation{
+					typeAnnotation,
+				},
+				ReturnTypeAnnotation: typeAnnotation,
 			},
 			IsInitialized: true,
 		})
 	case "insert":
+		elementType := ty.elementType()
 		return NewMemberForType(ty, "insert", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{
+				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntegerType{},
-					ty.elementType(),
-				},
-				ReturnType: &VoidType{},
+					elementType,
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 	case "remove":
+		elementType := ty.elementType()
 		return NewMemberForType(ty, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{&IntegerType{}},
-				ReturnType:     ty.elementType(),
+				ParameterTypeAnnotations: NewTypeAnnotations(
+					&IntegerType{},
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"at"},
 		})
 	case "removeFirst":
+		elementType := ty.elementType()
 		return NewMemberForType(ty, "removeFirst", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{},
-				ReturnType:     ty.elementType(),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
 			},
 			IsInitialized: true,
 		})
 	case "removeLast":
+		elementType := ty.elementType()
 		return NewMemberForType(ty, "removeLast", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{},
-				ReturnType:     ty.elementType(),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
 			},
 			IsInitialized: true,
 		})
 	case "contains":
+		elementType := ty.elementType()
+
+		// impossible for array of resources to have
+		// a `contains` function
+		if elementType.IsResourceType() {
+			return nil
+		}
+
 		return NewMemberForType(ty, "contains", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{ty.elementType()},
-				ReturnType:     &BoolType{},
+				ParameterTypeAnnotations: NewTypeAnnotations(
+					elementType,
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&BoolType{},
+				),
 			},
 			IsInitialized: true,
 		})
@@ -626,7 +695,7 @@ func (t *VariableSizedType) Equal(other Type) bool {
 func (t *VariableSizedType) GetMember(identifier string) *Member {
 	return getArrayMember(t, identifier)
 }
- 
+
 func (t *VariableSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
@@ -669,24 +738,24 @@ func (t *ConstantSizedType) IsResourceType() bool {
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypes        []Type
-	ReturnType            Type
-	Apply                 func([]Type) Type
-	RequiredArgumentCount *int
+	ParameterTypeAnnotations []*TypeAnnotation
+	ReturnTypeAnnotation     *TypeAnnotation
+	GetReturnType            func(argumentTypes []Type) Type
+	RequiredArgumentCount    *int
 }
 
 func (*FunctionType) isType() {}
 
 func (t *FunctionType) String() string {
 	var parameters strings.Builder
-	for i, parameter := range t.ParameterTypes {
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
 		if i > 0 {
 			parameters.WriteString(", ")
 		}
-		parameters.WriteString(parameter.String())
+		parameters.WriteString(parameterTypeAnnotation.String())
 	}
 
-	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnType.String())
+	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnTypeAnnotation.String())
 }
 
 func (t *FunctionType) Equal(other Type) bool {
@@ -695,18 +764,18 @@ func (t *FunctionType) Equal(other Type) bool {
 		return false
 	}
 
-	if len(t.ParameterTypes) != len(otherFunction.ParameterTypes) {
+	if len(t.ParameterTypeAnnotations) != len(otherFunction.ParameterTypeAnnotations) {
 		return false
 	}
 
-	for i, parameterType := range t.ParameterTypes {
-		otherParameterType := otherFunction.ParameterTypes[i]
-		if !parameterType.Equal(otherParameterType) {
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		otherParameterType := otherFunction.ParameterTypeAnnotations[i]
+		if !parameterTypeAnnotation.Equal(otherParameterType) {
 			return false
 		}
 	}
 
-	return t.ReturnType.Equal(otherFunction.ReturnType)
+	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
 }
 
 func (*FunctionType) IsResourceType() bool {
@@ -766,7 +835,7 @@ type CompositeType struct {
 	Conformances []*InterfaceType
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
-	ConstructorParameterTypes []Type
+	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
 
 func (*CompositeType) isType() {}
@@ -804,8 +873,11 @@ type Member struct {
 
 // NewMemberForType initializes a new member type and panics if the member declaration is invalid.
 func NewMemberForType(ty Type, identifier string, member Member) *Member {
+
 	if functionType, ok := member.Type.(*FunctionType); ok {
-		if member.ArgumentLabels != nil && len(member.ArgumentLabels) != len(functionType.ParameterTypes) {
+		if member.ArgumentLabels != nil &&
+			len(member.ArgumentLabels) != len(functionType.ParameterTypeAnnotations) {
+
 			panic(fmt.Sprintf(
 				"member %s.%s has incorrect argument label count",
 				ty.String(),
@@ -832,10 +904,10 @@ type HasMembers interface {
 // InterfaceType
 
 type InterfaceType struct {
-	CompositeKind             common.CompositeKind
-	Identifier                string
-	Members                   map[string]*Member
-	InitializerParameterTypes []Type
+	CompositeKind                       common.CompositeKind
+	Identifier                          string
+	Members                             map[string]*Member
+	InitializerParameterTypeAnnotations []*TypeAnnotation
 }
 
 func (*InterfaceType) isType() {}
@@ -927,12 +999,14 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 		return NewMemberForType(t, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
-				ParameterTypes: []Type{
+				ParameterTypeAnnotations: NewTypeAnnotations(
 					t.KeyType,
-				},
-				ReturnType: &OptionalType{
-					Type: t.ValueType,
-				},
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&OptionalType{
+						Type: t.ValueType,
+					},
+				),
 			},
 			IsInitialized:  true,
 			ArgumentLabels: []string{"key"},

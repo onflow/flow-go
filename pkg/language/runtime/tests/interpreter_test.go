@@ -1269,11 +1269,13 @@ func TestInterpretHostFunction(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypes: []sema.Type{
+			ParameterTypeAnnotations: sema.NewTypeAnnotations(
 				&sema.IntType{},
 				&sema.IntType{},
-			},
-			ReturnType: &sema.IntType{},
+			),
+			ReturnTypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
 		},
 		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int

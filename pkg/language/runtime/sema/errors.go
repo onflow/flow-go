@@ -812,9 +812,12 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []Type
-	InterfaceParameterTypes []Type
+	CompositeParameterTypes []*TypeAnnotation
+	InterfaceParameterTypes []*TypeAnnotation
 }
+
+// TODO: improve error message:
+//  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
 	CompositeType       *CompositeType

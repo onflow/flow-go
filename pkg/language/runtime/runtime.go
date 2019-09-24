@@ -92,7 +92,7 @@ func NewInterpreterRuntime() Runtime {
 
 // TODO: improve types
 var setValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// owner
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -108,14 +108,16 @@ var setValueFunctionType = sema.FunctionType{
 		// value
 		// TODO: add proper type
 		&sema.IntType{},
-	},
+	),
 	// nothing
-	ReturnType: &sema.VoidType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
 // TODO: improve types
 var getValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// owner
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -128,15 +130,17 @@ var getValueFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
-	},
+	),
 	// value
 	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.IntType{},
+	),
 }
 
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// key
 		&sema.OptionalType{
 			Type: &sema.VariableSizedType{
@@ -145,19 +149,21 @@ var createAccountFunctionType = sema.FunctionType{
 		},
 		// code
 		&sema.OptionalType{
-			&sema.VariableSizedType{
+			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
 		},
-	},
+	),
 	// value
 	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.IntType{},
+	),
 }
 
 // TODO: improve types
 var updateAccountCodeFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// accountID
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -166,24 +172,33 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
-	},
+	),
 	// nothing
-	ReturnType: &sema.VoidType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
 var accountType = stdlib.AccountType.Type
 
 var getAccountFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		// TODO:
 		// address
 		&sema.StringType{},
-	},
-	ReturnType: accountType,
+	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		accountType,
+	),
 }
 
 var logFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{&sema.AnyType{}},
-	ReturnType:     &sema.VoidType{},
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		&sema.AnyType{},
+	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
@@ -288,7 +303,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	// check parameter count
 
 	signingAccountsCount := len(signingAccountAddresses)
-	mainFunctionParameterCount := len(mainFunctionType.ParameterTypes)
+	mainFunctionParameterCount := len(mainFunctionType.ParameterTypeAnnotations)
 	if signingAccountsCount != mainFunctionParameterCount {
 		err := fmt.Errorf(
 			"parameter count mismatch for `main` function: expected %d, got %d",
@@ -300,7 +315,9 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	// check parameter types
 
-	for _, parameterType := range mainFunctionType.ParameterTypes {
+	for _, parameterTypeAnnotation := range mainFunctionType.ParameterTypeAnnotations {
+		parameterType := parameterTypeAnnotation.Type
+
 		if !parameterType.Equal(accountType) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",

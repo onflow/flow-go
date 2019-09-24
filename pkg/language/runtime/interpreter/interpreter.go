@@ -276,8 +276,8 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		}
 	}
 
-	parameterTypes := functionType.ParameterTypes
-	parameterCount := len(parameterTypes)
+	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
+	parameterCount := len(parameterTypeAnnotations)
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
@@ -294,13 +294,14 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	boxedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
+		parameterType := parameterTypeAnnotations[i].Type
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
-		if parameterTypes[i].Equal(&sema.AnyType{}) {
+		if parameterType.Equal(&sema.AnyType{}) {
 			return nil, &NotCallableError{
 				Value: variableValue,
 			}
 		}
-		boxedArguments[i] = interpreter.box(argument, nil, parameterTypes[i])
+		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
 	}
 
 	trampoline = function.invoke(boxedArguments, Location{})
@@ -1173,7 +1174,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
 		function.Expression.FunctionBlock,
-		function.Type.ReturnType,
+		function.Type.ReturnTypeAnnotation.Type,
 	)
 
 	return functionBlockTrampoline.
