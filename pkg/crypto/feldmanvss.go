@@ -33,14 +33,18 @@ func (s *feldmanVSSstate) init() {
 	s.xReceived = false
 }
 
-func (s *feldmanVSSstate) StartDKG() (*DKGoutput, error) {
+func (s *feldmanVSSstate) StartDKG() *DKGoutput {
 	s.isrunning = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
 		seed := []byte{1, 2, 3}
-		return s.generateShares(seed), nil
+		return s.generateShares(seed)
 	}
-	return new(DKGoutput), nil
+	out := &(DKGoutput{
+		result: nonApplicable,
+		err:    nil,
+	})
+	return out
 }
 
 func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {

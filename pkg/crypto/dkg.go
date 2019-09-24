@@ -25,7 +25,7 @@ type DKGstate interface {
 	// Threshold returns the threshold value t
 	Threshold() int
 	// StartDKG starts running a DKG
-	StartDKG() (*DKGoutput, error)
+	StartDKG() *DKGoutput
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrKey, PubKey, []PubKey, error)
 	// ProcessDKGmsg processes a new DKG message received by the current node

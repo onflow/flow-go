@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,10 +38,10 @@ func broadcast(network [][]dkgChan, orig int, msg DKGmsg) {
 	}
 }
 
-func (out *DKGoutput) processOutput(current int, network [][]dkgChan) {
+func (out *DKGoutput) processOutput(current int, network [][]dkgChan) dkgResult {
 	if out.err != nil {
 		log.Error("DKG output error: " + out.err.Error())
-		return
+		return nonApplicable
 	}
 
 	for _, msg := range out.action {
@@ -50,11 +51,11 @@ func (out *DKGoutput) processOutput(current int, network [][]dkgChan) {
 			send(network, current, msg.dest, msg.data)
 		}
 	}
-	//g.Expect(out.result).To(Equal(valid))
+	return out.result
 }
 
 func TestFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 3
@@ -72,14 +73,15 @@ func TestFeldmanVSS(t *testing.T) {
 
 	for current := 0; current < n; current++ {
 		go func(current int) {
-			//g := gomega.NewWithT(t)
+			g := gomega.NewWithT(t)
 			dkg, err := NewDKG(FeldmanVSS, n, current, lead)
 			if err != nil {
 				log.Error(err.Error())
 				return
 			}
-			out, _ := dkg.StartDKG()
-			out.processOutput(current, network)
+			out := dkg.StartDKG()
+			res := out.processOutput(current, network)
+			g.Expect(res).To(Equal(nonApplicable))
 
 			// the current node listens continuously
 			orig := make([]int, n-1)
@@ -90,10 +92,12 @@ func TestFeldmanVSS(t *testing.T) {
 				select {
 				case msg := <-network[orig[0]][current]:
 					out = dkg.ProcessDKGmsg(orig[0], msg)
-					out.processOutput(current, network)
+					res := out.processOutput(current, network)
+					g.Expect(res).To(Equal(valid))
 				case msg := <-network[orig[1]][current]:
 					out = dkg.ProcessDKGmsg(orig[1], msg)
-					out.processOutput(current, network)
+					res := out.processOutput(current, network)
+					g.Expect(res).To(Equal(valid))
 					/*case msg := <-network[orig[2]][current]:
 					out = dkg.ProcessDKGmsg(orig[2], msg)
 					out.processOutput(current, network)*/
