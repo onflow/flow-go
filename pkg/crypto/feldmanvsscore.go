@@ -40,7 +40,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 		// the leader own share
 		if i-1 == s.currentIndex {
 			xdata := make([]byte, shareSize)
-			polynomialImage(xdata, s.a, i, &s.y[i-1])
+			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
 				(*C.uchar)((unsafe.Pointer)(&xdata[0])),
 				PrKeyLengthBLS_BLS12381,
@@ -53,7 +53,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 
 		data := make([]byte, shareSize+1)
 		data[0] = byte(FeldmanVSSshare)
-		polynomialImage(data[1:], s.a, i, &s.y[i-1])
+		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		toSend.data = DKGmsg(data)
 	}
 	// prepare the DKGToSend to be broadcasted
@@ -82,7 +82,7 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, erro
 	)
 	s.xReceived = true
 	if s.A != nil {
-		return s.verifyShare()
+		return s.verifyShare(), nil
 	}
 	return valid, nil
 }
@@ -101,17 +101,17 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
 	if s.xReceived {
-		return s.verifyShare()
+		return s.verifyShare(), nil
 	}
 	return valid, nil
 }
 
-// computes for P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
+// ZrPolynomialImage computes for P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func polynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
-	C._polynomialImage((*C.uchar)((unsafe.Pointer)(&dest[0])),
+func ZrPolynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
+	C.Zr_polynomialImage((*C.uchar)((unsafe.Pointer)(&dest[0])),
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.int)(x),
 		(*C.ep2_st)(y),
@@ -136,16 +136,21 @@ func readVerifVector(A []pointG2, src []byte) {
 	)
 }
 
-func (s *feldmanVSSstate) verifyShare() (dkgResult, error) {
+func (s *feldmanVSSstate) verifyShare() dkgResult {
 	// check y[current] == x.G2
-	return valid, nil
+	if C._verifyshare((*C.bn_st)(&s.x),
+		(*C.ep2_st)(&s.y[s.currentIndex])) == 1 {
+		return valid
+	}
+	return invalid
+
 }
 
 // compute the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 //  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {
-	C._G2polynomialImages(
+	C.G2_polynomialImages(
 		(*C.ep2_st)(&s.y[0]), (C.int)(len(s.y)),
 		(*C.ep2_st)(&s.A[0]), (C.int)(len(s.A)),
 	)

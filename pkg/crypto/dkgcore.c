@@ -11,7 +11,7 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y
 // x being a small integer
-void _polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_st* y){
+void Zr_polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_st* y){
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -56,20 +56,59 @@ void _polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_st
     bn_free(&u);
 }
 
-// Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
-static void G2polynomialImage(ep2_st* y, ep2_st* A, int len_A, int x){
-  // y = Q(x)
+// computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
+// and stores the point in y
+// r is the order of G2, u is the barett constant associated to r
+static void G2_polynomialImage(ep2_st* y, ep2_st* A, int len_A,
+         int x, bn_st* r, bn_st* u){
+    // powers of x
+    bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
+    ep_new(&bn_x);
+    bn_new_size(&bn_x, BITS_TO_DIGITS(Fr_BITS+N_bits_max));
+    bn_set_dig(&bn_x, 1);
+    
+    // temp variables
+    ep2_st mult, acc;
+    ep2_new(&mult);         
+    ep2_new(&acc);
+    ep2_set_infty(&acc);
+
+    for (int i=0; i < len_A; i++) {
+        ep2_mul_lwnaf(&mult, &A[i], &bn_x);
+        ep2_add_projc(&acc, &acc, &mult);
+        // TODO: hardcode x^i mod r
+        bn_mul_dig(&bn_x, &bn_x, x);
+        bn_mod_barrt(&bn_x, &bn_x, r, u);
+    }
+    // export the result
+    ep2_copy(y, &acc);
+    ep2_norm(y, y);
+
+    ep2_free(&acc)
+    ep2_free(&mult);
+    bn_free(&bn_x);
 }
 
 // compute the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 // for small x
-void _G2polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A) {
+void G2_polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A) {
+    // order r
+    bn_st r;
+    bn_new(&r); 
+    g2_get_ord(&r);
+    // Barett reduction constant
+    // TODO: hardcode u
+    bn_st u;
+    bn_new(&u)
+    bn_mod_pre_barrt(&u, &r);
     for (int i=0; i<len_y; i++) {
         //y[i] = Q(i+1)
-        G2polynomialImage(y+i , A, len_A, i+1);
+        G2_polynomialImage(y+i , A, len_A, i+1, &r, &u);
     }
+    bn_free(&u);
+    bn_free(&r);
 }
 
 // export an array of ep2_st into an array of bytes
@@ -93,4 +132,11 @@ void read_ep2st_vector(ep2_st* A, byte* src, const int len){
         else ep2_read_bin(&A[i], p, size);
         p+= size;
     }
+}
+
+int _verifyshare(bn_st* x, ep2_st* y) {
+    ep2_st res;
+    ep2_new(res);
+    g2_mul_gen(&res, x);
+    return (ep2_cmp(&res, y) == RLC_EQ);
 }

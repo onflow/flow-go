@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,10 +37,10 @@ func broadcast(network [][]dkgChan, orig int, msg DKGmsg) {
 	}
 }
 
-func (out *DKGoutput) processOutput(current int, network [][]dkgChan) dkgResult {
+func (out *DKGoutput) processOutput(current int, network [][]dkgChan) {
 	if out.err != nil {
 		log.Error("DKG output error: " + out.err.Error())
-		return out.result
+		return
 	}
 
 	for _, msg := range out.action {
@@ -49,7 +50,7 @@ func (out *DKGoutput) processOutput(current int, network [][]dkgChan) dkgResult 
 			send(network, current, msg.dest, msg.data)
 		}
 	}
-	return out.result
+	//g.Expect(out.result).To(Equal(valid))
 }
 
 func TestFeldmanVSS(t *testing.T) {
@@ -71,13 +72,14 @@ func TestFeldmanVSS(t *testing.T) {
 
 	for current := 0; current < n; current++ {
 		go func(current int) {
+			//g := gomega.NewWithT(t)
 			dkg, err := NewDKG(FeldmanVSS, n, current, lead)
 			if err != nil {
 				log.Error(err.Error())
 				return
 			}
 			out, _ := dkg.StartDKG()
-			_ = out.processOutput(current, network)
+			out.processOutput(current, network)
 
 			// the current node listens continuously
 			orig := make([]int, n-1)
@@ -88,13 +90,13 @@ func TestFeldmanVSS(t *testing.T) {
 				select {
 				case msg := <-network[orig[0]][current]:
 					out = dkg.ProcessDKGmsg(orig[0], msg)
-					_ = out.processOutput(current, network)
+					out.processOutput(current, network)
 				case msg := <-network[orig[1]][current]:
 					out = dkg.ProcessDKGmsg(orig[1], msg)
-					_ = out.processOutput(current, network)
+					out.processOutput(current, network)
 					/*case msg := <-network[orig[2]][current]:
 					out = dkg.ProcessDKGmsg(orig[2], msg)
-					_ = out.processOutput(current, network)*/
+					out.processOutput(current, network)*/
 				// if timeout, stop and finalize
 				case <-time.After(time.Second):
 					_, _, _, _ = dkg.EndDKG()
@@ -103,7 +105,6 @@ func TestFeldmanVSS(t *testing.T) {
 					return
 				}
 			}
-			// first time out and second timeout ?
 		}(current)
 	}
 
