@@ -89,7 +89,7 @@ func (analyzer *AssignmentAnalyzer) branch(assignments AssignmentSet) *Assignmen
 	return &AssignmentAnalyzer{assignments, analyzer.errors}
 }
 
-func (analyzer *AssignmentAnalyzer) isSelfValue(expr ast.Expression) bool {
+func (analyzer *AssignmentAnalyzer) isSelfExpression(expr ast.Expression) bool {
 	if identifier, ok := expr.(*ast.IdentifierExpression); ok {
 		return identifier.Identifier.Identifier == SelfIdentifier
 	}
@@ -110,12 +110,16 @@ func (analyzer *AssignmentAnalyzer) visitStatements(statements []ast.Statement) 
 }
 
 func (analyzer *AssignmentAnalyzer) visitStatement(statement ast.Statement) AssignmentSet {
+	if statement == nil {
+		return analyzer.assignments
+	}
+
 	return statement.Accept(analyzer).(AssignmentSet)
 }
 
 func (analyzer *AssignmentAnalyzer) visitNode(node ast.Element) AssignmentSet {
 	if node == nil {
-		return NewAssignmentSet()
+		return analyzer.assignments
 	}
 
 	return node.Accept(analyzer).(AssignmentSet)
@@ -123,7 +127,7 @@ func (analyzer *AssignmentAnalyzer) visitNode(node ast.Element) AssignmentSet {
 
 func (analyzer *AssignmentAnalyzer) VisitBlock(node *ast.Block) ast.Repr {
 	if node == nil {
-		return NewAssignmentSet()
+		return analyzer.assignments
 	}
 
 	return analyzer.visitStatements(node.Statements)
@@ -140,48 +144,45 @@ func (analyzer *AssignmentAnalyzer) VisitIfStatement(node *ast.IfStatement) ast.
 	thenAssignments := analyzer.visitNode(node.Then)
 	elseAssignments := analyzer.visitNode(node.Else)
 
-	return thenAssignments.Intersection(elseAssignments)
+	assignments := thenAssignments.Intersection(elseAssignments)
+
+	return analyzer.assignments.Union(assignments)
 }
 
 func (analyzer *AssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
 	analyzer.visitNode(node.Test)
 	analyzer.visitNode(node.Block)
 
-	// TODO: optimize
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitVariableDeclaration(*ast.VariableDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitReturnStatement(*ast.ReturnStatement) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitBreakStatement(*ast.BreakStatement) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
-	assignments := analyzer.assignments
-
 	node.Value.Accept(analyzer)
 
 	if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
-		if identifier, ok := memberExpression.Expression.(*ast.IdentifierExpression); ok {
-			if identifier.Identifier.Identifier == SelfIdentifier {
-				assignments = assignments.Insert(memberExpression.Identifier)
-			}
+		if !analyzer.isSelfExpression(node.Target) {
+			return analyzer.assignments.Insert(memberExpression.Identifier)
 		}
 	}
 
-	return assignments
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitExpressionStatement(node *ast.ExpressionStatement) ast.Repr {
 	analyzer.visitNode(node.Expression)
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitInvocationExpression(node *ast.InvocationExpression) ast.Repr {
@@ -189,7 +190,7 @@ func (analyzer *AssignmentAnalyzer) VisitInvocationExpression(node *ast.Invocati
 		arg.Expression.Accept(analyzer)
 	}
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitConditionalExpression(node *ast.ConditionalExpression) ast.Repr {
@@ -197,55 +198,55 @@ func (analyzer *AssignmentAnalyzer) VisitConditionalExpression(node *ast.Conditi
 	analyzer.visitNode(node.Then)
 	analyzer.visitNode(node.Else)
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitProgram(node *ast.Program) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFunctionDeclaration(*ast.FunctionDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitCompositeDeclaration(*ast.CompositeDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitInterfaceDeclaration(*ast.InterfaceDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFieldDeclaration(*ast.FieldDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitInitializerDeclaration(node *ast.InitializerDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitCondition(node *ast.Condition) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitImportDeclaration(*ast.ImportDeclaration) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitBoolExpression(*ast.BoolExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitNilExpression(*ast.NilExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitIntExpression(*ast.IntExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitArrayExpression(node *ast.ArrayExpression) ast.Repr {
@@ -253,7 +254,7 @@ func (analyzer *AssignmentAnalyzer) VisitArrayExpression(node *ast.ArrayExpressi
 		analyzer.visitNode(value)
 	}
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitDictionaryExpression(node *ast.DictionaryExpression) ast.Repr {
@@ -262,16 +263,16 @@ func (analyzer *AssignmentAnalyzer) VisitDictionaryExpression(node *ast.Dictiona
 		analyzer.visitNode(entry.Value)
 	}
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitIdentifierExpression(*ast.IdentifierExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitMemberExpression(node *ast.MemberExpression) ast.Repr {
-	if !analyzer.isSelfValue(node.Expression) {
-		return NewAssignmentSet()
+	if !analyzer.isSelfExpression(node.Expression) {
+		return analyzer.assignments
 	}
 
 	if !analyzer.assignments.Contains(node.Identifier) {
@@ -282,46 +283,46 @@ func (analyzer *AssignmentAnalyzer) VisitMemberExpression(node *ast.MemberExpres
 		})
 	}
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitIndexExpression(node *ast.IndexExpression) ast.Repr {
 	analyzer.visitNode(node.Expression)
 	analyzer.visitNode(node.Index)
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitUnaryExpression(node *ast.UnaryExpression) ast.Repr {
 	analyzer.visitNode(node.Expression)
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpression) ast.Repr {
 	analyzer.visitNode(node.Left)
 	analyzer.visitNode(node.Right)
 
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFunctionExpression(node *ast.FunctionExpression) ast.Repr {
 	// TODO: how to handle this?
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitStringExpression(*ast.StringExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFailableDowncastExpression(node *ast.FailableDowncastExpression) ast.Repr {
 	analyzer.visitNode(node.Expression)
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitCreateExpression(node *ast.CreateExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	return NewAssignmentSet()
+	return analyzer.assignments
 }
