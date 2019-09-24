@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
+// AssignmentSet is an immutable set of field assignments.
 type AssignmentSet struct {
 	set hamt.Set
 }
@@ -28,6 +29,7 @@ func (a AssignmentSet) Size() int {
 	return a.set.Size()
 }
 
+// Intersection returns a new set containing all fields that exist in both sets.
 func (a AssignmentSet) Intersection(b AssignmentSet) AssignmentSet {
 	c := hamt.NewSet()
 
@@ -45,10 +47,7 @@ func (a AssignmentSet) Intersection(b AssignmentSet) AssignmentSet {
 	return AssignmentSet{c}
 }
 
-func (a AssignmentSet) Union(b AssignmentSet) AssignmentSet {
-	return AssignmentSet{a.set.Merge(b.set)}
-}
-
+// hashableIdentifier is an alias for ast.Identifier that implements the hamt.Entry interface.
 type hashableIdentifier ast.Identifier
 
 func (f hashableIdentifier) Hash() uint32 {
@@ -61,7 +60,15 @@ func (f hashableIdentifier) Equal(other hamt.Entry) bool {
 	return f.Identifier == other.(hashableIdentifier).Identifier
 }
 
-func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBlock) ([]*ast.FieldDeclaration, []error) {
+// CheckFieldAssignments performs a definite assignment analysis on the provided function block.
+//
+// This function checks that the provided fields are definitely assigned in the function block. It returns
+// a list of all fields that are not definitely assigned, as well as a list of errors that occurred
+// due to unassigned usages in the function block itself.
+func CheckFieldAssignments(
+	fields []*ast.FieldDeclaration,
+	block *ast.FunctionBlock,
+) ([]*ast.FieldDeclaration, []error) {
 	assignments := NewAssignmentSet()
 	errors := make([]error, 0)
 
@@ -80,15 +87,24 @@ func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBl
 	return unassigned, errors
 }
 
+// AssignmentAnalyzer is a visitor that traverses an AST to perform definite assignment analysis.
+//
+// This analyzer accumulates field assignments as it traverses, meaning that each node is aware of all
+// definitely-assigned fields in its logical path.
 type AssignmentAnalyzer struct {
 	assignments AssignmentSet
 	errors      *[]error
 }
 
-func (analyzer *AssignmentAnalyzer) branch(assignments AssignmentSet) *AssignmentAnalyzer {
-	return &AssignmentAnalyzer{assignments, analyzer.errors}
+// branch spawns a new analyzer to inspect a branch of the AST.
+func (analyzer *AssignmentAnalyzer) branch() *AssignmentAnalyzer {
+	return &AssignmentAnalyzer{analyzer.assignments, analyzer.errors}
 }
 
+// isSelfExpression returns true if the given expression is the `self` identifier referring
+// to the composite declaration being analyzed.
+//
+// TODO: perform more sophisticated check (i.e. `var self = 1` is not valid)
 func (analyzer *AssignmentAnalyzer) isSelfExpression(expr ast.Expression) bool {
 	if identifier, ok := expr.(*ast.IdentifierExpression); ok {
 		return identifier.Identifier.Identifier == SelfIdentifier
@@ -98,15 +114,11 @@ func (analyzer *AssignmentAnalyzer) isSelfExpression(expr ast.Expression) bool {
 }
 
 func (analyzer *AssignmentAnalyzer) visitStatements(statements []ast.Statement) AssignmentSet {
-	assignments := analyzer.assignments
-
 	for _, statement := range statements {
-		newAnalyzer := analyzer.branch(assignments)
-		newAssignments := newAnalyzer.visitStatement(statement)
-		assignments = assignments.Union(newAssignments)
+		analyzer.assignments = analyzer.visitStatement(statement)
 	}
 
-	return assignments
+	return analyzer.assignments
 }
 
 func (analyzer *AssignmentAnalyzer) visitStatement(statement ast.Statement) AssignmentSet {
@@ -141,17 +153,15 @@ func (analyzer *AssignmentAnalyzer) VisitIfStatement(node *ast.IfStatement) ast.
 	test := node.Test.(ast.Element)
 	analyzer.visitNode(test)
 
-	thenAssignments := analyzer.visitNode(node.Then)
-	elseAssignments := analyzer.visitNode(node.Else)
+	thenAssignments := analyzer.branch().visitNode(node.Then)
+	elseAssignments := analyzer.branch().visitNode(node.Else)
 
-	assignments := thenAssignments.Intersection(elseAssignments)
-
-	return analyzer.assignments.Union(assignments)
+	return thenAssignments.Intersection(elseAssignments)
 }
 
 func (analyzer *AssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
-	analyzer.visitNode(node.Test)
-	analyzer.visitNode(node.Block)
+	analyzer.branch().visitNode(node.Test)
+	analyzer.branch().visitNode(node.Block)
 
 	return analyzer.assignments
 }
@@ -308,7 +318,7 @@ func (analyzer *AssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpres
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFunctionExpression(node *ast.FunctionExpression) ast.Repr {
-	// TODO: how to handle this?
+	// TODO: handle anonymous functions
 	return analyzer.assignments
 }
 
