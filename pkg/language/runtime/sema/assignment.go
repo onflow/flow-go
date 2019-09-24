@@ -17,11 +17,11 @@ func NewAssignmentSet() AssignmentSet {
 }
 
 func (a AssignmentSet) Insert(identifier ast.Identifier) AssignmentSet {
-	return AssignmentSet{a.set.Insert(Field(identifier))}
+	return AssignmentSet{a.set.Insert(hashableIdentifier(identifier))}
 }
 
 func (a AssignmentSet) Contains(identifier ast.Identifier) bool {
-	return a.set.Include(Field(identifier))
+	return a.set.Include(hashableIdentifier(identifier))
 }
 
 func (a AssignmentSet) Size() int {
@@ -49,19 +49,19 @@ func (a AssignmentSet) Union(b AssignmentSet) AssignmentSet {
 	return AssignmentSet{a.set.Merge(b.set)}
 }
 
-type Field ast.Identifier
+type hashableIdentifier ast.Identifier
 
-func (f Field) Hash() uint32 {
+func (f hashableIdentifier) Hash() uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(f.Identifier))
 	return h.Sum32()
 }
 
-func (f Field) Equal(other hamt.Entry) bool {
-	return f.Identifier == other.(Field).Identifier
+func (f hashableIdentifier) Equal(other hamt.Entry) bool {
+	return f.Identifier == other.(hashableIdentifier).Identifier
 }
 
-func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBlock) []error {
+func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBlock) ([]*ast.FieldDeclaration, []error) {
 	assignments := NewAssignmentSet()
 	errors := make([]error, 0)
 
@@ -69,17 +69,15 @@ func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBl
 
 	assigned := block.Accept(a).(AssignmentSet)
 
+	unassigned := make([]*ast.FieldDeclaration, 0)
+
 	for _, field := range fields {
 		if !assigned.Contains(field.Identifier) {
-			errors = append(errors, &UnassignedFieldError{
-				Identifier: field.Identifier,
-				StartPos:   field.StartPosition(),
-				EndPos:     field.EndPosition(),
-			})
+			unassigned = append(unassigned, field)
 		}
 	}
 
-	return errors
+	return unassigned, errors
 }
 
 type AssignmentAnalyzer struct {
@@ -103,8 +101,8 @@ func (analyzer *AssignmentAnalyzer) visitStatements(statements []ast.Statement) 
 	assignments := analyzer.assignments
 
 	for _, statement := range statements {
-		newanalyzer := analyzer.branch(assignments)
-		newAssignments := newanalyzer.visitStatement(statement)
+		newAnalyzer := analyzer.branch(assignments)
+		newAssignments := newAnalyzer.visitStatement(statement)
 		assignments = assignments.Union(newAssignments)
 	}
 
