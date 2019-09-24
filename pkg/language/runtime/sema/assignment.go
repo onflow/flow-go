@@ -1,49 +1,76 @@
 package sema
 
 import (
-	"fmt"
+	"hash/fnv"
 
 	"github.com/raviqqe/hamt"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
-type AssignmentAnalyzer struct {
-	assignments hamt.Set
-	errors      *[]error
+type AssignmentSet struct {
+	set hamt.Set
 }
 
-func intersection(a, b hamt.Set) hamt.Set {
+func NewAssignmentSet() AssignmentSet {
+	return AssignmentSet{hamt.NewSet()}
+}
+
+func (a AssignmentSet) Insert(identifier ast.Identifier) AssignmentSet {
+	return AssignmentSet{a.set.Insert(Field(identifier))}
+}
+
+func (a AssignmentSet) Contains(identifier ast.Identifier) bool {
+	return a.set.Include(Field(identifier))
+}
+
+func (a AssignmentSet) Size() int {
+	return a.set.Size()
+}
+
+func (a AssignmentSet) Intersection(b AssignmentSet) AssignmentSet {
 	c := hamt.NewSet()
 
-	for a.Size() != 0 {
+	set := a.set
+
+	for set.Size() != 0 {
 		var e hamt.Entry
-		e, a = a.FirstRest()
-		if b.Include(e) {
+		e, set = set.FirstRest()
+
+		if b.set.Include(e) {
 			c = c.Insert(e)
 		}
 	}
 
-	return c
+	return AssignmentSet{c}
 }
 
-func union(a, b hamt.Set) hamt.Set {
-	return a.Merge(b)
+func (a AssignmentSet) Union(b AssignmentSet) AssignmentSet {
+	return AssignmentSet{a.set.Merge(b.set)}
+}
+
+type Field ast.Identifier
+
+func (f Field) Hash() uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(f.Identifier))
+	return h.Sum32()
+}
+
+func (f Field) Equal(other hamt.Entry) bool {
+	return f.Identifier == other.(Field).Identifier
 }
 
 func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBlock) []error {
-	assignments := hamt.NewSet()
-
+	assignments := NewAssignmentSet()
 	errors := make([]error, 0)
 
 	a := &AssignmentAnalyzer{assignments, &errors}
 
-	assigned := block.Accept(a).(hamt.Set)
-
-	fmt.Println("FINAL ASSIGNMENTS:", assigned.Size())
+	assigned := block.Accept(a).(AssignmentSet)
 
 	for _, field := range fields {
-		if !assigned.Include(field.Identifier) {
+		if !assigned.Contains(field.Identifier) {
 			errors = append(errors, &UnassignedFieldError{
 				Identifier: field.Identifier,
 				StartPos:   field.StartPosition(),
@@ -55,41 +82,50 @@ func CheckFieldAssignments(fields []*ast.FieldDeclaration, block *ast.FunctionBl
 	return errors
 }
 
-func (detector *AssignmentAnalyzer) branch(assignments hamt.Set) *AssignmentAnalyzer {
+type AssignmentAnalyzer struct {
+	assignments AssignmentSet
+	errors      *[]error
+}
+
+func (detector *AssignmentAnalyzer) branch(assignments AssignmentSet) *AssignmentAnalyzer {
 	return &AssignmentAnalyzer{assignments, detector.errors}
 }
 
-func (detector *AssignmentAnalyzer) visitStatements(statements []ast.Statement) hamt.Set {
+func (detector *AssignmentAnalyzer) isSelfValue(expr ast.Expression) bool {
+	if identifier, ok := expr.(*ast.IdentifierExpression); ok {
+		return identifier.Identifier.Identifier == SelfIdentifier
+	}
+
+	return false
+}
+
+func (detector *AssignmentAnalyzer) visitStatements(statements []ast.Statement) AssignmentSet {
 	assignments := detector.assignments
 
 	for _, statement := range statements {
 		newDetector := detector.branch(assignments)
 		newAssignments := newDetector.visitStatement(statement)
-		assignments = assignments.Merge(newAssignments)
+		assignments = assignments.Union(newAssignments)
 	}
 
 	return assignments
 }
 
-func (detector *AssignmentAnalyzer) visitStatement(statement ast.Statement) hamt.Set {
-	return statement.Accept(detector).(hamt.Set)
+func (detector *AssignmentAnalyzer) visitStatement(statement ast.Statement) AssignmentSet {
+	return statement.Accept(detector).(AssignmentSet)
 }
 
-func (detector *AssignmentAnalyzer) visitNode(node ast.Element) hamt.Set {
+func (detector *AssignmentAnalyzer) visitNode(node ast.Element) AssignmentSet {
 	if node == nil {
-		return hamt.NewSet()
+		return NewAssignmentSet()
 	}
 
-	return node.Accept(detector).(hamt.Set)
-}
-
-func (detector *AssignmentAnalyzer) VisitReturnStatement(*ast.ReturnStatement) ast.Repr {
-	return hamt.NewSet()
+	return node.Accept(detector).(AssignmentSet)
 }
 
 func (detector *AssignmentAnalyzer) VisitBlock(node *ast.Block) ast.Repr {
 	if node == nil {
-		return hamt.NewSet()
+		return NewAssignmentSet()
 	}
 
 	return detector.visitStatements(node.Statements)
@@ -99,10 +135,6 @@ func (detector *AssignmentAnalyzer) VisitFunctionBlock(node *ast.FunctionBlock) 
 	return detector.visitNode(node.Block)
 }
 
-func (detector *AssignmentAnalyzer) VisitBreakStatement(*ast.BreakStatement) ast.Repr {
-	return hamt.NewSet()
-}
-
 func (detector *AssignmentAnalyzer) VisitIfStatement(node *ast.IfStatement) ast.Repr {
 	test := node.Test.(ast.Element)
 	detector.visitNode(test)
@@ -110,7 +142,7 @@ func (detector *AssignmentAnalyzer) VisitIfStatement(node *ast.IfStatement) ast.
 	thenAssignments := detector.visitNode(node.Then)
 	elseAssignments := detector.visitNode(node.Else)
 
-	return intersection(thenAssignments, elseAssignments)
+	return thenAssignments.Intersection(elseAssignments)
 }
 
 func (detector *AssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
@@ -118,17 +150,24 @@ func (detector *AssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement
 	detector.visitNode(node.Block)
 
 	// TODO: optimize
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
-func (detector *AssignmentAnalyzer) VisitVariableDeclaration(node *ast.VariableDeclaration) ast.Repr {
-	return hamt.NewSet()
+func (detector *AssignmentAnalyzer) VisitVariableDeclaration(*ast.VariableDeclaration) ast.Repr {
+	return NewAssignmentSet()
+}
+
+func (detector *AssignmentAnalyzer) VisitReturnStatement(*ast.ReturnStatement) ast.Repr {
+	return NewAssignmentSet()
+}
+
+func (detector *AssignmentAnalyzer) VisitBreakStatement(*ast.BreakStatement) ast.Repr {
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
 	assignments := detector.assignments
 
-	fmt.Println("assignments:", assignments.Size())
 	node.Value.Accept(detector)
 
 	if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
@@ -144,7 +183,7 @@ func (detector *AssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatemen
 
 func (detector *AssignmentAnalyzer) VisitExpressionStatement(node *ast.ExpressionStatement) ast.Repr {
 	detector.visitNode(node.Expression)
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitInvocationExpression(node *ast.InvocationExpression) ast.Repr {
@@ -152,7 +191,7 @@ func (detector *AssignmentAnalyzer) VisitInvocationExpression(node *ast.Invocati
 		arg.Expression.Accept(detector)
 	}
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitConditionalExpression(node *ast.ConditionalExpression) ast.Repr {
@@ -160,55 +199,55 @@ func (detector *AssignmentAnalyzer) VisitConditionalExpression(node *ast.Conditi
 	detector.visitNode(node.Then)
 	detector.visitNode(node.Else)
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitProgram(node *ast.Program) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitFunctionDeclaration(*ast.FunctionDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitCompositeDeclaration(*ast.CompositeDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitInterfaceDeclaration(*ast.InterfaceDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitFieldDeclaration(*ast.FieldDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitInitializerDeclaration(node *ast.InitializerDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitCondition(node *ast.Condition) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitImportDeclaration(*ast.ImportDeclaration) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitBoolExpression(*ast.BoolExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitNilExpression(*ast.NilExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitIntExpression(*ast.IntExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitArrayExpression(node *ast.ArrayExpression) ast.Repr {
@@ -216,7 +255,7 @@ func (detector *AssignmentAnalyzer) VisitArrayExpression(node *ast.ArrayExpressi
 		detector.visitNode(value)
 	}
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitDictionaryExpression(node *ast.DictionaryExpression) ast.Repr {
@@ -225,66 +264,66 @@ func (detector *AssignmentAnalyzer) VisitDictionaryExpression(node *ast.Dictiona
 		detector.visitNode(entry.Value)
 	}
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitIdentifierExpression(*ast.IdentifierExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitMemberExpression(node *ast.MemberExpression) ast.Repr {
-	if identifier, ok := node.Expression.(*ast.IdentifierExpression); ok {
-		if identifier.Identifier.Identifier == SelfIdentifier {
-			if !detector.assignments.Include(node.Identifier) {
-				*detector.errors = append(*detector.errors, &UnassignedFieldError{
-					Identifier: node.Identifier,
-					StartPos:   node.StartPosition(),
-					EndPos:     node.EndPosition(),
-				})
-			}
-		}
+	if !detector.isSelfValue(node.Expression) {
+		return NewAssignmentSet()
 	}
 
-	return hamt.NewSet()
+	if !detector.assignments.Contains(node.Identifier) {
+		*detector.errors = append(*detector.errors, &UnassignedFieldError{
+			Identifier: node.Identifier,
+			StartPos:   node.StartPosition(),
+			EndPos:     node.EndPosition(),
+		})
+	}
+
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitIndexExpression(node *ast.IndexExpression) ast.Repr {
 	detector.visitNode(node.Expression)
 	detector.visitNode(node.Index)
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitUnaryExpression(node *ast.UnaryExpression) ast.Repr {
 	detector.visitNode(node.Expression)
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpression) ast.Repr {
 	detector.visitNode(node.Left)
 	detector.visitNode(node.Right)
 
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitFunctionExpression(node *ast.FunctionExpression) ast.Repr {
 	// TODO: how to handle this?
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitStringExpression(*ast.StringExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitFailableDowncastExpression(node *ast.FailableDowncastExpression) ast.Repr {
 	detector.visitNode(node.Expression)
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitCreateExpression(node *ast.CreateExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
 
 func (detector *AssignmentAnalyzer) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	return hamt.NewSet()
+	return NewAssignmentSet()
 }
