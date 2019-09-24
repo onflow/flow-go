@@ -30,8 +30,8 @@ func TestAssignmentInEmptyInitializer(t *testing.T) {
 
 	body := `
 		struct Test {
-			pub(set) var foo: Int
-			pub(set) var bar: Int
+			var foo: Int
+			var bar: Int
 
 			init(foo: Int) {}
 		}
@@ -48,7 +48,7 @@ func TestAssignmentFromArgument(t *testing.T) {
 
 	body := `
 		struct Test {
-			pub(set) var foo: Int
+			var foo: Int
 
 			init(foo: Int) {
 				self.foo = foo
@@ -68,7 +68,7 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 	
 				init() {	
 					if 1 > 2 {
@@ -91,7 +91,7 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 	
 				init() {
 					if 1 > 2 {
@@ -113,7 +113,7 @@ func TestAssignmentInWhileStatement(t *testing.T) {
 
 	body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 	
 				init() {
 					while 1 < 2 {
@@ -135,8 +135,8 @@ func TestAssignmentFromField(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
-				pub(set) var bar: Int
+				var foo: Int
+				var bar: Int
 
 				init() {
 					self.foo = 1
@@ -156,8 +156,8 @@ func TestAssignmentFromField(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
-				pub(set) var bar: Int
+				var foo: Int
+				var bar: Int
 
 				init() {
 					self.bar = self.foo + 1
@@ -180,7 +180,7 @@ func TestAssignmentUsages(t *testing.T) {
 			fun myFunc(x: Int) {}
 
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 
 				init() {
 					self.foo = 1
@@ -202,7 +202,7 @@ func TestAssignmentUsages(t *testing.T) {
 			fun myFunc(x: Int) {}
 
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 
 				init() {
 					myFunc(self.foo)
@@ -222,7 +222,7 @@ func TestAssignmentUsages(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 
 				init() {
 					if self.foo > 0 {
@@ -245,7 +245,7 @@ func TestAssignmentUsages(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 
 				init() {	
 					var x = [self.foo]
@@ -266,7 +266,7 @@ func TestAssignmentUsages(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var foo: Int
+				var foo: Int
 
 				init() {	
 					var x = 4 + self.foo
@@ -287,9 +287,9 @@ func TestAssignmentUsages(t *testing.T) {
 
 		body := `
 			struct Test {
-				pub(set) var a: Int
-				pub(set) var b: Int
-				pub(set) var c: Int
+				var a: Int
+				var b: Int
+				var c: Int
 
 				init(x: Int) {
 					self.a = x
