@@ -33,7 +33,7 @@ func Execute(args []string) {
 		os.Exit(1)
 	}
 
-	program, code, err := parser.ParseProgramFromFile(filename)
+	program, _, code, err := parser.ParseProgramFromFile(filename)
 	codes[filename] = code
 	must(err, filename)
 
@@ -41,7 +41,7 @@ func Execute(args []string) {
 		switch location := location.(type) {
 		case ast.StringImportLocation:
 			filename := string(location)
-			imported, code, err := parser.ParseProgramFromFile(filename)
+			imported, _, code, err := parser.ParseProgramFromFile(filename)
 			codes[filename] = code
 			must(err, filename)
 			return imported, nil

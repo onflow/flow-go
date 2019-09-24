@@ -25,7 +25,7 @@ func parseAndCheckWithExtra(
 	types map[string]sema.TypeDeclaration,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -5944,7 +5944,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 	// NOTE: only parse, don't check imported program.
 	// will be checked by checker checking importing program
 
-	imported, err := parser.ParseProgram(`
+	imported, _, err := parser.ParseProgram(`
        let x: Bool = 1
 	`)
 

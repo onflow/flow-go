@@ -2,7 +2,6 @@ package parser
 
 import (
 	"encoding/hex"
-	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
@@ -16,6 +15,11 @@ import (
 
 type ProgramVisitor struct {
 	*BaseStrictusVisitor
+	parseErrors []error
+}
+
+func (v *ProgramVisitor) report(errs ...error) {
+	v.parseErrors = append(v.parseErrors, errs...)
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
@@ -139,6 +143,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		address := make([]byte, hex.DecodedLen(length))
 		_, err := hex.Decode(address, bytes)
 		if err != nil {
+			// unreachable, hex literal should always be valid
 			panic(err)
 		}
 		location = ast.AddressImportLocation(address)
@@ -1017,9 +1022,11 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 	// ensure unary operators are not juxtaposed
 	if ctx.GetChildCount() > 2 {
 		position := ast.PositionFromToken(ctx.UnaryOp(0).GetStart())
-		panic(&JuxtaposedUnaryOperatorsError{
-			Pos: position,
-		})
+		v.report(
+			&JuxtaposedUnaryOperatorsError{
+				Pos: position,
+			},
+		)
 	}
 
 	expression := unaryContext.Accept(v).(ast.Expression)
@@ -1169,39 +1176,52 @@ func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interfa
 	return intExpression
 }
 
-func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
+func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
 	startPosition := ast.PositionFromToken(token)
 	endPosition := ast.EndPosition(startPosition, token.GetStop())
 
 	// check literal has no leading underscore
 	if strings.HasPrefix(text, "_") {
-		panic(&InvalidIntegerLiteralError{
-			IntegerLiteralKind:        kind,
-			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
-			// NOTE: not using text, because it has the base-prefix stripped
-			Literal:  token.GetText(),
-			StartPos: startPosition,
-			EndPos:   endPosition,
-		})
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	// check literal has no trailing underscore
 	if strings.HasSuffix(text, "_") {
-		panic(&InvalidIntegerLiteralError{
-			IntegerLiteralKind:        kind,
-			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
-			// NOTE: not using text, because it has the base-prefix stripped
-			Literal:  token.GetText(),
-			StartPos: startPosition,
-			EndPos:   endPosition,
-		})
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	withoutUnderscores := strings.Replace(text, "_", "", -1)
 
 	value, ok := big.NewInt(0).SetString(withoutUnderscores, kind.Base())
 	if !ok {
-		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknown,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	return &ast.IntExpression{
@@ -1215,17 +1235,24 @@ func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralCont
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.GetStop().GetStop())
 
-	panic(&InvalidIntegerLiteralError{
-		IntegerLiteralKind:        IntegerLiteralKindUnknown,
-		InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
-		Literal:                   ctx.GetText(),
-		StartPos:                  startPosition,
-		EndPos:                    endPosition,
-	})
+	v.report(
+		&InvalidIntegerLiteralError{
+			IntegerLiteralKind:        IntegerLiteralKindUnknown,
+			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
+			Literal:                   ctx.GetText(),
+			StartPos:                  startPosition,
+			EndPos:                    endPosition,
+		},
+	)
+
+	return &ast.IntExpression{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText(),
 		IntegerLiteralKindDecimal,
@@ -1233,7 +1260,7 @@ func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interfa
 }
 
 func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindBinary,
@@ -1241,7 +1268,7 @@ func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface
 }
 
 func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindOctal,
@@ -1249,7 +1276,7 @@ func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindHexadecimal,
