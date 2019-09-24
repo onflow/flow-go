@@ -2459,13 +2459,24 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		if kind == common.CompositeKindStructure {
+		switch kind {
+		case common.CompositeKindStructure:
 			Expect(err).
 				To(Not(HaveOccurred()))
-		} else {
+		case common.CompositeKindContract:
 			errs := expectCheckerErrors(err, 1)
 
 			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		case common.CompositeKindResource:
+			errs := expectCheckerErrors(err, 2)
+
+			// TODO: handle `self` properly
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+
+			Expect(errs[1]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -2483,13 +2494,26 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 
 		// TODO: add support for non-structure declarations
 
-		if kind == common.CompositeKindStructure {
+		switch kind {
+		case common.CompositeKindStructure:
 			Expect(err).
 				To(Not(HaveOccurred()))
-		} else {
+
+		case common.CompositeKindContract:
 			errs := expectCheckerErrors(err, 1)
 
 			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		case common.CompositeKindResource:
+			errs := expectCheckerErrors(err, 2)
+
+			// TODO: handle `self` properly
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+
+			Expect(errs[1]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 		}
 	}
@@ -6920,6 +6944,28 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.InvalidConstructionError{}))
+}
+
+func TestCheckInvalidResourceLoss(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
 }
 
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {

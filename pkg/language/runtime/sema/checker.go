@@ -1851,7 +1851,19 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
-	statement.Expression.Accept(checker)
+	result := statement.Expression.Accept(checker)
+
+	if ty, ok := result.(Type); ok &&
+		ty.IsResourceType() {
+
+		checker.report(
+			&ResourceLossError{
+				StartPos: statement.Expression.StartPosition(),
+				EndPos:   statement.Expression.EndPosition(),
+			},
+		)
+	}
+
 	return nil
 }
 

@@ -1261,3 +1261,24 @@ func (e *InvalidDestructionError) StartPosition() ast.Position {
 func (e *InvalidDestructionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// ResourceLossError
+
+type ResourceLossError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *ResourceLossError) Error() string {
+	return "loss of resource"
+}
+
+func (*ResourceLossError) isSemanticError() {}
+
+func (e *ResourceLossError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *ResourceLossError) EndPosition() ast.Position {
+	return e.EndPos
+}
