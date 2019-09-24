@@ -13,20 +13,19 @@ type AssignmentSet struct {
 	set hamt.Set
 }
 
+// NewAssignmentSet returns an empty assignment set.
 func NewAssignmentSet() AssignmentSet {
 	return AssignmentSet{hamt.NewSet()}
 }
 
+// Insert inserts an identifier into the set.
 func (a AssignmentSet) Insert(identifier ast.Identifier) AssignmentSet {
 	return AssignmentSet{a.set.Insert(hashableIdentifier(identifier))}
 }
 
+// Contains returns true if the given identifier exists in the set.
 func (a AssignmentSet) Contains(identifier ast.Identifier) bool {
 	return a.set.Include(hashableIdentifier(identifier))
-}
-
-func (a AssignmentSet) Size() int {
-	return a.set.Size()
 }
 
 // Intersection returns a new set containing all fields that exist in both sets.
@@ -103,14 +102,19 @@ func (analyzer *AssignmentAnalyzer) branch() *AssignmentAnalyzer {
 
 // isSelfExpression returns true if the given expression is the `self` identifier referring
 // to the composite declaration being analyzed.
-//
-// TODO: perform more sophisticated check (i.e. `var self = 1` is not valid)
 func (analyzer *AssignmentAnalyzer) isSelfExpression(expr ast.Expression) bool {
+	// TODO: perform more sophisticated check (i.e. `var self = 1` is not valid)
+
 	if identifier, ok := expr.(*ast.IdentifierExpression); ok {
 		return identifier.Identifier.Identifier == SelfIdentifier
 	}
 
 	return false
+}
+
+// recordError records an error that has occurred during the analysis.
+func (analyzer *AssignmentAnalyzer) recordError(err error) {
+	*analyzer.errors = append(*analyzer.errors, err)
 }
 
 func (analyzer *AssignmentAnalyzer) visitStatements(statements []ast.Statement) AssignmentSet {
@@ -288,10 +292,9 @@ func (analyzer *AssignmentAnalyzer) VisitMemberExpression(node *ast.MemberExpres
 	}
 
 	if !analyzer.assignments.Contains(node.Identifier) {
-		*analyzer.errors = append(*analyzer.errors, &UnassignedFieldError{
+		analyzer.recordError(&UnassignedFieldAccessError{
 			Identifier: node.Identifier,
-			StartPos:   node.StartPosition(),
-			EndPos:     node.EndPosition(),
+			Pos:        node.Identifier.Pos,
 		})
 	}
 
