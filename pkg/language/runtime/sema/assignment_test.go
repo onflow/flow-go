@@ -39,8 +39,8 @@ func TestAssignmentInEmptyInitializer(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To((HaveLen(2)))
-	Expect(errors).To((HaveLen(0)))
+	Expect(unassigned).To(HaveLen(2))
+	Expect(errors).To(HaveLen(0))
 }
 
 func TestAssignmentFromArgument(t *testing.T) {
@@ -58,8 +58,8 @@ func TestAssignmentFromArgument(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To((HaveLen(0)))
-	Expect(errors).To((HaveLen(0)))
+	Expect(unassigned).To(HaveLen(0))
+	Expect(errors).To(HaveLen(0))
 }
 
 func TestAssignmentInIfStatement(t *testing.T) {
@@ -82,8 +82,8 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(0)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(0))
 	})
 
 	t.Run("InvalidIfStatement", func(t *testing.T) {
@@ -103,8 +103,8 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(1)))
-		Expect(errors).To((HaveLen(0)))
+		Expect(unassigned).To(HaveLen(1))
+		Expect(errors).To(HaveLen(0))
 	})
 }
 
@@ -125,8 +125,8 @@ func TestAssignmentInWhileStatement(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To((HaveLen(1)))
-	Expect(errors).To((HaveLen(0)))
+	Expect(unassigned).To(HaveLen(1))
+	Expect(errors).To(HaveLen(0))
 }
 
 func TestAssignmentFromField(t *testing.T) {
@@ -147,8 +147,8 @@ func TestAssignmentFromField(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(0)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(0))
 	})
 
 	t.Run("FromUninitializedField", func(t *testing.T) {
@@ -167,8 +167,8 @@ func TestAssignmentFromField(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(1)))
-		Expect(errors).To((HaveLen(1)))
+		Expect(unassigned).To(HaveLen(1))
+		Expect(errors).To(HaveLen(1))
 	})
 }
 
@@ -191,8 +191,8 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(0)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(0))
 	})
 
 	t.Run("UninitializedUsage", func(t *testing.T) {
@@ -213,8 +213,8 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(1)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(1))
 	})
 
 	t.Run("IfStatementUsage", func(t *testing.T) {
@@ -236,8 +236,8 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(1)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(1))
 	})
 
 	t.Run("ArrayLiteralUsage", func(t *testing.T) {
@@ -257,8 +257,8 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(1)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(1))
 	})
 
 	t.Run("BinaryOperationUsage", func(t *testing.T) {
@@ -278,8 +278,8 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(1)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(1))
 	})
 
 	t.Run("ComplexUsages", func(t *testing.T) {
@@ -311,7 +311,7 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To((HaveLen(0)))
-		Expect(errors).To((HaveLen(0)))
+		Expect(unassigned).To(HaveLen(0))
+		Expect(errors).To(HaveLen(0))
 	})
 }
