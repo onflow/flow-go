@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
