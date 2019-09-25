@@ -13,7 +13,7 @@ import (
 
 func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	seedRelic(seed)
-	// Generate a polyomial P in Zr[X] od degree t
+	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.A = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
@@ -28,7 +28,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 
 	// prepare the DKGToSend slice and compute the shares
 	out := &(DKGoutput{
-		result: nonApplicable,
+		result : valid, //result: nonApplicable,
 		err:    nil,
 	})
 

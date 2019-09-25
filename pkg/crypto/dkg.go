@@ -33,6 +33,12 @@ type DKGstate interface {
 }
 
 func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
+	if currentIndex >= size || leaderIndex >= size {
+		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}
+	}
+	if size < 3 {
+		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
+	}
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	// assuming the protocol requires:
 	//   m<=t for unforgeability

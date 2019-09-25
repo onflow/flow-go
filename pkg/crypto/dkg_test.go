@@ -22,14 +22,14 @@ func index(current int, loop int) int {
 	return loop + 1
 }
 
-func send(network [][]dkgChan, orig int, dest int, msg DKGmsg) {
-	log.Debug(fmt.Sprintf("%d Sending msg to %d:\n", orig, dest))
+func sendChannels(network [][]dkgChan, orig int, dest int, msg DKGmsg) {
+	log.Info(fmt.Sprintf("%d Sending msg to %d:\n", orig, dest))
 	log.Debug(msg)
 	network[orig][dest] <- msg
 }
 
-func broadcast(network [][]dkgChan, orig int, msg DKGmsg) {
-	log.Debug(fmt.Sprintf("%d Broadcasting:", orig))
+func broadcastChannels(network [][]dkgChan, orig int, msg DKGmsg) {
+	log.Info(fmt.Sprintf("%d Broadcasting:", orig))
 	log.Debug(msg)
 	for i := 0; i < len(network[orig]); i++ {
 		if i != orig {
@@ -38,27 +38,27 @@ func broadcast(network [][]dkgChan, orig int, msg DKGmsg) {
 	}
 }
 
-func (out *DKGoutput) processOutput(current int, network [][]dkgChan) dkgResult {
+func (out *DKGoutput) processOutputChannels(current int, network [][]dkgChan) dkgResult {
 	if out.err != nil {
 		log.Error("DKG output error: " + out.err.Error())
-		return nonApplicable
+		return valid
 	}
 
 	for _, msg := range out.action {
 		if msg.broadcast {
-			broadcast(network, current, msg.data)
+			broadcastChannels(network, current, msg.data)
 		} else {
-			send(network, current, msg.dest, msg.data)
+			sendChannels(network, current, msg.dest, msg.data)
 		}
 	}
 	return out.result
 }
 
-func TestFeldmanVSS(t *testing.T) {
+func TestFeldmanVSSChannels(t *testing.T) {
 	log.SetLevel(log.InfoLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
-	n := 3
+	n := 4
 	lead := 0
 
 	// Create channels
@@ -80,8 +80,8 @@ func TestFeldmanVSS(t *testing.T) {
 				return
 			}
 			out := dkg.StartDKG()
-			res := out.processOutput(current, network)
-			g.Expect(res).To(Equal(nonApplicable))
+			res := out.processOutputChannels(current, network)
+			g.Expect(res).To(Equal(valid))
 
 			// the current node listens continuously
 			orig := make([]int, n-1)
@@ -92,19 +92,19 @@ func TestFeldmanVSS(t *testing.T) {
 				select {
 				case msg := <-network[orig[0]][current]:
 					out = dkg.ProcessDKGmsg(orig[0], msg)
-					res := out.processOutput(current, network)
+					res := out.processOutputChannels(current, network)
 					g.Expect(res).To(Equal(valid))
 				case msg := <-network[orig[1]][current]:
 					out = dkg.ProcessDKGmsg(orig[1], msg)
-					res := out.processOutput(current, network)
+					res := out.processOutputChannels(current, network)
 					g.Expect(res).To(Equal(valid))
-					/*case msg := <-network[orig[2]][current]:
+				case msg := <-network[orig[2]][current]:
 					out = dkg.ProcessDKGmsg(orig[2], msg)
-					out.processOutput(current, network)*/
+					out.processOutputChannels(current, network)
 				// if timeout, stop and finalize
 				case <-time.After(time.Second):
 					_, _, _, _ = dkg.EndDKG()
-					log.Debug(fmt.Sprintf("%d quit \n", current))
+					log.Info(fmt.Sprintf("%d quit \n", current))
 					quit <- 1
 					return
 				}
@@ -116,4 +116,74 @@ func TestFeldmanVSS(t *testing.T) {
 	for i := 0; i < n; i++ {
 		<-quit
 	}
+}
+
+func send(orig int, dest int, msg DKGmsg, dkg []DKGstate) {
+	log.Info(fmt.Sprintf("%d Sending msg to %d:\n", orig, dest))
+	log.Debug(msg)
+	go func() {
+		out := dkg[dest].ProcessDKGmsg(orig, msg)
+		Expect(out.result).To(Equal(valid))
+		out.processOutput(dest, dkg)
+	}()
+}
+
+func broadcast(orig int, dkg []DKGstate, msg DKGmsg) {
+	log.Info(fmt.Sprintf("%d Broadcasting:", orig))
+	log.Debug(msg)
+	for i := 0; i < len(dkg); i++ {
+		if i != orig {
+			go func(i int) {
+				out := dkg[i].ProcessDKGmsg(orig, msg)
+				Expect(out.result).To(Equal(valid))
+				out.processOutput(i, dkg)
+			}(i)
+		}
+	}
+}
+
+func (out *DKGoutput) processOutput(current int, dkg []DKGstate) {
+	if out.err != nil {
+		log.Error("DKG output error: " + out.err.Error())
+	}
+
+	Expect(out.result).To(Equal(valid))
+
+	for _, msg := range out.action {
+		if msg.broadcast {
+			broadcast(current, dkg, msg.data)
+		} else {
+			send(current, msg.dest, msg.data, dkg)
+		}
+	}
+}
+
+func TestFeldmanVSSSimple(t *testing.T) {
+	log.SetLevel(log.InfoLevel)
+	log.Debug("Feldman VSS starts")
+	RegisterTestingT(t)
+	// number of nodes to test
+	n := 4
+	lead := 0
+	dkg := make([]DKGstate, n)
+
+	for current := 0; current < n; current++ {
+		var err error
+		dkg[current], err = NewDKG(FeldmanVSS, n, current, lead)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+		// start the DKG in all nodes but the leader
+		if current != lead {
+			go func(current int) {
+				out := dkg[current].StartDKG()
+				out.processOutput(current, dkg)
+			}(current)
+		}
+	}
+
+	// start the leader
+	out := dkg[lead].StartDKG()
+	out.processOutput(lead, dkg)
 }

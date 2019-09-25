@@ -41,7 +41,7 @@ func (s *feldmanVSSstate) StartDKG() *DKGoutput {
 		return s.generateShares(seed)
 	}
 	out := &(DKGoutput{
-		result: nonApplicable,
+		result: valid, //nonApplicable,
 		err:    nil,
 	})
 	return out
