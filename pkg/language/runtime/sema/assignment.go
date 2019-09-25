@@ -217,7 +217,7 @@ func (analyzer *AssignmentAnalyzer) VisitConditionalExpression(node *ast.Conditi
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitProgram(node *ast.Program) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitProgram(*ast.Program) ast.Repr {
 	return analyzer.assignments
 }
 
@@ -237,11 +237,11 @@ func (analyzer *AssignmentAnalyzer) VisitFieldDeclaration(*ast.FieldDeclaration)
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitInitializerDeclaration(node *ast.InitializerDeclaration) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitInitializerDeclaration(*ast.InitializerDeclaration) ast.Repr {
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitCondition(node *ast.Condition) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitCondition(*ast.Condition) ast.Repr {
 	return analyzer.assignments
 }
 
@@ -320,7 +320,7 @@ func (analyzer *AssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpres
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitFunctionExpression(node *ast.FunctionExpression) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitFunctionExpression(*ast.FunctionExpression) ast.Repr {
 	// TODO: handle anonymous functions
 	return analyzer.assignments
 }
@@ -334,10 +334,10 @@ func (analyzer *AssignmentAnalyzer) VisitFailableDowncastExpression(node *ast.Fa
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitCreateExpression(node *ast.CreateExpression) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitCreateExpression(*ast.CreateExpression) ast.Repr {
 	return analyzer.assignments
 }
 
-func (analyzer *AssignmentAnalyzer) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+func (analyzer *AssignmentAnalyzer) VisitDestroyExpression(*ast.DestroyExpression) ast.Repr {
 	return analyzer.assignments
 }
