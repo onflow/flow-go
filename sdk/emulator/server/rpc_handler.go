@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/shared"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/sdk/emulator"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types/proto"
+	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
 // Ping the Observation API server for a response.
@@ -29,22 +28,13 @@ func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*o
 // SendTransaction submits a transaction to the network.
 func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
-	payerSig := txMsg.GetPayerSignature()
 
-	// TODO: take timestamp from SignedTransaction message
-	tx := &types.SignedTransaction{
-		Script:       txMsg.GetScript(),
-		Nonce:        txMsg.GetNonce(),
-		ComputeLimit: txMsg.GetComputeLimit(),
-		Timestamp:    time.Now(),
-		PayerSignature: types.AccountSignature{
-			Account:   types.BytesToAddress(payerSig.GetAccount()),
-			Signature: payerSig.GetSignature(),
-		},
-		Status: types.TransactionPending,
+	tx, err := proto.MessageToSignedTransaction(txMsg)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err := s.blockchain.SubmitTransaction(tx)
+	err = s.blockchain.SubmitTransaction(&tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
@@ -76,7 +66,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	}).Infof("️⛏  Block #%d mined", block.Number)
 
 	response := &observe.SendTransactionResponse{
-		Hash: tx.Hash().Bytes(),
+		Hash: tx.Hash(),
 	}
 
 	return response, nil
@@ -84,10 +74,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 
 // GetBlockByHash gets a block by hash.
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
-	hash, err := crypto.BytesToHash(req.GetHash())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
+	hash := crypto.BytesToHash(req.GetHash())
 
 	block, err := s.blockchain.GetBlockByHash(hash)
 	if err != nil {
@@ -157,10 +144,7 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 
 // GetTransaction gets a transaction by hash.
 func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
-	hash, err := crypto.BytesToHash(req.GetHash())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
+	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := s.blockchain.GetTransaction(hash)
 	if err != nil {
@@ -176,18 +160,9 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 		WithField("txHash", hash).
 		Debugf("💵  GetTransaction called")
 
-	// TODO: add timestamp for SignTransaction response
-	txMsg := &shared.SignedTransaction{
-		Script:       tx.Script,
-		Nonce:        tx.Nonce,
-		ComputeLimit: tx.ComputeLimit,
-		ComputeUsed:  tx.ComputeUsed,
-		PayerSignature: &shared.AccountSignature{
-			Account: tx.PayerSignature.Account.Bytes(),
-			// TODO: update this (default signature bytes for now)
-			Signature: tx.PayerSignature.Signature,
-		},
-		Status: shared.TransactionStatus(tx.Status),
+	txMsg, err := proto.SignedTransactionToMessage(*tx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	response := &observe.GetTransactionResponse{

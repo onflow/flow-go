@@ -6,16 +6,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/accounts"
-	"github.com/dapperlabs/bamboo-node/internal/cli/bpl"
-	"github.com/dapperlabs/bamboo-node/internal/cli/emulator"
-	"github.com/dapperlabs/bamboo-node/internal/cli/initialize"
-	"github.com/dapperlabs/bamboo-node/internal/cli/keys"
-	"github.com/dapperlabs/bamboo-node/internal/cli/transactions"
+	"github.com/dapperlabs/flow-go/internal/cli/accounts"
+	"github.com/dapperlabs/flow-go/internal/cli/bpl"
+	"github.com/dapperlabs/flow-go/internal/cli/emulator"
+	"github.com/dapperlabs/flow-go/internal/cli/initialize"
+	"github.com/dapperlabs/flow-go/internal/cli/keys"
+	"github.com/dapperlabs/flow-go/internal/cli/transactions"
 )
 
 var cmd = &cobra.Command{
-	Use:              "bamboo",
+	Use:              "flow",
 	TraverseChildren: true,
 }
 

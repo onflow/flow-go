@@ -2,8 +2,7 @@ package ast
 
 import (
 	"fmt"
-
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 // Identifier
@@ -11,6 +10,10 @@ import (
 type Identifier struct {
 	Identifier string
 	Pos        Position
+}
+
+func (i Identifier) String() string {
+	return i.Identifier
 }
 
 func (i Identifier) StartPosition() Position {

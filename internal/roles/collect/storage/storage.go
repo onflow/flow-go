@@ -1,9 +1,9 @@
 package storage
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/data/keyvalue"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/data/keyvalue"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // Storage provides methods to store and retrieve data required by a collection node.

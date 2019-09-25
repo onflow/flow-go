@@ -2,11 +2,10 @@ package sema
 
 import (
 	"fmt"
-	"strings"
+	"math/big"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 // astTypeConversionError
@@ -61,17 +60,11 @@ type CheckerError struct {
 }
 
 func (e CheckerError) Error() string {
-	var sb strings.Builder
-	sb.WriteString("Checking failed:\n")
-	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
-		if err, ok := err.(errors.SecondaryError); ok {
-			sb.WriteString(". ")
-			sb.WriteString(err.SecondaryError())
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
+	return "Checking failed"
+}
+
+func (e CheckerError) ChildErrors() []error {
+	return e.Errors
 }
 
 // SemanticError
@@ -232,6 +225,28 @@ func (e *NotIndexingTypeError) StartPosition() ast.Position {
 }
 
 func (e *NotIndexingTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// NotEquatableTypeError
+
+type NotEquatableTypeError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *NotEquatableTypeError) Error() string {
+	return fmt.Sprintf("cannot compare value which has type: `%s`", e.Type.String())
+}
+
+func (*NotEquatableTypeError) isSemanticError() {}
+
+func (e *NotEquatableTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *NotEquatableTypeError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -665,7 +680,8 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 
 type FieldUninitializedError struct {
 	Name          string
-	StructureType *StructureType
+	CompositeType *CompositeType
+	Initializer   *ast.InitializerDeclaration
 	Pos           ast.Position
 }
 
@@ -673,7 +689,7 @@ func (e *FieldUninitializedError) Error() string {
 	return fmt.Sprintf(
 		"field `%s` of type `%s` is not initialized",
 		e.Name,
-		e.StructureType.Identifier,
+		e.CompositeType.Identifier,
 	)
 }
 
@@ -792,17 +808,20 @@ func (e *InvalidConformanceError) EndPosition() ast.Position {
 // TODO: report each missing member and mismatch as note
 
 type MemberMismatch struct {
-	StructureMember *Member
+	CompositeMember *Member
 	InterfaceMember *Member
 }
 
 type InitializerMismatch struct {
-	StructureParameterTypes []Type
-	InterfaceParameterTypes []Type
+	CompositeParameterTypes []*TypeAnnotation
+	InterfaceParameterTypes []*TypeAnnotation
 }
 
+// TODO: improve error message:
+//  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
+
 type ConformanceError struct {
-	StructureType       *StructureType
+	CompositeType       *CompositeType
 	InterfaceType       *InterfaceType
 	InitializerMismatch *InitializerMismatch
 	MissingMembers      []*Member
@@ -813,7 +832,7 @@ type ConformanceError struct {
 func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` does not conform to interface `%s`",
-		e.StructureType.Identifier,
+		e.CompositeType.Identifier,
 		e.InterfaceType.Identifier,
 	)
 }
@@ -833,14 +852,14 @@ func (e *ConformanceError) EndPosition() ast.Position {
 // TODO: just make this a warning?
 
 type DuplicateConformanceError struct {
-	StructureIdentifier string
+	CompositeIdentifier string
 	Conformance         *ast.NominalType
 }
 
 func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` repeats conformance for interface `%s`",
-		e.StructureIdentifier,
+		e.CompositeIdentifier,
 		e.Conformance.Identifier.Identifier,
 	)
 }
@@ -942,6 +961,10 @@ func (e *ImportedProgramError) Error() string {
 	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
 }
 
+func (e *ImportedProgramError) ChildErrors() []error {
+	return e.CheckerError.Errors
+}
+
 func (*ImportedProgramError) isSemanticError() {}
 
 func (e *ImportedProgramError) StartPosition() ast.Position {
@@ -974,5 +997,290 @@ func (e *UnsupportedTypeError) StartPosition() ast.Position {
 }
 
 func (e *UnsupportedTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnsupportedDeclarationError
+
+type UnsupportedDeclarationError struct {
+	DeclarationKind common.DeclarationKind
+	StartPos        ast.Position
+	EndPos          ast.Position
+}
+
+func (e *UnsupportedDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations are not supported yet",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*UnsupportedDeclarationError) isSemanticError() {}
+
+func (e *UnsupportedDeclarationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedDeclarationError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnsupportedOverloadingError
+
+type UnsupportedOverloadingError struct {
+	DeclarationKind common.DeclarationKind
+	StartPos        ast.Position
+	EndPos          ast.Position
+}
+
+func (e *UnsupportedOverloadingError) Error() string {
+	return fmt.Sprintf(
+		"%s overloading is not supported yet",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*UnsupportedOverloadingError) isSemanticError() {}
+
+func (e *UnsupportedOverloadingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedOverloadingError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// CompositeKindMismatchError
+
+type CompositeKindMismatchError struct {
+	ExpectedKind common.CompositeKind
+	ActualKind   common.CompositeKind
+	StartPos     ast.Position
+	EndPos       ast.Position
+}
+
+func (e *CompositeKindMismatchError) Error() string {
+	return "mismatched composite kinds"
+}
+
+func (*CompositeKindMismatchError) isSemanticError() {}
+
+func (e *CompositeKindMismatchError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedKind.Name(),
+		e.ActualKind.Name(),
+	)
+}
+
+func (e *CompositeKindMismatchError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *CompositeKindMismatchError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidIntegerLiteralRangeError
+
+type InvalidIntegerLiteralRangeError struct {
+	ExpectedType     Type
+	ExpectedRangeMin *big.Int
+	ExpectedRangeMax *big.Int
+	StartPos         ast.Position
+	EndPos           ast.Position
+}
+
+func (e *InvalidIntegerLiteralRangeError) Error() string {
+	return fmt.Sprintf(
+		"integer literal out of range: expected `%s`, in range [%s, %s]",
+		e.ExpectedType.String(),
+		e.ExpectedRangeMin,
+		e.ExpectedRangeMax,
+	)
+}
+
+func (*InvalidIntegerLiteralRangeError) isSemanticError() {}
+
+func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingReturnStatementError
+
+type MissingReturnStatementError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingReturnStatementError) Error() string {
+	return "missing return statement"
+}
+
+func (*MissingReturnStatementError) isSemanticError() {}
+
+func (e *MissingReturnStatementError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingReturnStatementError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnsupportedExpressionError
+
+type UnsupportedExpressionError struct {
+	ExpressionKind common.ExpressionKind
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *UnsupportedExpressionError) Error() string {
+	return fmt.Sprintf(
+		"%s expressions are not supported yet",
+		e.ExpressionKind.Name(),
+	)
+}
+
+func (*UnsupportedExpressionError) isSemanticError() {}
+
+func (e *UnsupportedExpressionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnassignedFieldAccessError
+
+type UnassignedFieldAccessError struct {
+	Identifier ast.Identifier
+	Pos        ast.Position
+}
+
+func (e *UnassignedFieldAccessError) Error() string {
+	return fmt.Sprintf("cannot access unassigned field %s", e.Identifier.String())
+}
+
+func (*UnassignedFieldAccessError) isSemanticError() {}
+
+func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
+	length := len(e.Identifier.Identifier)
+	return e.Pos.Shifted(length - 1)
+}
+
+// MissingMoveAnnotationError
+
+type MissingMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveAnnotationError) Error() string {
+	return "missing move annotation: `<-`"
+}
+
+func (*MissingMoveAnnotationError) isSemanticError() {}
+
+func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveAnnotationError
+
+type InvalidMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidMoveAnnotationError) Error() string {
+	return "invalid move annotation: `<-`"
+}
+
+func (*InvalidMoveAnnotationError) isSemanticError() {}
+
+func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// IncorrectTransferOperationError
+
+type IncorrectTransferOperationError struct {
+	ActualOperation   ast.TransferOperation
+	ExpectedOperation ast.TransferOperation
+	Pos               ast.Position
+}
+
+func (e *IncorrectTransferOperationError) Error() string {
+	return fmt.Sprintf(
+		"incorrect transfer operation: expected `%s`",
+		e.ExpectedOperation.Operator(),
+	)
+}
+
+func (*IncorrectTransferOperationError) isSemanticError() {}
+
+func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidConstructionError
+
+type InvalidConstructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidConstructionError) Error() string {
+	return "cannot destroy value: not a resource"
+}
+
+func (*InvalidConstructionError) isSemanticError() {}
+
+func (e *InvalidConstructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidConstructionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidDestructionError
+
+type InvalidDestructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructionError) Error() string {
+	return "cannot destroy value: not a resource"
+}
+
+func (*InvalidDestructionError) isSemanticError() {}
+
+func (e *InvalidDestructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructionError) EndPosition() ast.Position {
 	return e.EndPos
 }

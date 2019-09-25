@@ -9,9 +9,9 @@ import (
 
 	"github.com/bluele/gcache"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/compute"
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/compute"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type ReceiptProcessor struct {
@@ -71,7 +71,7 @@ func (p *ReceiptProcessor) run() {
 		receiptHash := p.hasher.ComputeStructHash(receipt)
 
 		// If cached result exists (err == nil), reuse it
-		if v, err := p.cache.Get(receiptHash); err == nil {
+		if v, err := p.cache.Get(string(receiptHash)); err == nil {
 			validationResult := v.(compute.ValidationResult)
 			p.sendApprovalOrSlash(receipt, validationResult)
 			notifyDone(done)
@@ -101,7 +101,7 @@ func (p *ReceiptProcessor) run() {
 		p.sendApprovalOrSlash(receipt, validationResult)
 
 		// Cache the result.
-		if err := p.cache.Set(receiptHash, validationResult); err != nil {
+		if err := p.cache.Set(string(receiptHash), validationResult); err != nil {
 			p.effects.HandleError(err)
 		}
 		notifyDone(done)

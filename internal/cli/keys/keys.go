@@ -3,7 +3,7 @@ package keys
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/keys/generate"
+	"github.com/dapperlabs/flow-go/internal/cli/keys/generate"
 )
 
 var Cmd = &cobra.Command{

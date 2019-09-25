@@ -2,19 +2,24 @@ package parser
 
 import (
 	"encoding/hex"
-	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 type ProgramVisitor struct {
 	*BaseStrictusVisitor
+	parseErrors []error
+}
+
+func (v *ProgramVisitor) report(errs ...error) {
+	v.parseErrors = append(v.parseErrors, errs...)
 }
 
 func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
@@ -41,11 +46,10 @@ func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	access := ctx.Access().Accept(v).(ast.Access)
 
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	parameterListEnd := ctx.ParameterList().GetStop()
-	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
+	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -62,38 +66,39 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.FunctionDeclaration{
-		Access: access,
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
-		Parameters:    parameters,
-		ReturnType:    returnType,
-		FunctionBlock: functionBlock,
-		StartPos:      startPosition,
+		Access:               access,
+		Identifier:           identifier,
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+		FunctionBlock:        functionBlock,
+		StartPos:             startPosition,
 	}
 }
 
-// visitReturnType returns the return type.
-// if none was given in the program, return an empty type with the position of tokenBefore
-func (v *ProgramVisitor) visitReturnType(ctx IFullTypeContext, tokenBefore antlr.Token) ast.Type {
+// visitReturnTypeAnnotation returns the return type annotation.
+// if none was given in the program, return a type annotation with an empty type, with the position of tokenBefore
+func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, tokenBefore antlr.Token) *ast.TypeAnnotation {
 	if ctx == nil {
 		positionBeforeMissingReturnType :=
 			ast.PositionFromToken(tokenBefore)
-		return &ast.NominalType{
+		returnType := &ast.NominalType{
 			Identifier: ast.Identifier{
 				Pos: positionBeforeMissingReturnType,
 			},
+		}
+		return &ast.TypeAnnotation{
+			Move:     false,
+			Type:     returnType,
+			StartPos: positionBeforeMissingReturnType,
 		}
 	}
 	result := ctx.Accept(v)
 	if result == nil {
 		return nil
 	}
-	return result.(ast.Type)
+	return result.(*ast.TypeAnnotation)
 }
 
 func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
@@ -138,6 +143,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		address := make([]byte, hex.DecodedLen(length))
 		_, err := hex.Decode(address, bytes)
 		if err != nil {
+			// unreachable, hex literal should always be valid
 			panic(err)
 		}
 		location = ast.AddressImportLocation(address)
@@ -149,13 +155,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	allIdentifierNodes := ctx.AllIdentifier()
 	identifiers := make([]ast.Identifier, len(allIdentifierNodes))
 	for i, identifierNode := range allIdentifierNodes {
-		identifier := identifierNode.GetText()
-		symbol := identifierNode.GetSymbol()
-		identifierPos := ast.PositionFromToken(symbol)
-		identifiers[i] = ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		}
+		identifiers[i] = identifierNode.Accept(v).(ast.Identifier)
 	}
 
 	return &ast.ImportDeclaration{
@@ -167,45 +167,21 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
-func (v *ProgramVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-
+func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
+	members := ctx.Members().Accept(v).(*ast.Members)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
 
-	return &ast.StructureDeclaration{
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
-		Conformances: conformances,
-		Fields:       fields,
-		Initializer:  initializer,
-		Functions:    functions,
-		StartPos:     startPosition,
-		EndPos:       endPosition,
+	return &ast.CompositeDeclaration{
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Conformances:  conformances,
+		Members:       members,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -213,16 +189,53 @@ func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{}
 	identifierNodes := ctx.AllIdentifier
 	conformances := make([]*ast.NominalType, len(identifierNodes()))
 	for i, identifierNode := range identifierNodes() {
-		identifier := identifierNode.GetText()
-		pos := ast.PositionFromToken(identifierNode.GetSymbol())
+		identifier := identifierNode.Accept(v).(ast.Identifier)
 		conformances[i] = &ast.NominalType{
-			Identifier: ast.Identifier{
-				Identifier: identifier,
-				Pos:        pos,
-			},
+			Identifier: identifier,
 		}
 	}
 	return conformances
+}
+
+func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
+
+	var fields []*ast.FieldDeclaration
+	var initializers []*ast.InitializerDeclaration
+	var functions []*ast.FunctionDeclaration
+	var compositeDeclarations []*ast.CompositeDeclaration
+	var interfaceDeclarations []*ast.InterfaceDeclaration
+
+	for _, memberCtx := range ctx.AllMember() {
+		member := memberCtx.Accept(v)
+
+		switch member := member.(type) {
+		case *ast.FieldDeclaration:
+			fields = append(fields, member)
+
+		case *ast.InitializerDeclaration:
+			initializers = append(initializers, member)
+
+		case *ast.FunctionDeclaration:
+			functions = append(functions, member)
+
+		case *ast.CompositeDeclaration:
+			compositeDeclarations = append(compositeDeclarations, member)
+
+		case *ast.InterfaceDeclaration:
+			interfaceDeclarations = append(interfaceDeclarations, member)
+		}
+	}
+
+	return &ast.Members{
+		Fields:                fields,
+		Initializers:          initializers,
+		Functions:             functions,
+		CompositeDeclarations: compositeDeclarations,
+	}
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
@@ -234,33 +247,26 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 		variableKind = variableKindContext.Accept(v).(ast.VariableKind)
 	}
 
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	typeContext := ctx.FullType()
-	fullType := typeContext.Accept(v).(ast.Type)
+	typeAnnotationContext := ctx.TypeAnnotation()
+	typeAnnotation := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	endPosition := ast.EndPosition(startPosition, typeContext.GetStop().GetStop())
+	endPosition := ast.EndPosition(startPosition, typeAnnotationContext.GetStop().GetStop())
 
 	return &ast.FieldDeclaration{
-		Access:       access,
-		VariableKind: variableKind,
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
-		Type:     fullType,
-		StartPos: startPosition,
-		EndPos:   endPosition,
+		Access:         access,
+		VariableKind:   variableKind,
+		Identifier:     identifier,
+		TypeAnnotation: typeAnnotation,
+		StartPos:       startPosition,
+		EndPos:         endPosition,
 	}
 }
 
 func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -279,10 +285,7 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.InitializerDeclaration{
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
+		Identifier:    identifier,
 		Parameters:    parameters,
 		FunctionBlock: functionBlock,
 		StartPos:      startPosition,
@@ -290,47 +293,39 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-
-	var fields []*ast.FieldDeclaration
-	for _, fieldCtx := range ctx.AllField() {
-		field := fieldCtx.Accept(v).(*ast.FieldDeclaration)
-		fields = append(fields, field)
-	}
-
-	var initializer *ast.InitializerDeclaration
-	initializerNode := ctx.Initializer()
-	if initializerNode != nil {
-		initializer = initializerNode.Accept(v).(*ast.InitializerDeclaration)
-	}
-
-	var functions []*ast.FunctionDeclaration
-	for _, functionDeclarationCtx := range ctx.AllFunctionDeclaration() {
-		functionDeclaration :=
-			functionDeclarationCtx.Accept(v).(*ast.FunctionDeclaration)
-		functions = append(functions, functionDeclaration)
-	}
-
+	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	members := ctx.Members().Accept(v).(*ast.Members)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
-	identifierPos := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.InterfaceDeclaration{
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
-		Fields:      fields,
-		Initializer: initializer,
-		Functions:   functions,
-		StartPos:    startPosition,
-		EndPos:      endPosition,
+		CompositeKind: kind,
+		Identifier:    identifier,
+		Members:       members,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
+}
+
+func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
+	if ctx.Struct() != nil {
+		return common.CompositeKindStructure
+	}
+
+	if ctx.Resource() != nil {
+		return common.CompositeKindResource
+	}
+
+	if ctx.Contract() != nil {
+		return common.CompositeKindContract
+	}
+
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
 	parameterListEnd := ctx.ParameterList().GetStop()
-	returnType := v.visitReturnType(ctx.returnType, parameterListEnd)
+	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
 	var parameters []*ast.Parameter
 	parameterList := ctx.ParameterList()
@@ -343,10 +338,10 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
-		Parameters:    parameters,
-		ReturnType:    returnType,
-		FunctionBlock: functionBlock,
-		StartPos:      startPosition,
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+		FunctionBlock:        functionBlock,
+		StartPos:             startPosition,
 	}
 }
 
@@ -370,72 +365,112 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 		label = ctx.argumentLabel.GetText()
 	}
 
-	// identifier
-	identifier := ctx.parameterName.GetText()
-	identifierPos := ast.PositionFromToken(ctx.parameterName)
+	identifier := ctx.parameterName.Accept(v).(ast.Identifier)
 
-	fullType := ctx.FullType().Accept(v).(ast.Type)
+	typeAnnotation := ctx.TypeAnnotation().Accept(v).(*ast.TypeAnnotation)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.Parameter{
-		Label: label,
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
-		Type:     fullType,
-		StartPos: startPosition,
-		EndPos:   endPosition,
+		Label:          label,
+		Identifier:     identifier,
+		TypeAnnotation: typeAnnotation,
+		StartPos:       startPosition,
+		EndPos:         endPosition,
 	}
 }
 
 func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
-	identifierNode := ctx.Identifier()
-	// identifier?
-	if identifierNode != nil {
-		identifier := identifierNode.GetText()
-		position := ast.PositionFromToken(identifierNode.GetSymbol())
-		return &ast.NominalType{
-			Identifier: ast.Identifier{
-				Identifier: identifier,
-				Pos:        position,
-			},
-		}
-	}
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
 
-	// alternative: function type
-	functionTypeContext := ctx.FunctionType()
-	if functionTypeContext != nil {
-		return functionTypeContext.Accept(v)
-	}
+func (v *ProgramVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	panic(&errors.UnreachableError{})
+	return &ast.NominalType{
+		Identifier: identifier,
+	}
 }
 
 func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{} {
 
-	var parameterTypes []ast.Type
-	for _, fullType := range ctx.parameterTypes {
-		parameterTypes = append(
-			parameterTypes,
-			fullType.Accept(v).(ast.Type),
+	var parameterTypeAnnotations []*ast.TypeAnnotation
+	for _, typeAnnotationContext := range ctx.parameterTypes {
+		parameterTypeAnnotations = append(
+			parameterTypeAnnotations,
+			typeAnnotationContext.Accept(v).(*ast.TypeAnnotation),
 		)
 	}
 
 	if ctx.returnType == nil {
 		return nil
 	}
-	returnType := ctx.returnType.Accept(v).(ast.Type)
+	returnTypeAnnotation := ctx.returnType.Accept(v).(*ast.TypeAnnotation)
 
 	startPosition := ast.PositionFromToken(ctx.OpenParen(0).GetSymbol())
-	endPosition := returnType.EndPosition()
+	endPosition := returnTypeAnnotation.EndPosition()
 
 	return &ast.FunctionType{
-		ParameterTypes: parameterTypes,
-		ReturnType:     returnType,
-		StartPos:       startPosition,
-		EndPos:         endPosition,
+		ParameterTypeAnnotations: parameterTypeAnnotations,
+		ReturnTypeAnnotation:     returnTypeAnnotation,
+		StartPos:                 startPosition,
+		EndPos:                   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{} {
+	elementType := ctx.FullType().Accept(v).(ast.Type)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.VariableSizedType{
+		Type:     elementType,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitConstantSizedType(ctx *ConstantSizedTypeContext) interface{} {
+	elementType := ctx.FullType().Accept(v).(ast.Type)
+
+	size, err := strconv.Atoi(ctx.size.GetText())
+	if err != nil {
+		return nil
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.ConstantSizedType{
+		Type:     elementType,
+		Size:     size,
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interface{} {
+	keyType := ctx.keyType.Accept(v).(ast.Type)
+	valueType := ctx.valueType.Accept(v).(ast.Type)
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.DictionaryType{
+		KeyType:   keyType,
+		ValueType: valueType,
+		StartPos:  startPosition,
+		EndPos:    endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
+	move := ctx.Move() != nil
+	fullType := ctx.FullType().Accept(v).(ast.Type)
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.TypeAnnotation{
+		Move:     move,
+		Type:     fullType,
+		StartPos: startPosition,
 	}
 }
 
@@ -446,87 +481,13 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 	result := baseTypeResult.(ast.Type)
 
-	// reduce in reverse
-	indices := ctx.AllTypeIndex()
-	lastIndex := len(indices) - 1
-	for i := range indices {
-		indexContext := indices[lastIndex-i]
-		startPosition, endPosition :=
-			ast.PositionRangeFromContext(indexContext)
-
-		switch index := indexContext.Accept(v).(type) {
-		case *int:
-			if index == nil {
-				result = &ast.VariableSizedType{
-					Type:     result,
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				}
-			} else {
-				result = &ast.ConstantSizedType{
-					Type:     result,
-					Size:     *index,
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				}
-			}
-		case ast.Type:
-			result = &ast.DictionaryType{
-				ValueType: result,
-				KeyType:   index,
-				StartPos:  startPosition,
-				EndPos:    endPosition,
-			}
-		}
-	}
-
 	for _, optional := range ctx.optionals {
-		switch optional.GetTokenType() {
-		case StrictusLexerOptional:
-			endPos := ast.PositionFromToken(optional)
-			result = &ast.OptionalType{
-				Type:   result,
-				EndPos: endPos,
-			}
-			continue
-		case StrictusLexerNilCoalescing:
-			endPosInner := ast.PositionFromToken(optional)
-			endPosOuter := endPosInner.Shifted(1)
-			result = &ast.OptionalType{
-				Type: &ast.OptionalType{
-					Type:   result,
-					EndPos: endPosInner,
-				},
-				EndPos: endPosOuter,
-			}
-			continue
+		endPos := ast.PositionFromToken(optional)
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
 		}
 	}
-
-	return result
-}
-
-func (v *ProgramVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
-	// type?
-	typeContext := ctx.FullType()
-	if typeContext != nil {
-		return typeContext.Accept(v).(ast.Type)
-	}
-
-	// dimension
-	var result *int
-
-	literalNode := ctx.DecimalLiteral()
-	if literalNode == nil {
-		return result
-	}
-
-	value, err := strconv.Atoi(literalNode.GetText())
-	if err != nil {
-		return result
-	}
-
-	result = &value
 
 	return result
 }
@@ -701,34 +662,33 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	variableKind := ctx.VariableKind().Accept(v).(ast.VariableKind)
 	isConstant := variableKind == ast.VariableKindConstant
 
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+
 	expressionResult := ctx.Expression().Accept(v)
 	if expressionResult == nil {
 		return nil
 	}
 	expression := expressionResult.(ast.Expression)
-	var fullType ast.Type
+	var typeAnnotation *ast.TypeAnnotation
 
-	fullTypeContext := ctx.FullType()
-	if fullTypeContext != nil {
-		if x, ok := fullTypeContext.Accept(v).(ast.Type); ok {
-			fullType = x
+	typeAnnotationContext := ctx.TypeAnnotation()
+	if typeAnnotationContext != nil {
+		if x, ok := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation); ok {
+			typeAnnotation = x
 		}
 	}
 
+	transfer := ctx.Transfer().Accept(v).(*ast.Transfer)
+
 	startPosition := ast.PositionFromToken(ctx.GetStart())
-	identifierPosition := ast.PositionFromToken(identifierNode.GetSymbol())
 
 	return &ast.VariableDeclaration{
-		IsConstant: isConstant,
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPosition,
-		},
-		Value:    expression,
-		Type:     fullType,
-		StartPos: startPosition,
+		IsConstant:     isConstant,
+		Identifier:     identifier,
+		Value:          expression,
+		TypeAnnotation: typeAnnotation,
+		Transfer:       transfer,
+		StartPos:       startPosition,
 	}
 }
 
@@ -797,20 +757,11 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 }
 
 func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-	identifierSymbol := identifierNode.GetSymbol()
-
-	targetStartPosition := ast.PositionFromToken(identifierSymbol)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var target ast.Expression = &ast.IdentifierExpression{
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        targetStartPosition,
-		},
+		Identifier: identifier,
 	}
-
-	value := ctx.Expression().Accept(v).(ast.Expression)
 
 	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
 		expression := accessExpressionContext.Accept(v)
@@ -818,9 +769,28 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 		target = v.wrapPartialAccessExpression(target, accessExpression)
 	}
 
+	transfer := ctx.Transfer().Accept(v).(*ast.Transfer)
+
+	value := ctx.Expression().Accept(v).(ast.Expression)
+
 	return &ast.AssignmentStatement{
-		Target: target,
-		Value:  value,
+		Target:   target,
+		Transfer: transfer,
+		Value:    value,
+	}
+}
+
+func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
+	operation := ast.TransferOperationCopy
+	if ctx.Move() != nil {
+		operation = ast.TransferOperationMove
+	}
+
+	position := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.Transfer{
+		Operation: operation,
+		Pos:       position,
 	}
 }
 
@@ -960,17 +930,38 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 }
 
 func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
-	typeContext := ctx.FullType()
-	if typeContext == nil {
-		return ctx.AdditiveExpression().Accept(v)
+	typeAnnotationContext := ctx.TypeAnnotation()
+	if typeAnnotationContext == nil {
+		return ctx.ConcatenatingExpression().Accept(v)
 	}
 
 	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
-	fullType := typeContext.Accept(v).(ast.Type)
+	typeAnnotation := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
 
 	return &ast.FailableDowncastExpression{
-		Expression: expression,
-		Type:       fullType,
+		Expression:     expression,
+		TypeAnnotation: typeAnnotation,
+	}
+}
+
+func (v *ProgramVisitor) VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{} {
+	right := ctx.AdditiveExpression().Accept(v)
+	if right == nil {
+		return nil
+	}
+	rightExpression := right.(ast.Expression)
+
+	leftContext := ctx.ConcatenatingExpression()
+	if leftContext == nil {
+		return rightExpression
+	}
+
+	leftExpression := leftContext.Accept(v).(ast.Expression)
+
+	return &ast.BinaryExpression{
+		Operation: ast.OperationConcat,
+		Left:      leftExpression,
+		Right:     rightExpression,
 	}
 }
 
@@ -1031,9 +1022,11 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 	// ensure unary operators are not juxtaposed
 	if ctx.GetChildCount() > 2 {
 		position := ast.PositionFromToken(ctx.UnaryOp(0).GetStart())
-		panic(&JuxtaposedUnaryOperatorsError{
-			Pos: position,
-		})
+		v.report(
+			&JuxtaposedUnaryOperatorsError{
+				Pos: position,
+			},
+		)
 	}
 
 	expression := unaryContext.Accept(v).(ast.Expression)
@@ -1058,6 +1051,10 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 
 	if ctx.Minus() != nil {
 		return ast.OperationMinus
+	}
+
+	if ctx.Move() != nil {
+		return ast.OperationMove
 	}
 
 	panic(&errors.UnreachableError{})
@@ -1101,8 +1098,6 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 		return &ast.MemberExpression{
 			Expression: wrapped,
 			Identifier: partialAccessExpression.Identifier,
-			StartPos:   partialAccessExpression.StartPos,
-			EndPos:     partialAccessExpression.EndPos,
 		}
 	}
 
@@ -1118,17 +1113,11 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 }
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
-	identifierNode := ctx.Identifier()
-	identifier := identifierNode.GetText()
-
-	startPosition := ast.PositionFromToken(ctx.GetStart())
-	endPosition := ast.EndPosition(startPosition, identifierNode.GetSymbol().GetStop())
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
 		Identifier: identifier,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
 	}
 }
 
@@ -1144,6 +1133,38 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 	}
 }
 
+// NOTE: manually go over all child rules and find a match
+func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	invocation.InvokedExpression =
+		&ast.IdentifierExpression{
+			Identifier: identifier,
+		}
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.CreateExpression{
+		InvocationExpression: invocation,
+		StartPos:             startPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.DestroyExpression{
+		Expression: expression,
+		StartPos:   startPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
 	return ctx.Literal().Accept(v)
 }
@@ -1153,39 +1174,60 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
+func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
+	intExpression := ctx.PositiveIntegerLiteral().Accept(v).(*ast.IntExpression)
+	if ctx.Minus() != nil {
+		intExpression.Value.Neg(intExpression.Value)
+	}
+	return intExpression
+}
+
+func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
 	startPosition := ast.PositionFromToken(token)
 	endPosition := ast.EndPosition(startPosition, token.GetStop())
 
 	// check literal has no leading underscore
 	if strings.HasPrefix(text, "_") {
-		panic(&InvalidIntegerLiteralError{
-			IntegerLiteralKind:        kind,
-			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
-			// NOTE: not using text, because it has the base-prefix stripped
-			Literal:  token.GetText(),
-			StartPos: startPosition,
-			EndPos:   endPosition,
-		})
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	// check literal has no trailing underscore
 	if strings.HasSuffix(text, "_") {
-		panic(&InvalidIntegerLiteralError{
-			IntegerLiteralKind:        kind,
-			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
-			// NOTE: not using text, because it has the base-prefix stripped
-			Literal:  token.GetText(),
-			StartPos: startPosition,
-			EndPos:   endPosition,
-		})
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	withoutUnderscores := strings.Replace(text, "_", "", -1)
 
 	value, ok := big.NewInt(0).SetString(withoutUnderscores, kind.Base())
 	if !ok {
-		panic(fmt.Sprintf("invalid %s literal: %s", kind, text))
+		v.report(
+			&InvalidIntegerLiteralError{
+				IntegerLiteralKind:        kind,
+				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknown,
+				// NOTE: not using text, because it has the base-prefix stripped
+				Literal:  token.GetText(),
+				StartPos: startPosition,
+				EndPos:   endPosition,
+			},
+		)
 	}
 
 	return &ast.IntExpression{
@@ -1199,17 +1241,24 @@ func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralCont
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.GetStop().GetStop())
 
-	panic(&InvalidIntegerLiteralError{
-		IntegerLiteralKind:        IntegerLiteralKindUnknown,
-		InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
-		Literal:                   ctx.GetText(),
-		StartPos:                  startPosition,
-		EndPos:                    endPosition,
-	})
+	v.report(
+		&InvalidIntegerLiteralError{
+			IntegerLiteralKind:        IntegerLiteralKindUnknown,
+			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
+			Literal:                   ctx.GetText(),
+			StartPos:                  startPosition,
+			EndPos:                    endPosition,
+		},
+	)
+
+	return &ast.IntExpression{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText(),
 		IntegerLiteralKindDecimal,
@@ -1217,7 +1266,7 @@ func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interfa
 }
 
 func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindBinary,
@@ -1225,7 +1274,7 @@ func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface
 }
 
 func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindOctal,
@@ -1233,7 +1282,7 @@ func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
-	return parseIntExpression(
+	return v.parseIntExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindHexadecimal,
@@ -1410,17 +1459,26 @@ func (v *ProgramVisitor) VisitDictionaryEntry(ctx *DictionaryEntryContext) inter
 }
 
 func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
-	identifierNode := ctx.Identifier()
-
-	identifier := identifierNode.GetText()
-	identifierSymbol := identifierNode.GetSymbol()
-	identifierPos := ast.PositionFromToken(identifierSymbol)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	return &ast.IdentifierExpression{
-		Identifier: ast.Identifier{
-			Identifier: identifier,
-			Pos:        identifierPos,
-		},
+		Identifier: identifier,
+	}
+}
+
+func (v *ProgramVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
+
+	terminalNode := ctx.Identifier()
+	if terminalNode == nil {
+		terminalNode = ctx.From()
+	}
+
+	text := terminalNode.GetText()
+	pos := ast.PositionFromToken(terminalNode.GetSymbol())
+
+	return ast.Identifier{
+		Identifier: text,
+		Pos:        pos,
 	}
 }
 
@@ -1448,7 +1506,7 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 	var labelStartPos, labelEndPos *ast.Position
 	if identifierNode != nil {
 		label = identifierNode.GetText()
-		symbol := identifierNode.GetSymbol()
+		symbol := identifierNode.GetStart()
 		startPos := ast.PositionFromToken(symbol)
 		endPos := ast.EndPosition(startPos, symbol.GetStop())
 		labelStartPos = &startPos

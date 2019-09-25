@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 )
 
 // Execute parses the given filename and prints any syntax errors.
@@ -17,7 +17,6 @@ import (
 // If after the interpretation a global function `main` is defined, it will be called.
 // The program may call the function `log` to print a value.
 func Execute(args []string) {
-	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
 
 	if len(args) < 1 {
 		exitWithError("no input file")
@@ -34,7 +33,7 @@ func Execute(args []string) {
 		os.Exit(1)
 	}
 
-	program, code, err := parser.ParseProgramFromFile(filename)
+	program, _, code, err := parser.ParseProgramFromFile(filename)
 	codes[filename] = code
 	must(err, filename)
 
@@ -42,7 +41,7 @@ func Execute(args []string) {
 		switch location := location.(type) {
 		case ast.StringImportLocation:
 			filename := string(location)
-			imported, code, err := parser.ParseProgramFromFile(filename)
+			imported, _, code, err := parser.ParseProgramFromFile(filename)
 			codes[filename] = code
 			must(err, filename)
 			return imported, nil
@@ -53,14 +52,16 @@ func Execute(args []string) {
 	})
 	must(err, filename)
 
-	valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
+	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, nil)
+	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	must(err, filename)
 
 	must(checker.Check(), filename)
 
-	values := stdlib.ToValues(standardLibraryFunctions)
+	values := standardLibraryFunctions.ToValues()
 
 	inter, err := interpreter.NewInterpreter(checker, values)
 	must(err, filename)

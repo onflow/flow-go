@@ -6,22 +6,22 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types/proto"
 )
 
-// RPCClient is an RPC client compatible with the Bamboo Observation API.
+// RPCClient is an RPC client compatible with the Flow Observation API.
 type RPCClient observe.ObserveServiceClient
 
-// Client is a Bamboo user agent client.
+// Client is a Flow user agent client.
 type Client struct {
 	rpcClient RPCClient
 	close     func() error
 }
 
-// New initializes a Bamboo client with the default gRPC provider.
+// New initializes a Flow client with the default gRPC provider.
 //
 // An error will be returned if the host is unreachable.
 func New(addr string) (*Client, error) {
@@ -38,7 +38,7 @@ func New(addr string) (*Client, error) {
 	}, nil
 }
 
-// NewFromRPCClient initializes a Bamboo client using a pre-configured gRPC provider.
+// NewFromRPCClient initializes a Flow client using a pre-configured gRPC provider.
 func NewFromRPCClient(rpcClient RPCClient) *Client {
 	return &Client{
 		rpcClient: rpcClient,
@@ -86,7 +86,7 @@ func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, er
 func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
 	res, err := c.rpcClient.GetTransaction(
 		ctx,
-		&observe.GetTransactionRequest{Hash: h.Bytes()},
+		&observe.GetTransactionRequest{Hash: h},
 	)
 	if err != nil {
 		return nil, err

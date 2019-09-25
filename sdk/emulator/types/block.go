@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 )
 
 type Block struct {
@@ -34,11 +34,11 @@ func (b *Block) ToMessage() *observe.Block {
 	var prevBlockHash []byte
 
 	if b.PreviousBlockHash != nil {
-		prevBlockHash = b.PreviousBlockHash.Bytes()
+		prevBlockHash = b.PreviousBlockHash
 	}
 
 	blockMsg := &observe.Block{
-		Hash:              b.Hash().Bytes(),
+		Hash:              b.Hash(),
 		Number:            b.Number,
 		PrevBlockHash:     prevBlockHash,
 		Timestamp:         timestamp,

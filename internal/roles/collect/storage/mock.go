@@ -3,8 +3,8 @@ package storage
 import (
 	"errors"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // MockStorage is an in-memory storage implementation.
@@ -21,7 +21,7 @@ func NewMockStorage() Storage {
 
 // InsertTransaction inserts a signed transaction into storage.
 func (d *MockStorage) InsertTransaction(tx types.SignedTransaction) error {
-	d.transactions[string(tx.Hash().Bytes())] = tx
+	d.transactions[string(tx.Hash())] = tx
 	return nil
 }
 
@@ -29,7 +29,7 @@ func (d *MockStorage) InsertTransaction(tx types.SignedTransaction) error {
 //
 // This function returns error if the hash does not exist in storage.
 func (d *MockStorage) GetTransaction(hash crypto.Hash) (types.SignedTransaction, error) {
-	tx, exists := d.transactions[string(hash.Bytes())]
+	tx, exists := d.transactions[string(hash)]
 	if !exists {
 		return types.SignedTransaction{}, errors.New("transaction does not exist")
 	}
@@ -40,6 +40,6 @@ func (d *MockStorage) GetTransaction(hash crypto.Hash) (types.SignedTransaction,
 // ContainsTransaction returns true if a transaction with the given hash exists
 // in storage and false otherwise.
 func (d *MockStorage) ContainsTransaction(hash crypto.Hash) bool {
-	_, exists := d.transactions[string(hash.Bytes())]
+	_, exists := d.transactions[string(hash)]
 	return exists
 }

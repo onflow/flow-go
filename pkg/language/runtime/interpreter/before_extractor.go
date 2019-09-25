@@ -1,9 +1,9 @@
 package interpreter
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
 
 type BeforeExtractor struct {

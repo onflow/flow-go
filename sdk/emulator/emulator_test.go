@@ -9,8 +9,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -122,7 +122,7 @@ func TestWorldStates(t *testing.T) {
 	// World state updates
 	Expect(ws5).NotTo(Equal(ws4))
 	// World state is indexed
-	Expect(b.worldStates).To(HaveKey(string(ws5.Bytes())))
+	Expect(b.worldStates).To(HaveKey(string(ws5)))
 
 	// Submit tx3
 	b.SubmitTransaction(tx3)
@@ -490,7 +490,7 @@ func TestQueryByVersion(t *testing.T) {
 		Timestamp:    time.Now(),
 	}).SignPayer(b.RootAccount(), b.RootKey())
 
-	invalidWorldState := new(crypto.Hash32)
+	var invalidWorldState crypto.Hash
 
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()

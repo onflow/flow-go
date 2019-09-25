@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 type Block struct {

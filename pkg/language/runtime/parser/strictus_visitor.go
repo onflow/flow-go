@@ -23,8 +23,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#access.
 	VisitAccess(ctx *AccessContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#structureDeclaration.
-	VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{}
+	// Visit a parse tree produced by StrictusParser#compositeDeclaration.
+	VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#conformances.
 	VisitConformances(ctx *ConformancesContext) interface{}
@@ -38,6 +38,15 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#members.
+	VisitMembers(ctx *MembersContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#member.
+	VisitMember(ctx *MemberContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#compositeKind.
+	VisitCompositeKind(ctx *CompositeKindContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#initializer.
 	VisitInitializer(ctx *InitializerContext) interface{}
 
@@ -50,17 +59,29 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#parameter.
 	VisitParameter(ctx *ParameterContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#typeAnnotation.
+	VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#fullType.
 	VisitFullType(ctx *FullTypeContext) interface{}
-
-	// Visit a parse tree produced by StrictusParser#typeIndex.
-	VisitTypeIndex(ctx *TypeIndexContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#nominalType.
+	VisitNominalType(ctx *NominalTypeContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#functionType.
 	VisitFunctionType(ctx *FunctionTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#variableSizedType.
+	VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#constantSizedType.
+	VisitConstantSizedType(ctx *ConstantSizedTypeContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#dictionaryType.
+	VisitDictionaryType(ctx *DictionaryTypeContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
@@ -107,6 +128,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#assignment.
 	VisitAssignment(ctx *AssignmentContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#transfer.
+	VisitTransfer(ctx *TransferContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#expression.
 	VisitExpression(ctx *ExpressionContext) interface{}
 
@@ -130,6 +154,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#failableDowncastingExpression.
 	VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#concatenatingExpression.
+	VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#additiveExpression.
 	VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{}
@@ -161,16 +188,25 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#unaryOp.
 	VisitUnaryOp(ctx *UnaryOpContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#IdentifierExpression.
+	// Visit a parse tree produced by StrictusParser#primaryExpressionStart.
+	VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#createExpression.
+	VisitCreateExpression(ctx *CreateExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#destroyExpression.
+	VisitDestroyExpression(ctx *DestroyExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#identifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#LiteralExpression.
+	// Visit a parse tree produced by StrictusParser#literalExpression.
 	VisitLiteralExpression(ctx *LiteralExpressionContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#FunctionExpression.
+	// Visit a parse tree produced by StrictusParser#functionExpression.
 	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#NestedExpression.
+	// Visit a parse tree produced by StrictusParser#nestedExpression.
 	VisitNestedExpression(ctx *NestedExpressionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#expressionAccess.
@@ -200,6 +236,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#integerLiteral.
+	VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#DecimalLiteral.
 	VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{}
 
@@ -223,6 +262,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#dictionaryEntry.
 	VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#identifier.
+	VisitIdentifier(ctx *IdentifierContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#eos.
 	VisitEos(ctx *EosContext) interface{}

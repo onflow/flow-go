@@ -6,8 +6,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	svc "github.com/dapperlabs/bamboo-node/pkg/grpc/services/collect"
-	"github.com/dapperlabs/bamboo-node/pkg/types/proto"
+	svc "github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
+	"github.com/dapperlabs/flow-go/pkg/types/proto"
 )
 
 const (
@@ -47,7 +47,7 @@ func (c *Controller) SubmitTransaction(
 	}
 
 	// TODO: validate transaction signature
-	// https://github.com/dapperlabs/bamboo-node/issues/171
+	// https://github.com/dapperlabs/flow-go/issues/171
 
 	// TODO: route transaction to cluster if required and return
 

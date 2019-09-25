@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 //go:generate stringer -type=Operation
 
@@ -21,8 +21,10 @@ const (
 	OperationMul
 	OperationDiv
 	OperationMod
+	OperationConcat
 	OperationNegate
 	OperationNilCoalesce
+	OperationMove
 )
 
 func (s Operation) Symbol() string {
@@ -53,10 +55,14 @@ func (s Operation) Symbol() string {
 		return "/"
 	case OperationMod:
 		return "%"
+	case OperationConcat:
+		return "&"
 	case OperationNegate:
 		return "!"
 	case OperationNilCoalesce:
 		return "??"
+	case OperationMove:
+		return "<-"
 	}
 
 	panic(&errors.UnreachableError{})

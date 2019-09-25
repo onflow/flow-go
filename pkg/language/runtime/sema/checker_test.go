@@ -5,7 +5,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
 func TestOptionalSubtyping(t *testing.T) {

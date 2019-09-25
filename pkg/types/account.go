@@ -1,6 +1,6 @@
 package types
 
-// Account represents an account on the Bamboo network.
+// Account represents an account on the Flow network.
 //
 // An account can be an externally owned account or a contract account with code.
 type Account struct {

@@ -26,19 +26,16 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 type GossipMessage struct {
-	// Types that are valid to be assigned to Payload:
-	//	*GossipMessage_MessageRequest
-	//	*GossipMessage_MessageReply
-	Payload              isGossipMessage_Payload `protobuf_oneof:"Payload"`
-	Method               string                  `protobuf:"bytes,20,opt,name=Method,proto3" json:"Method,omitempty"`
-	Recipients           []string                `protobuf:"bytes,21,rep,name=Recipients,proto3" json:"Recipients,omitempty"`
-	Sender               string                  `protobuf:"bytes,22,opt,name=Sender,proto3" json:"Sender,omitempty"`
-	Path                 []string                `protobuf:"bytes,23,rep,name=Path,proto3" json:"Path,omitempty"`
-	TTL                  uint64                  `protobuf:"varint,24,opt,name=TTL,proto3" json:"TTL,omitempty"`
-	Uuid                 *UUID                   `protobuf:"bytes,25,opt,name=uuid,proto3" json:"uuid,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Payload              []byte   `protobuf:"bytes,1,opt,name=Payload,proto3" json:"Payload,omitempty"`
+	Method               string   `protobuf:"bytes,2,opt,name=Method,proto3" json:"Method,omitempty"`
+	Recipients           []string `protobuf:"bytes,3,rep,name=Recipients,proto3" json:"Recipients,omitempty"`
+	Sender               string   `protobuf:"bytes,4,opt,name=Sender,proto3" json:"Sender,omitempty"`
+	Path                 []string `protobuf:"bytes,5,rep,name=Path,proto3" json:"Path,omitempty"`
+	TTL                  uint64   `protobuf:"varint,6,opt,name=TTL,proto3" json:"TTL,omitempty"`
+	Uuid                 string   `protobuf:"bytes,7,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *GossipMessage) Reset()         { *m = GossipMessage{} }
@@ -66,39 +63,9 @@ func (m *GossipMessage) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GossipMessage proto.InternalMessageInfo
 
-type isGossipMessage_Payload interface {
-	isGossipMessage_Payload()
-}
-
-type GossipMessage_MessageRequest struct {
-	MessageRequest *MessageRequest `protobuf:"bytes,18,opt,name=messageRequest,proto3,oneof"`
-}
-
-type GossipMessage_MessageReply struct {
-	MessageReply *MessageReply `protobuf:"bytes,19,opt,name=messageReply,proto3,oneof"`
-}
-
-func (*GossipMessage_MessageRequest) isGossipMessage_Payload() {}
-
-func (*GossipMessage_MessageReply) isGossipMessage_Payload() {}
-
-func (m *GossipMessage) GetPayload() isGossipMessage_Payload {
+func (m *GossipMessage) GetPayload() []byte {
 	if m != nil {
 		return m.Payload
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetMessageRequest() *MessageRequest {
-	if x, ok := m.GetPayload().(*GossipMessage_MessageRequest); ok {
-		return x.MessageRequest
-	}
-	return nil
-}
-
-func (m *GossipMessage) GetMessageReply() *MessageReply {
-	if x, ok := m.GetPayload().(*GossipMessage_MessageReply); ok {
-		return x.MessageReply
 	}
 	return nil
 }
@@ -138,205 +105,79 @@ func (m *GossipMessage) GetTTL() uint64 {
 	return 0
 }
 
-func (m *GossipMessage) GetUuid() *UUID {
+func (m *GossipMessage) GetUuid() string {
 	if m != nil {
 		return m.Uuid
+	}
+	return ""
+}
+
+type GossipReply struct {
+	ResponseByte         []byte   `protobuf:"bytes,1,opt,name=responseByte,proto3" json:"responseByte,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GossipReply) Reset()         { *m = GossipReply{} }
+func (m *GossipReply) String() string { return proto.CompactTextString(m) }
+func (*GossipReply) ProtoMessage()    {}
+func (*GossipReply) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b864370d9939db87, []int{1}
+}
+
+func (m *GossipReply) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GossipReply.Unmarshal(m, b)
+}
+func (m *GossipReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GossipReply.Marshal(b, m, deterministic)
+}
+func (m *GossipReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GossipReply.Merge(m, src)
+}
+func (m *GossipReply) XXX_Size() int {
+	return xxx_messageInfo_GossipReply.Size(m)
+}
+func (m *GossipReply) XXX_DiscardUnknown() {
+	xxx_messageInfo_GossipReply.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GossipReply proto.InternalMessageInfo
+
+func (m *GossipReply) GetResponseByte() []byte {
+	if m != nil {
+		return m.ResponseByte
 	}
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*GossipMessage) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
-		(*GossipMessage_MessageRequest)(nil),
-		(*GossipMessage_MessageReply)(nil),
-	}
-}
-
-type MessageRequest struct {
-	Text                 string   `protobuf:"bytes,1,opt,name=Text,proto3" json:"Text,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *MessageRequest) Reset()         { *m = MessageRequest{} }
-func (m *MessageRequest) String() string { return proto.CompactTextString(m) }
-func (*MessageRequest) ProtoMessage()    {}
-func (*MessageRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b864370d9939db87, []int{1}
-}
-
-func (m *MessageRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MessageRequest.Unmarshal(m, b)
-}
-func (m *MessageRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MessageRequest.Marshal(b, m, deterministic)
-}
-func (m *MessageRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MessageRequest.Merge(m, src)
-}
-func (m *MessageRequest) XXX_Size() int {
-	return xxx_messageInfo_MessageRequest.Size(m)
-}
-func (m *MessageRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_MessageRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MessageRequest proto.InternalMessageInfo
-
-func (m *MessageRequest) GetText() string {
-	if m != nil {
-		return m.Text
-	}
-	return ""
-}
-
-type MessageReply struct {
-	TextResponse         string   `protobuf:"bytes,1,opt,name=TextResponse,proto3" json:"TextResponse,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *MessageReply) Reset()         { *m = MessageReply{} }
-func (m *MessageReply) String() string { return proto.CompactTextString(m) }
-func (*MessageReply) ProtoMessage()    {}
-func (*MessageReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b864370d9939db87, []int{2}
-}
-
-func (m *MessageReply) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MessageReply.Unmarshal(m, b)
-}
-func (m *MessageReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MessageReply.Marshal(b, m, deterministic)
-}
-func (m *MessageReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MessageReply.Merge(m, src)
-}
-func (m *MessageReply) XXX_Size() int {
-	return xxx_messageInfo_MessageReply.Size(m)
-}
-func (m *MessageReply) XXX_DiscardUnknown() {
-	xxx_messageInfo_MessageReply.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_MessageReply proto.InternalMessageInfo
-
-func (m *MessageReply) GetTextResponse() string {
-	if m != nil {
-		return m.TextResponse
-	}
-	return ""
-}
-
-type VoidReply struct {
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *VoidReply) Reset()         { *m = VoidReply{} }
-func (m *VoidReply) String() string { return proto.CompactTextString(m) }
-func (*VoidReply) ProtoMessage()    {}
-func (*VoidReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b864370d9939db87, []int{3}
-}
-
-func (m *VoidReply) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_VoidReply.Unmarshal(m, b)
-}
-func (m *VoidReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_VoidReply.Marshal(b, m, deterministic)
-}
-func (m *VoidReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VoidReply.Merge(m, src)
-}
-func (m *VoidReply) XXX_Size() int {
-	return xxx_messageInfo_VoidReply.Size(m)
-}
-func (m *VoidReply) XXX_DiscardUnknown() {
-	xxx_messageInfo_VoidReply.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_VoidReply proto.InternalMessageInfo
-
-type UUID struct {
-	Value                string   `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *UUID) Reset()         { *m = UUID{} }
-func (m *UUID) String() string { return proto.CompactTextString(m) }
-func (*UUID) ProtoMessage()    {}
-func (*UUID) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b864370d9939db87, []int{4}
-}
-
-func (m *UUID) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_UUID.Unmarshal(m, b)
-}
-func (m *UUID) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_UUID.Marshal(b, m, deterministic)
-}
-func (m *UUID) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_UUID.Merge(m, src)
-}
-func (m *UUID) XXX_Size() int {
-	return xxx_messageInfo_UUID.Size(m)
-}
-func (m *UUID) XXX_DiscardUnknown() {
-	xxx_messageInfo_UUID.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_UUID proto.InternalMessageInfo
-
-func (m *UUID) GetValue() string {
-	if m != nil {
-		return m.Value
-	}
-	return ""
-}
-
 func init() {
-	proto.RegisterType((*GossipMessage)(nil), "bamboo.shared.gossip.GossipMessage")
-	proto.RegisterType((*MessageRequest)(nil), "bamboo.shared.gossip.MessageRequest")
-	proto.RegisterType((*MessageReply)(nil), "bamboo.shared.gossip.MessageReply")
-	proto.RegisterType((*VoidReply)(nil), "bamboo.shared.gossip.VoidReply")
-	proto.RegisterType((*UUID)(nil), "bamboo.shared.gossip.UUID")
+	proto.RegisterType((*GossipMessage)(nil), "flow.shared.gossip.GossipMessage")
+	proto.RegisterType((*GossipReply)(nil), "flow.shared.gossip.GossipReply")
 }
 
 func init() { proto.RegisterFile("shared/gossip.proto", fileDescriptor_b864370d9939db87) }
 
 var fileDescriptor_b864370d9939db87 = []byte{
-	// 371 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x52, 0xc1, 0x6e, 0xda, 0x40,
-	0x10, 0xb5, 0x8b, 0x4b, 0xeb, 0x81, 0xd2, 0x6a, 0xa1, 0x74, 0x8b, 0xaa, 0xd6, 0xda, 0x72, 0xf0,
-	0xc9, 0x95, 0xe8, 0x17, 0x14, 0x55, 0x0a, 0x91, 0x42, 0x44, 0x16, 0xc3, 0x21, 0x37, 0x83, 0x47,
-	0x60, 0xc9, 0x78, 0x1d, 0xaf, 0x8d, 0xe2, 0xaf, 0xcb, 0x7f, 0xe4, 0x6b, 0x22, 0xaf, 0x09, 0xc1,
-	0x91, 0xa5, 0x24, 0xb7, 0x37, 0x33, 0xef, 0xbd, 0x7d, 0xb3, 0x1a, 0xe8, 0xca, 0xad, 0x97, 0xa0,
-	0xff, 0x67, 0x23, 0xa4, 0x0c, 0x62, 0x27, 0x4e, 0x44, 0x2a, 0x48, 0x6f, 0xe5, 0xed, 0x56, 0x42,
-	0x38, 0xe5, 0xcc, 0x29, 0x67, 0xec, 0xfe, 0x1d, 0x7c, 0x3a, 0x53, 0x70, 0x8a, 0x52, 0x7a, 0x1b,
-	0x24, 0x97, 0xd0, 0xd9, 0x95, 0x90, 0xe3, 0x4d, 0x86, 0x32, 0xa5, 0xc4, 0xd2, 0xed, 0xd6, 0x68,
-	0xe8, 0xd4, 0x19, 0x38, 0xd3, 0x0a, 0x77, 0xa2, 0xf1, 0x67, 0x6a, 0x32, 0x81, 0xf6, 0xb1, 0x13,
-	0x87, 0x39, 0xed, 0x2a, 0x37, 0xf6, 0x82, 0x5b, 0x1c, 0xe6, 0x13, 0x8d, 0x57, 0x94, 0xa4, 0x0f,
-	0xcd, 0x29, 0xa6, 0x5b, 0xe1, 0xd3, 0x9e, 0xa5, 0xdb, 0x26, 0x3f, 0x54, 0xe4, 0x27, 0x00, 0xc7,
-	0x75, 0x10, 0x07, 0x18, 0xa5, 0x92, 0x7e, 0xb5, 0x1a, 0xb6, 0xc9, 0x4f, 0x3a, 0x85, 0x6e, 0x8e,
-	0x91, 0x8f, 0x09, 0xed, 0x97, 0xba, 0xb2, 0x22, 0x04, 0x8c, 0x99, 0x97, 0x6e, 0xe9, 0x37, 0xa5,
-	0x50, 0x98, 0x7c, 0x81, 0x86, 0xeb, 0x5e, 0x50, 0x6a, 0xe9, 0xb6, 0xc1, 0x0b, 0x48, 0x1c, 0x30,
-	0xb2, 0x2c, 0xf0, 0xe9, 0x77, 0x95, 0x7b, 0x50, 0x9f, 0x7b, 0xb1, 0x38, 0xff, 0xcf, 0x15, 0x6f,
-	0x6c, 0xc2, 0x87, 0x99, 0x97, 0x87, 0xc2, 0xf3, 0xd9, 0x10, 0x3a, 0xd5, 0xef, 0x29, 0x9e, 0x74,
-	0xf1, 0x36, 0xa5, 0xba, 0x0a, 0xa2, 0x30, 0x1b, 0x41, 0xfb, 0x74, 0x6d, 0xc2, 0xa0, 0x5d, 0xf4,
-	0x39, 0xca, 0x58, 0x44, 0x12, 0x0f, 0xdc, 0x4a, 0x8f, 0xb5, 0xc0, 0x5c, 0x8a, 0xc0, 0x57, 0x02,
-	0xf6, 0x03, 0x8c, 0xe2, 0x7d, 0xd2, 0x83, 0xf7, 0x7b, 0x2f, 0xcc, 0x1e, 0x15, 0x65, 0x31, 0xba,
-	0xd3, 0xe1, 0xf3, 0xd1, 0x7f, 0x1d, 0xe0, 0x1e, 0x13, 0xe2, 0x02, 0xfc, 0x93, 0x79, 0xb4, 0xbe,
-	0xca, 0x30, 0x43, 0xf2, 0xbb, 0x7e, 0xa7, 0xca, 0x59, 0x0c, 0x7e, 0xd5, 0x93, 0x9e, 0x52, 0x68,
-	0x64, 0x09, 0xe6, 0xfc, 0x6d, 0xa6, 0xaf, 0xb8, 0x02, 0xa6, 0x8d, 0x3f, 0x5e, 0x37, 0xcb, 0xf9,
-	0xaa, 0xa9, 0x4e, 0xf9, 0xef, 0x43, 0x00, 0x00, 0x00, 0xff, 0xff, 0xc7, 0x10, 0x70, 0xe7, 0xe1,
-	0x02, 0x00, 0x00,
+	// 273 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x51, 0xb1, 0x4e, 0xc3, 0x30,
+	0x10, 0xc5, 0x24, 0xa4, 0xe4, 0x28, 0x02, 0x1d, 0x12, 0xb2, 0x18, 0x20, 0x64, 0xca, 0x14, 0x04,
+	0x7c, 0x01, 0x5d, 0x58, 0xa8, 0xd4, 0xba, 0x9d, 0xd8, 0x42, 0x73, 0x34, 0x91, 0xa2, 0xd8, 0xb2,
+	0x1d, 0x50, 0xbe, 0x8b, 0x85, 0xcf, 0x43, 0xb1, 0x83, 0x44, 0x85, 0xd8, 0xd8, 0xde, 0xbb, 0x77,
+	0xcf, 0x7a, 0x7e, 0x07, 0x67, 0xa6, 0x2a, 0x34, 0x95, 0x37, 0x5b, 0x69, 0x4c, 0xad, 0x72, 0xa5,
+	0xa5, 0x95, 0x88, 0xaf, 0x8d, 0x7c, 0xcf, 0xbd, 0x92, 0x7b, 0x25, 0xfd, 0x60, 0x70, 0xfc, 0xe8,
+	0xe0, 0x9c, 0x8c, 0x29, 0xb6, 0x84, 0x1c, 0x26, 0x8b, 0xa2, 0x6f, 0x64, 0x51, 0x72, 0x96, 0xb0,
+	0x6c, 0x2a, 0xbe, 0x29, 0x9e, 0x43, 0x34, 0x27, 0x5b, 0xc9, 0x92, 0xef, 0x27, 0x2c, 0x8b, 0xc5,
+	0xc8, 0xf0, 0x12, 0x40, 0xd0, 0xa6, 0x56, 0x35, 0xb5, 0xd6, 0xf0, 0x20, 0x09, 0xb2, 0x58, 0xfc,
+	0x98, 0x0c, 0xbe, 0x15, 0xb5, 0x25, 0x69, 0x1e, 0x7a, 0x9f, 0x67, 0x88, 0x10, 0x2e, 0x0a, 0x5b,
+	0xf1, 0x03, 0xe7, 0x70, 0x18, 0x4f, 0x21, 0x58, 0xaf, 0x9f, 0x78, 0x94, 0xb0, 0x2c, 0x14, 0x03,
+	0x1c, 0xb6, 0xba, 0xae, 0x2e, 0xf9, 0xc4, 0x79, 0x1d, 0x4e, 0x6f, 0xe1, 0xc8, 0x87, 0x16, 0xa4,
+	0x9a, 0x1e, 0x53, 0x98, 0x6a, 0x32, 0x4a, 0xb6, 0x86, 0x66, 0xbd, 0xa5, 0x31, 0xf7, 0xce, 0xec,
+	0xee, 0x93, 0xc1, 0xc9, 0xf8, 0xc5, 0x21, 0x1a, 0xbd, 0x91, 0x46, 0x01, 0xf0, 0x60, 0xfa, 0x76,
+	0xb3, 0xec, 0xa8, 0x23, 0xbc, 0xce, 0x7f, 0xf7, 0x93, 0xef, 0x74, 0x73, 0x71, 0xf5, 0xf7, 0x8a,
+	0x4b, 0x92, 0xee, 0xe1, 0x12, 0xe2, 0xd5, 0xff, 0x3e, 0x39, 0x3b, 0x7c, 0x8e, 0xbc, 0xfc, 0x12,
+	0xb9, 0x43, 0xde, 0x7f, 0x05, 0x00, 0x00, 0xff, 0xff, 0x1a, 0x08, 0x87, 0x2b, 0xdf, 0x01, 0x00,
+	0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -351,8 +192,8 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type MessageRecieverClient interface {
-	AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*VoidReply, error)
-	SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error)
+	AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
+	SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
 }
 
 type messageRecieverClient struct {
@@ -363,18 +204,18 @@ func NewMessageRecieverClient(cc *grpc.ClientConn) MessageRecieverClient {
 	return &messageRecieverClient{cc}
 }
 
-func (c *messageRecieverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*VoidReply, error) {
-	out := new(VoidReply)
-	err := c.cc.Invoke(ctx, "/bamboo.shared.gossip.MessageReciever/AsyncQueue", in, out, opts...)
+func (c *messageRecieverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
+	out := new(GossipReply)
+	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReciever/AsyncQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *messageRecieverClient) SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*MessageReply, error) {
-	out := new(MessageReply)
-	err := c.cc.Invoke(ctx, "/bamboo.shared.gossip.MessageReciever/SyncQueue", in, out, opts...)
+func (c *messageRecieverClient) SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
+	out := new(GossipReply)
+	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReciever/SyncQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -383,18 +224,18 @@ func (c *messageRecieverClient) SyncQueue(ctx context.Context, in *GossipMessage
 
 // MessageRecieverServer is the server API for MessageReciever service.
 type MessageRecieverServer interface {
-	AsyncQueue(context.Context, *GossipMessage) (*VoidReply, error)
-	SyncQueue(context.Context, *GossipMessage) (*MessageReply, error)
+	AsyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
+	SyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
 }
 
 // UnimplementedMessageRecieverServer can be embedded to have forward compatible implementations.
 type UnimplementedMessageRecieverServer struct {
 }
 
-func (*UnimplementedMessageRecieverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*VoidReply, error) {
+func (*UnimplementedMessageRecieverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AsyncQueue not implemented")
 }
-func (*UnimplementedMessageRecieverServer) SyncQueue(ctx context.Context, req *GossipMessage) (*MessageReply, error) {
+func (*UnimplementedMessageRecieverServer) SyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncQueue not implemented")
 }
 
@@ -412,7 +253,7 @@ func _MessageReciever_AsyncQueue_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/bamboo.shared.gossip.MessageReciever/AsyncQueue",
+		FullMethod: "/flow.shared.gossip.MessageReciever/AsyncQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MessageRecieverServer).AsyncQueue(ctx, req.(*GossipMessage))
@@ -430,7 +271,7 @@ func _MessageReciever_SyncQueue_Handler(srv interface{}, ctx context.Context, de
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/bamboo.shared.gossip.MessageReciever/SyncQueue",
+		FullMethod: "/flow.shared.gossip.MessageReciever/SyncQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MessageRecieverServer).SyncQueue(ctx, req.(*GossipMessage))
@@ -439,7 +280,7 @@ func _MessageReciever_SyncQueue_Handler(srv interface{}, ctx context.Context, de
 }
 
 var _MessageReciever_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "bamboo.shared.gossip.MessageReciever",
+	ServiceName: "flow.shared.gossip.MessageReciever",
 	HandlerType: (*MessageRecieverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

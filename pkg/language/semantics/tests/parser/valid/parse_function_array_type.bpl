@@ -1,0 +1,1 @@
+let test: ((Int8): Int16)[2] = []

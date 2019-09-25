@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 mkdir -p $DIR/relic/build
 cd $DIR/relic/build
 
-# set RELIC config for Bamboo
+# set RELIC config for Flow
 
 # 
 GENERAL="-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF"

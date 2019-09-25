@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 // Error
@@ -116,6 +116,8 @@ func (e *InvalidIntegerLiteralError) Error() string {
 
 func (e *InvalidIntegerLiteralError) SecondaryError() string {
 	switch e.InvalidIntegerLiteralKind {
+	case InvalidIntegerLiteralKindUnknown:
+		return ""
 	case InvalidIntegerLiteralKindLeadingUnderscore:
 		return "remove the leading underscore"
 	case InvalidIntegerLiteralKindTrailingUnderscore:
@@ -125,24 +127,4 @@ func (e *InvalidIntegerLiteralError) SecondaryError() string {
 	}
 
 	panic(&errors.UnreachableError{})
-}
-
-// MissingIdentifierError
-
-type MissingIdentifierError struct {
-	Pos ast.Position
-}
-
-func (*MissingIdentifierError) isParseError() {}
-
-func (e *MissingIdentifierError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *MissingIdentifierError) EndPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *MissingIdentifierError) Error() string {
-	return "missing name"
 }

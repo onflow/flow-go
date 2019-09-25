@@ -8,15 +8,14 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	runtimeErrors "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	runtimeErrors "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type ImportLocation interface {
@@ -56,13 +55,13 @@ func (e Error) Error() string {
 	var sb strings.Builder
 	sb.WriteString("Execution failed:\n")
 	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
+		sb.WriteString(runtimeErrors.UnrollChildErrors(err))
 		sb.WriteString("\n")
 	}
 	return sb.String()
 }
 
-// Runtime is a runtime capable of executing the Bamboo programming language.
+// Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
@@ -70,10 +69,10 @@ type Runtime interface {
 	ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error)
 }
 
-// mockRuntime is a mocked version of the Bamboo runtime
+// mockRuntime is a mocked version of the Flow runtime
 type mockRuntime struct{}
 
-// NewMockRuntime returns a mocked version of the Bamboo runtime.
+// NewMockRuntime returns a mocked version of the Flow runtime.
 func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
@@ -82,33 +81,18 @@ func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (
 	return nil, nil
 }
 
-// interpreterRuntime is a interpreter-based version of the Bamboo runtime.
+// interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct {
 }
 
-// NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime.
+// NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-var accountType = sema.StructureType{
-	Identifier: "Account",
-	Members: map[string]*sema.Member{
-		"address": {
-			Type: &sema.StringType{},
-		},
-		"storage": {
-			Type: &sema.DictionaryType{
-				KeyType:   &sema.AnyType{},
-				ValueType: &sema.AnyType{},
-			},
-		},
-	},
-}
-
 // TODO: improve types
 var setValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// owner
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -124,14 +108,16 @@ var setValueFunctionType = sema.FunctionType{
 		// value
 		// TODO: add proper type
 		&sema.IntType{},
-	},
+	),
 	// nothing
-	ReturnType: &sema.VoidType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
 // TODO: improve types
 var getValueFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// owner
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -144,15 +130,17 @@ var getValueFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
-	},
+	),
 	// value
 	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.IntType{},
+	),
 }
 
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// key
 		&sema.OptionalType{
 			Type: &sema.VariableSizedType{
@@ -161,19 +149,21 @@ var createAccountFunctionType = sema.FunctionType{
 		},
 		// code
 		&sema.OptionalType{
-			&sema.VariableSizedType{
+			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
 		},
-	},
+	),
 	// value
 	// TODO: add proper type
-	ReturnType: &sema.IntType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.IntType{},
+	),
 }
 
 // TODO: improve types
 var updateAccountCodeFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// accountID
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -182,33 +172,40 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
-	},
+	),
 	// nothing
-	ReturnType: &sema.VoidType{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
+var accountType = stdlib.AccountType.Type
+
 var getAccountFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		// TODO:
 		// address
 		&sema.StringType{},
-	},
-	ReturnType: &accountType,
+	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		accountType,
+	),
 }
 
 var logFunctionType = sema.FunctionType{
-	ParameterTypes: []sema.Type{&sema.AnyType{}},
-	ReturnType:     &sema.VoidType{},
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		&sema.AnyType{},
+	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
 }
 
-var typeDeclarations = map[string]sema.TypeDeclaration{
-	accountType.Identifier: stdlib.StandardLibraryType{
-		Type: &accountType,
-		Kind: common.DeclarationKindStructure,
-	},
-}
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
-	return parser.ParseProgram(string(script))
+func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
+	program, _, err = parser.ParseProgram(string(script))
+	return
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
@@ -279,7 +276,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		),
 	)
 
-	valueDeclarations := stdlib.ToValueDeclarations(functions)
+	valueDeclarations := functions.ToValueDeclarations()
 
 	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	if err != nil {
@@ -307,7 +304,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	// check parameter count
 
 	signingAccountsCount := len(signingAccountAddresses)
-	mainFunctionParameterCount := len(mainFunctionType.ParameterTypes)
+	mainFunctionParameterCount := len(mainFunctionType.ParameterTypeAnnotations)
 	if signingAccountsCount != mainFunctionParameterCount {
 		err := fmt.Errorf(
 			"parameter count mismatch for `main` function: expected %d, got %d",
@@ -319,18 +316,20 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	// check parameter types
 
-	for _, parameterType := range mainFunctionType.ParameterTypes {
-		if !parameterType.Equal(&accountType) {
+	for _, parameterTypeAnnotation := range mainFunctionType.ParameterTypeAnnotations {
+		parameterType := parameterTypeAnnotation.Type
+
+		if !parameterType.Equal(accountType) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				&accountType,
+				accountType,
 				parameterType,
 			)
 			return nil, Error{[]error{err}}
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, stdlib.ToValues(functions))
+	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -397,10 +396,10 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 		}
 	}
 
-	account := interpreter.StructureValue{
-		Identifier: accountType.Identifier,
+	account := interpreter.CompositeValue{
+		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
-			"address": interpreter.StringValue(address.String()),
+			"address": interpreter.NewStringValue(address.String()),
 			"storage": storedValue,
 		},
 	}
@@ -417,7 +416,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 		if !ok {
 			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
 		}
-		value := intValue.Bytes()
+		value := intValue.Int.Bytes()
 
 		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
 			panic(err)
@@ -502,7 +501,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
 		}
 
-		address := types.HexToAddress(string(stringValue))
+		address := types.HexToAddress(stringValue.StrValue())
 
 		account, _, err := loadAccount(runtimeInterface, address)
 		if err != nil {
@@ -564,7 +563,7 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 			return nil, errors.New("array value is not an Int")
 		}
 		// check 0 <= value < 256
-		if intValue.Cmp(big.NewInt(-1)) != 1 || intValue.Cmp(big.NewInt(256)) != -1 {
+		if intValue.Int.Cmp(big.NewInt(-1)) != 1 || intValue.Int.Cmp(big.NewInt(256)) != -1 {
 			return nil, errors.New("array value is not in byte range (0-255)")
 		}
 

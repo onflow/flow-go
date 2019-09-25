@@ -8,7 +8,7 @@
 
 First, build the language server. This will build the language server and place
 it in `$GOPATH/bin/language-server`.
-- `cd bamboo-node/pkg/language/tools/language-server`
+- `cd flow-go/pkg/language/tools/language-server`
 - `GO111MODULE=on go install`
 
 - `npm install`

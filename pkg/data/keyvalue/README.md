@@ -1,7 +1,7 @@
 
 
 # keyvalue
-`import "github.com/dapperlabs/bamboo-node/pkg/data/keyvalue"`
+`import "github.com/dapperlabs/flow-go/pkg/data/keyvalue"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -47,14 +47,14 @@ Some examples:
 
 
 #### <a name="pkg-files">Package files</a>
-[interface.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/interface.go) [pg_connection.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/pg_connection.go) [pg_query.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/pg_query.go) [pg_query_builder.go](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/pg_query_builder.go)
+[interface.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/interface.go) [pg_connection.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/pg_connection.go) [pg_query.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/pg_query.go) [pg_query_builder.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/pg_query_builder.go)
 
 
 
 
 
 
-## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/interface.go?s=753:1546#L30)
+## <a name="DBConnector">type</a> [DBConnector](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/interface.go?s=753:1546#L30)
 ``` go
 type DBConnector interface {
     // NewQueryBuilder returns an instance of a new QueryBuilder. Intended to be used when building a custom multi statement query
@@ -79,7 +79,7 @@ DBConnector abstracts a database connection.
 
 
 
-### <a name="NewpostgresDB">func</a> [NewpostgresDB](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/pg_connection.go?s=270:337#L18)
+### <a name="NewpostgresDB">func</a> [NewpostgresDB](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/pg_connection.go?s=270:337#L18)
 ``` go
 func NewpostgresDB(addr, user, password, dbname string) DBConnector
 ```
@@ -89,7 +89,7 @@ NewpostgresDB returns a DBConnector interface backed by a postgres DB
 
 
 
-## <a name="Query">type</a> [Query](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/interface.go?s=2082:2210#L60)
+## <a name="Query">type</a> [Query](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/interface.go?s=2082:2210#L60)
 ``` go
 type Query interface {
     // Execute runs the query and returns its result
@@ -107,7 +107,7 @@ Query provides a way to execute a query
 
 
 
-## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/bamboo-node/tree/master/pkg/data/keyvalue/interface.go?s=1590:2037#L46)
+## <a name="QueryBuilder">type</a> [QueryBuilder](https://github.com/dapperlabs/flow-go/tree/master/pkg/data/keyvalue/interface.go?s=1590:2037#L46)
 ``` go
 type QueryBuilder interface {
     // InTransaction sets a query to run in a multi statement transaction

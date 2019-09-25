@@ -5,8 +5,8 @@ package verify
 import (
 	"github.com/google/wire"
 
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/config"
-	"github.com/dapperlabs/bamboo-node/internal/roles/verify/processor"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/config"
+	"github.com/dapperlabs/flow-go/internal/roles/verify/processor"
 )
 
 // InitializeServer resolves all dependencies for dependency injection and returns the server object

@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
-	"github.com/dapperlabs/bamboo-node/pkg/language/tools/language-server/protocol"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/tools/language-server/protocol"
 )
 
 func protocolToSemaPosition(pos protocol.Position) sema.Position {
@@ -43,7 +43,8 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	}
 }
 
-var standardLibraryFunctions = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+var valueDeclarations = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...).ToValueDeclarations()
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
@@ -105,7 +106,7 @@ func convertError(err error) *protocol.Diagnostic {
 
 func (s server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
 	start := time.Now()
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 	elapsed := time.Since(start)
 
 	connection.LogMessage(&protocol.LogMessageParams{
@@ -157,8 +158,7 @@ func (s server) DidChangeTextDocument(
 
 		// check program
 
-		valueDeclarations := stdlib.ToValueDeclarations(standardLibraryFunctions)
-		checker, err := sema.NewChecker(program, valueDeclarations, nil)
+		checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 		if err != nil {
 			panic(err)
 		}
@@ -205,15 +205,15 @@ func (s server) Hover(
 		return nil, nil
 	}
 
-	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if origin == nil {
+	if occurrence == nil {
 		return nil, nil
 	}
 
 	contents := protocol.MarkupContent{
 		Kind:  protocol.Markdown,
-		Value: fmt.Sprintf("* Type: `%s`", origin.Variable.Type.String()),
+		Value: fmt.Sprintf("* Type: `%s`", occurrence.Origin.Type.String()),
 	}
 	return &protocol.Hover{Contents: contents}, nil
 }
@@ -229,20 +229,20 @@ func (s server) Definition(
 		return nil, nil
 	}
 
-	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if origin == nil {
+	if occurrence == nil {
 		return nil, nil
 	}
 
-	variable := origin.Variable
-	if variable == nil {
+	origin := occurrence.Origin
+	if origin == nil || origin.StartPos == nil || origin.EndPos == nil {
 		return nil, nil
 	}
 
 	return &protocol.Location{
 		URI:   uri,
-		Range: astToProtocolRange(*variable.Pos, *variable.Pos),
+		Range: astToProtocolRange(*origin.StartPos, *origin.EndPos),
 	}, nil
 }
 
@@ -284,7 +284,7 @@ func (s server) resolveImport(
 		return nil, nil
 	}
 
-	program, _, err := parser.ParseProgramFromFile(filename)
+	program, _, _, err := parser.ParseProgramFromFile(filename)
 	// TODO: publish diagnostic file does not exist?
 	if err != nil {
 		return nil, nil

@@ -17,15 +17,19 @@ func _() {
 	_ = x[DeclarationKindParameter-6]
 	_ = x[DeclarationKindArgumentLabel-7]
 	_ = x[DeclarationKindStructure-8]
-	_ = x[DeclarationKindField-9]
-	_ = x[DeclarationKindInitializer-10]
-	_ = x[DeclarationKindInterface-11]
-	_ = x[DeclarationKindImport-12]
+	_ = x[DeclarationKindResource-9]
+	_ = x[DeclarationKindContract-10]
+	_ = x[DeclarationKindField-11]
+	_ = x[DeclarationKindInitializer-12]
+	_ = x[DeclarationKindStructureInterface-13]
+	_ = x[DeclarationKindResourceInterface-14]
+	_ = x[DeclarationKindContractInterface-15]
+	_ = x[DeclarationKindImport-16]
 }
 
-const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindFieldDeclarationKindInitializerDeclarationKindInterfaceDeclarationKindImport"
+const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindResourceDeclarationKindContractDeclarationKindFieldDeclarationKindInitializerDeclarationKindStructureInterfaceDeclarationKindResourceInterfaceDeclarationKindContractInterfaceDeclarationKindImport"
 
-var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 226, 252, 276, 297}
+var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 229, 252, 272, 298, 331, 363, 395, 416}
 
 func (i DeclarationKind) String() string {
 	if i < 0 || i >= DeclarationKind(len(_DeclarationKind_index)-1) {

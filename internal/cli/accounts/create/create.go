@@ -6,15 +6,15 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/dapperlabs/bamboo-node/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/client"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/bamboo-node/internal/cli/project"
-	"github.com/dapperlabs/bamboo-node/internal/cli/utils"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
-	"github.com/dapperlabs/bamboo-node/sdk/accounts"
+	"github.com/dapperlabs/flow-go/internal/cli/project"
+	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/accounts"
 )
 
 type Config struct {

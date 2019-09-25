@@ -1,6 +1,6 @@
 package main
 
-import "github.com/dapperlabs/bamboo-node/internal/roles/verify"
+import "github.com/dapperlabs/flow-go/internal/roles/verify"
 
 func main() {
 	server, err := verify.InitializeServer()

@@ -2,16 +2,17 @@ package tests
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 )
 
 func parseAndCheck(code string) (*sema.Checker, error) {
@@ -24,7 +25,7 @@ func parseAndCheckWithExtra(
 	types map[string]sema.TypeDeclaration,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -63,6 +64,214 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 		To(Equal(&sema.IntType{}))
 }
 
+func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Int8 = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.Int8Type{}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Int8? = 1
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.OptionalType{Type: &sema.Int8Type{}}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        var x: Int8 = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.Int8Type{}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        var x: Int8? = 1
+        fun test() {
+            x = 2
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralRanges(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, ty := range []sema.Type{
+		&sema.Int8Type{},
+		&sema.Int16Type{},
+		&sema.Int32Type{},
+		&sema.Int64Type{},
+		&sema.UInt8Type{},
+		&sema.UInt16Type{},
+		&sema.UInt32Type{},
+		&sema.UInt64Type{},
+	} {
+		t.Run(ty.String(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			code := fmt.Sprintf(`
+                let min: %s = %s
+                let max: %s = %s 
+	        `,
+				ty.String(),
+				ty.(sema.Ranged).Min(),
+				ty.String(),
+				ty.(sema.Ranged).Max(),
+			)
+
+			_, err := parseAndCheck(code)
+
+			Expect(err).
+				To(Not(HaveOccurred()))
+		})
+	}
+}
+
+func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, ty := range []sema.Type{
+		&sema.Int8Type{},
+		&sema.Int16Type{},
+		&sema.Int32Type{},
+		&sema.Int64Type{},
+		&sema.UInt8Type{},
+		&sema.UInt16Type{},
+		&sema.UInt32Type{},
+		&sema.UInt64Type{},
+	} {
+		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+                let minMinusOne: %s = %s
+	        `,
+				ty.String(),
+				big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1)),
+			))
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+		})
+
+		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+                let maxPlusOne: %s = %s
+	        `,
+				ty.String(),
+				big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1)),
+			))
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+		})
+	}
+}
+
+// Test fix for crasher, see https://github.com/dapperlabs/flow-go/pull/675
+// Integer literal value fits range can't be checked when target is Never
+//
+func TestCheckInvalidIntegerLiteralWithNeverReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Never {
+            return 1
+        }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(_ x: Int8) {}
+        let x = test(1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(_ x: Int8?) {}
+        let x = test(1)
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Int8 {
+            return 1
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+        fun test(): Int8? {
+            return 1
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func TestCheckBoolean(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -76,6 +285,48 @@ func TestCheckBoolean(t *testing.T) {
 	Expect(checker.GlobalValues["x"].Type).
 		To(Equal(&sema.BoolType{}))
 }
+
+func TestCheckCharacter(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "x"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+func TestCheckCharacterUnicodeScalar(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+        let x: Character = "\u{1F1FA}\u{1F1F8}"
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(checker.GlobalValues["x"].Type).
+		To(Equal(&sema.CharacterType{}))
+}
+
+// TODO: prevent invalid character literals
+// func TestCheckInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//         let x: Character = "abc"
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
 
 func TestCheckString(t *testing.T) {
 	RegisterTestingT(t)
@@ -91,8 +342,135 @@ func TestCheckString(t *testing.T) {
 		To(Equal(&sema.StringType{}))
 }
 
+func TestCheckStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): String {
+	 	  let a = "abc"
+		  let b = "def"
+		  let c = a.concat(b)
+		  return c
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abc"
+		  let b = [1, 2]
+		  let c = a.concat(b)
+		  return c
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckStringConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abc"
+		  let b = "def"
+		  let c = a.concat
+		  return c(b)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStringSlice(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): String {
+	 	  let a = "abcdef"
+		  return a.slice(from: 0, upTo: 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringSlice(t *testing.T) {
+	t.Run("MissingBothArgumentLabels", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(0, 1)
+		`)
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	})
+
+	t.Run("MissingOneArgumentLabel", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(from: 0, 1)
+		`)
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	})
+
+	t.Run("InvalidArgumentType", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := parseAndCheck(`
+		  let a = "abcdef"
+		  let x = a.slice(from: "a", upTo: "b")
+		`)
+
+		errs := expectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	})
+}
+
+func TestCheckStringSliceBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): String {
+		  let a = "abcdef"
+		  let c = a.slice
+		  return c(from: 0, upTo: 1)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
 func expectCheckerErrors(err error, len int) []error {
-	if len <= 0 {
+	if len <= 0 && err == nil {
 		return nil
 	}
 
@@ -329,13 +707,10 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
       }
 	`)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
 func TestCheckInvalidArrayElements(t *testing.T) {
@@ -470,6 +845,82 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
+
+func TestCheckStringIndexing(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          let y: Character = z[0]
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[true]
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+}
+
+func TestCheckStringIndexingAssignment(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+		  let z = "abc"
+		  let y: Character = "d"
+          z[0] = y
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let z = "abc"
+          z[0] = "d"
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO: prevent assignment with invalid character literal
+// func TestCheckStringIndexingAssignmentWithInvalidCharacterLiteral(t *testing.T) {
+// 	RegisterTestingT(t)
+
+// 	_, err := parseAndCheck(`
+//       fun test() {
+//           let z = "abc"
+//           z[0] = "def"
+//       }
+// 	`)
+
+// 	errs := expectCheckerErrors(err, 1)
+
+// 	Expect(errs[0]).
+// 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+// }
 
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
 	RegisterTestingT(t)
@@ -723,7 +1174,9 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       fun test(x: Int?): Int {
           if var y = x {
               return y
-          }
+		  }
+		  
+		  return 0
       }
 	`)
 
@@ -757,7 +1210,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      fun test(x: Int??): Int? {
          if var y = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -772,7 +1227,9 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      fun test(x: Int??): Int? {
          if var y: Int? = x {
              return y
-         }
+		 }
+		 
+		 return nil
      }
 	`)
 
@@ -787,7 +1244,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
      fun test(x: Int) {
          if var y = x {
              // ...
-         }
+		 }
+		 
+		 return
      }
 	`)
 
@@ -804,7 +1263,9 @@ func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
       fun test(x: Int?): Int? {
           if var y: Int? = x {
              return y
-          }
+		  }
+		  
+		  return nil
       }
 	`)
 
@@ -1199,8 +1660,6 @@ type operationTests struct {
 }
 
 func TestCheckIntegerBinaryOperations(t *testing.T) {
-	RegisterTestingT(t)
-
 	allOperationTests := []operationTests{
 		{
 			operations: []ast.Operation{
@@ -1272,7 +1731,7 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
 					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
 				}},
-				{&sema.StringType{}, `test`, `test`, nil},
+				{&sema.BoolType{}, `"test"`, `"test"`, nil},
 			},
 		},
 	}
@@ -1280,21 +1739,81 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	for _, operationTests := range allOperationTests {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
-				_, err := parseAndCheck(
-					fmt.Sprintf(
-						`fun test(): %s { return %s %s %s }`,
-						test.ty, test.left, operation.Symbol(), test.right,
-					),
-				)
+				t.Run("", func(t *testing.T) {
+					RegisterTestingT(t)
 
-				errs := expectCheckerErrors(err, len(test.matchers))
+					_, err := parseAndCheck(
+						fmt.Sprintf(
+							`fun test(): %s { return %s %s %s }`,
+							test.ty, test.left, operation.Symbol(), test.right,
+						),
+					)
 
-				for i, matcher := range test.matchers {
-					Expect(errs[i]).
-						To(matcher)
-				}
+					errs := expectCheckerErrors(err, len(test.matchers))
+
+					for i, matcher := range test.matchers {
+						Expect(errs[i]).
+							To(matcher)
+					}
+				})
 			}
 		}
+	}
+}
+
+func TestCheckConcatenatingExpression(t *testing.T) {
+	tests := []operationTest{
+		{&sema.StringType{}, `"abc"`, `"def"`, nil},
+		{&sema.StringType{}, `""`, `"def"`, nil},
+		{&sema.StringType{}, `"abc"`, `""`, nil},
+		{&sema.StringType{}, `""`, `""`, nil},
+		{&sema.StringType{}, "1", `"def"`, []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+		{&sema.StringType{}, `"abc"`, "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		}},
+		{&sema.StringType{}, "1", "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[3, 4]", nil},
+		// TODO: support empty arrays
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[]", nil},
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[3, 4]", nil},
+		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[]", nil},
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "1", "[3, 4]", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		}},
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "2", []types.GomegaMatcher{
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(
+				fmt.Sprintf(
+					`fun test(): %s { return %s %s %s }`,
+					test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
+				),
+			)
+
+			errs := expectCheckerErrors(err, len(test.matchers))
+
+			for i, matcher := range test.matchers {
+				Expect(errs[i]).To(matcher)
+			}
+		})
 	}
 }
 
@@ -1471,602 +1990,1056 @@ func TestCheckInvalidFunctionAccess(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.InvalidAccessModifierError{}))
 }
 
-func TestCheckInvalidStructureRedeclaringType(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Int {}
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Int {}
+        `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructure(t *testing.T) {
+func TestCheckComposite(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            pub(set) var foo: Int
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              pub(set) var foo: Int
 
-            init(foo: Int) {
-                self.foo = foo
-            }
+              init(foo: Int) {
+                  self.foo = foo
+              }
 
-            pub fun getFoo(): Int {
-                return self.foo
-            }
-        }
-	`)
+              pub fun getFoo(): Int {
+                  return self.foo
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInitializerName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            init() {}
-        }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {}
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInitializerName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            initializer() {}
-        }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              initializer() {}
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidInitializerNameError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidInitializerNameError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFieldName(t *testing.T) {
+func TestCheckInvalidCompositeFieldName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            let init: Int
-        }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let init: Int
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 3)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		errs := expectCheckerErrors(err, expectedErrorCount)
 
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFunctionName(t *testing.T) {
+func TestCheckInvalidCompositeFunctionName(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct Test {
-            fun init() {}
-        }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun init() {}
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidNameError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFields(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
-           let x: Int
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
+              let x: Int
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 4)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		errs := expectCheckerErrors(err, expectedErrorCount)
 
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[3]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFunctions(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           fun x() {}
-           fun x() {}
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun x() {}
+              fun x() {}
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureRedeclaringFieldsAndFunctions(t *testing.T) {
+func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
-           fun x() {}
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
+              fun x() {}
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 2)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		errs := expectCheckerErrors(err, expectedErrorCount)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureFieldsAndFunctions(t *testing.T) {
+func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: Int
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: Int
 
-           init() {
-               self.x = 1
+              init() {
+                  self.x = 1
+              }
+
+              fun y() {}
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeFieldType(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let x: X
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init(x: X) {}
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init(x: Int, x: Int) {}
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() { X }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun test() { X }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckCompositeInitializerSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() { self }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckCompositeFunctionSelfReference(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun test() { self }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidLocalComposite(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          fun test() {
+              %s Test {}
+          }
+        `, kind.Keyword()))
+
+		errs := expectCheckerErrors(err, 1)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+	}
+}
+
+func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+           %s Test {
+               let foo: Int
            }
+        `, kind.Keyword()))
 
-           fun y() {}
-       }
-	`)
+		// TODO: add support for non-structure declarations
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFieldType(t *testing.T) {
+func TestCheckCompositeFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           let x: X
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let foo: Int
 
-	errs := expectCheckerErrors(err, 3)
+              init() {
+                  self.foo = 1
+              }
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+              fun test() {
+                  self.foo
+              }
+          }
+        `, kind.Keyword()))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureInitializerParameterType(t *testing.T) {
+func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init(x: X) {}
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {
+                  self.foo
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              fun test() {
+                  self.bar
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 3
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.UnassignedFieldAccessError{}))
+
+		Expect(errs[2]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[2].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("bar"))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[3]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureInitializerParameters(t *testing.T) {
+func TestCheckCompositeFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init(x: Int, x: Int) {}
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-	errs := expectCheckerErrors(err, 1)
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+              var foo: Int
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+              init() {
+                  self.foo = 1
+                  let alsoSelf %[2]s self
+                  alsoSelf.foo = 2
+              }
+
+              fun test() {
+                  self.foo = 3
+                  let alsoSelf %[2]s self
+                  alsoSelf.foo = 4
+              }
+          }
+	    `,
+			kind.Keyword(),
+			transferOperator,
+		))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureInitializer(t *testing.T) {
+func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           init() { X }
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-	errs := expectCheckerErrors(err, 1)
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+              init() {
+                  self %[2]s Test()
+              }
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+              fun test() {
+                  self %[2]s Test()
+              }
+          }
+	    `,
+			kind.Keyword(),
+			transferOperator,
+		))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFunction(t *testing.T) {
+func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-       struct Test {
-           fun test() { X }
-       }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              init() {
+                  self.foo = 1
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              fun test() {
+                  self.bar = 2
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
+			To(Equal("bar"))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureInitializerSelfReference(t *testing.T) {
+func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() { self }
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              var foo: Int
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              init() {
+                  self.foo = true
+              }
+
+              fun test() {
+                  self.foo = false
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureFunctionSelfReference(t *testing.T) {
+func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          fun test() { self }
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              let foo: Int
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              init() {
+                  // initialization is fine
+                  self.foo = 1
+              }
+
+              fun test() {
+                  // assignment is invalid
+                  self.foo = 2
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidLocalStructure(t *testing.T) {
+func TestCheckCompositeFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-	  fun test() {
-          struct Test {}
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-	errs := expectCheckerErrors(err, 1)
+              fun bar() {
+                  self.foo()
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureMissingInitializer(t *testing.T) {
+func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-	errs := expectCheckerErrors(err, 2)
+              fun bar() {
+                  self.baz()
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingInitializerError{}))
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.FieldUninitializedError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureFieldAccess(t *testing.T) {
+func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+              fun foo() {}
 
-          init() {
-              self.foo = 1
+              fun bar() {
+                  self.foo = 2
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
+		Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
+			To(Equal("foo"))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckCompositeInstantiation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+
+              init(x: Int) {
+                  let test: %[2]sTest %[3]s Test(x: 1)
+              }
+
+              fun test() {
+                  let test: %[2]sTest %[3]s Test(x: 2)
+              }
           }
 
-          fun test() {
-              self.foo
-          }
-      }
-	`)
+          let test: %[2]sTest %[3]s Test(x: 3)
+    	`,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFieldAccess(t *testing.T) {
+func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self.foo
-          }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          let x = 1
+          %[1]s Foo {}
+          %[1]s Foo {}
+	    `, kind.Keyword()))
 
-          fun test() {
-              self.bar
-          }
-      }
-	`)
+		// TODO: add support for non-structure declarations
 
-	errs := expectCheckerErrors(err, 2)
+		expectedErrorCount := 2
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 2
+		}
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("foo"))
+		errs := expectCheckerErrors(err, expectedErrorCount)
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("bar"))
+		// NOTE: two errors: one because type is redeclared,
+		// the other because the global is redeclared
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[3]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureFieldAssignment(t *testing.T) {
+func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
-          var foo: Int
+	for _, firstKind := range common.CompositeKinds {
+		for _, secondKind := range common.CompositeKinds {
 
-          init() {
-              self.foo = 1
-              let alsoSelf = self
-              alsoSelf.foo = 2
-          }
+			// only check different kinds
+			if firstKind == secondKind {
+				continue
+			}
 
-          fun test() {
-              self.foo = 3
-              let alsoSelf = self
-              alsoSelf.foo = 4
-          }
-      }
-	`)
+			_, err := parseAndCheck(fmt.Sprintf(`
+              let x = 1
+              %s Foo {}
+              %s Foo {}
+	        `, firstKind.Keyword(), secondKind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
+			// TODO: add support for non-structure declarations
 
-func TestCheckInvalidStructureSelfAssignment(t *testing.T) {
-	RegisterTestingT(t)
+			expectedErrorCount := 2
+			if firstKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+			if secondKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self = Test()
-          }
+			errs := expectCheckerErrors(err, expectedErrorCount)
 
-          fun test() {
-              self = Test()
-          }
-      }
-	`)
+			// NOTE: two errors: one because type is redeclared,
+			// the other because the global is redeclared
 
-	errs := expectCheckerErrors(err, 2)
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantError{}))
-}
+			if firstKind != common.CompositeKindStructure &&
+				secondKind != common.CompositeKindStructure {
 
-func TestCheckInvalidStructureFieldAssignment(t *testing.T) {
-	RegisterTestingT(t)
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-	_, err := parseAndCheck(`
-      struct Test {
-          init() {
-              self.foo = 1
-          }
+				Expect(errs[3]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-          fun test() {
-              self.bar = 2
-          }
-      }
-	`)
+			} else if firstKind != common.CompositeKindStructure ||
+				secondKind != common.CompositeKindStructure {
 
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[0].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("foo"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-	Expect(errs[1].(*sema.NotDeclaredMemberError).Name).
-		To(Equal("bar"))
-}
-
-func TestCheckInvalidStructureFieldAssignmentWrongType(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          var foo: Int
-
-          init() {
-              self.foo = true
-          }
-
-          fun test() {
-              self.foo = false
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-}
-
-func TestCheckInvalidStructureFieldConstantAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-
-          init() {
-              // initialization is fine
-              self.foo = 1
-          }
-
-          fun test() {
-              // assignment is invalid
-              self.foo = 2
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-}
-
-func TestCheckStructureFunctionCall(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.foo()
-          }
-      }
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureFunctionCall(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.baz()
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
-}
-
-func TestCheckInvalidStructureFunctionAssignment(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          fun foo() {}
-
-          fun bar() {
-              self.foo = 2
-          }
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.AssignmentToConstantMemberError{}))
-	Expect(errs[0].(*sema.AssignmentToConstantMemberError).Name).
-		To(Equal("foo"))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-}
-
-func TestCheckStructureInstantiation(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          init(x: Int) {
-              let test: Test = Test(x: 1)
-          }
-
-          fun test() {
-              let test: Test = Test(x: 2)
-          }
-      }
-
-      let test: Test = Test(x: 3)
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      let x = 1
-      struct Foo {}
-      struct Foo {}
-	`)
-
-	errs := expectCheckerErrors(err, 2)
-
-	// NOTE: two errors: one because type is redeclared,
-	// the other because the global is redeclared
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
+		}
+	}
 }
 
 func TestCheckInvalidForwardReference(t *testing.T) {
@@ -2083,231 +3056,422 @@ func TestCheckInvalidForwardReference(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
 }
 
-func TestCheckInvalidIncompatibleStructureTypes(t *testing.T) {
-	// tests that structure typing is nominal, not structural
+func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
+	// tests that composite typing is nominal, not structural,
+	// and composite kind is considered
 
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Foo {
-          init() {}
-      }
+	for _, firstKind := range common.CompositeKinds {
+		for _, secondKind := range common.CompositeKinds {
 
-      struct Bar {
-          init() {}
-      }
+			annotation := getCompositeKindAnnotation(firstKind)
+			transferOperator := getCompositeKindTransferOperator(firstKind)
 
-      let foo: Foo = Bar()
-	`)
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s Foo {
+                  init() {}
+              }
 
-	errs := expectCheckerErrors(err, 1)
+              %[2]s Bar {
+                  init() {}
+              }
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+              let foo: %[3]sFoo %[4]s Bar()
+    	    `,
+				firstKind.Keyword(),
+				secondKind.Keyword(),
+				annotation,
+				transferOperator,
+			))
+
+			// TODO: add support for non-structure declarations
+
+			expectedErrorCount := 1
+			if firstKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+
+			if secondKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+
+			errs := expectCheckerErrors(err, expectedErrorCount)
+
+			if firstKind != common.CompositeKindStructure &&
+				secondKind != common.CompositeKindStructure {
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			} else if firstKind != common.CompositeKindStructure ||
+				secondKind != common.CompositeKindStructure {
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
+
+			Expect(errs[expectedErrorCount-1]).
+				To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+		}
+	}
 }
 
-func TestCheckInvalidStructureFunctionWithSelfParameter(t *testing.T) {
+func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Foo {
-          fun test(self: Int) {}
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-}
-
-func TestCheckInvalidStructureInitializerWithSelfParameter(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Foo {
-          init(self: Int) {}
-      }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
-}
-
-func TestCheckStructureInitializesConstant(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-          let foo: Int
-
-          init() {
-              self.foo = 42
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Foo {
+              fun test(self: Int) {}
           }
-      }
+	    `, kind.Keyword()))
 
-	  let test = Test()
-	`)
+		// TODO: add support for non-structure declarations
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckStructureInitializerWithArgumentLabel(t *testing.T) {
+func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Foo {
+              init(self: Int) {}
+          }
+	    `, kind.Keyword()))
 
-          init(x: Int) {}
-      }
+		// TODO: add support for non-structure declarations
 
-	  let test = Test(x: 1)
-	`)
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureInitializerCallWithMissingArgumentLabel(t *testing.T) {
+func TestCheckCompositeInitializesConstant(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct Test {
+	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-          init(x: Int) {}
-      }
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+              let foo: Int
 
-	  let test = Test(1)
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
-}
-
-func TestCheckStructureFunctionWithArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-      struct Test {
-
-          fun test(x: Int) {}
-      }
-
-	  let test = Test().test(x: 1)
-	`)
-
-	Expect(err).
-		To(Not(HaveOccurred()))
-}
-
-func TestCheckInvalidStructureFunctionCallWithMissingArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-     struct Test {
-
-         fun test(x: Int) {}
-     }
-
-	  let test = Test().test(1)
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
-}
-
-func TestCheckStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
-	RegisterTestingT(t)
-
-	checker, err := parseAndCheck(`
-
-      struct Test {
-
-          init() {
-              Test
+              init() {
+                  self.foo = 42
+              }
           }
 
-          fun test(): Test {
+	      let test %[2]s Test()
+	    `, kind.Keyword(), transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+
+              init(x: Int) {}
+          }
+
+	      let test %[2]s Test(x: 1)
+	    `, kind.Keyword(), transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s Test {
+
+              init(x: Int) {}
+          }
+
+	      let test %[2]s Test(1)
+
+	    `, kind.Keyword(), transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		}
+	}
+}
+
+func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              fun test(x: Int) {}
+          }
+
+	      let test = Test().test(x: 1)
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              fun test(x: Int) {}
+          }
+
+	      let test = Test().test(1)
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+		}
+	}
+}
+
+func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
+		checker, err := parseAndCheck(fmt.Sprintf(`
+          %s Test {
+
+              init() {
+                  Test
+              }
+
+              fun test(): %[2]sTest {
+                  return Test()
+              }
+          }
+
+          fun test(): %[2]sTest {
               return Test()
           }
-      }
 
-      fun test(): Test {
-         return Test()
-      }
+          fun test2(): %[2]sTest {
+              return Test().test()
+          }
+        `, kind.Keyword(), annotation))
 
-      fun test2(): Test {
-         return Test().test()
-      }
-	`)
+		// TODO: add support for non-structure declarations
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
 
-	testType := checker.FindType("Test")
+			testType := checker.FindType("Test")
 
-	Expect(testType).
-		To(BeAssignableToTypeOf(&sema.StructureType{}))
+			Expect(testType).
+				To(BeAssignableToTypeOf(&sema.CompositeType{}))
 
-	structureType := testType.(*sema.StructureType)
+			structureType := testType.(*sema.CompositeType)
 
-	Expect(structureType.Identifier).
-		To(Equal("Test"))
+			Expect(structureType.Identifier).
+				To(Equal("Test"))
 
-	testFunctionMember := structureType.Members["test"]
+			testFunctionMember := structureType.Members["test"]
 
-	Expect(testFunctionMember.Type).
-		To(BeAssignableToTypeOf(&sema.FunctionType{}))
+			Expect(testFunctionMember.Type).
+				To(BeAssignableToTypeOf(&sema.FunctionType{}))
 
-	testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
+			testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
 
-	Expect(testFunctionType.ReturnType).
-		To(BeIdenticalTo(structureType))
+			Expect(testFunctionType.ReturnTypeAnnotation.Type).
+				To(BeIdenticalTo(structureType))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
-func TestCheckInvalidStructureFieldMissingVariableKind(t *testing.T) {
-	RegisterTestingT(t)
-
-	_, err := parseAndCheck(`
-        struct X {
-            x: Int
-
-            init(x: Int) {
-                self.x = x
-            }
-        }
-	`)
-
-	errs := expectCheckerErrors(err, 1)
-
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+func getCompositeKindAnnotation(kind common.CompositeKind) string {
+	if kind != common.CompositeKindResource {
+		return ""
+	}
+	return "<-"
 }
 
-func TestCheckStructureFunction(t *testing.T) {
+func getCompositeKindTransferOperator(kind common.CompositeKind) string {
+	if kind != common.CompositeKindResource {
+		return "="
+	}
+	return "<-"
+}
+
+func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-        struct X {
-            fun foo(): ((): X) {
-                return self.bar
-            }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s X {
+              x: Int
 
-            fun bar(): X {
-                return self
-            }
-        }
-	`)
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidVariableKindError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckCompositeFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+            %[1]s X {
+                fun foo(): ((): %[2]sX) {
+                    return self.bar
+                }
+
+                fun bar(): %[2]sX {
+                    return self
+                }
+            }
+	    `, kind.Keyword(), annotation))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckFunctionConditions(t *testing.T) {
@@ -2625,7 +3789,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
               (fun (): Int { return 2 })() == 2
           }
@@ -2642,7 +3806,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: "nope"
           }
@@ -2657,7 +3821,7 @@ func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *test
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int {
+      fun test() {
           post {
              1 == 2: true
           }
@@ -2739,25 +3903,38 @@ func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
-func TestCheckReferenceBeforeDeclaration(t *testing.T) {
+func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      var tests = 0
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
 
-      fun test(): Test {
-          return Test()
-      }
+		_, err := parseAndCheck(fmt.Sprintf(`
+          var tests = 0
 
-      struct Test {
-         init() {
-             tests = tests + 1
-         }
-      }
-    `)
+          fun test(): %sTest {
+              return Test()
+          }
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          %s Test {
+             init() {
+                 tests = tests + 1
+             }
+          }
+        `, annotation, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckNever(t *testing.T) {
@@ -2769,11 +3946,9 @@ func TestCheckNever(t *testing.T) {
                 return panic("XXX")
             }
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3142,11 +4317,9 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
-				stdlib.PanicFunction,
-			},
-		),
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}.ToValueDeclarations(),
 		nil,
 		nil,
 	)
@@ -3201,697 +4374,1168 @@ func TestCheckInvalidNonOptionalReturn(t *testing.T) {
 func TestCheckInvalidLocalInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-	  fun test() {
-          interface Test {}
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          fun test() {
+              %s interface Test {}
+          }
+        `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		errs := expectCheckerErrors(err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidDeclarationError{}))
+	}
 }
 
 func TestCheckInterfaceWithFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test()
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test()
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(x: Int) {
-              pre {
-                x == 0
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(x: Int) {
+                  pre {
+                    x == 0
+                  }
               }
           }
-      }
-	`)
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int {
-             return 1
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test(): Int {
+                 return 1
+              }
           }
-      }
-	`)
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test() {
-            // ...
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              fun test() {
+                // ...
+              }
           }
-      }
-	`)
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceWithInitializer(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init()
-      }
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init()
+          }
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init() {
-            // ...
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init() {
+                // ...
+              }
           }
-      }
-	`)
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidImplementationError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int) {
-              pre {
-                x == 0
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {
+              init(x: Int) {
+                  pre {
+                    x == 0
+                  }
               }
           }
-      }
-	`)
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s interface Test {}
 
-      let test = Test()
-	`)
+          let test = Test()
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheckWithExtra(
-		`
-          interface Test {}
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-          let test: Test = panic("")
-        `,
-		stdlib.ToValueDeclarations(
-			[]stdlib.StandardLibraryFunction{
+		_, err := parseAndCheckWithExtra(
+			fmt.Sprintf(`
+              %[1]s interface Test {}
+
+              let test: %[2]sTest %[3]s panic("")
+            `,
+				kind.Keyword(),
+				annotation,
+				transferOperator,
+			),
+			stdlib.StandardLibraryFunctions{
 				stdlib.PanicFunction,
-			},
-		),
-		nil,
-		nil,
-	)
+			}.ToValueDeclarations(),
+			nil,
+			nil,
+		)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      struct TestImpl: Test {}
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {}
 
-      let test: Test = TestImpl()
-	`)
+          %[1]s TestImpl: Test {}
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          let test: %[2]sTest %[3]s TestImpl()
+	    `,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, firstKind := range common.CompositeKinds {
+		for _, secondKind := range common.CompositeKinds {
+
+			// only test incompatible combinations
+			if firstKind == secondKind {
+				continue
+			}
+
+			annotation := getCompositeKindAnnotation(firstKind)
+			transferOperator := getCompositeKindTransferOperator(firstKind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s interface Test {}
+
+              %[2]s TestImpl: Test {}
+
+              let test: %[3]sTest %[4]s TestImpl()
+	        `,
+				firstKind.Keyword(),
+				secondKind.Keyword(),
+				annotation,
+				transferOperator,
+			))
+
+			// TODO: add support for non-structure declarations
+
+			expectedErrorCount := 1
+			if firstKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+			if secondKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+			_ = expectCheckerErrors(err, expectedErrorCount)
+			//
+			//	Expect(errs[0]).
+			//		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			//
+			//	Expect(errs[1]).
+			//		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      // NOTE: not declaring conformance
-      struct TestImpl {}
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {}
 
-      let test: Test = TestImpl()
-	`)
+          // NOTE: not declaring conformance
+          %[1]s TestImpl {}
 
-	errs := expectCheckerErrors(err, 1)
+          let test: %[2]sTest %[3]s TestImpl()
+	    `,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+		}
+	}
 }
 
-func TestCheckInvalidInterfaceConformanceNonInterface(t *testing.T) {
+func TestCheckInvalidCompositeInterfaceConformanceNonInterface(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct TestImpl: Int {}
-	`)
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s TestImpl: Int {}
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.InvalidConformanceError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Int
-      }
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      struct TestImpl: Test {
-          var x: Int
-
-          init(x: Int) {
-              self.x = x
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              x: Int
           }
-      }
 
-      let test: Test = TestImpl(x: 1)
+          %[1]s TestImpl: Test {
+              var x: Int
 
-      let x = test.x
-	`)
+              init(x: Int) {
+                  self.x = x
+              }
+          }
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          let test: %[2]sTest %[3]s TestImpl(x: 1)
+
+          let x = test.x
+
+        `, kind.Keyword(), annotation, transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {}
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      struct TestImpl: Test {
-          var x: Int
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {}
 
-          init(x: Int) {
-              self.x = x
+          %[1]s TestImpl: Test {
+              var x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
           }
-      }
 
-      let test: Test = TestImpl(x: 1)
+          let test: %[2]sTest %[3]s TestImpl(x: 1)
 
-      let x = test.x
-	`)
+          let x = test.x
+    	`,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      struct TestImpl: Test {
-          fun test(): Int {
-              return 2
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              fun test(): Int
           }
-      }
 
-      let test: Test = TestImpl()
+          %[1]s TestImpl: Test {
+              fun test(): Int {
+                  return 2
+              }
+          }
 
-      let val = test.test()
-	`)
+          let test: %[2]sTest %[3]s TestImpl()
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+          let val = test.test()
+	    `, kind.Keyword(), annotation, transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-      }
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
-      struct TestImpl: Test {
-          fun test(): Int {
-              return 2
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {}
+
+          %[1]s TestImpl: Test {
+              fun test(): Int {
+                  return 2
+              }
           }
-      }
 
-      let test: Test = TestImpl()
+          let test: %[2]sTest %[3]s TestImpl()
 
-      let val = test.test()
-	`)
+          let val = test.test()
+	    `, kind.Keyword(), annotation, transferOperator))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int)
-      }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              init(x: Int)
+          }
 
-      struct TestImpl: Test {
-          init(x: Bool) {}
-      }
-	`)
+          %[1]s TestImpl: Test {
+              init(x: Bool) {}
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          init(x: Int)
-      }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              init(x: Int)
+          }
 
-      struct TestImpl: Test {
-      }
-	`)
+          %[1]s TestImpl: Test {
+          }
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              fun test(): Int
+          }
 
-      struct TestImpl: Test {}
-	`)
+          %[1]s TestImpl: Test {}
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun test(): Int
-      }
-
-      struct TestImpl: Test {
-          fun test(): Bool {
-              return true
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              fun test(): Int
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              fun test(): Bool {
+                  return true
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-           x: Int
-      }
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+               x: Int
+          }
 
-      struct TestImpl: Test {}
-	`)
+          %[1]s TestImpl: Test {}
 
-	errs := expectCheckerErrors(err, 1)
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Int
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              x: Int
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              var x: Bool
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          x: Bool
-      }
-
-      struct TestImpl: Test {
-          fun x(): Bool {
-              return true
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              fun x(): Bool {
+                  return true
+              }
+          }
+	    `, kind.Keyword()))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          fun x(): Bool
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              fun x(): Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              var x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          let x: Bool
-      }
-
-      struct TestImpl: Test {
-          var x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              let x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              var x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface Test {
-          var x: Bool
-      }
-
-      struct TestImpl: Test {
-          let x: Bool
-
-          init(x: Bool) {
-             self.x = x
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface Test {
+              var x: Bool
           }
-      }
-	`)
 
-	errs := expectCheckerErrors(err, 1)
+          %[1]s TestImpl: Test {
+              let x: Bool
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+              init(x: Bool) {
+                 self.x = x
+              }
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+		} else {
+
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.ConformanceError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      interface X {}
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface X {}
 
-      interface Y {}
+          %[1]s interface Y {}
 
-      struct TestImpl: X, Y, X {}
-	`)
+          %[1]s TestImpl: X, Y, X {}
+	    `, kind.Keyword()))
 
-	errs := expectCheckerErrors(err, 1)
+		// TODO: add support for non-structure declarations
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 3
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+
+		if kind != common.CompositeKindStructure {
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.DuplicateConformanceError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[2]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[3]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceTypeAsValue(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`
-      interface X {}
+	for _, kind := range common.CompositeKinds {
+		checker, err := parseAndCheck(fmt.Sprintf(`
+          %s interface X {}
 
-      let x = X
-	`)
+          let x = X
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+
+			Expect(checker.GlobalValues["x"].Type).
+				To(BeAssignableToTypeOf(&sema.InterfaceMetaType{}))
+		} else {
+			errs := expectCheckerErrors(err, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
 }
 
 func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, firstKind := range common.CompositeKinds {
+		for _, secondKind := range common.CompositeKinds {
+			annotation := getCompositeKindAnnotation(firstKind)
 
-      interface I {
-          s: S
-      }
-	`)
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s S {}
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              %s interface I {
+                  s: %sS
+              }
+	        `, firstKind.Keyword(), secondKind.Keyword(), annotation))
+
+			expectedErrorCount := 0
+			if firstKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+			if secondKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+
+			if expectedErrorCount == 0 {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := expectCheckerErrors(err, expectedErrorCount)
+
+				for i := 0; i < expectedErrorCount; i += 1 {
+					Expect(errs[i]).
+						To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				}
+			}
+		}
+	}
 }
 
 func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parseAndCheck(`
-      struct S {}
+	for _, firstKind := range common.CompositeKinds {
+		for _, secondKind := range common.CompositeKinds {
+			annotation := getCompositeKindAnnotation(firstKind)
 
-      interface I {
-          fun s(): S
-      }
-	`)
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s S {}
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+              %s interface I {
+                  fun s(): %sS
+              }
+	        `, firstKind.Keyword(), secondKind.Keyword(), annotation))
+
+			expectedErrorCount := 0
+			if firstKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+			if secondKind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
+
+			if expectedErrorCount == 0 {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := expectCheckerErrors(err, expectedErrorCount)
+
+				for i := 0; i < expectedErrorCount; i += 1 {
+					Expect(errs[i]).
+						To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				}
+			}
+		}
+	}
 }
 
-// TODO: field declaration, member access, type references
-//
-func TestCheckOrigins(t *testing.T) {
+func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
 	checker, err := parseAndCheck(`
         let x = 1
-        var y = 1
-
-        fun f1(paramX: Int, paramY: Bool) {
-            let x = 1
-            var y: Int? = y
-            fun f2() {
-                if let y = y {
-                }
-            }
-        }
-
-        struct S1 {
-            fun test() {}
-        }
-
-        interface I1 {}
-
-        fun f3(): S1 {
-            f1(paramX: 1, paramY: true)
-            return S1()
-        }
+        var y = x
     `)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	origins := checker.Origins.All()
+	occurrences := checker.Occurrences.All()
 
-	matchers := []*originMatcher{
+	matchers := []*occurrenceMatcher{
 		{
-			sema.Position{Line: 2, Column: 12},
-			sema.Position{Line: 2, Column: 12},
-			common.DeclarationKindConstant,
+			startPos:        sema.Position{Line: 2, Column: 12},
+			endPos:          sema.Position{Line: 2, Column: 12},
+			originStartPos:  &sema.Position{Line: 2, Column: 12},
+			originEndPos:    &sema.Position{Line: 2, Column: 12},
+			declarationKind: common.DeclarationKindConstant,
 		},
 		{
-			sema.Position{Line: 3, Column: 12},
-			sema.Position{Line: 3, Column: 12},
-			common.DeclarationKindVariable,
+			startPos:        sema.Position{Line: 3, Column: 12},
+			endPos:          sema.Position{Line: 3, Column: 12},
+			originStartPos:  &sema.Position{Line: 3, Column: 12},
+			originEndPos:    &sema.Position{Line: 3, Column: 12},
+			declarationKind: common.DeclarationKindVariable,
 		},
 		{
-			sema.Position{Line: 5, Column: 12},
-			sema.Position{Line: 5, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 5, Column: 15},
-			sema.Position{Line: 5, Column: 20},
-			common.DeclarationKindParameter,
-		},
-		{
-			sema.Position{Line: 5, Column: 28},
-			sema.Position{Line: 5, Column: 33},
-			common.DeclarationKindParameter,
-		},
-		{
-			sema.Position{Line: 6, Column: 16},
-			sema.Position{Line: 6, Column: 16},
-			common.DeclarationKindConstant,
-		},
-		{
-			sema.Position{Line: 7, Column: 16},
-			sema.Position{Line: 7, Column: 16},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 7, Column: 26},
-			sema.Position{Line: 7, Column: 26},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 8, Column: 16},
-			sema.Position{Line: 8, Column: 17},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 9, Column: 23},
-			sema.Position{Line: 9, Column: 23},
-			common.DeclarationKindConstant,
-		},
-		{
-			sema.Position{Line: 9, Column: 27},
-			sema.Position{Line: 9, Column: 27},
-			common.DeclarationKindVariable,
-		},
-		{
-			sema.Position{Line: 14, Column: 15},
-			sema.Position{Line: 14, Column: 16},
-			common.DeclarationKindStructure,
-		},
-		{
-			sema.Position{Line: 15, Column: 16},
-			sema.Position{Line: 15, Column: 19},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 18, Column: 18},
-			sema.Position{Line: 18, Column: 19},
-			common.DeclarationKindInterface,
-		},
-		{
-			sema.Position{Line: 20, Column: 12},
-			sema.Position{Line: 20, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 21, Column: 12},
-			sema.Position{Line: 21, Column: 13},
-			common.DeclarationKindFunction,
-		},
-		{
-			sema.Position{Line: 22, Column: 19},
-			sema.Position{Line: 22, Column: 20},
-			// NOTE: function instead of structure: constructor
-			common.DeclarationKindFunction,
+			startPos:        sema.Position{Line: 3, Column: 16},
+			endPos:          sema.Position{Line: 3, Column: 16},
+			originStartPos:  &sema.Position{Line: 2, Column: 12},
+			originEndPos:    &sema.Position{Line: 2, Column: 12},
+			declarationKind: common.DeclarationKindConstant,
 		},
 	}
 
@@ -3900,12 +5544,262 @@ func TestCheckOrigins(t *testing.T) {
 		ms[i] = matchers[i]
 	}
 
-	Expect(origins).
+	Expect(occurrences).
 		To(ConsistOf(ms...))
 
 	for _, matcher := range matchers {
-		Expect(checker.Origins.Find(matcher.startPos)).To(Not(BeNil()))
-		Expect(checker.Origins.Find(matcher.endPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+func TestCheckOccurrencesFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+		fun f1(paramX: Int, paramY: Bool) {
+		   let x = 1
+		   var y: Int? = x
+		   fun f2() {
+		       if let y = y {
+		       }
+		   }
+           f1(paramX: 1, paramY: true)
+		}
+
+        fun f3() {
+            f1(paramX: 2, paramY: false)
+        }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	occurrences := checker.Occurrences.All()
+
+	matchers := []*occurrenceMatcher{
+		{
+			startPos:        sema.Position{Line: 2, Column: 6},
+			endPos:          sema.Position{Line: 2, Column: 7},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 2, Column: 9},
+			endPos:          sema.Position{Line: 2, Column: 14},
+			originStartPos:  &sema.Position{Line: 2, Column: 9},
+			originEndPos:    &sema.Position{Line: 2, Column: 9},
+			declarationKind: common.DeclarationKindParameter,
+		},
+		{
+			startPos:        sema.Position{Line: 2, Column: 22},
+			endPos:          sema.Position{Line: 2, Column: 27},
+			originStartPos:  &sema.Position{Line: 2, Column: 22},
+			originEndPos:    &sema.Position{Line: 2, Column: 22},
+			declarationKind: common.DeclarationKindParameter,
+		},
+		{
+			startPos:        sema.Position{Line: 3, Column: 9},
+			endPos:          sema.Position{Line: 3, Column: 9},
+			originStartPos:  &sema.Position{Line: 3, Column: 9},
+			originEndPos:    &sema.Position{Line: 3, Column: 9},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 9},
+			endPos:          sema.Position{Line: 4, Column: 9},
+			originStartPos:  &sema.Position{Line: 4, Column: 9},
+			originEndPos:    &sema.Position{Line: 4, Column: 9},
+			declarationKind: common.DeclarationKindVariable,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 19},
+			endPos:          sema.Position{Line: 4, Column: 19},
+			originStartPos:  &sema.Position{Line: 3, Column: 9},
+			originEndPos:    &sema.Position{Line: 3, Column: 9},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 5, Column: 9},
+			endPos:          sema.Position{Line: 5, Column: 10},
+			originStartPos:  &sema.Position{Line: 5, Column: 9},
+			originEndPos:    &sema.Position{Line: 5, Column: 9},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 6, Column: 16},
+			endPos:          sema.Position{Line: 6, Column: 16},
+			originStartPos:  &sema.Position{Line: 6, Column: 16},
+			originEndPos:    &sema.Position{Line: 6, Column: 16},
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 6, Column: 20},
+			endPos:          sema.Position{Line: 6, Column: 20},
+			originStartPos:  &sema.Position{Line: 4, Column: 9},
+			originEndPos:    &sema.Position{Line: 4, Column: 9},
+			declarationKind: common.DeclarationKindVariable,
+		},
+		{
+			startPos:        sema.Position{Line: 9, Column: 11},
+			endPos:          sema.Position{Line: 9, Column: 12},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 12, Column: 12},
+			endPos:          sema.Position{Line: 12, Column: 13},
+			originStartPos:  &sema.Position{Line: 12, Column: 12},
+			originEndPos:    &sema.Position{Line: 12, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 13, Column: 12},
+			endPos:          sema.Position{Line: 13, Column: 13},
+			originStartPos:  &sema.Position{Line: 2, Column: 6},
+			originEndPos:    &sema.Position{Line: 2, Column: 6},
+			declarationKind: common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(occurrences).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
+	}
+}
+
+// TODO: implement occurrences for type references
+//  (e.g. conformances, conditional casting expression)
+
+func TestCheckOccurrencesStructAndInterface(t *testing.T) {
+	RegisterTestingT(t)
+
+	checker, err := parseAndCheck(`
+		struct interface I1 {}
+
+	    struct S1: I1 {
+	       let x: Int
+	       init() {
+	          self.x = 1
+	          self.test()
+	       }
+	       fun test() {}
+	    }
+
+	    fun f(): S1 {
+	       return S1()
+	    }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	occurrences := checker.Occurrences.All()
+
+	matchers := []*occurrenceMatcher{
+		{
+			startPos:        sema.Position{Line: 2, Column: 19},
+			endPos:          sema.Position{Line: 2, Column: 20},
+			originStartPos:  &sema.Position{Line: 2, Column: 19},
+			originEndPos:    &sema.Position{Line: 2, Column: 19},
+			declarationKind: common.DeclarationKindStructureInterface,
+		},
+		{
+			startPos:        sema.Position{Line: 4, Column: 12},
+			endPos:          sema.Position{Line: 4, Column: 13},
+			originStartPos:  &sema.Position{Line: 4, Column: 12},
+			originEndPos:    &sema.Position{Line: 4, Column: 12},
+			declarationKind: common.DeclarationKindStructure,
+		},
+		{
+			startPos:        sema.Position{Line: 5, Column: 8},
+			endPos:          sema.Position{Line: 5, Column: 17},
+			originStartPos:  &sema.Position{Line: 5, Column: 12},
+			originEndPos:    &sema.Position{Line: 5, Column: 12},
+			declarationKind: common.DeclarationKindField,
+		},
+		// self
+		{
+			startPos:        sema.Position{Line: 7, Column: 11},
+			endPos:          sema.Position{Line: 7, Column: 14},
+			originStartPos:  nil,
+			originEndPos:    nil,
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 7, Column: 16},
+			endPos:          sema.Position{Line: 7, Column: 16},
+			originStartPos:  &sema.Position{Line: 5, Column: 12},
+			originEndPos:    &sema.Position{Line: 5, Column: 12},
+			declarationKind: common.DeclarationKindField,
+		},
+		// self
+		{
+			startPos:        sema.Position{Line: 8, Column: 11},
+			endPos:          sema.Position{Line: 8, Column: 14},
+			originStartPos:  nil,
+			originEndPos:    nil,
+			declarationKind: common.DeclarationKindConstant,
+		},
+		{
+			startPos:        sema.Position{Line: 8, Column: 16},
+			endPos:          sema.Position{Line: 8, Column: 19},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 15},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 10, Column: 12},
+			endPos:          sema.Position{Line: 10, Column: 15},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		// TODO: why the duplicate?
+		{
+			startPos:        sema.Position{Line: 10, Column: 12},
+			endPos:          sema.Position{Line: 10, Column: 15},
+			originStartPos:  &sema.Position{Line: 10, Column: 12},
+			originEndPos:    &sema.Position{Line: 10, Column: 15},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 13, Column: 9},
+			endPos:          sema.Position{Line: 13, Column: 9},
+			originStartPos:  &sema.Position{Line: 13, Column: 9},
+			originEndPos:    &sema.Position{Line: 13, Column: 9},
+			declarationKind: common.DeclarationKindFunction,
+		},
+		{
+			startPos:        sema.Position{Line: 14, Column: 15},
+			endPos:          sema.Position{Line: 14, Column: 16},
+			originStartPos:  &sema.Position{Line: 4, Column: 12},
+			originEndPos:    &sema.Position{Line: 4, Column: 12},
+			declarationKind: common.DeclarationKindFunction,
+		},
+	}
+
+	ms := make([]interface{}, len(matchers))
+	for i := range matchers {
+		ms[i] = matchers[i]
+	}
+
+	Expect(occurrences).
+		To(ConsistOf(ms...))
+
+	for _, matcher := range matchers {
+		Expect(checker.Occurrences.Find(matcher.startPos)).To(Not(BeNil()))
+		Expect(checker.Occurrences.Find(matcher.endPos)).To(Not(BeNil()))
 	}
 }
 
@@ -3975,7 +5869,7 @@ func TestCheckImportAll(t *testing.T) {
 func TestCheckInvalidImportUnexported(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`	
+	checker, err := parseAndCheck(`
        let x = 1
 	`)
 
@@ -4038,7 +5932,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 	// NOTE: only parse, don't check imported program.
 	// will be checked by checker checking importing program
 
-	imported, err := parser.ParseProgram(`	
+	imported, _, err := parser.ParseProgram(`
        let x: Bool = 1
 	`)
 
@@ -4065,28 +5959,49 @@ func TestCheckInvalidImportedError(t *testing.T) {
 func TestCheckImportTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	checker, err := parseAndCheck(`
-	   struct Test {}
-	`)
+	for _, kind := range common.CompositeKinds {
+		checker, err := parseAndCheck(fmt.Sprintf(`
+	       %s Test {}
+	    `, kind.Keyword()))
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		// TODO: add support for non-structure declarations
 
-	_, err = parseAndCheckWithExtra(
-		`
-           import "imported"
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 1)
 
-           let x: Test = Test()
-        `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
-		},
-	)
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+		_, err = parseAndCheckWithExtra(
+			`
+               import "imported"
+
+               let x: Test = Test()
+            `,
+			nil,
+			nil,
+			func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
+		)
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 3)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
+		}
+
+	}
 }
 
 func TestCheckDictionary(t *testing.T) {
@@ -4104,7 +6019,7 @@ func TestCheckDictionaryType(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: Int[String] = {"a": 1, "b": 2}
+      let z: {String: Int} = {"a": 1, "b": 2}
 	`)
 
 	Expect(err).
@@ -4115,7 +6030,7 @@ func TestCheckInvalidDictionaryTypeKey(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: Int[Int] = {"a": 1, "b": 2}
+      let z: {Int: Int} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -4128,7 +6043,7 @@ func TestCheckInvalidDictionaryTypeValue(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: String[String] = {"a": 1, "b": 2}
+      let z: {String: String} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -4141,7 +6056,7 @@ func TestCheckInvalidDictionaryTypeSwapped(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let z: String[Int] = {"a": 1, "b": 2}
+      let z: {Int: String} = {"a": 1, "b": 2}
 	`)
 
 	errs := expectCheckerErrors(err, 1)
@@ -4247,6 +6162,36 @@ func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 }
 
+func TestCheckDictionaryRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          x.remove(key: "abc")
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidDictionaryRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          x.remove(key: true)
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
 func TestCheckFailableDowncastingAny(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -4292,11 +6237,12 @@ func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
 }
 
 // TODO: add support for interfaces
+// TODO: add test this is *INVALID* for resources
 func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      interface I {}
+      struct interface I {}
 
       struct S: I {}
 
@@ -4325,23 +6271,18 @@ func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
 }
 
-// TODO: requires array subtyping
-
 // TODO: add support for "wrapped" Any: optional, array, dictionary
 func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      let x: Any[] = [1]
-      let y: Int[]? = x as? Int[]
+      let x: [Any] = [1]
+      let y: [Int]? = x as? [Int]
     `)
 
-	errs := expectCheckerErrors(err, 2)
+	errs := expectCheckerErrors(err, 1)
 
 	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
-
-	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
 }
 
@@ -4399,7 +6340,7 @@ func TestCheckArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append(4)
           return x
@@ -4414,7 +6355,7 @@ func TestCheckInvalidArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append("4")
           return x
@@ -4431,7 +6372,7 @@ func TestCheckArrayAppendBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := parseAndCheck(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           let y = x.append
           y(4)
@@ -4442,3 +6383,1619 @@ func TestCheckArrayAppendBound(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 }
+
+func TestCheckArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+	  fun test(): [Int] {
+	 	  let a = [1, 2]
+		  let b = [3, 4]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayConcat(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+		  let a = [1, 2]
+		  let b = ["a", "b"]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayConcatBound(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+		  let a = [1, 2]
+		  let b = [3, 4]
+		  let c = a.concat
+		  return c(b)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.insert(at: 1, 4)
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayInsert(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.insert(at: 1, "4")
+          return x
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.remove(at: 1)
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayRemove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.remove(at: "1")
+          return x
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.removeFirst()
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.removeFirst(1)
+          return x
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+}
+
+func TestCheckArrayRemoveLast(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): [Int] {
+          let x = [1, 2, 3]
+          x.removeLast()
+          return x
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let x = [1, 2, 3]
+          return x.contains(2)
+      }
+    `)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidArrayContains(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let x = [1, 2, 3]
+          return x.contains("abc")
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckInvalidArrayContainsNotEquatable(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Bool {
+          let z = [[1], [2], [3]]
+          return z.contains([1, 2])
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotEquatableTypeError{}))
+}
+
+func TestCheckEmptyArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: [Int] = []
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyArrayCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun foo(xs: [Int]) {
+          foo(xs: [])
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: {String: Int} = {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckEmptyDictionaryCall(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun foo(xs: {String: Int}) {
+          foo(xs: {})
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckArraySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface I {}
+          %[1]s S: I {}
+
+          let xs: %[2]s[S] %[3]s []
+          let ys: %[2]s[I] %[3]s xs
+	    `, kind.Keyword(), annotation, transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidArraySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: [Bool] = []
+      let ys: [Int] = xs
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckDictionarySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
+
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %[1]s interface I {}
+          %[1]s S: I {}
+
+          let xs: %[2]s{String: S} %[3]s {}
+          let ys: %[2]s{String: I} %[3]s xs
+	    `, kind.Keyword(), annotation, transferOperator))
+
+		// TODO: add support for non-structure declarations
+
+		if kind == common.CompositeKindStructure {
+			Expect(err).
+				To(Not(HaveOccurred()))
+		} else {
+			errs := expectCheckerErrors(err, 2)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckInvalidDictionarySubtyping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      let xs: {String: Bool} = {}
+      let ys: {String: Int} = xs
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+}
+
+func TestCheckUnaryMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun foo(x: <-X): <-X {
+          return x
+      }
+
+      var x <- foo(x: <-X())
+
+      fun bar() {
+          x <- X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+}
+
+func TestCheckImmediateDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- X()
+          destroy x
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDestructionError{}))
+}
+
+func TestCheckUnaryCreateAndDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          var x <- create X()
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckUnaryCreateAndDestroyWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {
+          let x: Int
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test() {
+          var x <- create X(x: 1)
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidUnaryCreateAndDestroyWithWrongInitializerArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {
+          let x: Int
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test() {
+          var x <- create X(y: true)
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+}
+
+func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct X {}
+
+      fun test() {
+          create X()
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidConstructionError{}))
+}
+
+func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		_, err := parseAndCheck(fmt.Sprintf(`
+          %s X {
+              init() {}
+              init(y: Int) {}
+          }
+	    `, kind.Keyword()))
+
+		// TODO: add support for non-structure declarations
+
+		expectedErrorCount := 1
+		if kind != common.CompositeKindStructure {
+			expectedErrorCount += 1
+		}
+
+		errs := expectCheckerErrors(err, expectedErrorCount)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedOverloadingError{}))
+
+		if kind != common.CompositeKindStructure {
+			Expect(errs[1]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		}
+	}
+}
+
+func TestCheckAssertWithoutMessage(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+            fun test() {
+                assert(1 == 2)
+            }
+        `,
+		stdlib.StandardLibraryFunctions{
+			stdlib.AssertFunction,
+		}.ToValueDeclarations(),
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckAssertWithMessage(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheckWithExtra(
+		`
+            fun test() {
+                assert(1 == 2, message: "test message")
+            }
+        `,
+		stdlib.StandardLibraryFunctions{
+			stdlib.AssertFunction,
+		}.ToValueDeclarations(),
+		nil,
+		nil,
+	)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+// TODO: add support for nested composite declarations
+
+func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+}
+
+func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      contract interface TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := expectCheckerErrors(err, 2)
+
+	// TODO: add support for contracts
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	// TODO: add support for nested composite declarations
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckMissingReturnStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      fun test(): Int {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+}
+
+func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      	struct interface Test {
+			fun test(x: Int): Int {
+				pre {
+					x != 0
+				}
+			}
+		}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+		struct Test {
+			pub(set) var foo: Int
+
+			init(foo: Int) {
+				self.foo = foo
+			}
+
+			pub fun getFoo(): Int {
+				if 2 > 1 {
+					return 0
+				}
+			}
+		}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+}
+
+func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              fun test(r: <-T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              fun test(r: T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              fun test(): <-T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              fun test(): T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test: <-T %[2]s T()
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test: T %[2]s T()
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              %[1]s U {
+                  let t: <-T
+                  init(t: <-T) {
+                      self.t %[2]s t
+                  }
+              }
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 4)
+
+				// NOTE: one invalid move annotation error for field, one for parameter
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				Expect(errs[3]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 2)
+
+				// NOTE: one invalid move annotation error for field, one for parameter
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              %[1]s U {
+                  let t: T
+                  init(t: T) {
+                      self.t %[2]s t
+                  }
+              }
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				// NOTE: one missing move annotation error for field, one for parameter
+
+				errs := expectCheckerErrors(err, 4)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+				Expect(errs[3]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = fun (r: <-T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = fun (r: T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = fun (): <-T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test = fun (): T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test: ((<-T): Void) = fun (r: <-T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test: ((T): Void) = fun (r: T) {}
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test: ((): <-T) = fun (): <-T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %s T {}
+
+              let test: ((): T) = fun (): T {
+                  return T()
+              }
+	        `, kind.Keyword()))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindStructure:
+
+				Expect(err).
+					To(Not(HaveOccurred()))
+			}
+		})
+	}
+}
+
+func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test %[2]s T() as? <-T
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 3)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindStructure:
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+			}
+		})
+	}
+}
+
+func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+			RegisterTestingT(t)
+
+			transferOperator := getCompositeKindTransferOperator(kind)
+
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test %[2]s T() as? T
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
+
+			switch kind {
+			case common.CompositeKindResource:
+
+				// TODO: add support for resources
+
+				errs := expectCheckerErrors(err, 3)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[2]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindContract:
+
+				// TODO: add support for contracts
+
+				errs := expectCheckerErrors(err, 2)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+
+			case common.CompositeKindStructure:
+
+				// TODO: add support for non-Any types in failable downcasting
+
+				errs := expectCheckerErrors(err, 1)
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+			}
+		})
+	}
+}
+

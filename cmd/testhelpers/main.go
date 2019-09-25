@@ -10,7 +10,7 @@ import (
 
 	"github.com/psiemens/sconfig"
 
-	"github.com/dapperlabs/bamboo-node/pkg/data/keyvalue"
+	"github.com/dapperlabs/flow-go/pkg/data/keyvalue"
 )
 
 // DBConfig holds the configuration for a Postgres database connection.

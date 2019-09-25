@@ -3,11 +3,11 @@ package stdlib
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 type StandardLibraryFunction struct {
@@ -52,6 +52,26 @@ func NewStandardLibraryFunction(
 	}
 }
 
+// StandardLibraryFunctions
+
+type StandardLibraryFunctions []StandardLibraryFunction
+
+func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
+	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
+	for _, function := range functions {
+		valueDeclarations[function.Name] = function
+	}
+	return valueDeclarations
+}
+
+func (functions StandardLibraryFunctions) ToValues() map[string]interpreter.Value {
+	values := make(map[string]interpreter.Value, len(functions))
+	for _, function := range functions {
+		values[function.Name] = function.Function
+	}
+	return values
+}
+
 // AssertionError
 
 type AssertionError struct {
@@ -86,11 +106,13 @@ var assertRequiredArgumentCount = 1
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
 			&sema.BoolType{},
 			&sema.StringType{},
-		},
-		ReturnType:            &sema.VoidType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VoidType{},
+		),
 		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
@@ -98,7 +120,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		if !result {
 			var message string
 			if len(arguments) > 1 {
-				message = string(arguments[1].(interpreter.StringValue))
+				message = arguments[1].(interpreter.StringValue).StrValue()
 			}
 			panic(AssertionError{
 				Message:  message,
@@ -107,7 +129,10 @@ var AssertFunction = NewStandardLibraryFunction(
 		}
 		return trampoline.Done{}
 	},
-	[]string{"", "message"},
+	[]string{
+		sema.ArgumentLabelNotRequired,
+		"message",
+	},
 )
 
 // PanicError
@@ -138,15 +163,17 @@ func (e PanicError) ImportLocation() ast.ImportLocation {
 var PanicFunction = NewStandardLibraryFunction(
 	"panic",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
 			&sema.StringType{},
-		},
-		ReturnType: &sema.NeverType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.NeverType{},
+		),
 	},
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
-			Message:  string(message),
+			Message:  message.StrValue(),
 			Location: location,
 		})
 		return trampoline.Done{}
@@ -156,7 +183,7 @@ var PanicFunction = NewStandardLibraryFunction(
 
 // BuiltinFunctions
 
-var BuiltinFunctions = []StandardLibraryFunction{
+var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
 }
@@ -166,8 +193,12 @@ var BuiltinFunctions = []StandardLibraryFunction{
 var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{&sema.AnyType{}},
-		ReturnType:     &sema.VoidType{},
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
+			&sema.AnyType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VoidType{},
+		),
 	},
 	func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])
@@ -178,6 +209,6 @@ var LogFunction = NewStandardLibraryFunction(
 
 // HelperFunctions
 
-var HelperFunctions = []StandardLibraryFunction{
+var HelperFunctions = StandardLibraryFunctions{
 	LogFunction,
 }

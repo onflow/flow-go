@@ -1,6 +1,6 @@
 package collect
 
-import "github.com/dapperlabs/bamboo-node/pkg/data/keyvalue"
+import "github.com/dapperlabs/flow-go/pkg/data/keyvalue"
 
 // NewDatabaseConnector constructs a keyvalue.DBConnector instance from the provided configuration.
 func NewDatabaseConnector(conf *Config) keyvalue.DBConnector {

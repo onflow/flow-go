@@ -1,11 +1,11 @@
 # Cryptography
 
-This package contains all the cryptography tools needed in Bamboo across all the protocol streams.  
-Some tools offer cryptographic services that can be used in other contexts and projects while others are specific to Bamboo. 
+This package contains all the cryptography tools needed in Flow across all the protocol streams.  
+Some tools offer cryptographic services that can be used in other contexts and projects while others are specific to Flow. 
 
 ## Hashing
 
-A cryptographic hash function is needed in Bamboo to provide different services:
+A cryptographic hash function is needed in Flow to provide different services:
 
 - It verifies message integrity of communications and prevents non-malicious and malicious alterations.
 - It is involved in signature schemes during signature generations and signature verifications. The signature and verification algorithms are applied over the short message digests instead of the original message. 
@@ -16,7 +16,7 @@ A cryptographic hash function can be used in this context although it is more co
 
 ### SHA3
 
-[SHA3-256](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) is used as the cryptographic hash function in Bamboo. The digests size is 256 bits while the input message can be of arbitrary size. The algorithm provides a 128-bits collision resistance, along with a 256-bits security strength for preimage and 2nd preimage.
+[SHA3-256](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) is used as the cryptographic hash function in Flow. The digests size is 256 bits while the input message can be of arbitrary size. The algorithm provides a 128-bits collision resistance, along with a 256-bits security strength for preimage and 2nd preimage.
 
 ### Interface
 
@@ -29,10 +29,10 @@ The interface also supports appending data to the hash state without computing t
 
 ## The Signature Scheme
 
-A signature scheme is needed in Bamboo for several purposes:
+A signature scheme is needed in Flow for several purposes:
 - The main purpose is to provide authentication to communications between nodes. 
 - It provides a way to generate a distributed random number through [threshold signatures](#Threshold-Signature). 
-- In a specific [use-case in Bamboo](#verification-of-ownership), it provides a verifiable proof of the ownership of some secret data without revealing the secret data itself. 
+- In a specific [use-case in Flow](#verification-of-ownership), it provides a verifiable proof of the ownership of some secret data without revealing the secret data itself. 
 
 A signature scheme is defined by three functions:
 - Key generation: Given a seed, the function generates a private key and a public key.
@@ -71,12 +71,12 @@ Although the aggregated signature is of a size of a single signature, the aggreg
 
 BLS provides a simple aggregation solution. The aggregation is non-interactive and it doesn't require knowledge of any private key or the message(s) being signed. It therefore can be performed by any party, whether they are signers or not. 
 
-The aggregation should be used in Bamboo in different streams, it is still not decided what scenarios will be used in what part of the streams. The interface will be defined accordingly.
+The aggregation should be used in Flow in different streams, it is still not decided what scenarios will be used in what part of the streams. The interface will be defined accordingly.
  
 
 ## Distributed Random Generation
 
-Bamboo requires a source of randomness for several mechanisms needed in the protocol. 
+Flow requires a source of randomness for several mechanisms needed in the protocol. 
 
 At each Epoch, the generation process needs to output a sequence of pseudo-random numbers that are deterministic, unpredictable by any party until the random number itself is generated, agreed upon by all nodes, and verifiable by anyone against the commitment. 
 
@@ -97,17 +97,14 @@ The signature can only be generated if _t+1_ parties or more have signed the mes
 
 BLS provides a non-interactive [protocol to generate threshold signatures](https://www.iacr.org/archive/pkc2003/25670031/25670031.pdf). These signatures inherit the uniqueness property from the single BLS signature.
 
-In Bamboo, the hash of the threshold signature is the distributed random output. 
+In Flow, the hash of the threshold signature is the distributed random output. 
 
 ## Proof of ownership
 
-A signature scheme can be used to prove the ownership of some secret data _Z_, known only by a limited group of parties. The proof has to be verifiable by any party inside or outside the group. This mechanism is needed in Bamboo for the [verification stream](/internal/roles/verify).
+A signature scheme can be used to prove the ownership of some secret data _Z_, known only by a limited group of parties. The proof has to be verifiable by any party inside or outside the group. This mechanism is needed in Flow for the [verification stream](/internal/roles/verify).
 
 This can be achieved by using the secret data _Z_ as a source of entropy to generate a key pair following a determinstic public process. The first party to hold _Z_ publishes the generated public key.  
 Every party that claims the ownership of _Z_ needs to generate the same key pair and uses the private key to sign a message and publish the signature. The signature is the proof of ownership of _Z_. The signed message needs to be unique to the owner in order to construct a unique proof per owner.  
 Any party that challenges the ownership of _Z_ needs to use the unique message and the published public key to verify the signature. 
 
 There is no specific interface for this purpose, the same signature scheme interface described above is enough to achieve this service. 
-
-
-

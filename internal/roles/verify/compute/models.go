@@ -3,7 +3,7 @@
 // Once the validation flow is hooked up with the actual compute module, this package will likely be removed or changed.
 package compute
 
-import "github.com/dapperlabs/bamboo-node/pkg/types"
+import "github.com/dapperlabs/flow-go/pkg/types"
 
 type BlockPartExecutionResult struct {
 	PartIndex        uint64
