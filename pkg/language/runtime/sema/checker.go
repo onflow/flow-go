@@ -1857,8 +1857,16 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		}
 		return valueType
 
-	// TODO: check
 	case ast.OperationMove:
+		if !valueType.IsResourceType() {
+			checker.report(
+				&InvalidMoveOperationError{
+					StartPos: expression.StartPos,
+					EndPos:   expression.Expression.StartPosition(),
+				},
+			)
+		}
+
 		return valueType
 	}
 

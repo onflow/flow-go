@@ -1323,3 +1323,24 @@ func (e *MissingMoveOperationError) StartPosition() ast.Position {
 func (e *MissingMoveOperationError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// InvalidMoveOperationError
+
+type InvalidMoveOperationError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidMoveOperationError) Error() string {
+	return "invalid move operation for non-resource: unexpected `<-`"
+}
+
+func (*InvalidMoveOperationError) isSemanticError() {}
+
+func (e *InvalidMoveOperationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidMoveOperationError) EndPosition() ast.Position {
+	return e.EndPos
+}

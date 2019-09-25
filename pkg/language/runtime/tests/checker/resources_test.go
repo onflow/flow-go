@@ -1129,3 +1129,61 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
 }
+
+func TestCheckResourceReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return <-create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceReturnWithMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      fun test(): X {
+          return <-X()
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
