@@ -188,10 +188,11 @@ func (analyzer *AssignmentAnalyzer) VisitInvocationExpression(node *ast.Invocati
 
 func (analyzer *AssignmentAnalyzer) VisitConditionalExpression(node *ast.ConditionalExpression) ast.Repr {
 	analyzer.visitNode(node.Test)
-	analyzer.visitNode(node.Then)
-	analyzer.visitNode(node.Else)
 
-	return analyzer.assignments
+	thenAssignments := analyzer.branch().visitNode(node.Then)
+	elseAssignments := analyzer.branch().visitNode(node.Else)
+
+	return thenAssignments.Intersection(elseAssignments)
 }
 
 func (analyzer *AssignmentAnalyzer) VisitProgram(*ast.Program) ast.Repr {
