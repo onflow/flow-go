@@ -170,7 +170,7 @@ The done chan is optional. If caller is not interested to be notified when proce
 
 
 
-## <a name="ReceiptProcessorConfig">type</a> [ReceiptProcessorConfig](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=3939:4011#L123)
+## <a name="ReceiptProcessorConfig">type</a> [ReceiptProcessorConfig](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/verify/processor/processor.go?s=3955:4027#L123)
 ``` go
 type ReceiptProcessorConfig struct {
     QueueBuffer int

@@ -60,7 +60,7 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	rootAccountAddress, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
 
 	bytes := ws.Encode()
-	worldStates[string(ws.Hash().Bytes())] = bytes
+	worldStates[string(ws.Hash())] = bytes
 
 	return &EmulatedBlockchain{
 		worldStates:             worldStates,
@@ -113,7 +113,7 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTr
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	if tx, ok := b.txPool[string(txHash.Bytes())]; ok {
+	if tx, ok := b.txPool[string(txHash)]; ok {
 		return tx, nil
 	}
 
@@ -177,7 +177,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if _, exists := b.txPool[string(tx.Hash().Bytes())]; exists {
+	if _, exists := b.txPool[string(tx.Hash())]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
@@ -189,7 +189,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return err
 	}
 
-	b.txPool[string(tx.Hash().Bytes())] = tx
+	b.txPool[string(tx.Hash())] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
@@ -212,12 +212,12 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
-	if _, exists := b.intermediateWorldStates[string(txHash.Bytes())]; exists {
+	if _, exists := b.intermediateWorldStates[string(txHash)]; exists {
 		return
 	}
 
 	bytes := b.pendingWorldState.Encode()
-	b.intermediateWorldStates[string(txHash.Bytes())] = bytes
+	b.intermediateWorldStates[string(txHash)] = bytes
 }
 
 // CallScript executes a read-only script against the world state and returns the result.
@@ -276,7 +276,7 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if bytes, ok := b.worldStates[string(hash.Bytes())]; ok {
+	if bytes, ok := b.worldStates[string(hash)]; ok {
 		ws := state.Decode(bytes)
 		b.pendingWorldState = ws
 		b.txPool = make(map[string]*types.SignedTransaction)
@@ -284,11 +284,11 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 }
 
 func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
-	if wsBytes, ok := b.worldStates[string(wsHash.Bytes())]; ok {
+	if wsBytes, ok := b.worldStates[string(wsHash)]; ok {
 		return state.Decode(wsBytes), nil
 	}
 
-	if wsBytes, ok := b.intermediateWorldStates[string(wsHash.Bytes())]; ok {
+	if wsBytes, ok := b.intermediateWorldStates[string(wsHash)]; ok {
 		return state.Decode(wsBytes), nil
 	}
 
@@ -296,12 +296,12 @@ func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.
 }
 
 func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
-	if _, exists := b.worldStates[string(blockHash.Bytes())]; exists {
+	if _, exists := b.worldStates[string(blockHash)]; exists {
 		return
 	}
 
 	bytes := b.pendingWorldState.Encode()
-	b.worldStates[string(blockHash.Bytes())] = bytes
+	b.worldStates[string(blockHash)] = bytes
 }
 
 func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature, unsignedTxHash crypto.Hash) error {
