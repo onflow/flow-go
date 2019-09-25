@@ -15,7 +15,10 @@ import (
 // This function returns a list of all fields that are not definitely assigned
 // in the initializer, as well as any errors that occurred due to unassigned usages.
 func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
-	program, _ := parser.ParseProgram(body)
+	program, _, err := parser.ParseProgram(body)
+	if err != nil {
+		panic(err)
+	}
 
 	structDeclaration := program.CompositeDeclarations()[0]
 
