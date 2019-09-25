@@ -1056,13 +1056,13 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 			)
 		}
 
-		checker.checkReturnStatementMoveOperation(statement.Expression, valueType)
+		checker.checkResourceMoveOperation(statement.Expression, valueType)
 	}
 
 	return nil
 }
 
-func (checker *Checker) checkReturnStatementMoveOperation(valueExpression ast.Expression, valueType Type) {
+func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expression, valueType Type) {
 	if !valueType.IsResourceType() {
 		return
 	}
@@ -2341,7 +2341,9 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentTypes = append(argumentTypes, argumentType)
 
-		if !checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
+		if !isInvalidType(parameterType) &&
+			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
@@ -2351,6 +2353,8 @@ func (checker *Checker) checkInvocationArguments(
 				},
 			)
 		}
+
+		checker.checkResourceMoveOperation(argument.Expression, argumentType)
 	}
 
 	return argumentTypes
