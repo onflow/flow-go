@@ -15,7 +15,7 @@ import (
 
 func init() {
 	format.TruncatedDiff = false
-	format.MaxDepth = 10
+	format.MaxDepth = 100
 }
 
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
@@ -817,18 +817,15 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		Value: &FunctionExpression{
-			ReturnValue: &ReturnValue{
-				TypeAnnotation: &TypeAnnotation{
-					Move: false,
-					Type: &NominalType{
-						Identifier: Identifier{
-							Identifier: "Int",
-							Pos:        Position{Offset: 25, Line: 2, Column: 24},
-						},
+			ReturnTypeAnnotation: &TypeAnnotation{
+				Move: false,
+				Type: &NominalType{
+					Identifier: Identifier{
+						Identifier: "Int",
+						Pos:        Position{Offset: 25, Line: 2, Column: 24},
 					},
 				},
 				StartPos: Position{Offset: 25, Line: 2, Column: 24},
-				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -876,17 +873,14 @@ func TestParseFunctionAndBlock(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -942,22 +936,20 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 							Pos:        Position{Offset: 18, Line: 2, Column: 17},
 						},
 					},
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				},
 				StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				EndPos:   Position{Offset: 18, Line: 2, Column: 17},
 			},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 21, Line: 2, Column: 20},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 			},
 			StartPos: Position{Offset: 21, Line: 2, Column: 20},
-			EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1007,22 +999,20 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 							Pos:        Position{Offset: 20, Line: 2, Column: 19},
 						},
 					},
+					StartPos: Position{Offset: 20, Line: 2, Column: 19},
 				},
 				StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				EndPos:   Position{Offset: 20, Line: 2, Column: 19},
 			},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 23, Line: 2, Column: 22},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
 			StartPos: Position{Offset: 23, Line: 2, Column: 22},
-			EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1066,17 +1056,14 @@ func TestParseIfStatement(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1185,17 +1172,14 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1279,17 +1263,14 @@ func TestParseIfStatementNoElse(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1351,17 +1332,14 @@ func TestParseWhileStatement(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1428,17 +1406,14 @@ func TestParseAssignment(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1490,17 +1465,14 @@ func TestParseAccessAssignment(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1586,17 +1558,14 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Pos: Position{Offset: 15, Line: 2, Column: 14},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1691,6 +1660,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 							Pos:        Position{Offset: 19, Line: 2, Column: 18},
 						},
 					},
+					StartPos: Position{Offset: 19, Line: 2, Column: 18},
 				},
 				StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				EndPos:   Position{Offset: 19, Line: 2, Column: 18},
@@ -1713,6 +1683,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						StartPos: Position{Offset: 29, Line: 2, Column: 28},
 						EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 					},
+					StartPos: Position{Offset: 29, Line: 2, Column: 28},
 				},
 				StartPos: Position{Offset: 26, Line: 2, Column: 25},
 				EndPos:   Position{Offset: 38, Line: 2, Column: 37},
@@ -1739,30 +1710,28 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						StartPos: Position{Offset: 44, Line: 2, Column: 43},
 						EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 					},
+					StartPos: Position{Offset: 44, Line: 2, Column: 43},
 				},
 				StartPos: Position{Offset: 41, Line: 2, Column: 40},
 				EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 			},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &VariableSizedType{
 				Type: &VariableSizedType{
-					Type: &VariableSizedType{
-						Type: &NominalType{
-							Identifier: Identifier{Identifier: "Int64",
-								Pos: Position{Offset: 61, Line: 2, Column: 60},
-							},
+					Type: &NominalType{
+						Identifier: Identifier{Identifier: "Int64",
+							Pos: Position{Offset: 61, Line: 2, Column: 60},
 						},
-						StartPos: Position{Offset: 60, Line: 2, Column: 59},
-						EndPos:   Position{Offset: 66, Line: 2, Column: 65},
 					},
-					StartPos: Position{Offset: 59, Line: 2, Column: 58},
-					EndPos:   Position{Offset: 67, Line: 2, Column: 66},
+					StartPos: Position{Offset: 60, Line: 2, Column: 59},
+					EndPos:   Position{Offset: 66, Line: 2, Column: 65},
 				},
+				StartPos: Position{Offset: 59, Line: 2, Column: 58},
+				EndPos:   Position{Offset: 67, Line: 2, Column: 66},
 			},
 			StartPos: Position{Offset: 59, Line: 2, Column: 58},
-			EndPos:   Position{Offset: 67, Line: 2, Column: 66},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1814,6 +1783,7 @@ func TestParseDictionaryType(t *testing.T) {
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &DictionaryExpression{
 			StartPos: Position{Offset: 29, Line: 2, Column: 28},
@@ -2281,6 +2251,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 10, Line: 2, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 10, Line: 2, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(1),
@@ -2294,7 +2265,6 @@ func TestParseIntegerTypes(t *testing.T) {
 			Identifier: "b",
 			Pos:        Position{Offset: 25, Line: 3, Column: 6},
 		},
-
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -2304,6 +2274,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 28, Line: 3, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 28, Line: 3, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(2),
@@ -2326,6 +2297,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 47, Line: 4, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 47, Line: 4, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(3),
@@ -2344,11 +2316,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Move: false,
 			Type: &NominalType{
 				Identifier: Identifier{
-
 					Identifier: "Int64",
 					Pos:        Position{Offset: 66, Line: 5, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 66, Line: 5, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(4),
@@ -2371,6 +2343,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 85, Line: 6, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 85, Line: 6, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(5),
@@ -2393,6 +2366,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 104, Line: 7, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 104, Line: 7, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(6),
@@ -2406,7 +2380,6 @@ func TestParseIntegerTypes(t *testing.T) {
 			Identifier: "g",
 			Pos:        Position{Offset: 121, Line: 8, Column: 6},
 		},
-
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -2416,6 +2389,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 124, Line: 8, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 124, Line: 8, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(7),
@@ -2438,6 +2412,7 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 144, Line: 9, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 144, Line: 9, Column: 9},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(8),
@@ -2483,6 +2458,7 @@ func TestParseFunctionType(t *testing.T) {
 								Pos:        Position{Offset: 14, Line: 2, Column: 13},
 							},
 						},
+						StartPos: Position{Offset: 14, Line: 2, Column: 13},
 					},
 					{
 						Move: false,
@@ -2492,6 +2468,7 @@ func TestParseFunctionType(t *testing.T) {
 								Pos:        Position{Offset: 20, Line: 2, Column: 19},
 							},
 						},
+						StartPos: Position{Offset: 20, Line: 2, Column: 19},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2502,10 +2479,12 @@ func TestParseFunctionType(t *testing.T) {
 							Pos:        Position{Offset: 28, Line: 2, Column: 27},
 						},
 					},
+					StartPos: Position{Offset: 28, Line: 2, Column: 27},
 				},
 				StartPos: Position{Offset: 12, Line: 2, Column: 11},
 				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 			},
+			StartPos: Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2554,6 +2533,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 									Pos:        Position{Offset: 16, Line: 2, Column: 15},
 								},
 							},
+							StartPos: Position{Offset: 16, Line: 2, Column: 15},
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
@@ -2564,6 +2544,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 					StartPos: Position{Offset: 14, Line: 2, Column: 13},
 					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
@@ -2572,6 +2553,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &ArrayExpression{
 			StartPos: Position{Offset: 36, Line: 2, Column: 35},
@@ -2617,6 +2599,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2632,10 +2615,12 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 						EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2683,6 +2668,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2697,6 +2683,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 										Pos:        Position{Offset: 24, Line: 2, Column: 23},
 									},
 								},
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
@@ -2707,14 +2694,17 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 									Pos:        Position{Offset: 32, Line: 2, Column: 31},
 								},
 							},
+							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
 						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2762,6 +2752,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2776,6 +2767,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 										Pos:        Position{Offset: 24, Line: 2, Column: 23},
 									},
 								},
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
@@ -2786,14 +2778,17 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 									Pos:        Position{Offset: 32, Line: 2, Column: 31},
 								},
 							},
+							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
 						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2841,23 +2836,22 @@ func TestParseMissingReturnType(t *testing.T) {
 							Pos:        Position{Offset: 18, Line: 2, Column: 17},
 						},
 					},
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &FunctionExpression{
-			ReturnValue: &ReturnValue{
-				TypeAnnotation: &TypeAnnotation{
-					Move: false,
-					Type: &NominalType{
-						Identifier: Identifier{
-							Pos: Position{Offset: 43, Line: 3, Column: 17},
-						},
+			ReturnTypeAnnotation: &TypeAnnotation{
+				Move: false,
+				Type: &NominalType{
+					Identifier: Identifier{
+						Pos: Position{Offset: 43, Line: 3, Column: 17},
 					},
 				},
 				StartPos: Position{Offset: 43, Line: 3, Column: 17},
-				EndPos:   Position{Offset: 43, Line: 3, Column: 17},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -3093,6 +3087,7 @@ func TestParseStructure(t *testing.T) {
 								Pos:        Position{Offset: 53, Line: 3, Column: 30},
 							},
 						},
+						StartPos: Position{Offset: 53, Line: 3, Column: 30},
 					},
 					StartPos: Position{Offset: 35, Line: 3, Column: 12},
 					EndPos:   Position{Offset: 55, Line: 3, Column: 32},
@@ -3119,6 +3114,7 @@ func TestParseStructure(t *testing.T) {
 										Pos:        Position{Offset: 80, Line: 5, Column: 22},
 									},
 								},
+								StartPos: Position{Offset: 80, Line: 5, Column: 22},
 							},
 							StartPos: Position{Offset: 75, Line: 5, Column: 17},
 							EndPos:   Position{Offset: 80, Line: 5, Column: 22},
@@ -3162,20 +3158,15 @@ func TestParseStructure(t *testing.T) {
 						Identifier: "getFoo",
 						Pos:        Position{Offset: 153, Line: 9, Column: 20},
 					},
-
-					Parameters: nil,
-					ReturnValue: &ReturnValue{
-						TypeAnnotation: &TypeAnnotation{
-							Move: false,
-							Type: &NominalType{
-								Identifier: Identifier{
-									Identifier: "Int",
-									Pos:        Position{Offset: 163, Line: 9, Column: 30},
-								},
+					ReturnTypeAnnotation: &TypeAnnotation{
+						Move: false,
+						Type: &NominalType{
+							Identifier: Identifier{
+								Identifier: "Int",
+								Pos:        Position{Offset: 163, Line: 9, Column: 30},
 							},
 						},
 						StartPos: Position{Offset: 163, Line: 9, Column: 30},
-						EndPos:   Position{Offset: 163, Line: 9, Column: 30},
 					},
 					FunctionBlock: &FunctionBlock{
 						Block: &Block{
@@ -3315,23 +3306,21 @@ func TestParsePreAndPostConditions(t *testing.T) {
 									Pos:        Position{Offset: 21, Line: 2, Column: 20},
 								},
 							},
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
 						},
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
 						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 					},
 				},
-				ReturnValue: &ReturnValue{
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "",
-								Pos:        Position{Offset: 24, Line: 2, Column: 23},
-							},
+				ReturnTypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "",
+							Pos:        Position{Offset: 24, Line: 2, Column: 23},
 						},
 					},
 					StartPos: Position{Offset: 24, Line: 2, Column: 23},
-					EndPos:   Position{Offset: 24, Line: 2, Column: 23},
 				},
 				FunctionBlock: &FunctionBlock{
 					Block: &Block{
@@ -3562,23 +3551,21 @@ func TestParseConditionMessage(t *testing.T) {
 									Pos:        Position{Offset: 21, Line: 2, Column: 20},
 								},
 							},
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
 						},
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
 						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 					},
 				},
-				ReturnValue: &ReturnValue{
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "",
-								Pos:        Position{Offset: 24, Line: 2, Column: 23},
-							},
+				ReturnTypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "",
+							Pos:        Position{Offset: 24, Line: 2, Column: 23},
 						},
 					},
 					StartPos: Position{Offset: 24, Line: 2, Column: 23},
-					EndPos:   Position{Offset: 24, Line: 2, Column: 23},
 				},
 				FunctionBlock: &FunctionBlock{
 					Block: &Block{
@@ -3664,6 +3651,7 @@ func TestParseOptionalType(t *testing.T) {
 						},
 						EndPos: Position{Offset: 19, Line: 2, Column: 18},
 					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 				Value: &IntExpression{
 					Value:    big.NewInt(1),
@@ -3798,6 +3786,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 								Pos:        Position{Offset: 22, Line: 2, Column: 21},
 							},
 						},
+						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 					},
 				},
 				StartPos: Position{Offset: 8, Line: 2, Column: 7},
@@ -3855,6 +3844,7 @@ func TestParseInterface(t *testing.T) {
 									Pos:        Position{Offset: 58, Line: 3, Column: 21},
 								},
 							},
+							StartPos: Position{Offset: 58, Line: 3, Column: 21},
 						},
 						StartPos: Position{Offset: 53, Line: 3, Column: 16},
 						EndPos:   Position{Offset: 60, Line: 3, Column: 23},
@@ -3881,6 +3871,7 @@ func TestParseInterface(t *testing.T) {
 											Pos:        Position{Offset: 89, Line: 5, Column: 26},
 										},
 									},
+									StartPos: Position{Offset: 89, Line: 5, Column: 26},
 								},
 								StartPos: Position{Offset: 84, Line: 5, Column: 21},
 								EndPos:   Position{Offset: 89, Line: 5, Column: 26},
@@ -3897,19 +3888,15 @@ func TestParseInterface(t *testing.T) {
 							Identifier: "getFoo",
 							Pos:        Position{Offset: 115, Line: 7, Column: 20},
 						},
-						Parameters: nil,
-						ReturnValue: &ReturnValue{
-							TypeAnnotation: &TypeAnnotation{
-								Move: false,
-								Type: &NominalType{
-									Identifier: Identifier{
-										Identifier: "Int",
-										Pos:        Position{Offset: 125, Line: 7, Column: 30},
-									},
+						ReturnTypeAnnotation: &TypeAnnotation{
+							Move: false,
+							Type: &NominalType{
+								Identifier: Identifier{
+									Identifier: "Int",
+									Pos:        Position{Offset: 125, Line: 7, Column: 30},
 								},
 							},
 							StartPos: Position{Offset: 125, Line: 7, Column: 30},
-							EndPos:   Position{Offset: 125, Line: 7, Column: 30},
 						},
 						FunctionBlock: nil,
 						StartPos:      Position{Offset: 111, Line: 7, Column: 16},
@@ -4159,18 +4146,15 @@ func TestParseMoveReturnType(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: true,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Identifier: "X",
-						Pos:        Position{Offset: 23, Line: 2, Column: 22},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: true,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "X",
+					Pos:        Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
 			StartPos: Position{Offset: 21, Line: 2, Column: 20},
-			EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -4239,18 +4223,15 @@ func TestParseMoveStatement(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Identifier: "",
-						Pos:        Position{Offset: 18, Line: 2, Column: 17},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 18, Line: 2, Column: 17},
 				},
 			},
 			StartPos: Position{Offset: 18, Line: 2, Column: 17},
-			EndPos:   Position{Offset: 18, Line: 2, Column: 17},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -4354,18 +4335,15 @@ func TestParseMoveParameterType(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
-		ReturnValue: &ReturnValue{
-			TypeAnnotation: &TypeAnnotation{
-				Move: false,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Identifier: "",
-						Pos:        Position{Offset: 24, Line: 2, Column: 23},
-					},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
 				},
 			},
 			StartPos: Position{Offset: 24, Line: 2, Column: 23},
-			EndPos:   Position{Offset: 24, Line: 2, Column: 23},
 		},
 		Parameters: []*Parameter{
 			{
@@ -4382,6 +4360,7 @@ func TestParseMoveParameterType(t *testing.T) {
 							Pos:        Position{Offset: 23, Line: 2, Column: 22},
 						},
 					},
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
@@ -4428,6 +4407,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 					Pos:        Position{Offset: 18, Line: 2, Column: 17},
 				},
 			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -4480,6 +4460,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 								Pos:        Position{Offset: 25, Line: 2, Column: 24},
 							},
 						},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 					StartPos: Position{Offset: 20, Line: 2, Column: 19},
 					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
@@ -4526,10 +4507,12 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 							Pos:        Position{Offset: 23, Line: 2, Column: 22},
 						},
 					},
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -4565,18 +4548,15 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &FunctionExpression{
-			ReturnValue: &ReturnValue{
-				TypeAnnotation: &TypeAnnotation{
-					Move: true,
-					Type: &NominalType{
-						Identifier: Identifier{
-							Identifier: "R",
-							Pos:        Position{Offset: 27, Line: 2, Column: 26},
-						},
+			ReturnTypeAnnotation: &TypeAnnotation{
+				Move: true,
+				Type: &NominalType{
+					Identifier: Identifier{
+						Identifier: "R",
+						Pos:        Position{Offset: 27, Line: 2, Column: 26},
 					},
 				},
 				StartPos: Position{Offset: 25, Line: 2, Column: 24},
-				EndPos:   Position{Offset: 27, Line: 2, Column: 26},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -4641,6 +4621,7 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 						Pos:        Position{Offset: 25, Line: 2, Column: 24},
 					},
 				},
+				StartPos: Position{Offset: 23, Line: 2, Column: 22},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},

@@ -426,7 +426,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	checker.checkFunction(
 		declaration.Parameters,
-		declaration.ReturnValue,
+		declaration.ReturnTypeAnnotation.StartPos,
 		functionType,
 		declaration.FunctionBlock,
 		mustExit,
@@ -437,11 +437,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
 
-	functionType := checker.functionType(
-		declaration.Parameters,
-		declaration.ReturnValue.TypeAnnotation,
-	)
-
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
@@ -489,7 +485,7 @@ func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
 
 func (checker *Checker) checkFunction(
 	parameters []*ast.Parameter,
-	returnValue *ast.ReturnValue,
+	returnTypePosition ast.Position,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
@@ -500,21 +496,11 @@ func (checker *Checker) checkFunction(
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
 
-	checker.declareParameters(
-		parameters,
-		functionType.ParameterTypeAnnotations,
-	)
+	checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
 
-	checker.checkParameters(
-		parameters,
-		functionType.ParameterTypeAnnotations,
-	)
-
-	if returnValue != nil {
-		checker.checkTypeAnnotation(
-			functionType.ReturnTypeAnnotation,
-			returnValue.StartPos,
-		)
+	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
+	if functionType.ReturnTypeAnnotation != nil {
+		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
 
 	if functionBlock != nil {
@@ -670,7 +656,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	// does the declaration have an explicit type annotation?
 	if declaration.TypeAnnotation != nil {
-		declarationType = checker.ConvertType(declaration.TypeAnnotation.Type)
+		typeAnnotation := checker.ConvertTypeAnnotation(declaration.TypeAnnotation)
+		declarationType = typeAnnotation.Type
+
+		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation.StartPos)
 
 		// check the value type is a subtype of the declaration type
 		if declarationType != nil && valueType != nil && !valueIsInvalid && !isInvalidType(declarationType) {
@@ -2246,16 +2235,13 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(
-		expression.Parameters,
-		expression.ReturnValue.TypeAnnotation,
-	)
+	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
 
 	checker.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
 		expression.Parameters,
-		expression.ReturnValue,
+		expression.ReturnTypeAnnotation.StartPos,
 		functionType,
 		expression.FunctionBlock,
 		true,
@@ -2309,20 +2295,13 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	case *ast.FunctionType:
 		var parameterTypeAnnotations []*TypeAnnotation
 		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-			parameterType := checker.ConvertType(parameterTypeAnnotation.Type)
+			parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
 			parameterTypeAnnotations = append(parameterTypeAnnotations,
-				&TypeAnnotation{
-					Move: parameterTypeAnnotation.Move,
-					Type: parameterType,
-				},
+				parameterTypeAnnotation,
 			)
 		}
 
-		returnType := checker.ConvertType(t.ReturnTypeAnnotation.Type)
-		returnTypeAnnotation := &TypeAnnotation{
-			Move: t.ReturnTypeAnnotation.Move,
-			Type: returnType,
-		}
+		returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
 
 		return &FunctionType{
 			ParameterTypeAnnotations: parameterTypeAnnotations,
@@ -2344,6 +2323,17 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+// ConvertTypeAnnotation converts an AST type annotation representation
+// to a sema type annotation
+//
+func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation) *TypeAnnotation {
+	convertedType := checker.ConvertType(typeAnnotation.Type)
+	return &TypeAnnotation{
+		Move: typeAnnotation.Move,
+		Type: convertedType,
+	}
 }
 
 func (checker *Checker) declareFunction(
@@ -2407,17 +2397,14 @@ func (checker *Checker) functionType(
 	parameters []*ast.Parameter,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
+	convertedParameterTypeAnnotations :=
+		checker.parameterTypeAnnotations(parameters)
 
-	parameterTypeAnnotations := checker.parameterTypeAnnotations(parameters)
-	convertedReturnType := checker.ConvertType(returnTypeAnnotation.Type)
-
-	convertedReturnTypeAnnotation := &TypeAnnotation{
-		Move: returnTypeAnnotation.Move,
-		Type: convertedReturnType,
-	}
+	convertedReturnTypeAnnotation :=
+		checker.ConvertTypeAnnotation(returnTypeAnnotation)
 
 	return &FunctionType{
-		ParameterTypeAnnotations: parameterTypeAnnotations,
+		ParameterTypeAnnotations: convertedParameterTypeAnnotations,
 		ReturnTypeAnnotation:     convertedReturnTypeAnnotation,
 	}
 }
@@ -2847,10 +2834,7 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(
-			function.Parameters,
-			function.ReturnValue.TypeAnnotation,
-		)
+		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
 
@@ -3006,7 +2990,7 @@ func (checker *Checker) checkInitializer(
 
 	checker.checkFunction(
 		initializer.Parameters,
-		nil,
+		ast.Position{},
 		functionType,
 		initializer.FunctionBlock,
 		true,
