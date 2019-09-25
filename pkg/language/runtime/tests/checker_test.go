@@ -25,7 +25,7 @@ func parseAndCheckWithExtra(
 	types map[string]sema.TypeDeclaration,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 
 	Expect(err).
 		To(Not(HaveOccurred()))
@@ -5932,7 +5932,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 	// NOTE: only parse, don't check imported program.
 	// will be checked by checker checking importing program
 
-	imported, err := parser.ParseProgram(`
+	imported, _, err := parser.ParseProgram(`
        let x: Bool = 1
 	`)
 
@@ -6757,6 +6757,66 @@ func TestCheckUnaryMove(t *testing.T) {
 
 }
 
+func TestCheckImmediateDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- X()
+          destroy x
+      }
+	`)
+
+	// TODO: add create expression once supported
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct X {}
+
+      fun test() {
+          destroy X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidDestructionError{}))
+}
+
 func TestCheckUnaryCreateAndDestroy(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -6764,15 +6824,62 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
       resource X {}
 
       fun test() {
-          var x = create X()
+          var x <- create X()
           destroy x
       }
 	`)
 
 	// TODO: add support for resources
-	// TODO: add support for create expressions
-	// TODO: add support for destroy expressions
-	// TODO: use moving transfer operator once create expression is supported
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckUnaryCreateAndDestroyWithInitializer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {
+          let x: Int
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test() {
+          var x <- create X(x: 1)
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidUnaryCreateAndDestroyWithWrongInitializerArguments(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource X {
+          let x: Int
+          init(x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test() {
+          var x <- create X(y: true)
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
 
 	errs := expectCheckerErrors(err, 3)
 
@@ -6780,10 +6887,27 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
 
 	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedExpressionError{}))
+		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+}
+
+func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct X {}
+
+      fun test() {
+          create X()
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidConstructionError{}))
 }
 
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {

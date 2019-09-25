@@ -13,7 +13,7 @@ import (
 func parseFunctionBlock(code string) (*ast.FunctionBlock, error) {
 	body := fmt.Sprintf("fun test(): Any {%s}", code)
 
-	program, err := parser.ParseProgram(body)
+	program, _, err := parser.ParseProgram(body)
 	if err != nil {
 		return nil, err
 	}

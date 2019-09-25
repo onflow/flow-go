@@ -203,8 +203,9 @@ var logFunctionType = sema.FunctionType{
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
-	return parser.ParseProgram(string(script))
+func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
+	program, _, err = parser.ParseProgram(string(script))
+	return
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {

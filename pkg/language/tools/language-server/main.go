@@ -106,7 +106,7 @@ func convertError(err error) *protocol.Diagnostic {
 
 func (s server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
 	start := time.Now()
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 	elapsed := time.Since(start)
 
 	connection.LogMessage(&protocol.LogMessageParams{
@@ -284,7 +284,7 @@ func (s server) resolveImport(
 		return nil, nil
 	}
 
-	program, _, err := parser.ParseProgramFromFile(filename)
+	program, _, _, err := parser.ParseProgramFromFile(filename)
 	// TODO: publish diagnostic file does not exist?
 	if err != nil {
 		return nil, nil

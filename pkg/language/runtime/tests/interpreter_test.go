@@ -1259,7 +1259,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, err := parser.ParseProgram(`
+	program, _, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 

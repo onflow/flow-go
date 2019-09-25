@@ -376,40 +376,46 @@ func (s *BaseStrictusListener) EnterUnaryOp(ctx *UnaryOpContext) {}
 // ExitUnaryOp is called when production unaryOp is exited.
 func (s *BaseStrictusListener) ExitUnaryOp(ctx *UnaryOpContext) {}
 
-// EnterCreateExpression is called when production CreateExpression is entered.
+// EnterPrimaryExpressionStart is called when production primaryExpressionStart is entered.
+func (s *BaseStrictusListener) EnterPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}
+
+// ExitPrimaryExpressionStart is called when production primaryExpressionStart is exited.
+func (s *BaseStrictusListener) ExitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}
+
+// EnterCreateExpression is called when production createExpression is entered.
 func (s *BaseStrictusListener) EnterCreateExpression(ctx *CreateExpressionContext) {}
 
-// ExitCreateExpression is called when production CreateExpression is exited.
+// ExitCreateExpression is called when production createExpression is exited.
 func (s *BaseStrictusListener) ExitCreateExpression(ctx *CreateExpressionContext) {}
 
-// EnterDestroyExpression is called when production DestroyExpression is entered.
+// EnterDestroyExpression is called when production destroyExpression is entered.
 func (s *BaseStrictusListener) EnterDestroyExpression(ctx *DestroyExpressionContext) {}
 
-// ExitDestroyExpression is called when production DestroyExpression is exited.
+// ExitDestroyExpression is called when production destroyExpression is exited.
 func (s *BaseStrictusListener) ExitDestroyExpression(ctx *DestroyExpressionContext) {}
 
-// EnterIdentifierExpression is called when production IdentifierExpression is entered.
+// EnterIdentifierExpression is called when production identifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
 
-// ExitIdentifierExpression is called when production IdentifierExpression is exited.
+// ExitIdentifierExpression is called when production identifierExpression is exited.
 func (s *BaseStrictusListener) ExitIdentifierExpression(ctx *IdentifierExpressionContext) {}
 
-// EnterLiteralExpression is called when production LiteralExpression is entered.
+// EnterLiteralExpression is called when production literalExpression is entered.
 func (s *BaseStrictusListener) EnterLiteralExpression(ctx *LiteralExpressionContext) {}
 
-// ExitLiteralExpression is called when production LiteralExpression is exited.
+// ExitLiteralExpression is called when production literalExpression is exited.
 func (s *BaseStrictusListener) ExitLiteralExpression(ctx *LiteralExpressionContext) {}
 
-// EnterFunctionExpression is called when production FunctionExpression is entered.
+// EnterFunctionExpression is called when production functionExpression is entered.
 func (s *BaseStrictusListener) EnterFunctionExpression(ctx *FunctionExpressionContext) {}
 
-// ExitFunctionExpression is called when production FunctionExpression is exited.
+// ExitFunctionExpression is called when production functionExpression is exited.
 func (s *BaseStrictusListener) ExitFunctionExpression(ctx *FunctionExpressionContext) {}
 
-// EnterNestedExpression is called when production NestedExpression is entered.
+// EnterNestedExpression is called when production nestedExpression is entered.
 func (s *BaseStrictusListener) EnterNestedExpression(ctx *NestedExpressionContext) {}
 
-// ExitNestedExpression is called when production NestedExpression is exited.
+// ExitNestedExpression is called when production nestedExpression is exited.
 func (s *BaseStrictusListener) ExitNestedExpression(ctx *NestedExpressionContext) {}
 
 // EnterExpressionAccess is called when production expressionAccess is entered.
