@@ -58,8 +58,7 @@ func CheckFieldAssignments(
 	errors := make([]error, 0)
 
 	a := &AssignmentAnalyzer{assignments, &errors}
-
-	assigned := block.Accept(a).(AssignmentSet)
+	assigned := a.visitNode(block)
 
 	unassigned := make([]*ast.FieldDeclaration, 0)
 
@@ -105,18 +104,10 @@ func (analyzer *AssignmentAnalyzer) recordError(err error) {
 
 func (analyzer *AssignmentAnalyzer) visitStatements(statements []ast.Statement) AssignmentSet {
 	for _, statement := range statements {
-		analyzer.assignments = analyzer.visitStatement(statement)
+		analyzer.assignments = analyzer.visitNode(statement)
 	}
 
 	return analyzer.assignments
-}
-
-func (analyzer *AssignmentAnalyzer) visitStatement(statement ast.Statement) AssignmentSet {
-	if statement == nil {
-		return analyzer.assignments
-	}
-
-	return statement.Accept(analyzer).(AssignmentSet)
 }
 
 func (analyzer *AssignmentAnalyzer) visitNode(node ast.Element) AssignmentSet {
@@ -189,7 +180,7 @@ func (analyzer *AssignmentAnalyzer) VisitExpressionStatement(node *ast.Expressio
 
 func (analyzer *AssignmentAnalyzer) VisitInvocationExpression(node *ast.InvocationExpression) ast.Repr {
 	for _, arg := range node.Arguments {
-		arg.Expression.Accept(analyzer)
+		analyzer.visitNode(arg.Expression)
 	}
 
 	return analyzer.assignments
