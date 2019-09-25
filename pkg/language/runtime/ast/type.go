@@ -5,8 +5,9 @@ import "fmt"
 // TypeAnnotation
 
 type TypeAnnotation struct {
-	Move bool
-	Type Type
+	Move     bool
+	Type     Type
+	StartPos Position
 }
 
 func (e *TypeAnnotation) String() string {
@@ -18,7 +19,7 @@ func (e *TypeAnnotation) String() string {
 }
 
 func (e *TypeAnnotation) StartPosition() Position {
-	return e.Type.StartPosition()
+	return e.StartPos
 }
 
 func (e *TypeAnnotation) EndPosition() Position {

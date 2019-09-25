@@ -30,7 +30,7 @@ func (a *ECDSAalgo) SignHash(sk PrKey, h Hash) (Signature, error) {
 	if !ok {
 		return nil, cryptoError{"ECDSA sigature can only be called using an ECDSA private key"}
 	}
-	r, s, err := goecdsa.Sign(rand.Reader, skECDSA.goPrKey, h.Bytes())
+	r, s, err := goecdsa.Sign(rand.Reader, skECDSA.goPrKey, h)
 	if err != nil {
 		return nil, cryptoError{"ECDSA Signature has failed"}
 	}
@@ -80,7 +80,7 @@ func (a *ECDSAalgo) VerifyHash(pk PubKey, sig Signature, h Hash) (bool, error) {
 	Nlen := bitToBytes((a.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
-	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h.Bytes(), &r, &s), nil
+	return goecdsa.Verify((*goecdsa.PublicKey)(ecdsaPk), h, &r, &s), nil
 }
 
 // VerifyBytes verifies a signature of a byte array

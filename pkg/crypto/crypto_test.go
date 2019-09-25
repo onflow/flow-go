@@ -28,17 +28,40 @@ func TestSha3_256(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
-	hash := alg.ComputeBytesHash(input).Bytes()
+	hash := alg.ComputeBytesHash(input)
 	checkBytes(t, input, expected, hash)
 
-	hash = alg.ComputeStructHash(&testStruct{"te", "st"}).Bytes()
+	hash = alg.ComputeStructHash(&testStruct{"te", "st"})
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
 	alg.AddBytes([]byte("te"))
 	alg.AddBytes([]byte("s"))
 	alg.AddBytes([]byte("t"))
-	hash = alg.SumHash().Bytes()
+	hash = alg.SumHash()
+	checkBytes(t, input, expected, hash)
+}
+
+func TestSha3_384(t *testing.T) {
+	input := []byte("test")
+	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
+
+	alg, err := NewHashAlgo(SHA3_384)
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	hash := alg.ComputeBytesHash(input)
+	checkBytes(t, input, expected, hash)
+
+	hash = alg.ComputeStructHash(&testStruct{"te", "st"})
+	checkBytes(t, input, expected, hash)
+
+	alg.Reset()
+	alg.AddBytes([]byte("te"))
+	alg.AddBytes([]byte("s"))
+	alg.AddBytes([]byte("t"))
+	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
 
@@ -54,6 +77,16 @@ func checkBytes(t *testing.T, input, expected, result []byte) {
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
 	alg, _ := NewHashAlgo(SHA3_256)
+	for i := 0; i < b.N; i++ {
+		alg.ComputeBytesHash(a)
+	}
+	return
+}
+
+// SHA3_384 bench
+func BenchmarkSha3_384(b *testing.B) {
+	a := []byte("Bench me!")
+	alg, _ := NewHashAlgo(SHA3_384)
 	for i := 0; i < b.N; i++ {
 		alg.ComputeBytesHash(a)
 	}
@@ -122,9 +155,9 @@ func testSignStruct(t *testing.T, salg Signer, halg Hasher, sk PrKey, input Enco
 	}
 
 	if result == false {
-		t.Errorf("Verification failed:\n signature is %x", s)
+		t.Errorf("Verification failed:\n signature is %s", s)
 	} else {
-		t.Logf("Verification passed:\n signature is %x", s)
+		t.Logf("Verification passed:\n signature is %s", s)
 	}
 }
 
@@ -141,11 +174,12 @@ func TestBLS_BLS12381(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
+	halg, err := NewHashAlgo(SHA3_384)
 	input := []byte("test")
-	testSignBytes(t, salg, nil, sk, input)
+	testSignBytes(t, salg, halg, sk, input)
 
 	inputStruct := &testStruct{"te", "st"}
-	testSignStruct(t, salg, nil, sk, inputStruct)
+	testSignStruct(t, salg, halg, sk, inputStruct)
 }
 
 // TestG1 helps debugging but is not a unit test

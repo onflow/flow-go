@@ -813,9 +813,12 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []Type
-	InterfaceParameterTypes []Type
+	CompositeParameterTypes []*TypeAnnotation
+	InterfaceParameterTypes []*TypeAnnotation
 }
+
+// TODO: improve error message:
+//  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
 	CompositeType       *CompositeType
@@ -1173,4 +1176,69 @@ func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
 func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
 	length := len(e.Identifier.Identifier)
 	return e.Pos.Shifted(length - 1)
+}
+
+// MissingMoveAnnotationError
+
+type MissingMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveAnnotationError) Error() string {
+	return "missing move annotation: `<-`"
+}
+
+func (*MissingMoveAnnotationError) isSemanticError() {}
+
+func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveAnnotationError
+
+type InvalidMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidMoveAnnotationError) Error() string {
+	return "invalid move annotation: `<-`"
+}
+
+func (*InvalidMoveAnnotationError) isSemanticError() {}
+
+func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// IncorrectTransferOperationError
+
+type IncorrectTransferOperationError struct {
+	ActualOperation   ast.TransferOperation
+	ExpectedOperation ast.TransferOperation
+	Pos               ast.Position
+}
+
+func (e *IncorrectTransferOperationError) Error() string {
+	return fmt.Sprintf(
+		"incorrect transfer operation: expected `%s`",
+		e.ExpectedOperation.Operator(),
+	)
+}
+
+func (*IncorrectTransferOperationError) isSemanticError() {}
+
+func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
+	return e.Pos
 }

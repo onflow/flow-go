@@ -86,7 +86,7 @@ func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, er
 func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
 	res, err := c.rpcClient.GetTransaction(
 		ctx,
-		&observe.GetTransactionRequest{Hash: h.Bytes()},
+		&observe.GetTransactionRequest{Hash: h},
 	)
 	if err != nil {
 		return nil, err
