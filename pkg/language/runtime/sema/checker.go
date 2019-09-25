@@ -1041,11 +1041,11 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				},
 			)
 		}
-	} else if !isInvalidType(returnType) {
+	} else {
 
-		if checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
-			checker.checkReturnStatementMoveOperation(statement.Expression, valueType)
-		} else {
+		if !isInvalidType(returnType) &&
+			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: returnType,
@@ -1055,6 +1055,8 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				},
 			)
 		}
+
+		checker.checkReturnStatementMoveOperation(statement.Expression, valueType)
 	}
 
 	return nil

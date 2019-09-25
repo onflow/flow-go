@@ -1171,6 +1171,31 @@ func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
 }
 
+func TestCheckInvalidResourceReturnMissingMoveInvalidReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): Y {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
 func TestCheckInvalidNonResourceReturnWithMove(t *testing.T) {
 	RegisterTestingT(t)
 
