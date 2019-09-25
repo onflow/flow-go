@@ -1,8 +1,7 @@
 package sema
 
 import (
-	"hash/fnv"
-
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/raviqqe/hamt"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
@@ -20,12 +19,12 @@ func NewAssignmentSet() AssignmentSet {
 
 // Insert inserts an identifier into the set.
 func (a AssignmentSet) Insert(identifier ast.Identifier) AssignmentSet {
-	return AssignmentSet{a.set.Insert(hashableIdentifier(identifier))}
+	return AssignmentSet{a.set.Insert(common.StringKey(identifier.Identifier))}
 }
 
 // Contains returns true if the given identifier exists in the set.
 func (a AssignmentSet) Contains(identifier ast.Identifier) bool {
-	return a.set.Include(hashableIdentifier(identifier))
+	return a.set.Include(common.StringKey(identifier.Identifier))
 }
 
 // Intersection returns a new set containing all fields that exist in both sets.
@@ -44,19 +43,6 @@ func (a AssignmentSet) Intersection(b AssignmentSet) AssignmentSet {
 	}
 
 	return AssignmentSet{c}
-}
-
-// hashableIdentifier is an alias for ast.Identifier that implements the hamt.Entry interface.
-type hashableIdentifier ast.Identifier
-
-func (f hashableIdentifier) Hash() uint32 {
-	h := fnv.New32a()
-	h.Write([]byte(f.Identifier))
-	return h.Sum32()
-}
-
-func (f hashableIdentifier) Equal(other hamt.Entry) bool {
-	return f.Identifier == other.(hashableIdentifier).Identifier
 }
 
 // CheckFieldAssignments performs a definite assignment analysis on the provided function block.
