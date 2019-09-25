@@ -735,6 +735,13 @@ func (t *ConstantSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
+// InvokableType
+
+type InvokableType interface {
+	Type
+	InvocationFunctionType() *FunctionType
+}
+
 // FunctionType
 
 type FunctionType struct {
@@ -745,6 +752,10 @@ type FunctionType struct {
 }
 
 func (*FunctionType) isType() {}
+
+func (t *FunctionType) InvocationFunctionType() *FunctionType {
+	return t
+}
 
 func (t *FunctionType) String() string {
 	var parameters strings.Builder
@@ -782,7 +793,13 @@ func (*FunctionType) IsResourceType() bool {
 	return false
 }
 
-// BaseTypes
+// ConstructorFunctionType
+
+type ConstructorFunctionType struct {
+	*FunctionType
+}
+
+// baseTypes are the nominal types available in programs
 
 var baseTypes hamt.Map
 
@@ -874,7 +891,9 @@ type Member struct {
 // NewMemberForType initializes a new member type and panics if the member declaration is invalid.
 func NewMemberForType(ty Type, identifier string, member Member) *Member {
 
-	if functionType, ok := member.Type.(*FunctionType); ok {
+	if invokableType, ok := member.Type.(InvokableType); ok {
+		functionType := invokableType.InvocationFunctionType()
+
 		if member.ArgumentLabels != nil &&
 			len(member.ArgumentLabels) != len(functionType.ParameterTypeAnnotations) {
 

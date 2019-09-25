@@ -113,7 +113,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
+		To(BeAssignableToTypeOf(&interpreter.NotInvokableError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {

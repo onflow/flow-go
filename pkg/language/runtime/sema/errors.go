@@ -1228,7 +1228,7 @@ type InvalidConstructionError struct {
 }
 
 func (e *InvalidConstructionError) Error() string {
-	return "cannot destroy value: not a resource"
+	return "cannot create value: not a resource"
 }
 
 func (*InvalidConstructionError) isSemanticError() {}
@@ -1280,5 +1280,26 @@ func (e *ResourceLossError) StartPosition() ast.Position {
 }
 
 func (e *ResourceLossError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingCreateError
+
+type MissingCreateError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingCreateError) Error() string {
+	return "cannot create resource: expected `create`"
+}
+
+func (*MissingCreateError) isSemanticError() {}
+
+func (e *MissingCreateError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingCreateError) EndPosition() ast.Position {
 	return e.EndPos
 }
