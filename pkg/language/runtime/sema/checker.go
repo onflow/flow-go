@@ -1358,7 +1358,7 @@ func (checker *Checker) visitIndexingExpression(
 }
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := checker.findAndCheckVariable(expression, true)
+	variable := checker.findAndCheckVariable(expression.Identifier, true)
 	if variable == nil {
 		return &InvalidType{}
 	}
@@ -1366,15 +1366,14 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	return variable.Type
 }
 
-func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOccurrence bool) *Variable {
-	identifier := expression.Identifier.Identifier
-	variable := checker.findVariable(identifier)
+func (checker *Checker) findAndCheckVariable(identifier ast.Identifier, recordOccurrence bool) *Variable {
+	variable := checker.findVariable(identifier.Identifier)
 	if variable == nil {
 		checker.report(
 			&NotDeclaredError{
 				ExpectedKind: common.DeclarationKindValue,
-				Name:         identifier,
-				Pos:          expression.StartPosition(),
+				Name:         identifier.Identifier,
+				Pos:          identifier.StartPosition(),
 			},
 		)
 		return nil
@@ -1382,8 +1381,8 @@ func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpressio
 
 	if recordOccurrence {
 		checker.recordVariableReferenceOccurrence(
-			expression.StartPosition(),
-			expression.EndPosition(),
+			identifier.StartPosition(),
+			identifier.EndPosition(),
 			variable,
 		)
 	}
@@ -2132,8 +2131,7 @@ func (checker *Checker) checkIdentifierInvocationArgumentLabels(
 	invocationExpression *ast.InvocationExpression,
 	identifierExpression *ast.IdentifierExpression,
 ) {
-
-	variable := checker.findAndCheckVariable(identifierExpression, false)
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 
 	if variable == nil || len(variable.ArgumentLabels) == 0 {
 		return
@@ -3624,27 +3622,47 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
 	// TODO: check create expressions
 
-	checker.report(
-		&UnsupportedExpressionError{
-			common.ExpressionKindCreate,
-			expression.StartPosition(),
-			expression.EndPosition(),
-		},
-	)
+	ty := expression.InvocationExpression.Accept(checker)
 
-	return &InvalidType{}
+	// NOTE: not using `isResourceType`,
+	// as only direct resource types can be constructed
+	if compositeType, ok := ty.(*CompositeType); !ok ||
+		compositeType.Kind != common.CompositeKindResource {
+
+		checker.report(
+			&InvalidConstructionError{
+				StartPos: expression.InvocationExpression.StartPosition(),
+				EndPos:   expression.InvocationExpression.EndPosition(),
+			},
+		)
+	}
+
+	return ty
 }
 
-func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	// TODO: check destroy expressions
+func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) (resultType ast.Repr) {
+	resultType = &VoidType{}
 
-	checker.report(
-		&UnsupportedExpressionError{
-			common.ExpressionKindDestroy,
-			expression.StartPosition(),
-			expression.EndPosition(),
-		},
-	)
+	valueType := expression.Expression.Accept(checker).(Type)
 
-	return &InvalidType{}
+	// NOTE: not using `isResourceType`,
+	// as only direct resource types can be destructed
+	if compositeType, ok := valueType.(*CompositeType); !ok ||
+		compositeType.Kind != common.CompositeKindResource {
+
+		checker.report(
+			&InvalidDestructionError{
+				StartPos: expression.Expression.StartPosition(),
+				EndPos:   expression.Expression.EndPosition(),
+			},
+		)
+
+		return
+	}
+
+	if _, ok := expression.Expression.(*ast.IdentifierExpression); ok {
+		// TODO: record destruction of resource
+	}
+
+	return
 }

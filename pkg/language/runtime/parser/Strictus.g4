@@ -376,12 +376,36 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : Create identifier invocation                                      # CreateExpression
-    | Destroy expression                                                # DestroyExpression
-    | identifier                                                        # IdentifierExpression
-    | literal                                                           # LiteralExpression
-    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                                # NestedExpression
+    : createExpression
+    | destroyExpression
+    | identifierExpression
+    | literalExpression
+    | functionExpression
+    | nestedExpression
+    ;
+
+createExpression
+    : Create identifier invocation
+    ;
+
+destroyExpression
+    : Destroy expression
+    ;
+
+identifierExpression
+    : identifier
+    ;
+
+literalExpression
+    : literal
+    ;
+
+functionExpression
+    : Fun parameterList (':' returnType=typeAnnotation)? functionBlock
+    ;
+
+nestedExpression
+    : '(' expression ')'
     ;
 
 expressionAccess
