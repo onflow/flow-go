@@ -1303,3 +1303,23 @@ func (e *MissingCreateError) StartPosition() ast.Position {
 func (e *MissingCreateError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// MissingMoveOperationError
+
+type MissingMoveOperationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveOperationError) Error() string {
+	return "missing move operation: `<-`"
+}
+
+func (*MissingMoveOperationError) isSemanticError() {}
+
+func (e *MissingMoveOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveOperationError) EndPosition() ast.Position {
+	return e.Pos
+}

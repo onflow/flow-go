@@ -167,10 +167,11 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -216,10 +217,11 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -572,10 +574,11 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -621,10 +624,11 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -754,10 +758,11 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): <-T) = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -803,10 +808,11 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): T) = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -908,7 +914,7 @@ func TestCheckUnaryMove(t *testing.T) {
       resource X {}
 
       fun foo(x: <-X): <-X {
-          return x
+          return <-x
       }
 
       var x <- foo(x: <-create X())

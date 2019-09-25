@@ -1041,20 +1041,39 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				},
 			)
 		}
-	} else if !isInvalidType(returnType) &&
-		!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+	} else if !isInvalidType(returnType) {
 
-		checker.report(
-			&TypeMismatchError{
-				ExpectedType: returnType,
-				ActualType:   valueType,
-				StartPos:     statement.Expression.StartPosition(),
-				EndPos:       statement.Expression.EndPosition(),
-			},
-		)
+		if checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+			checker.checkReturnStatementMoveOperation(statement.Expression, valueType)
+		} else {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: returnType,
+					ActualType:   valueType,
+					StartPos:     statement.Expression.StartPosition(),
+					EndPos:       statement.Expression.EndPosition(),
+				},
+			)
+		}
 	}
 
 	return nil
+}
+
+func (checker *Checker) checkReturnStatementMoveOperation(valueExpression ast.Expression, valueType Type) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	if unaryExpression, ok := valueExpression.(*ast.UnaryExpression); !ok ||
+		unaryExpression.Operation != ast.OperationMove {
+
+		checker.report(
+			&MissingMoveOperationError{
+				Pos: valueExpression.StartPosition(),
+			},
+		)
+	}
 }
 
 func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {

@@ -1409,16 +1409,16 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
               }
 
               fun test(): %[2]sTest {
-                  return %[3]s Test()
+                  return %[2]s%[3]s Test()
               }
           }
 
           fun test(): %[2]sTest {
-              return %[3]s Test()
+              return %[2]s%[3]s Test()
           }
 
           fun test2(): %[2]sTest {
-              return (%[3]s Test()).test()
+              return %[2]s(%[3]s Test()).test()
           }
         `,
 			kind.Keyword(),
@@ -1504,7 +1504,7 @@ func TestCheckCompositeFunction(t *testing.T) {
                 }
 
                 fun bar(): %[2]sX {
-                    return self
+                    return %[2]s self
                 }
             }
 	    `, kind.Keyword(), kind.Annotation()))
@@ -1531,7 +1531,7 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
           var tests = 0
 
           fun test(): %[1]sTest {
-              return %[2]s Test()
+              return %[1]s %[2]s Test()
           }
 
           %[3]s Test {
