@@ -1361,3 +1361,71 @@ func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
 }
+
+func TestCheckResourceAssignmentTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+
+      fun test() {
+         var x2 <- create X()
+         destroy x2
+         x2 <- x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+
+      fun test() {
+        var x2 <- create X()
+        destroy x2
+        x2 = x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+}
+
+func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      fun test() {
+        var x2 = X()
+        x2 <- x
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+}
