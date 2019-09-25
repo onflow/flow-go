@@ -1194,3 +1194,28 @@ func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
 func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
+
+// IncorrectTransferOperationError
+
+type IncorrectTransferOperationError struct {
+	ActualOperation   ast.TransferOperation
+	ExpectedOperation ast.TransferOperation
+	Pos               ast.Position
+}
+
+func (e *IncorrectTransferOperationError) Error() string {
+	return fmt.Sprintf(
+		"incorrect transfer operation: expected `%s`",
+		e.ExpectedOperation.Operator(),
+	)
+}
+
+func (*IncorrectTransferOperationError) isSemanticError() {}
+
+func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
+	return e.Pos
+}

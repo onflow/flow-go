@@ -239,11 +239,16 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
+    : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
 assignment
-    : identifier expressionAccess* ('=' | Move) expression
+    : identifier expressionAccess* transfer expression
+    ;
+
+transfer
+    : '='
+    | Move
     ;
 
 expression

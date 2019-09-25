@@ -254,6 +254,12 @@ func (s *BaseStrictusListener) EnterAssignment(ctx *AssignmentContext) {}
 // ExitAssignment is called when production assignment is exited.
 func (s *BaseStrictusListener) ExitAssignment(ctx *AssignmentContext) {}
 
+// EnterTransfer is called when production transfer is entered.
+func (s *BaseStrictusListener) EnterTransfer(ctx *TransferContext) {}
+
+// ExitTransfer is called when production transfer is exited.
+func (s *BaseStrictusListener) ExitTransfer(ctx *TransferContext) {}
+
 // EnterExpression is called when production expression is entered.
 func (s *BaseStrictusListener) EnterExpression(ctx *ExpressionContext) {}
 

@@ -2622,23 +2622,28 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
               var foo: Int
 
               init() {
                   self.foo = 1
-                  let alsoSelf = self
+                  let alsoSelf %[2]s self
                   alsoSelf.foo = 2
               }
 
               fun test() {
                   self.foo = 3
-                  let alsoSelf = self
+                  let alsoSelf %[2]s self
                   alsoSelf.foo = 4
               }
           }
-	    `, kind.Keyword()))
+	    `,
+			kind.Keyword(),
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -2658,17 +2663,22 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
               init() {
-                  self = Test()
+                  self %[2]s Test()
               }
 
               fun test() {
-                  self = Test()
+                  self %[2]s Test()
               }
           }
-	    `, kind.Keyword()))
+	    `,
+			kind.Keyword(),
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -2914,21 +2924,26 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s Test {
 
               init(x: Int) {
-                  let test: %[2]sTest = Test(x: 1)
+                  let test: %[2]sTest %[3]s Test(x: 1)
               }
 
               fun test() {
-                  let test: %[2]sTest = Test(x: 2)
+                  let test: %[2]sTest %[3]s Test(x: 2)
               }
           }
 
-          let test: %[2]sTest = Test(x: 3)
-    	`, kind.Keyword(), annotation))
+          let test: %[2]sTest %[3]s Test(x: 3)
+    	`,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -3063,6 +3078,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 		for _, secondKind := range common.CompositeKinds {
 
 			annotation := getCompositeKindAnnotation(firstKind)
+			transferOperator := getCompositeKindTransferOperator(firstKind)
 
 			_, err := parseAndCheck(fmt.Sprintf(`
               %[1]s Foo {
@@ -3073,8 +3089,13 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
                   init() {}
               }
 
-              let foo: %[3]sFoo = Bar()
-    	    `, firstKind.Keyword(), secondKind.Keyword(), annotation))
+              let foo: %[3]sFoo %[4]s Bar()
+    	    `,
+				firstKind.Keyword(),
+				secondKind.Keyword(),
+				annotation,
+				transferOperator,
+			))
 
 			// TODO: add support for non-structure declarations
 
@@ -3174,8 +3195,10 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
               let foo: Int
 
               init() {
@@ -3183,8 +3206,8 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
               }
           }
 
-	      let test = Test()
-	    `, kind.Keyword()))
+	      let test %[2]s Test()
+	    `, kind.Keyword(), transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -3204,14 +3227,16 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
 
               init(x: Int) {}
           }
 
-	      let test = Test(x: 1)
-	    `, kind.Keyword()))
+	      let test %[2]s Test(x: 1)
+	    `, kind.Keyword(), transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -3231,14 +3256,17 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		transferOperator := getCompositeKindTransferOperator(kind)
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s Test {
+          %[1]s Test {
 
               init(x: Int) {}
           }
 
-	      let test = Test(1)
-	    `, kind.Keyword()))
+	      let test %[2]s Test(1)
+
+	    `, kind.Keyword(), transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -3382,6 +3410,13 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 func getCompositeKindAnnotation(kind common.CompositeKind) string {
 	if kind != common.CompositeKindResource {
 		return ""
+	}
+	return "<-"
+}
+
+func getCompositeKindTransferOperator(kind common.CompositeKind) string {
+	if kind != common.CompositeKindResource {
+		return "="
 	}
 	return "<-"
 }
@@ -4595,13 +4630,18 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheckWithExtra(
 			fmt.Sprintf(`
-              %s interface Test {}
+              %[1]s interface Test {}
 
-              let test: %sTest = panic("")
-            `, kind.Keyword(), annotation),
+              let test: %[2]sTest %[3]s panic("")
+            `,
+				kind.Keyword(),
+				annotation,
+				transferOperator,
+			),
 			stdlib.StandardLibraryFunctions{
 				stdlib.PanicFunction,
 			}.ToValueDeclarations(),
@@ -4628,14 +4668,19 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
 
           %[1]s TestImpl: Test {}
 
-          let test: %[2]sTest = TestImpl()
-	    `, kind.Keyword(), annotation))
+          let test: %[2]sTest %[3]s TestImpl()
+	    `,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -4666,14 +4711,20 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 			}
 
 			annotation := getCompositeKindAnnotation(firstKind)
+			transferOperator := getCompositeKindTransferOperator(firstKind)
 
 			_, err := parseAndCheck(fmt.Sprintf(`
-              %s interface Test {}
+              %[1]s interface Test {}
 
-              %s TestImpl: Test {}
+              %[2]s TestImpl: Test {}
 
-              let test: %sTest = TestImpl()
-	        `, firstKind.Keyword(), secondKind.Keyword(), annotation))
+              let test: %[3]sTest %[4]s TestImpl()
+	        `,
+				firstKind.Keyword(),
+				secondKind.Keyword(),
+				annotation,
+				transferOperator,
+			))
 
 			// TODO: add support for non-structure declarations
 
@@ -4700,6 +4751,7 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
@@ -4707,8 +4759,12 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
           // NOTE: not declaring conformance
           %[1]s TestImpl {}
 
-          let test: %[2]sTest = TestImpl()
-	  `, kind.Keyword(), annotation))
+          let test: %[2]sTest %[3]s TestImpl()
+	    `,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -4764,6 +4820,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {
@@ -4778,10 +4835,11 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
               }
           }
 
-          let test: %[2]sTest = TestImpl(x: 1)
+          let test: %[2]sTest %[3]s TestImpl(x: 1)
 
           let x = test.x
-        `, kind.Keyword(), annotation))
+
+        `, kind.Keyword(), annotation, transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -4805,6 +4863,7 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
@@ -4817,10 +4876,14 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
               }
           }
 
-          let test: %[2]sTest = TestImpl(x: 1)
+          let test: %[2]sTest %[3]s TestImpl(x: 1)
 
           let x = test.x
-    	`, kind.Keyword(), annotation))
+    	`,
+			kind.Keyword(),
+			annotation,
+			transferOperator,
+		))
 
 		// TODO: add support for non-structure declarations
 
@@ -4849,6 +4912,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {
@@ -4861,10 +4925,10 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
               }
           }
 
-          let test: %[2]sTest = TestImpl()
+          let test: %[2]sTest %[3]s TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword(), annotation))
+	    `, kind.Keyword(), annotation, transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -4888,6 +4952,7 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface Test {}
@@ -4898,10 +4963,10 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
               }
           }
 
-          let test: %sTest = TestImpl()
+          let test: %[2]sTest %[3]s TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword(), annotation))
+	    `, kind.Keyword(), annotation, transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -6591,14 +6656,15 @@ func TestCheckArraySubtyping(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface I {}
           %[1]s S: I {}
 
-          let xs: %[2]s[S] = []
-          let ys: %[2]s[I] = xs
-	    `, kind.Keyword(), annotation))
+          let xs: %[2]s[S] %[3]s []
+          let ys: %[2]s[I] %[3]s xs
+	    `, kind.Keyword(), annotation, transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -6636,14 +6702,15 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		annotation := getCompositeKindAnnotation(kind)
+		transferOperator := getCompositeKindTransferOperator(kind)
 
 		_, err := parseAndCheck(fmt.Sprintf(`
           %[1]s interface I {}
           %[1]s S: I {}
 
-          let xs: %[2]s{String: S} = {}
-          let ys: %[2]s{String: I} = xs
-	    `, kind.Keyword(), annotation))
+          let xs: %[2]s{String: S} %[3]s {}
+          let ys: %[2]s{String: I} %[3]s xs
+	    `, kind.Keyword(), annotation, transferOperator))
 
 		// TODO: add support for non-structure declarations
 
@@ -6709,7 +6776,7 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
       resource X {}
 
       fun test() {
-          var x <- create X()
+          var x = create X()
           destroy x
       }
 	`)
@@ -6717,6 +6784,7 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
 	// TODO: add support for resources
 	// TODO: add support for create expressions
 	// TODO: add support for destroy expressions
+	// TODO: use moving transfer operator once create expression is supported
 
 	errs := expectCheckerErrors(err, 3)
 
@@ -7092,11 +7160,16 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
-			_, err := parseAndCheck(fmt.Sprintf(`
-              %s T {}
+			transferOperator := getCompositeKindTransferOperator(kind)
 
-              let test: <-T <- T()
-	        `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test: <-T %[2]s T()
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -7138,11 +7211,16 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
-			_, err := parseAndCheck(fmt.Sprintf(`
-              %s T {}
+			transferOperator := getCompositeKindTransferOperator(kind)
 
-              let test: T <- T()
-	        `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test: T %[2]s T()
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -7182,16 +7260,21 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
+			transferOperator := getCompositeKindTransferOperator(kind)
+
 			_, err := parseAndCheck(fmt.Sprintf(`
               %[1]s T {}
 
               %[1]s U {
                   let t: <-T
                   init(t: <-T) {
-                      self.t = t
+                      self.t %[2]s t
                   }
               }
-	        `, kind.Keyword()))
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -7249,16 +7332,21 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
+			transferOperator := getCompositeKindTransferOperator(kind)
+
 			_, err := parseAndCheck(fmt.Sprintf(`
               %[1]s T {}
 
               %[1]s U {
                   let t: T
                   init(t: T) {
-                      self.t = t
+                      self.t %[2]s t
                   }
               }
-	        `, kind.Keyword()))
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -7677,11 +7765,16 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
-			_, err := parseAndCheck(fmt.Sprintf(`
-              %s T {}
+			transferOperator := getCompositeKindTransferOperator(kind)
 
-              let test = T() as? <-T
-	        `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test %[2]s T() as? <-T
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -7738,11 +7831,16 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 			RegisterTestingT(t)
 
-			_, err := parseAndCheck(fmt.Sprintf(`
-              %s T {}
+			transferOperator := getCompositeKindTransferOperator(kind)
 
-              let test = T() as? T
-	        `, kind.Keyword()))
+			_, err := parseAndCheck(fmt.Sprintf(`
+              %[1]s T {}
+
+              let test %[2]s T() as? T
+	        `,
+				kind.Keyword(),
+				transferOperator,
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
