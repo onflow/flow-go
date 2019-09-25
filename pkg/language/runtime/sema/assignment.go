@@ -299,7 +299,8 @@ func (analyzer *AssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpres
 }
 
 func (analyzer *AssignmentAnalyzer) VisitFunctionExpression(*ast.FunctionExpression) ast.Repr {
-	// TODO: handle anonymous functions
+	// TODO: decide how to handle `self` captured inside a function expression
+	// https://github.com/dapperlabs/flow-go/issues/726
 	return analyzer.assignments
 }
 
