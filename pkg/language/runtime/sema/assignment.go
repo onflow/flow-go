@@ -188,7 +188,7 @@ func (analyzer *AssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatemen
 	node.Value.Accept(analyzer)
 
 	if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
-		if !analyzer.isSelfExpression(node.Target) {
+		if analyzer.isSelfExpression(memberExpression.Expression) {
 			return analyzer.assignments.Insert(memberExpression.Identifier)
 		}
 	}
