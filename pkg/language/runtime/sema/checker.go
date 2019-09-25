@@ -2467,6 +2467,8 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	// TODO: also check nested composite members' identifiers
 
+	// TODO: also check nested composite fields' type annotations
+
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
@@ -2482,24 +2484,22 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		initializerKindComposite,
 	)
 
-	if compositeType != nil {
-		checker.checkFieldsInitialized(declaration, compositeType)
+	checker.checkFieldsInitialized(declaration, compositeType)
 
-		checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
+	checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
 
-		// check composite conforms to interfaces.
-		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
+	// check composite conforms to interfaces.
+	// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
-		for i, interfaceType := range compositeType.Conformances {
-			conformance := declaration.Conformances[i]
+	for i, interfaceType := range compositeType.Conformances {
+		conformance := declaration.Conformances[i]
 
-			checker.checkCompositeConformance(
-				compositeType,
-				interfaceType,
-				declaration.Identifier.Pos,
-				conformance.Identifier,
-			)
-		}
+		checker.checkCompositeConformance(
+			compositeType,
+			interfaceType,
+			declaration.Identifier.Pos,
+			conformance.Identifier,
+		)
 	}
 
 	// TODO: support non-structure composites, such as contracts and resources
@@ -2806,7 +2806,11 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each field
 	for _, field := range fields {
-		fieldType := checker.ConvertType(field.TypeAnnotation.Type)
+		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
+
+		fieldType := fieldTypeAnnotation.Type
+
+		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
 
 		identifier := field.Identifier.Identifier
 
