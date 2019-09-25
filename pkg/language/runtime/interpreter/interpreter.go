@@ -1629,9 +1629,9 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 }
 
 func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.InvocationExpression.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.Expression.Accept(interpreter)
 }
