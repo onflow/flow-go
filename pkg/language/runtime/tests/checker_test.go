@@ -2948,9 +2948,9 @@ func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
           let x = 1
-          %s Foo {}
-          %s Foo {}
-	    `, kind.Keyword(), kind.Keyword()))
+          %[1]s Foo {}
+          %[1]s Foo {}
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -3318,6 +3318,11 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := ""
+		if kind == common.CompositeKindResource {
+			annotation = "<-"
+		}
+
 		checker, err := parseAndCheck(fmt.Sprintf(`
           %s Test {
 
@@ -3325,19 +3330,19 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
                   Test
               }
 
-              fun test(): Test {
+              fun test(): %[2]sTest {
                   return Test()
               }
           }
 
-          fun test(): Test {
+          fun test(): %[2]sTest {
              return Test()
           }
 
-          fun test2(): Test {
+          fun test2(): %[2]sTest {
              return Test().test()
           }
-	    `, kind.Keyword()))
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -3410,17 +3415,22 @@ func TestCheckCompositeFunction(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := ""
+		if kind == common.CompositeKindResource {
+			annotation = "<-"
+		}
+
 		_, err := parseAndCheck(fmt.Sprintf(`
-            %s X {
-                fun foo(): ((): X) {
+            %[1]s X {
+                fun foo(): ((): %[2]sX) {
                     return self.bar
                 }
 
-                fun bar(): X {
+                fun bar(): %[2]sX {
                     return self
                 }
             }
-	    `, kind.Keyword()))
+	    `, kind.Keyword(), annotation))
 
 		// TODO: add support for non-structure declarations
 
@@ -3869,10 +3879,15 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
+		annotation := ""
+		if kind == common.CompositeKindResource {
+			annotation = "<-"
+		}
+
 		_, err := parseAndCheck(fmt.Sprintf(`
           var tests = 0
 
-          fun test(): Test {
+          fun test(): %sTest {
               return Test()
           }
 
@@ -3881,7 +3896,7 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
                  tests = tests + 1
              }
           }
-        `, kind.Keyword()))
+        `, annotation, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4609,12 +4624,12 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {}
+          %[1]s interface Test {}
 
-          %s TestImpl: Test {}
+          %[1]s TestImpl: Test {}
 
           let test: Test = TestImpl()
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4677,13 +4692,13 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {}
+          %[1]s interface Test {}
 
           // NOTE: not declaring conformance
-          %s TestImpl {}
+          %[1]s TestImpl {}
 
           let test: Test = TestImpl()
-	  `, kind.Keyword(), kind.Keyword()))
+	  `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4739,11 +4754,11 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               x: Int
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               var x: Int
 
               init(x: Int) {
@@ -4754,7 +4769,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
           let test: Test = TestImpl(x: 1)
 
           let x = test.x
-        `, kind.Keyword(), kind.Keyword()))
+        `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4778,9 +4793,9 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {}
+          %[1]s interface Test {}
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               var x: Int
 
               init(x: Int) {
@@ -4791,7 +4806,7 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
           let test: Test = TestImpl(x: 1)
 
           let x = test.x
-    	`, kind.Keyword(), kind.Keyword()))
+    	`, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4820,11 +4835,11 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               fun test(): Int
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               fun test(): Int {
                   return 2
               }
@@ -4833,7 +4848,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
           let test: Test = TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4857,9 +4872,9 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {}
+          %[1]s interface Test {}
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               fun test(): Int {
                   return 2
               }
@@ -4868,7 +4883,7 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
           let test: Test = TestImpl()
 
           let val = test.test()
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4897,14 +4912,14 @@ func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               init(x: Int)
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               init(x: Bool) {}
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4933,13 +4948,13 @@ func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               init(x: Int)
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -4968,12 +4983,12 @@ func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               fun test(): Int
           }
 
-          %s TestImpl: Test {}
-	    `, kind.Keyword(), kind.Keyword()))
+          %[1]s TestImpl: Test {}
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5002,16 +5017,16 @@ func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               fun test(): Int
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               fun test(): Bool {
                   return true
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5041,12 +5056,13 @@ func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
                x: Int
           }
 
-          %s TestImpl: Test {}
-	    `, kind.Keyword(), kind.Keyword()))
+          %[1]s TestImpl: Test {}
+
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5075,17 +5091,17 @@ func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               x: Int
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               var x: Bool
               init(x: Bool) {
                  self.x = x
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5115,16 +5131,16 @@ func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T)
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               x: Bool
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               fun x(): Bool {
                   return true
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5154,18 +5170,18 @@ func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T)
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               fun x(): Bool
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               var x: Bool
 
               init(x: Bool) {
                  self.x = x
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5195,18 +5211,18 @@ func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               let x: Bool
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               var x: Bool
 
               init(x: Bool) {
                  self.x = x
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5235,18 +5251,18 @@ func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface Test {
+          %[1]s interface Test {
               var x: Bool
           }
 
-          %s TestImpl: Test {
+          %[1]s TestImpl: Test {
               let x: Bool
 
               init(x: Bool) {
                  self.x = x
               }
           }
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5276,12 +5292,12 @@ func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface X {}
+          %[1]s interface X {}
 
-          %s interface Y {}
+          %[1]s interface Y {}
 
-          %s TestImpl: X, Y, X {}
-	    `, kind.Keyword(), kind.Keyword(), kind.Keyword()))
+          %[1]s TestImpl: X, Y, X {}
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -5380,13 +5396,18 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
+			annotation := ""
+			if firstKind == common.CompositeKindResource {
+				annotation = "<-"
+			}
+
 			_, err := parseAndCheck(fmt.Sprintf(`
               %s S {}
 
               %s interface I {
-                  fun s(): S
+                  fun s(): %sS
               }
-	        `, firstKind.Keyword(), secondKind.Keyword()))
+	        `, firstKind.Keyword(), secondKind.Keyword(), annotation))
 
 			expectedErrorCount := 0
 			if firstKind != common.CompositeKindStructure {
@@ -6553,12 +6574,12 @@ func TestCheckArraySubtyping(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface I {}
-          %s S: I {}
+          %[1]s interface I {}
+          %[1]s S: I {}
 
           let xs: [S] = []
           let ys: [I] = xs
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -6596,12 +6617,12 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		_, err := parseAndCheck(fmt.Sprintf(`
-          %s interface I {}
-          %s S: I {}
+          %[1]s interface I {}
+          %[1]s S: I {}
 
           let xs: {String: S} = {}
           let ys: {String: I} = xs
-	    `, kind.Keyword(), kind.Keyword()))
+	    `, kind.Keyword()))
 
 		// TODO: add support for non-structure declarations
 
@@ -6859,3 +6880,142 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
 }
+
+func TestCheckResourceParameterWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(r: <-R) {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceParameterWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(r: R) {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+}
+
+func TestCheckStructParameterWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      fun test(r: S) {}
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructParameterWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      fun test(r: <-S) {}
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+}
+
+func TestCheckResourceReturnTypeWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(): <-R {
+          return R()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceReturnTypeWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      resource R {}
+
+      fun test(): R {
+          return R()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := expectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveAnnotationError{}))
+}
+
+func TestCheckStructReturnTypeWithoutMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      fun test(): S {
+          return S()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+}
+
+func TestCheckInvalidStructReturnTypeWithMoveAnnotation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := parseAndCheck(`
+      struct S {}
+
+      fun test(): <-S {
+          return S()
+      }
+	`)
+
+	errs := expectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveAnnotationError{}))
+}
+
