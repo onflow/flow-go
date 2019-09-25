@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"errors"
 	"hash"
 
 	"golang.org/x/crypto/sha3"
@@ -11,9 +10,17 @@ import (
 func NewHashAlgo(name AlgoName) (Hasher, error) {
 	if name == SHA3_256 {
 		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
-		// Output length sanity check
-		if a.outputLength != a.Size() {
+		// Output length sanity check, size() is provided by Hash.hash
+		if a.outputSize != a.Size() {
 			return nil, cryptoError{string(SHA3_256) + " requires an output length " + string(a.Size())}
+		}
+		return a, nil
+	}
+	if name == SHA3_384 {
+		a := &(sha3_384Algo{&HashAlgo{name, HashLengthSha3_384, sha3.New384()}})
+		// Output length sanity check, size() is provided by Hash.hash
+		if a.outputSize != a.Size() {
+			return nil, cryptoError{string(SHA3_384) + " requires an output length " + string(a.Size())}
 		}
 		return a, nil
 	}
@@ -21,21 +28,25 @@ func NewHashAlgo(name AlgoName) (Hasher, error) {
 }
 
 // Hash is the hash algorithms output types
+type Hash []byte
 
-type Hash interface {
-	// Bytes returns the bytes representation of a hash
-	Bytes() []byte
-	// String returns a Hex string representation of the hash bytes in big endian
-	String() string
-	// IsEqual tests an equality with a given hash
-	IsEqual(Hash) bool
+func (h Hash) IsEqual(input Hash) bool {
+	if len(h) != len(input) {
+		return false
+	}
+	for i := 0; i < len(h); i++ {
+		if h[i] != input[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Hasher interface
 
 type Hasher interface {
 	Name() AlgoName
-	// Size return the hash output length (a Hash.hash method)
+	// Size returns the hash output length
 	Size() int
 	// Compute hash
 	ComputeBytesHash([]byte) Hash
@@ -51,14 +62,19 @@ type Hasher interface {
 
 // HashAlgo
 type HashAlgo struct {
-	name         AlgoName
-	outputLength int
+	name       AlgoName
+	outputSize int
 	hash.Hash
 }
 
 // Name returns the name of the algorithm
 func (a *HashAlgo) Name() AlgoName {
 	return a.name
+}
+
+// Name returns the size of the output
+func (a *HashAlgo) Size() int {
+	return a.outputSize
 }
 
 // AddBytes adds bytes to the current hash state
@@ -71,17 +87,10 @@ func (a *HashAlgo) AddStruct(struc Encoder) {
 	a.Write(struc.Encode())
 }
 
-// BytesToHash converts a byte slice to a hash instance.
-func BytesToHash(b []byte) (Hash, error) {
-	if len(b) == 32 {
-		var h Hash32
-		copy(h[:], b[:])
-		return &h, nil
-	}
-
-	// TODO: add support for Hash64
-
-	return nil, errors.New("invalid hash length")
+func BytesToHash(b []byte) Hash {
+	h := make([]byte, len(b))
+	copy(h, b)
+	return h
 }
 
 // HashesToBytes converts a slice of hashes to a slice of byte slices.
@@ -89,7 +98,7 @@ func HashesToBytes(hashes []Hash) [][]byte {
 	b := make([][]byte, len(hashes))
 
 	for i, h := range hashes {
-		b[i] = h.Bytes()
+		b[i] = h
 	}
 
 	return b

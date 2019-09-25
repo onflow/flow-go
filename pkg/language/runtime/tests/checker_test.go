@@ -7095,7 +7095,6 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 }
 
 func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
