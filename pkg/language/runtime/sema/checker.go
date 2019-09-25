@@ -3559,7 +3559,12 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 
 	leftHandExpression := expression.Expression
 	leftHandType := leftHandExpression.Accept(checker).(Type)
-	rightHandType := checker.ConvertType(expression.TypeAnnotation.Type)
+
+	rightHandTypeAnnotation := checker.ConvertTypeAnnotation(expression.TypeAnnotation)
+	checker.checkTypeAnnotation(rightHandTypeAnnotation, expression.TypeAnnotation.StartPos)
+
+	rightHandType := rightHandTypeAnnotation.Type
+
 	checker.FailableDowncastingTypes[expression] = rightHandType
 
 	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
