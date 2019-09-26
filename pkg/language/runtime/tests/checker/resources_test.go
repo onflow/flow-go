@@ -1168,7 +1168,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 			}
 	
 			fun createResource(): <-Foo {
-				return create Foo()
+				return <-create Foo()
 			}
 	
 			fun test() {
