@@ -71,7 +71,8 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 }
 
 func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, error) {
-	log.Debug(fmt.Sprintf("%d Receiving a share from %d, the share is %d\n", s.currentIndex, origin, data))
+	log.Debug(fmt.Sprintf("%d Receiving a share from %d\n", s.currentIndex, origin))
+	log.Debug(fmt.Sprintf("the share is %d\n", data))
 	if s.xReceived {
 		return invalid, nil
 	}
@@ -92,7 +93,8 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, erro
 }
 
 func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult, error) {
-	log.Debug(fmt.Sprintf("%d Receiving vector from %d, the share is %d\n", s.currentIndex, origin, data))
+	log.Debug(fmt.Sprintf("%d Receiving vector from %d\n", s.currentIndex, origin))
+	log.Debug(fmt.Sprintf("the vector is %d\n", data))
 	if s.AReceived {
 		return invalid, nil
 	}

@@ -30,6 +30,8 @@ type DKGstate interface {
 	EndDKG() (PrKey, PubKey, []PubKey, error)
 	// ProcessDKGmsg processes a new DKG message received by the current node
 	ProcessDKGmsg(int, DKGmsg) *DKGoutput
+	// IsRunning returns true if the DKG instance is running, false otherwise
+	IsRunning() bool
 }
 
 // NewDKG creates a new instance of a DKG protocol.
@@ -81,6 +83,11 @@ func (s *DKGcommon) Size() int {
 // Threshold returns the threshold value t
 func (s *DKGcommon) Threshold() int {
 	return s.threshold
+}
+
+// IsRunning tells if the instance is running
+func (s *DKGcommon) IsRunning() bool {
+	return s.isrunning
 }
 
 type dkgMsgTag byte
