@@ -202,50 +202,47 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
-func TestSubmitTransactionInvalidAccount(t *testing.T) {
-	RegisterTestingT(t)
+func TestSubmitTransactionInvalidPayerSignature(t *testing.T) {
+	t.Run("InvalidAccount", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	b := NewEmulatedBlockchain(DefaultOptions)
+		b := NewEmulatedBlockchain(DefaultOptions)
 
-	invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
+		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
 
-	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
-	}
+		tx1 := &types.Transaction{
+			Script:       []byte(addTwoScript),
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
 
-	tx1.SetPayerSignature(invalidAddress, b.RootKey())
+		tx1.SetPayerSignature(invalidAddress, b.RootKey())
 
-	// Submit invalid tx1 (errors)
-	err := b.SubmitTransaction(tx1)
-	Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
-}
+		err := b.SubmitTransaction(tx1)
 
-func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
-	RegisterTestingT(t)
+		Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
+	})
 
-	b := NewEmulatedBlockchain(DefaultOptions)
+	t.Run("InvalidKeyPair", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	// use key pair that does not exist on root account
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
+		b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
-	}
+		// use key-pair that does not exist on root account
+		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
 
-	tx1.SetPayerSignature(b.RootAccount(), invalidKey)
+		tx1 := &types.Transaction{
+			Script:       []byte(addTwoScript),
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
 
-	// Submit invalid tx1 (errors)
-	err := b.SubmitTransaction(tx1)
-	Expect(err).To(MatchError(
-		&ErrInvalidSignaturePublicKey{
-			Account: b.RootAccount(),
-		}),
-	)
+		tx1.SetPayerSignature(b.RootAccount(), invalidKey)
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccount()}))
+	})
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
@@ -583,7 +580,7 @@ func TestRuntimeLogger(t *testing.T) {
 		}
 	`))
 	Expect(err).ToNot(HaveOccurred())
-	Expect(loggedMessages).To(Equal([]string{"\"elephant ears\""}))
+	Expect(loggedMessages).To(Equal([]string{`"elephant ears"`}))
 }
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
