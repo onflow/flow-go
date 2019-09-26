@@ -28,7 +28,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 
 	// prepare the DKGToSend slice and compute the shares
 	out := &(DKGoutput{
-		result : valid, //result: nonApplicable,
+		result: valid, //result: nonApplicable,
 		err:    nil,
 	})
 
@@ -64,6 +64,9 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	data[0] = byte(FeldmanVSSVerifVec)
 	writeVerifVector(data[1:], s.A)
 	toBroadcast.data = DKGmsg(data)
+
+	s.AReceived = true
+	s.xReceived = true
 	return out
 }
 
@@ -80,8 +83,9 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, erro
 		(*C.uchar)((unsafe.Pointer)(&data[0])),
 		PrKeyLengthBLS_BLS12381,
 	)
+
 	s.xReceived = true
-	if s.A != nil {
+	if s.AReceived {
 		return s.verifyShare(), nil
 	}
 	return valid, nil
@@ -89,7 +93,7 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, erro
 
 func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult, error) {
 	log.Debug(fmt.Sprintf("%d Receiving vector from %d, the share is %d\n", s.currentIndex, origin, data))
-	if s.A != nil {
+	if s.AReceived {
 		return invalid, nil
 	}
 	if (PubKeyLengthBLS_BLS12381+1)*(s.threshold+1) != len(data) {
@@ -100,6 +104,8 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult
 	readVerifVector(s.A, data)
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
+
+	s.AReceived = true
 	if s.xReceived {
 		return s.verifyShare(), nil
 	}
@@ -143,7 +149,6 @@ func (s *feldmanVSSstate) verifyShare() dkgResult {
 		return valid
 	}
 	return invalid
-
 }
 
 // compute the nodes public keys from the verification vector

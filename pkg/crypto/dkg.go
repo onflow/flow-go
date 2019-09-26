@@ -32,6 +32,9 @@ type DKGstate interface {
 	ProcessDKGmsg(int, DKGmsg) *DKGoutput
 }
 
+// NewDKG creates a new instance of a DKG protocol.
+// An instance is run by a single node and is usable for only one protocol.
+// In order to rerun the protocol again, a new instance needs to be created
 func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
 	if currentIndex >= size || leaderIndex >= size {
 		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}

@@ -14,7 +14,8 @@ type feldmanVSSstate struct {
 	a []scalar
 	// Public data of the group, the vector size is (t+1)
 	// A_0 is the group public key
-	A []pointG2
+	A         []pointG2
+	AReceived bool
 	// Private share of the current node
 	x         scalar
 	xReceived bool
@@ -31,6 +32,7 @@ func (s *feldmanVSSstate) init() {
 	s.A = nil
 	s.y = nil
 	s.xReceived = false
+	s.AReceived = false
 }
 
 func (s *feldmanVSSstate) StartDKG() *DKGoutput {
