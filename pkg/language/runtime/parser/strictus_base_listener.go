@@ -26,6 +26,12 @@ func (s *BaseStrictusListener) EnterProgram(ctx *ProgramContext) {}
 // ExitProgram is called when production program is exited.
 func (s *BaseStrictusListener) ExitProgram(ctx *ProgramContext) {}
 
+// EnterReplInput is called when production replInput is entered.
+func (s *BaseStrictusListener) EnterReplInput(ctx *ReplInputContext) {}
+
+// ExitReplInput is called when production replInput is exited.
+func (s *BaseStrictusListener) ExitReplInput(ctx *ReplInputContext) {}
+
 // EnterDeclaration is called when production declaration is entered.
 func (s *BaseStrictusListener) EnterDeclaration(ctx *DeclarationContext) {}
 
@@ -339,6 +345,12 @@ func (s *BaseStrictusListener) EnterPrimaryExpression(ctx *PrimaryExpressionCont
 
 // ExitPrimaryExpression is called when production primaryExpression is exited.
 func (s *BaseStrictusListener) ExitPrimaryExpression(ctx *PrimaryExpressionContext) {}
+
+// EnterComposedExpression is called when production composedExpression is entered.
+func (s *BaseStrictusListener) EnterComposedExpression(ctx *ComposedExpressionContext) {}
+
+// ExitComposedExpression is called when production composedExpression is exited.
+func (s *BaseStrictusListener) ExitComposedExpression(ctx *ComposedExpressionContext) {}
 
 // EnterPrimaryExpressionSuffix is called when production primaryExpressionSuffix is entered.
 func (s *BaseStrictusListener) EnterPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) {}

@@ -10,6 +10,9 @@ type StrictusListener interface {
 	// EnterProgram is called when entering the program production.
 	EnterProgram(c *ProgramContext)
 
+	// EnterReplInput is called when entering the replInput production.
+	EnterReplInput(c *ReplInputContext)
+
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
@@ -166,6 +169,9 @@ type StrictusListener interface {
 	// EnterPrimaryExpression is called when entering the primaryExpression production.
 	EnterPrimaryExpression(c *PrimaryExpressionContext)
 
+	// EnterComposedExpression is called when entering the composedExpression production.
+	EnterComposedExpression(c *ComposedExpressionContext)
+
 	// EnterPrimaryExpressionSuffix is called when entering the primaryExpressionSuffix production.
 	EnterPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
 
@@ -267,6 +273,9 @@ type StrictusListener interface {
 
 	// ExitProgram is called when exiting the program production.
 	ExitProgram(c *ProgramContext)
+
+	// ExitReplInput is called when exiting the replInput production.
+	ExitReplInput(c *ReplInputContext)
 
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
@@ -423,6 +432,9 @@ type StrictusListener interface {
 
 	// ExitPrimaryExpression is called when exiting the primaryExpression production.
 	ExitPrimaryExpression(c *PrimaryExpressionContext)
+
+	// ExitComposedExpression is called when exiting the composedExpression production.
+	ExitComposedExpression(c *ComposedExpressionContext)
 
 	// ExitPrimaryExpressionSuffix is called when exiting the primaryExpressionSuffix production.
 	ExitPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)

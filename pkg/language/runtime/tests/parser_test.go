@@ -4858,3 +4858,109 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 	Expect(actual).
 		To(Equal(expected))
 }
+
+func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+          let r <- create R()
+          (fun () {})()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &FunctionDeclaration{
+		Access: AccessNotSpecified,
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Parameters: nil,
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&VariableDeclaration{
+						IsConstant: true,
+						Identifier: Identifier{
+							Identifier: "r",
+							Pos:        Position{Offset: 34, Line: 3, Column: 14},
+						},
+						TypeAnnotation: nil,
+						Value: &CreateExpression{
+							InvocationExpression: &InvocationExpression{
+								InvokedExpression: &IdentifierExpression{
+									Identifier: Identifier{
+										Identifier: "R",
+										Pos:        Position{Offset: 46, Line: 3, Column: 26},
+									},
+								},
+								Arguments: nil,
+								EndPos:    Position{Offset: 48, Line: 3, Column: 28},
+							},
+							StartPos: Position{Offset: 39, Line: 3, Column: 19},
+						},
+						Transfer: &Transfer{
+							Operation: TransferOperationMove,
+							Pos:       Position{Offset: 36, Line: 3, Column: 16},
+						},
+						StartPos: Position{Offset: 30, Line: 3, Column: 10},
+					},
+					&ExpressionStatement{
+						Expression: &InvocationExpression{
+							InvokedExpression: &FunctionExpression{
+								Parameters: nil,
+								ReturnTypeAnnotation: &TypeAnnotation{
+									Move: false,
+									Type: &NominalType{
+										Identifier: Identifier{
+											Identifier: "",
+											Pos:        Position{Offset: 66, Line: 4, Column: 16},
+										},
+									},
+									StartPos: Position{Offset: 66, Line: 4, Column: 16},
+								},
+								FunctionBlock: &FunctionBlock{
+									Block: &Block{
+										Statements: nil,
+										StartPos:   Position{Offset: 68, Line: 4, Column: 18},
+										EndPos:     Position{Offset: 69, Line: 4, Column: 19},
+									},
+									PreConditions:  nil,
+									PostConditions: nil,
+								},
+								StartPos: Position{Offset: 61, Line: 4, Column: 11},
+							},
+							Arguments: nil,
+							EndPos:    Position{Offset: 72, Line: 4, Column: 22},
+						},
+					},
+				},
+				StartPos: Position{Offset: 18, Line: 2, Column: 17},
+				EndPos:   Position{Offset: 80, Line: 5, Column: 6},
+			},
+			PreConditions:  nil,
+			PostConditions: nil,
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}

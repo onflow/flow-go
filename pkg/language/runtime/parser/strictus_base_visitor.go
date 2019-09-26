@@ -11,6 +11,10 @@ func (v *BaseStrictusVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitReplInput(ctx *ReplInputContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -216,6 +220,10 @@ func (v *BaseStrictusVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) 
 }
 
 func (v *BaseStrictusVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitComposedExpression(ctx *ComposedExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
