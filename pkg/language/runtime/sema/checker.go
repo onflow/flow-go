@@ -2024,6 +2024,15 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	expressionType := expression.Expression.Accept(checker).(Type)
 
+	if expressionType.IsResourceType() {
+		if _, isIdentifier := expression.Expression.(*ast.IdentifierExpression); !isIdentifier {
+			checker.report(&ResourceLossError{
+				StartPos: expression.Expression.StartPosition(),
+				EndPos:   expression.Expression.EndPosition(),
+			})
+		}
+	}
+
 	origins := checker.memberOrigins[expressionType]
 
 	identifier := expression.Identifier.Identifier
