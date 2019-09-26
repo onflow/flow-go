@@ -252,6 +252,107 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 }
 
+func TestSubmitTransactionScriptSignatures(t *testing.T) {
+	t.Run("InvalidAccount", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:       []byte(addTwoScript),
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
+
+		tx1.AddScriptSignature(invalidAddress, b.RootKey())
+		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+
+		Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
+	})
+
+	t.Run("InvalidKeyPair", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		// use key-pair that does not exist on root account
+		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
+
+		tx1 := &types.Transaction{
+			Script:       []byte(addTwoScript),
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
+
+		tx1.AddScriptSignature(b.RootAccount(), invalidKey)
+		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccount()}))
+	})
+
+	t.Run("MultipleAccounts", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		loggedMessages := make([]string, 0)
+
+		b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+			RuntimeLogger: func(msg string) {
+				loggedMessages = append(loggedMessages, msg)
+			},
+		})
+
+		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		privateKey, _ := salg.GeneratePrKey([]byte("elephant ears"))
+		pubKey, _ := salg.EncodePubKey(privateKey.Pubkey())
+
+		createAccountScript := generateCreateAccountScript(pubKey, nil)
+
+		accountAddressA := b.RootAccount()
+		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:       createAccountScript,
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
+
+		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
+		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).ToNot(HaveOccurred())
+
+		multipleAccountScript := `
+			fun main(accountA: Account, accountB: Account) {
+				log(accountA.address)
+				log(accountB.address)
+			}
+		`
+
+		tx2 := &types.Transaction{
+			Script:       []byte(multipleAccountScript),
+			Nonce:        1,
+			ComputeLimit: 10,
+		}
+
+		tx2.AddScriptSignature(accountAddressA, b.RootKey())
+		tx2.AddScriptSignature(accountAddressB, privateKey)
+		tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+
+		err = b.SubmitTransaction(tx2)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(loggedMessages).To(ContainElement(fmt.Sprintf(`"%x"`, accountAddressA.Bytes())))
+		Expect(loggedMessages).To(ContainElement(fmt.Sprintf(`"%x"`, accountAddressB.Bytes())))
+	})
+}
+
 func TestSubmitTransactionReverted(t *testing.T) {
 	RegisterTestingT(t)
 
