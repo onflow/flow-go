@@ -27,7 +27,14 @@ func NewComputer(runtime runtime.Runtime, runtimeLogger func(string)) *Computer 
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
 func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) error {
 	runtimeContext := NewRuntimeContext(registers)
-	runtimeContext.Accounts = []types.Address{tx.PayerSignature.Account}
+
+	// TODO: remove duplicate accounts
+	accounts := make([]types.Address, len(tx.ScriptSignatures))
+	for i, accountSig := range tx.ScriptSignatures {
+		accounts[i] = accountSig.Account
+	}
+
+	runtimeContext.Accounts = accounts
 	runtimeContext.Logger = c.runtimeLogger
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
