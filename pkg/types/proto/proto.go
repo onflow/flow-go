@@ -3,8 +3,6 @@ package proto
 import (
 	"errors"
 
-	"github.com/golang/protobuf/ptypes"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -25,38 +23,24 @@ func AccountSignatureToMessage(t types.AccountSignature) *shared.AccountSignatur
 	}
 }
 
-func MessageToSignedTransaction(m *shared.SignedTransaction) (types.SignedTransaction, error) {
+func MessageToTransaction(m *shared.Transaction) (types.Transaction, error) {
 	if m == nil {
-		return types.SignedTransaction{}, ErrEmptyMessage
+		return types.Transaction{}, ErrEmptyMessage
 	}
 
-	timestamp, err := ptypes.Timestamp(m.GetTimestamp())
-	if err != nil {
-		return types.SignedTransaction{}, err
-	}
-
-	return types.SignedTransaction{
+	return types.Transaction{
 		Script:         m.GetScript(),
 		Nonce:          m.GetNonce(),
 		ComputeLimit:   m.GetComputeLimit(),
-		ComputeUsed:    m.GetComputeUsed(),
-		Timestamp:      timestamp,
 		PayerSignature: MessageToAccountSignature(m.GetPayerSignature()),
 	}, nil
 }
 
-func SignedTransactionToMessage(t types.SignedTransaction) (*shared.SignedTransaction, error) {
-	timestamp, err := ptypes.TimestampProto(t.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &shared.SignedTransaction{
+func TransactionToMessage(t types.Transaction) *shared.Transaction {
+	return &shared.Transaction{
 		Script:         t.Script,
 		Nonce:          t.Nonce,
 		ComputeLimit:   t.ComputeLimit,
-		ComputeUsed:    t.ComputeUsed,
-		Timestamp:      timestamp,
 		PayerSignature: AccountSignatureToMessage(t.PayerSignature),
-	}, nil
+	}
 }

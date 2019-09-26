@@ -25,8 +25,8 @@ type EmulatedBlockchain struct {
 	intermediateWorldStates map[string][]byte
 	// current world state
 	pendingWorldState *state.WorldState
-	// pool of pending transactions waiting to be commmitted (already executed)
-	txPool             map[string]*types.SignedTransaction
+	// pool of pending transactions waiting to be committed (already executed)
+	txPool             map[string]*types.Transaction
 	mutex              sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
@@ -48,7 +48,7 @@ var DefaultOptions = &EmulatedBlockchainOptions{
 func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[string][]byte)
 	intermediateWorldStates := make(map[string][]byte)
-	txPool := make(map[string]*types.SignedTransaction)
+	txPool := make(map[string]*types.Transaction)
 	ws := state.NewWorldState()
 
 	runtime := runtime.NewInterpreterRuntime()
@@ -109,7 +109,7 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, err
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
-func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTransaction, error) {
+func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.Transaction, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -126,7 +126,7 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.SignedTr
 }
 
 // GetTransactionAtVersion gets an existing transaction by hash at a specified state.
-func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) (*types.SignedTransaction, error) {
+func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) (*types.Transaction, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) error {
+func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -185,7 +185,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.SignedTransaction) erro
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if err := b.validateSignature(tx.PayerSignature, tx.UnsignedHash()); err != nil {
+	if err := b.validateSignatures(tx); err != nil {
 		return err
 	}
 
@@ -252,7 +252,7 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
 		}
 	}
-	b.txPool = make(map[string]*types.SignedTransaction)
+	b.txPool = make(map[string]*types.Transaction)
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	block := &etypes.Block{
@@ -279,7 +279,7 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	if bytes, ok := b.worldStates[string(hash)]; ok {
 		ws := state.Decode(bytes)
 		b.pendingWorldState = ws
-		b.txPool = make(map[string]*types.SignedTransaction)
+		b.txPool = make(map[string]*types.Transaction)
 	}
 }
 
@@ -304,11 +304,32 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
-func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature, unsignedTxHash crypto.Hash) error {
-	account, err := b.GetAccount(signature.Account)
+func (b *EmulatedBlockchain) validateSignatures(tx *types.Transaction) error {
+	err := b.validateAccountSignature(tx.PayerSignature, tx.PayerMessage())
 	if err != nil {
-		return &ErrInvalidSignatureAccount{Account: signature.Account}
+		return err
 	}
+
+	for _, accountSig := range tx.ScriptSignatures {
+		err := b.validateAccountSignature(accountSig, tx.ScriptMessage())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *EmulatedBlockchain) validateAccountSignature(
+	accountSig types.AccountSignature,
+	message []byte,
+) error {
+	account, err := b.GetAccount(accountSig.Account)
+	if err != nil {
+		return &ErrInvalidSignatureAccount{Account: accountSig.Account}
+	}
+
+	signature := crypto.Signature(accountSig.Signature)
 
 	// TODO: replace hard-coded signature algorithm
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
@@ -319,7 +340,10 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 			continue
 		}
 
-		valid, err := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), unsignedTxHash)
+		// TODO: replace hard-coded hashing algorithm
+		hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+
+		valid, err := salg.VerifyBytes(publicKey, signature, message, hasher)
 		if err != nil {
 			continue
 		}
@@ -330,7 +354,7 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 	}
 
 	return &ErrInvalidSignaturePublicKey{
-		Account: signature.Account,
+		Account: accountSig.Account,
 	}
 }
 
@@ -338,6 +362,7 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address, crypto.PrKey) {
 	registers := ws.Registers.NewView()
 
+	// TODO: replace hard-coded signature algorithm
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 
 	if prKey == nil {

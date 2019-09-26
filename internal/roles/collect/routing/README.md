@@ -14,8 +14,8 @@ Package routing implements a deterministic transaction routing algorithm.
 
 ## <a name="pkg-index">Index</a>
 * [type TransactionRouter](#TransactionRouter)
-  * [func (tr *TransactionRouter) InRange(transaction *types.SignedTransaction, cluster *clusters.Cluster) bool](#TransactionRouter.InRange)
-  * [func (tr *TransactionRouter) Route(transaction *types.SignedTransaction, epoch uint64) *clusters.Cluster](#TransactionRouter.Route)
+  * [func (tr *TransactionRouter) InRange(transaction *types.Transaction, cluster *clusters.Cluster) bool](#TransactionRouter.InRange)
+  * [func (tr *TransactionRouter) Route(transaction *types.Transaction, epoch uint64) *clusters.Cluster](#TransactionRouter.Route)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -44,18 +44,18 @@ TransactionRouter routes transactions to clusters using a deterministic transact
 
 
 
-### <a name="TransactionRouter.InRange">func</a> (\*TransactionRouter) [InRange](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=686:792#L20)
+### <a name="TransactionRouter.InRange">func</a> (\*TransactionRouter) [InRange](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=680:780#L20)
 ``` go
-func (tr *TransactionRouter) InRange(transaction *types.SignedTransaction, cluster *clusters.Cluster) bool
+func (tr *TransactionRouter) InRange(transaction *types.Transaction, cluster *clusters.Cluster) bool
 ```
 InRange returns true if the transaction belongs in the given cluster, and false otherwise.
 
 
 
 
-### <a name="TransactionRouter.Route">func</a> (\*TransactionRouter) [Route](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=470:574#L15)
+### <a name="TransactionRouter.Route">func</a> (\*TransactionRouter) [Route](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=470:568#L15)
 ``` go
-func (tr *TransactionRouter) Route(transaction *types.SignedTransaction, epoch uint64) *clusters.Cluster
+func (tr *TransactionRouter) Route(transaction *types.Transaction, epoch uint64) *clusters.Cluster
 ```
 Route returns the routed cluster for a transaction in the given epoch.
 

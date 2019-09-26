@@ -52,16 +52,14 @@ func (c *Client) Close() error {
 }
 
 // SendTransaction submits a transaction to the network.
-func (c *Client) SendTransaction(ctx context.Context, tx types.SignedTransaction) error {
-	txMsg, err := proto.SignedTransactionToMessage(tx)
-	if err != nil {
-		return err
-	}
+func (c *Client) SendTransaction(ctx context.Context, tx types.Transaction) error {
+	txMsg := proto.TransactionToMessage(tx)
 
-	_, err = c.rpcClient.SendTransaction(
+	_, err := c.rpcClient.SendTransaction(
 		ctx,
 		&observe.SendTransactionRequest{Transaction: txMsg},
 	)
+
 	return err
 }
 
@@ -83,7 +81,7 @@ func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, er
 }
 
 // GetTransaction fetches a transaction by hash.
-func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.SignedTransaction, error) {
+func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Transaction, error) {
 	res, err := c.rpcClient.GetTransaction(
 		ctx,
 		&observe.GetTransactionRequest{Hash: h},
@@ -95,16 +93,14 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Sign
 	tx := res.GetTransaction()
 	payerSig := tx.GetPayerSignature()
 
-	return &types.SignedTransaction{
+	return &types.Transaction{
 		Script:       tx.GetScript(),
 		Nonce:        tx.GetNonce(),
 		ComputeLimit: tx.GetComputeLimit(),
-		ComputeUsed:  tx.GetComputeUsed(),
 		PayerSignature: types.AccountSignature{
 			Account:   types.BytesToAddress(payerSig.GetAccount()),
 			Signature: payerSig.GetSignature(),
 		},
-		Status: types.TransactionStatus(tx.GetStatus()),
 	}, nil
 }
 

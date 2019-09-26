@@ -76,7 +76,7 @@ enum TransactionStatus {
   STATUS_SEALED = 3;
 }
 
-message SignedTransaction {
+message Transaction {
   bytes script = 1;
   uint64 nonce = 2;
   uint64 compute_limit = 3;
@@ -88,7 +88,7 @@ message SignedTransaction {
 }
 
 message Collection {
-  repeated SignedTransaction transactions = 1;
+  repeated Transaction transactions = 1;
   bytes foundationBlockHash = 2;
 }
 

@@ -29,7 +29,7 @@ const (
 func (c *Controller) SubmitTransaction(
 	ctx context.Context, req *svc.SubmitTransactionRequest,
 ) (*svc.SubmitTransactionResponse, error) {
-	tx, err := proto.MessageToSignedTransaction(req.GetTransaction())
+	tx, err := proto.MessageToTransaction(req.GetTransaction())
 	if err != nil {
 		if err == proto.ErrEmptyMessage {
 			return nil, status.Error(codes.InvalidArgument, msgEmptyTransaction)
