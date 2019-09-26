@@ -51,13 +51,13 @@ func (e *NotDeclaredError) SecondaryError() string {
 	return "not found in this scope"
 }
 
-// NotCallableError
+// NotInvokableError
 
-type NotCallableError struct {
+type NotInvokableError struct {
 	Value Value
 }
 
-func (e *NotCallableError) Error() string {
+func (e *NotInvokableError) Error() string {
 	return fmt.Sprintf("cannot call value: %#+v", e.Value)
 }
 

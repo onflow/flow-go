@@ -19,18 +19,24 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithExtra(code, nil, nil)
+	return parseCheckAndInterpretWithExtra(code, nil, nil, nil)
 }
 
 func parseCheckAndInterpretWithExtra(
 	code string,
 	predefinedValueTypes map[string]sema.ValueDeclaration,
 	predefinedValues map[string]interpreter.Value,
+	handleCheckerError func(error),
 ) *interpreter.Interpreter {
 
 	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
-	Expect(err).
-		To(Not(HaveOccurred()))
+
+	if handleCheckerError != nil {
+		handleCheckerError(err)
+	} else {
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 
 	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
@@ -113,7 +119,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
+		To(BeAssignableToTypeOf(&interpreter.NotInvokableError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {
@@ -3699,4 +3705,37 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 		To(Equal(interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		}))
+}
+
+func TestInterpretIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              destroy x
+          }
+	    `,
+		nil,
+		nil,
+		func(checkerError error) {
+			// TODO: add support for resources
+
+			errs := expectCheckerErrors(checkerError, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		},
+	)
+
+	// TODO: add create expression once supported
+
+	value, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+	Expect(value).
+		To(Equal(interpreter.VoidValue{}))
 }

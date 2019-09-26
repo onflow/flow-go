@@ -254,7 +254,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	function, ok := variableValue.(FunctionValue)
 	if !ok {
-		return nil, &NotCallableError{
+		return nil, &NotInvokableError{
 			Value: variableValue,
 		}
 	}
@@ -269,12 +269,15 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	ty := interpreter.Checker.GlobalValues[functionName].Type
 
-	functionType, ok := ty.(*sema.FunctionType)
+	invokableType, ok := ty.(sema.InvokableType)
+
 	if !ok {
-		return nil, &NotCallableError{
+		return nil, &NotInvokableError{
 			Value: variableValue,
 		}
 	}
+
+	functionType := invokableType.InvocationFunctionType()
 
 	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
 	parameterCount := len(parameterTypeAnnotations)
@@ -297,7 +300,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		parameterType := parameterTypeAnnotations[i].Type
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
 		if parameterType.Equal(&sema.AnyType{}) {
-			return nil, &NotCallableError{
+			return nil, &NotInvokableError{
 				Value: variableValue,
 			}
 		}
@@ -1353,7 +1356,7 @@ func (interpreter *Interpreter) bindSelf(
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
 	initializer *ast.InitializerDeclaration,
-	functionType *sema.FunctionType,
+	constructorFunctionType *sema.ConstructorFunctionType,
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
@@ -1391,7 +1394,7 @@ func (interpreter *Interpreter) initializerFunction(
 	return newInterpretedFunction(
 		interpreter,
 		function,
-		functionType,
+		constructorFunctionType.FunctionType,
 		lexicalScope,
 	)
 }
@@ -1626,9 +1629,9 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 }
 
 func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.InvocationExpression.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.Expression.Accept(interpreter)
 }

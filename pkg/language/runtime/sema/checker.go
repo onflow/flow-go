@@ -52,6 +52,7 @@ type Checker struct {
 	memberOrigins     map[Type]map[string]*Origin
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
+	inCreate          bool
 	// TODO: refactor into typed AST: https://github.com/dapperlabs/flow-go/issues/665
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
@@ -59,7 +60,7 @@ type Checker struct {
 	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
 	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
-	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
+	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*ConstructorFunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
@@ -102,7 +103,7 @@ func NewChecker(
 		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
 		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
-		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
+		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*ConstructorFunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
@@ -2077,16 +2078,19 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 }
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+	inCreate := checker.inCreate
+	checker.inCreate = false
+	defer func() {
+		checker.inCreate = inCreate
+	}()
 
 	// check the invoked expression can be invoked
 
 	invokedExpression := invocationExpression.InvokedExpression
 	expressionType := invokedExpression.Accept(checker).(Type)
 
-	var returnType Type = &InvalidType{}
-	functionType, ok := expressionType.(*FunctionType)
+	invokableType, ok := expressionType.(InvokableType)
 	if !ok {
-
 		if !isInvalidType(expressionType) {
 			checker.report(
 				&NotCallableError{
@@ -2096,46 +2100,89 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 				},
 			)
 		}
-	} else {
-		// invoked expression has function type
-
-		argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
-
-		// if the invocation refers directly to the name of the function as stated in the declaration,
-		// or the invocation refers to a function of a composite (member),
-		// check that the correct argument labels are supplied in the invocation
-
-		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-			checker.checkIdentifierInvocationArgumentLabels(
-				invocationExpression,
-				identifierExpression,
-			)
-		} else if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
-			checker.checkMemberInvocationArgumentLabels(
-				invocationExpression,
-				memberExpression,
-			)
-		}
-
-		parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-		if len(argumentTypes) == len(parameterTypeAnnotations) &&
-			functionType.GetReturnType != nil {
-
-			returnType = functionType.GetReturnType(argumentTypes)
-		} else {
-			returnType = functionType.ReturnTypeAnnotation.Type
-		}
-
-		checker.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
-
-		var parameterTypes []Type
-		for _, parameterTypeAnnotation := range parameterTypeAnnotations {
-			parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
-		}
-		checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
+		return &InvalidType{}
 	}
 
+	functionType := invokableType.InvocationFunctionType()
+
+	var returnType Type = &InvalidType{}
+
+	// invoked expression has function type
+
+	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
+
+	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// or the invocation refers to a function of a composite (member),
+	// check that the correct argument labels are supplied in the invocation
+
+	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+		checker.checkIdentifierInvocationArgumentLabels(
+			invocationExpression,
+			identifierExpression,
+		)
+	} else if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
+		checker.checkMemberInvocationArgumentLabels(
+			invocationExpression,
+			memberExpression,
+		)
+	}
+
+	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
+	if len(argumentTypes) == len(parameterTypeAnnotations) &&
+		functionType.GetReturnType != nil {
+
+		returnType = functionType.GetReturnType(argumentTypes)
+	} else {
+		returnType = functionType.ReturnTypeAnnotation.Type
+	}
+
+	checker.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
+
+	var parameterTypes []Type
+	for _, parameterTypeAnnotation := range parameterTypeAnnotations {
+		parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
+	}
+	checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
+
+	checker.checkConstructorInvocationWithResourceResult(
+		invocationExpression,
+		invokableType,
+		returnType,
+		inCreate,
+	)
+
 	return returnType
+}
+
+func (checker *Checker) checkConstructorInvocationWithResourceResult(
+	invocationExpression *ast.InvocationExpression,
+	invokableType InvokableType,
+	returnType Type,
+	inCreate bool,
+) {
+	if _, ok := invokableType.(*ConstructorFunctionType); !ok {
+		return
+	}
+
+	// NOTE: not using `isResourceType`,
+	// as only direct resource types can be constructed
+
+	if compositeReturnType, ok := returnType.(*CompositeType); !ok ||
+		compositeReturnType.Kind != common.CompositeKindResource {
+
+		return
+	}
+
+	if inCreate {
+		return
+	}
+
+	checker.report(
+		&MissingCreateError{
+			StartPos: invocationExpression.StartPosition(),
+			EndPos:   invocationExpression.EndPosition(),
+		},
+	)
 }
 
 func (checker *Checker) checkIdentifierInvocationArgumentLabels(
@@ -2385,7 +2432,7 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 
 func (checker *Checker) declareFunction(
 	identifier ast.Identifier,
-	functionType *FunctionType,
+	invokableType InvokableType,
 	argumentLabels []string,
 	recordOccurrence bool,
 ) {
@@ -2410,7 +2457,7 @@ func (checker *Checker) declareFunction(
 		Kind:           common.DeclarationKindFunction,
 		IsConstant:     true,
 		Depth:          depth,
-		Type:           functionType,
+		Type:           invokableType,
 		ArgumentLabels: argumentLabels,
 		Pos:            &identifier.Pos,
 	}
@@ -2809,10 +2856,12 @@ func (checker *Checker) declareCompositeConstructor(
 	compositeType *CompositeType,
 	parameterTypeAnnotations []*TypeAnnotation,
 ) {
-	functionType := &FunctionType{
-		ReturnTypeAnnotation: NewTypeAnnotation(
-			compositeType,
-		),
+	functionType := &ConstructorFunctionType{
+		&FunctionType{
+			ReturnTypeAnnotation: NewTypeAnnotation(
+				compositeType,
+			),
+		},
 	}
 
 	var argumentLabels []string
@@ -2824,9 +2873,11 @@ func (checker *Checker) declareCompositeConstructor(
 
 		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
 
-		functionType = &FunctionType{
-			ParameterTypeAnnotations: parameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
+		functionType = &ConstructorFunctionType{
+			FunctionType: &FunctionType{
+				ParameterTypeAnnotations: parameterTypeAnnotations,
+				ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
+			},
 		}
 
 		checker.InitializerFunctionTypes[firstInitializer] = functionType
@@ -3632,7 +3683,12 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 }
 
 func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-	// TODO: check create expressions
+	// TODO: check invocation expression of resources is in creation
+
+	checker.inCreate = true
+	defer func() {
+		checker.inCreate = false
+	}()
 
 	ty := expression.InvocationExpression.Accept(checker)
 
