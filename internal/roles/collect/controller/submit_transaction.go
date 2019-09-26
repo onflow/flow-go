@@ -2,11 +2,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	svc "github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
+	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/pkg/types/proto"
 )
 
@@ -42,7 +45,7 @@ func (c *Controller) SubmitTransaction(
 		return &svc.SubmitTransactionResponse{}, nil
 	}
 
-	if err := tx.Validate(); err != nil {
+	if err := validateTransaction(tx); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -59,4 +62,36 @@ func (c *Controller) SubmitTransaction(
 	}
 
 	return &svc.SubmitTransactionResponse{}, nil
+}
+
+// InvalidTransactionError indicates that a transaction does not contain all
+// required information.
+type InvalidTransactionError struct {
+	missingFields []string
+}
+
+func (e InvalidTransactionError) Error() string {
+	return fmt.Sprintf(
+		"required fields are not set: %s",
+		strings.Join(e.missingFields[:], ", "),
+	)
+}
+
+// validateTransaction returns an error if the transaction does not contain all required fields.
+func validateTransaction(tx types.Transaction) error {
+	missingFields := make([]string, 0)
+
+	if len(tx.Script) == 0 {
+		missingFields = append(missingFields, "script")
+	}
+
+	if tx.ComputeLimit == 0 {
+		missingFields = append(missingFields, "compute_limit")
+	}
+
+	if len(missingFields) > 0 {
+		return InvalidTransactionError{missingFields}
+	}
+
+	return nil
 }

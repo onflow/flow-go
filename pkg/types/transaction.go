@@ -1,10 +1,8 @@
 package types
 
 import (
-	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"strings"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -141,39 +139,6 @@ func (tx *Transaction) AddScriptSignature(account Address, prKey crypto.PrKey) e
 	}
 
 	tx.ScriptSignatures = append(tx.ScriptSignatures, accountSig)
-
-	return nil
-}
-
-// InvalidTransactionError indicates that a transaction does not contain all
-// required information.
-type InvalidTransactionError struct {
-	missingFields []string
-}
-
-func (e InvalidTransactionError) Error() string {
-	return fmt.Sprintf(
-		"required fields are not set: %s",
-		strings.Join(e.missingFields[:], ", "),
-	)
-}
-
-// Validate returns and error if the transaction does not contain all required
-// fields.
-func (tx *Transaction) Validate() error {
-	missingFields := make([]string, 0)
-
-	if len(tx.Script) == 0 {
-		missingFields = append(missingFields, "script")
-	}
-
-	if tx.ComputeLimit == 0 {
-		missingFields = append(missingFields, "compute_limit")
-	}
-
-	if len(missingFields) > 0 {
-		return InvalidTransactionError{missingFields}
-	}
 
 	return nil
 }
