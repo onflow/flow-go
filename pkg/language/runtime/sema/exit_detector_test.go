@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	. "github.com/onsi/gomega"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
-	. "github.com/onsi/gomega"
 )
 
 func parseFunctionBlock(code string) (*ast.FunctionBlock, error) {
