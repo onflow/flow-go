@@ -1342,9 +1342,11 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
               fun test(x: Int) {}
           }
 
-	      let test = (%[2]s Test()).test(x: 1)
+          let test %[2]s %[3]s Test()
+	      let void = test.test(x: 1)
 	    `,
 			kind.Keyword(),
+			kind.TransferOperator(),
 			kind.ConstructionKeyword(),
 		))
 
@@ -1372,9 +1374,11 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
               fun test(x: Int) {}
           }
 
-	      let test = (%[2]s Test()).test(1)
+          let test %[2]s %[3]s Test()
+	      let void = test.test(1)
 	    `,
 			kind.Keyword(),
+			kind.TransferOperator(),
 			kind.ConstructionKeyword(),
 		))
 
@@ -1418,12 +1422,14 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
           }
 
           fun test2(): %[2]sTest {
-              return (%[3]s Test()).test()
+              let test %[4]s %[3]s Test()
+              return %[2]s test.test()
           }
         `,
 			kind.Keyword(),
 			kind.Annotation(),
 			kind.ConstructionKeyword(),
+			kind.TransferOperator(),
 		))
 
 		// TODO: add support for non-structure declarations
