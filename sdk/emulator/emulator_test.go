@@ -60,6 +60,7 @@ func TestWorldStates(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	tx2 := &types.Transaction{
@@ -68,6 +69,7 @@ func TestWorldStates(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	tx3 := &types.Transaction{
@@ -76,6 +78,7 @@ func TestWorldStates(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx3.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx3.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	ws1 := b.pendingWorldState.Hash()
@@ -168,6 +171,7 @@ func TestSubmitTransaction(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
@@ -191,6 +195,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
@@ -202,7 +207,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
-func TestSubmitTransactionInvalidPayerSignature(t *testing.T) {
+func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("InvalidAccount", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -216,6 +221,7 @@ func TestSubmitTransactionInvalidPayerSignature(t *testing.T) {
 			ComputeLimit: 10,
 		}
 
+		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 		tx1.SetPayerSignature(invalidAddress, b.RootKey())
 
 		err := b.SubmitTransaction(tx1)
@@ -238,6 +244,7 @@ func TestSubmitTransactionInvalidPayerSignature(t *testing.T) {
 			ComputeLimit: 10,
 		}
 
+		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 		tx1.SetPayerSignature(b.RootAccount(), invalidKey)
 
 		err := b.SubmitTransaction(tx1)
@@ -256,6 +263,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Submit invalid tx1 (errors)
@@ -279,6 +287,7 @@ func TestCommitBlock(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
@@ -293,6 +302,7 @@ func TestCommitBlock(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Submit invalid tx2
@@ -325,6 +335,7 @@ func TestCreateAccount(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
@@ -348,6 +359,7 @@ func TestCreateAccount(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
@@ -376,6 +388,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
@@ -395,6 +408,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
@@ -428,6 +442,7 @@ func TestImportAccountCode(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
@@ -450,6 +465,7 @@ func TestImportAccountCode(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
@@ -467,6 +483,7 @@ func TestCallScript(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	// Sample call (value is 0)
@@ -495,6 +512,7 @@ func TestQueryByVersion(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	tx2 := &types.Transaction{
@@ -503,6 +521,7 @@ func TestQueryByVersion(t *testing.T) {
 		ComputeLimit: 10,
 	}
 
+	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
 	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
 
 	var invalidWorldState crypto.Hash
