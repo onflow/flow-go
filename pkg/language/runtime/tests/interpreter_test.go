@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"math/big"
 	"testing"
 
@@ -29,7 +30,7 @@ func parseCheckAndInterpretWithExtra(
 	handleCheckerError func(error),
 ) *interpreter.Interpreter {
 
-	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
+	checker, err := ParseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
 
 	if handleCheckerError != nil {
 		handleCheckerError(err)
@@ -2903,7 +2904,7 @@ func TestInterpretInterfaceTypeAsValue(t *testing.T) {
 func TestInterpretImport(t *testing.T) {
 	RegisterTestingT(t)
 
-	checkerImported, err := parseAndCheck(`
+	checkerImported, err := ParseAndCheck(`
       fun answer(): Int {
           return 42
       }
@@ -2911,7 +2912,7 @@ func TestInterpretImport(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -2951,7 +2952,7 @@ func TestInterpretImportError(t *testing.T) {
 			stdlib.PanicFunction,
 		}.ToValueDeclarations()
 
-	checkerImported, err := parseAndCheckWithExtra(
+	checkerImported, err := ParseAndCheckWithExtra(
 		`
           fun answer(): Int {
               return panic("?!")
@@ -2964,7 +2965,7 @@ func TestInterpretImportError(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -3724,7 +3725,7 @@ func TestInterpretIndirectDestroy(t *testing.T) {
 		func(checkerError error) {
 			// TODO: add support for resources
 
-			errs := expectCheckerErrors(checkerError, 1)
+			errs := ExpectCheckerErrors(checkerError, 1)
 
 			Expect(errs[0]).
 				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
