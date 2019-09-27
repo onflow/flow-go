@@ -223,6 +223,28 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 }
 
 func TestSubmitTransactionPayerSignature(t *testing.T) {
+	t.Run("MissingPayerSignature", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       addressA,
+			ScriptAccounts:     []types.Address{b.RootAccount()},
+		}
+
+		tx1.AddSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+
+		Expect(err).To(MatchError(&ErrMissingSignature{Account: addressA}))
+	})
+
 	t.Run("InvalidAccount", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -270,6 +292,28 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
+	t.Run("MissingScriptSignature", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccount(),
+			ScriptAccounts:     []types.Address{addressA},
+		}
+
+		tx1.AddSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(&ErrMissingSignature{Account: addressA}))
+	})
+
 	t.Run("MultipleAccounts", func(t *testing.T) {
 		RegisterTestingT(t)
 
