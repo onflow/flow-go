@@ -13,9 +13,9 @@ type DKGtype int
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	FeldmanVSS DKGtype = iota
-	// Joit Feldman
+	// Joint Feldman (Pedersen)
 	JointFeldman
-	// Gennaro et.al protocl
+	// Gennaro et.al protocol
 	GJKR
 )
 
@@ -30,13 +30,11 @@ type DKGstate interface {
 	EndDKG() (PrKey, PubKey, []PubKey, error)
 	// ProcessDKGmsg processes a new DKG message received by the current node
 	ProcessDKGmsg(int, DKGmsg) *DKGoutput
-	// IsRunning returns true if the DKG instance is running, false otherwise
-	IsRunning() bool
 }
 
 // NewDKG creates a new instance of a DKG protocol.
 // An instance is run by a single node and is usable for only one protocol.
-// In order to rerun the protocol again, a new instance needs to be created
+// In order to run the protocol again, a new instance needs to be created
 func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
 	if currentIndex >= size || leaderIndex >= size {
 		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}
@@ -67,6 +65,7 @@ func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate,
 	return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 }
 
+// DKGcommon holds the common data of all DKG protocols
 type DKGcommon struct {
 	size         int
 	threshold    int
@@ -85,11 +84,6 @@ func (s *DKGcommon) Threshold() int {
 	return s.threshold
 }
 
-// IsRunning tells if the instance is running
-func (s *DKGcommon) IsRunning() bool {
-	return s.isrunning
-}
-
 type dkgMsgTag byte
 
 const (
@@ -99,22 +93,25 @@ const (
 
 type DKGToSend struct {
 	broadcast bool   // true if it's a broadcasted message, false otherwise
-	dest      int    // if boradcast is false, dest is the destination index
+	dest      int    // if broadcast is false, dest is the destination index
 	data      DKGmsg // data to be sent, including a tag
 }
 
+// DKGmsg is the data sent in any DKG communication
 type DKGmsg []byte
 
-type dkgResult int
+// DKGresult is the supported type for the return values
+type DKGresult int
 
 const (
-	nonApplicable dkgResult = iota
+	nonApplicable DKGresult = iota
 	valid
 	invalid
 )
 
+// DKGoutput is the type of the uotput of any DKG fucntion
 type DKGoutput struct {
-	result dkgResult
+	result DKGresult
 	action []DKGToSend
 	err    error
 }

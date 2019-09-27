@@ -1,6 +1,6 @@
 package crypto
 
-// Implemets Feldman Verifiable Secret Sharing using BLS G2 group.
+// Implements Feldman Verifiable Secret Sharing using BLS G2 group.
 
 type feldmanVSSstate struct {
 	// common DKG state
@@ -43,7 +43,7 @@ func (s *feldmanVSSstate) StartDKG() *DKGoutput {
 		return s.generateShares(seed)
 	}
 	out := &(DKGoutput{
-		result: valid, //nonApplicable,
+		result: valid,
 		err:    nil,
 	})
 	return out

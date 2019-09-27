@@ -27,6 +27,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
 	github.com/spf13/cobra v0.0.5
+	github.com/stretchr/testify v1.3.0
 	github.com/tyler-smith/go-bip32 v0.0.0-20170922074101-2c9cfd177564
 	github.com/uber/prototool v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4

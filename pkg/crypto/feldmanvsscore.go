@@ -18,17 +18,13 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	s.A = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
 	for i := 0; i < s.threshold+1; i++ {
-		//randZr(&s.a[i])
-		(&s.a[i]).setInt(0)
-		if i == 1 {
-			(&s.a[i]).setInt(1)
-		}
+		randZr(&s.a[i])
 		_G2scalarGenMult(&s.A[i], &s.a[i])
 	}
 
 	// prepare the DKGToSend slice and compute the shares
 	out := &(DKGoutput{
-		result: valid, //result: nonApplicable,
+		result: valid,
 		err:    nil,
 	})
 
@@ -70,7 +66,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	return out
 }
 
-func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, error) {
+func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, error) {
 	log.Debug(fmt.Sprintf("%d Receiving a share from %d\n", s.currentIndex, origin))
 	log.Debug(fmt.Sprintf("the share is %d\n", data))
 	if s.xReceived {
@@ -92,7 +88,7 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (dkgResult, erro
 	return valid, nil
 }
 
-func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult, error) {
+func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult, error) {
 	log.Debug(fmt.Sprintf("%d Receiving vector from %d\n", s.currentIndex, origin))
 	log.Debug(fmt.Sprintf("the vector is %d\n", data))
 	if s.AReceived {
@@ -114,7 +110,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (dkgResult
 	return valid, nil
 }
 
-// ZrPolynomialImage computes for P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
+// ZrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
@@ -126,7 +122,7 @@ func ZrPolynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
 	)
 }
 
-// export A vector into a slice of bytes
+// writeVerifVector exports A vector into a slice of bytes
 // assuming the slice length matches the vector length
 func writeVerifVector(dest []byte, A []pointG2) {
 	C.write_ep2st_vector((*C.uchar)((unsafe.Pointer)(&dest[0])),
@@ -135,7 +131,7 @@ func writeVerifVector(dest []byte, A []pointG2) {
 	)
 }
 
-// import A vector from a slice of bytes,
+// readVerifVector imports A vector from a slice of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) {
 	C.read_ep2st_vector((*C.ep2_st)(&A[0]),
@@ -144,16 +140,16 @@ func readVerifVector(A []pointG2, src []byte) {
 	)
 }
 
-func (s *feldmanVSSstate) verifyShare() dkgResult {
+func (s *feldmanVSSstate) verifyShare() DKGresult {
 	// check y[current] == x.G2
-	if C._verifyshare((*C.bn_st)(&s.x),
+	if C.verifyshare((*C.bn_st)(&s.x),
 		(*C.ep2_st)(&s.y[s.currentIndex])) == 1 {
 		return valid
 	}
 	return invalid
 }
 
-// compute the nodes public keys from the verification vector
+// computePublicKeys computes the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 //  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {

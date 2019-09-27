@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/elliptic"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,8 +61,7 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 		})
 		return ECDSA_SECp256k1Instance, nil
 	}
-
-	return nil, cryptoError{"the signature scheme " + string(name) + " is not supported."}
+	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", name)}
 }
 
 // Signer interface

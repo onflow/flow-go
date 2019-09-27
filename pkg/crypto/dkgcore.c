@@ -38,11 +38,11 @@ void Zr_polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_
         bn_mul(&mult, &a[i], &bn_x);
         bn_add(&acc, &acc, &mult);
         bn_mod_barrt(&acc, &acc, &r, &u);
-        // TODO: hardcode x^i mod r
+        // TODO: hardcode x^i mod r ?
         bn_mul_dig(&bn_x, &bn_x, x);
         bn_mod_barrt(&bn_x, &bn_x, &r, &u);
     }
-    // export the result
+    // exports the result
     const int out_size = Fr_BYTES;
     bn_write_bin(out, out_size, &acc); 
 
@@ -76,7 +76,7 @@ static void G2_polynomialImage(ep2_st* y, ep2_st* A, int len_A,
     for (int i=0; i < len_A; i++) {
         ep2_mul_lwnaf(&mult, &A[i], &bn_x);
         ep2_add_projc(&acc, &acc, &mult);
-        // TODO: hardcode x^i mod r
+        // TODO: hardcode x^i mod r ?
         bn_mul_dig(&bn_x, &bn_x, x);
         bn_mod_barrt(&bn_x, &bn_x, r, u);
     }
@@ -134,7 +134,7 @@ void read_ep2st_vector(ep2_st* A, byte* src, const int len){
     }
 }
 
-int _verifyshare(bn_st* x, ep2_st* y) {
+int verifyshare(bn_st* x, ep2_st* y) {
     ep2_st res;
     ep2_new(res);
     g2_mul_gen(&res, x);

@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
-	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 // maps the interval [0..n-1] into [0..c-1,c+1..n] if c>1
@@ -42,28 +41,31 @@ func broadcast(orig int, dkg []DKGstate, msg DKGmsg, chans []chan *toProcess) {
 	}
 }
 
-func processChan(current int, dkg []DKGstate, chans []chan *toProcess, quit chan int, g []*WithT) {
-	//g := gomega.NewWithT(t)
+func processChan(current int, dkg []DKGstate, chans []chan *toProcess, quit chan int) {
 	for {
 		select {
 		case new := <-chans[current]:
 			log.Info(fmt.Sprintf("%d Receiving from %d:", current, new.orig))
 			out := dkg[current].ProcessDKGmsg(new.orig, new.msg)
-			out.processOutput(current, dkg, chans, g[current])
+			out.processOutput(current, dkg, chans)
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
+			log.Info(fmt.Sprintf("%d quit \n", current))
+			_, _, _, _ = dkg[current].EndDKG()
 			quit <- 1
 			return
 		}
 	}
 }
 
-func (out *DKGoutput) processOutput(current int, dkg []DKGstate, chans []chan *toProcess, g *WithT) {
+func (out *DKGoutput) processOutput(current int, dkg []DKGstate,
+	chans []chan *toProcess) {
+	assert.Nil(x, out.err)
 	if out.err != nil {
 		log.Error("DKG output error: " + out.err.Error())
 	}
 
-	g.Expect(out.result).To(Equal(valid))
+	assert.Equal(x, out.result, valid, "they should be equal")
 
 	for _, msg := range out.action {
 		if msg.broadcast {
@@ -74,8 +76,11 @@ func (out *DKGoutput) processOutput(current int, dkg []DKGstate, chans []chan *t
 	}
 }
 
-func TestFeldmanVSSSimple(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+var x *testing.T
+
+func TestFeldmanVSS(t *testing.T) {
+	x = t
+	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 5
@@ -83,44 +88,35 @@ func TestFeldmanVSSSimple(t *testing.T) {
 	dkg := make([]DKGstate, n)
 	quit := make(chan int)
 	chans := make([]chan *toProcess, n)
-	g := make([]*WithT, n)
-	for i := 0; i < n; i++ {
-		g[i] = gomega.NewWithT(t)
-	}
 
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
 		dkg[current], err = NewDKG(FeldmanVSS, n, current, lead)
-		if err != nil { // change to g[i]
+		assert.Nil(t, err)
+		if err != nil {
 			log.Error(err.Error())
 			return
 		}
 	}
-
-	// create the nodes channels
+	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go processChan(i, dkg, chans, quit, g)
+		go processChan(i, dkg, chans, quit)
 	}
-	// start DKG in all nodes but leader
+	// start DKG in all nodes but the leader
 	for current := 0; current < n; current++ {
 		if current != lead {
 			out := dkg[current].StartDKG()
-			out.processOutput(current, dkg, chans, g[current])
+			out.processOutput(current, dkg, chans)
 		}
 	}
 	// start the leader (this avoids a data racing issue)
 	out := dkg[lead].StartDKG()
-	out.processOutput(lead, dkg, chans, g[lead])
+	out.processOutput(lead, dkg, chans)
 
 	// this loop synchronizes the main thread to end all DKGs
 	for i := 0; i < n; i++ {
 		<-quit
-	}
-	// close all DKGs
-	for i := 0; i < n; i++ {
-		_, _, _, _ = dkg[i].EndDKG()
-		log.Info(fmt.Sprintf("%d quit \n", i))
 	}
 }
