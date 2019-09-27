@@ -681,6 +681,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
+	Initializer   *ast.InitializerDeclaration
 	Pos           ast.Position
 }
 
@@ -1155,6 +1156,28 @@ func (e *UnsupportedExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// UnassignedFieldAccessError
+
+type UnassignedFieldAccessError struct {
+	Identifier ast.Identifier
+	Pos        ast.Position
+}
+
+func (e *UnassignedFieldAccessError) Error() string {
+	return fmt.Sprintf("cannot access unassigned field %s", e.Identifier.String())
+}
+
+func (*UnassignedFieldAccessError) isSemanticError() {}
+
+func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
+	length := len(e.Identifier.Identifier)
+	return e.Pos.Shifted(length - 1)
+}
+
 // MissingMoveAnnotationError
 
 type MissingMoveAnnotationError struct {
@@ -1301,5 +1324,46 @@ func (e *MissingCreateError) StartPosition() ast.Position {
 }
 
 func (e *MissingCreateError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingMoveOperationError
+
+type MissingMoveOperationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveOperationError) Error() string {
+	return "missing move operation: `<-`"
+}
+
+func (*MissingMoveOperationError) isSemanticError() {}
+
+func (e *MissingMoveOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveOperationError
+
+type InvalidMoveOperationError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidMoveOperationError) Error() string {
+	return "invalid move operation for non-resource: unexpected `<-`"
+}
+
+func (*InvalidMoveOperationError) isSemanticError() {}
+
+func (e *InvalidMoveOperationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidMoveOperationError) EndPosition() ast.Position {
 	return e.EndPos
 }

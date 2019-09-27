@@ -167,10 +167,11 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -216,10 +217,11 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -572,10 +574,11 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -621,10 +624,11 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -754,10 +758,11 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): <-T) = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -803,10 +808,11 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): T) = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -908,7 +914,7 @@ func TestCheckUnaryMove(t *testing.T) {
       resource X {}
 
       fun foo(x: <-X): <-X {
-          return x
+          return <-x
       }
 
       var x <- foo(x: <-create X())
@@ -1180,4 +1186,304 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		Expect(errs[1]).
 			To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
 	})
+}
+
+func TestCheckResourceReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return <-create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidResourceReturnMissingMoveInvalidReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): Y {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceReturnWithMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      fun test(): X {
+          return <-X()
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
+
+func TestCheckResourceArgument(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun foo(_ x: <-X) {}
+
+      fun bar() {
+          foo(<-create X())
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun foo(_ x: <-X) {}
+
+      fun bar() {
+          foo(create X())
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidResourceArgumentMissingMoveInvalidParameterType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun foo(_ x: Y) {}
+
+      fun bar() {
+          foo(create X())
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceArgumentWithMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      fun foo(_ x: X) {}
+
+      fun bar() {
+          foo(<-X())
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
+
+func TestCheckResourceVariableDeclarationTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let y <- x
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceVariableDeclarationIncorrectTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x = create X()
+      let y = x
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+}
+
+func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      let y <- x
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+}
+
+func TestCheckResourceAssignmentTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+
+      fun test() {
+         var x2 <- create X()
+         destroy x2
+         x2 <- x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+
+      fun test() {
+        var x2 <- create X()
+        destroy x2
+        x2 = x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
+}
+
+func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      fun test() {
+        var x2 = X()
+        x2 <- x
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.IncorrectTransferOperationError{}))
 }
