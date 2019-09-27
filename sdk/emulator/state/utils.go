@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	gob.Register(new(crypto.Hash32))
+	gob.Register(new(crypto.Hash))
 }
 
 // Encode serializes a World State object into bytes.

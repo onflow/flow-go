@@ -254,7 +254,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	function, ok := variableValue.(FunctionValue)
 	if !ok {
-		return nil, &NotCallableError{
+		return nil, &NotInvokableError{
 			Value: variableValue,
 		}
 	}
@@ -269,15 +269,18 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	ty := interpreter.Checker.GlobalValues[functionName].Type
 
-	functionType, ok := ty.(*sema.FunctionType)
+	invokableType, ok := ty.(sema.InvokableType)
+
 	if !ok {
-		return nil, &NotCallableError{
+		return nil, &NotInvokableError{
 			Value: variableValue,
 		}
 	}
 
-	parameterTypes := functionType.ParameterTypes
-	parameterCount := len(parameterTypes)
+	functionType := invokableType.InvocationFunctionType()
+
+	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
+	parameterCount := len(parameterTypeAnnotations)
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
@@ -294,13 +297,14 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	boxedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
+		parameterType := parameterTypeAnnotations[i].Type
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
-		if parameterTypes[i].Equal(&sema.AnyType{}) {
-			return nil, &NotCallableError{
+		if parameterType.Equal(&sema.AnyType{}) {
+			return nil, &NotInvokableError{
 				Value: variableValue,
 			}
 		}
-		boxedArguments[i] = interpreter.box(argument, nil, parameterTypes[i])
+		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
 	}
 
 	trampoline = function.invoke(boxedArguments, Location{})
@@ -1173,7 +1177,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
 		function.Expression.FunctionBlock,
-		function.Type.ReturnType,
+		function.Type.ReturnTypeAnnotation.Type,
 	)
 
 	return functionBlockTrampoline.
@@ -1352,7 +1356,7 @@ func (interpreter *Interpreter) bindSelf(
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
 	initializer *ast.InitializerDeclaration,
-	functionType *sema.FunctionType,
+	constructorFunctionType *sema.ConstructorFunctionType,
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
@@ -1390,7 +1394,7 @@ func (interpreter *Interpreter) initializerFunction(
 	return newInterpretedFunction(
 		interpreter,
 		function,
-		functionType,
+		constructorFunctionType.FunctionType,
 		lexicalScope,
 	)
 }
@@ -1625,9 +1629,9 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 }
 
 func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.InvocationExpression.Accept(interpreter)
 }
 
 func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	panic(&errors.UnreachableError{})
+	return expression.Expression.Accept(interpreter)
 }

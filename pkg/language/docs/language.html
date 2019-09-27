@@ -348,7 +348,7 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper and lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
+          Names may start with any upper or lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
           This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
@@ -740,11 +740,17 @@
           <section>
             <h4 id="array-types"><a href="#array-types" aria-hidden="true"><span class="icon icon-link"></span></a>Array Types</h4>
             <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
-            <p>Fixed-size arrays have the type suffix <code>[N]</code>, where <code>N</code> is the size of the array. For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>Int8[3]</code>.</p>
-            <p>Variable-size arrays have the type suffix <code>[]</code>. For example, the type <code>Int16[]</code> specifies a variable-size array of elements that have type <code>Int16</code>.</p>
-            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> array: Int8[2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+            <p>
+              Fixed-size arrays have the form <code>[T; N]</code>, where <code>T</code> is the element type, and <code>N</code> is the size of the array.
+              For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>[Int8; 3]</code>.
+            </p>
+            <p>
+              Variable-size arrays have the form <code>[T]</code>, where <code>T</code> is the element type.
+              For example, the type <code>[Int16]</code> specifies a variable-size array of elements that have type <code>Int16</code>.
+            </p>
+            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: Int16[2][3] = [</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: [[Int16; 3]; 2] = [</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
 </span><span style="color: #000000">]</span><span>
@@ -821,8 +827,11 @@
 </span></code></pre>
           <section>
             <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
-            <p>Dictionaries have the type suffix <code>[T]</code>, where <code>T</code> is the type of the key. For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>Bool[Int]</code>.</p>
-            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #008000">// Declare a constant that has type `Bool[Int]`,</span><span>
+            <p>
+              Dictionaries have the form <code>{K: V}</code>, where <code>K</code> is the type of the key, and <code>V</code> is the type of the value.
+              For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>{Int: Bool}</code>.
+            </p>
+            <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping integers to booleans</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
@@ -830,7 +839,7 @@
 </span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a constant that has type `Int[Bool]`,</span><span>
+</span><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping booleans to integers</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
@@ -843,7 +852,7 @@
             <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
             <p>To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.</p>
             <p>Accessing a key returns an <a href="#optionals">optional</a>: If the key is found in the dictionary, the value for the given key is returned, and if the key is not found, <code>nil</code> is returned.</p>
-            <pre><code class="language-bamboo,file=dictionary-access-integer-keys.bpl"><span style="color: #008000">// Declare a constant that has type `Bool[Int]`,</span><span>
+            <pre><code class="language-bamboo,file=dictionary-access-integer-keys.bpl"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping integers to booleans</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
@@ -861,7 +870,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #A31515">"1"</span><span style="color: #000000">]</span><span>
 </span></code></pre>
-            <pre><code class="language-bamboo,file=dictionary-access-boolean-keys.bpl"><span style="color: #008000">// Declare a constant that has type `Int[Bool]`,</span><span>
+            <pre><code class="language-bamboo,file=dictionary-access-boolean-keys.bpl"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping booleans to integers</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
@@ -1442,7 +1451,7 @@
             For example, a function type <code>((Int): ((): Int))</code> is the type for a function which accepts one argument with type <code>Int</code>,
             and which returns another function, that takes no arguments and returns an <code>Int</code>.
           </p>
-          <p>The type <code>((Int): Int)[2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
+          <p>The type <code>[((Int): Int); 2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
           <section>
             <h4 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h4>
             <p>
@@ -1453,7 +1462,7 @@
             <pre><code class="language-bamboo,file=function-change.bpl"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
 </span><span style="color: #008000">// of an array of integers</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: Int[]) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: [Int]) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Change the elements of the passed in array.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The changes are only local, as the array was copied</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -1585,7 +1594,7 @@
           <h3 id="optional-binding"><a href="#optional-binding" aria-hidden="true"><span class="icon icon-link"></span></a>Optional Binding</h3>
           <p>
             Optional binding allows getting the value inside an optional.
-            It is a variant of the if-statment.
+            It is a variant of the if-statement.
           </p>
           <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
           <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
@@ -1769,7 +1778,7 @@
 </span></code></pre>
         <p>Array literals are inferred based on the elements of the literal, and to be variable-size.</p>
         <pre><code class="language-bamboo,file=type-inference-intergers.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
-</span><span style="color: #008000">// `integers` has type `Int[]`</span><span>
+</span><span style="color: #008000">// `integers` has type `[Int]`</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: mixed types</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1780,7 +1789,7 @@
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">2</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
-</span><span style="color: #008000">// `booleans` has type `Bool[Int]`</span><span>
+</span><span style="color: #008000">// `booleans` has type `{Int: Bool}`</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: mixed types</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2324,7 +2333,7 @@
 </span><span>
 </span><span style="color: #008000">// **Move** the second resource into a new constant</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> secondResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[1]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> secondResource &#x3C;- </span><span style="color: #0000FF">resources</span><span style="color: #000000">[0]</span><span>
 </span><span>
 </span><span style="color: #008000">// `resources` only contains one element,</span><span>
 </span><span style="color: #008000">// the initial third resource!</span><span>
@@ -3125,7 +3134,7 @@
         <blockquote>
           <p>🚧 Status: Attestations are not implemented yet.</p>
         </blockquote>
-        <p>Attestations are values that proof ownership without giving any control over it. They can be created for resources to show that they exists.</p>
+        <p>Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.</p>
         <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
         <p>
           As an analogy, a bank statement is a proof of ownership of money.

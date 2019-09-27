@@ -66,7 +66,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	}).Infof("️⛏  Block #%d mined", block.Number)
 
 	response := &observe.SendTransactionResponse{
-		Hash: tx.Hash().Bytes(),
+		Hash: tx.Hash(),
 	}
 
 	return response, nil
@@ -74,10 +74,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 
 // GetBlockByHash gets a block by hash.
 func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
-	hash, err := crypto.BytesToHash(req.GetHash())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
+	hash := crypto.BytesToHash(req.GetHash())
 
 	block, err := s.blockchain.GetBlockByHash(hash)
 	if err != nil {
@@ -147,10 +144,7 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 
 // GetTransaction gets a transaction by hash.
 func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
-	hash, err := crypto.BytesToHash(req.GetHash())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
+	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := s.blockchain.GetTransaction(hash)
 	if err != nil {

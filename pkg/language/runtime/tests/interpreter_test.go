@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"math/big"
 	"testing"
 
@@ -19,18 +20,24 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithExtra(code, nil, nil)
+	return parseCheckAndInterpretWithExtra(code, nil, nil, nil)
 }
 
 func parseCheckAndInterpretWithExtra(
 	code string,
 	predefinedValueTypes map[string]sema.ValueDeclaration,
 	predefinedValues map[string]interpreter.Value,
+	handleCheckerError func(error),
 ) *interpreter.Interpreter {
 
-	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
-	Expect(err).
-		To(Not(HaveOccurred()))
+	checker, err := ParseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
+
+	if handleCheckerError != nil {
+		handleCheckerError(err)
+	} else {
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 
 	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
@@ -113,7 +120,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
+		To(BeAssignableToTypeOf(&interpreter.NotInvokableError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {
@@ -1259,7 +1266,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, err := parser.ParseProgram(`
+	program, _, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
@@ -1269,11 +1276,13 @@ func TestInterpretHostFunction(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypes: []sema.Type{
+			ParameterTypeAnnotations: sema.NewTypeAnnotations(
 				&sema.IntType{},
 				&sema.IntType{},
-			},
-			ReturnType: &sema.IntType{},
+			),
+			ReturnTypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
 		},
 		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
@@ -1865,7 +1874,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.wasFed = true
@@ -1898,7 +1907,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.feed()
@@ -1927,7 +1936,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           var cat = Cat()
           let kitty = Cat()
           cat = kitty
@@ -1957,7 +1966,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cats = [Cat()]
           let kitty = Cat()
           cats[0] = kitty
@@ -1994,7 +2003,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let carrier = Carrier(cat: Cat())
           let kitty = Cat()
           carrier.cat = kitty
@@ -2044,12 +2053,12 @@ func TestInterpretArrayCopy(t *testing.T) {
 
 	inter := parseCheckAndInterpret(`
 
-      fun change(_ numbers: Int[]): Int[] {
+      fun change(_ numbers: [Int]): [Int] {
           numbers[0] = 1
           return numbers
       }
 
-      fun test(): Int[] {
+      fun test(): [Int] {
           let numbers = [0]
           let numbers2 = change(numbers)
           return [
@@ -2895,7 +2904,7 @@ func TestInterpretInterfaceTypeAsValue(t *testing.T) {
 func TestInterpretImport(t *testing.T) {
 	RegisterTestingT(t)
 
-	checkerImported, err := parseAndCheck(`
+	checkerImported, err := ParseAndCheck(`
       fun answer(): Int {
           return 42
       }
@@ -2903,7 +2912,7 @@ func TestInterpretImport(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -2943,7 +2952,7 @@ func TestInterpretImportError(t *testing.T) {
 			stdlib.PanicFunction,
 		}.ToValueDeclarations()
 
-	checkerImported, err := parseAndCheckWithExtra(
+	checkerImported, err := ParseAndCheckWithExtra(
 		`
           fun answer(): Int {
               return panic("?!")
@@ -2956,7 +2965,7 @@ func TestInterpretImportError(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -3301,7 +3310,7 @@ func TestInterpretArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append(4)
           return x
@@ -3323,7 +3332,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           let y = x.append
           y(4)
@@ -3346,7 +3355,7 @@ func TestInterpretArrayConcat(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           return a.concat([3, 4])
       }
@@ -3367,7 +3376,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           let b = a.concat
           return b([3, 4])
@@ -3389,7 +3398,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.insert(at: 1, 4)
           return x
@@ -3524,7 +3533,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	inter := parseCheckAndInterpret(`
       var removed: Int? = nil
 
-      fun test(): Int[String] {
+      fun test(): {String: Int} {
           let x = {"abc": 1, "def": 2}
           removed = x.remove(key: "abc")
           return x
@@ -3697,4 +3706,37 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 		To(Equal(interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		}))
+}
+
+func TestInterpretIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              destroy x
+          }
+	    `,
+		nil,
+		nil,
+		func(checkerError error) {
+			// TODO: add support for resources
+
+			errs := ExpectCheckerErrors(checkerError, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		},
+	)
+
+	// TODO: add create expression once supported
+
+	value, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+	Expect(value).
+		To(Equal(interpreter.VoidValue{}))
 }

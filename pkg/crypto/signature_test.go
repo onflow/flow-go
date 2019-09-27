@@ -97,11 +97,11 @@ func TestBLS_BLS12381(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
+	halg, err := NewHashAlgo(SHA3_384)
 	input := []byte("test")
-	testSignVerifyBytes(t, salg, nil, sk, input)
-
+	testSignVerifyBytes(t, salg, halg, sk, input)
 	inputStruct := &testStruct{"te", "st"}
-	testSignVerifyStruct(t, salg, nil, sk, inputStruct)
+	testSignVerifyStruct(t, salg, halg, sk, inputStruct)
 }
 
 // Signing bench

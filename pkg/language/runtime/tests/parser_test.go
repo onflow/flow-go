@@ -16,13 +16,12 @@ import (
 func init() {
 	format.TruncatedDiff = false
 	format.MaxDepth = 100
-	format.UseStringerRepresentation = true
 }
 
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    le
 	`)
 
@@ -48,9 +47,12 @@ func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, inputIsComplete, err := parser.ParseProgram(`
 	    let
 	`)
+
+	Expect(inputIsComplete).
+		To(BeFalse())
 
 	Expect(actual).
 		To(BeNil())
@@ -74,9 +76,12 @@ func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
 func TestParseInvalidIncompleteConstantDeclaration2(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, inputIsComplete, err := parser.ParseProgram(`
 	    let =
 	`)
+
+	Expect(inputIsComplete).
+		To(BeFalse())
 
 	Expect(actual).
 		To(BeNil())
@@ -108,7 +113,7 @@ func TestParseInvalidIncompleteConstantDeclaration2(t *testing.T) {
 func TestParseBoolExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = true
 	`)
 
@@ -120,6 +125,10 @@ func TestParseBoolExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &BoolExpression{
 			Value:    true,
@@ -140,7 +149,7 @@ func TestParseBoolExpression(t *testing.T) {
 func TestParseIdentifierExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let b = a
 	`)
 
@@ -152,6 +161,10 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "b",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -173,7 +186,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 func TestParseArrayExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = [1, 2]
 	`)
 
@@ -184,6 +197,10 @@ func TestParseArrayExpression(t *testing.T) {
 		IsConstant: true,
 		Identifier: Identifier{Identifier: "a",
 			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &ArrayExpression{
 			Values: []Expression{
@@ -215,7 +232,7 @@ func TestParseArrayExpression(t *testing.T) {
 func TestParseDictionaryExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let x = {"a": 1, "b": 2}
 	`)
 
@@ -226,6 +243,10 @@ func TestParseDictionaryExpression(t *testing.T) {
 		IsConstant: true,
 		Identifier: Identifier{Identifier: "x",
 			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &DictionaryExpression{
 			Entries: []Entry{
@@ -271,7 +292,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = b(1, 2)
 	`)
 
@@ -283,6 +304,10 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &InvocationExpression{
 			InvokedExpression: &IdentifierExpression{
@@ -325,7 +350,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = b(x: 1, y: 2)
 	`)
 
@@ -337,6 +362,10 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &InvocationExpression{
 			InvokedExpression: &IdentifierExpression{
@@ -383,7 +412,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 func TestParseMemberExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = b.c
 	`)
 
@@ -395,6 +424,10 @@ func TestParseMemberExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &MemberExpression{
 			Expression: &IdentifierExpression{
@@ -422,7 +455,7 @@ func TestParseMemberExpression(t *testing.T) {
 func TestParseIndexExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let a = b[1]
 	`)
 
@@ -434,6 +467,10 @@ func TestParseIndexExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &IndexExpression{
 			Expression: &IdentifierExpression{
@@ -464,7 +501,7 @@ func TestParseIndexExpression(t *testing.T) {
 func TestParseUnaryExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let foo = -boo
 	`)
 
@@ -476,6 +513,10 @@ func TestParseUnaryExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "foo",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 14, Line: 2, Column: 13},
 		},
 		Value: &UnaryExpression{
 			Operation: OperationMinus,
@@ -502,7 +543,7 @@ func TestParseUnaryExpression(t *testing.T) {
 func TestParseOrExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = false || true
 	`)
 
@@ -514,6 +555,10 @@ func TestParseOrExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationOr,
@@ -542,7 +587,7 @@ func TestParseOrExpression(t *testing.T) {
 func TestParseAndExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = false && true
 	`)
 
@@ -554,6 +599,10 @@ func TestParseAndExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationAnd,
@@ -582,7 +631,7 @@ func TestParseAndExpression(t *testing.T) {
 func TestParseEqualityExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = false == true
 	`)
 
@@ -594,6 +643,10 @@ func TestParseEqualityExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationEqual,
@@ -622,7 +675,7 @@ func TestParseEqualityExpression(t *testing.T) {
 func TestParseRelationalExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = 1 < 2
 	`)
 
@@ -634,6 +687,10 @@ func TestParseRelationalExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationLess,
@@ -662,7 +719,7 @@ func TestParseRelationalExpression(t *testing.T) {
 func TestParseAdditiveExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = 1 + 2
 	`)
 
@@ -674,6 +731,10 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationPlus,
@@ -702,7 +763,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 func TestParseMultiplicativeExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = 1 * 2
 	`)
 
@@ -714,6 +775,10 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationMul,
@@ -742,7 +807,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 func TestParseConcatenatingExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = [1, 2] & [3, 4]
 	`)
 
@@ -754,6 +819,10 @@ func TestParseConcatenatingExpression(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationConcat,
@@ -804,7 +873,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let test = fun (): Int { return 1 }
 	`)
 
@@ -817,6 +886,10 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Value: &FunctionExpression{
 			ReturnTypeAnnotation: &TypeAnnotation{
 				Move: false,
@@ -826,6 +899,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 						Pos:        Position{Offset: 25, Line: 2, Column: 24},
 					},
 				},
+				StartPos: Position{Offset: 25, Line: 2, Column: 24},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -860,7 +934,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 func TestParseFunctionAndBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() { return }
 	`)
 
@@ -880,6 +954,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -907,7 +982,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test(x: Int) { }
 	`)
 
@@ -935,6 +1010,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 							Pos:        Position{Offset: 18, Line: 2, Column: 17},
 						},
 					},
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				},
 				StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				EndPos:   Position{Offset: 18, Line: 2, Column: 17},
@@ -947,6 +1023,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 					Pos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 			},
+			StartPos: Position{Offset: 21, Line: 2, Column: 20},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -968,7 +1045,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 func TestParseFunctionParameterWithLabel(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test(x y: Int) { }
 	`)
 
@@ -996,6 +1073,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 							Pos:        Position{Offset: 20, Line: 2, Column: 19},
 						},
 					},
+					StartPos: Position{Offset: 20, Line: 2, Column: 19},
 				},
 				StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				EndPos:   Position{Offset: 20, Line: 2, Column: 19},
@@ -1008,6 +1086,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 					Pos: Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
+			StartPos: Position{Offset: 23, Line: 2, Column: 22},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1029,7 +1108,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 func TestParseIfStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -1058,6 +1137,7 @@ func TestParseIfStatement(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1147,7 +1227,7 @@ func TestParseIfStatement(t *testing.T) {
 func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             if var y = x {
                 1
@@ -1173,6 +1253,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1183,6 +1264,10 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 							Identifier: Identifier{
 								Identifier: "y",
 								Pos:        Position{Offset: 38, Line: 3, Column: 19},
+							},
+							Transfer: &Transfer{
+								Operation: TransferOperationCopy,
+								Pos:       Position{Offset: 40, Line: 3, Column: 21},
 							},
 							Value: &IdentifierExpression{
 								Identifier: Identifier{
@@ -1239,7 +1324,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 func TestParseIfStatementNoElse(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             if true {
                 return
@@ -1263,6 +1348,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1305,7 +1391,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 func TestParseWhileStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             while true {
               return
@@ -1331,6 +1417,7 @@ func TestParseWhileStatement(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1382,7 +1469,7 @@ func TestParseWhileStatement(t *testing.T) {
 func TestParseAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             a = 1
         }
@@ -1404,6 +1491,7 @@ func TestParseAssignment(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1414,6 +1502,10 @@ func TestParseAssignment(t *testing.T) {
 								Identifier: "a",
 								Pos:        Position{Offset: 31, Line: 3, Column: 12},
 							},
+						},
+						Transfer: &Transfer{
+							Operation: TransferOperationCopy,
+							Pos:       Position{Offset: 33, Line: 3, Column: 14},
 						},
 						Value: &IntExpression{
 							Value:    big.NewInt(1),
@@ -1440,7 +1532,7 @@ func TestParseAssignment(t *testing.T) {
 func TestParseAccessAssignment(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() {
             x.foo.bar[0][1].baz = 1
         }
@@ -1462,6 +1554,7 @@ func TestParseAccessAssignment(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1509,6 +1602,10 @@ func TestParseAccessAssignment(t *testing.T) {
 								Pos:        Position{Offset: 47, Line: 3, Column: 28},
 							},
 						},
+						Transfer: &Transfer{
+							Operation: TransferOperationCopy,
+							Pos:       Position{Offset: 51, Line: 3, Column: 32},
+						},
 						Value: &IntExpression{
 							Value:    big.NewInt(1),
 							StartPos: Position{Offset: 53, Line: 3, Column: 34},
@@ -1534,7 +1631,7 @@ func TestParseAccessAssignment(t *testing.T) {
 func TestParseExpressionStatementWithAccess(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
@@ -1554,6 +1651,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
 				},
 			},
+			StartPos: Position{Offset: 15, Line: 2, Column: 14},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -1621,8 +1719,8 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 func TestParseParametersAndArrayTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
-		pub fun test(a: Int32, b: Int32[2], c: Int32[][3]): Int64[][] {}
+	actual, _, err := parser.ParseProgram(`
+		pub fun test(a: Int32, b: [Int32; 2], c: [[Int32; 3]]): [[Int64]] {}
 	`)
 
 	Expect(err).
@@ -1648,6 +1746,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 							Pos:        Position{Offset: 19, Line: 2, Column: 18},
 						},
 					},
+					StartPos: Position{Offset: 19, Line: 2, Column: 18},
 				},
 				StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				EndPos:   Position{Offset: 19, Line: 2, Column: 18},
@@ -1663,21 +1762,22 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int32",
-								Pos:        Position{Offset: 29, Line: 2, Column: 28},
+								Pos:        Position{Offset: 30, Line: 2, Column: 29},
 							},
 						},
 						Size:     2,
-						StartPos: Position{Offset: 34, Line: 2, Column: 33},
-						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						StartPos: Position{Offset: 29, Line: 2, Column: 28},
+						EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 					},
+					StartPos: Position{Offset: 29, Line: 2, Column: 28},
 				},
 				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 			},
 			{
 				Identifier: Identifier{
 					Identifier: "c",
-					Pos:        Position{Offset: 39, Line: 2, Column: 38},
+					Pos:        Position{Offset: 41, Line: 2, Column: 40},
 				},
 				TypeAnnotation: &TypeAnnotation{
 					Move: false,
@@ -1686,19 +1786,20 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
-									Pos:        Position{Offset: 42, Line: 2, Column: 41},
+									Pos:        Position{Offset: 46, Line: 2, Column: 45},
 								},
 							},
 							Size:     3,
-							StartPos: Position{Offset: 49, Line: 2, Column: 48},
-							EndPos:   Position{Offset: 51, Line: 2, Column: 50},
+							StartPos: Position{Offset: 45, Line: 2, Column: 44},
+							EndPos:   Position{Offset: 54, Line: 2, Column: 53},
 						},
-						StartPos: Position{Offset: 47, Line: 2, Column: 46},
-						EndPos:   Position{Offset: 48, Line: 2, Column: 47},
+						StartPos: Position{Offset: 44, Line: 2, Column: 43},
+						EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 					},
+					StartPos: Position{Offset: 44, Line: 2, Column: 43},
 				},
-				StartPos: Position{Offset: 39, Line: 2, Column: 38},
-				EndPos:   Position{Offset: 51, Line: 2, Column: 50},
+				StartPos: Position{Offset: 41, Line: 2, Column: 40},
+				EndPos:   Position{Offset: 55, Line: 2, Column: 54},
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
@@ -1707,20 +1808,21 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 				Type: &VariableSizedType{
 					Type: &NominalType{
 						Identifier: Identifier{Identifier: "Int64",
-							Pos: Position{Offset: 55, Line: 2, Column: 54},
+							Pos: Position{Offset: 61, Line: 2, Column: 60},
 						},
 					},
-					StartPos: Position{Offset: 62, Line: 2, Column: 61},
-					EndPos:   Position{Offset: 63, Line: 2, Column: 62},
+					StartPos: Position{Offset: 60, Line: 2, Column: 59},
+					EndPos:   Position{Offset: 66, Line: 2, Column: 65},
 				},
-				StartPos: Position{Offset: 60, Line: 2, Column: 59},
-				EndPos:   Position{Offset: 61, Line: 2, Column: 60},
+				StartPos: Position{Offset: 59, Line: 2, Column: 58},
+				EndPos:   Position{Offset: 67, Line: 2, Column: 66},
 			},
+			StartPos: Position{Offset: 59, Line: 2, Column: 58},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 65, Line: 2, Column: 64},
-				EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+				StartPos: Position{Offset: 69, Line: 2, Column: 68},
+				EndPos:   Position{Offset: 70, Line: 2, Column: 69},
 			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
@@ -1737,8 +1839,8 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 func TestParseDictionaryType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
-	    let x: Int[String] = {}
+	actual, _, err := parser.ParseProgram(`
+	    let x: {String: Int} = {}
 	`)
 
 	Expect(err).
@@ -1752,25 +1854,30 @@ func TestParseDictionaryType(t *testing.T) {
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
 			Type: &DictionaryType{
-				ValueType: &NominalType{
-					Identifier: Identifier{
-						Identifier: "Int",
-						Pos:        Position{Offset: 13, Line: 2, Column: 12},
-					},
-				},
 				KeyType: &NominalType{
 					Identifier: Identifier{
 						Identifier: "String",
-						Pos:        Position{Offset: 17, Line: 2, Column: 16},
+						Pos:        Position{Offset: 14, Line: 2, Column: 13},
 					},
 				},
-				StartPos: Position{Offset: 16, Line: 2, Column: 15},
-				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+				ValueType: &NominalType{
+					Identifier: Identifier{
+						Identifier: "Int",
+						Pos:        Position{Offset: 22, Line: 2, Column: 21},
+					},
+				},
+				StartPos: Position{Offset: 13, Line: 2, Column: 12},
+				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 27, Line: 2, Column: 26},
 		},
 		Value: &DictionaryExpression{
-			StartPos: Position{Offset: 27, Line: 2, Column: 26},
-			EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+			StartPos: Position{Offset: 29, Line: 2, Column: 28},
+			EndPos:   Position{Offset: 30, Line: 2, Column: 29},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -1786,7 +1893,7 @@ func TestParseDictionaryType(t *testing.T) {
 func TestParseIntegerLiterals(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32
         let hex = 0xf2
         let binary = 0b101010
@@ -1797,12 +1904,15 @@ func TestParseIntegerLiterals(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	octal := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "octal",
 			Pos:        Position{Offset: 7, Line: 2, Column: 6},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 13, Line: 2, Column: 12},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(26),
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1812,12 +1922,15 @@ func TestParseIntegerLiterals(t *testing.T) {
 	}
 
 	hex := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "hex",
 			Pos:        Position{Offset: 32, Line: 3, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 36, Line: 3, Column: 16},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(242),
 			StartPos: Position{Offset: 38, Line: 3, Column: 18},
@@ -1827,12 +1940,15 @@ func TestParseIntegerLiterals(t *testing.T) {
 	}
 
 	binary := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "binary",
 			Pos:        Position{Offset: 55, Line: 4, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 62, Line: 4, Column: 19},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(42),
 			StartPos: Position{Offset: 64, Line: 4, Column: 21},
@@ -1842,12 +1958,15 @@ func TestParseIntegerLiterals(t *testing.T) {
 	}
 
 	decimal := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "decimal",
 			Pos:        Position{Offset: 85, Line: 5, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 93, Line: 5, Column: 20},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(1234567890),
 			StartPos: Position{Offset: 95, Line: 5, Column: 22},
@@ -1867,7 +1986,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32_45
         let hex = 0xf2_09
         let binary = 0b101010_101010
@@ -1878,12 +1997,15 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 		To(Not(HaveOccurred()))
 
 	octal := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "octal",
 			Pos:        Position{Offset: 7, Line: 2, Column: 6},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 13, Line: 2, Column: 12},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(1701),
 			StartPos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1893,12 +2015,15 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	}
 
 	hex := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "hex",
 			Pos:        Position{Offset: 35, Line: 3, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 39, Line: 3, Column: 16},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(61961),
 			StartPos: Position{Offset: 41, Line: 3, Column: 18},
@@ -1908,12 +2033,15 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	}
 
 	binary := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "binary",
 			Pos:        Position{Offset: 61, Line: 4, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 68, Line: 4, Column: 19},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(2730),
 			StartPos: Position{Offset: 70, Line: 4, Column: 21},
@@ -1923,12 +2051,15 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	}
 
 	decimal := &VariableDeclaration{
+		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "decimal",
 			Pos:        Position{Offset: 98, Line: 5, Column: 12},
 		},
-
-		IsConstant: true,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 106, Line: 5, Column: 20},
+		},
 		Value: &IntExpression{
 			Value:    big.NewInt(1234567890),
 			StartPos: Position{Offset: 108, Line: 5, Column: 22},
@@ -1948,12 +2079,12 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let octal = 0o_32_45
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -1980,12 +2111,12 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32_45_
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2012,12 +2143,12 @@ func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let binary = 0b_101010_101010
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2044,12 +2175,12 @@ func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let binary = 0b101010_101010_
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2076,12 +2207,12 @@ func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let decimal = 1_234_567_890_
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2108,12 +2239,12 @@ func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let hex = 0x_f2_09
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2140,12 +2271,12 @@ func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let hex = 0xf2_09_
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2173,12 +2304,12 @@ func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.
 func TestParseInvalidIntegerLiteral(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let hex = 0z123
 	`)
 
 	Expect(actual).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2205,7 +2336,7 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 func TestParseIntegerTypes(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let a: Int8 = 1
 		let b: Int16 = 2
 		let c: Int32 = 3
@@ -2234,6 +2365,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 10, Line: 2, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(1),
@@ -2247,7 +2383,6 @@ func TestParseIntegerTypes(t *testing.T) {
 			Identifier: "b",
 			Pos:        Position{Offset: 25, Line: 3, Column: 6},
 		},
-
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -2257,6 +2392,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 28, Line: 3, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 28, Line: 3, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 34, Line: 3, Column: 15},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(2),
@@ -2279,6 +2419,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 47, Line: 4, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 47, Line: 4, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 53, Line: 4, Column: 15},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(3),
@@ -2297,11 +2442,15 @@ func TestParseIntegerTypes(t *testing.T) {
 			Move: false,
 			Type: &NominalType{
 				Identifier: Identifier{
-
 					Identifier: "Int64",
 					Pos:        Position{Offset: 66, Line: 5, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 66, Line: 5, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 72, Line: 5, Column: 15},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(4),
@@ -2324,6 +2473,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 85, Line: 6, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 85, Line: 6, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 91, Line: 6, Column: 15},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(5),
@@ -2346,6 +2500,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 104, Line: 7, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 104, Line: 7, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 111, Line: 7, Column: 16},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(6),
@@ -2359,7 +2518,6 @@ func TestParseIntegerTypes(t *testing.T) {
 			Identifier: "g",
 			Pos:        Position{Offset: 121, Line: 8, Column: 6},
 		},
-
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -2369,6 +2527,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 124, Line: 8, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 124, Line: 8, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 131, Line: 8, Column: 16},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(7),
@@ -2391,6 +2554,11 @@ func TestParseIntegerTypes(t *testing.T) {
 					Pos:        Position{Offset: 144, Line: 9, Column: 9},
 				},
 			},
+			StartPos: Position{Offset: 144, Line: 9, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 151, Line: 9, Column: 16},
 		},
 		Value: &IntExpression{
 			Value:    big.NewInt(8),
@@ -2411,7 +2579,7 @@ func TestParseIntegerTypes(t *testing.T) {
 func TestParseFunctionType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
@@ -2436,6 +2604,7 @@ func TestParseFunctionType(t *testing.T) {
 								Pos:        Position{Offset: 14, Line: 2, Column: 13},
 							},
 						},
+						StartPos: Position{Offset: 14, Line: 2, Column: 13},
 					},
 					{
 						Move: false,
@@ -2445,6 +2614,7 @@ func TestParseFunctionType(t *testing.T) {
 								Pos:        Position{Offset: 20, Line: 2, Column: 19},
 							},
 						},
+						StartPos: Position{Offset: 20, Line: 2, Column: 19},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2455,10 +2625,16 @@ func TestParseFunctionType(t *testing.T) {
 							Pos:        Position{Offset: 28, Line: 2, Column: 27},
 						},
 					},
+					StartPos: Position{Offset: 28, Line: 2, Column: 27},
 				},
 				StartPos: Position{Offset: 12, Line: 2, Column: 11},
 				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 			},
+			StartPos: Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 35, Line: 2, Column: 34},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2480,8 +2656,8 @@ func TestParseFunctionType(t *testing.T) {
 func TestParseFunctionArrayType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
-		let test: ((Int8): Int16)[2] = []
+	actual, _, err := parser.ParseProgram(`
+		let test: [((Int8): Int16); 2] = []
 	`)
 
 	Expect(err).
@@ -2504,9 +2680,10 @@ func TestParseFunctionArrayType(t *testing.T) {
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int8",
-									Pos:        Position{Offset: 15, Line: 2, Column: 14},
+									Pos:        Position{Offset: 16, Line: 2, Column: 15},
 								},
 							},
+							StartPos: Position{Offset: 16, Line: 2, Column: 15},
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
@@ -2514,21 +2691,27 @@ func TestParseFunctionArrayType(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
+								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
-					StartPos: Position{Offset: 13, Line: 2, Column: 12},
-					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+					StartPos: Position{Offset: 14, Line: 2, Column: 13},
+					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
 				},
 				Size:     2,
-				StartPos: Position{Offset: 28, Line: 2, Column: 27},
-				EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+				StartPos: Position{Offset: 13, Line: 2, Column: 12},
+				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 34, Line: 2, Column: 33},
 		},
 		Value: &ArrayExpression{
-			StartPos: Position{Offset: 34, Line: 2, Column: 33},
-			EndPos:   Position{Offset: 35, Line: 2, Column: 34},
+			StartPos: Position{Offset: 36, Line: 2, Column: 35},
+			EndPos:   Position{Offset: 37, Line: 2, Column: 36},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -2544,8 +2727,8 @@ func TestParseFunctionArrayType(t *testing.T) {
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
-		let test: ((Int8): Int16[2]) = nothing
+	actual, _, err := parser.ParseProgram(`
+		let test: ((Int8): [Int16; 2]) = nothing
 	`)
 
 	Expect(err).
@@ -2570,6 +2753,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2578,22 +2762,28 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
+								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
 						Size:     2,
-						StartPos: Position{Offset: 27, Line: 2, Column: 26},
-						EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+						StartPos: Position{Offset: 22, Line: 2, Column: 21},
+						EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 34, Line: 2, Column: 33},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "nothing",
-				Pos:        Position{Offset: 34, Line: 2, Column: 33},
+				Pos:        Position{Offset: 36, Line: 2, Column: 35},
 			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
@@ -2610,7 +2800,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2622,7 +2812,6 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 7, Line: 2, Column: 6},
 		},
-
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -2636,6 +2825,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2650,6 +2840,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 										Pos:        Position{Offset: 24, Line: 2, Column: 23},
 									},
 								},
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
@@ -2660,14 +2851,21 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 									Pos:        Position{Offset: 32, Line: 2, Column: 31},
 								},
 							},
+							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
 						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 40, Line: 2, Column: 39},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2689,7 +2887,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
@@ -2715,6 +2913,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 								Pos:        Position{Offset: 15, Line: 2, Column: 14},
 							},
 						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
@@ -2729,6 +2928,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 										Pos:        Position{Offset: 24, Line: 2, Column: 23},
 									},
 								},
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
@@ -2739,14 +2939,21 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 									Pos:        Position{Offset: 32, Line: 2, Column: 31},
 								},
 							},
+							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
 						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 					},
+					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 40, Line: 2, Column: 39},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -2768,7 +2975,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 func TestParseMissingReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 		let noop: ((): Void) =
             fun () { return }
 	`)
@@ -2794,10 +3001,16 @@ func TestParseMissingReturnType(t *testing.T) {
 							Pos:        Position{Offset: 18, Line: 2, Column: 17},
 						},
 					},
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				},
 				StartPos: Position{Offset: 13, Line: 2, Column: 12},
 				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
 			},
+			StartPos: Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 24, Line: 2, Column: 23},
 		},
 		Value: &FunctionExpression{
 			ReturnTypeAnnotation: &TypeAnnotation{
@@ -2807,6 +3020,7 @@ func TestParseMissingReturnType(t *testing.T) {
 						Pos: Position{Offset: 43, Line: 3, Column: 17},
 					},
 				},
+				StartPos: Position{Offset: 43, Line: 3, Column: 17},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -2836,7 +3050,7 @@ func TestParseMissingReturnType(t *testing.T) {
 func TestParseLeftAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = 1 + 2 + 3
 	`)
 
@@ -2848,6 +3062,10 @@ func TestParseLeftAssociativity(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &BinaryExpression{
 			Operation: OperationPlus,
@@ -2884,13 +3102,13 @@ func TestParseLeftAssociativity(t *testing.T) {
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, err := parser.ParseProgram(`
+	program, _, err := parser.ParseProgram(`
 	   var a = 1
 	   let b = --a
 	`)
 
 	Expect(program).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2906,12 +3124,12 @@ func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, err := parser.ParseProgram(`
+	program, _, err := parser.ParseProgram(`
 	   let b = !!true
 	`)
 
 	Expect(program).
-		To(BeNil())
+		To(Not(BeNil()))
 
 	Expect(err).
 		To(BeAssignableToTypeOf(parser.Error{}))
@@ -2927,7 +3145,7 @@ func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 func TestParseTernaryRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let a = 2 > 1
           ? 0
           : 3 > 2 ? 1 : 2
@@ -2941,6 +3159,10 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "a",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &ConditionalExpression{
 			Test: &BinaryExpression{
@@ -3001,7 +3223,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 func TestParseStructure(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         struct Test {
             pub(set) var foo: Int
 
@@ -3042,6 +3264,7 @@ func TestParseStructure(t *testing.T) {
 								Pos:        Position{Offset: 53, Line: 3, Column: 30},
 							},
 						},
+						StartPos: Position{Offset: 53, Line: 3, Column: 30},
 					},
 					StartPos: Position{Offset: 35, Line: 3, Column: 12},
 					EndPos:   Position{Offset: 55, Line: 3, Column: 32},
@@ -3068,6 +3291,7 @@ func TestParseStructure(t *testing.T) {
 										Pos:        Position{Offset: 80, Line: 5, Column: 22},
 									},
 								},
+								StartPos: Position{Offset: 80, Line: 5, Column: 22},
 							},
 							StartPos: Position{Offset: 75, Line: 5, Column: 17},
 							EndPos:   Position{Offset: 80, Line: 5, Column: 22},
@@ -3088,6 +3312,10 @@ func TestParseStructure(t *testing.T) {
 											Identifier: "foo",
 											Pos:        Position{Offset: 108, Line: 6, Column: 21},
 										},
+									},
+									Transfer: &Transfer{
+										Operation: TransferOperationCopy,
+										Pos:       Position{Offset: 112, Line: 6, Column: 25},
 									},
 									Value: &IdentifierExpression{
 										Identifier: Identifier{
@@ -3111,8 +3339,6 @@ func TestParseStructure(t *testing.T) {
 						Identifier: "getFoo",
 						Pos:        Position{Offset: 153, Line: 9, Column: 20},
 					},
-
-					Parameters: nil,
 					ReturnTypeAnnotation: &TypeAnnotation{
 						Move: false,
 						Type: &NominalType{
@@ -3121,6 +3347,7 @@ func TestParseStructure(t *testing.T) {
 								Pos:        Position{Offset: 163, Line: 9, Column: 30},
 							},
 						},
+						StartPos: Position{Offset: 163, Line: 9, Column: 30},
 					},
 					FunctionBlock: &FunctionBlock{
 						Block: &Block{
@@ -3165,7 +3392,7 @@ func TestParseStructure(t *testing.T) {
 func TestParseStructureWithConformances(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         struct Test: Foo, Bar {}
 	`)
 
@@ -3208,7 +3435,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parser.ParseProgram(`
+	_, _, err := parser.ParseProgram(`
         struct Test {
             pub fun getFoo(): Int
         }
@@ -3221,7 +3448,7 @@ func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
 func TestParsePreAndPostConditions(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         fun test(n: Int) {
             pre {
                 n != 0
@@ -3260,6 +3487,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 									Pos:        Position{Offset: 21, Line: 2, Column: 20},
 								},
 							},
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
 						},
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
 						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
@@ -3273,6 +3501,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							Pos:        Position{Offset: 24, Line: 2, Column: 23},
 						},
 					},
+					StartPos: Position{Offset: 24, Line: 2, Column: 23},
 				},
 				FunctionBlock: &FunctionBlock{
 					Block: &Block{
@@ -3358,7 +3587,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 func TestParseExpression(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseExpression(`
+	actual, _, err := parser.ParseExpression(`
         before(x + before(y)) + z
 	`)
 
@@ -3429,7 +3658,7 @@ func TestParseExpression(t *testing.T) {
 func TestParseString(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseExpression(`
+	actual, _, err := parser.ParseExpression(`
        "test \0\n\r\t\"\'\\ xyz"
 	`)
 
@@ -3449,7 +3678,7 @@ func TestParseString(t *testing.T) {
 func TestParseStringWithUnicode(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseExpression(`
+	actual, _, err := parser.ParseExpression(`
       "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
 	`)
 
@@ -3469,7 +3698,7 @@ func TestParseStringWithUnicode(t *testing.T) {
 func TestParseConditionMessage(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         fun test(n: Int) {
             pre {
                 n >= 0: "n must be positive"
@@ -3503,6 +3732,7 @@ func TestParseConditionMessage(t *testing.T) {
 									Pos:        Position{Offset: 21, Line: 2, Column: 20},
 								},
 							},
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
 						},
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
 						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
@@ -3516,6 +3746,7 @@ func TestParseConditionMessage(t *testing.T) {
 							Pos:        Position{Offset: 24, Line: 2, Column: 23},
 						},
 					},
+					StartPos: Position{Offset: 24, Line: 2, Column: 23},
 				},
 				FunctionBlock: &FunctionBlock{
 					Block: &Block{
@@ -3572,7 +3803,7 @@ func TestParseConditionMessage(t *testing.T) {
 func TestParseOptionalType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
        let x: Int?? = 1
 	`)
 
@@ -3601,6 +3832,11 @@ func TestParseOptionalType(t *testing.T) {
 						},
 						EndPos: Position{Offset: 19, Line: 2, Column: 18},
 					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 21, Line: 2, Column: 20},
 				},
 				Value: &IntExpression{
 					Value:    big.NewInt(1),
@@ -3619,7 +3855,7 @@ func TestParseOptionalType(t *testing.T) {
 func TestParseNilCoalescing(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
        let x = nil ?? 1
 	`)
 
@@ -3633,6 +3869,10 @@ func TestParseNilCoalescing(t *testing.T) {
 				Identifier: Identifier{
 					Identifier: "x",
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 14, Line: 2, Column: 13},
 				},
 				Value: &BinaryExpression{
 					Operation: OperationNilCoalesce,
@@ -3658,7 +3898,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 	RegisterTestingT(t)
 
 	// NOTE: only syntactically, not semantically valid
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
        let x = 1 ?? 2 ?? 3
 	`)
 
@@ -3672,6 +3912,10 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 				Identifier: Identifier{
 					Identifier: "x",
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 14, Line: 2, Column: 13},
 				},
 				Value: &BinaryExpression{
 					Operation: OperationNilCoalesce,
@@ -3706,7 +3950,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 func TestParseFailableDowncasting(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
        let x = 0 as? Int
 	`)
 
@@ -3720,6 +3964,10 @@ func TestParseFailableDowncasting(t *testing.T) {
 				Identifier: Identifier{
 					Identifier: "x",
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 14, Line: 2, Column: 13},
 				},
 				Value: &FailableDowncastExpression{
 					Expression: &IntExpression{
@@ -3735,6 +3983,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 								Pos:        Position{Offset: 22, Line: 2, Column: 21},
 							},
 						},
+						StartPos: Position{Offset: 22, Line: 2, Column: 21},
 					},
 				},
 				StartPos: Position{Offset: 8, Line: 2, Column: 7},
@@ -3750,7 +3999,7 @@ func TestParseInterface(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		actual, err := parser.ParseProgram(fmt.Sprintf(`
+		actual, _, err := parser.ParseProgram(fmt.Sprintf(`
             %s interface Test {
                 foo: Int
 
@@ -3792,6 +4041,7 @@ func TestParseInterface(t *testing.T) {
 									Pos:        Position{Offset: 58, Line: 3, Column: 21},
 								},
 							},
+							StartPos: Position{Offset: 58, Line: 3, Column: 21},
 						},
 						StartPos: Position{Offset: 53, Line: 3, Column: 16},
 						EndPos:   Position{Offset: 60, Line: 3, Column: 23},
@@ -3818,6 +4068,7 @@ func TestParseInterface(t *testing.T) {
 											Pos:        Position{Offset: 89, Line: 5, Column: 26},
 										},
 									},
+									StartPos: Position{Offset: 89, Line: 5, Column: 26},
 								},
 								StartPos: Position{Offset: 84, Line: 5, Column: 21},
 								EndPos:   Position{Offset: 89, Line: 5, Column: 26},
@@ -3834,7 +4085,6 @@ func TestParseInterface(t *testing.T) {
 							Identifier: "getFoo",
 							Pos:        Position{Offset: 115, Line: 7, Column: 20},
 						},
-						Parameters: nil,
 						ReturnTypeAnnotation: &TypeAnnotation{
 							Move: false,
 							Type: &NominalType{
@@ -3843,6 +4093,7 @@ func TestParseInterface(t *testing.T) {
 									Pos:        Position{Offset: 125, Line: 7, Column: 30},
 								},
 							},
+							StartPos: Position{Offset: 125, Line: 7, Column: 30},
 						},
 						FunctionBlock: nil,
 						StartPos:      Position{Offset: 111, Line: 7, Column: 16},
@@ -3865,7 +4116,7 @@ func TestParseInterface(t *testing.T) {
 func TestParseImportWithString(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         import "test.bpl"
 	`)
 
@@ -3903,7 +4154,7 @@ func TestParseImportWithString(t *testing.T) {
 func TestParseImportWithAddress(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         import 0x1234
 	`)
 
@@ -3942,7 +4193,7 @@ func TestParseImportWithAddress(t *testing.T) {
 func TestParseImportWithIdentifiers(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         import A, b from 0x0
 	`)
 
@@ -3977,7 +4228,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 func TestParseFieldWithFromIdentifier(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parser.ParseProgram(`
+	_, _, err := parser.ParseProgram(`
       struct S {
           let from: String
       }
@@ -3990,7 +4241,7 @@ func TestParseFieldWithFromIdentifier(t *testing.T) {
 func TestParseFunctionWithFromIdentifier(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parser.ParseProgram(`
+	_, _, err := parser.ParseProgram(`
         fun send(from: String, to: String) {}
 	`)
 
@@ -4001,7 +4252,7 @@ func TestParseFunctionWithFromIdentifier(t *testing.T) {
 func TestParseImportWithFromIdentifier(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parser.ParseProgram(`
+	_, _, err := parser.ParseProgram(`
         import from from 0x0
 	`)
 
@@ -4012,7 +4263,7 @@ func TestParseImportWithFromIdentifier(t *testing.T) {
 func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 	RegisterTestingT(t)
 
-	_, err := parser.ParseProgram(`
+	_, _, err := parser.ParseProgram(`
         import from from 0x0;
         fun foo() {}; 
 	`)
@@ -4024,7 +4275,7 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 func TestParseInvalidTypeWithWhitespace(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
 	    let x: Int ? = 1
 	`)
 
@@ -4050,7 +4301,7 @@ func TestParseInvalidTypeWithWhitespace(t *testing.T) {
 func TestParseResource(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         resource Test {}
 	`)
 
@@ -4080,7 +4331,7 @@ func TestParseResource(t *testing.T) {
 func TestParseMoveReturnType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         fun test(): <-X {}
 	`)
 
@@ -4100,6 +4351,7 @@ func TestParseMoveReturnType(t *testing.T) {
 					Pos:        Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
+			StartPos: Position{Offset: 21, Line: 2, Column: 20},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -4121,7 +4373,7 @@ func TestParseMoveReturnType(t *testing.T) {
 func TestParseMovingVariableDeclaration(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let x <- y
 	`)
 
@@ -4140,6 +4392,10 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 				Pos:        Position{Offset: 18, Line: 2, Column: 17},
 			},
 		},
+		Transfer: &Transfer{
+			Operation: TransferOperationMove,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
 
@@ -4154,7 +4410,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 func TestParseMoveStatement(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         fun test() {
             x <- y
         }
@@ -4176,6 +4432,7 @@ func TestParseMoveStatement(t *testing.T) {
 					Pos:        Position{Offset: 18, Line: 2, Column: 17},
 				},
 			},
+			StartPos: Position{Offset: 18, Line: 2, Column: 17},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
@@ -4186,6 +4443,10 @@ func TestParseMoveStatement(t *testing.T) {
 								Identifier: "x",
 								Pos:        Position{Offset: 34, Line: 3, Column: 12},
 							},
+						},
+						Transfer: &Transfer{
+							Operation: TransferOperationMove,
+							Pos:       Position{Offset: 36, Line: 3, Column: 14},
 						},
 						Value: &IdentifierExpression{
 							Identifier: Identifier{
@@ -4213,7 +4474,7 @@ func TestParseMoveStatement(t *testing.T) {
 func TestParseMoveOperator(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
       let x = foo(<-y)
 	`)
 
@@ -4225,6 +4486,10 @@ func TestParseMoveOperator(t *testing.T) {
 		Identifier: Identifier{
 			Identifier: "x",
 			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &InvocationExpression{
 			InvokedExpression: &IdentifierExpression{
@@ -4267,7 +4532,7 @@ func TestParseMoveOperator(t *testing.T) {
 func TestParseMoveParameterType(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         fun test(x: <-X) {}
 	`)
 
@@ -4287,6 +4552,7 @@ func TestParseMoveParameterType(t *testing.T) {
 					Pos:        Position{Offset: 24, Line: 2, Column: 23},
 				},
 			},
+			StartPos: Position{Offset: 24, Line: 2, Column: 23},
 		},
 		Parameters: []*Parameter{
 			{
@@ -4303,6 +4569,7 @@ func TestParseMoveParameterType(t *testing.T) {
 							Pos:        Position{Offset: 23, Line: 2, Column: 22},
 						},
 					},
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
@@ -4328,7 +4595,7 @@ func TestParseMoveParameterType(t *testing.T) {
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let x: <-R <- y
 	`)
 
@@ -4349,12 +4616,17 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 					Pos:        Position{Offset: 18, Line: 2, Column: 17},
 				},
 			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "y",
 				Pos:        Position{Offset: 23, Line: 2, Column: 22},
 			},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationMove,
+			Pos:       Position{Offset: 20, Line: 2, Column: 19},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
@@ -4370,7 +4642,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         struct X { x: <-R }
 	`)
 
@@ -4401,6 +4673,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 								Pos:        Position{Offset: 25, Line: 2, Column: 24},
 							},
 						},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 					StartPos: Position{Offset: 20, Line: 2, Column: 19},
 					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
@@ -4422,7 +4695,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let f: ((): <-R) = g
 	`)
 
@@ -4447,10 +4720,16 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 							Pos:        Position{Offset: 23, Line: 2, Column: 22},
 						},
 					},
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 26, Line: 2, Column: 25},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
@@ -4472,7 +4751,7 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let f = fun (): <-R { return X }
 	`)
 
@@ -4485,6 +4764,10 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 			Identifier: "f",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Value: &FunctionExpression{
 			ReturnTypeAnnotation: &TypeAnnotation{
 				Move: true,
@@ -4494,6 +4777,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 						Pos:        Position{Offset: 27, Line: 2, Column: 26},
 					},
 				},
+				StartPos: Position{Offset: 25, Line: 2, Column: 24},
 			},
 			FunctionBlock: &FunctionBlock{
 				Block: &Block{
@@ -4529,7 +4813,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 	RegisterTestingT(t)
 
-	actual, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
         let y = x as? <-R
 	`)
 
@@ -4542,7 +4826,10 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 			Identifier: "y",
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
-		TypeAnnotation: nil,
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
 		Value: &FailableDowncastExpression{
 			Expression: &IdentifierExpression{
 				Identifier: Identifier{
@@ -4558,9 +4845,116 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 						Pos:        Position{Offset: 25, Line: 2, Column: 24},
 					},
 				},
+				StartPos: Position{Offset: 23, Line: 2, Column: 22},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}
+
+func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+          let r <- create R()
+          (fun () {})()
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &FunctionDeclaration{
+		Access: AccessNotSpecified,
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Parameters: nil,
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&VariableDeclaration{
+						IsConstant: true,
+						Identifier: Identifier{
+							Identifier: "r",
+							Pos:        Position{Offset: 34, Line: 3, Column: 14},
+						},
+						TypeAnnotation: nil,
+						Value: &CreateExpression{
+							InvocationExpression: &InvocationExpression{
+								InvokedExpression: &IdentifierExpression{
+									Identifier: Identifier{
+										Identifier: "R",
+										Pos:        Position{Offset: 46, Line: 3, Column: 26},
+									},
+								},
+								Arguments: nil,
+								EndPos:    Position{Offset: 48, Line: 3, Column: 28},
+							},
+							StartPos: Position{Offset: 39, Line: 3, Column: 19},
+						},
+						Transfer: &Transfer{
+							Operation: TransferOperationMove,
+							Pos:       Position{Offset: 36, Line: 3, Column: 16},
+						},
+						StartPos: Position{Offset: 30, Line: 3, Column: 10},
+					},
+					&ExpressionStatement{
+						Expression: &InvocationExpression{
+							InvokedExpression: &FunctionExpression{
+								Parameters: nil,
+								ReturnTypeAnnotation: &TypeAnnotation{
+									Move: false,
+									Type: &NominalType{
+										Identifier: Identifier{
+											Identifier: "",
+											Pos:        Position{Offset: 66, Line: 4, Column: 16},
+										},
+									},
+									StartPos: Position{Offset: 66, Line: 4, Column: 16},
+								},
+								FunctionBlock: &FunctionBlock{
+									Block: &Block{
+										Statements: nil,
+										StartPos:   Position{Offset: 68, Line: 4, Column: 18},
+										EndPos:     Position{Offset: 69, Line: 4, Column: 19},
+									},
+									PreConditions:  nil,
+									PostConditions: nil,
+								},
+								StartPos: Position{Offset: 61, Line: 4, Column: 11},
+							},
+							Arguments: nil,
+							EndPos:    Position{Offset: 72, Line: 4, Column: 22},
+						},
+					},
+				},
+				StartPos: Position{Offset: 18, Line: 2, Column: 17},
+				EndPos:   Position{Offset: 80, Line: 5, Column: 6},
+			},
+			PreConditions:  nil,
+			PostConditions: nil,
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
 	}
 
 	expected := &Program{

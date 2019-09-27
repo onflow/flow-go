@@ -10,6 +10,9 @@ type StrictusListener interface {
 	// EnterProgram is called when entering the program production.
 	EnterProgram(c *ProgramContext)
 
+	// EnterReplInput is called when entering the replInput production.
+	EnterReplInput(c *ReplInputContext)
+
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
@@ -61,14 +64,23 @@ type StrictusListener interface {
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
-	// EnterTypeIndex is called when entering the typeIndex production.
-	EnterTypeIndex(c *TypeIndexContext)
-
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
 
+	// EnterNominalType is called when entering the nominalType production.
+	EnterNominalType(c *NominalTypeContext)
+
 	// EnterFunctionType is called when entering the functionType production.
 	EnterFunctionType(c *FunctionTypeContext)
+
+	// EnterVariableSizedType is called when entering the variableSizedType production.
+	EnterVariableSizedType(c *VariableSizedTypeContext)
+
+	// EnterConstantSizedType is called when entering the constantSizedType production.
+	EnterConstantSizedType(c *ConstantSizedTypeContext)
+
+	// EnterDictionaryType is called when entering the dictionaryType production.
+	EnterDictionaryType(c *DictionaryTypeContext)
 
 	// EnterBlock is called when entering the block production.
 	EnterBlock(c *BlockContext)
@@ -115,6 +127,9 @@ type StrictusListener interface {
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
+	// EnterTransfer is called when entering the transfer production.
+	EnterTransfer(c *TransferContext)
+
 	// EnterExpression is called when entering the expression production.
 	EnterExpression(c *ExpressionContext)
 
@@ -154,6 +169,9 @@ type StrictusListener interface {
 	// EnterPrimaryExpression is called when entering the primaryExpression production.
 	EnterPrimaryExpression(c *PrimaryExpressionContext)
 
+	// EnterComposedExpression is called when entering the composedExpression production.
+	EnterComposedExpression(c *ComposedExpressionContext)
+
 	// EnterPrimaryExpressionSuffix is called when entering the primaryExpressionSuffix production.
 	EnterPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
 
@@ -172,22 +190,25 @@ type StrictusListener interface {
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
 
-	// EnterCreateExpression is called when entering the CreateExpression production.
+	// EnterPrimaryExpressionStart is called when entering the primaryExpressionStart production.
+	EnterPrimaryExpressionStart(c *PrimaryExpressionStartContext)
+
+	// EnterCreateExpression is called when entering the createExpression production.
 	EnterCreateExpression(c *CreateExpressionContext)
 
-	// EnterDestroyExpression is called when entering the DestroyExpression production.
+	// EnterDestroyExpression is called when entering the destroyExpression production.
 	EnterDestroyExpression(c *DestroyExpressionContext)
 
-	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
+	// EnterIdentifierExpression is called when entering the identifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
 
-	// EnterLiteralExpression is called when entering the LiteralExpression production.
+	// EnterLiteralExpression is called when entering the literalExpression production.
 	EnterLiteralExpression(c *LiteralExpressionContext)
 
-	// EnterFunctionExpression is called when entering the FunctionExpression production.
+	// EnterFunctionExpression is called when entering the functionExpression production.
 	EnterFunctionExpression(c *FunctionExpressionContext)
 
-	// EnterNestedExpression is called when entering the NestedExpression production.
+	// EnterNestedExpression is called when entering the nestedExpression production.
 	EnterNestedExpression(c *NestedExpressionContext)
 
 	// EnterExpressionAccess is called when entering the expressionAccess production.
@@ -253,6 +274,9 @@ type StrictusListener interface {
 	// ExitProgram is called when exiting the program production.
 	ExitProgram(c *ProgramContext)
 
+	// ExitReplInput is called when exiting the replInput production.
+	ExitReplInput(c *ReplInputContext)
+
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
 
@@ -304,14 +328,23 @@ type StrictusListener interface {
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
 
-	// ExitTypeIndex is called when exiting the typeIndex production.
-	ExitTypeIndex(c *TypeIndexContext)
-
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
 
+	// ExitNominalType is called when exiting the nominalType production.
+	ExitNominalType(c *NominalTypeContext)
+
 	// ExitFunctionType is called when exiting the functionType production.
 	ExitFunctionType(c *FunctionTypeContext)
+
+	// ExitVariableSizedType is called when exiting the variableSizedType production.
+	ExitVariableSizedType(c *VariableSizedTypeContext)
+
+	// ExitConstantSizedType is called when exiting the constantSizedType production.
+	ExitConstantSizedType(c *ConstantSizedTypeContext)
+
+	// ExitDictionaryType is called when exiting the dictionaryType production.
+	ExitDictionaryType(c *DictionaryTypeContext)
 
 	// ExitBlock is called when exiting the block production.
 	ExitBlock(c *BlockContext)
@@ -358,6 +391,9 @@ type StrictusListener interface {
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
 
+	// ExitTransfer is called when exiting the transfer production.
+	ExitTransfer(c *TransferContext)
+
 	// ExitExpression is called when exiting the expression production.
 	ExitExpression(c *ExpressionContext)
 
@@ -397,6 +433,9 @@ type StrictusListener interface {
 	// ExitPrimaryExpression is called when exiting the primaryExpression production.
 	ExitPrimaryExpression(c *PrimaryExpressionContext)
 
+	// ExitComposedExpression is called when exiting the composedExpression production.
+	ExitComposedExpression(c *ComposedExpressionContext)
+
 	// ExitPrimaryExpressionSuffix is called when exiting the primaryExpressionSuffix production.
 	ExitPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
 
@@ -415,22 +454,25 @@ type StrictusListener interface {
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
 
-	// ExitCreateExpression is called when exiting the CreateExpression production.
+	// ExitPrimaryExpressionStart is called when exiting the primaryExpressionStart production.
+	ExitPrimaryExpressionStart(c *PrimaryExpressionStartContext)
+
+	// ExitCreateExpression is called when exiting the createExpression production.
 	ExitCreateExpression(c *CreateExpressionContext)
 
-	// ExitDestroyExpression is called when exiting the DestroyExpression production.
+	// ExitDestroyExpression is called when exiting the destroyExpression production.
 	ExitDestroyExpression(c *DestroyExpressionContext)
 
-	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
+	// ExitIdentifierExpression is called when exiting the identifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)
 
-	// ExitLiteralExpression is called when exiting the LiteralExpression production.
+	// ExitLiteralExpression is called when exiting the literalExpression production.
 	ExitLiteralExpression(c *LiteralExpressionContext)
 
-	// ExitFunctionExpression is called when exiting the FunctionExpression production.
+	// ExitFunctionExpression is called when exiting the functionExpression production.
 	ExitFunctionExpression(c *FunctionExpressionContext)
 
-	// ExitNestedExpression is called when exiting the NestedExpression production.
+	// ExitNestedExpression is called when exiting the nestedExpression production.
 	ExitNestedExpression(c *NestedExpressionContext)
 
 	// ExitExpressionAccess is called when exiting the expressionAccess production.

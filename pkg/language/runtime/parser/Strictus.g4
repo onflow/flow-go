@@ -54,6 +54,11 @@ program
     : (declaration ';'?)* EOF
     ;
 
+replInput
+    : program
+    | statements
+    ;
+
 declaration
     : compositeDeclaration
     | interfaceDeclaration
@@ -139,22 +144,38 @@ typeAnnotation
     ;
 
 fullType
-    : baseType
-      ({p.noWhitespace()}? typeIndex)*
-      ({p.noWhitespace()}? optionals+=Optional)*
-    ;
-
-typeIndex
-    : '[' (DecimalLiteral|fullType)? ']'
+    : baseType ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
-    : identifier
+    : nominalType
     | functionType
+    | variableSizedType
+    | constantSizedType
+    | dictionaryType
+    ;
+
+nominalType
+    : identifier
     ;
 
 functionType
-    : '(' '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')' ':' returnType=typeAnnotation ')'
+    : '('
+        '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')'
+        ':' returnType=typeAnnotation
+      ')'
+    ;
+
+variableSizedType
+    : '[' fullType ']'
+    ;
+
+constantSizedType
+    : '[' fullType ';' size=DecimalLiteral ']'
+    ;
+
+dictionaryType
+    : '{' keyType=fullType ':' valueType=fullType '}'
     ;
 
 block
@@ -223,11 +244,16 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
+    : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
 assignment
-    : identifier expressionAccess* ('=' | Move) expression
+    : identifier expressionAccess* transfer expression
+    ;
+
+transfer
+    : '='
+    | Move
     ;
 
 expression
@@ -291,6 +317,12 @@ unaryExpression
     ;
 
 primaryExpression
+    : createExpression
+    | destroyExpression
+    | composedExpression
+    ;
+
+composedExpression
     : primaryExpressionStart primaryExpressionSuffix*
     ;
 
@@ -355,12 +387,34 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : Create identifier invocation                                      # CreateExpression
-    | Destroy expression                                                # DestroyExpression
-    | identifier                                                        # IdentifierExpression
-    | literal                                                           # LiteralExpression
-    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                                # NestedExpression
+    : identifierExpression
+    | literalExpression
+    | functionExpression
+    | nestedExpression
+    ;
+
+createExpression
+    : Create identifier invocation
+    ;
+
+destroyExpression
+    : Destroy expression
+    ;
+
+identifierExpression
+    : identifier
+    ;
+
+literalExpression
+    : literal
+    ;
+
+functionExpression
+    : Fun parameterList (':' returnType=typeAnnotation)? functionBlock
+    ;
+
+nestedExpression
+    : '(' expression ')'
     ;
 
 expressionAccess

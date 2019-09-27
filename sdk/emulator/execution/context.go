@@ -11,12 +11,12 @@ import (
 )
 
 type RuntimeContext struct {
-	registers *RegistersView
+	registers *types.RegistersView
 	Accounts  []types.Address
 	Logger    func(string)
 }
 
-func NewRuntimeContext(registers *RegistersView) *RuntimeContext {
+func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
 		registers: registers,
 		Logger:    func(string) {},

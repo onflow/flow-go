@@ -6,6 +6,7 @@ type AlgoName string
 const (
 	// Supported Hashing algorithms
 	SHA3_256 AlgoName = "SHA3_256"
+	SHA3_384 AlgoName = "SHA3_384"
 
 	// Supported Signing algorithms
 	BLS_BLS12381    = "BLS_BLS12381"
@@ -17,6 +18,7 @@ const (
 	// Lengths of hash outputs in bytes
 	HashLengthSha2_256 = 32
 	HashLengthSha3_256 = 32
+	HashLengthSha3_384 = 48
 	HashLengthSha3_512 = 64
 
 	// BLS signature scheme lengths
@@ -41,14 +43,6 @@ const (
 	PrKeyLengthECDSA_SECp256k1     = 32
 	PubKeyLengthECDSA_SECp256k1    = 64
 )
-
-// These types should implement Hash
-
-// Hash32 is 256-bits digest
-type Hash32 [32]byte
-
-// Hash64 is 512-bits digest
-type Hash64 [64]byte
 
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte

@@ -681,6 +681,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
+	Initializer   *ast.InitializerDeclaration
 	Pos           ast.Position
 }
 
@@ -812,9 +813,12 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []Type
-	InterfaceParameterTypes []Type
+	CompositeParameterTypes []*TypeAnnotation
+	InterfaceParameterTypes []*TypeAnnotation
 }
+
+// TODO: improve error message:
+//  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
 	CompositeType       *CompositeType
@@ -1106,6 +1110,27 @@ func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// MissingReturnStatementError
+
+type MissingReturnStatementError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingReturnStatementError) Error() string {
+	return "missing return statement"
+}
+
+func (*MissingReturnStatementError) isSemanticError() {}
+
+func (e *MissingReturnStatementError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingReturnStatementError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // UnsupportedExpressionError
 
 type UnsupportedExpressionError struct {
@@ -1128,5 +1153,217 @@ func (e *UnsupportedExpressionError) StartPosition() ast.Position {
 }
 
 func (e *UnsupportedExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnassignedFieldAccessError
+
+type UnassignedFieldAccessError struct {
+	Identifier ast.Identifier
+	Pos        ast.Position
+}
+
+func (e *UnassignedFieldAccessError) Error() string {
+	return fmt.Sprintf("cannot access unassigned field %s", e.Identifier.String())
+}
+
+func (*UnassignedFieldAccessError) isSemanticError() {}
+
+func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
+	length := len(e.Identifier.Identifier)
+	return e.Pos.Shifted(length - 1)
+}
+
+// MissingMoveAnnotationError
+
+type MissingMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveAnnotationError) Error() string {
+	return "missing move annotation: `<-`"
+}
+
+func (*MissingMoveAnnotationError) isSemanticError() {}
+
+func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveAnnotationError
+
+type InvalidMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidMoveAnnotationError) Error() string {
+	return "invalid move annotation: `<-`"
+}
+
+func (*InvalidMoveAnnotationError) isSemanticError() {}
+
+func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// IncorrectTransferOperationError
+
+type IncorrectTransferOperationError struct {
+	ActualOperation   ast.TransferOperation
+	ExpectedOperation ast.TransferOperation
+	Pos               ast.Position
+}
+
+func (e *IncorrectTransferOperationError) Error() string {
+	return fmt.Sprintf(
+		"incorrect transfer operation: expected `%s`",
+		e.ExpectedOperation.Operator(),
+	)
+}
+
+func (*IncorrectTransferOperationError) isSemanticError() {}
+
+func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidConstructionError
+
+type InvalidConstructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidConstructionError) Error() string {
+	return "cannot create value: not a resource"
+}
+
+func (*InvalidConstructionError) isSemanticError() {}
+
+func (e *InvalidConstructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidConstructionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidDestructionError
+
+type InvalidDestructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructionError) Error() string {
+	return "cannot destroy value: not a resource"
+}
+
+func (*InvalidDestructionError) isSemanticError() {}
+
+func (e *InvalidDestructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// ResourceLossError
+
+type ResourceLossError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *ResourceLossError) Error() string {
+	return "loss of resource"
+}
+
+func (*ResourceLossError) isSemanticError() {}
+
+func (e *ResourceLossError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *ResourceLossError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingCreateError
+
+type MissingCreateError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingCreateError) Error() string {
+	return "cannot create resource: expected `create`"
+}
+
+func (*MissingCreateError) isSemanticError() {}
+
+func (e *MissingCreateError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingCreateError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingMoveOperationError
+
+type MissingMoveOperationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveOperationError) Error() string {
+	return "missing move operation: `<-`"
+}
+
+func (*MissingMoveOperationError) isSemanticError() {}
+
+func (e *MissingMoveOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveOperationError
+
+type InvalidMoveOperationError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidMoveOperationError) Error() string {
+	return "invalid move operation for non-resource: unexpected `<-`"
+}
+
+func (*InvalidMoveOperationError) isSemanticError() {}
+
+func (e *InvalidMoveOperationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidMoveOperationError) EndPosition() ast.Position {
 	return e.EndPos
 }
