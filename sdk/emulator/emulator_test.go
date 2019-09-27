@@ -25,7 +25,7 @@ const addTwoScript = `
 
 // updateAccountCodeScript runs a script that updates the code for an account.
 const updateAccountCodeScript = `
-	fun main(account: Account) {
+	fun main() {
 		let account = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]
 		let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
 		updateAccountCode(account, code)
@@ -40,7 +40,7 @@ const sampleCall = `
 
 func generateCreateAccountScript(publicKey, code []byte) []byte {
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
+		fun main() {
 			createAccount(%s, %s)
 		}
 	`, bytesToString(publicKey), bytesToString(code))
@@ -55,31 +55,36 @@ func TestWorldStates(t *testing.T) {
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	tx2 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        2,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	tx3 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        3,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		Nonce:              3,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx3.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx3.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx3.AddSignature(b.RootAccount(), b.RootKey())
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: %x\n", ws1)
@@ -88,7 +93,9 @@ func TestWorldStates(t *testing.T) {
 	Expect(b.txPool).To(HaveLen(0))
 
 	// Submit tx1
-	b.SubmitTransaction(tx1)
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
 	ws2 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx1: %x\n", ws2)
 
@@ -98,7 +105,9 @@ func TestWorldStates(t *testing.T) {
 	Expect(ws2).NotTo(Equal(ws1))
 
 	// Submit tx1 again
-	b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
+	Expect(err).To(HaveOccurred())
+
 	ws3 := b.pendingWorldState.Hash()
 	t.Logf("world state after dup tx1: \t%s\n", ws3)
 
@@ -108,7 +117,9 @@ func TestWorldStates(t *testing.T) {
 	Expect(ws3).To(Equal(ws2))
 
 	// Submit tx2
-	b.SubmitTransaction(tx2)
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
+
 	ws4 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx2: \t%s\n", ws4)
 
@@ -130,7 +141,9 @@ func TestWorldStates(t *testing.T) {
 	Expect(b.worldStates).To(HaveKey(string(ws5)))
 
 	// Submit tx3
-	b.SubmitTransaction(tx3)
+	err = b.SubmitTransaction(tx3)
+	Expect(err).ToNot(HaveOccurred())
+
 	ws6 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx3: \t%s\n", ws6)
 
@@ -166,13 +179,14 @@ func TestSubmitTransaction(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -190,13 +204,14 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -216,13 +231,14 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
 
 		tx1 := &types.Transaction{
-			Script:       []byte(addTwoScript),
-			Nonce:        1,
-			ComputeLimit: 10,
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccount(),
+			ScriptAccounts:     []types.Address{b.RootAccount()},
 		}
 
-		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-		tx1.SetPayerSignature(invalidAddress, b.RootKey())
+		tx1.AddSignature(invalidAddress, b.RootKey())
 
 		err := b.SubmitTransaction(tx1)
 
@@ -239,13 +255,14 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
 
 		tx1 := &types.Transaction{
-			Script:       []byte(addTwoScript),
-			Nonce:        1,
-			ComputeLimit: 10,
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccount(),
+			ScriptAccounts:     []types.Address{b.RootAccount()},
 		}
 
-		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-		tx1.SetPayerSignature(b.RootAccount(), invalidKey)
+		tx1.AddSignature(b.RootAccount(), invalidKey)
 
 		err := b.SubmitTransaction(tx1)
 		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccount()}))
@@ -253,49 +270,6 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
-	t.Run("InvalidAccount", func(t *testing.T) {
-		RegisterTestingT(t)
-
-		b := NewEmulatedBlockchain(DefaultOptions)
-
-		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
-
-		tx1 := &types.Transaction{
-			Script:       []byte(addTwoScript),
-			Nonce:        1,
-			ComputeLimit: 10,
-		}
-
-		tx1.AddScriptSignature(invalidAddress, b.RootKey())
-		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
-
-		err := b.SubmitTransaction(tx1)
-
-		Expect(err).To(MatchError(&ErrInvalidSignatureAccount{Account: invalidAddress}))
-	})
-
-	t.Run("InvalidKeyPair", func(t *testing.T) {
-		RegisterTestingT(t)
-
-		b := NewEmulatedBlockchain(DefaultOptions)
-
-		// use key-pair that does not exist on root account
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
-
-		tx1 := &types.Transaction{
-			Script:       []byte(addTwoScript),
-			Nonce:        1,
-			ComputeLimit: 10,
-		}
-
-		tx1.AddScriptSignature(b.RootAccount(), invalidKey)
-		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
-
-		err := b.SubmitTransaction(tx1)
-		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccount()}))
-	})
-
 	t.Run("MultipleAccounts", func(t *testing.T) {
 		RegisterTestingT(t)
 
@@ -317,13 +291,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
 
 		tx1 := &types.Transaction{
-			Script:       createAccountScript,
-			Nonce:        1,
-			ComputeLimit: 10,
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccount(),
 		}
 
-		tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-		tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+		tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 		err := b.SubmitTransaction(tx1)
 		Expect(err).ToNot(HaveOccurred())
@@ -336,14 +310,15 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		`
 
 		tx2 := &types.Transaction{
-			Script:       []byte(multipleAccountScript),
-			Nonce:        1,
-			ComputeLimit: 10,
+			Script:             []byte(multipleAccountScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
 		}
 
-		tx2.AddScriptSignature(accountAddressA, b.RootKey())
-		tx2.AddScriptSignature(accountAddressB, privateKey)
-		tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+		tx2.AddSignature(accountAddressA, b.RootKey())
+		tx2.AddSignature(accountAddressB, privateKey)
 
 		err = b.SubmitTransaction(tx2)
 		Expect(err).ToNot(HaveOccurred())
@@ -359,13 +334,14 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte("invalid script"),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte("invalid script"),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Submit invalid tx1 (errors)
 	err := b.SubmitTransaction(tx1)
@@ -383,13 +359,14 @@ func TestCommitBlock(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
@@ -398,18 +375,22 @@ func TestCommitBlock(t *testing.T) {
 	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 
 	tx2 := &types.Transaction{
-		Script:       []byte("invalid script"),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte("invalid script"),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
-	tx, _ = b.GetTransaction(tx2.Hash())
 	Expect(err).To(HaveOccurred())
+
+	tx, err = b.GetTransaction(tx2.Hash())
+	Expect(err).ToNot(HaveOccurred())
+
 	Expect(tx.Status).To(Equal(types.TransactionReverted))
 
 	// Commit tx1 and tx2 into new block
@@ -431,13 +412,13 @@ func TestCreateAccount(t *testing.T) {
 	createAccountScriptA := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
-		Script:       createAccountScriptA,
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             createAccountScriptA,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
@@ -455,13 +436,14 @@ func TestCreateAccount(t *testing.T) {
 	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
 
 	tx2 := &types.Transaction{
-		Script:       createAccountScriptB,
-		Nonce:        2,
-		ComputeLimit: 10,
+		Script:             createAccountScriptB,
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
@@ -484,13 +466,13 @@ func TestUpdateAccountCode(t *testing.T) {
 	createAccountScript := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
-		Script:       createAccountScript,
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
@@ -504,13 +486,14 @@ func TestUpdateAccountCode(t *testing.T) {
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 	tx2 := &types.Transaction{
-		Script:       []byte(updateAccountCodeScript),
-		Nonce:        2,
-		ComputeLimit: 10,
+		Script:             []byte(updateAccountCodeScript),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
@@ -538,13 +521,13 @@ func TestImportAccountCode(t *testing.T) {
 	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
 
 	tx1 := &types.Transaction{
-		Script:       createAccountScript,
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
@@ -561,13 +544,14 @@ func TestImportAccountCode(t *testing.T) {
 	`)
 
 	tx2 := &types.Transaction{
-		Script:       script,
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             script,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
@@ -579,13 +563,14 @@ func TestCallScript(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
@@ -608,30 +593,39 @@ func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        1,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx1.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx1.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	tx2 := &types.Transaction{
-		Script:       []byte(addTwoScript),
-		Nonce:        2,
-		ComputeLimit: 10,
+		Script:             []byte(addTwoScript),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+		ScriptAccounts:     []types.Address{b.RootAccount()},
 	}
 
-	tx2.AddScriptSignature(b.RootAccount(), b.RootKey())
-	tx2.SetPayerSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(b.RootAccount(), b.RootKey())
 
 	var invalidWorldState crypto.Hash
 
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
-	b.SubmitTransaction(tx1)
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
 	ws2 := b.pendingWorldState.Hash()
-	b.SubmitTransaction(tx2)
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).ToNot(HaveOccurred())
+
 	ws3 := b.pendingWorldState.Hash()
 
 	// Get transaction at invalid world state version (errors)
