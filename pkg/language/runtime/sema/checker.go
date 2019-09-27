@@ -3169,7 +3169,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	depth := checker.valueActivations.Depth() + 1
 
 	self := &Variable{
-		Kind:       common.DeclarationKindConstant,
+		Kind:       common.DeclarationKindSelf,
 		Type:       selfType,
 		IsConstant: true,
 		Depth:      depth,
