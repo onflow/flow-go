@@ -1041,20 +1041,41 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				},
 			)
 		}
-	} else if !isInvalidType(returnType) &&
-		!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+	} else {
 
-		checker.report(
-			&TypeMismatchError{
-				ExpectedType: returnType,
-				ActualType:   valueType,
-				StartPos:     statement.Expression.StartPosition(),
-				EndPos:       statement.Expression.EndPosition(),
-			},
-		)
+		if !isInvalidType(returnType) &&
+			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: returnType,
+					ActualType:   valueType,
+					StartPos:     statement.Expression.StartPosition(),
+					EndPos:       statement.Expression.EndPosition(),
+				},
+			)
+		}
+
+		checker.checkReturnStatementMoveOperation(statement.Expression, valueType)
 	}
 
 	return nil
+}
+
+func (checker *Checker) checkReturnStatementMoveOperation(valueExpression ast.Expression, valueType Type) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	if unaryExpression, ok := valueExpression.(*ast.UnaryExpression); !ok ||
+		unaryExpression.Operation != ast.OperationMove {
+
+		checker.report(
+			&MissingMoveOperationError{
+				Pos: valueExpression.StartPosition(),
+			},
+		)
+	}
 }
 
 func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
@@ -1837,8 +1858,16 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		}
 		return valueType
 
-	// TODO: check
 	case ast.OperationMove:
+		if !valueType.IsResourceType() {
+			checker.report(
+				&InvalidMoveOperationError{
+					StartPos: expression.StartPos,
+					EndPos:   expression.Expression.StartPosition(),
+				},
+			)
+		}
+
 		return valueType
 	}
 

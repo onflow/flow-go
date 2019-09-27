@@ -167,10 +167,11 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -216,10 +217,11 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               fun test(): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -572,10 +574,11 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -621,10 +624,11 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -754,10 +758,11 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): <-T) = fun (): <-T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -803,10 +808,11 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: ((): T) = fun (): T {
-                  return %[2]s T()
+                  return %[2]s %[3]s T()
               }
 	        `,
 				kind.Keyword(),
+				kind.Annotation(),
 				kind.ConstructionKeyword(),
 			))
 
@@ -908,7 +914,7 @@ func TestCheckUnaryMove(t *testing.T) {
       resource X {}
 
       fun foo(x: <-X): <-X {
-          return x
+          return <-x
       }
 
       var x <- foo(x: <-create X())
@@ -1122,4 +1128,87 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckResourceReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return <-create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidResourceReturnMissingMoveInvalidReturnType(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): Y {
+          return create X()
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceReturnWithMove(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      fun test(): X {
+          return <-X()
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
 }

@@ -1326,3 +1326,44 @@ func (e *MissingCreateError) StartPosition() ast.Position {
 func (e *MissingCreateError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// MissingMoveOperationError
+
+type MissingMoveOperationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveOperationError) Error() string {
+	return "missing move operation: `<-`"
+}
+
+func (*MissingMoveOperationError) isSemanticError() {}
+
+func (e *MissingMoveOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveOperationError
+
+type InvalidMoveOperationError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidMoveOperationError) Error() string {
+	return "invalid move operation for non-resource: unexpected `<-`"
+}
+
+func (*InvalidMoveOperationError) isSemanticError() {}
+
+func (e *InvalidMoveOperationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidMoveOperationError) EndPosition() ast.Position {
+	return e.EndPos
+}
