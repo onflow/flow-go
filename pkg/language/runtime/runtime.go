@@ -8,15 +8,14 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	runtimeErrors "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/parser"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/stdlib"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	runtimeErrors "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type ImportLocation interface {
@@ -56,13 +55,13 @@ func (e Error) Error() string {
 	var sb strings.Builder
 	sb.WriteString("Execution failed:\n")
 	for _, err := range e.Errors {
-		sb.WriteString(err.Error())
+		sb.WriteString(runtimeErrors.UnrollChildErrors(err))
 		sb.WriteString("\n")
 	}
 	return sb.String()
 }
 
-// Runtime is a runtime capable of executing the Bamboo programming language.
+// Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
@@ -70,10 +69,10 @@ type Runtime interface {
 	ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error)
 }
 
-// mockRuntime is a mocked version of the Bamboo runtime
+// mockRuntime is a mocked version of the Flow runtime
 type mockRuntime struct{}
 
-// NewMockRuntime returns a mocked version of the Bamboo runtime.
+// NewMockRuntime returns a mocked version of the Flow runtime.
 func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
@@ -82,11 +81,11 @@ func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (
 	return nil, nil
 }
 
-// interpreterRuntime is a interpreter-based version of the Bamboo runtime.
+// interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct {
 }
 
-// NewInterpreterRuntime returns a interpreter-based version of the Bamboo runtime.
+// NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
@@ -139,12 +138,16 @@ var getValueFunctionType = sema.FunctionType{
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{
 		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+		&sema.OptionalType{
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
 		},
 		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+		&sema.OptionalType{
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
 		},
 	},
 	// value
@@ -168,33 +171,22 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	ReturnType: &sema.VoidType{},
 }
 
+var accountType = stdlib.AccountType.Type
+
+var getAccountFunctionType = sema.FunctionType{
+	ParameterTypes: []sema.Type{
+		// address
+		&sema.StringType{},
+	},
+	ReturnType: accountType,
+}
+
 var logFunctionType = sema.FunctionType{
 	ParameterTypes: []sema.Type{&sema.AnyType{}},
 	ReturnType:     &sema.VoidType{},
 }
 
-var accountType = sema.StructureType{
-	Identifier: "Account",
-	Members: map[string]*sema.Member{
-		"address": {
-			Type: &sema.StringType{},
-		},
-		"storage": {
-			Type: &sema.DictionaryType{
-				KeyType:   &sema.AnyType{},
-				ValueType: &sema.AnyType{},
-			},
-		},
-	},
-}
-
-var typeDeclarations = []sema.TypeDeclaration{
-	stdlib.StandardLibraryType{
-		Name: accountType.Identifier,
-		Type: &accountType,
-		Kind: common.DeclarationKindStructure,
-	},
-}
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (*ast.Program, error) {
 	return parser.ParseProgram(string(script))
@@ -255,6 +247,12 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			nil,
 		),
 		stdlib.NewStandardLibraryFunction(
+			"getAccount",
+			&getAccountFunctionType,
+			r.newGetAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
 			"log",
 			&logFunctionType,
 			r.newLogFunction(runtimeInterface),
@@ -262,7 +260,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		),
 	)
 
-	valueDeclarations := stdlib.ToValueDeclarations(functions)
+	valueDeclarations := functions.ToValueDeclarations()
 
 	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
 	if err != nil {
@@ -273,7 +271,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, Error{[]error{err}}
 	}
 
-	main, ok := checker.Globals["main"]
+	main, ok := checker.GlobalValues["main"]
 	if !ok {
 		// TODO: error because no main?
 		return nil, nil
@@ -303,17 +301,17 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	// check parameter types
 
 	for _, parameterType := range mainFunctionType.ParameterTypes {
-		if !parameterType.Equal(&accountType) {
+		if !parameterType.Equal(accountType) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				&accountType,
+				accountType,
 				parameterType,
 			)
 			return nil, Error{[]error{err}}
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, stdlib.ToValues(functions))
+	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -325,30 +323,13 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	signingAccounts := make([]interface{}, signingAccountsCount)
 	storedValues := make([]interpreter.DictionaryValue, signingAccountsCount)
 
-	storageKey := []byte("storage")
-
 	for i, address := range signingAccountAddresses {
-
-		// TODO: fix controller and key
-		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, storageKey)
+		signingAccount, storedValue, err := loadAccount(runtimeInterface, address)
 		if err != nil {
 			return nil, Error{[]error{err}}
 		}
 
-		storedValue := interpreter.DictionaryValue{}
-		if len(storedData) > 0 {
-			decoder := gob.NewDecoder(bytes.NewReader(storedData))
-			err = decoder.Decode(&storedValue)
-			if err != nil {
-				return nil, Error{[]error{err}}
-			}
-		}
-
-		signingAccounts[i] = interpreter.StructureValue{
-			"address": interpreter.StringValue(address.String()),
-			"storage": storedValue,
-		}
-
+		signingAccounts[i] = signingAccount
 		storedValues[i] = storedValue
 	}
 
@@ -368,13 +349,44 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		}
 
 		// TODO: fix controller and key
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, storageKey, newStoredData.Bytes())
+		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, []byte("storage"), newStoredData.Bytes())
 		if err != nil {
 			return nil, Error{[]error{err}}
 		}
 	}
 
 	return value.ToGoValue(), nil
+}
+
+func loadAccount(runtimeInterface Interface, address types.Address) (
+	interface{},
+	interpreter.DictionaryValue,
+	error,
+) {
+	// TODO: fix controller and key
+	storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte("storage"))
+	if err != nil {
+		return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+	}
+
+	storedValue := interpreter.DictionaryValue{}
+	if len(storedData) > 0 {
+		decoder := gob.NewDecoder(bytes.NewReader(storedData))
+		err = decoder.Decode(&storedValue)
+		if err != nil {
+			return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+		}
+	}
+
+	account := interpreter.CompositeValue{
+		Identifier: stdlib.AccountType.Name,
+		Fields: &map[string]interpreter.Value{
+			"address": interpreter.NewStringValue(address.String()),
+			"storage": storedValue,
+		},
+	}
+
+	return account, storedValue, nil
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
@@ -386,7 +398,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 		if !ok {
 			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
 		}
-		value := intValue.Bytes()
+		value := intValue.Int.Bytes()
 
 		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
 			panic(err)
@@ -434,13 +446,6 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 	}
 }
 
-func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		runtimeInterface.Log(fmt.Sprint(arguments[0]))
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
-	}
-}
-
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		if len(arguments) != 2 {
@@ -467,6 +472,35 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 	}
 }
 
+func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 1 {
+			panic(fmt.Sprintf("getAccount requires 1 parameter"))
+		}
+
+		stringValue, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
+		}
+
+		address := types.HexToAddress(stringValue.StrValue())
+
+		account, _, err := loadAccount(runtimeInterface, address)
+		if err != nil {
+			panic(err)
+		}
+
+		return trampoline.Done{Result: account}
+	}
+}
+
+func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		runtimeInterface.Log(fmt.Sprint(arguments[0]))
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	}
+}
+
 func (r *interpreterRuntime) getOwnerControllerKey(
 	arguments []interpreter.Value,
 ) (
@@ -489,19 +523,29 @@ func (r *interpreterRuntime) getOwnerControllerKey(
 }
 
 func toByteArray(value interpreter.Value) ([]byte, error) {
+	_, isNil := value.(interpreter.NilValue)
+	if isNil {
+		return nil, nil
+	}
+
+	someValue, ok := value.(interpreter.SomeValue)
+	if ok {
+		value = someValue.Value
+	}
+
 	array, ok := value.(interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(array))
-	for i, arrayValue := range array {
+	result := make([]byte, len(*array.Values))
+	for i, arrayValue := range *array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
 		}
 		// check 0 <= value < 256
-		if intValue.Cmp(big.NewInt(-1)) != 1 || intValue.Cmp(big.NewInt(256)) != -1 {
+		if intValue.Int.Cmp(big.NewInt(-1)) != 1 || intValue.Int.Cmp(big.NewInt(256)) != -1 {
 			return nil, errors.New("array value is not in byte range (0-255)")
 		}
 

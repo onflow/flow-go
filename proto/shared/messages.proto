@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-package bamboo.shared.messages;
+package flow.shared.messages;
 
 option go_package = "shared";
 

@@ -9,8 +9,7 @@ node_modules
 
 .DS_Store
 
-bamboo
-bamboo.mnemonic
+flow.json
  
 .idea
 

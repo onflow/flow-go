@@ -1,7 +1,7 @@
 
 
 # routing
-`import "github.com/dapperlabs/bamboo-node/internal/roles/collect/routing"`
+`import "github.com/dapperlabs/flow-go/internal/roles/collect/routing"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -19,14 +19,14 @@ Package routing implements a deterministic transaction routing algorithm.
 
 
 #### <a name="pkg-files">Package files</a>
-[routing.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/routing/routing.go)
+[routing.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go)
 
 
 
 
 
 
-## <a name="TransactionRouter">type</a> [TransactionRouter](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/routing/routing.go?s=328:402#L10)
+## <a name="TransactionRouter">type</a> [TransactionRouter](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=320:394#L10)
 ``` go
 type TransactionRouter struct {
     // contains filtered or unexported fields
@@ -44,7 +44,7 @@ TransactionRouter routes transactions to clusters using a deterministic transact
 
 
 
-### <a name="TransactionRouter.InRange">func</a> (\*TransactionRouter) [InRange](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/routing/routing.go?s=694:800#L20)
+### <a name="TransactionRouter.InRange">func</a> (\*TransactionRouter) [InRange](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=686:792#L20)
 ``` go
 func (tr *TransactionRouter) InRange(transaction *types.SignedTransaction, cluster *clusters.Cluster) bool
 ```
@@ -53,7 +53,7 @@ InRange returns true if the transaction belongs in the given cluster, and false 
 
 
 
-### <a name="TransactionRouter.Route">func</a> (\*TransactionRouter) [Route](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/routing/routing.go?s=478:582#L15)
+### <a name="TransactionRouter.Route">func</a> (\*TransactionRouter) [Route](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/routing/routing.go?s=470:574#L15)
 ``` go
 func (tr *TransactionRouter) Route(transaction *types.SignedTransaction, epoch uint64) *clusters.Cluster
 ```

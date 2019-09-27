@@ -1,8 +1,8 @@
 package sema
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 //go:generate stringer -type=BinaryOperationKind
@@ -16,6 +16,7 @@ const (
 	BinaryOperationKindBooleanLogic
 	BinaryOperationKindEquality
 	BinaryOperationKindNilCoalescing
+	BinaryOperationKindConcatenation
 )
 
 func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
@@ -47,6 +48,9 @@ func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
 
 	case ast.OperationNilCoalesce:
 		return BinaryOperationKindNilCoalescing
+
+	case ast.OperationConcat:
+		return BinaryOperationKindConcatenation
 	}
 
 	panic(&errors.UnreachableError{})

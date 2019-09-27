@@ -3,8 +3,8 @@ package interpreter
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 // unsupportedOperation
@@ -37,44 +37,28 @@ func (e *unsupportedOperation) EndPosition() ast.Position {
 type NotDeclaredError struct {
 	ExpectedKind common.DeclarationKind
 	Name         string
-	StartPos     ast.Position
-	EndPos       ast.Position
 }
 
 func (e *NotDeclaredError) Error() string {
-	return fmt.Sprintf("cannot find %s `%s` in this scope", e.ExpectedKind.Name(), e.Name)
+	return fmt.Sprintf(
+		"cannot find %s `%s` in this scope",
+		e.ExpectedKind.Name(),
+		e.Name,
+	)
 }
 
 func (e *NotDeclaredError) SecondaryError() string {
 	return "not found in this scope"
 }
 
-func (e *NotDeclaredError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotDeclaredError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // NotCallableError
 
 type NotCallableError struct {
-	Value    Value
-	StartPos ast.Position
-	EndPos   ast.Position
+	Value Value
 }
 
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("cannot call value: %#+v", e.Value)
-}
-
-func (e *NotCallableError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotCallableError) EndPosition() ast.Position {
-	return e.EndPos
 }
 
 // ArgumentCountError
@@ -82,8 +66,6 @@ func (e *NotCallableError) EndPosition() ast.Position {
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPos       ast.Position
-	EndPos         ast.Position
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -94,12 +76,12 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
-func (e *ArgumentCountError) StartPosition() ast.Position {
-	return e.StartPos
-}
+// AnyParameterTypeInInvocationError
 
-func (e *ArgumentCountError) EndPosition() ast.Position {
-	return e.EndPos
+type AnyParameterTypeInInvocationError struct{}
+
+func (e *AnyParameterTypeInInvocationError) Error() string {
+	return "cannot invoke functions with `Any` parameter type"
 }
 
 // ConditionError

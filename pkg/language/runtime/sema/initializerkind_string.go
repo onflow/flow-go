@@ -9,11 +9,11 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[initializerKindUnknown-0]
-	_ = x[initializerKindStructure-1]
+	_ = x[initializerKindComposite-1]
 	_ = x[initializerKindInterface-2]
 }
 
-const _initializerKind_name = "initializerKindUnknowninitializerKindStructureinitializerKindInterface"
+const _initializerKind_name = "initializerKindUnknowninitializerKindCompositeinitializerKindInterface"
 
 var _initializerKind_index = [...]uint8{0, 22, 46, 70}
 

@@ -1,42 +1,30 @@
 syntax = "proto3";
 
-package bamboo.shared.gossip;
+package flow.shared.gossip;
 
 option go_package = "shared";
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 message GossipMessage {
-  oneof Payload {
-    MessageRequest messageRequest = 18;
-    MessageReply messageReply = 19;
-  }
-  string Method = 20;                // Name of RPC method to be invoked on the message
-  repeated string Recipients = 21;   // Address of the recipients to which the message should be delivered
-  string Sender = 22;                // Address of the sender of this message
-  repeated string Path = 23;         // Address of the nodes that this message visited so far
-  uint64 TTL = 24;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
-  UUID uuid = 25;                    // The Uniqe identifier of the message. 
+  bytes Payload = 1;
+  string Method = 2;                // Name of RPC method to be invoked on the message
+  repeated string Recipients = 3;   // Address of the recipients to which the message should be delivered
+  string Sender = 4;                // Address of the sender of this message
+  repeated string Path = 5;         // Address of the nodes that this message visited so far
+  uint64 TTL = 6;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
+  string uuid = 7;                  // The Uniqe identifier of the message. 
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // 2 testing messages + rpc service to be deleted later
 
 service MessageReciever {
-  rpc AsyncQueue (GossipMessage) returns (VoidReply) {}
-  rpc SyncQueue (GossipMessage) returns (MessageReply) {}
+  rpc AsyncQueue (GossipMessage) returns (GossipReply) {}
+  rpc SyncQueue  (GossipMessage) returns (GossipReply) {}
 }
 
-message MessageRequest {
-  string Text = 1;
+message GossipReply {
+  bytes responseByte = 1;
 }
 
-message MessageReply {
- string TextResponse = 1;
-}
-
-message VoidReply {}
-
-message UUID {
-  string value = 1;
-}
 ////////////////////////////////////////////////////////////////////////////

@@ -1,58 +1,11 @@
 package accounts
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
-
-// accountConfig is the configuration format for a user account.
-//
-// This structure is used to load account configuration from JSON.
-type accountConfig struct {
-	Address string `json:"account"`
-	Seed    string `json:"seed"`
-}
-
-// LoadAccountFromFile loads an account key from a JSON file.
-//
-// An error will be returned if the file cannot be read or if it contains invalid JSON.
-func LoadAccountFromFile(filename string) (*types.AccountKey, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadAccount(f)
-}
-
-// LoadAccount parses an account key from a JSON reader.
-//
-// An error will be returned if the reader contains invalid JSON.
-func LoadAccount(r io.Reader) (*types.AccountKey, error) {
-	d := json.NewDecoder(r)
-
-	var conf accountConfig
-
-	if err := d.Decode(&conf); err != nil {
-		return nil, err
-	}
-
-	keyPair, err := crypto.KeyPairFromSeed(conf.Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.AccountKey{
-		Account: types.HexToAddress(conf.Address),
-		KeyPair: keyPair,
-	}, nil
-}
 
 // CreateAccount generates a transaction that creates a new account.
 func CreateAccount(publicKey, code []byte) *types.RawTransaction {
@@ -60,9 +13,9 @@ func CreateAccount(publicKey, code []byte) *types.RawTransaction {
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
-		fun main() {
-			let publicKey = %s
-			let code = %s
+		fun main(account: Account) {
+			let publicKey: Int[]? = %s
+			let code: Int[]? = %s
 			createAccount(publicKey, code)
 		}
 	`, publicKeyStr, codeStr)
@@ -78,7 +31,7 @@ func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
-		fun main() {
+		fun main(account: Account) {
 			let account = %s
 			let code = %s
 			updateAccountCode(account, code)
@@ -92,5 +45,9 @@ func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
+	if b == nil || len(b) == 0 {
+		return "nil"
+	}
+
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }

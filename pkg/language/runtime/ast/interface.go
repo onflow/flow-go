@@ -1,40 +1,30 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+)
 
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
-	Identifier            Identifier
-	Fields                []*FieldDeclaration
-	Initializer           *InitializerDeclaration
-	Functions             []*FunctionDeclaration
-	functionsByIdentifier map[string]*FunctionDeclaration
-	StartPos              Position
-	EndPos                Position
+	CompositeKind common.CompositeKind
+	Identifier    Identifier
+	Members       *Members
+	StartPos      Position
+	EndPos        Position
 }
 
-func (s *InterfaceDeclaration) FunctionsByIdentifier() map[string]*FunctionDeclaration {
-	if s.functionsByIdentifier == nil {
-		functionsByIdentifier := make(map[string]*FunctionDeclaration, len(s.Functions))
-		for _, function := range s.Functions {
-			functionsByIdentifier[function.Identifier.Identifier] = function
-		}
-		s.functionsByIdentifier = functionsByIdentifier
-	}
-	return s.functionsByIdentifier
+func (d *InterfaceDeclaration) StartPosition() Position {
+	return d.StartPos
 }
 
-func (s *InterfaceDeclaration) StartPosition() Position {
-	return s.StartPos
+func (d *InterfaceDeclaration) EndPosition() Position {
+	return d.EndPos
 }
 
-func (s *InterfaceDeclaration) EndPosition() Position {
-	return s.EndPos
-}
-
-func (s *InterfaceDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitInterfaceDeclaration(s)
+func (d *InterfaceDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitInterfaceDeclaration(d)
 }
 
 func (*InterfaceDeclaration) isDeclaration() {}
@@ -44,10 +34,19 @@ func (*InterfaceDeclaration) isDeclaration() {}
 //
 func (*InterfaceDeclaration) isStatement() {}
 
-func (s *InterfaceDeclaration) DeclarationName() string {
-	return s.Identifier.Identifier
+func (d *InterfaceDeclaration) DeclarationName() string {
+	return d.Identifier.Identifier
 }
 
-func (s *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
-	return common.DeclarationKindInterface
+func (d *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
+	switch d.CompositeKind {
+	case common.CompositeKindStructure:
+		return common.DeclarationKindStructureInterface
+	case common.CompositeKindResource:
+		return common.DeclarationKindResourceInterface
+	case common.CompositeKindContract:
+		return common.DeclarationKindContractInterface
+	}
+
+	panic(&errors.UnreachableError{})
 }

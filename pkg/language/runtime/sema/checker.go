@@ -1,12 +1,11 @@
 package sema
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"github.com/raviqqe/hamt"
-
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -32,33 +31,45 @@ var beforeType = &FunctionType{
 
 type Checker struct {
 	Program           *ast.Program
-	PredeclaredValues []ValueDeclaration
-	PredeclaredTypes  []TypeDeclaration
+	PredeclaredValues map[string]ValueDeclaration
+	PredeclaredTypes  map[string]TypeDeclaration
 	ImportCheckers    map[ast.ImportLocation]*Checker
 	errors            []error
 	valueActivations  *activations.Activations
 	typeActivations   *activations.Activations
 	functionContexts  []*functionContext
-	Globals           map[string]*Variable
+	GlobalValues      map[string]*Variable
+	GlobalTypes       map[string]Type
 	inCondition       bool
-	Origins           *Origins
+	Occurrences       *Occurrences
+	variableOrigins   map[*Variable]*Origin
+	memberOrigins     map[Type]map[string]*Origin
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
 	// TODO: refactor into fields on AST?
 	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
+	VariableDeclarationTargetTypes     map[*ast.VariableDeclaration]Type
+	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
-	StructureDeclarationTypes          map[*ast.StructureDeclaration]*StructureType
+	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
 	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*FunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
+	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
 	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
+	FailableDowncastingTypes           map[*ast.FailableDowncastExpression]Type
+	ReturnStatementValueTypes          map[*ast.ReturnStatement]Type
+	ReturnStatementReturnTypes         map[*ast.ReturnStatement]Type
+	BinaryExpressionResultTypes        map[*ast.BinaryExpression]Type
+	BinaryExpressionRightTypes         map[*ast.BinaryExpression]Type
+	MemberExpressionMembers            map[*ast.MemberExpression]*Member
 }
 
 func NewChecker(
 	program *ast.Program,
-	predeclaredValues []ValueDeclaration,
-	predeclaredTypes []TypeDeclaration,
+	predeclaredValues map[string]ValueDeclaration,
+	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
 	typeActivations := &activations.Activations{}
 	typeActivations.Push(baseTypes)
@@ -73,25 +84,38 @@ func NewChecker(
 		ImportCheckers:                     map[ast.ImportLocation]*Checker{},
 		valueActivations:                   valueActivations,
 		typeActivations:                    typeActivations,
-		Globals:                            map[string]*Variable{},
-		Origins:                            NewOrigins(),
+		GlobalValues:                       map[string]*Variable{},
+		GlobalTypes:                        map[string]Type{},
+		Occurrences:                        NewOccurrences(),
+		variableOrigins:                    map[*Variable]*Origin{},
+		memberOrigins:                      map[Type]map[string]*Origin{},
 		seenImports:                        map[ast.ImportLocation]bool{},
 		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
 		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
+		VariableDeclarationTargetTypes:     map[*ast.VariableDeclaration]Type{},
+		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
-		StructureDeclarationTypes:          map[*ast.StructureDeclaration]*StructureType{},
+		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
 		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*FunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
+		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
 		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
+		FailableDowncastingTypes:           map[*ast.FailableDowncastExpression]Type{},
+		ReturnStatementValueTypes:          map[*ast.ReturnStatement]Type{},
+		ReturnStatementReturnTypes:         map[*ast.ReturnStatement]Type{},
+		BinaryExpressionResultTypes:        map[*ast.BinaryExpression]Type{},
+		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
+		MemberExpressionMembers:            map[*ast.MemberExpression]*Member{},
 	}
 
-	for _, declaration := range predeclaredValues {
-		checker.declareValue(declaration)
+	for name, declaration := range predeclaredValues {
+		checker.declareValue(name, declaration)
+		checker.declareGlobalValue(name)
 	}
 
-	for _, declaration := range predeclaredTypes {
-		checker.declareTypeDeclaration(declaration)
+	for name, declaration := range predeclaredTypes {
+		checker.declareTypeDeclaration(name, declaration)
 	}
 
 	err := checker.checkerError()
@@ -103,7 +127,6 @@ func NewChecker(
 }
 
 type ValueDeclaration interface {
-	ValueDeclarationName() string
 	ValueDeclarationType() Type
 	ValueDeclarationKind() common.DeclarationKind
 	ValueDeclarationPosition() ast.Position
@@ -112,34 +135,39 @@ type ValueDeclaration interface {
 }
 
 type TypeDeclaration interface {
-	TypeDeclarationName() string
 	TypeDeclarationType() Type
 	TypeDeclarationKind() common.DeclarationKind
 	TypeDeclarationPosition() ast.Position
 }
 
-func (checker *Checker) declareValue(declaration ValueDeclaration) {
-	identifier := declaration.ValueDeclarationName()
+func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
 	variable := checker.declareVariable(
-		identifier,
+		name,
 		declaration.ValueDeclarationType(),
 		declaration.ValueDeclarationKind(),
 		declaration.ValueDeclarationPosition(),
 		declaration.ValueDeclarationIsConstant(),
 		declaration.ValueDeclarationArgumentLabels(),
 	)
-	checker.recordVariableOrigin(identifier, variable)
+	checker.recordVariableDeclarationOccurrence(name, variable)
 }
 
-func (checker *Checker) declareTypeDeclaration(declaration TypeDeclaration) {
+func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
 	identifier := ast.Identifier{
-		Identifier: declaration.TypeDeclarationName(),
+		Identifier: name,
 		Pos:        declaration.TypeDeclarationPosition(),
 	}
-	checker.declareType(
-		identifier,
-		declaration.TypeDeclarationType(),
-		declaration.TypeDeclarationKind(),
+
+	ty := declaration.TypeDeclarationType()
+	checker.declareType(identifier, ty)
+	checker.recordVariableDeclarationOccurrence(
+		identifier.Identifier,
+		&Variable{
+			Kind:       declaration.TypeDeclarationKind(),
+			IsConstant: true,
+			Type:       ty,
+			Pos:        &identifier.Pos,
+		},
 	)
 }
 
@@ -198,7 +226,9 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
-
+	case *CharacterType:
+		// TODO: only allow valid character literals
+		return subType.Equal(&StringType{})
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
@@ -209,17 +239,52 @@ func (checker *Checker) IsSubType(subType Type, superType Type) bool {
 		return checker.IsSubType(optionalSubType.Type, typedSuperType.Type)
 
 	case *InterfaceType:
-		structureSubType, ok := subType.(*StructureType)
+		compositeSubType, ok := subType.(*CompositeType)
 		if !ok {
 			return false
 		}
 		// TODO: optimize, use set
-		for _, conformance := range structureSubType.Conformances {
+		for _, conformance := range compositeSubType.Conformances {
 			if typedSuperType.Equal(conformance) {
 				return true
 			}
 		}
 		return false
+
+	case *DictionaryType:
+		typedSubType, ok := subType.(*DictionaryType)
+		if !ok {
+			return false
+		}
+
+		return checker.IsSubType(typedSubType.KeyType, typedSuperType.KeyType) &&
+			checker.IsSubType(typedSubType.ValueType, typedSuperType.ValueType)
+
+	case *VariableSizedType:
+		typedSubType, ok := subType.(*VariableSizedType)
+		if !ok {
+			return false
+		}
+
+		return checker.IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
+
+	case *ConstantSizedType:
+		typedSubType, ok := subType.(*ConstantSizedType)
+		if !ok {
+			return false
+		}
+
+		if typedSubType.Size != typedSuperType.Size {
+			return false
+		}
+
+		return checker.IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
 	}
 
 	// TODO: functions
@@ -231,6 +296,8 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 	switch indexedType := indexedType.(type) {
 	case ArrayType:
 		return indexedType.elementType()
+	case *StringType:
+		return &CharacterType{}
 	case *DictionaryType:
 		valueType := indexedType.ValueType
 		if isAssignment {
@@ -245,8 +312,10 @@ func (checker *Checker) IndexableElementType(indexedType Type, isAssignment bool
 
 func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool {
 	switch indexedType := indexedType.(type) {
-	// arrays can be indexed with integers
+	// arrays and strings can be indexed with integers
 	case ArrayType:
+		return checker.IsSubType(indexingType, &IntegerType{})
+	case *StringType:
 		return checker.IsSubType(indexingType, &IntegerType{})
 	// dictionaries can be indexed with the dictionary type's key type
 	case *DictionaryType:
@@ -254,6 +323,17 @@ func (checker *Checker) IsIndexingType(indexingType Type, indexedType Type) bool
 	}
 
 	return false
+}
+
+func (checker *Checker) IsConcatenatableType(ty Type) bool {
+	_, isArrayType := ty.(ArrayType)
+	return checker.IsSubType(ty, &StringType{}) || isArrayType
+}
+
+func (checker *Checker) IsEquatableType(ty Type) bool {
+	return checker.IsSubType(ty, &StringType{}) ||
+		checker.IsSubType(ty, &BoolType{}) ||
+		checker.IsSubType(ty, &IntType{})
 }
 
 func (checker *Checker) setVariable(name string, variable *Variable) {
@@ -300,14 +380,14 @@ func (checker *Checker) popActivations() {
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
-	// pre-declare interfaces, structures, and functions (check afterwards)
+	// pre-declare interfaces, composites, and functions (check afterwards)
 
 	for _, declaration := range program.InterfaceDeclarations() {
 		checker.declareInterfaceDeclaration(declaration)
 	}
 
-	for _, declaration := range program.StructureDeclarations() {
-		checker.declareStructureDeclaration(declaration)
+	for _, declaration := range program.CompositeDeclarations() {
+		checker.declareCompositeDeclaration(declaration)
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
@@ -318,7 +398,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.Declarations {
 		declaration.Accept(checker)
-		checker.declareGlobal(declaration)
+		checker.declareGlobalDeclaration(declaration)
 	}
 
 	return nil
@@ -346,7 +426,7 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
 
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnType)
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
 	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
@@ -480,7 +560,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 			Pos:        &identifier.Pos,
 		}
 		checker.setVariable(identifier.Identifier, variable)
-		checker.recordVariableOrigin(identifier.Identifier, variable)
+		checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 	}
 }
 
@@ -491,6 +571,8 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 
 func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 	valueType := declaration.Value.Accept(checker).(Type)
+
+	checker.VariableDeclarationValueTypes[declaration] = valueType
 
 	// if the variable declaration is a optional binding, the value must be optional
 
@@ -514,11 +596,11 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 	declarationType := valueType
 
 	// does the declaration have an explicit type annotation?
-	if declaration.Type != nil {
-		declarationType = checker.ConvertType(declaration.Type)
+	if declaration.TypeAnnotation != nil {
+		declarationType = checker.ConvertType(declaration.TypeAnnotation.Type)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !isInvalidType(valueType) {
+		if declarationType != nil && valueType != nil && !isInvalidType(valueType) && !isInvalidType(declarationType) {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -536,7 +618,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				}
 
 			} else {
-				if !checker.IsSubType(valueType, declarationType) {
+				if !checker.IsTypeCompatible(declaration.Value, valueType, declarationType) {
 					checker.report(
 						&TypeMismatchError{
 							ExpectedType: declarationType,
@@ -552,7 +634,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = optionalValueType.Type
 	}
 
-	checker.VariableDeclarationValueTypes[declaration] = declarationType
+	checker.VariableDeclarationTargetTypes[declaration] = declarationType
 
 	variable := checker.declareVariable(
 		declaration.Identifier.Identifier,
@@ -562,7 +644,44 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.IsConstant,
 		nil,
 	)
-	checker.recordVariableOrigin(declaration.Identifier.Identifier, variable)
+	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
+}
+
+func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
+	switch typedExpression := expression.(type) {
+	case *ast.IntExpression:
+		unwrappedTargetType := checker.unwrapOptionalType(targetType)
+		if checker.IsSubType(unwrappedTargetType, &IntegerType{}) {
+			checker.checkIntegerLiteral(typedExpression, unwrappedTargetType)
+
+			return true
+		}
+	}
+
+	return checker.IsSubType(valueType, targetType)
+}
+
+// checkIntegerLiteral checks that the value of the integer literal
+// fits into range of the target integer type
+//
+func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integerType Type) {
+	intRange := integerType.(Ranged)
+	literalValue := expression.Value
+	rangeMin := intRange.Min()
+	rangeMax := intRange.Max()
+	if (rangeMin != nil && literalValue.Cmp(rangeMin) == -1) ||
+		(rangeMax != nil && literalValue.Cmp(rangeMax) == 1) {
+
+		checker.report(
+			&InvalidIntegerLiteralRangeError{
+				ExpectedType:     integerType,
+				ExpectedRangeMin: rangeMin,
+				ExpectedRangeMax: rangeMax,
+				StartPos:         expression.StartPosition(),
+				EndPos:           expression.EndPosition(),
+			},
+		)
+	}
 }
 
 func (checker *Checker) declareVariable(
@@ -602,12 +721,29 @@ func (checker *Checker) declareVariable(
 	return variable
 }
 
-func (checker *Checker) declareGlobal(declaration ast.Declaration) {
+func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if name == "" {
 		return
 	}
-	checker.Globals[name] = checker.findVariable(name)
+	checker.declareGlobalValue(name)
+	checker.declareGlobalType(name)
+}
+
+func (checker *Checker) declareGlobalValue(name string) {
+	variable := checker.findVariable(name)
+	if variable == nil {
+		return
+	}
+	checker.GlobalValues[name] = variable
+}
+
+func (checker *Checker) declareGlobalType(name string) {
+	ty := checker.FindType(name)
+	if ty == nil {
+		return
+	}
+	checker.GlobalTypes[name] = ty
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
@@ -625,12 +761,12 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 	// check all statements
 	for _, statement := range statements {
 
-		// check statement is not a local structure or interface declaration
+		// check statement is not a local composite or interface declaration
 
-		if _, ok := statement.(*ast.StructureDeclaration); ok {
+		if compositeDeclaration, ok := statement.(*ast.CompositeDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind:     common.DeclarationKindStructure,
+					Kind:     compositeDeclaration.DeclarationKind(),
 					StartPos: statement.StartPosition(),
 					EndPos:   statement.EndPosition(),
 				},
@@ -639,10 +775,10 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 			continue
 		}
 
-		if _, ok := statement.(*ast.InterfaceDeclaration); ok {
+		if interfaceDeclaration, ok := statement.(*ast.InterfaceDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind:     common.DeclarationKindInterface,
+					Kind:     interfaceDeclaration.DeclarationKind(),
 					StartPos: statement.StartPosition(),
 					EndPos:   statement.EndPosition(),
 				},
@@ -694,7 +830,7 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 			true,
 			nil,
 		)
-		// TODO: record origin - but what position?
+		// TODO: record occurrence - but what position?
 	}
 
 	checker.visitConditions(functionBlock.PostConditions)
@@ -710,7 +846,7 @@ func (checker *Checker) declareBefore() {
 		true,
 		nil,
 	)
-	// TODO: record origin – but what position?
+	// TODO: record occurrence – but what position?
 }
 
 func (checker *Checker) visitConditions(conditions []*ast.Condition) {
@@ -784,32 +920,32 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	returnType := checker.currentFunction().returnType
 
-	if valueType != nil {
-		if valueIsInvalid {
-			// return statement has expression, but function has Void return type?
-			if _, ok := returnType.(*VoidType); ok {
-				checker.report(
-					&InvalidReturnValueError{
-						StartPos: statement.Expression.StartPosition(),
-						EndPos:   statement.Expression.EndPosition(),
-					},
-				)
-			}
-		} else {
-			if !valueIsInvalid &&
-				!isInvalidType(returnType) &&
-				!checker.IsSubType(valueType, returnType) {
+	checker.ReturnStatementValueTypes[statement] = valueType
+	checker.ReturnStatementReturnTypes[statement] = returnType
 
-				checker.report(
-					&TypeMismatchError{
-						ExpectedType: returnType,
-						ActualType:   valueType,
-						StartPos:     statement.Expression.StartPosition(),
-						EndPos:       statement.Expression.EndPosition(),
-					},
-				)
-			}
+	if valueType == nil {
+		return nil
+	} else if valueIsInvalid {
+		// return statement has expression, but function has Void return type?
+		if _, ok := returnType.(*VoidType); ok {
+			checker.report(
+				&InvalidReturnValueError{
+					StartPos: statement.Expression.StartPosition(),
+					EndPos:   statement.Expression.EndPosition(),
+				},
+			)
 		}
+	} else if !isInvalidType(returnType) &&
+		!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: returnType,
+				ActualType:   valueType,
+				StartPos:     statement.Expression.StartPosition(),
+				EndPos:       statement.Expression.EndPosition(),
+			},
+		)
 	}
 
 	return nil
@@ -910,9 +1046,9 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 
 	valueType := assignment.Value.Accept(checker).(Type)
+	checker.AssignmentStatementValueTypes[assignment] = valueType
 
 	targetType := checker.visitAssignmentValueType(assignment, valueType)
-
 	checker.AssignmentStatementTargetTypes[assignment] = targetType
 
 	return nil
@@ -971,7 +1107,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 		// check value type is subtype of variable type
 		if !isInvalidType(valueType) &&
-			!checker.IsSubType(valueType, variable.Type) {
+			!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
 
 			checker.report(
 				&TypeMismatchError{
@@ -1000,7 +1136,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	}
 
 	if !isInvalidType(elementType) &&
-		!checker.IsSubType(valueType, elementType) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -1033,7 +1169,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
-					Name:     target.Identifier,
+					Name:     target.Identifier.Identifier,
 					StartPos: assignment.Value.StartPosition(),
 					EndPos:   assignment.Value.EndPosition(),
 				},
@@ -1045,7 +1181,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// if value type is valid, check value can be assigned to member
 	if !isInvalidType(valueType) &&
-		!checker.IsSubType(valueType, member.Type) {
+		!checker.IsTypeCompatible(assignment.Value, valueType, member.Type) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -1121,7 +1257,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	return variable.Type
 }
 
-func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOrigin bool) *Variable {
+func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpression, recordOccurrence bool) *Variable {
 	identifier := expression.Identifier.Identifier
 	variable := checker.findVariable(identifier)
 	if variable == nil {
@@ -1135,8 +1271,8 @@ func (checker *Checker) findAndCheckVariable(expression *ast.IdentifierExpressio
 		return nil
 	}
 
-	if recordOrigin {
-		checker.recordOrigin(
+	if recordOccurrence {
+		checker.recordVariableReferenceOccurrence(
 			expression.StartPosition(),
 			expression.EndPosition(),
 			variable,
@@ -1190,8 +1326,19 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		)
 
 	case BinaryOperationKindNilCoalescing:
+		resultType := checker.checkBinaryExpressionNilCoalescing(
+			expression, operation, operationKind,
+			leftType, rightType,
+			leftIsInvalid, rightIsInvalid, anyInvalid,
+		)
 
-		return checker.checkBinaryExpressionNilCoalescing(
+		checker.BinaryExpressionResultTypes[expression] = resultType
+		checker.BinaryExpressionRightTypes[expression] = rightType
+
+		return resultType
+
+	case BinaryOperationKindConcatenation:
+		return checker.checkBinaryExpressionConcatenation(
 			expression, operation, operationKind,
 			leftType, rightType,
 			leftIsInvalid, rightIsInvalid, anyInvalid,
@@ -1257,8 +1404,9 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 			)
 		}
 	}
+
 	// check both types are equal
-	if !leftType.Equal(rightType) {
+	if !anyInvalid && !leftType.Equal(rightType) {
 		checker.report(
 			&InvalidBinaryOperandsError{
 				Operation: operation,
@@ -1316,6 +1464,14 @@ func (checker *Checker) isValidEqualityType(ty Type) bool {
 	}
 
 	if checker.IsSubType(ty, &IntegerType{}) {
+		return true
+	}
+
+	if checker.IsSubType(ty, &StringType{}) {
+		return true
+	}
+
+	if checker.IsSubType(ty, &CharacterType{}) {
 		return true
 	}
 
@@ -1472,6 +1628,74 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 	}
 }
 
+func (checker *Checker) checkBinaryExpressionConcatenation(
+	expression *ast.BinaryExpression,
+	operation ast.Operation,
+	operationKind BinaryOperationKind,
+	leftType, rightType Type,
+	leftIsInvalid, rightIsInvalid, anyInvalid bool,
+) Type {
+
+	// check both types are concatenatable
+	leftIsConcat := checker.IsConcatenatableType(leftType)
+	rightIsConcat := checker.IsConcatenatableType(rightType)
+
+	if !leftIsConcat && !rightIsConcat {
+		if !anyInvalid {
+			checker.report(
+				&InvalidBinaryOperandsError{
+					Operation: operation,
+					LeftType:  leftType,
+					RightType: rightType,
+					StartPos:  expression.StartPosition(),
+					EndPos:    expression.EndPosition(),
+				},
+			)
+		}
+	} else if !leftIsConcat {
+		if !leftIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideLeft,
+					ExpectedType: rightType,
+					ActualType:   leftType,
+					StartPos:     expression.Left.StartPosition(),
+					EndPos:       expression.Left.EndPosition(),
+				},
+			)
+		}
+	} else if !rightIsConcat {
+		if !rightIsInvalid {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: leftType,
+					ActualType:   rightType,
+					StartPos:     expression.Right.StartPosition(),
+					EndPos:       expression.Right.EndPosition(),
+				},
+			)
+		}
+	}
+
+	// check both types are equal
+	if !leftType.Equal(rightType) {
+		checker.report(
+			&InvalidBinaryOperandsError{
+				Operation: operation,
+				LeftType:  leftType,
+				RightType: rightType,
+				StartPos:  expression.StartPosition(),
+				EndPos:    expression.EndPosition(),
+			},
+		)
+	}
+
+	return leftType
+}
+
 func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
 
 	valueType := expression.Expression.Accept(checker).(Type)
@@ -1503,6 +1727,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 				},
 			)
 		}
+		return valueType
+
+	// TODO: check
+	case ast.OperationMove:
 		return valueType
 	}
 
@@ -1563,9 +1791,8 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 		}
 	}
 
-	// TODO: use bottom type
 	if elementType == nil {
-		elementType = &AnyType{}
+		elementType = &NeverType{}
 	}
 
 	return &VariableSizedType{
@@ -1573,8 +1800,62 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	}
 }
 
-func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
+func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
 
+	// visit all entries, ensure key are all the same type,
+	// and values are all the same type
+
+	var keyType, valueType Type
+
+	for _, entry := range expression.Entries {
+		entryKeyType := entry.Key.Accept(checker).(Type)
+		entryValueType := entry.Value.Accept(checker).(Type)
+
+		// infer key type from first entry's key
+		// TODO: find common super type?
+		if keyType == nil {
+			keyType = entryKeyType
+		} else if !checker.IsSubType(entryKeyType, keyType) {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: keyType,
+					ActualType:   entryKeyType,
+					StartPos:     entry.Key.StartPosition(),
+					EndPos:       entry.Key.EndPosition(),
+				},
+			)
+		}
+
+		// infer value type from first entry's value
+		// TODO: find common super type?
+		if valueType == nil {
+			valueType = entryValueType
+		} else if !checker.IsSubType(entryValueType, valueType) {
+			checker.report(
+				&TypeMismatchError{
+					ExpectedType: valueType,
+					ActualType:   entryValueType,
+					StartPos:     entry.Value.StartPosition(),
+					EndPos:       entry.Value.EndPosition(),
+				},
+			)
+		}
+	}
+
+	if keyType == nil {
+		keyType = &NeverType{}
+	}
+	if valueType == nil {
+		valueType = &NeverType{}
+	}
+
+	return &DictionaryType{
+		KeyType:   keyType,
+		ValueType: valueType,
+	}
+}
+
+func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	member := checker.visitMember(expression)
 
 	var memberType Type = &InvalidType{}
@@ -1586,30 +1867,70 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
+	member, ok := checker.MemberExpressionMembers[expression]
+	if ok {
+		return member
+	}
 
 	expressionType := expression.Expression.Accept(checker).(Type)
 
-	identifier := expression.Identifier
+	origins := checker.memberOrigins[expressionType]
 
-	var member *Member
-	var ok bool
+	identifier := expression.Identifier.Identifier
+	identifierStartPosition := expression.Identifier.StartPosition()
+	identifierEndPosition := expression.Identifier.EndPosition()
+
 	switch ty := expressionType.(type) {
-	case *StructureType:
-		member, ok = ty.Members[identifier]
+	case *CompositeType:
+		member = ty.Members[identifier]
 	case *InterfaceType:
-		member, ok = ty.Members[identifier]
+		member = ty.Members[identifier]
+	case *StringType:
+		member = stringMembers[identifier]
+	case ArrayType:
+		member = getArrayMember(ty, identifier)
+
+		// TODO: implement Equatable interface: https://github.com/dapperlabs/flow-go/issues/78
+		if identifier == "contains" {
+			functionType := member.Type.(*FunctionType)
+
+			if !checker.IsEquatableType(functionType.ParameterTypes[0]) {
+				checker.report(
+					&NotEquatableTypeError{
+						Type:     expressionType,
+						StartPos: identifierStartPosition,
+						EndPos:   identifierEndPosition,
+					},
+				)
+
+				return nil
+			}
+		}
+	case *DictionaryType:
+		member = getDictionaryMember(ty, identifier)
 	}
 
-	if !ok {
-		checker.report(
-			&NotDeclaredMemberError{
-				Type:     expressionType,
-				Name:     identifier,
-				StartPos: expression.StartPos,
-				EndPos:   expression.EndPos,
-			},
+	if member == nil {
+		if !isInvalidType(expressionType) {
+			checker.report(
+				&NotDeclaredMemberError{
+					Type:     expressionType,
+					Name:     identifier,
+					StartPos: identifierStartPosition,
+					EndPos:   identifierEndPosition,
+				},
+			)
+		}
+	} else {
+		origin := origins[identifier]
+		checker.Occurrences.Put(
+			identifierStartPosition,
+			identifierEndPosition,
+			origin,
 		)
 	}
+
+	checker.MemberExpressionMembers[expression] = member
 
 	return member
 }
@@ -1669,7 +1990,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
 
 		// if the invocation refers directly to the name of the function as stated in the declaration,
-		// or the invocation refers to a function of a structure (member),
+		// or the invocation refers to a function of a composite (member),
 		// check that the correct argument labels are supplied in the invocation
 
 		if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
@@ -1693,6 +2014,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 			returnType = functionType.ReturnType
 		}
 
+		checker.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 		checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 	}
 
@@ -1826,7 +2148,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentTypes = append(argumentTypes, argumentType)
 
-		if !checker.IsSubType(argumentType, parameterType) {
+		if !checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
@@ -1844,7 +2166,7 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnType)
+	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
 
 	checker.FunctionExpressionFunctionType[expression] = functionType
 
@@ -1901,12 +2223,12 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 
 	case *ast.FunctionType:
 		var parameterTypes []Type
-		for _, parameterType := range t.ParameterTypes {
-			parameterType := checker.ConvertType(parameterType)
+		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+			parameterType := checker.ConvertType(parameterTypeAnnotation.Type)
 			parameterTypes = append(parameterTypes, parameterType)
 		}
 
-		returnType := checker.ConvertType(t.ReturnType)
+		returnType := checker.ConvertType(t.ReturnTypeAnnotation.Type)
 
 		return &FunctionType{
 			ParameterTypes: parameterTypes,
@@ -1916,6 +2238,15 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	case *ast.OptionalType:
 		result := checker.ConvertType(t.Type)
 		return &OptionalType{result}
+
+	case *ast.DictionaryType:
+		keyType := checker.ConvertType(t.KeyType)
+		valueType := checker.ConvertType(t.ValueType)
+
+		return &DictionaryType{
+			KeyType:   keyType,
+			ValueType: valueType,
+		}
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
@@ -1925,7 +2256,7 @@ func (checker *Checker) declareFunction(
 	identifier ast.Identifier,
 	functionType *FunctionType,
 	argumentLabels []string,
-	recordOrigin bool,
+	recordOccurrence bool,
 ) {
 	name := identifier.Identifier
 
@@ -1953,8 +2284,8 @@ func (checker *Checker) declareFunction(
 		Pos:            &identifier.Pos,
 	}
 	checker.setVariable(name, variable)
-	if recordOrigin {
-		checker.recordVariableOrigin(name, variable)
+	if recordOccurrence {
+		checker.recordVariableDeclarationOccurrence(name, variable)
 	}
 }
 
@@ -1978,10 +2309,13 @@ func (checker *Checker) currentFunction() *functionContext {
 	return checker.functionContexts[lastIndex]
 }
 
-func (checker *Checker) functionType(parameters []*ast.Parameter, returnType ast.Type) *FunctionType {
+func (checker *Checker) functionType(
+	parameters []*ast.Parameter,
+	returnTypeAnnotation *ast.TypeAnnotation,
+) *FunctionType {
 
 	parameterTypes := checker.parameterTypes(parameters)
-	convertedReturnType := checker.ConvertType(returnType)
+	convertedReturnType := checker.ConvertType(returnTypeAnnotation.Type)
 
 	return &FunctionType{
 		ParameterTypes: parameterTypes,
@@ -1994,7 +2328,7 @@ func (checker *Checker) parameterTypes(parameters []*ast.Parameter) []Type {
 	parameterTypes := make([]Type, len(parameters))
 
 	for i, parameter := range parameters {
-		parameterType := checker.ConvertType(parameter.Type)
+		parameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypes[i] = parameterType
 	}
 
@@ -2036,90 +2370,155 @@ func (checker *Checker) visitConditional(
 	return
 }
 
-func (checker *Checker) VisitStructureDeclaration(structure *ast.StructureDeclaration) ast.Repr {
+func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	structureType := checker.StructureDeclarationTypes[structure]
+	compositeType := checker.CompositeDeclarationTypes[declaration]
 
-	checker.checkMemberIdentifiers(structure.Fields, structure.Functions)
+	// TODO: also check nested composite members
 
-	checker.checkInitializer(
-		structure.Initializer,
-		structure.Fields,
-		structureType,
-		structure.Identifier.Identifier,
-		structureType.ConstructorParameterTypes,
-		initializerKindStructure,
+	// TODO: also check nested composite members' identifiers
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
 	)
 
-	if structureType != nil {
-		checker.checkFieldsInitialized(structure, structureType)
+	checker.checkInitializers(
+		declaration.Members.Initializers,
+		declaration.Members.Fields,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		compositeType.ConstructorParameterTypes,
+		initializerKindComposite,
+	)
+
+	if compositeType != nil {
+		checker.checkFieldsInitialized(declaration, compositeType)
+
+		checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
+
+		// check composite conforms to interfaces.
+		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
+
+		for i, interfaceType := range compositeType.Conformances {
+			conformance := declaration.Conformances[i]
+
+			checker.checkCompositeConformance(
+				compositeType,
+				interfaceType,
+				declaration.Identifier.Pos,
+				conformance.Identifier,
+			)
+		}
 	}
 
-	checker.checkStructureFunctions(structure.Functions, structureType)
+	// TODO: support non-structure composites, such as contracts and resources
+
+	if declaration.CompositeKind != common.CompositeKindStructure {
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: declaration.DeclarationKind(),
+				StartPos:        declaration.Identifier.StartPosition(),
+				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: support nested declarations for contracts and contract interfaces
+
+	// report error for first nested composite declaration, if any
+	if len(declaration.Members.CompositeDeclarations) > 0 {
+		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
+				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
+				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+			},
+		)
+	}
 
 	return nil
 }
 
-func (checker *Checker) declareStructureDeclaration(structure *ast.StructureDeclaration) {
+func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) {
 
-	// NOTE: fields and functions might already refer to structure itself.
+	// NOTE: fields and functions might already refer to declaration itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	structureType := &StructureType{}
+	compositeType := &CompositeType{}
 
-	identifier := structure.Identifier
+	identifier := declaration.Identifier
 
-	checker.declareType(
-		identifier,
-		structureType,
-		common.DeclarationKindStructure,
+	checker.declareType(identifier, compositeType)
+	checker.recordVariableDeclarationOccurrence(
+		identifier.Identifier,
+		&Variable{
+			Kind:       declaration.DeclarationKind(),
+			IsConstant: true,
+			Type:       compositeType,
+			Pos:        &identifier.Pos,
+		},
 	)
 
-	conformances := checker.conformances(structure)
+	conformances := checker.conformances(declaration)
 
-	members := checker.members(
-		structure.Fields,
-		structure.Functions,
-		common.DeclarationKindStructure,
+	members, origins := checker.membersAndOrigins(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+		true,
 	)
 
-	*structureType = StructureType{
+	*compositeType = CompositeType{
+		Kind:         declaration.CompositeKind,
 		Identifier:   identifier.Identifier,
 		Members:      members,
 		Conformances: conformances,
 	}
 
-	initializer := structure.Initializer
+	checker.memberOrigins[compositeType] = origins
+
+	// TODO: support multiple overloaded initializers
+
 	var parameterTypes []Type
-	if initializer != nil {
-		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	initializerCount := len(declaration.Members.Initializers)
+	if initializerCount > 0 {
+		firstInitializer := declaration.Members.Initializers[0]
+		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
+
+		if initializerCount > 1 {
+			secondInitializer := declaration.Members.Initializers[1]
+
+			checker.report(
+				&UnsupportedOverloadingError{
+					DeclarationKind: common.DeclarationKindInitializer,
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
+				},
+			)
+		}
 	}
 
-	structureType.ConstructorParameterTypes = parameterTypes
+	compositeType.ConstructorParameterTypes = parameterTypes
 
-	checker.StructureDeclarationTypes[structure] = structureType
+	checker.CompositeDeclarationTypes[declaration] = compositeType
 
 	// declare constructor
 
-	checker.declareStructureConstructor(structure, structureType, parameterTypes)
-
-	// check structure conforms to interfaces.
-	// NOTE: perform after completing structure type (e.g. setting constructor parameter types)
-
-	for _, interfaceType := range conformances {
-		checker.checkStructureConformance(structureType, interfaceType, identifier.Pos)
-	}
+	checker.declareCompositeConstructor(declaration, compositeType, parameterTypes)
 }
 
-func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*InterfaceType {
+func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*InterfaceType {
 
 	var interfaceTypes []*InterfaceType
 	seenConformances := map[string]bool{}
 
-	structureIdentifier := structure.Identifier.Identifier
+	compositeIdentifier := declaration.Identifier.Identifier
 
-	for _, conformance := range structure.Conformances {
+	for _, conformance := range declaration.Conformances {
 		convertedType := checker.ConvertType(conformance)
 
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
@@ -2139,7 +2538,7 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 		if seenConformances[conformanceIdentifier] {
 			checker.report(
 				&DuplicateConformanceError{
-					StructureIdentifier: structureIdentifier,
+					CompositeIdentifier: compositeIdentifier,
 					Conformance:         conformance,
 				},
 			)
@@ -2150,19 +2549,34 @@ func (checker *Checker) conformances(structure *ast.StructureDeclaration) []*Int
 	return interfaceTypes
 }
 
-func (checker *Checker) checkStructureConformance(
-	structureType *StructureType,
+func (checker *Checker) checkCompositeConformance(
+	compositeType *CompositeType,
 	interfaceType *InterfaceType,
-	pos ast.Position,
+	compositeIdentifierPos ast.Position,
+	interfaceIdentifier ast.Identifier,
 ) {
 	var missingMembers []*Member
 	var memberMismatches []MemberMismatch
 	var initializerMismatch *InitializerMismatch
 
+	// ensure the composite kinds match, e.g. a structure shouldn't be able
+	// to conform to a resource interface
+
+	if interfaceType.CompositeKind != compositeType.Kind {
+		checker.report(
+			&CompositeKindMismatchError{
+				ExpectedKind: compositeType.Kind,
+				ActualKind:   interfaceType.CompositeKind,
+				StartPos:     interfaceIdentifier.StartPosition(),
+				EndPos:       interfaceIdentifier.EndPosition(),
+			},
+		)
+	}
+
 	if interfaceType.InitializerParameterTypes != nil {
 
-		structureInitializerType := &FunctionType{
-			ParameterTypes: structureType.ConstructorParameterTypes,
+		initializerType := &FunctionType{
+			ParameterTypes: compositeType.ConstructorParameterTypes,
 			ReturnType:     &VoidType{},
 		}
 		interfaceInitializerType := &FunctionType{
@@ -2171,9 +2585,9 @@ func (checker *Checker) checkStructureConformance(
 		}
 
 		// TODO: subtype?
-		if !structureInitializerType.Equal(interfaceInitializerType) {
+		if !initializerType.Equal(interfaceInitializerType) {
 			initializerMismatch = &InitializerMismatch{
-				StructureParameterTypes: structureType.ConstructorParameterTypes,
+				CompositeParameterTypes: compositeType.ConstructorParameterTypes,
 				InterfaceParameterTypes: interfaceType.InitializerParameterTypes,
 			}
 		}
@@ -2181,16 +2595,16 @@ func (checker *Checker) checkStructureConformance(
 
 	for name, interfaceMember := range interfaceType.Members {
 
-		structureMember, ok := structureType.Members[name]
+		compositeMember, ok := compositeType.Members[name]
 		if !ok {
 			missingMembers = append(missingMembers, interfaceMember)
 			continue
 		}
 
-		if !checker.memberSatisfied(structureMember, interfaceMember) {
+		if !checker.memberSatisfied(compositeMember, interfaceMember) {
 			memberMismatches = append(memberMismatches,
 				MemberMismatch{
-					StructureMember: structureMember,
+					CompositeMember: compositeMember,
 					InterfaceMember: interfaceMember,
 				},
 			)
@@ -2203,9 +2617,9 @@ func (checker *Checker) checkStructureConformance(
 
 		checker.report(
 			&ConformanceError{
-				StructureType:       structureType,
+				CompositeType:       compositeType,
 				InterfaceType:       interfaceType,
-				Pos:                 pos,
+				Pos:                 compositeIdentifierPos,
 				InitializerMismatch: initializerMismatch,
 				MissingMembers:      missingMembers,
 				MemberMismatches:    memberMismatches,
@@ -2214,14 +2628,14 @@ func (checker *Checker) checkStructureConformance(
 	}
 }
 
-func (checker *Checker) memberSatisfied(structureMember, interfaceMember *Member) bool {
+func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
 	// TODO: subtype?
-	if !structureMember.Type.Equal(interfaceMember.Type) {
+	if !compositeMember.Type.Equal(interfaceMember.Type) {
 		return false
 	}
 
 	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
-		structureMember.VariableKind != interfaceMember.VariableKind {
+		compositeMember.VariableKind != interfaceMember.VariableKind {
 
 		return false
 	}
@@ -2233,80 +2647,89 @@ func (checker *Checker) memberSatisfied(structureMember, interfaceMember *Member
 //  perform proper definite assignment analysis
 //
 func (checker *Checker) checkFieldsInitialized(
-	structure *ast.StructureDeclaration,
-	structureType *StructureType,
+	declaration *ast.CompositeDeclaration,
+	compositeType *CompositeType,
 ) {
 
-	for _, field := range structure.Fields {
+	for _, field := range declaration.Members.Fields {
 		name := field.Identifier.Identifier
-		member := structureType.Members[name]
+		member := compositeType.Members[name]
 
 		if !member.IsInitialized {
 			checker.report(
 				&FieldUninitializedError{
 					Name:          name,
 					Pos:           field.Identifier.Pos,
-					StructureType: structureType,
+					CompositeType: compositeType,
 				},
 			)
 		}
 	}
 }
 
-func (checker *Checker) declareStructureConstructor(
-	structure *ast.StructureDeclaration,
-	structureType *StructureType,
+func (checker *Checker) declareCompositeConstructor(
+	compositeDeclaration *ast.CompositeDeclaration,
+	compositeType *CompositeType,
 	parameterTypes []Type,
 ) {
 	functionType := &FunctionType{
-		ReturnType: structureType,
+		ReturnType: compositeType,
 	}
 
 	var argumentLabels []string
 
-	initializer := structure.Initializer
-	if initializer != nil {
-		argumentLabels = checker.argumentLabels(initializer.Parameters)
+	// TODO: support multiple overloaded initializers
+
+	if len(compositeDeclaration.Members.Initializers) > 0 {
+		firstInitializer := compositeDeclaration.Members.Initializers[0]
+
+		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
 
 		functionType = &FunctionType{
 			ParameterTypes: parameterTypes,
-			ReturnType:     structureType,
+			ReturnType:     compositeType,
 		}
+
+		checker.InitializerFunctionTypes[firstInitializer] = functionType
 	}
 
-	checker.InitializerFunctionTypes[initializer] = functionType
-
 	checker.declareFunction(
-		structure.Identifier,
+		compositeDeclaration.Identifier,
 		functionType,
 		argumentLabels,
 		false,
 	)
 }
 
-func (checker *Checker) members(
+func (checker *Checker) membersAndOrigins(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
-	declarationKind common.DeclarationKind,
-) map[string]*Member {
-
-	fieldCount := len(fields)
-	functionCount := len(functions)
-
-	members := make(map[string]*Member, fieldCount+functionCount)
+	requireVariableKind bool,
+) (
+	members map[string]*Member,
+	origins map[string]*Origin,
+) {
+	memberCount := len(fields) + len(functions)
+	members = make(map[string]*Member, memberCount)
+	origins = make(map[string]*Origin, memberCount)
 
 	// declare a member for each field
 	for _, field := range fields {
-		fieldType := checker.ConvertType(field.Type)
+		fieldType := checker.ConvertType(field.TypeAnnotation.Type)
 
-		members[field.Identifier.Identifier] = &Member{
+		identifier := field.Identifier.Identifier
+
+		members[identifier] = &Member{
 			Type:          fieldType,
 			VariableKind:  field.VariableKind,
 			IsInitialized: false,
 		}
 
-		if field.VariableKind == ast.VariableKindNotSpecified &&
-			declarationKind != common.DeclarationKindInterface {
+		origins[identifier] =
+			checker.recordFieldDeclarationOrigin(field, fieldType)
+
+		if requireVariableKind &&
+			field.VariableKind == ast.VariableKindNotSpecified {
 
 			checker.report(
 				&InvalidVariableKindError{
@@ -2320,53 +2743,143 @@ func (checker *Checker) members(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnType)
+		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
 
 		argumentLabels := checker.argumentLabels(function.Parameters)
 
-		members[function.Identifier.Identifier] = &Member{
+		identifier := function.Identifier.Identifier
+
+		members[identifier] = &Member{
 			Type:           functionType,
 			VariableKind:   ast.VariableKindConstant,
 			IsInitialized:  true,
 			ArgumentLabels: argumentLabels,
 		}
+
+		origins[identifier] =
+			checker.recordFunctionDeclarationOrigin(function, functionType)
 	}
 
-	return members
+	return members, origins
+}
+
+func (checker *Checker) recordFieldDeclarationOrigin(
+	field *ast.FieldDeclaration,
+	fieldType Type,
+) *Origin {
+	startPosition := field.Identifier.StartPosition()
+	endPosition := field.Identifier.EndPosition()
+
+	origin := &Origin{
+		Type:            fieldType,
+		DeclarationKind: common.DeclarationKindField,
+		StartPos:        &startPosition,
+		EndPos:          &endPosition,
+	}
+
+	checker.Occurrences.Put(
+		field.StartPos,
+		field.EndPos,
+		origin,
+	)
+
+	return origin
+}
+
+func (checker *Checker) recordFunctionDeclarationOrigin(
+	function *ast.FunctionDeclaration,
+	functionType *FunctionType,
+) *Origin {
+	startPosition := function.Identifier.StartPosition()
+	endPosition := function.Identifier.EndPosition()
+
+	origin := &Origin{
+		Type:            functionType,
+		DeclarationKind: common.DeclarationKindFunction,
+		StartPos:        &startPosition,
+		EndPos:          &endPosition,
+	}
+
+	checker.Occurrences.Put(
+		startPosition,
+		endPosition,
+		origin,
+	)
+	return origin
+}
+
+func (checker *Checker) checkInitializers(
+	initializers []*ast.InitializerDeclaration,
+	fields []*ast.FieldDeclaration,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
+	typeIdentifier string,
+	initializerParameterTypes []Type,
+	initializerKind initializerKind,
+) {
+	count := len(initializers)
+
+	if count == 0 {
+		checker.checkNoInitializerNoFields(fields, initializerKind, typeIdentifier)
+		return
+	}
+
+	// TODO: check all initializers:
+	//  parameter initializerParameterTypes needs to be a slice
+
+	initializer := initializers[0]
+	checker.checkInitializer(
+		initializer,
+		fields,
+		containerType,
+		containerDeclarationKind,
+		typeIdentifier,
+		initializerParameterTypes,
+		initializerKind,
+	)
+}
+
+// checkNoInitializerNoFields checks that if there are no initializers
+// there are also no fields – otherwise the fields will be uninitialized.
+// In interfaces this is allowed.
+//
+func (checker *Checker) checkNoInitializerNoFields(
+	fields []*ast.FieldDeclaration,
+	initializerKind initializerKind,
+	typeIdentifier string,
+) {
+	if len(fields) == 0 || initializerKind == initializerKindInterface {
+		return
+	}
+
+	// report error for first field
+	firstField := fields[0]
+
+	checker.report(
+		&MissingInitializerError{
+			TypeIdentifier: typeIdentifier,
+			FirstFieldName: firstField.Identifier.Identifier,
+			FirstFieldPos:  firstField.Identifier.Pos,
+		},
+	)
 }
 
 func (checker *Checker) checkInitializer(
 	initializer *ast.InitializerDeclaration,
 	fields []*ast.FieldDeclaration,
-	ty Type,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
 	typeIdentifier string,
 	initializerParameterTypes []Type,
-	kind initializerKind,
+	initializerKind initializerKind,
 ) {
-	if initializer == nil {
-		// no initializer, inside a structure, but fields?
-		if kind != initializerKindInterface && len(fields) > 0 {
-			firstField := fields[0]
-
-			// structure has fields, but no initializer
-			checker.report(
-				&MissingInitializerError{
-					TypeIdentifier: typeIdentifier,
-					FirstFieldName: firstField.Identifier.Identifier,
-					FirstFieldPos:  firstField.Identifier.Pos,
-				},
-			)
-		}
-		return
-	}
-
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
 	checker.valueActivations.PushCurrent()
 	defer checker.valueActivations.Pop()
 
-	checker.declareSelfValue(ty)
+	checker.declareSelfValue(containerType)
 
 	// check the initializer is named properly
 	identifier := initializer.Identifier.Identifier
@@ -2390,19 +2903,20 @@ func (checker *Checker) checkInitializer(
 		initializer.FunctionBlock,
 	)
 
-	if kind == initializerKindInterface &&
+	if initializerKind == initializerKindInterface &&
 		initializer.FunctionBlock != nil {
 
 		checker.checkInterfaceFunctionBlock(
 			initializer.FunctionBlock,
+			containerDeclarationKind,
 			common.DeclarationKindInitializer,
 		)
 	}
 }
 
-func (checker *Checker) checkStructureFunctions(
+func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
-	selfType *StructureType,
+	selfType *CompositeType,
 ) {
 	for _, function := range functions {
 		func() {
@@ -2434,10 +2948,10 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 		Pos:        nil,
 	}
 	checker.setVariable(SelfIdentifier, self)
-	checker.recordVariableOrigin(SelfIdentifier, self)
+	checker.recordVariableDeclarationOccurrence(SelfIdentifier, self)
 }
 
-// checkMemberIdentifiers checks the fields and functions are unique and aren'T named `init`
+// checkMemberIdentifiers checks the fields and functions are unique and aren't named `init`
 //
 func (checker *Checker) checkMemberIdentifiers(
 	fields []*ast.FieldDeclaration,
@@ -2497,7 +3011,6 @@ func (checker *Checker) checkMemberIdentifier(
 func (checker *Checker) declareType(
 	identifier ast.Identifier,
 	newType Type,
-	kind common.DeclarationKind,
 ) {
 	name := identifier.Identifier
 
@@ -2515,20 +3028,11 @@ func (checker *Checker) declareType(
 
 	// type with this identifier is not declared in current scope, declare it
 	checker.setType(name, newType)
-	checker.recordVariableOrigin(
-		name,
-		&Variable{
-			Kind:       kind,
-			IsConstant: true,
-			Type:       newType,
-			Pos:        &identifier.Pos,
-		},
-	)
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 
-	// NOTE: field type is already checked when determining structure function in `structureType`
+	// NOTE: field type is already checked when determining composite function in `compositeType`
 
 	panic(&errors.UnreachableError{})
 }
@@ -2544,23 +3048,81 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	interfaceType := checker.InterfaceDeclarationTypes[declaration]
 
-	checker.checkMemberIdentifiers(declaration.Fields, declaration.Functions)
+	// TODO: also check nested composite members
 
-	checker.checkInitializer(
-		declaration.Initializer,
-		declaration.Fields,
+	// TODO: also check nested composite members' identifiers
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+	)
+
+	members, origins := checker.membersAndOrigins(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+		false,
+	)
+
+	interfaceType.Members = members
+
+	checker.memberOrigins[interfaceType] = origins
+
+	checker.checkMemberIdentifiers(
+		declaration.Members.Fields,
+		declaration.Members.Functions,
+	)
+
+	checker.checkInitializers(
+		declaration.Members.Initializers,
+		declaration.Members.Fields,
 		interfaceType,
+		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypes,
 		initializerKindInterface,
 	)
 
-	checker.checkInterfaceFunctions(declaration.Functions, interfaceType)
+	checker.checkInterfaceFunctions(
+		declaration.Members.Functions,
+		interfaceType,
+		declaration.DeclarationKind(),
+	)
+
+	// TODO: support non-structure interfaces, such as contracts and resources
+
+	if declaration.CompositeKind != common.CompositeKindStructure {
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: declaration.DeclarationKind(),
+				StartPos:        declaration.Identifier.StartPosition(),
+				EndPos:          declaration.Identifier.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: support nested declarations for contracts and contract interfaces
+
+	// report error for first nested composite declaration, if any
+	if len(declaration.Members.CompositeDeclarations) > 0 {
+		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
+				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
+				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+			},
+		)
+	}
 
 	return nil
 }
 
-func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclaration, interfaceType Type) {
+func (checker *Checker) checkInterfaceFunctions(
+	functions []*ast.FunctionDeclaration,
+	interfaceType Type,
+	declarationKind common.DeclarationKind,
+) {
 	for _, function := range functions {
 		func() {
 			// NOTE: new activation, as function declarations
@@ -2577,6 +3139,7 @@ func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclara
 			if function.FunctionBlock != nil {
 				checker.checkInterfaceFunctionBlock(
 					function.FunctionBlock,
+					declarationKind,
 					common.DeclarationKindFunction,
 				)
 			}
@@ -2586,35 +3149,51 @@ func (checker *Checker) checkInterfaceFunctions(functions []*ast.FunctionDeclara
 
 func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDeclaration) {
 
-	// NOTE: fields and functions might already refer to structure itself.
+	// NOTE: fields and functions might already refer to interface itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
 	interfaceType := &InterfaceType{}
 
-	name := declaration.Identifier
+	identifier := declaration.Identifier
 
-	checker.declareType(
-		name,
-		interfaceType,
-		common.DeclarationKindInterface,
+	checker.declareType(identifier, interfaceType)
+	checker.recordVariableDeclarationOccurrence(
+		identifier.Identifier,
+		&Variable{
+			Kind:       declaration.DeclarationKind(),
+			IsConstant: true,
+			Type:       interfaceType,
+			Pos:        &identifier.Pos,
+		},
 	)
 
-	members := checker.members(
-		declaration.Fields,
-		declaration.Functions,
-		common.DeclarationKindInterface,
-	)
-
+	// NOTE: members are added in `VisitInterfaceDeclaration` –
+	//   left out for now, as field and function requirements could refer to e.g. composites
 	*interfaceType = InterfaceType{
-		Identifier: name.Identifier,
-		Members:    members,
+		CompositeKind: declaration.CompositeKind,
+		Identifier:    identifier.Identifier,
 	}
 
-	initializer := declaration.Initializer
+	// TODO: support multiple overloaded initializers
+
 	var parameterTypes []Type
-	if initializer != nil {
-		parameterTypes = checker.parameterTypes(initializer.Parameters)
+	initializerCount := len(declaration.Members.Initializers)
+	if initializerCount > 0 {
+		firstInitializer := declaration.Members.Initializers[0]
+		parameterTypes = checker.parameterTypes(firstInitializer.Parameters)
+
+		if initializerCount > 1 {
+			secondInitializer := declaration.Members.Initializers[1]
+
+			checker.report(
+				&UnsupportedOverloadingError{
+					DeclarationKind: common.DeclarationKindInitializer,
+					StartPos:        secondInitializer.StartPosition(),
+					EndPos:          secondInitializer.EndPosition(),
+				},
+			)
+		}
 	}
 
 	interfaceType.InitializerParameterTypes = parameterTypes
@@ -2626,14 +3205,18 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.declareInterfaceMetaType(declaration, interfaceType)
 }
 
-func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, kind common.DeclarationKind) {
+func (checker *Checker) checkInterfaceFunctionBlock(
+	block *ast.FunctionBlock,
+	containerKind common.DeclarationKind,
+	implementedKind common.DeclarationKind,
+) {
 
 	if len(block.Statements) > 0 {
 		checker.report(
 			&InvalidImplementationError{
 				Pos:             block.Statements[0].StartPosition(),
-				ContainerKind:   common.DeclarationKindInterface,
-				ImplementedKind: kind,
+				ContainerKind:   containerKind,
+				ImplementedKind: implementedKind,
 			},
 		)
 	} else if len(block.PreConditions) == 0 &&
@@ -2642,8 +3225,8 @@ func (checker *Checker) checkInterfaceFunctionBlock(block *ast.FunctionBlock, ki
 		checker.report(
 			&InvalidImplementationError{
 				Pos:             block.StartPos,
-				ContainerKind:   common.DeclarationKindInterface,
-				ImplementedKind: kind,
+				ContainerKind:   containerKind,
+				ImplementedKind: implementedKind,
 			},
 		)
 	}
@@ -2661,24 +3244,35 @@ func (checker *Checker) declareInterfaceMetaType(
 		declaration.Identifier.Identifier,
 		metaType,
 		// TODO: check
-		common.DeclarationKindInterface,
+		declaration.DeclarationKind(),
 		declaration.Identifier.Pos,
 		true,
 		nil,
 	)
 }
 
-func (checker *Checker) recordOrigin(startPos, endPos ast.Position, variable *Variable) {
-	checker.Origins.Put(startPos, endPos, variable)
+func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.Position, variable *Variable) {
+	origin, ok := checker.variableOrigins[variable]
+	if !ok {
+		origin = &Origin{
+			Type:            variable.Type,
+			DeclarationKind: variable.Kind,
+			StartPos:        variable.Pos,
+			// TODO:
+			EndPos: variable.Pos,
+		}
+		checker.variableOrigins[variable] = origin
+	}
+	checker.Occurrences.Put(startPos, endPos, origin)
 }
 
-func (checker *Checker) recordVariableOrigin(name string, variable *Variable) {
+func (checker *Checker) recordVariableDeclarationOccurrence(name string, variable *Variable) {
 	if variable.Pos == nil {
 		return
 	}
 	startPos := *variable.Pos
 	endPos := variable.Pos.Shifted(len(name) - 1)
-	checker.recordOrigin(startPos, endPos, variable)
+	checker.recordVariableReferenceOccurrence(startPos, endPos, variable)
 }
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
@@ -2737,43 +3331,76 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		return nil
 	}
 
+	missing := make(map[ast.Identifier]bool, len(declaration.Identifiers))
+	for _, identifier := range declaration.Identifiers {
+		missing[identifier] = true
+	}
+
+	checker.importValues(declaration, importChecker, missing)
+	checker.importTypes(declaration, importChecker, missing)
+
+	for identifier, _ := range missing {
+		checker.report(
+			&NotExportedError{
+				Name:           identifier.Identifier,
+				ImportLocation: declaration.Location,
+				Pos:            identifier.Pos,
+			},
+		)
+
+		// NOTE: declare constant variable with invalid type to silence rest of program
+		checker.declareVariable(
+			identifier.Identifier,
+			&InvalidType{},
+			common.DeclarationKindValue,
+			identifier.Pos,
+			true,
+			nil,
+		)
+
+		// NOTE: declare type with invalid type to silence rest of program
+		checker.declareType(identifier, &InvalidType{})
+	}
+
+	return nil
+}
+
+func (checker *Checker) importValues(
+	declaration *ast.ImportDeclaration,
+	importChecker *Checker,
+	missing map[ast.Identifier]bool,
+) {
 	// TODO: consider access modifiers
 
 	// determine which identifiers are imported /
 	// which variables need to be declared
+
 	var variables map[string]*Variable
 	identifierLength := len(declaration.Identifiers)
 	if identifierLength > 0 {
 		variables = make(map[string]*Variable, identifierLength)
 		for _, identifier := range declaration.Identifiers {
-			variable := importChecker.Globals[identifier.Identifier]
-
+			name := identifier.Identifier
+			variable := importChecker.GlobalValues[name]
 			if variable == nil {
-				checker.report(
-					&NotExportedError{
-						Name:           identifier.Identifier,
-						ImportLocation: declaration.Location,
-						Pos:            identifier.Pos,
-					},
-				)
-
-				// NOTE: creating variable to silence rest of program
-				variable = &Variable{
-					Type:       &InvalidType{},
-					IsConstant: true,
-				}
+				continue
 			}
-
-			variables[identifier.Identifier] = variable
+			variables[name] = variable
+			delete(missing, identifier)
 		}
 	} else {
-		variables = importChecker.Globals
+		variables = importChecker.GlobalValues
 	}
 
 	for name, variable := range variables {
 
 		// TODO: improve position
 		// TODO: allow cross-module variables?
+
+		// don't import predeclared values
+		if _, ok := importChecker.PredeclaredValues[name]; ok {
+			continue
+		}
 
 		checker.declareVariable(
 			name,
@@ -2784,6 +3411,100 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			variable.ArgumentLabels,
 		)
 	}
+}
 
-	return nil
+func (checker *Checker) importTypes(
+	declaration *ast.ImportDeclaration,
+	importChecker *Checker,
+	missing map[ast.Identifier]bool,
+) {
+	// TODO: consider access modifiers
+
+	// determine which identifiers are imported /
+	// which types need to be declared
+
+	var types map[string]Type
+	identifierLength := len(declaration.Identifiers)
+	if identifierLength > 0 {
+		types = make(map[string]Type, identifierLength)
+		for _, identifier := range declaration.Identifiers {
+			name := identifier.Identifier
+			ty := importChecker.GlobalTypes[name]
+			if ty == nil {
+				continue
+			}
+			types[name] = ty
+			delete(missing, identifier)
+		}
+	} else {
+		types = importChecker.GlobalTypes
+	}
+
+	for name, ty := range types {
+
+		// TODO: improve position
+		// TODO: allow cross-module types?
+
+		// don't import predeclared values
+		if _, ok := importChecker.PredeclaredValues[name]; ok {
+			continue
+		}
+
+		identifier := ast.Identifier{
+			Identifier: name,
+			Pos:        declaration.LocationPos,
+		}
+		checker.declareType(identifier, ty)
+	}
+}
+
+func (checker *Checker) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+
+	leftHandExpression := expression.Expression
+	leftHandType := leftHandExpression.Accept(checker).(Type)
+	rightHandType := checker.ConvertType(expression.TypeAnnotation.Type)
+	checker.FailableDowncastingTypes[expression] = rightHandType
+
+	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
+
+	if _, ok := leftHandType.(*AnyType); !ok {
+
+		checker.report(
+			&UnsupportedTypeError{
+				Type:     leftHandType,
+				StartPos: leftHandExpression.StartPosition(),
+				EndPos:   leftHandExpression.EndPosition(),
+			},
+		)
+	}
+
+	return &OptionalType{Type: rightHandType}
+}
+
+func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
+	// TODO: check create expressions
+
+	checker.report(
+		&UnsupportedExpressionError{
+			common.ExpressionKindCreate,
+			expression.StartPosition(),
+			expression.EndPosition(),
+		},
+	)
+
+	return &InvalidType{}
+}
+
+func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+	// TODO: check destroy expressions
+
+	checker.report(
+		&UnsupportedExpressionError{
+			common.ExpressionKindDestroy,
+			expression.StartPosition(),
+			expression.EndPosition(),
+		},
+	)
+
+	return &InvalidType{}
 }

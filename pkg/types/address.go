@@ -40,9 +40,14 @@ func (a *Address) SetBytes(b []byte) {
 // Bytes returns the byte representation of the address.
 func (a Address) Bytes() []byte { return a[:] }
 
-// String returns the hex string representation of the address.
+// Hex returns the hex string representation of the address.
+func (a Address) Hex() string {
+	return hex.EncodeToString(a.Bytes())
+}
+
+// String returns the string representation of the address.
 func (a Address) String() string {
-	return "0x" + hex.EncodeToString(a.Bytes())
+	return a.Hex()
 }
 
 // ZeroAddress represents the "zero address" (account that no one owns).

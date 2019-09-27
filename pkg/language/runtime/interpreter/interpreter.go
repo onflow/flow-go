@@ -6,12 +6,12 @@ import (
 
 	"github.com/raviqqe/hamt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/activations"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	. "github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 type loopBreak struct{}
@@ -20,25 +20,54 @@ type functionReturn struct {
 	Value
 }
 
+// StatementTrampoline
+
+type StatementTrampoline struct {
+	F    func() Trampoline
+	Line int
+}
+
+func (m StatementTrampoline) Resume() interface{} {
+	return m.F
+}
+
+func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
+	return FlatMap{Subroutine: m, Continuation: f}
+}
+
+func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
+	return MapTrampoline(m, f)
+}
+
+func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
+	return ThenTrampoline(m, f)
+}
+
+func (m StatementTrampoline) Continue() Trampoline {
+	return m.F()
+}
+
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Checker          *sema.Checker
-	PredefinedValues map[string]Value
-	activations      *activations.Activations
-	Globals          map[string]*Variable
-	interfaces       map[string]*ast.InterfaceDeclaration
-	ImportLocation   ast.ImportLocation
+	Checker            *sema.Checker
+	PredefinedValues   map[string]Value
+	activations        *activations.Activations
+	Globals            map[string]*Variable
+	interfaces         map[string]*ast.InterfaceDeclaration
+	ImportLocation     ast.ImportLocation
+	CompositeFunctions map[string]map[string]FunctionValue
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:          checker,
-		PredefinedValues: predefinedValues,
-		activations:      &activations.Activations{},
-		Globals:          map[string]*Variable{},
-		interfaces:       map[string]*ast.InterfaceDeclaration{},
+		Checker:            checker,
+		PredefinedValues:   predefinedValues,
+		activations:        &activations.Activations{},
+		Globals:            map[string]*Variable{},
+		interfaces:         map[string]*ast.InterfaceDeclaration{},
+		CompositeFunctions: map[string]map[string]FunctionValue{},
 	}
 
 	for name, value := range predefinedValues {
@@ -89,9 +118,66 @@ func (interpreter *Interpreter) Interpret() (err error) {
 		}
 	}()
 
-	Run(interpreter.interpret())
+	interpreter.runAllStatements(interpreter.interpret())
 
 	return nil
+}
+
+type Statement struct {
+	Trampoline Trampoline
+	Line       int
+}
+
+func (interpreter *Interpreter) runUntilNextStatement(t Trampoline) (result interface{}, statement *Statement) {
+	for {
+		statement := getStatement(t)
+
+		if statement != nil {
+			return nil, &Statement{
+				// NOTE: resumption using outer trampoline,
+				// not just inner statement trampoline
+				Trampoline: t,
+				Line:       statement.Line,
+			}
+		}
+
+		result := t.Resume()
+
+		if continuation, ok := result.(func() Trampoline); ok {
+
+			t = continuation()
+			continue
+		}
+
+		return result, nil
+	}
+}
+
+func (interpreter *Interpreter) runAllStatements(t Trampoline) interface{} {
+	for {
+		result, statement := interpreter.runUntilNextStatement(t)
+		if statement == nil {
+			return result
+		}
+		result = statement.Trampoline.Resume()
+		if continuation, ok := result.(func() Trampoline); ok {
+			t = continuation()
+			continue
+		}
+
+		return result
+	}
+}
+
+func getStatement(t Trampoline) *StatementTrampoline {
+	switch t := t.(type) {
+	case FlatMap:
+		return getStatement(t.Subroutine)
+	case StatementTrampoline:
+		return &t
+	default:
+		return nil
+	}
 }
 
 func (interpreter *Interpreter) interpret() Trampoline {
@@ -109,7 +195,7 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-	for _, declaration := range program.StructureDeclarations() {
+	for _, declaration := range program.CompositeDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
 	for _, declaration := range program.FunctionDeclarations() {
@@ -155,7 +241,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
+func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []interface{}) (trampoline Trampoline, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -179,6 +265,49 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		return nil, err
 	}
 
+	// ensures the invocation's argument count matches the function's parameter count
+
+	ty := interpreter.Checker.GlobalValues[functionName].Type
+
+	functionType, ok := ty.(*sema.FunctionType)
+	if !ok {
+		return nil, &NotCallableError{
+			Value: variableValue,
+		}
+	}
+
+	parameterTypes := functionType.ParameterTypes
+	parameterCount := len(parameterTypes)
+	argumentCount := len(argumentValues)
+
+	if argumentCount != parameterCount {
+
+		if functionType.RequiredArgumentCount == nil ||
+			argumentCount < *functionType.RequiredArgumentCount {
+
+			return nil, &ArgumentCountError{
+				ParameterCount: parameterCount,
+				ArgumentCount:  argumentCount,
+			}
+		}
+	}
+
+	boxedArguments := make([]Value, len(arguments))
+	for i, argument := range argumentValues {
+		// TODO: value type is not known – only used for Any boxing right now, so reject for now
+		if parameterTypes[i].Equal(&sema.AnyType{}) {
+			return nil, &NotCallableError{
+				Value: variableValue,
+			}
+		}
+		boxedArguments[i] = interpreter.box(argument, nil, parameterTypes[i])
+	}
+
+	trampoline = function.invoke(boxedArguments, Location{})
+	return trampoline, nil
+}
+
+func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
 	// recover internal panics and return them as an error
 	defer func() {
 		if r := recover(); r != nil {
@@ -195,38 +324,11 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		}
 	}()
 
-	// ensures the invocation's argument count matches the function's parameter count
-
-	parameterTypes := function.functionType().ParameterTypes
-	parameterCount := len(parameterTypes)
-	argumentCount := len(argumentValues)
-
-	if argumentCount != parameterCount {
-
-		var functionType *sema.FunctionType
-
-		if hostFunction, ok := function.(HostFunctionValue); ok {
-			functionType = hostFunction.Type
-		}
-
-		// TODO: improve
-		if functionType == nil ||
-			(functionType.RequiredArgumentCount == nil ||
-				argumentCount < *functionType.RequiredArgumentCount) {
-
-			return nil, &ArgumentCountError{
-				ParameterCount: parameterCount,
-				ArgumentCount:  argumentCount,
-			}
-		}
+	trampoline, err := interpreter.prepareInvoke(functionName, arguments)
+	if err != nil {
+		return nil, err
 	}
-
-	boxedArguments := make(ArrayValue, len(arguments))
-	for i, argument := range argumentValues {
-		boxedArguments[i] = interpreter.box(argument, parameterTypes[i])
-	}
-
-	result := Run(function.invoke(boxedArguments, Location{}))
+	result := interpreter.runAllStatements(trampoline)
 	if result == nil {
 		return nil, nil
 	}
@@ -314,14 +416,21 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 		return Done{}
 	}
 
+	statement := statements[0]
+	line := statement.StartPosition().Line
+
 	// interpret the first statement, then the remaining ones
-	return statements[0].Accept(interpreter).(Trampoline).
-		FlatMap(func(returnValue interface{}) Trampoline {
-			if returnValue != nil {
-				return Done{Result: returnValue}
-			}
-			return interpreter.visitStatements(statements[1:])
-		})
+	return StatementTrampoline{
+		F: func() Trampoline {
+			return statement.Accept(interpreter).(Trampoline)
+		},
+		Line: line,
+	}.FlatMap(func(returnValue interface{}) Trampoline {
+		if returnValue != nil {
+			return Done{Result: returnValue}
+		}
+		return interpreter.visitStatements(statements[1:])
+	})
 }
 
 func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
@@ -352,7 +461,6 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 						resultValue = VoidValue{}
 					} else {
 						resultValue = blockResult.(functionReturn).Value
-						resultValue = interpreter.box(resultValue, returnType)
 					}
 
 					// if there is a return type, declare the constant `result`
@@ -438,14 +546,14 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 				var messageTrampoline Trampoline
 
 				if condition.Message == nil {
-					messageTrampoline = Done{Result: StringValue("")}
+					messageTrampoline = Done{Result: NewStringValue("")}
 				} else {
 					messageTrampoline = condition.Message.Accept(interpreter).(Trampoline)
 				}
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := string(result.(StringValue))
+						message := result.(StringValue).StrValue()
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -475,8 +583,15 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 	}
 
 	return statement.Expression.Accept(interpreter).(Trampoline).
-		Map(func(value interface{}) interface{} {
-			return functionReturn{value.(Value)}
+		Map(func(result interface{}) interface{} {
+			value := result.(Value)
+
+			valueType := interpreter.Checker.ReturnStatementValueTypes[statement]
+			returnType := interpreter.Checker.ReturnStatementReturnTypes[statement]
+
+			value = interpreter.box(value, valueType, returnType)
+
+			return functionReturn{value}
 		})
 }
 
@@ -577,8 +692,10 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			targetType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
-			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
+			valueType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
+			targetType := interpreter.Checker.VariableDeclarationTargetTypes[declaration]
+
+			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
 				declaration.Identifier.Identifier,
@@ -601,8 +718,10 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
+			valueType := interpreter.Checker.AssignmentStatementValueTypes[assignment]
 			targetType := interpreter.Checker.AssignmentStatementTargetTypes[assignment]
-			valueCopy := interpreter.copyAndBox(result.(Value), targetType)
+
+			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
 			return interpreter.visitAssignmentValue(assignment, valueCopy)
 		})
@@ -649,9 +768,9 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(StructureValue)
+			structure := result.(CompositeValue)
 
-			structure.Set(target.Identifier, value)
+			structure.SetMember(interpreter, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -663,8 +782,14 @@ func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.Identi
 	return Done{Result: variable.Value}
 }
 
+// valueTuple
+
+type valueTuple struct {
+	left, right Value
+}
+
 // visitBinaryOperation interprets the left-hand side and the right-hand side and returns
-// the result in a TupleValue
+// the result in a valueTuple
 func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression) Trampoline {
 	// interpret the left-hand side
 	return expr.Left.Accept(interpreter).(Trampoline).
@@ -673,7 +798,7 @@ func (interpreter *Interpreter) visitBinaryOperation(expr *ast.BinaryExpression)
 			// interpret the right-hand side
 			return expr.Right.Accept(interpreter).(Trampoline).
 				FlatMap(func(right interface{}) Trampoline {
-					tuple := TupleValue{
+					tuple := valueTuple{
 						left.(Value),
 						right.(Value),
 					}
@@ -687,96 +812,96 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	case ast.OperationPlus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Plus(right)
 			})
 
 	case ast.OperationMinus:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Minus(right)
 			})
 
 	case ast.OperationMod:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mod(right)
 			})
 
 	case ast.OperationMul:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Mul(right)
 			})
 
 	case ast.OperationDiv:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Div(right)
 			})
 
 	case ast.OperationLess:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Less(right)
 			})
 
 	case ast.OperationLessEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.LessEqual(right)
 			})
 
 	case ast.OperationGreater:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.Greater(right)
 			})
 
 	case ast.OperationGreaterEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				left := tuple.Left.(IntegerValue)
-				right := tuple.Right.(IntegerValue)
+				tuple := result.(valueTuple)
+				left := tuple.left.(IntegerValue)
+				right := tuple.right.(IntegerValue)
 				return left.GreaterEqual(right)
 			})
 
 	case ast.OperationEqual:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				return interpreter.testEqual(tuple.Left, tuple.Right)
+				tuple := result.(valueTuple)
+				return interpreter.testEqual(tuple.left, tuple.right)
 			})
 
 	case ast.OperationUnequal:
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
-				tuple := result.(TupleValue)
-				return BoolValue(!interpreter.testEqual(tuple.Left, tuple.Right))
+				tuple := result.(valueTuple)
+				return BoolValue(!interpreter.testEqual(tuple.left, tuple.right))
 			})
 
 	case ast.OperationOr:
@@ -821,11 +946,29 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 			FlatMap(func(left interface{}) Trampoline {
 				// only evaluate right-hand side if left-hand side is nil
 				if _, ok := left.(NilValue); ok {
-					return expression.Right.Accept(interpreter).(Trampoline)
+					return expression.Right.Accept(interpreter).(Trampoline).
+						Map(func(result interface{}) interface{} {
+							value := result.(Value)
+
+							rightType := interpreter.Checker.BinaryExpressionRightTypes[expression]
+							resultType := interpreter.Checker.BinaryExpressionResultTypes[expression]
+
+							// NOTE: important to box both any and optional
+							return interpreter.box(value, rightType, resultType)
+						})
 				}
 
 				value := left.(SomeValue).Value
 				return Done{Result: value}
+			})
+
+	case ast.OperationConcat:
+		return interpreter.visitBinaryOperation(expression).
+			Map(func(result interface{}) interface{} {
+				tuple := result.(valueTuple)
+				left := tuple.left.(ConcatenatableValue)
+				right := tuple.right.(ConcatenatableValue)
+				return left.Concat(right)
 			})
 	}
 
@@ -856,6 +999,14 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	case NilValue:
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
+
+	case StringValue:
+		// NOTE: might be NilValue
+		right, ok := right.(StringValue)
+		if !ok {
+			return false
+		}
+		return left.Equal(right)
 	}
 
 	panic(&errors.UnreachableError{})
@@ -874,6 +1025,9 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			case ast.OperationMinus:
 				integerValue := value.(IntegerValue)
 				return integerValue.Negate()
+
+			case ast.OperationMove:
+				return value
 			}
 
 			panic(&unsupportedOperation{
@@ -911,7 +1065,7 @@ func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression
 }
 
 func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
-	value := StringValue(expression.Value)
+	value := NewStringValue(expression.Value)
 
 	return Done{Result: value}
 }
@@ -920,11 +1074,15 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 	return interpreter.visitExpressions(expression.Values, nil)
 }
 
+func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
+	return interpreter.visitEntries(expression.Entries, DictionaryValue{})
+}
+
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			structure := result.(StructureValue)
-			return structure.Get(expression.Identifier)
+			value := result.(ValueWithMembers)
+			return value.GetMember(interpreter, expression.Identifier.Identifier)
 		})
 }
 
@@ -971,11 +1129,14 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
 
+					argumentTypes := interpreter.Checker.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes := interpreter.Checker.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make(ArrayValue, len(arguments))
-					for i, argument := range arguments {
-						argumentCopies[i] = interpreter.copyAndBox(argument, parameterTypes[i])
+					argumentCopies := make([]Value, len(*arguments.Values))
+					for i, argument := range *arguments.Values {
+						argumentType := argumentTypes[i]
+						parameterType := parameterTypes[i]
+						argumentCopies[i] = interpreter.copyAndBox(argument, argumentType, parameterType)
 					}
 
 					// TODO: optimize: only potentially used by host-functions
@@ -1037,7 +1198,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 
 	// no expressions? stop
 	if count == 0 {
-		return Done{Result: ArrayValue(values)}
+		return Done{Result: ArrayValue{Values: &values}}
 	}
 
 	// interpret the first expression
@@ -1047,6 +1208,36 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, v
 
 			// interpret the remaining expressions
 			return interpreter.visitExpressions(expressions[1:], append(values, value))
+		})
+}
+
+func (interpreter *Interpreter) visitEntries(entries []ast.Entry, result DictionaryValue) Trampoline {
+	count := len(entries)
+
+	// no entries? stop
+	if count == 0 {
+		return Done{Result: result}
+	}
+
+	entry := entries[0]
+
+	// interpret the key expression
+	return entry.Key.Accept(interpreter).(Trampoline).
+		FlatMap(func(keyResult interface{}) Trampoline {
+			key := keyResult.(Value)
+
+			// interpret the value expression
+			return entry.Value.Accept(interpreter).(Trampoline).
+				FlatMap(func(valueResult interface{}) Trampoline {
+					value := valueResult.(Value)
+
+					// NOTE: not setting using indexing,
+					// as key might need special handling
+					result.Set(key, value)
+
+					// interpret the remaining entries
+					return interpreter.visitEntries(entries[1:], result)
+				})
 		})
 }
 
@@ -1062,85 +1253,104 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	return Done{Result: function}
 }
 
-func (interpreter *Interpreter) VisitStructureDeclaration(declaration *ast.StructureDeclaration) ast.Repr {
+func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	interpreter.declareStructureConstructor(declaration)
+	interpreter.declareCompositeConstructor(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareStructureConstructor creates a constructor function
-// for the given structure, bound in a variable.
+// declareCompositeConstructor creates a constructor function
+// for the given composite, bound in a variable.
 //
-// The constructor is a host function which creates a new structure,
+// The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
-// and then returns the structure.
+// and then returns the composite.
 //
 // Inside the initializer and all functions, `self` is bound to
-// the new structure value, and the constructor itself is bound
+// the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareStructureConstructor(structureDeclaration *ast.StructureDeclaration) {
+func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.CompositeDeclaration) {
 
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	identifier := structureDeclaration.Identifier.Identifier
+	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringKey(identifier), variable)
 
-	initializer := structureDeclaration.Initializer
+	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if initializer != nil {
+	if len(declaration.Members.Initializers) > 0 {
+		firstInitializer := declaration.Members.Initializers[0]
 
-		functionType := interpreter.Checker.InitializerFunctionTypes[initializer]
+		functionType := interpreter.Checker.InitializerFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
-			structureDeclaration,
-			initializer,
+			declaration,
+			firstInitializer,
 			functionType,
 			lexicalScope,
 		)
 		initializerFunction = &f
 	}
 
-	functions := interpreter.structureFunctions(structureDeclaration, lexicalScope)
+	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 
-	// TODO: function type
+	interpreter.CompositeFunctions[identifier] = functions
+
 	variable.Value = NewHostFunctionValue(
-		nil,
-		func(values []Value, location Location) Trampoline {
-			structure := StructureValue{}
+		func(arguments []Value, location Location) Trampoline {
 
-			for name, function := range functions {
-				structFunction := NewStructFunction(function, structure)
-				structure.Set(name, structFunction)
+			value := CompositeValue{
+				Identifier: identifier,
+				Fields:     &map[string]Value{},
+				Functions:  &functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
 
 			if initializerFunction != nil {
-				initializationTrampoline = interpreter.invokeStructureFunction(
-					*initializerFunction,
-					values,
-					structure,
-				)
+				// NOTE: arguments are already properly boxed by invocation expression
+
+				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
+					invoke(arguments, location)
 			}
 
 			return initializationTrampoline.
 				Map(func(_ interface{}) interface{} {
-					return structure
+					return value
 				})
 		},
 	)
 }
 
+// bindSelf returns a function which binds `self` to the structure
+//
+func (interpreter *Interpreter) bindSelf(
+	function InterpretedFunctionValue,
+	structure CompositeValue,
+) FunctionValue {
+	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
+		// start a new activation record
+		// lexical scope: use the function declaration's activation record,
+		// not the current one (which would be dynamic scope)
+		interpreter.activations.Push(function.Activation)
+
+		// make `self` available
+		interpreter.declareVariable(sema.SelfIdentifier, structure)
+
+		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+	})
+}
+
 func (interpreter *Interpreter) initializerFunction(
-	structureDeclaration *ast.StructureDeclaration,
+	compositeDeclaration *ast.CompositeDeclaration,
 	initializer *ast.InitializerDeclaration,
 	functionType *sema.FunctionType,
 	lexicalScope hamt.Map,
@@ -1152,21 +1362,28 @@ func (interpreter *Interpreter) initializerFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range structureDeclaration.Conformances {
+	for _, conformance := range compositeDeclaration.Conformances {
 		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
-		initializer := interfaceDeclaration.Initializer
-		if initializer == nil || initializer.FunctionBlock == nil {
+
+		// TODO: support multiple overloaded initializers
+
+		if len(interfaceDeclaration.Members.Initializers) == 0 {
+			continue
+		}
+
+		firstInitializer := interfaceDeclaration.Members.Initializers[0]
+		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}
 
 		functionBlockCopy.PreConditions = append(
 			functionBlockCopy.PreConditions,
-			initializer.FunctionBlock.PreConditions...,
+			firstInitializer.FunctionBlock.PreConditions...,
 		)
 
 		functionBlockCopy.PostConditions = append(
 			functionBlockCopy.PostConditions,
-			initializer.FunctionBlock.PostConditions...,
+			firstInitializer.FunctionBlock.PostConditions...,
 		)
 	}
 
@@ -1178,38 +1395,17 @@ func (interpreter *Interpreter) initializerFunction(
 	)
 }
 
-// invokeStructureFunction calls the given function with the values.
-//
-// Inside the function, `self` is bound to the structure,
-// and the constructor for the structure is bound
-//
-func (interpreter *Interpreter) invokeStructureFunction(
-	function InterpretedFunctionValue,
-	arguments []Value,
-	structure StructureValue,
-) Trampoline {
-	// start a new activation record
-	// lexical scope: use the function declaration's activation record,
-	// not the current one (which would be dynamic scope)
-	interpreter.activations.Push(function.Activation)
-
-	// make `self` available in the initializer
-	interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
-}
-
-func (interpreter *Interpreter) structureFunctions(
-	structureDeclaration *ast.StructureDeclaration,
+func (interpreter *Interpreter) compositeFunctions(
+	compositeDeclaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
-) map[string]InterpretedFunctionValue {
+) map[string]FunctionValue {
 
-	functions := map[string]InterpretedFunctionValue{}
+	functions := map[string]FunctionValue{}
 
-	for _, functionDeclaration := range structureDeclaration.Functions {
+	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.structureFunction(structureDeclaration, functionDeclaration)
+		function := interpreter.compositeFunction(compositeDeclaration, functionDeclaration)
 
 		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(
@@ -1223,8 +1419,8 @@ func (interpreter *Interpreter) structureFunctions(
 	return functions
 }
 
-func (interpreter *Interpreter) structureFunction(
-	structureDeclaration *ast.StructureDeclaration,
+func (interpreter *Interpreter) compositeFunction(
+	compositeDeclaration *ast.CompositeDeclaration,
 	functionDeclaration *ast.FunctionDeclaration,
 ) *ast.FunctionExpression {
 
@@ -1236,10 +1432,10 @@ func (interpreter *Interpreter) structureFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range structureDeclaration.Conformances {
+	for _, conformance := range compositeDeclaration.Conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
 		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
-		interfaceFunction, ok := interfaceDeclaration.FunctionsByIdentifier()[functionIdentifier]
+		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
 			continue
 		}
@@ -1266,14 +1462,20 @@ func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.Ini
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) copyAndBox(value Value, targetType sema.Type) Value {
+func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
 	result := value.Copy()
-	return interpreter.box(result, targetType)
+	return interpreter.box(result, valueType, targetType)
 }
 
-// box boxes a value in optionals, if necessary
-func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
-	inner := result
+// box boxes a value in optionals and any value, if necessary
+func (interpreter *Interpreter) box(value Value, valueType, targetType sema.Type) Value {
+	value, valueType = interpreter.boxOptional(value, valueType, targetType)
+	return interpreter.boxAny(value, valueType, targetType)
+}
+
+// boxOptional boxes a value in optionals, if necessary
+func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType sema.Type) (Value, sema.Type) {
+	inner := value
 	for {
 		optionalType, ok := targetType.(*sema.OptionalType)
 		if !ok {
@@ -1283,14 +1485,52 @@ func (interpreter *Interpreter) box(result Value, targetType sema.Type) Value {
 		if some, ok := inner.(SomeValue); ok {
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
-			return inner
+			// NOTE: nested nil will be unboxed!
+			return inner, &sema.OptionalType{
+				Type: &sema.NeverType{},
+			}
 		} else {
-			result = SomeValue{Value: result}
+			value = SomeValue{Value: value}
+			valueType = &sema.OptionalType{
+				Type: valueType,
+			}
 		}
 
 		targetType = optionalType.Type
 	}
-	return result
+	return value, valueType
+}
+
+// boxOptional boxes a value in an Any value, if necessary
+func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
+	switch targetType := targetType.(type) {
+	case *sema.AnyType:
+		// no need to box already boxed value
+		if _, ok := value.(AnyValue); ok {
+			return value
+		}
+		return AnyValue{
+			Value: value,
+			Type:  valueType,
+		}
+
+	case *sema.OptionalType:
+		if _, ok := value.(NilValue); ok {
+			return value
+		}
+		some := value.(SomeValue)
+		return SomeValue{
+			Value: interpreter.boxAny(
+				some.Value,
+				valueType.(*sema.OptionalType).Type,
+				targetType.Type,
+			),
+		}
+
+	// TODO: support more types, e.g. arrays, dictionaries
+	default:
+		return value
+	}
 }
 
 func (interpreter *Interpreter) unbox(value Value) Value {
@@ -1352,7 +1592,42 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 			// set variables for all imported values
 			for name, variable := range variables {
+				// don't import predeclared values
+				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+					continue
+				}
+
 				interpreter.setVariable(name, variable)
+
+				// if the imported name refers to a structure,
+				// also take the structure functions from the sub-interpreter
+				if structureFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
+					interpreter.CompositeFunctions[name] = structureFunctions
+				}
 			}
 		})
+}
+
+func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			value := result.(Value)
+
+			anyValue := value.(AnyValue)
+			expectedType := interpreter.Checker.FailableDowncastingTypes[expression]
+
+			if !interpreter.Checker.IsSubType(anyValue.Type, expectedType) {
+				return NilValue{}
+			}
+
+			return SomeValue{Value: anyValue.Value}
+		})
+}
+
+func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
+	panic(&errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
+	panic(&errors.UnreachableError{})
 }

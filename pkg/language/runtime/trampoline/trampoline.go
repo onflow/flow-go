@@ -1,6 +1,6 @@
 package trampoline
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 // Based on "Stackless Scala With Free" by Rúnar Óli Bjarnason:
 // http://blog.higher-order.com/assets/trampolines.pdf
@@ -24,7 +24,7 @@ import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
 ///
 
 type Trampoline interface {
-	resume() interface{}
+	Resume() interface{}
 	FlatMap(f func(interface{}) Trampoline) Trampoline
 	Map(f func(interface{}) interface{}) Trampoline
 	Then(f func(interface{})) Trampoline
@@ -32,7 +32,7 @@ type Trampoline interface {
 
 func Run(t Trampoline) interface{} {
 	for {
-		result := t.resume()
+		result := t.Resume()
 
 		if continuation, ok := result.(func() Trampoline); ok {
 			t = continuation()
@@ -43,13 +43,13 @@ func Run(t Trampoline) interface{} {
 	}
 }
 
-func mapTrampoline(t Trampoline, f func(interface{}) interface{}) Trampoline {
+func MapTrampoline(t Trampoline, f func(interface{}) interface{}) Trampoline {
 	return t.FlatMap(func(value interface{}) Trampoline {
 		return Done{Result: f(value)}
 	})
 }
 
-func thenTrampoline(t Trampoline, f func(interface{})) Trampoline {
+func ThenTrampoline(t Trampoline, f func(interface{})) Trampoline {
 	return t.Map(func(value interface{}) interface{} {
 		f(value)
 		return value
@@ -62,7 +62,7 @@ type Done struct {
 	Result interface{}
 }
 
-func (d Done) resume() interface{} {
+func (d Done) Resume() interface{} {
 	return d.Result
 }
 
@@ -71,18 +71,22 @@ func (d Done) FlatMap(f func(interface{}) Trampoline) Trampoline {
 }
 
 func (d Done) Map(f func(interface{}) interface{}) Trampoline {
-	return mapTrampoline(d, f)
+	return MapTrampoline(d, f)
 }
 
 func (d Done) Then(f func(interface{})) Trampoline {
-	return thenTrampoline(d, f)
+	return ThenTrampoline(d, f)
+}
+
+type Continuation interface {
+	Continue() Trampoline
 }
 
 // More
 
 type More func() Trampoline
 
-func (m More) resume() interface{} {
+func (m More) Resume() interface{} {
 	return (func() Trampoline)(m)
 }
 
@@ -91,11 +95,15 @@ func (m More) FlatMap(f func(interface{}) Trampoline) Trampoline {
 }
 
 func (m More) Map(f func(interface{}) interface{}) Trampoline {
-	return mapTrampoline(m, f)
+	return MapTrampoline(m, f)
 }
 
 func (m More) Then(f func(interface{})) Trampoline {
-	return thenTrampoline(m, f)
+	return ThenTrampoline(m, f)
+}
+
+func (m More) Continue() Trampoline {
+	return m()
 }
 
 // FlatMap
@@ -115,7 +123,7 @@ func (m FlatMap) FlatMap(f func(interface{}) Trampoline) Trampoline {
 	}
 }
 
-func (m FlatMap) resume() interface{} {
+func (m FlatMap) Resume() interface{} {
 	continuation := m.Continuation
 
 	switch sub := m.Subroutine.(type) {
@@ -123,9 +131,9 @@ func (m FlatMap) resume() interface{} {
 		return func() Trampoline {
 			return continuation(sub.Result)
 		}
-	case More:
+	case Continuation:
 		return func() Trampoline {
-			return sub().FlatMap(continuation)
+			return sub.Continue().FlatMap(continuation)
 		}
 	case FlatMap:
 		panic("FlatMap is not a valid subroutine. Use the FlatMap function to construct proper FlatMap structures.")
@@ -135,9 +143,9 @@ func (m FlatMap) resume() interface{} {
 }
 
 func (m FlatMap) Map(f func(interface{}) interface{}) Trampoline {
-	return mapTrampoline(m, f)
+	return MapTrampoline(m, f)
 }
 
 func (m FlatMap) Then(f func(interface{})) Trampoline {
-	return thenTrampoline(m, f)
+	return ThenTrampoline(m, f)
 }

@@ -3,25 +3,22 @@ package stdlib
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 type StandardLibraryFunction struct {
 	Name           string
+	Type           *sema.FunctionType
 	Function       interpreter.HostFunctionValue
 	ArgumentLabels []string
 }
 
-func (f StandardLibraryFunction) ValueDeclarationName() string {
-	return f.Name
-}
-
 func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
-	return f.Function.Type
+	return f.Type
 }
 
 func (StandardLibraryFunction) ValueDeclarationKind() common.DeclarationKind {
@@ -46,15 +43,33 @@ func NewStandardLibraryFunction(
 	function interpreter.HostFunction,
 	argumentLabels []string,
 ) StandardLibraryFunction {
-	functionValue := interpreter.NewHostFunctionValue(
-		functionType,
-		function,
-	)
+	functionValue := interpreter.NewHostFunctionValue(function)
 	return StandardLibraryFunction{
 		Name:           name,
+		Type:           functionType,
 		Function:       functionValue,
 		ArgumentLabels: argumentLabels,
 	}
+}
+
+// StandardLibraryFunctions
+
+type StandardLibraryFunctions []StandardLibraryFunction
+
+func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
+	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
+	for _, function := range functions {
+		valueDeclarations[function.Name] = function
+	}
+	return valueDeclarations
+}
+
+func (functions StandardLibraryFunctions) ToValues() map[string]interpreter.Value {
+	values := make(map[string]interpreter.Value, len(functions))
+	for _, function := range functions {
+		values[function.Name] = function.Function
+	}
+	return values
 }
 
 // AssertionError
@@ -103,7 +118,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		if !result {
 			var message string
 			if len(arguments) > 1 {
-				message = string(arguments[1].(interpreter.StringValue))
+				message = arguments[1].(interpreter.StringValue).StrValue()
 			}
 			panic(AssertionError{
 				Message:  message,
@@ -112,7 +127,10 @@ var AssertFunction = NewStandardLibraryFunction(
 		}
 		return trampoline.Done{}
 	},
-	[]string{"", "message"},
+	[]string{
+		sema.ArgumentLabelNotRequired,
+		"message",
+	},
 )
 
 // PanicError
@@ -151,7 +169,7 @@ var PanicFunction = NewStandardLibraryFunction(
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
-			Message:  string(message),
+			Message:  message.StrValue(),
 			Location: location,
 		})
 		return trampoline.Done{}
@@ -161,7 +179,7 @@ var PanicFunction = NewStandardLibraryFunction(
 
 // BuiltinFunctions
 
-var BuiltinFunctions = []StandardLibraryFunction{
+var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
 }
@@ -183,6 +201,6 @@ var LogFunction = NewStandardLibraryFunction(
 
 // HelperFunctions
 
-var HelperFunctions = []StandardLibraryFunction{
+var HelperFunctions = StandardLibraryFunctions{
 	LogFunction,
 }

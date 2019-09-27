@@ -1,13 +1,13 @@
 package ast
 
-import "github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
+import "github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 type VariableDeclaration struct {
-	IsConstant bool
-	Identifier Identifier
-	Type       Type
-	Value      Expression
-	StartPos   Position
+	IsConstant     bool
+	Identifier     Identifier
+	TypeAnnotation *TypeAnnotation
+	Value          Expression
+	StartPos       Position
 }
 
 func (v *VariableDeclaration) StartPosition() Position {

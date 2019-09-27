@@ -19,8 +19,8 @@ type StrictusListener interface {
 	// EnterAccess is called when entering the access production.
 	EnterAccess(c *AccessContext)
 
-	// EnterStructureDeclaration is called when entering the structureDeclaration production.
-	EnterStructureDeclaration(c *StructureDeclarationContext)
+	// EnterCompositeDeclaration is called when entering the compositeDeclaration production.
+	EnterCompositeDeclaration(c *CompositeDeclarationContext)
 
 	// EnterConformances is called when entering the conformances production.
 	EnterConformances(c *ConformancesContext)
@@ -34,6 +34,15 @@ type StrictusListener interface {
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
+	// EnterMembers is called when entering the members production.
+	EnterMembers(c *MembersContext)
+
+	// EnterMember is called when entering the member production.
+	EnterMember(c *MemberContext)
+
+	// EnterCompositeKind is called when entering the compositeKind production.
+	EnterCompositeKind(c *CompositeKindContext)
+
 	// EnterInitializer is called when entering the initializer production.
 	EnterInitializer(c *InitializerContext)
 
@@ -46,11 +55,14 @@ type StrictusListener interface {
 	// EnterParameter is called when entering the parameter production.
 	EnterParameter(c *ParameterContext)
 
+	// EnterTypeAnnotation is called when entering the typeAnnotation production.
+	EnterTypeAnnotation(c *TypeAnnotationContext)
+
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
-	// EnterTypeDimension is called when entering the typeDimension production.
-	EnterTypeDimension(c *TypeDimensionContext)
+	// EnterTypeIndex is called when entering the typeIndex production.
+	EnterTypeIndex(c *TypeIndexContext)
 
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
@@ -124,6 +136,12 @@ type StrictusListener interface {
 	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
 	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
+	// EnterFailableDowncastingExpression is called when entering the failableDowncastingExpression production.
+	EnterFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+
+	// EnterConcatenatingExpression is called when entering the concatenatingExpression production.
+	EnterConcatenatingExpression(c *ConcatenatingExpressionContext)
+
 	// EnterAdditiveExpression is called when entering the additiveExpression production.
 	EnterAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -153,6 +171,12 @@ type StrictusListener interface {
 
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
+
+	// EnterCreateExpression is called when entering the CreateExpression production.
+	EnterCreateExpression(c *CreateExpressionContext)
+
+	// EnterDestroyExpression is called when entering the DestroyExpression production.
+	EnterDestroyExpression(c *DestroyExpressionContext)
 
 	// EnterIdentifierExpression is called when entering the IdentifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
@@ -193,6 +217,9 @@ type StrictusListener interface {
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
+	// EnterIntegerLiteral is called when entering the integerLiteral production.
+	EnterIntegerLiteral(c *IntegerLiteralContext)
+
 	// EnterDecimalLiteral is called when entering the DecimalLiteral production.
 	EnterDecimalLiteral(c *DecimalLiteralContext)
 
@@ -211,6 +238,15 @@ type StrictusListener interface {
 	// EnterArrayLiteral is called when entering the arrayLiteral production.
 	EnterArrayLiteral(c *ArrayLiteralContext)
 
+	// EnterDictionaryLiteral is called when entering the dictionaryLiteral production.
+	EnterDictionaryLiteral(c *DictionaryLiteralContext)
+
+	// EnterDictionaryEntry is called when entering the dictionaryEntry production.
+	EnterDictionaryEntry(c *DictionaryEntryContext)
+
+	// EnterIdentifier is called when entering the identifier production.
+	EnterIdentifier(c *IdentifierContext)
+
 	// EnterEos is called when entering the eos production.
 	EnterEos(c *EosContext)
 
@@ -226,8 +262,8 @@ type StrictusListener interface {
 	// ExitAccess is called when exiting the access production.
 	ExitAccess(c *AccessContext)
 
-	// ExitStructureDeclaration is called when exiting the structureDeclaration production.
-	ExitStructureDeclaration(c *StructureDeclarationContext)
+	// ExitCompositeDeclaration is called when exiting the compositeDeclaration production.
+	ExitCompositeDeclaration(c *CompositeDeclarationContext)
 
 	// ExitConformances is called when exiting the conformances production.
 	ExitConformances(c *ConformancesContext)
@@ -241,6 +277,15 @@ type StrictusListener interface {
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
 
+	// ExitMembers is called when exiting the members production.
+	ExitMembers(c *MembersContext)
+
+	// ExitMember is called when exiting the member production.
+	ExitMember(c *MemberContext)
+
+	// ExitCompositeKind is called when exiting the compositeKind production.
+	ExitCompositeKind(c *CompositeKindContext)
+
 	// ExitInitializer is called when exiting the initializer production.
 	ExitInitializer(c *InitializerContext)
 
@@ -253,11 +298,14 @@ type StrictusListener interface {
 	// ExitParameter is called when exiting the parameter production.
 	ExitParameter(c *ParameterContext)
 
+	// ExitTypeAnnotation is called when exiting the typeAnnotation production.
+	ExitTypeAnnotation(c *TypeAnnotationContext)
+
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
 
-	// ExitTypeDimension is called when exiting the typeDimension production.
-	ExitTypeDimension(c *TypeDimensionContext)
+	// ExitTypeIndex is called when exiting the typeIndex production.
+	ExitTypeIndex(c *TypeIndexContext)
 
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
@@ -331,6 +379,12 @@ type StrictusListener interface {
 	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
 	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
+	// ExitFailableDowncastingExpression is called when exiting the failableDowncastingExpression production.
+	ExitFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+
+	// ExitConcatenatingExpression is called when exiting the concatenatingExpression production.
+	ExitConcatenatingExpression(c *ConcatenatingExpressionContext)
+
 	// ExitAdditiveExpression is called when exiting the additiveExpression production.
 	ExitAdditiveExpression(c *AdditiveExpressionContext)
 
@@ -360,6 +414,12 @@ type StrictusListener interface {
 
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
+
+	// ExitCreateExpression is called when exiting the CreateExpression production.
+	ExitCreateExpression(c *CreateExpressionContext)
+
+	// ExitDestroyExpression is called when exiting the DestroyExpression production.
+	ExitDestroyExpression(c *DestroyExpressionContext)
 
 	// ExitIdentifierExpression is called when exiting the IdentifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)
@@ -400,6 +460,9 @@ type StrictusListener interface {
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)
 
+	// ExitIntegerLiteral is called when exiting the integerLiteral production.
+	ExitIntegerLiteral(c *IntegerLiteralContext)
+
 	// ExitDecimalLiteral is called when exiting the DecimalLiteral production.
 	ExitDecimalLiteral(c *DecimalLiteralContext)
 
@@ -417,6 +480,15 @@ type StrictusListener interface {
 
 	// ExitArrayLiteral is called when exiting the arrayLiteral production.
 	ExitArrayLiteral(c *ArrayLiteralContext)
+
+	// ExitDictionaryLiteral is called when exiting the dictionaryLiteral production.
+	ExitDictionaryLiteral(c *DictionaryLiteralContext)
+
+	// ExitDictionaryEntry is called when exiting the dictionaryEntry production.
+	ExitDictionaryEntry(c *DictionaryEntryContext)
+
+	// ExitIdentifier is called when exiting the identifier production.
+	ExitIdentifier(c *IdentifierContext)
 
 	// ExitEos is called when exiting the eos production.
 	ExitEos(c *EosContext)

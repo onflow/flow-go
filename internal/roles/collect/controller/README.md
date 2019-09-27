@@ -1,7 +1,7 @@
 
 
 # controller
-`import "github.com/dapperlabs/bamboo-node/internal/roles/collect/controller"`
+`import "github.com/dapperlabs/flow-go/internal/roles/collect/controller"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
@@ -21,14 +21,14 @@
 
 
 #### <a name="pkg-files">Package files</a>
-[controller.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go) [submit_transaction.go](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go)
+[controller.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go) [submit_transaction.go](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go)
 
 
 
 
 
 
-## <a name="Controller">type</a> [Controller](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=342:440#L15)
+## <a name="Controller">type</a> [Controller](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=330:428#L15)
 ``` go
 type Controller struct {
     // contains filtered or unexported fields
@@ -41,7 +41,7 @@ type Controller struct {
 
 
 
-### <a name="New">func</a> [New](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=485:573#L23)
+### <a name="New">func</a> [New](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=473:561#L23)
 ``` go
 func New(storage storage.Storage, txPool *txpool.TxPool, log *logrus.Logger) *Controller
 ```
@@ -49,35 +49,35 @@ func New(storage storage.Storage, txPool *txpool.TxPool, log *logrus.Logger) *Co
 
 
 
-### <a name="Controller.GetCollection">func</a> (\*Controller) [GetCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=1185:1299#L45)
+### <a name="Controller.GetCollection">func</a> (\*Controller) [GetCollection](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=1173:1287#L45)
 ``` go
 func (c *Controller) GetCollection(context.Context, *svc.GetCollectionRequest) (*svc.GetCollectionResponse, error)
 ```
 
 
 
-### <a name="Controller.GetTransaction">func</a> (\*Controller) [GetTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=1011:1128#L41)
+### <a name="Controller.GetTransaction">func</a> (\*Controller) [GetTransaction](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=999:1116#L41)
 ``` go
 func (c *Controller) GetTransaction(context.Context, *svc.GetTransactionRequest) (*svc.GetTransactionResponse, error)
 ```
 
 
 
-### <a name="Controller.Ping">func</a> (\*Controller) [Ping](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=675:762#L31)
+### <a name="Controller.Ping">func</a> (\*Controller) [Ping](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=663:750#L31)
 ``` go
 func (c *Controller) Ping(context.Context, *svc.PingRequest) (*svc.PingResponse, error)
 ```
 
 
 
-### <a name="Controller.SubmitCollection">func</a> (\*Controller) [SubmitCollection](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/controller.go?s=831:954#L37)
+### <a name="Controller.SubmitCollection">func</a> (\*Controller) [SubmitCollection](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/controller.go?s=819:942#L37)
 ``` go
 func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequest) (*svc.SubmitCollectionResponse, error)
 ```
 
 
 
-### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/bamboo-node/tree/master/internal/roles/collect/controller/submit_transaction.go?s=868:1006#L29)
+### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go?s=860:998#L29)
 ``` go
 func (c *Controller) SubmitTransaction(
     ctx context.Context, req *svc.SubmitTransactionRequest,

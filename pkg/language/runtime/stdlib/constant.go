@@ -1,9 +1,9 @@
 package stdlib
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/ast"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/common"
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
 
 type StandardLibraryValue struct {
@@ -11,10 +11,6 @@ type StandardLibraryValue struct {
 	Type       sema.Type
 	Kind       common.DeclarationKind
 	IsConstant bool
-}
-
-func (v StandardLibraryValue) ValueDeclarationName() string {
-	return v.Name
 }
 
 func (v StandardLibraryValue) ValueDeclarationType() sema.Type {

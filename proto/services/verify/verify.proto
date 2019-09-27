@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package bamboo.services.verify;
+package flow.services.verify;
 
 option go_package = "verify";
 
@@ -22,5 +22,5 @@ message PingResponse {
 }
 
 message SubmitExecutionReceiptRequest {
-  bamboo.shared.messages.ExecutionReceipt executionReceipt = 1;
+  flow.shared.messages.ExecutionReceipt executionReceipt = 1;
 }

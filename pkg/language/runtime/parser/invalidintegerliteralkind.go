@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 //go:generate stringer -type=InvalidIntegerLiteralKind

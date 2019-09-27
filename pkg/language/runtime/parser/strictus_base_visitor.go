@@ -23,7 +23,7 @@ func (v *BaseStrictusVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitStructureDeclaration(ctx *StructureDeclarationContext) interface{} {
+func (v *BaseStrictusVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -43,6 +43,18 @@ func (v *BaseStrictusVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclaratio
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitMembers(ctx *MembersContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitMember(ctx *MemberContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -59,11 +71,15 @@ func (v *BaseStrictusVisitor) VisitParameter(ctx *ParameterContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitTypeDimension(ctx *TypeDimensionContext) interface{} {
+func (v *BaseStrictusVisitor) VisitTypeIndex(ctx *TypeIndexContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -163,6 +179,14 @@ func (v *BaseStrictusVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExp
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -200,6 +224,14 @@ func (v *BaseStrictusVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext
 }
 
 func (v *BaseStrictusVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -255,6 +287,10 @@ func (v *BaseStrictusVisitor) VisitStringLiteral(ctx *StringLiteralContext) inte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -276,6 +312,18 @@ func (v *BaseStrictusVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLitera
 }
 
 func (v *BaseStrictusVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDictionaryLiteral(ctx *DictionaryLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitDictionaryEntry(ctx *DictionaryEntryContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

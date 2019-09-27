@@ -1,13 +1,14 @@
 package crypto
 
 // Elliptic Curve Digital Signature Algorithm is implemented as
-// defined in FIPS 186-4, although the hash function implemented in this package is SHA3.
+// defined in FIPS 186-4, although The hash function implemented in this package is SHA3.
 // This is different from the ECDSA version implemented in some blockchains.
 
 import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"math/big"
 )
 
@@ -108,6 +109,46 @@ func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrKey, error) {
 		return nil, cryptoError{"The ECDSA key generation has failed"}
 	}
 	return &(PrKeyECDSA{a, sk}), nil
+}
+
+func (a *ECDSAalgo) EncodePrKey(sk PrKey) ([]byte, error) {
+	skECDSA, ok := sk.(*PrKeyECDSA)
+	if !ok {
+		return nil, cryptoError{"key is not an ECDSA private key"}
+	}
+
+	return x509.MarshalECPrivateKey(skECDSA.goPrKey)
+}
+
+func (a *ECDSAalgo) DecodePrKey(der []byte) (PrKey, error) {
+	sk, err := x509.ParseECPrivateKey(der)
+	if err != nil {
+		return nil, err
+	}
+
+	return &(PrKeyECDSA{a, sk}), nil
+}
+
+func (a *ECDSAalgo) EncodePubKey(pk PubKey) ([]byte, error) {
+	ecdsaPk, ok := pk.(*PubKeyECDSA)
+	if !ok {
+		return nil, cryptoError{"key is not an ECDSA public key"}
+	}
+
+	goecdsaPk := goecdsa.PublicKey(*ecdsaPk)
+
+	return x509.MarshalPKIXPublicKey(&goecdsaPk)
+}
+
+func (a *ECDSAalgo) DecodePubKey(der []byte) (PubKey, error) {
+	i, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return nil, err
+	}
+
+	goecdsaPk := i.(*goecdsa.PublicKey)
+	ecdsaPk := PubKeyECDSA(*goecdsaPk)
+	return &ecdsaPk, nil
 }
 
 // PrKeyECDSA is the private key of ECDSA, it implements PrKey

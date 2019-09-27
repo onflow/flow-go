@@ -43,14 +43,19 @@ grammar Strictus;
         return (_type == StrictusParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
             (_type == StrictusParserTerminator)
     }
+
+    func (p *StrictusParser) noWhitespace() bool {
+    	index := p.GetCurrentToken().GetTokenIndex()
+    	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
+    }
 }
 
 program
-    : declaration* EOF
+    : (declaration ';'?)* EOF
     ;
 
 declaration
-    : structureDeclaration
+    : compositeDeclaration
     | interfaceDeclaration
     | functionDeclaration[true]
     | variableDeclaration
@@ -58,7 +63,7 @@ declaration
     ;
 
 importDeclaration
-    : 'import' (Identifier (',' Identifier)* 'from')? (stringLiteral | HexadecimalLiteral)
+    : Import (identifier (',' identifier)* From)? (stringLiteral | HexadecimalLiteral)
     ;
 
 access
@@ -67,16 +72,12 @@ access
     | PubSet
     ;
 
-structureDeclaration
-    : Struct Identifier conformances '{'
-        field*
-        initializer[true]?
-        functionDeclaration[true]*
-      '}'
+compositeDeclaration
+    : access compositeKind identifier conformances '{' members[true] '}'
     ;
 
 conformances
-    : (':' Identifier (',' Identifier)*)?
+    : (':' identifier (',' identifier)*)?
     ;
 
 variableKind
@@ -85,24 +86,42 @@ variableKind
     ;
 
 field
-    : access variableKind? Identifier ':' fullType
+    : access variableKind? identifier ':' typeAnnotation
     ;
 
 interfaceDeclaration
-    : Interface Identifier '{' field* initializer[false]? functionDeclaration[false]* '}'
+    : access compositeKind Interface identifier '{' members[false] '}'
+    ;
+
+members[bool functionBlockRequired]
+    : member[functionBlockRequired]*
+    ;
+
+member[bool functionBlockRequired]
+    : field
+    | initializer[functionBlockRequired]
+    | functionDeclaration[functionBlockRequired]
+    | interfaceDeclaration
+    | compositeDeclaration
+    ;
+
+compositeKind
+    : Struct
+    | Resource
+    | Contract
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
 // is `init` in semantic analysis to provide better error
 //
 initializer[bool functionBlockRequired]
-    : Identifier parameterList
+    : identifier parameterList
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
 
 functionDeclaration[bool functionBlockRequired]
-    : access Fun Identifier parameterList (':' returnType=fullType)?
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
     ;
@@ -112,24 +131,30 @@ parameterList
     ;
 
 parameter
-    : (argumentLabel=Identifier)? parameterName=Identifier ':' fullType
+    : (argumentLabel=identifier)? parameterName=identifier ':' typeAnnotation
+    ;
+
+typeAnnotation
+    : Move? fullType
     ;
 
 fullType
-    : baseType typeDimension* (optionals+=(Optional|NilCoalescing))*
+    : baseType
+      ({p.noWhitespace()}? typeIndex)*
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
-typeDimension
-    : '[' DecimalLiteral? ']'
+typeIndex
+    : '[' (DecimalLiteral|fullType)? ']'
     ;
 
 baseType
-    : Identifier
+    : identifier
     | functionType
     ;
 
 functionType
-    : '(' '(' (parameterTypes+=fullType (',' parameterTypes+=fullType)*)? ')' ':' returnType=fullType ')'
+    : '(' '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')' ':' returnType=typeAnnotation ')'
     ;
 
 block
@@ -198,58 +223,70 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind Identifier (':' fullType)? '=' expression
+    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
     ;
 
 assignment
-	: Identifier expressionAccess* '=' expression
-	;
+    : identifier expressionAccess* ('=' | Move) expression
+    ;
 
 expression
     : conditionalExpression
     ;
 
 conditionalExpression
-	: <assoc=right> orExpression ('?' then=expression ':' alt=expression)?
-	;
+    : <assoc=right> orExpression ('?' then=expression ':' alt=expression)?
+    ;
 
 orExpression
-	: andExpression
-	| orExpression '||' andExpression
-	;
+    : andExpression
+    | orExpression '||' andExpression
+    ;
 
 andExpression
-	: equalityExpression
-	| andExpression '&&' equalityExpression
-	;
+    : equalityExpression
+    | andExpression '&&' equalityExpression
+    ;
 
 equalityExpression
-	: relationalExpression
-	| equalityExpression equalityOp relationalExpression
-	;
+    : relationalExpression
+    | equalityExpression equalityOp relationalExpression
+    ;
 
 relationalExpression
-	: nilCoalescingExpression
-	| relationalExpression relationalOp nilCoalescingExpression
-	;
+    : nilCoalescingExpression
+    | relationalExpression relationalOp nilCoalescingExpression
+    ;
 
 nilCoalescingExpression
-	// NOTE: right associative
-    : additiveExpression (NilCoalescing nilCoalescingExpression)?
+    // NOTE: right associative
+    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    ;
+
+failableDowncastingExpression
+    : concatenatingExpression
+    | failableDowncastingExpression FailableDowncasting typeAnnotation
+    ;
+
+concatenatingExpression
+    : additiveExpression
+    | concatenatingExpression Concat additiveExpression
     ;
 
 additiveExpression
-	: multiplicativeExpression
-	| additiveExpression additiveOp multiplicativeExpression
-	;
+    : multiplicativeExpression
+    | additiveExpression additiveOp multiplicativeExpression
+    ;
 
 multiplicativeExpression
-	: unaryExpression
-	| multiplicativeExpression multiplicativeOp unaryExpression
-	;
+    : unaryExpression
+    | multiplicativeExpression multiplicativeOp unaryExpression
+    ;
 
 unaryExpression
     : primaryExpression
+    // NOTE: allow multiple unary operators, but reject in visitor
+    // to provide better error for invalid juxtaposition
     | unaryOp+ unaryExpression
     ;
 
@@ -300,23 +337,30 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Concat : '&';
 
 unaryOp
     : Minus
     | Negate
+    | Move
     ;
 
 Negate : '!' ;
+Move : '<-' ;
 
 Optional : '?' ;
 
-NilCoalescing : '??' ;
+NilCoalescing : WS '??';
+
+FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : Identifier                                                  # IdentifierExpression
-    | literal                                                     # LiteralExpression
-    | Fun parameterList (':' returnType=fullType)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                          # NestedExpression
+    : Create identifier invocation                                      # CreateExpression
+    | Destroy expression                                                # DestroyExpression
+    | identifier                                                        # IdentifierExpression
+    | literal                                                           # LiteralExpression
+    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
+    | '(' expression ')'                                                # NestedExpression
     ;
 
 expressionAccess
@@ -325,25 +369,26 @@ expressionAccess
     ;
 
 memberAccess
-	: '.' Identifier
-	;
+    : '.' identifier
+    ;
 
 bracketExpression
-	: '[' expression ']'
-	;
+    : '[' expression ']'
+    ;
 
 invocation
-	: '(' (argument (',' argument)*)? ')'
-	;
+    : '(' (argument (',' argument)*)? ')'
+    ;
 
 argument
-    : (Identifier ':')? expression
+    : (identifier ':')? expression
     ;
 
 literal
     : integerLiteral
     | booleanLiteral
     | arrayLiteral
+    | dictionaryLiteral
     | stringLiteral
     | nilLiteral
     ;
@@ -362,6 +407,10 @@ stringLiteral
     ;
 
 integerLiteral
+    : Minus? positiveIntegerLiteral
+    ;
+
+positiveIntegerLiteral
     : DecimalLiteral        # DecimalLiteral
     | BinaryLiteral         # BinaryLiteral
     | OctalLiteral          # OctalLiteral
@@ -373,12 +422,22 @@ arrayLiteral
     : '[' ( expression (',' expression)* )? ']'
     ;
 
+dictionaryLiteral
+    : '{' ( dictionaryEntry (',' dictionaryEntry)* )? '}'
+    ;
+
+dictionaryEntry
+    : key=expression ':' value=expression
+    ;
+
 OpenParen: '(' ;
 CloseParen: ')' ;
 
 Transaction : 'transaction' ;
 
 Struct : 'struct' ;
+Resource : 'resource' ;
+Contract : 'contract' ;
 
 Interface : 'interface' ;
 
@@ -407,6 +466,19 @@ True : 'true' ;
 False : 'false' ;
 
 Nil : 'nil' ;
+
+Import : 'import' ;
+From : 'from' ;
+
+Create : 'create' ;
+Destroy : 'destroy' ;
+
+identifier
+    : Identifier
+    | From
+    | Create
+    | Destroy
+    ;
 
 Identifier
     : IdentifierHead IdentifierCharacter*
@@ -477,8 +549,8 @@ WS
     ;
 
 Terminator
-	: [\r\n]+ -> channel(HIDDEN)
-	;
+    : [\r\n]+ -> channel(HIDDEN)
+    ;
 
 BlockComment
     : '/*' (BlockComment|.)*? '*/'	-> channel(HIDDEN) // nesting comments allowed

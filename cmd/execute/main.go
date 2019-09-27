@@ -1,6 +1,6 @@
 package main
 
-import "github.com/dapperlabs/bamboo-node/internal/roles/execute"
+import "github.com/dapperlabs/flow-go/internal/roles/execute"
 
 func main() {
 	server, err := execute.InitializeServer()

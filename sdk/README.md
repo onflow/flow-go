@@ -1,14 +1,14 @@
 
 
 # sdk
-`import "github.com/dapperlabs/bamboo-node/sdk"`
+`import "github.com/dapperlabs/flow-go/sdk"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
 * [Subdirectories](#pkg-subdirectories)
 
 ## <a name="pkg-overview">Overview</a>
-Package sdk provides libraries and tools that can be used to develop Bamboo
+Package sdk provides libraries and tools that can be used to develop Flow
 applications in Go.
 
 
@@ -18,7 +18,7 @@ applications in Go.
 
 
 #### <a name="pkg-files">Package files</a>
-[doc.go](https://github.com/dapperlabs/bamboo-node/tree/master/sdk/doc.go)
+[doc.go](https://github.com/dapperlabs/flow-go/tree/master/sdk/doc.go)
 
 
 

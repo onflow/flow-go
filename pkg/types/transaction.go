@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	crypto "github.com/dapperlabs/bamboo-node/pkg/crypto/oldcrypto"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -37,27 +38,42 @@ type RawTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	bytes := crypto.EncodeAsBytes(
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	return hasher.ComputeStructHash(tx)
+}
+
+// Encode returns the encoded transaction as bytes.
+func (tx *RawTransaction) Encode() []byte {
+	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
-		tx.Timestamp,
-	)
-	return crypto.NewHash(bytes)
+	})
+	return b
 }
 
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) SignPayer(account Address, keyPair *crypto.KeyPair) *SignedTransaction {
-	hash := tx.Hash()
+func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) (*SignedTransaction, error) {
+	// TODO: don't hard-code signature algo
+	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: include account in signature
-	sig := crypto.Sign(hash, keyPair)
+	hasher, err := crypto.NewHashAlgo(crypto.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := salg.SignStruct(prKey, tx, hasher)
+	if err != nil {
+		return nil, err
+	}
 
 	accountSig := AccountSignature{
 		Account:   account,
-		PublicKey: keyPair.PublicKey,
 		Signature: sig.Bytes(),
 	}
 
@@ -67,7 +83,7 @@ func (tx *RawTransaction) SignPayer(account Address, keyPair *crypto.KeyPair) *S
 		ComputeLimit:   tx.ComputeLimit,
 		Timestamp:      tx.Timestamp,
 		PayerSignature: accountSig,
-	}
+	}, nil
 }
 
 // SignedTransaction is a transaction that has been signed by at least one account.
@@ -83,14 +99,29 @@ type SignedTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	bytes := crypto.EncodeAsBytes(
+	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	return hasher.ComputeStructHash(tx)
+}
+
+// UnsignedHash computes the hash of the original unsigned transaction.
+func (tx *SignedTransaction) UnsignedHash() crypto.Hash {
+	return (&RawTransaction{
 		tx.Script,
 		tx.Nonce,
 		tx.ComputeLimit,
 		tx.Timestamp,
-		tx.PayerSignature.Bytes(),
-	)
-	return crypto.NewHash(bytes)
+	}).Hash()
+}
+
+// Encode returns the encoded transaction as bytes.
+func (tx *SignedTransaction) Encode() []byte {
+	b, _ := rlp.EncodeToBytes([]interface{}{
+		tx.Script,
+		tx.Nonce,
+		tx.ComputeLimit,
+		tx.PayerSignature.Encode(),
+	})
+	return b
 }
 
 // InvalidTransactionError indicates that a transaction does not contain all

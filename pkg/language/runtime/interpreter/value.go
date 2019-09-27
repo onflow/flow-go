@@ -1,13 +1,19 @@
 package interpreter
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/sema"
+	"github.com/rivo/uniseg"
+	"golang.org/x/text/unicode/norm"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
 type Value interface {
@@ -17,6 +23,27 @@ type Value interface {
 
 type ExportableValue interface {
 	ToGoValue() interface{}
+}
+
+// IndexableValue
+
+type IndexableValue interface {
+	isIndexableValue()
+	Get(key Value) Value
+	Set(key Value, value Value)
+}
+
+// ConcatenatableValue
+
+type ConcatenatableValue interface {
+	isConcatenatableValue()
+	Concat(other ConcatenatableValue) Value
+}
+
+// EquatableValue
+
+type EquatableValue interface {
+	Equal(other Value) BoolValue
 }
 
 // VoidValue
@@ -55,72 +82,187 @@ func (v BoolValue) Negate() BoolValue {
 	return !v
 }
 
+func (v BoolValue) Equal(other Value) BoolValue {
+	return bool(v) == bool(other.(BoolValue))
+}
+
 // StringValue
 
-type StringValue string
+type StringValue struct {
+	Str *string
+}
 
-func (StringValue) isValue() {}
+func NewStringValue(str string) StringValue {
+	return StringValue{&str}
+}
+
+func (StringValue) isValue()               {}
+func (StringValue) isIndexableValue()      {}
+func (StringValue) isConcatenatableValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
 }
 
 func (v StringValue) ToGoValue() interface{} {
-	return string(v)
+	return v.StrValue()
 }
 
 func (v StringValue) String() string {
 	// TODO: quote like in string literal
-	return strconv.Quote(string(v))
+	return strconv.Quote(v.StrValue())
 }
 
-// IndexableValue
+func (v StringValue) StrValue() string {
+	return *v.Str
+}
 
-type IndexableValue interface {
-	isIndexableValue()
-	Get(key Value) Value
-	Set(key Value, value Value)
+func (v StringValue) KeyString() string {
+	return v.StrValue()
+}
+
+func (v StringValue) Equal(other Value) BoolValue {
+	otherString := other.(StringValue)
+	return norm.NFC.String(v.StrValue()) == norm.NFC.String(otherString.StrValue())
+}
+
+func (v StringValue) Concat(other ConcatenatableValue) Value {
+	otherString := other.(StringValue)
+
+	var sb strings.Builder
+
+	sb.WriteString(v.StrValue())
+	sb.WriteString(otherString.StrValue())
+
+	return NewStringValue(sb.String())
+}
+
+func (v StringValue) Slice(from IntValue, to IntValue) Value {
+	fromInt := from.IntValue()
+	toInt := to.IntValue()
+	str := v.StrValue()
+	return NewStringValue(str[fromInt:toInt])
+}
+
+func (v StringValue) Get(key Value) Value {
+	i := key.(IntegerValue).IntValue()
+
+	// TODO: optimize grapheme clusters to prevent unnecessary iteration
+	graphemes := uniseg.NewGraphemes(v.StrValue())
+	graphemes.Next()
+
+	for j := 0; j < i; j++ {
+		graphemes.Next()
+	}
+
+	char := graphemes.Str()
+
+	return NewStringValue(char)
+}
+
+func (v StringValue) Set(key Value, value Value) {
+	i := key.(IntegerValue).IntValue()
+	char := value.(StringValue).StrValue()
+
+	str := v.StrValue()
+
+	// TODO: optimize grapheme clusters to prevent unnecessary iteration
+	graphemes := uniseg.NewGraphemes(str)
+	graphemes.Next()
+
+	for j := 0; j < i; j++ {
+		graphemes.Next()
+	}
+
+	start, end := graphemes.Positions()
+
+	var sb strings.Builder
+
+	sb.WriteString(str[:start])
+	sb.WriteString(char)
+	sb.WriteString(str[end:])
+
+	*v.Str = sb.String()
+}
+
+func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
+	case "length":
+		count := uniseg.GraphemeClusterCount(v.StrValue())
+		return NewIntValue(int64(count))
+	case "concat":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				otherValue := arguments[0].(ConcatenatableValue)
+				result := v.Concat(otherValue)
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "slice":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				from := arguments[0].(IntValue)
+				to := arguments[1].(IntValue)
+				result := v.Slice(from, to)
+				return trampoline.Done{Result: result}
+			},
+		)
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v StringValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	panic(&errors.UnreachableError{})
 }
 
 // ArrayValue
 
-type ArrayValue []Value
+type ArrayValue struct {
+	Values *[]Value
+}
 
-func (ArrayValue) isValue() {}
+func (ArrayValue) isValue()               {}
+func (ArrayValue) isIndexableValue()      {}
+func (ArrayValue) isConcatenatableValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
-	copies := make(ArrayValue, len(v))
-	for i, value := range v {
+	copies := make([]Value, len(*v.Values))
+	for i, value := range *v.Values {
 		copies[i] = value.Copy()
 	}
-	return copies
+	return ArrayValue{Values: &copies}
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
-	values := make([]interface{}, len(v))
+	values := make([]interface{}, len(*v.Values))
 
-	for i, value := range v {
+	for i, value := range *v.Values {
 		values[i] = value.(ExportableValue).ToGoValue()
 	}
 
 	return values
 }
 
-func (v ArrayValue) isIndexableValue() {}
+func (v ArrayValue) Concat(other ConcatenatableValue) Value {
+	otherArray := other.(ArrayValue)
+	values := append(*v.Values, *otherArray.Values...)
+	return ArrayValue{Values: &values}
+}
 
 func (v ArrayValue) Get(key Value) Value {
-	return v[key.(IntegerValue).IntValue()]
+	return (*v.Values)[key.(IntegerValue).IntValue()]
 }
 
 func (v ArrayValue) Set(key Value, value Value) {
-	v[key.(IntegerValue).IntValue()] = value
+	(*v.Values)[key.(IntegerValue).IntValue()] = value
 }
 
 func (v ArrayValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("[")
-	for i, value := range v {
+	for i, value := range *v.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -128,6 +270,127 @@ func (v ArrayValue) String() string {
 	}
 	builder.WriteString("]")
 	return builder.String()
+}
+
+func (v ArrayValue) Append(x Value) {
+	*v.Values = append(*v.Values, x)
+}
+
+func (v ArrayValue) Insert(i int, x Value) {
+	values := *v.Values
+	*v.Values = append(values[:i], append([]Value{x}, values[i:]...)...)
+}
+
+func (v ArrayValue) Remove(i int) Value {
+	values := *v.Values
+	result := values[i]
+	lastIndex := len(values) - 1
+
+	copy(values[i:], values[i+1:])
+
+	// avoid memory leaks by explicitly setting value to nil
+	values[lastIndex] = nil
+
+	*v.Values = values[:lastIndex]
+
+	return result
+}
+
+func (v ArrayValue) RemoveFirst() Value {
+	values := *v.Values
+	var x Value
+
+	x, *v.Values = values[0], values[1:]
+
+	return x
+}
+
+func (v ArrayValue) RemoveLast() Value {
+	values := *v.Values
+	var x Value
+
+	lastIndex := len(values) - 1
+	x, *v.Values = values[lastIndex], values[:lastIndex]
+
+	return x
+}
+
+func (v ArrayValue) Contains(x Value) BoolValue {
+	y := x.(EquatableValue)
+
+	for _, z := range *v.Values {
+		if y.Equal(z) {
+			return BoolValue(true)
+		}
+	}
+
+	return BoolValue(false)
+}
+
+func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
+	case "length":
+		return NewIntValue(int64(len(*v.Values)))
+	case "append":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				v.Append(arguments[0])
+				return trampoline.Done{Result: VoidValue{}}
+			},
+		)
+	case "concat":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				x := arguments[0].(ConcatenatableValue)
+				result := v.Concat(x)
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "insert":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				i := arguments[0].(IntegerValue).IntValue()
+				x := arguments[1]
+				v.Insert(i, x)
+				return trampoline.Done{Result: VoidValue{}}
+			},
+		)
+	case "remove":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				i := arguments[0].(IntegerValue).IntValue()
+				result := v.Remove(i)
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "removeFirst":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.RemoveFirst()
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "removeLast":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.RemoveLast()
+				return trampoline.Done{Result: result}
+			},
+		)
+	case "contains":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				result := v.Contains(arguments[0])
+				return trampoline.Done{Result: result}
+			},
+		)
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v ArrayValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	panic(&errors.UnreachableError{})
 }
 
 // IntegerValue
@@ -145,13 +408,17 @@ type IntegerValue interface {
 	LessEqual(other IntegerValue) BoolValue
 	Greater(other IntegerValue) BoolValue
 	GreaterEqual(other IntegerValue) BoolValue
-	Equal(other IntegerValue) BoolValue
+	Equal(other Value) BoolValue
 }
 
 // IntValue
 
 type IntValue struct {
-	*big.Int
+	Int *big.Int
+}
+
+func NewIntValue(value int64) IntValue {
+	return IntValue{Int: big.NewInt(value)}
 }
 
 func (v IntValue) isValue() {}
@@ -161,12 +428,20 @@ func (v IntValue) Copy() Value {
 }
 
 func (v IntValue) ToGoValue() interface{} {
-	return v.IntValue()
+	return big.NewInt(0).Set(v.Int)
 }
 
 func (v IntValue) IntValue() int {
 	// TODO: handle overflow
-	return int(v.Int64())
+	return int(v.Int.Int64())
+}
+
+func (v IntValue) String() string {
+	return v.Int.String()
+}
+
+func (v IntValue) KeyString() string {
+	return v.Int.String()
 }
 
 func (v IntValue) Negate() IntegerValue {
@@ -218,7 +493,7 @@ func (v IntValue) GreaterEqual(other IntegerValue) BoolValue {
 	return BoolValue(cmp >= 0)
 }
 
-func (v IntValue) Equal(other IntegerValue) BoolValue {
+func (v IntValue) Equal(other Value) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
 	return BoolValue(cmp == 0)
 }
@@ -281,7 +556,7 @@ func (v Int8Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int8Value)
 }
 
-func (v Int8Value) Equal(other IntegerValue) BoolValue {
+func (v Int8Value) Equal(other Value) BoolValue {
 	return v == other.(Int8Value)
 }
 
@@ -343,7 +618,7 @@ func (v Int16Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int16Value)
 }
 
-func (v Int16Value) Equal(other IntegerValue) BoolValue {
+func (v Int16Value) Equal(other Value) BoolValue {
 	return v == other.(Int16Value)
 }
 
@@ -405,7 +680,7 @@ func (v Int32Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int32Value)
 }
 
-func (v Int32Value) Equal(other IntegerValue) BoolValue {
+func (v Int32Value) Equal(other Value) BoolValue {
 	return v == other.(Int32Value)
 }
 
@@ -467,7 +742,7 @@ func (v Int64Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(Int64Value)
 }
 
-func (v Int64Value) Equal(other IntegerValue) BoolValue {
+func (v Int64Value) Equal(other Value) BoolValue {
 	return v == other.(Int64Value)
 }
 
@@ -529,7 +804,7 @@ func (v UInt8Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt8Value)
 }
 
-func (v UInt8Value) Equal(other IntegerValue) BoolValue {
+func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == other.(UInt8Value)
 }
 
@@ -590,7 +865,7 @@ func (v UInt16Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt16Value)
 }
 
-func (v UInt16Value) Equal(other IntegerValue) BoolValue {
+func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == other.(UInt16Value)
 }
 
@@ -652,7 +927,7 @@ func (v UInt32Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt32Value)
 }
 
-func (v UInt32Value) Equal(other IntegerValue) BoolValue {
+func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == other.(UInt32Value)
 }
 
@@ -714,46 +989,100 @@ func (v UInt64Value) GreaterEqual(other IntegerValue) BoolValue {
 	return v >= other.(UInt64Value)
 }
 
-func (v UInt64Value) Equal(other IntegerValue) BoolValue {
+func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == other.(UInt64Value)
 }
 
-// StructureValue
+// CompositeValue
 
-type StructureValue map[string]Value
+type CompositeValue struct {
+	Identifier string
+	Fields     *map[string]Value
+	Functions  *map[string]FunctionValue
+}
 
-func (StructureValue) isValue() {}
+func (CompositeValue) isValue() {}
 
-func (v StructureValue) Copy() Value {
-	newStructure := make(StructureValue, len(v))
-	for field, value := range v {
-		var copiedValue Value
-		if f, ok := value.(*StructureFunctionValue); ok {
-			copiedValue = f.CopyWithStructure(newStructure)
-		} else {
-			copiedValue = value.Copy()
-		}
-		newStructure[field] = copiedValue
+func (v CompositeValue) Copy() Value {
+	newFields := make(map[string]Value, len(*v.Fields))
+	for field, value := range *v.Fields {
+		newFields[field] = value.Copy()
 	}
-	return newStructure
+
+	// NOTE: not copying functions – linked in
+
+	return CompositeValue{
+		Identifier: v.Identifier,
+		Fields:     &newFields,
+		Functions:  v.Functions,
+	}
 }
 
-func (v StructureValue) ToGoValue() interface{} {
+func (v CompositeValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
-	return v
+	return *v.Fields
 }
 
-func (v StructureValue) Get(field string) Value {
-	return v[field]
+func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
+	value, ok := (*v.Fields)[name]
+	if ok {
+		return value
+	}
+
+	// if structure was deserialized, dynamically link in the functions
+	if v.Functions == nil {
+		functions := interpreter.CompositeFunctions[v.Identifier]
+		v.Functions = &functions
+	}
+
+	function, ok := (*v.Functions)[name]
+	if ok {
+		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
+			function = interpreter.bindSelf(interpretedFunction, v)
+		}
+		return function
+	}
+
+	return nil
 }
 
-func (v StructureValue) Set(field string, value Value) {
-	v[field] = value
+func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	(*v.Fields)[name] = value
+}
+
+func (v CompositeValue) GobEncode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(v.Identifier)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Fields)
+	if err != nil {
+		return nil, err
+	}
+	// NOTE: *not* encoding functions – linked in on-demand
+	return w.Bytes(), nil
+}
+
+func (v *CompositeValue) GobDecode(buf []byte) error {
+	r := bytes.NewBuffer(buf)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&v.Identifier)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Fields)
+	if err != nil {
+		return err
+	}
+	// NOTE: *not* decoding functions – linked in on-demand
+	return nil
 }
 
 // DictionaryValue
 
-type DictionaryValue map[Value]Value
+type DictionaryValue map[interface{}]Value
 
 func (DictionaryValue) isValue() {}
 
@@ -772,16 +1101,28 @@ func (v DictionaryValue) ToGoValue() interface{} {
 
 func (v DictionaryValue) isIndexableValue() {}
 
-func (v DictionaryValue) Get(key Value) Value {
-	value, ok := v[key]
+func (v DictionaryValue) Get(keyValue Value) Value {
+	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
 	}
 	return SomeValue{Value: value}
 }
 
-func (v DictionaryValue) Set(key Value, value Value) {
-	v[key] = value
+func dictionaryKey(keyValue Value) interface{} {
+	var key interface{} = keyValue
+	if keyValue, ok := keyValue.(HasKeyString); ok {
+		return keyValue.KeyString()
+	}
+	return key
+}
+
+type HasKeyString interface {
+	KeyString() string
+}
+
+func (v DictionaryValue) Set(keyValue Value, value Value) {
+	v[dictionaryKey(keyValue)] = value
 }
 
 func (v DictionaryValue) String() string {
@@ -799,6 +1140,31 @@ func (v DictionaryValue) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
+}
+
+func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch name {
+	case "length":
+		return NewIntValue(int64(len(v)))
+	case "remove":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				key := dictionaryKey(arguments[0])
+				value, ok := v[key]
+				if !ok {
+					return trampoline.Done{Result: NilValue{}}
+				}
+				delete(v, key)
+				return trampoline.Done{Result: SomeValue{Value: value}}
+			},
+		)
+	default:
+		panic(&errors.UnreachableError{})
+	}
+}
+
+func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	panic(&errors.UnreachableError{})
 }
 
 // ToValue
@@ -828,7 +1194,7 @@ func ToValue(value interface{}) (Value, error) {
 	case bool:
 		return BoolValue(value), nil
 	case string:
-		return StringValue(value), nil
+		return NewStringValue(value), nil
 	case nil:
 		return NilValue{}, nil
 	}
@@ -853,28 +1219,6 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 		)
 	}
 	return values, nil
-}
-
-// TupleValue
-
-type TupleValue struct {
-	Left, Right Value
-}
-
-func (TupleValue) isValue() {}
-
-func (v TupleValue) Copy() Value {
-	return TupleValue{
-		Left:  v.Left.Copy(),
-		Right: v.Right.Copy(),
-	}
-}
-
-func (v TupleValue) String() string {
-	return fmt.Sprintf(
-		"Tuple(left: %s, right: %s)",
-		v.Left, v.Right,
-	)
 }
 
 // NilValue
@@ -925,10 +1269,39 @@ func (v MetaTypeValue) Copy() Value {
 	return v
 }
 
+// AnyValue
+
+type AnyValue struct {
+	Value Value
+	Type  sema.Type
+}
+
+func (AnyValue) isValue() {}
+
+func (v AnyValue) Copy() Value {
+	return AnyValue{
+		Value: v.Value.Copy(),
+		Type:  v.Type,
+	}
+}
+
+func (v AnyValue) String() string {
+	return fmt.Sprint(v.Value)
+}
+
+// ValueWithMembers
+
+type ValueWithMembers interface {
+	GetMember(interpreter *Interpreter, name string) Value
+	SetMember(interpreter *Interpreter, name string, value Value)
+}
+
+//
+
 func init() {
 	gob.Register(VoidValue{})
 	gob.Register(BoolValue(true))
-	gob.Register(StringValue(""))
+	gob.Register(StringValue{})
 	gob.Register(ArrayValue{})
 	gob.Register(IntValue{})
 	gob.Register(Int8Value(0))
@@ -939,10 +1312,10 @@ func init() {
 	gob.Register(UInt16Value(0))
 	gob.Register(UInt32Value(0))
 	gob.Register(UInt64Value(0))
-	gob.Register(StructureValue{})
+	gob.Register(CompositeValue{})
 	gob.Register(DictionaryValue{})
-	gob.Register(TupleValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
 	gob.Register(MetaTypeValue{})
+	gob.Register(AnyValue{})
 }

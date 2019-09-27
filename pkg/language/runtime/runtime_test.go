@@ -7,7 +7,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/dapperlabs/bamboo-node/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type testRuntimeInterface struct {
@@ -109,7 +109,7 @@ func TestRuntimeImport(t *testing.T) {
        import "imported"
 
        fun main(): Int {
-           let answer =  answer()
+           let answer = answer()
            if answer != 42 {
                panic("?!")
            }
@@ -133,7 +133,7 @@ func TestRuntimeImport(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(value).To(Equal(42))
+	Expect(value).To(Equal(big.NewInt(42)))
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
@@ -193,10 +193,10 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(value).To(Equal(42))
+	Expect(value).To(Equal(big.NewInt(42)))
 
 	Expect(loggedMessage).
-		To(Equal(`"0x2a00000000000000000000000000000000000000"`))
+		To(Equal(`"2a00000000000000000000000000000000000000"`))
 }
 
 func TestRuntimeStorage(t *testing.T) {
@@ -278,6 +278,9 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
+	Expect(err).
+		To(Not(HaveOccurred()))
+
 	_, err = runtime.ExecuteScript(script, runtimeInterface)
 
 	Expect(err).
@@ -285,4 +288,132 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 
 	Expect(loggedMessages).
 		To(Equal([]string{"nil", `["A", "B"]`}))
+}
+
+// test function call of stored structure declared in an imported program
+//
+func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	deepThought := []byte(`
+       struct DeepThought {
+           fun answer(): Int {
+               return 42
+           }
+       }
+	`)
+
+	script1 := []byte(`
+	   import "deep-thought"
+
+       fun main(account: Account) {
+           account.storage["x"] = DeepThought()
+
+           log(account.storage["x"])
+       }
+	`)
+
+	script2 := []byte(`
+	   import "deep-thought"
+
+       fun main(account: Account): Int {
+           log(account.storage["x"])
+
+           let stored = account.storage["x"]
+               ?? panic("missing computer")
+
+           let computer = (stored as? DeepThought)
+               ?? panic("not a computer")
+
+           return computer.answer()
+       }
+	`)
+
+	var loggedMessages []string
+	var storedValue []byte
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("deep-thought"):
+				return deepThought, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValue, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValue = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	answer, err := runtime.ExecuteScript(script2, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(answer).
+		To(Equal(big.NewInt(42)))
+}
+
+func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
+	RegisterTestingT(t)
+
+	runtime := NewInterpreterRuntime()
+
+	script1 := []byte(`
+	  fun main(account: Account) {
+	      account.storage["count"] = 42
+	  }
+	`)
+
+	script2 := []byte(`
+	  fun main(account: Account): Int {
+	      let count = account.storage["count"] ?? panic("stored value is nil")
+	      return (count as? Int) ?? panic("not an Int")
+	  }
+	`)
+
+	var loggedMessages []string
+	var storedValue []byte
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValue, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValue = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	Expect(runtime.ExecuteScript(script2, runtimeInterface)).
+		To(Equal(big.NewInt(42)))
 }

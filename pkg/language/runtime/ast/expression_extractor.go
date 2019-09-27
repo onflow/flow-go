@@ -3,7 +3,7 @@ package ast
 import (
 	"fmt"
 
-	"github.com/dapperlabs/bamboo-node/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
 type BoolExtractor interface {
@@ -24,6 +24,10 @@ type StringExtractor interface {
 
 type ArrayExtractor interface {
 	ExtractArray(extractor *ExpressionExtractor, expression *ArrayExpression) ExpressionExtraction
+}
+
+type DictionaryExtractor interface {
+	ExtractDictionary(extractor *ExpressionExtractor, expression *DictionaryExpression) ExpressionExtraction
 }
 
 type IdentifierExtractor interface {
@@ -58,21 +62,37 @@ type FunctionExtractor interface {
 	ExtractFunction(extractor *ExpressionExtractor, expression *FunctionExpression) ExpressionExtraction
 }
 
+type FailableDowncastExtractor interface {
+	ExtractFailableDowncast(extractor *ExpressionExtractor, expression *FailableDowncastExpression) ExpressionExtraction
+}
+
+type CreateExtractor interface {
+	ExtractCreate(extractor *ExpressionExtractor, expression *CreateExpression) ExpressionExtraction
+}
+
+type DestroyExtractor interface {
+	ExtractDestroy(extractor *ExpressionExtractor, expression *DestroyExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
-	nextIdentifier       int
-	BoolExtractor        BoolExtractor
-	NilExtractor         NilExtractor
-	IntExtractor         IntExtractor
-	StringExtractor      StringExtractor
-	ArrayExtractor       ArrayExtractor
-	IdentifierExtractor  IdentifierExtractor
-	InvocationExtractor  InvocationExtractor
-	MemberExtractor      MemberExtractor
-	IndexExtractor       IndexExtractor
-	ConditionalExtractor ConditionalExtractor
-	UnaryExtractor       UnaryExtractor
-	BinaryExtractor      BinaryExtractor
-	FunctionExtractor    FunctionExtractor
+	nextIdentifier            int
+	BoolExtractor             BoolExtractor
+	NilExtractor              NilExtractor
+	IntExtractor              IntExtractor
+	StringExtractor           StringExtractor
+	ArrayExtractor            ArrayExtractor
+	DictionaryExtractor       DictionaryExtractor
+	IdentifierExtractor       IdentifierExtractor
+	InvocationExtractor       InvocationExtractor
+	MemberExtractor           MemberExtractor
+	IndexExtractor            IndexExtractor
+	ConditionalExtractor      ConditionalExtractor
+	UnaryExtractor            UnaryExtractor
+	BinaryExtractor           BinaryExtractor
+	FunctionExtractor         FunctionExtractor
+	FailableDowncastExtractor FailableDowncastExtractor
+	CreateExtractor           CreateExtractor
+	DestroyExtractor          DestroyExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -248,6 +268,50 @@ func (extractor *ExpressionExtractor) VisitExpressions(
 	return rewrittenExpressions, extractedExpressions
 }
 
+func (extractor *ExpressionExtractor) VisitDictionaryExpression(expression *DictionaryExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.DictionaryExtractor != nil {
+		return extractor.DictionaryExtractor.ExtractDictionary(extractor, expression)
+	} else {
+		return extractor.ExtractDictionary(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractDictionary(expression *DictionaryExpression) ExpressionExtraction {
+
+	var extractedExpressions []ExtractedExpression
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite all value expressions
+
+	rewrittenEntries := make([]Entry, len(expression.Entries))
+
+	for i, entry := range expression.Entries {
+		keyResult := extractor.Extract(entry.Key)
+		extractedExpressions = append(extractedExpressions, keyResult.ExtractedExpressions...)
+
+		valueResult := extractor.Extract(entry.Value)
+		extractedExpressions = append(extractedExpressions, valueResult.ExtractedExpressions...)
+
+		rewrittenEntries[i] = Entry{
+			Key:   keyResult.RewrittenExpression,
+			Value: valueResult.RewrittenExpression,
+		}
+	}
+
+	newExpression.Entries = rewrittenEntries
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: extractedExpressions,
+	}
+}
+
 func (extractor *ExpressionExtractor) VisitIdentifierExpression(expression *IdentifierExpression) Repr {
 
 	// delegate to child extractor, if any,
@@ -282,7 +346,6 @@ func (extractor *ExpressionExtractor) VisitInvocationExpression(expression *Invo
 }
 
 func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationExpression) ExpressionExtraction {
-
 	var extractedExpressions []ExtractedExpression
 
 	invokedExpression := expression.InvokedExpression
@@ -301,8 +364,27 @@ func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationEx
 
 	// rewrite all arguments
 
-	var newArguments []*Argument
-	for _, argument := range expression.Arguments {
+	newArguments, argumentExtractedExpressions := extractor.extractArguments(expression.Arguments)
+	extractedExpressions = append(
+		extractedExpressions,
+		argumentExtractedExpressions...,
+	)
+
+	newExpression.Arguments = newArguments
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: extractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) extractArguments(
+	arguments []*Argument,
+) (
+	newArguments []*Argument,
+	extractedExpressions []ExtractedExpression,
+) {
+	for _, argument := range arguments {
 
 		// copy the argument
 		newArgument := *argument
@@ -318,13 +400,7 @@ func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationEx
 
 		newArguments = append(newArguments, &newArgument)
 	}
-
-	newExpression.Arguments = newArguments
-
-	return ExpressionExtraction{
-		RewrittenExpression:  &newExpression,
-		ExtractedExpressions: extractedExpressions,
-	}
+	return newArguments, extractedExpressions
 }
 
 func (extractor *ExpressionExtractor) VisitMemberExpression(expression *MemberExpression) Repr {
@@ -500,4 +576,94 @@ func (extractor *ExpressionExtractor) VisitFunctionExpression(expression *Functi
 func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpression) ExpressionExtraction {
 	// NOTE: not supported
 	panic(&errors.UnreachableError{})
+}
+
+func (extractor *ExpressionExtractor) VisitFailableDowncastExpression(expression *FailableDowncastExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.FailableDowncastExtractor != nil {
+		return extractor.FailableDowncastExtractor.ExtractFailableDowncast(extractor, expression)
+	} else {
+		return extractor.ExtractFailableDowncast(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractFailableDowncast(expression *FailableDowncastExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitCreateExpression(expression *CreateExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.CreateExtractor != nil {
+		return extractor.CreateExtractor.ExtractCreate(extractor, expression)
+	} else {
+		return extractor.ExtractCreate(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractCreate(expression *CreateExpression) ExpressionExtraction {
+	var extractedExpressions []ExtractedExpression
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite all arguments
+
+	newArguments, argumentExtractedExpressions := extractor.extractArguments(expression.Arguments)
+	extractedExpressions = append(
+		extractedExpressions,
+		argumentExtractedExpressions...,
+	)
+
+	newExpression.Arguments = newArguments
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: extractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitDestroyExpression(expression *DestroyExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.DestroyExtractor != nil {
+		return extractor.DestroyExtractor.ExtractDestroy(extractor, expression)
+	} else {
+		return extractor.ExtractDestroy(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractDestroy(expression *DestroyExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
 }

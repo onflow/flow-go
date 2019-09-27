@@ -6,6 +6,6 @@ type initializerKind int
 
 const (
 	initializerKindUnknown initializerKind = iota
-	initializerKindStructure
+	initializerKindComposite
 	initializerKindInterface
 )
