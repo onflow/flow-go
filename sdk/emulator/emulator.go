@@ -184,7 +184,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if err := b.validateSignatures(tx); err != nil {
+	if err := b.verifySignatures(tx); err != nil {
 		return err
 	}
 
@@ -303,11 +303,14 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
-func (b *EmulatedBlockchain) validateSignatures(tx *types.Transaction) error {
+// verifySignatures verifies that a transaction contains the necessary signatures.
+//
+// An error is returned if any of the expected signatures are invalid or missing.
+func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	accountWeights := make(map[types.Address]int)
 
 	for _, accountSig := range tx.Signatures {
-		err := b.validateAccountSignature(accountSig, tx.CanonicalEncoding())
+		err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
@@ -329,7 +332,11 @@ func (b *EmulatedBlockchain) validateSignatures(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *EmulatedBlockchain) validateAccountSignature(
+// verifyAccountSignature verifies a that an account signature is valid for the account and given message.
+//
+// An error is returned if the account does not contain a public key that correctly verifies the signature
+// against the given message.
+func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
 ) error {
@@ -343,6 +350,7 @@ func (b *EmulatedBlockchain) validateAccountSignature(
 	// TODO: replace hard-coded signature algorithm
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 
+	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
 	for _, publicKeyBytes := range account.PublicKeys {
 		publicKey, err := salg.DecodePubKey(publicKeyBytes)
 		if err != nil {
