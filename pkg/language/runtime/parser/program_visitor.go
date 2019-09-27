@@ -1476,13 +1476,8 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 
 func (v *ProgramVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
 
-	terminalNode := ctx.Identifier()
-	if terminalNode == nil {
-		terminalNode = ctx.From()
-	}
-
-	text := terminalNode.GetText()
-	pos := ast.PositionFromToken(terminalNode.GetSymbol())
+	text := ctx.GetText()
+	pos := ast.PositionFromToken(ctx.GetStart())
 
 	return ast.Identifier{
 		Identifier: text,
