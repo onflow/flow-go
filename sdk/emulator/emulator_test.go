@@ -222,6 +222,80 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).To(MatchError(&ErrDuplicateTransaction{TxHash: tx1.Hash()}))
 }
 
+func TestSubmitTransactionScriptAccounts(t *testing.T) {
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	privateKeyA := b.RootKey()
+
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
+	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+
+	createAccountScript := generateCreateAccountScript(pubKeyB, nil)
+
+	accountAddressA := b.RootAccount()
+	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
+
+	tx1 := &types.Transaction{
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+	}
+
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).ToNot(HaveOccurred())
+
+	t.Run("TooManyAccountsForScript", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		// script only support one account
+		script := `
+			fun main(account: Account) {}
+		`
+
+		// create transaction with two accounts
+		tx1 := &types.Transaction{
+			Script:             []byte(script),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
+		}
+
+		tx1.AddSignature(accountAddressA, privateKeyA)
+		tx1.AddSignature(accountAddressB, privateKeyB)
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).To(HaveOccurred())
+	})
+
+	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		// script only support one account
+		script := `
+			fun main(accountA: Account, accountB: Account) {}
+		`
+
+		// create transaction with two accounts
+		tx1 := &types.Transaction{
+			Script:             []byte(script),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA},
+		}
+
+		tx1.AddSignature(accountAddressA, privateKeyA)
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).To(HaveOccurred())
+	})
+}
+
 func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
 		RegisterTestingT(t)
@@ -325,11 +399,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			},
 		})
 
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-		privateKey, _ := salg.GeneratePrKey([]byte("elephant ears"))
-		pubKey, _ := salg.EncodePubKey(privateKey.Pubkey())
+		privateKeyA := b.RootKey()
 
-		createAccountScript := generateCreateAccountScript(pubKey, nil)
+		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
+		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+
+		createAccountScript := generateCreateAccountScript(pubKeyB, nil)
 
 		accountAddressA := b.RootAccount()
 		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -361,8 +437,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
 		}
 
-		tx2.AddSignature(accountAddressA, b.RootKey())
-		tx2.AddSignature(accountAddressB, privateKey)
+		tx2.AddSignature(accountAddressA, privateKeyA)
+		tx2.AddSignature(accountAddressB, privateKeyB)
 
 		err = b.SubmitTransaction(tx2)
 		Expect(err).ToNot(HaveOccurred())
