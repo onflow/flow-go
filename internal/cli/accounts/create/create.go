@@ -59,8 +59,15 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := accounts.CreateAccount(publicKey, code)
-		err = tx.SetPayerSignature(signerAddr, signerKey)
+		script := accounts.CreateAccount(publicKey, code)
+
+		tx := types.Transaction{
+			Script:       script,
+			ComputeLimit: 10,
+			PayerAccount: signerAddr,
+		}
+
+		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
 			utils.Exit("Failed to sign transaction", 1)
 		}
@@ -70,7 +77,7 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to connect to emulator", 1)
 		}
 
-		err = client.SendTransaction(context.Background(), *tx)
+		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
 			utils.Exit("Failed to send account creation transaction", 1)
 		}

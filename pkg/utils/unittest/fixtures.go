@@ -17,9 +17,12 @@ func AccountSignatureFixture() types.AccountSignature {
 
 func TransactionFixture() types.Transaction {
 	return types.Transaction{
-		Script:         []byte("fun main() {}"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		PayerSignature: AccountSignatureFixture(),
+		Script:             []byte("fun main() {}"),
+		ReferenceBlockHash: nil,
+		Nonce:              0,
+		ComputeLimit:       10,
+		PayerAccount:       AddressFixture(),
+		ScriptAccounts:     []types.Address{AddressFixture()},
+		Signatures:         []types.AccountSignature{AccountSignatureFixture()},
 	}
 }

@@ -28,19 +28,45 @@ func MessageToTransaction(m *shared.Transaction) (types.Transaction, error) {
 		return types.Transaction{}, ErrEmptyMessage
 	}
 
+	scriptAccounts := make([]types.Address, len(m.ScriptAccounts))
+	for i, account := range m.ScriptAccounts {
+		scriptAccounts[i] = types.BytesToAddress(account)
+	}
+
+	signatures := make([]types.AccountSignature, len(m.Signatures))
+	for i, accountSig := range m.Signatures {
+		signatures[i] = MessageToAccountSignature(accountSig)
+	}
+
 	return types.Transaction{
-		Script:         m.GetScript(),
-		Nonce:          m.GetNonce(),
-		ComputeLimit:   m.GetComputeLimit(),
-		PayerSignature: MessageToAccountSignature(m.GetPayerSignature()),
+		Script:             m.GetScript(),
+		ReferenceBlockHash: m.ReferenceBlockHash,
+		Nonce:              m.GetNonce(),
+		ComputeLimit:       m.GetComputeLimit(),
+		PayerAccount:       types.BytesToAddress(m.PayerAccount),
+		ScriptAccounts:     scriptAccounts,
+		Signatures:         signatures,
 	}, nil
 }
 
 func TransactionToMessage(t types.Transaction) *shared.Transaction {
+	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
+	for i, account := range t.ScriptAccounts {
+		scriptAccounts[i] = account.Bytes()
+	}
+
+	signatures := make([]*shared.AccountSignature, len(t.Signatures))
+	for i, accountSig := range t.Signatures {
+		signatures[i] = AccountSignatureToMessage(accountSig)
+	}
+
 	return &shared.Transaction{
-		Script:         t.Script,
-		Nonce:          t.Nonce,
-		ComputeLimit:   t.ComputeLimit,
-		PayerSignature: AccountSignatureToMessage(t.PayerSignature),
+		Script:             t.Script,
+		ReferenceBlockHash: t.ReferenceBlockHash,
+		Nonce:              t.Nonce,
+		ComputeLimit:       t.ComputeLimit,
+		PayerAccount:       t.PayerAccount.Bytes(),
+		ScriptAccounts:     scriptAccounts,
+		Signatures:         signatures,
 	}
 }

@@ -31,18 +31,20 @@ var transactionTests = []transactionTestCase{
 	{
 		title: "transaction with no script should be rejected",
 		tx: types.Transaction{
-			Nonce:          10,
-			ComputeLimit:   5,
-			PayerSignature: unittest.AccountSignatureFixture(),
+			Nonce:        10,
+			ComputeLimit: 5,
+			PayerAccount: unittest.AddressFixture(),
+			Signatures:   []types.AccountSignature{unittest.AccountSignatureFixture()},
 		},
 		shouldSucceed: false,
 	},
 	{
 		title: "transaction with no compute limit should be rejected",
 		tx: types.Transaction{
-			Nonce:          10,
-			Script:         []byte("fun main() {}"),
-			PayerSignature: unittest.AccountSignatureFixture(),
+			Nonce:        10,
+			Script:       []byte("fun main() {}"),
+			PayerAccount: unittest.AddressFixture(),
+			Signatures:   []types.AccountSignature{unittest.AccountSignatureFixture()},
 		},
 		shouldSucceed: false,
 	},

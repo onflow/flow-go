@@ -90,18 +90,12 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Tran
 		return nil, err
 	}
 
-	tx := res.GetTransaction()
-	payerSig := tx.GetPayerSignature()
+	tx, err := proto.MessageToTransaction(res.GetTransaction())
+	if err != nil {
+		return nil, err
+	}
 
-	return &types.Transaction{
-		Script:       tx.GetScript(),
-		Nonce:        tx.GetNonce(),
-		ComputeLimit: tx.GetComputeLimit(),
-		PayerSignature: types.AccountSignature{
-			Account:   types.BytesToAddress(payerSig.GetAccount()),
-			Signature: payerSig.GetSignature(),
-		},
-	}, nil
+	return &tx, nil
 }
 
 // GetAccount fetches an account by address.

@@ -78,12 +78,12 @@ enum TransactionStatus {
 
 message Transaction {
   bytes script = 1;
-  uint64 nonce = 2;
-  uint64 compute_limit = 3;
-  uint64 compute_used = 4;
-  google.protobuf.Timestamp timestamp = 5;
-  AccountSignature payer_signature = 6;
-  repeated AccountSignature script_signatures = 7;
+  bytes reference_block_hash = 2;
+  uint64 nonce = 3;
+  uint64 compute_limit = 4;
+  bytes PayerAccount = 5;
+  repeated bytes ScriptAccounts = 6;
+  repeated AccountSignature signatures = 7;
   TransactionStatus status = 8;
 }
 

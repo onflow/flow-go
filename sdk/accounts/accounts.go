@@ -8,7 +8,7 @@ import (
 )
 
 // CreateAccount generates a transaction that creates a new account.
-func CreateAccount(publicKey, code []byte) *types.Transaction {
+func CreateAccount(publicKey, code []byte) []byte {
 	publicKeyStr := bytesToString(publicKey)
 	codeStr := bytesToString(code)
 
@@ -20,13 +20,11 @@ func CreateAccount(publicKey, code []byte) *types.Transaction {
 		}
 	`, publicKeyStr, codeStr)
 
-	return &types.Transaction{
-		Script: []byte(script),
-	}
+	return []byte(script)
 }
 
 // UpdateAccountCode generates a transaction that updates the code associated with an account.
-func UpdateAccountCode(account types.Address, code []byte) *types.Transaction {
+func UpdateAccountCode(account types.Address, code []byte) []byte {
 	accountStr := bytesToString(account.Bytes())
 	codeStr := bytesToString(code)
 
@@ -38,9 +36,7 @@ func UpdateAccountCode(account types.Address, code []byte) *types.Transaction {
 		}
 	`, accountStr, codeStr)
 
-	return &types.Transaction{
-		Script: []byte(script),
-	}
+	return []byte(script)
 }
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.

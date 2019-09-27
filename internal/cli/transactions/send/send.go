@@ -45,11 +45,14 @@ var Cmd = &cobra.Command{
 		}
 
 		tx := types.Transaction{
-			Script:       code,
-			Nonce:        conf.Nonce,
-			ComputeLimit: 10,
+			Script:         code,
+			Nonce:          conf.Nonce,
+			ComputeLimit:   10,
+			PayerAccount:   signerAddr,
+			ScriptAccounts: []types.Address{signerAddr},
 		}
-		err = tx.SetPayerSignature(signerAddr, signerKey)
+
+		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
 			utils.Exit("Failed to sign transaction", 1)
 		}

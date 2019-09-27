@@ -28,13 +28,7 @@ func NewComputer(runtime runtime.Runtime, runtimeLogger func(string)) *Computer 
 func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) error {
 	runtimeContext := NewRuntimeContext(registers)
 
-	// TODO: remove duplicate accounts
-	accounts := make([]types.Address, len(tx.ScriptSignatures))
-	for i, accountSig := range tx.ScriptSignatures {
-		accounts[i] = accountSig.Account
-	}
-
-	runtimeContext.Accounts = accounts
+	runtimeContext.Accounts = tx.ScriptAccounts
 	runtimeContext.Logger = c.runtimeLogger
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)

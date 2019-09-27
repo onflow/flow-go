@@ -26,68 +26,59 @@ func (s TransactionStatus) String() string {
 
 // Transaction is a transaction that contains a script and optional signatures.
 type Transaction struct {
-	Script           []byte
-	Nonce            uint64
-	ComputeLimit     uint64
-	ScriptSignatures []AccountSignature
-	PayerSignature   AccountSignature
-	Status           TransactionStatus
+	Script             []byte
+	ReferenceBlockHash []byte
+	Nonce              uint64
+	ComputeLimit       uint64
+	PayerAccount       Address
+	ScriptAccounts     []Address
+	Signatures         []AccountSignature
+	Status             TransactionStatus
 }
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *Transaction) Hash() crypto.Hash {
 	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
-	return hasher.ComputeStructHash(tx)
+	return hasher.ComputeBytesHash(tx.CanonicalEncoding())
 }
 
-// Encode returns the encoded transaction as bytes.
-func (tx *Transaction) Encode() []byte {
-	scriptSigs := make([][]byte, len(tx.ScriptSignatures))
-	for i, sig := range tx.ScriptSignatures {
-		scriptSigs[i] = sig.Encode()
+// CanonicalEncoding returns the encoded canonical transaction as bytes.
+func (tx *Transaction) CanonicalEncoding() []byte {
+	b, _ := rlp.EncodeToBytes([]interface{}{
+		tx.Script,
+		tx.ReferenceBlockHash,
+		tx.Nonce,
+		tx.ComputeLimit,
+		tx.PayerAccount,
+		tx.ScriptAccounts,
+	})
+
+	return b
+}
+
+// FullEncoding returns the encoded full transaction (including signatures) as bytes.
+func (tx *Transaction) FullEncoding() []byte {
+	sigs := make([][]byte, len(tx.ScriptAccounts))
+	for i, sig := range tx.Signatures {
+		sigs[i] = sig.Encode()
 	}
 
 	b, _ := rlp.EncodeToBytes([]interface{}{
 		tx.Script,
+		tx.ReferenceBlockHash,
 		tx.Nonce,
 		tx.ComputeLimit,
-		scriptSigs,
-		tx.PayerSignature.Encode(),
+		tx.PayerAccount,
+		tx.ScriptAccounts,
+		sigs,
 	})
 
 	return b
 }
 
-// ScriptMessage encodes the fields of the transaction used for script signatures.
-func (tx *Transaction) ScriptMessage() []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		"script",
-		tx.Script,
-		tx.Nonce,
-		tx.ComputeLimit,
-	})
-	return b
-}
-
-// PayerMessage encodes the fields of the transaction used for payer signatures.
-func (tx *Transaction) PayerMessage() []byte {
-	scriptSigs := make([][]byte, len(tx.ScriptSignatures))
-	for i, sig := range tx.ScriptSignatures {
-		scriptSigs[i] = sig.Encode()
-	}
-
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		"payer",
-		tx.Script,
-		tx.Nonce,
-		tx.ComputeLimit,
-		scriptSigs,
-	})
-	return b
-}
-
-// SetPayerSignature signs the transaction with the given account and private key and sets it as the payer signature.
-func (tx *Transaction) SetPayerSignature(account Address, prKey crypto.PrKey) error {
+// AddSignature signs the transaction with the given account and private key, then adds the signature to the list
+// of signatures.
+func (tx *Transaction) AddSignature(account Address, prKey crypto.PrKey) error {
 	// TODO: replace hard-coded signature algorithm
 	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	if err != nil {
@@ -100,35 +91,7 @@ func (tx *Transaction) SetPayerSignature(account Address, prKey crypto.PrKey) er
 		return err
 	}
 
-	sig, err := salg.SignBytes(prKey, tx.PayerMessage(), hasher)
-	if err != nil {
-		return err
-	}
-
-	tx.PayerSignature = AccountSignature{
-		Account:   account,
-		Signature: sig.Bytes(),
-	}
-
-	return nil
-}
-
-// AddScriptSignature signs the transaction with the given account and private key, then adds the signature to the list
-// of script signatures.
-func (tx *Transaction) AddScriptSignature(account Address, prKey crypto.PrKey) error {
-	// TODO: replace hard-coded signature algorithm
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	if err != nil {
-		return err
-	}
-
-	// TODO: replace hard-coded hashing algorithm
-	hasher, err := crypto.NewHashAlgo(crypto.SHA3_256)
-	if err != nil {
-		return err
-	}
-
-	sig, err := salg.SignBytes(prKey, tx.ScriptMessage(), hasher)
+	sig, err := salg.SignBytes(prKey, tx.CanonicalEncoding(), hasher)
 	if err != nil {
 		return err
 	}
@@ -138,7 +101,7 @@ func (tx *Transaction) AddScriptSignature(account Address, prKey crypto.PrKey) e
 		Signature: sig.Bytes(),
 	}
 
-	tx.ScriptSignatures = append(tx.ScriptSignatures, accountSig)
+	tx.Signatures = append(tx.Signatures, accountSig)
 
 	return nil
 }
