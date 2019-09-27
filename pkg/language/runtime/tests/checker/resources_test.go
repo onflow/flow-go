@@ -1109,25 +1109,83 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
 }
 
 func TestCheckInvalidResourceLoss(t *testing.T) {
-	RegisterTestingT(t)
+	t.Run("UnassignedResource", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
-      resource X {}
+		_, err := ParseAndCheck(`
+			resource X {}
+			
+			fun test() {
+				create X()
+			}
+		`)
 
-      fun test() {
-          create X()
-      }
-	`)
+		// TODO: add support for resources
 
-	// TODO: add support for resources
+		errs := ExpectCheckerErrors(err, 2)
 
-	errs := ExpectCheckerErrors(err, 2)
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+	})
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+	t.Run("ImmediateMemberAccess", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := ParseAndCheck(`
+			resource Foo {
+				fun bar(): Int {
+					return 42
+				}
+			}
+
+			fun test() {
+				let x = (create Foo()).bar()
+			}
+		`)
+
+		// TODO: add support for resources
+
+		errs := ExpectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+	})
+
+	t.Run("ImmediateMemberAccessFunctionInvocation", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		_, err := ParseAndCheck(`
+			resource Foo {
+				fun bar(): Int {
+					return 42
+				}
+			}
+	
+			fun createResource(): <-Foo {
+				return <-create Foo()
+			}
+	
+			fun test() {
+				let x = createResource().bar()
+			}
+		`)
+
+		// TODO: add support for resources
+
+		errs := ExpectCheckerErrors(err, 2)
+
+		Expect(errs[0]).
+			To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+		Expect(errs[1]).
+			To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+	})
 }
 
 func TestCheckResourceReturn(t *testing.T) {
