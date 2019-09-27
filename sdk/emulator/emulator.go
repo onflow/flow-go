@@ -304,15 +304,25 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 }
 
 func (b *EmulatedBlockchain) validateSignatures(tx *types.Transaction) error {
-	err := b.validateAccountSignature(tx.PayerSignature, tx.PayerMessage())
-	if err != nil {
-		return err
-	}
+	accountWeights := make(map[types.Address]int)
 
-	for _, accountSig := range tx.ScriptSignatures {
-		err := b.validateAccountSignature(accountSig, tx.ScriptMessage())
+	for _, accountSig := range tx.Signatures {
+		err := b.validateAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
+		}
+
+		// TODO: add key weights
+		accountWeights[accountSig.Account] = 1
+	}
+
+	if accountWeights[tx.PayerAccount] < 1 {
+		return &ErrMissingSignature{tx.PayerAccount}
+	}
+
+	for _, account := range tx.ScriptAccounts {
+		if accountWeights[account] < 1 {
+			return &ErrMissingSignature{account}
 		}
 	}
 
