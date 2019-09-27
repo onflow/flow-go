@@ -375,16 +375,6 @@ func (checker *Checker) FindType(name string) Type {
 	return ty
 }
 
-func (checker *Checker) pushActivations() {
-	checker.valueActivations.PushCurrent()
-	checker.typeActivations.PushCurrent()
-}
-
-func (checker *Checker) popActivations() {
-	checker.valueActivations.Pop()
-	checker.typeActivations.Pop()
-}
-
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// pre-declare interfaces, composites, and functions (check afterwards)
@@ -491,8 +481,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.valueActivations.PushCurrent()
+	defer checker.valueActivations.Pop()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -852,8 +842,8 @@ func (checker *Checker) declareGlobalType(name string) {
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.valueActivations.PushCurrent()
+	defer checker.valueActivations.Pop()
 
 	checker.visitStatements(block.Statements)
 
@@ -904,8 +894,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.valueActivations.PushCurrent()
+	defer checker.valueActivations.Pop()
 
 	checker.visitConditions(functionBlock.PreConditions)
 
@@ -1127,8 +1117,8 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 
 	case *ast.VariableDeclaration:
 		func() {
-			checker.pushActivations()
-			defer checker.popActivations()
+			checker.valueActivations.PushCurrent()
+			defer checker.valueActivations.Pop()
 
 			checker.visitVariableDeclaration(test, true)
 
