@@ -35,11 +35,10 @@ func (s *feldmanVSSstate) init() {
 	s.AReceived = false
 }
 
-func (s *feldmanVSSstate) StartDKG() *DKGoutput {
+func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
 	s.isrunning = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
-		seed := []byte{1, 2, 3}
 		return s.generateShares(seed)
 	}
 	out := &(DKGoutput{

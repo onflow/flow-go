@@ -105,14 +105,15 @@ func TestFeldmanVSS(t *testing.T) {
 		go processChan(i, dkg, chans, quit)
 	}
 	// start DKG in all nodes but the leader
+	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
 		if current != lead {
-			out := dkg[current].StartDKG()
+			out := dkg[current].StartDKG(seed)
 			out.processOutput(current, dkg, chans)
 		}
 	}
 	// start the leader (this avoids a data racing issue)
-	out := dkg[lead].StartDKG()
+	out := dkg[lead].StartDKG(seed)
 	out.processOutput(lead, dkg, chans)
 
 	// this loop synchronizes the main thread to end all DKGs
