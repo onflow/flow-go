@@ -54,6 +54,11 @@ program
     : (declaration ';'?)* EOF
     ;
 
+replInput
+    : program
+    | statements
+    ;
+
 declaration
     : compositeDeclaration
     | interfaceDeclaration
@@ -312,6 +317,12 @@ unaryExpression
     ;
 
 primaryExpression
+    : createExpression
+    | destroyExpression
+    | composedExpression
+    ;
+
+composedExpression
     : primaryExpressionStart primaryExpressionSuffix*
     ;
 
@@ -376,9 +387,7 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : createExpression
-    | destroyExpression
-    | identifierExpression
+    : identifierExpression
     | literalExpression
     | functionExpression
     | nestedExpression

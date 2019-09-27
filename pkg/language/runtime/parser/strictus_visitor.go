@@ -14,6 +14,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#program.
 	VisitProgram(ctx *ProgramContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#replInput.
+	VisitReplInput(ctx *ReplInputContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 
@@ -169,6 +172,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#composedExpression.
+	VisitComposedExpression(ctx *ComposedExpressionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#primaryExpressionSuffix.
 	VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{}

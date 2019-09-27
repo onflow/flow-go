@@ -39,6 +39,10 @@ func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 	}
 }
 
+func (v *ProgramVisitor) VisitReplInput(ctx *ReplInputContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
 func (v *ProgramVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
@@ -1061,6 +1065,10 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitComposedExpression(ctx *ComposedExpressionContext) interface{} {
 	result := ctx.PrimaryExpressionStart().Accept(v).(ast.Expression)
 
 	for _, suffix := range ctx.AllPrimaryExpressionSuffix() {
