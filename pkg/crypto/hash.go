@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"errors"
+	"fmt"
 	"hash"
 
 	"golang.org/x/crypto/sha3"
