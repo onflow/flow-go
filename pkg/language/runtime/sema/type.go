@@ -129,11 +129,6 @@ func (*InvalidType) IsResourceType() bool {
 	return false
 }
 
-func isInvalidType(ty Type) bool {
-	_, ok := ty.(*InvalidType)
-	return ok
-}
-
 // OptionalType represents the optional variant of another type
 type OptionalType struct {
 	Type Type
@@ -1027,6 +1022,150 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 		return nil
 	}
 }
+
+////
+
+func IsSubType(subType Type, superType Type) bool {
+	if subType.Equal(superType) {
+		return true
+	}
+
+	if _, ok := superType.(*AnyType); ok {
+		return true
+	}
+
+	if _, ok := subType.(*NeverType); ok {
+		return true
+	}
+
+	switch typedSuperType := superType.(type) {
+	case *IntegerType:
+		switch subType.(type) {
+		case *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+
+			return true
+
+		default:
+			return false
+		}
+	case *CharacterType:
+		// TODO: only allow valid character literals
+		return subType.Equal(&StringType{})
+	case *OptionalType:
+		optionalSubType, ok := subType.(*OptionalType)
+		if !ok {
+			// T <: U? if T <: U
+			return IsSubType(subType, typedSuperType.Type)
+		}
+		// optionals are covariant: T? <: U? if T <: U
+		return IsSubType(optionalSubType.Type, typedSuperType.Type)
+
+	case *InterfaceType:
+		compositeSubType, ok := subType.(*CompositeType)
+		if !ok {
+			return false
+		}
+		// TODO: optimize, use set
+		for _, conformance := range compositeSubType.Conformances {
+			if typedSuperType.Equal(conformance) {
+				return true
+			}
+		}
+		return false
+
+	case *DictionaryType:
+		typedSubType, ok := subType.(*DictionaryType)
+		if !ok {
+			return false
+		}
+
+		return IsSubType(typedSubType.KeyType, typedSuperType.KeyType) &&
+			IsSubType(typedSubType.ValueType, typedSuperType.ValueType)
+
+	case *VariableSizedType:
+		typedSubType, ok := subType.(*VariableSizedType)
+		if !ok {
+			return false
+		}
+
+		return IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
+
+	case *ConstantSizedType:
+		typedSubType, ok := subType.(*ConstantSizedType)
+		if !ok {
+			return false
+		}
+
+		if typedSubType.Size != typedSuperType.Size {
+			return false
+		}
+
+		return IsSubType(
+			typedSubType.elementType(),
+			typedSuperType.elementType(),
+		)
+	}
+
+	// TODO: functions
+
+	return false
+}
+
+func IndexableElementType(indexedType Type, isAssignment bool) Type {
+	switch indexedType := indexedType.(type) {
+	case ArrayType:
+		return indexedType.elementType()
+	case *StringType:
+		return &CharacterType{}
+	case *DictionaryType:
+		valueType := indexedType.ValueType
+		if isAssignment {
+			return valueType
+		} else {
+			return &OptionalType{Type: valueType}
+		}
+	}
+
+	return nil
+}
+
+func IsIndexingType(indexingType Type, indexedType Type) bool {
+	switch indexedType := indexedType.(type) {
+	// arrays and strings can be indexed with integers
+	case ArrayType:
+		return IsSubType(indexingType, &IntegerType{})
+	case *StringType:
+		return IsSubType(indexingType, &IntegerType{})
+	// dictionaries can be indexed with the dictionary type's key type
+	case *DictionaryType:
+		return IsSubType(indexingType, indexedType.KeyType)
+	}
+
+	return false
+}
+
+func IsConcatenatableType(ty Type) bool {
+	_, isArrayType := ty.(ArrayType)
+	return IsSubType(ty, &StringType{}) || isArrayType
+}
+
+func IsEquatableType(ty Type) bool {
+	return IsSubType(ty, &StringType{}) ||
+		IsSubType(ty, &BoolType{}) ||
+		IsSubType(ty, &IntType{})
+}
+
+func IsInvalidType(ty Type) bool {
+	_, ok := ty.(*InvalidType)
+	return ok
+}
+
+////
 
 func init() {
 	gob.Register(&AnyType{})

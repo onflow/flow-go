@@ -1614,7 +1614,7 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 			anyValue := value.(AnyValue)
 			expectedType := interpreter.Checker.Elaboration.FailableDowncastingTypes[expression]
 
-			if !interpreter.Checker.IsSubType(anyValue.Type, expectedType) {
+			if !sema.IsSubType(anyValue.Type, expectedType) {
 				return NilValue{}
 			}
 
