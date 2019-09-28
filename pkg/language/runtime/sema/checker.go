@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/exit_detector"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/self_field_analyzer"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -2713,7 +2714,7 @@ func (checker *Checker) checkFieldsInitialized(
 	compositeType *CompositeType,
 ) {
 	for _, initializer := range declaration.Members.Initializers {
-		unassigned, errs := CheckFieldAssignments(
+		unassigned, errs := self_field_analyzer.CheckSelfFieldInitializations(
 			declaration.Members.Fields,
 			initializer.FunctionBlock,
 		)

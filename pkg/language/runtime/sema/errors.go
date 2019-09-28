@@ -1156,28 +1156,6 @@ func (e *UnsupportedExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// UnassignedFieldAccessError
-
-type UnassignedFieldAccessError struct {
-	Identifier ast.Identifier
-	Pos        ast.Position
-}
-
-func (e *UnassignedFieldAccessError) Error() string {
-	return fmt.Sprintf("cannot access unassigned field %s", e.Identifier.String())
-}
-
-func (*UnassignedFieldAccessError) isSemanticError() {}
-
-func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
-	length := len(e.Identifier.Identifier)
-	return e.Pos.Shifted(length - 1)
-}
-
 // MissingMoveAnnotationError
 
 type MissingMoveAnnotationError struct {

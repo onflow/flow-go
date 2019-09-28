@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/self_field_analyzer"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	. "github.com/onsi/gomega"
 	"testing"
@@ -697,7 +698,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 				To(Equal("foo"))
 
 			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnassignedFieldAccessError{}))
+				To(BeAssignableToTypeOf(&self_field_analyzer.UninitializedFieldAccessError{}))
 
 			Expect(errs[2]).
 				To(BeAssignableToTypeOf(&sema.NotDeclaredMemberError{}))
