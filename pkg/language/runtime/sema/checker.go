@@ -356,7 +356,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
 
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
-	argumentLabels := checker.argumentLabels(declaration.Parameters)
+	argumentLabels := declaration.Parameters.ArgumentLabels()
 
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
@@ -387,24 +387,8 @@ func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDec
 	}
 }
 
-func (checker *Checker) argumentLabels(parameters []*ast.Parameter) []string {
-	argumentLabels := make([]string, len(parameters))
-
-	for i, parameter := range parameters {
-		argumentLabel := parameter.Label
-		// if no argument label is given, the parameter name
-		// is used as the argument labels and is required
-		if argumentLabel == "" {
-			argumentLabel = parameter.Identifier.Identifier
-		}
-		argumentLabels[i] = argumentLabel
-	}
-
-	return argumentLabels
-}
-
 func (checker *Checker) checkFunction(
-	parameters []*ast.Parameter,
+	parameters ast.Parameters,
 	returnTypePosition ast.Position,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
@@ -445,7 +429,7 @@ func (checker *Checker) checkFunction(
 	}
 }
 
-func (checker *Checker) checkParameters(parameters []*ast.Parameter, parameterTypeAnnotations []*TypeAnnotation) {
+func (checker *Checker) checkParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
 	for i, parameter := range parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.StartPos)
@@ -482,7 +466,7 @@ func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position
 
 // checkArgumentLabels checks that all argument labels (if any) are unique
 //
-func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
+func (checker *Checker) checkArgumentLabels(parameters ast.Parameters) {
 
 	argumentLabelPositions := map[string]ast.Position{}
 
@@ -512,7 +496,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 // declareParameters declares a constant for each parameter,
 // ensuring names are unique and constants don't already exist
 //
-func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameterTypeAnnotations []*TypeAnnotation) {
+func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
 
 	depth := checker.valueActivations.Depth()
 
@@ -2370,7 +2354,7 @@ func (checker *Checker) currentFunction() *functionContext {
 }
 
 func (checker *Checker) functionType(
-	parameters []*ast.Parameter,
+	parameters ast.Parameters,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
 	convertedParameterTypeAnnotations :=
@@ -2385,7 +2369,7 @@ func (checker *Checker) functionType(
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameters []*ast.Parameter) []*TypeAnnotation {
+func (checker *Checker) parameterTypeAnnotations(parameters ast.Parameters) []*TypeAnnotation {
 
 	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameters))
 
@@ -2754,7 +2738,7 @@ func (checker *Checker) declareCompositeConstructor(
 	if len(compositeDeclaration.Members.Initializers) > 0 {
 		firstInitializer := compositeDeclaration.Members.Initializers[0]
 
-		argumentLabels = checker.argumentLabels(firstInitializer.Parameters)
+		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
 
 		functionType = &ConstructorFunctionType{
 			FunctionType: &FunctionType{
@@ -2822,7 +2806,7 @@ func (checker *Checker) membersAndOrigins(
 	for _, function := range functions {
 		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
 
-		argumentLabels := checker.argumentLabels(function.Parameters)
+		argumentLabels := function.Parameters.ArgumentLabels()
 
 		identifier := function.Identifier.Identifier
 
