@@ -1,7 +1,6 @@
-package sema
+package self_field_analyzer
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/self_field_analyzer"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -26,7 +25,7 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 	fields := structDeclaration.Members.Fields
 	initializer := structDeclaration.Members.Initializers[0]
 
-	return self_field_analyzer.CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
+	return CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
 }
 
 func TestAssignmentInEmptyInitializer(t *testing.T) {
