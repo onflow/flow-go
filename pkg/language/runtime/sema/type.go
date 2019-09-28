@@ -1165,6 +1165,62 @@ func IsInvalidType(ty Type) bool {
 	return ok
 }
 
+// UnwrapOptionalType returns the type if it is not an optional type,
+// or the inner-most type if it is (optional types are repeatedly unwrapped)
+//
+func UnwrapOptionalType(ty Type) Type {
+	for {
+		optionalType, ok := ty.(*OptionalType)
+		if !ok {
+			return ty
+		}
+		ty = optionalType.Type
+	}
+}
+
+func AreCompatibleEqualityTypes(leftType, rightType Type) bool {
+	unwrappedLeft := UnwrapOptionalType(leftType)
+	unwrappedRight := UnwrapOptionalType(rightType)
+
+	if unwrappedLeft.Equal(unwrappedRight) {
+		return true
+	}
+
+	if _, ok := unwrappedLeft.(*NeverType); ok {
+		return true
+	}
+
+	if _, ok := unwrappedRight.(*NeverType); ok {
+		return true
+	}
+
+	return false
+}
+
+func IsValidEqualityType(ty Type) bool {
+	if IsSubType(ty, &BoolType{}) {
+		return true
+	}
+
+	if IsSubType(ty, &IntegerType{}) {
+		return true
+	}
+
+	if IsSubType(ty, &StringType{}) {
+		return true
+	}
+
+	if IsSubType(ty, &CharacterType{}) {
+		return true
+	}
+
+	if _, ok := ty.(*OptionalType); ok {
+		return true
+	}
+
+	return false
+}
+
 ////
 
 func init() {
