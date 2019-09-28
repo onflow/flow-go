@@ -4,6 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/exit_detector"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -431,7 +432,7 @@ func (checker *Checker) checkFunction(
 		}()
 
 		if mustExit && !functionType.ReturnTypeAnnotation.Type.Equal(&VoidType{}) {
-			if !FunctionBlockExits(functionBlock) {
+			if !exit_detector.FunctionBlockExits(functionBlock) {
 				checker.report(
 					&MissingReturnStatementError{
 						StartPos: functionBlock.StartPosition(),

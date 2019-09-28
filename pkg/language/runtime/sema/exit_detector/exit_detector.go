@@ -1,4 +1,4 @@
-package sema
+package exit_detector
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
