@@ -5,7 +5,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
-	"github.com/raviqqe/hamt"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -41,7 +40,7 @@ type Checker struct {
 	PredeclaredTypes  map[string]TypeDeclaration
 	ImportCheckers    map[ast.ImportLocation]*Checker
 	errors            []error
-	valueActivations  *activations.Activations
+	valueActivations  *ValueActivations
 	typeActivations   *activations.Activations
 	functionContexts  []*functionContext
 	GlobalValues      map[string]*Variable
@@ -64,15 +63,12 @@ func NewChecker(
 	typeActivations := &activations.Activations{}
 	typeActivations.Push(baseTypes)
 
-	valueActivations := &activations.Activations{}
-	valueActivations.Push(hamt.NewMap())
-
 	checker := &Checker{
 		Program:           program,
 		PredeclaredValues: predeclaredValues,
 		PredeclaredTypes:  predeclaredTypes,
 		ImportCheckers:    map[ast.ImportLocation]*Checker{},
-		valueActivations:  valueActivations,
+		valueActivations:  NewValueActivations(),
 		typeActivations:   typeActivations,
 		GlobalValues:      map[string]*Variable{},
 		GlobalTypes:       map[string]Type{},
@@ -100,20 +96,6 @@ func NewChecker(
 	return checker, nil
 }
 
-type ValueDeclaration interface {
-	ValueDeclarationType() Type
-	ValueDeclarationKind() common.DeclarationKind
-	ValueDeclarationPosition() ast.Position
-	ValueDeclarationIsConstant() bool
-	ValueDeclarationArgumentLabels() []string
-}
-
-type TypeDeclaration interface {
-	TypeDeclarationType() Type
-	TypeDeclarationKind() common.DeclarationKind
-	TypeDeclarationPosition() ast.Position
-}
-
 func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
 	variable := checker.declareVariable(
 		name,
@@ -124,14 +106,6 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 		declaration.ValueDeclarationArgumentLabels(),
 	)
 	checker.recordVariableDeclarationOccurrence(name, variable)
-}
-
-func (checker *Checker) enterValueScope() {
-	checker.valueActivations.PushCurrent()
-}
-
-func (checker *Checker) leaveValueScope() {
-	checker.valueActivations.Pop()
 }
 
 func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
@@ -318,24 +292,8 @@ func (checker *Checker) IsEquatableType(ty Type) bool {
 		checker.IsSubType(ty, &IntType{})
 }
 
-func (checker *Checker) setVariable(name string, variable *Variable) {
-	checker.valueActivations.Set(name, variable)
-}
-
 func (checker *Checker) setType(name string, ty Type) {
 	checker.typeActivations.Set(name, ty)
-}
-
-func (checker *Checker) findVariable(name string) *Variable {
-	value := checker.valueActivations.Find(name)
-	if value == nil {
-		return nil
-	}
-	variable, ok := value.(*Variable)
-	if !ok {
-		return nil
-	}
-	return variable
 }
 
 func (checker *Checker) FindType(name string) Type {
@@ -456,8 +414,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
+	checker.valueActivations.Enter()
+	defer checker.valueActivations.Leave()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -566,7 +524,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 		identifier := parameter.Identifier
 
 		// check if variable with this identifier is already declared in the current scope
-		existingVariable := checker.findVariable(identifier.Identifier)
+		existingVariable := checker.valueActivations.Find(identifier.Identifier)
 		if existingVariable != nil && existingVariable.Depth == depth {
 			checker.report(
 				&RedeclarationError{
@@ -590,7 +548,7 @@ func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameter
 			Depth:      depth,
 			Pos:        &identifier.Pos,
 		}
-		checker.setVariable(identifier.Identifier, variable)
+		checker.valueActivations.Set(identifier.Identifier, variable)
 		checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 	}
 }
@@ -765,7 +723,7 @@ func (checker *Checker) declareVariable(
 	depth := checker.valueActivations.Depth()
 
 	// check if variable with this name is already declared in the current scope
-	existingVariable := checker.findVariable(identifier)
+	existingVariable := checker.valueActivations.Find(identifier)
 	if existingVariable != nil && existingVariable.Depth == depth {
 		checker.report(
 			&RedeclarationError{
@@ -786,7 +744,7 @@ func (checker *Checker) declareVariable(
 		Pos:            &pos,
 		ArgumentLabels: argumentLabels,
 	}
-	checker.setVariable(identifier, variable)
+	checker.valueActivations.Set(identifier, variable)
 	return variable
 }
 
@@ -800,7 +758,7 @@ func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 }
 
 func (checker *Checker) declareGlobalValue(name string) {
-	variable := checker.findVariable(name)
+	variable := checker.valueActivations.Find(name)
 	if variable == nil {
 		return
 	}
@@ -816,12 +774,9 @@ func (checker *Checker) declareGlobalType(name string) {
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
-
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
-
-	checker.visitStatements(block.Statements)
-
+	checker.valueActivations.Scoped(func() {
+		checker.visitStatements(block.Statements)
+	})
 	return nil
 }
 
@@ -869,8 +824,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
+	checker.valueActivations.Enter()
+	defer checker.valueActivations.Leave()
 
 	checker.visitConditions(functionBlock.PreConditions)
 
@@ -1091,14 +1046,12 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		checker.visitConditional(test, thenElement, elseElement)
 
 	case *ast.VariableDeclaration:
-		func() {
-			checker.enterValueScope()
-			defer checker.leaveValueScope()
+		checker.valueActivations.Scoped(func() {
 
 			checker.visitVariableDeclaration(test, true)
 
 			thenElement.Accept(checker)
-		}()
+		})
 
 		elseElement.Accept(checker)
 
@@ -1175,7 +1128,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	identifier := target.Identifier.Identifier
 
 	// check identifier was declared before
-	variable := checker.findVariable(identifier)
+	variable := checker.valueActivations.Find(identifier)
 	if variable == nil {
 		checker.report(
 			&NotDeclaredError{
@@ -1353,7 +1306,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 }
 
 func (checker *Checker) findAndCheckVariable(identifier ast.Identifier, recordOccurrence bool) *Variable {
-	variable := checker.findVariable(identifier.Identifier)
+	variable := checker.valueActivations.Find(identifier.Identifier)
 	if variable == nil {
 		checker.report(
 			&NotDeclaredError{
@@ -2446,7 +2399,7 @@ func (checker *Checker) declareFunction(
 	name := identifier.Identifier
 
 	// check if variable with this identifier is already declared in the current scope
-	existingVariable := checker.findVariable(name)
+	existingVariable := checker.valueActivations.Find(name)
 	depth := checker.valueActivations.Depth()
 	if existingVariable != nil && existingVariable.Depth == depth {
 		checker.report(
@@ -2468,7 +2421,7 @@ func (checker *Checker) declareFunction(
 		ArgumentLabels: argumentLabels,
 		Pos:            &identifier.Pos,
 	}
-	checker.setVariable(name, variable)
+	checker.valueActivations.Set(name, variable)
 	if recordOccurrence {
 		checker.recordVariableDeclarationOccurrence(name, variable)
 	}
@@ -3077,8 +3030,8 @@ func (checker *Checker) checkInitializer(
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
+	checker.valueActivations.Enter()
+	defer checker.valueActivations.Leave()
 
 	checker.declareSelfValue(containerType)
 
@@ -3122,17 +3075,16 @@ func (checker *Checker) checkCompositeFunctions(
 	selfType *CompositeType,
 ) {
 	for _, function := range functions {
-		func() {
-			// NOTE: new activation, as function declarations
-			// shouldn'T be visible in other function declarations,
-			// and `self` is is only visible inside function
-			checker.enterValueScope()
-			defer checker.leaveValueScope()
+		// NOTE: new activation, as function declarations
+		// shouldn't be visible in other function declarations,
+		// and `self` is is only visible inside function
+
+		checker.valueActivations.Scoped(func() {
 
 			checker.declareSelfValue(selfType)
 
 			function.Accept(checker)
-		}()
+		})
 	}
 }
 
@@ -3150,7 +3102,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 		Depth:      depth,
 		Pos:        nil,
 	}
-	checker.setVariable(SelfIdentifier, self)
+	checker.valueActivations.Set(SelfIdentifier, self)
 	checker.recordVariableDeclarationOccurrence(SelfIdentifier, self)
 }
 
@@ -3327,13 +3279,11 @@ func (checker *Checker) checkInterfaceFunctions(
 	declarationKind common.DeclarationKind,
 ) {
 	for _, function := range functions {
-		func() {
-			// NOTE: new activation, as function declarations
-			// shouldn'T be visible in other function declarations,
-			// and `self` is is only visible inside function
-			checker.enterValueScope()
-			defer checker.leaveValueScope()
+		// NOTE: new activation, as function declarations
+		// shouldn't be visible in other function declarations,
+		// and `self` is is only visible inside function
 
+		checker.valueActivations.Scoped(func() {
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
@@ -3346,7 +3296,7 @@ func (checker *Checker) checkInterfaceFunctions(
 					common.DeclarationKindFunction,
 				)
 			}
-		}()
+		})
 	}
 }
 
