@@ -53,24 +53,7 @@ type Checker struct {
 	seenImports       map[ast.ImportLocation]bool
 	isChecked         bool
 	inCreate          bool
-	// TODO: refactor into typed AST: https://github.com/dapperlabs/flow-go/issues/665
-	FunctionDeclarationFunctionTypes   map[*ast.FunctionDeclaration]*FunctionType
-	VariableDeclarationValueTypes      map[*ast.VariableDeclaration]Type
-	VariableDeclarationTargetTypes     map[*ast.VariableDeclaration]Type
-	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
-	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
-	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
-	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*ConstructorFunctionType
-	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
-	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
-	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
-	InterfaceDeclarationTypes          map[*ast.InterfaceDeclaration]*InterfaceType
-	FailableDowncastingTypes           map[*ast.FailableDowncastExpression]Type
-	ReturnStatementValueTypes          map[*ast.ReturnStatement]Type
-	ReturnStatementReturnTypes         map[*ast.ReturnStatement]Type
-	BinaryExpressionResultTypes        map[*ast.BinaryExpression]Type
-	BinaryExpressionRightTypes         map[*ast.BinaryExpression]Type
-	MemberExpressionMembers            map[*ast.MemberExpression]*Member
+	Elaboration       *Elaboration
 }
 
 func NewChecker(
@@ -85,35 +68,19 @@ func NewChecker(
 	valueActivations.Push(hamt.NewMap())
 
 	checker := &Checker{
-		Program:                            program,
-		PredeclaredValues:                  predeclaredValues,
-		PredeclaredTypes:                   predeclaredTypes,
-		ImportCheckers:                     map[ast.ImportLocation]*Checker{},
-		valueActivations:                   valueActivations,
-		typeActivations:                    typeActivations,
-		GlobalValues:                       map[string]*Variable{},
-		GlobalTypes:                        map[string]Type{},
-		Occurrences:                        NewOccurrences(),
-		variableOrigins:                    map[*Variable]*Origin{},
-		memberOrigins:                      map[Type]map[string]*Origin{},
-		seenImports:                        map[ast.ImportLocation]bool{},
-		FunctionDeclarationFunctionTypes:   map[*ast.FunctionDeclaration]*FunctionType{},
-		VariableDeclarationValueTypes:      map[*ast.VariableDeclaration]Type{},
-		VariableDeclarationTargetTypes:     map[*ast.VariableDeclaration]Type{},
-		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
-		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
-		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
-		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*ConstructorFunctionType{},
-		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
-		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
-		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
-		InterfaceDeclarationTypes:          map[*ast.InterfaceDeclaration]*InterfaceType{},
-		FailableDowncastingTypes:           map[*ast.FailableDowncastExpression]Type{},
-		ReturnStatementValueTypes:          map[*ast.ReturnStatement]Type{},
-		ReturnStatementReturnTypes:         map[*ast.ReturnStatement]Type{},
-		BinaryExpressionResultTypes:        map[*ast.BinaryExpression]Type{},
-		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
-		MemberExpressionMembers:            map[*ast.MemberExpression]*Member{},
+		Program:           program,
+		PredeclaredValues: predeclaredValues,
+		PredeclaredTypes:  predeclaredTypes,
+		ImportCheckers:    map[ast.ImportLocation]*Checker{},
+		valueActivations:  valueActivations,
+		typeActivations:   typeActivations,
+		GlobalValues:      map[string]*Variable{},
+		GlobalTypes:       map[string]Type{},
+		Occurrences:       NewOccurrences(),
+		variableOrigins:   map[*Variable]*Origin{},
+		memberOrigins:     map[Type]map[string]*Origin{},
+		seenImports:       map[ast.ImportLocation]bool{},
+		Elaboration:       NewElaboration(),
 	}
 
 	for name, declaration := range predeclaredValues {
@@ -418,7 +385,7 @@ func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclar
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
 
-	functionType := checker.FunctionDeclarationFunctionTypes[declaration]
+	functionType := checker.Elaboration.FunctionDeclarationFunctionTypes[declaration]
 	if functionType == nil {
 		functionType = checker.declareFunctionDeclaration(declaration)
 	}
@@ -439,7 +406,7 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
 	argumentLabels := checker.argumentLabels(declaration.Parameters)
 
-	checker.FunctionDeclarationFunctionTypes[declaration] = functionType
+	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	checker.declareFunction(
 		declaration.Identifier,
@@ -636,7 +603,7 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 	valueType := declaration.Value.Accept(checker).(Type)
 
-	checker.VariableDeclarationValueTypes[declaration] = valueType
+	checker.Elaboration.VariableDeclarationValueTypes[declaration] = valueType
 
 	valueIsInvalid := isInvalidType(valueType)
 
@@ -707,7 +674,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		checker.checkTransfer(declaration.Transfer, declarationType)
 	}
 
-	checker.VariableDeclarationTargetTypes[declaration] = declarationType
+	checker.Elaboration.VariableDeclarationTargetTypes[declaration] = declarationType
 
 	variable := checker.declareVariable(
 		declaration.Identifier.Identifier,
@@ -1024,8 +991,8 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	returnType := checker.currentFunction().returnType
 
-	checker.ReturnStatementValueTypes[statement] = valueType
-	checker.ReturnStatementReturnTypes[statement] = returnType
+	checker.Elaboration.ReturnStatementValueTypes[statement] = valueType
+	checker.Elaboration.ReturnStatementReturnTypes[statement] = returnType
 
 	if valueType == nil {
 		return nil
@@ -1170,10 +1137,10 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 	valueType := assignment.Value.Accept(checker).(Type)
-	checker.AssignmentStatementValueTypes[assignment] = valueType
+	checker.Elaboration.AssignmentStatementValueTypes[assignment] = valueType
 
 	targetType := checker.visitAssignmentValueType(assignment, valueType)
-	checker.AssignmentStatementTargetTypes[assignment] = targetType
+	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
 	checker.checkTransfer(assignment.Transfer, valueType)
 
@@ -1459,8 +1426,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 			leftIsInvalid, rightIsInvalid, anyInvalid,
 		)
 
-		checker.BinaryExpressionResultTypes[expression] = resultType
-		checker.BinaryExpressionRightTypes[expression] = rightType
+		checker.Elaboration.BinaryExpressionResultTypes[expression] = resultType
+		checker.Elaboration.BinaryExpressionRightTypes[expression] = rightType
 
 		return resultType
 
@@ -2014,7 +1981,7 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
-	member, ok := checker.MemberExpressionMembers[expression]
+	member, ok := checker.Elaboration.MemberExpressionMembers[expression]
 	if ok {
 		return member
 	}
@@ -2079,7 +2046,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		)
 	}
 
-	checker.MemberExpressionMembers[expression] = member
+	checker.Elaboration.MemberExpressionMembers[expression] = member
 
 	return member
 }
@@ -2172,13 +2139,13 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		returnType = functionType.ReturnTypeAnnotation.Type
 	}
 
-	checker.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
+	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
 	var parameterTypes []Type
 	for _, parameterTypeAnnotation := range parameterTypeAnnotations {
 		parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
 	}
-	checker.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
+	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
 	checker.checkConstructorInvocationWithResourceResult(
 		invocationExpression,
@@ -2371,7 +2338,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	// TODO: infer
 	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
 
-	checker.FunctionExpressionFunctionType[expression] = functionType
+	checker.Elaboration.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
 		expression.Parameters,
@@ -2595,7 +2562,7 @@ func (checker *Checker) visitConditional(
 
 func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	compositeType := checker.CompositeDeclarationTypes[declaration]
+	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
 
@@ -2727,7 +2694,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	compositeType.ConstructorParameterTypeAnnotations = parameterTypeAnnotations
 
-	checker.CompositeDeclarationTypes[declaration] = compositeType
+	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
 
 	// declare constructor
 
@@ -2920,7 +2887,7 @@ func (checker *Checker) declareCompositeConstructor(
 			},
 		}
 
-		checker.InitializerFunctionTypes[firstInitializer] = functionType
+		checker.Elaboration.InitializerFunctionTypes[firstInitializer] = functionType
 	}
 
 	checker.declareFunction(
@@ -3282,7 +3249,7 @@ func (checker *Checker) VisitInitializerDeclaration(initializer *ast.Initializer
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
 
-	interfaceType := checker.InterfaceDeclarationTypes[declaration]
+	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
 
@@ -3434,7 +3401,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 	interfaceType.InitializerParameterTypeAnnotations = parameterTypeAnnotations
 
-	checker.InterfaceDeclarationTypes[declaration] = interfaceType
+	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
 
 	// declare value
 
@@ -3704,7 +3671,7 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 
 	rightHandType := rightHandTypeAnnotation.Type
 
-	checker.FailableDowncastingTypes[expression] = rightHandType
+	checker.Elaboration.FailableDowncastingTypes[expression] = rightHandType
 
 	// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
 

@@ -181,11 +181,7 @@ func getStatement(t Trampoline) *StatementTrampoline {
 }
 
 func (interpreter *Interpreter) interpret() Trampoline {
-	return More(func() Trampoline {
-		interpreter.prepareInterpretation()
-
-		return interpreter.visitProgramDeclarations()
-	})
+	return interpreter.Checker.Program.Accept(interpreter).(Trampoline)
 }
 
 func (interpreter *Interpreter) prepareInterpretation() {
@@ -204,10 +200,6 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareInterface(declaration)
 	}
-}
-
-func (interpreter *Interpreter) visitProgramDeclarations() Trampoline {
-	return interpreter.visitGlobalDeclarations(interpreter.Checker.Program.Declarations)
 }
 
 func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
@@ -359,14 +351,16 @@ func (interpreter *Interpreter) InvokeExportable(
 }
 
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
-	panic(&errors.UnreachableError{})
+	interpreter.prepareInterpretation()
+
+	return interpreter.visitGlobalDeclarations(program.Declarations)
 }
 
 func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
 
 	identifier := declaration.Identifier.Identifier
 
-	functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[declaration]
+	functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[declaration]
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 
@@ -590,8 +584,8 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 		Map(func(result interface{}) interface{} {
 			value := result.(Value)
 
-			valueType := interpreter.Checker.ReturnStatementValueTypes[statement]
-			returnType := interpreter.Checker.ReturnStatementReturnTypes[statement]
+			valueType := interpreter.Checker.Elaboration.ReturnStatementValueTypes[statement]
+			returnType := interpreter.Checker.Elaboration.ReturnStatementReturnTypes[statement]
 
 			value = interpreter.box(value, valueType, returnType)
 
@@ -696,8 +690,8 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			valueType := interpreter.Checker.VariableDeclarationValueTypes[declaration]
-			targetType := interpreter.Checker.VariableDeclarationTargetTypes[declaration]
+			valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+			targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
 
 			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
@@ -722,8 +716,8 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			valueType := interpreter.Checker.AssignmentStatementValueTypes[assignment]
-			targetType := interpreter.Checker.AssignmentStatementTargetTypes[assignment]
+			valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
+			targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
 
 			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
@@ -954,8 +948,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 						Map(func(result interface{}) interface{} {
 							value := result.(Value)
 
-							rightType := interpreter.Checker.BinaryExpressionRightTypes[expression]
-							resultType := interpreter.Checker.BinaryExpressionResultTypes[expression]
+							rightType := interpreter.Checker.Elaboration.BinaryExpressionRightTypes[expression]
+							resultType := interpreter.Checker.Elaboration.BinaryExpressionResultTypes[expression]
 
 							// NOTE: important to box both any and optional
 							return interpreter.box(value, rightType, resultType)
@@ -1133,8 +1127,8 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
 
-					argumentTypes := interpreter.Checker.InvocationExpressionArgumentTypes[invocationExpression]
-					parameterTypes := interpreter.Checker.InvocationExpressionParameterTypes[invocationExpression]
+					argumentTypes := interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
+					parameterTypes := interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
 					argumentCopies := make([]Value, len(*arguments.Values))
 					for i, argument := range *arguments.Values {
@@ -1250,7 +1244,7 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	functionType := interpreter.Checker.FunctionExpressionFunctionType[expression]
+	functionType := interpreter.Checker.Elaboration.FunctionExpressionFunctionType[expression]
 
 	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
 
@@ -1293,7 +1287,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	if len(declaration.Members.Initializers) > 0 {
 		firstInitializer := declaration.Members.Initializers[0]
 
-		functionType := interpreter.Checker.InitializerFunctionTypes[firstInitializer]
+		functionType := interpreter.Checker.Elaboration.InitializerFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
 			declaration,
@@ -1407,7 +1401,7 @@ func (interpreter *Interpreter) compositeFunctions(
 	functions := map[string]FunctionValue{}
 
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
-		functionType := interpreter.Checker.FunctionDeclarationFunctionTypes[functionDeclaration]
+		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
 		function := interpreter.compositeFunction(compositeDeclaration, functionDeclaration)
 
@@ -1561,7 +1555,7 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 
 func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.InterfaceDeclaration) {
 
-	interfaceType := interpreter.Checker.InterfaceDeclarationTypes[declaration]
+	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	variable := interpreter.findOrDeclareVariable(declaration.Identifier.Identifier)
 	variable.Value = MetaTypeValue{Type: interfaceType}
@@ -1618,7 +1612,7 @@ func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.
 			value := result.(Value)
 
 			anyValue := value.(AnyValue)
-			expectedType := interpreter.Checker.FailableDowncastingTypes[expression]
+			expectedType := interpreter.Checker.Elaboration.FailableDowncastingTypes[expression]
 
 			if !interpreter.Checker.IsSubType(anyValue.Type, expectedType) {
 				return NilValue{}
