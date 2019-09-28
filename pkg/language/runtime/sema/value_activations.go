@@ -27,7 +27,7 @@ func (a *ValueActivations) Leave() {
 	a.activations.Pop()
 }
 
-func (a *ValueActivations) Scoped(f func()) {
+func (a *ValueActivations) WithScope(f func()) {
 	a.Enter()
 	defer a.Leave()
 	f()

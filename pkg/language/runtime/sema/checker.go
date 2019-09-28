@@ -14,11 +14,6 @@ const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
 
-type functionContext struct {
-	returnType Type
-	loops      int
-}
-
 // TODO: move annotations
 
 var beforeType = &FunctionType{
@@ -36,24 +31,24 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program           *ast.Program
-	PredeclaredValues map[string]ValueDeclaration
-	PredeclaredTypes  map[string]TypeDeclaration
-	ImportCheckers    map[ast.ImportLocation]*Checker
-	errors            []error
-	valueActivations  *ValueActivations
-	typeActivations   *TypeActivations
-	functionContexts  []*functionContext
-	GlobalValues      map[string]*Variable
-	GlobalTypes       map[string]Type
-	inCondition       bool
-	Occurrences       *Occurrences
-	variableOrigins   map[*Variable]*Origin
-	memberOrigins     map[Type]map[string]*Origin
-	seenImports       map[ast.ImportLocation]bool
-	isChecked         bool
-	inCreate          bool
-	Elaboration       *Elaboration
+	Program             *ast.Program
+	PredeclaredValues   map[string]ValueDeclaration
+	PredeclaredTypes    map[string]TypeDeclaration
+	ImportCheckers      map[ast.ImportLocation]*Checker
+	errors              []error
+	valueActivations    *ValueActivations
+	typeActivations     *TypeActivations
+	functionActivations *FunctionActivations
+	GlobalValues        map[string]*Variable
+	GlobalTypes         map[string]Type
+	inCondition         bool
+	Occurrences         *Occurrences
+	variableOrigins     map[*Variable]*Origin
+	memberOrigins       map[Type]map[string]*Origin
+	seenImports         map[ast.ImportLocation]bool
+	isChecked           bool
+	inCreate            bool
+	Elaboration         *Elaboration
 }
 
 func NewChecker(
@@ -63,19 +58,20 @@ func NewChecker(
 ) (*Checker, error) {
 
 	checker := &Checker{
-		Program:           program,
-		PredeclaredValues: predeclaredValues,
-		PredeclaredTypes:  predeclaredTypes,
-		ImportCheckers:    map[ast.ImportLocation]*Checker{},
-		valueActivations:  NewValueActivations(),
-		typeActivations:   NewTypeActivations(baseTypes),
-		GlobalValues:      map[string]*Variable{},
-		GlobalTypes:       map[string]Type{},
-		Occurrences:       NewOccurrences(),
-		variableOrigins:   map[*Variable]*Origin{},
-		memberOrigins:     map[Type]map[string]*Origin{},
-		seenImports:       map[ast.ImportLocation]bool{},
-		Elaboration:       NewElaboration(),
+		Program:             program,
+		PredeclaredValues:   predeclaredValues,
+		PredeclaredTypes:    predeclaredTypes,
+		ImportCheckers:      map[ast.ImportLocation]*Checker{},
+		valueActivations:    NewValueActivations(),
+		typeActivations:     NewTypeActivations(baseTypes),
+		functionActivations: &FunctionActivations{},
+		GlobalValues:        map[string]*Variable{},
+		GlobalTypes:         map[string]Type{},
+		Occurrences:         NewOccurrences(),
+		variableOrigins:     map[*Variable]*Origin{},
+		memberOrigins:       map[Type]map[string]*Origin{},
+		seenImports:         map[ast.ImportLocation]bool{},
+		Elaboration:         NewElaboration(),
 	}
 
 	for name, declaration := range predeclaredValues {
@@ -273,16 +269,15 @@ func (checker *Checker) checkFunction(
 	}
 
 	if functionBlock != nil {
-		func() {
-			// check the function's block
-			checker.enterFunction(functionType)
-			defer checker.leaveFunction()
+		checker.functionActivations.WithFunction(functionType, func() {
+			checker.visitFunctionBlock(
+				functionBlock,
+				functionType.ReturnTypeAnnotation,
+			)
+		})
 
-			checker.visitFunctionBlock(functionBlock, functionType.ReturnTypeAnnotation)
-		}()
-
-		if mustExit && !functionType.ReturnTypeAnnotation.Type.Equal(&VoidType{}) {
-			if !exit_detector.FunctionBlockExits(functionBlock) {
+		if _, returnTypeIsVoid := functionType.ReturnTypeAnnotation.Type.(*VoidType); !returnTypeIsVoid {
+			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
 				checker.report(
 					&MissingReturnStatementError{
 						StartPos: functionBlock.StartPosition(),
@@ -583,7 +578,7 @@ func (checker *Checker) declareGlobalType(name string) {
 }
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
-	checker.valueActivations.Scoped(func() {
+	checker.valueActivations.WithScope(func() {
 		checker.visitStatements(block.Statements)
 	})
 	return nil
@@ -692,7 +687,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	valueType := statement.Expression.Accept(checker).(Type)
 	valueIsInvalid := IsInvalidType(valueType)
 
-	returnType := checker.currentFunction().returnType
+	returnType := checker.functionActivations.Current().ReturnType
 
 	checker.Elaboration.ReturnStatementValueTypes[statement] = valueType
 	checker.Elaboration.ReturnStatementReturnTypes[statement] = returnType
@@ -746,11 +741,15 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 	}
 }
 
+func (checker *Checker) inLoop() bool {
+	return checker.functionActivations.Current().InLoop()
+}
+
 func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
 
 	// check statement is inside loop
 
-	if checker.currentFunction().loops == 0 {
+	if !checker.inLoop() {
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementBreak,
@@ -767,7 +766,7 @@ func (checker *Checker) VisitContinueStatement(statement *ast.ContinueStatement)
 
 	// check statement is inside loop
 
-	if checker.currentFunction().loops == 0 {
+	if !checker.inLoop() {
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementContinue,
@@ -794,7 +793,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		checker.visitConditional(test, thenElement, elseElement)
 
 	case *ast.VariableDeclaration:
-		checker.valueActivations.Scoped(func() {
+		checker.valueActivations.WithScope(func() {
 
 			checker.visitVariableDeclaration(test, true)
 
@@ -826,12 +825,9 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 		)
 	}
 
-	checker.currentFunction().loops += 1
-	defer func() {
-		checker.currentFunction().loops -= 1
-	}()
-
-	statement.Block.Accept(checker)
+	checker.functionActivations.WithLoop(func() {
+		statement.Block.Accept(checker)
+	})
 
 	return nil
 }
@@ -2138,26 +2134,6 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 	}
 }
 
-func (checker *Checker) enterFunction(functionType *FunctionType) {
-	checker.functionContexts = append(checker.functionContexts,
-		&functionContext{
-			returnType: functionType.ReturnTypeAnnotation.Type,
-		})
-}
-
-func (checker *Checker) leaveFunction() {
-	lastIndex := len(checker.functionContexts) - 1
-	checker.functionContexts = checker.functionContexts[:lastIndex]
-}
-
-func (checker *Checker) currentFunction() *functionContext {
-	lastIndex := len(checker.functionContexts) - 1
-	if lastIndex < 0 {
-		return nil
-	}
-	return checker.functionContexts[lastIndex]
-}
-
 func (checker *Checker) functionType(
 	parameters ast.Parameters,
 	returnTypeAnnotation *ast.TypeAnnotation,
@@ -2791,7 +2767,7 @@ func (checker *Checker) checkCompositeFunctions(
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.valueActivations.Scoped(func() {
+		checker.valueActivations.WithScope(func() {
 
 			checker.declareSelfValue(selfType)
 
@@ -2973,7 +2949,7 @@ func (checker *Checker) checkInterfaceFunctions(
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.valueActivations.Scoped(func() {
+		checker.valueActivations.WithScope(func() {
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
