@@ -1,7 +1,6 @@
 package sema
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
@@ -41,7 +40,7 @@ type Checker struct {
 	ImportCheckers    map[ast.ImportLocation]*Checker
 	errors            []error
 	valueActivations  *ValueActivations
-	typeActivations   *activations.Activations
+	typeActivations   *TypeActivations
 	functionContexts  []*functionContext
 	GlobalValues      map[string]*Variable
 	GlobalTypes       map[string]Type
@@ -60,8 +59,6 @@ func NewChecker(
 	predeclaredValues map[string]ValueDeclaration,
 	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
-	typeActivations := &activations.Activations{}
-	typeActivations.Push(baseTypes)
 
 	checker := &Checker{
 		Program:           program,
@@ -69,7 +66,7 @@ func NewChecker(
 		PredeclaredTypes:  predeclaredTypes,
 		ImportCheckers:    map[ast.ImportLocation]*Checker{},
 		valueActivations:  NewValueActivations(),
-		typeActivations:   typeActivations,
+		typeActivations:   NewTypeActivations(baseTypes),
 		GlobalValues:      map[string]*Variable{},
 		GlobalTypes:       map[string]Type{},
 		Occurrences:       NewOccurrences(),
@@ -97,7 +94,7 @@ func NewChecker(
 }
 
 func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
-	variable := checker.declareVariable(
+	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
 		declaration.ValueDeclarationKind(),
@@ -105,6 +102,7 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 		declaration.ValueDeclarationIsConstant(),
 		declaration.ValueDeclarationArgumentLabels(),
 	)
+	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(name, variable)
 }
 
@@ -115,7 +113,8 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	}
 
 	ty := declaration.TypeDeclarationType()
-	checker.declareType(identifier, ty)
+	err := checker.typeActivations.Declare(identifier, ty)
+	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
@@ -125,6 +124,10 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 			Pos:        &identifier.Pos,
 		},
 	)
+}
+
+func (checker *Checker) FindType(name string) Type {
+	return checker.typeActivations.Find(name)
 }
 
 func (checker *Checker) IsChecked() bool {
@@ -154,7 +157,12 @@ func (checker *Checker) checkerError() *CheckerError {
 }
 
 func (checker *Checker) report(errs ...error) {
-	checker.errors = append(checker.errors, errs...)
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		checker.errors = append(checker.errors, errs...)
+	}
 }
 
 func (checker *Checker) IsSubType(subType Type, superType Type) bool {
@@ -292,22 +300,6 @@ func (checker *Checker) IsEquatableType(ty Type) bool {
 		checker.IsSubType(ty, &IntType{})
 }
 
-func (checker *Checker) setType(name string, ty Type) {
-	checker.typeActivations.Set(name, ty)
-}
-
-func (checker *Checker) FindType(name string) Type {
-	value := checker.typeActivations.Find(name)
-	if value == nil {
-		return nil
-	}
-	ty, ok := value.(Type)
-	if !ok {
-		return nil
-	}
-	return ty
-}
-
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// pre-declare interfaces, composites, and functions (check afterwards)
@@ -366,12 +358,14 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
-	checker.declareFunction(
+	variable, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
 		functionType,
 		argumentLabels,
-		true,
 	)
+	checker.report(err)
+
+	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
 
 	return functionType
 }
@@ -514,7 +508,7 @@ func (checker *Checker) checkArgumentLabels(parameters []*ast.Parameter) {
 }
 
 // declareParameters declares a constant for each parameter,
-// ensuring names are unique and constants don'T already exist
+// ensuring names are unique and constants don't already exist
 //
 func (checker *Checker) declareParameters(parameters []*ast.Parameter, parameterTypeAnnotations []*TypeAnnotation) {
 
@@ -634,7 +628,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	checker.Elaboration.VariableDeclarationTargetTypes[declaration] = declarationType
 
-	variable := checker.declareVariable(
+	variable, err := checker.valueActivations.Declare(
 		declaration.Identifier.Identifier,
 		declarationType,
 		declaration.DeclarationKind(),
@@ -642,6 +636,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.IsConstant,
 		nil,
 	)
+	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
 }
 
@@ -711,43 +706,6 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 	}
 }
 
-func (checker *Checker) declareVariable(
-	identifier string,
-	ty Type,
-	kind common.DeclarationKind,
-	pos ast.Position,
-	isConstant bool,
-	argumentLabels []string,
-) *Variable {
-
-	depth := checker.valueActivations.Depth()
-
-	// check if variable with this name is already declared in the current scope
-	existingVariable := checker.valueActivations.Find(identifier)
-	if existingVariable != nil && existingVariable.Depth == depth {
-		checker.report(
-			&RedeclarationError{
-				Kind:        kind,
-				Name:        identifier,
-				Pos:         pos,
-				PreviousPos: existingVariable.Pos,
-			},
-		)
-	}
-
-	// variable with this name is not declared in current scope, declare it
-	variable := &Variable{
-		Kind:           kind,
-		IsConstant:     isConstant,
-		Depth:          depth,
-		Type:           ty,
-		Pos:            &pos,
-		ArgumentLabels: argumentLabels,
-	}
-	checker.valueActivations.Set(identifier, variable)
-	return variable
-}
-
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	if name == "" {
@@ -766,7 +724,7 @@ func (checker *Checker) declareGlobalValue(name string) {
 }
 
 func (checker *Checker) declareGlobalType(name string) {
-	ty := checker.FindType(name)
+	ty := checker.typeActivations.Find(name)
 	if ty == nil {
 		return
 	}
@@ -846,30 +804,29 @@ func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, ret
 	// which has the return type
 
 	if _, ok := returnTypeAnnotation.Type.(*VoidType); !ok {
-		checker.declareVariable(
-			ResultIdentifier,
-			returnTypeAnnotation.Type,
-			common.DeclarationKindConstant,
-			ast.Position{},
-			true,
-			nil,
-		)
-		// TODO: record occurrence - but what position?
+		checker.declareResult(returnTypeAnnotation.Type)
 	}
 
 	checker.visitConditions(functionBlock.PostConditions)
 }
 
-func (checker *Checker) declareBefore() {
+func (checker *Checker) declareResult(ty Type) {
+	_, err := checker.valueActivations.DeclareImplicitConstant(
+		ResultIdentifier,
+		ty,
+		common.DeclarationKindConstant,
+	)
+	checker.report(err)
+	// TODO: record occurrence - but what position?
+}
 
-	checker.declareVariable(
+func (checker *Checker) declareBefore() {
+	_, err := checker.valueActivations.DeclareImplicitConstant(
 		BeforeIdentifier,
 		beforeType,
 		common.DeclarationKindFunction,
-		ast.Position{},
-		true,
-		nil,
 	)
+	checker.report(err)
 	// TODO: record occurrence – but what position?
 }
 
@@ -2320,7 +2277,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case *ast.NominalType:
 		identifier := t.Identifier.Identifier
-		result := checker.FindType(identifier)
+		result := checker.typeActivations.Find(identifier)
 		if result == nil {
 			checker.report(
 				&NotDeclaredError{
@@ -2387,43 +2344,6 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 	return &TypeAnnotation{
 		Move: typeAnnotation.Move,
 		Type: convertedType,
-	}
-}
-
-func (checker *Checker) declareFunction(
-	identifier ast.Identifier,
-	invokableType InvokableType,
-	argumentLabels []string,
-	recordOccurrence bool,
-) {
-	name := identifier.Identifier
-
-	// check if variable with this identifier is already declared in the current scope
-	existingVariable := checker.valueActivations.Find(name)
-	depth := checker.valueActivations.Depth()
-	if existingVariable != nil && existingVariable.Depth == depth {
-		checker.report(
-			&RedeclarationError{
-				Kind:        common.DeclarationKindFunction,
-				Name:        name,
-				Pos:         identifier.Pos,
-				PreviousPos: existingVariable.Pos,
-			},
-		)
-	}
-
-	// variable with this identifier is not declared in current scope, declare it
-	variable := &Variable{
-		Kind:           common.DeclarationKindFunction,
-		IsConstant:     true,
-		Depth:          depth,
-		Type:           invokableType,
-		ArgumentLabels: argumentLabels,
-		Pos:            &identifier.Pos,
-	}
-	checker.valueActivations.Set(name, variable)
-	if recordOccurrence {
-		checker.recordVariableDeclarationOccurrence(name, variable)
 	}
 }
 
@@ -2596,7 +2516,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	identifier := declaration.Identifier
 
-	checker.declareType(identifier, compositeType)
+	err := checker.typeActivations.Declare(identifier, compositeType)
+	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
@@ -2843,12 +2764,12 @@ func (checker *Checker) declareCompositeConstructor(
 		checker.Elaboration.InitializerFunctionTypes[firstInitializer] = functionType
 	}
 
-	checker.declareFunction(
+	_, err := checker.valueActivations.DeclareFunction(
 		compositeDeclaration.Identifier,
 		functionType,
 		argumentLabels,
-		false,
 	)
+	checker.report(err)
 }
 
 func (checker *Checker) membersAndOrigins(
@@ -3091,7 +3012,7 @@ func (checker *Checker) checkCompositeFunctions(
 func (checker *Checker) declareSelfValue(selfType Type) {
 
 	// NOTE: declare `self` one depth lower ("inside" function),
-	// so it can'T be re-declared by the function's parameters
+	// so it can't be re-declared by the function's parameters
 
 	depth := checker.valueActivations.Depth() + 1
 
@@ -3161,28 +3082,6 @@ func (checker *Checker) checkMemberIdentifier(
 	} else {
 		positions[name] = pos
 	}
-}
-
-func (checker *Checker) declareType(
-	identifier ast.Identifier,
-	newType Type,
-) {
-	name := identifier.Identifier
-
-	existingType := checker.FindType(name)
-	if existingType != nil {
-		checker.report(
-			&RedeclarationError{
-				Kind: common.DeclarationKindType,
-				Name: name,
-				Pos:  identifier.Pos,
-				// TODO: previous pos
-			},
-		)
-	}
-
-	// type with this identifier is not declared in current scope, declare it
-	checker.setType(name, newType)
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -3310,7 +3209,8 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 	identifier := declaration.Identifier
 
-	checker.declareType(identifier, interfaceType)
+	err := checker.typeActivations.Declare(identifier, interfaceType)
+	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
@@ -3393,7 +3293,7 @@ func (checker *Checker) declareInterfaceMetaType(
 		InterfaceType: interfaceType,
 	}
 
-	checker.declareVariable(
+	_, err := checker.valueActivations.Declare(
 		declaration.Identifier.Identifier,
 		metaType,
 		// TODO: check
@@ -3402,6 +3302,7 @@ func (checker *Checker) declareInterfaceMetaType(
 		true,
 		nil,
 	)
+	checker.report(err)
 }
 
 func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.Position, variable *Variable) {
@@ -3502,7 +3403,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		)
 
 		// NOTE: declare constant variable with invalid type to silence rest of program
-		checker.declareVariable(
+		_, err := checker.valueActivations.Declare(
 			identifier.Identifier,
 			&InvalidType{},
 			common.DeclarationKindValue,
@@ -3510,9 +3411,11 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			true,
 			nil,
 		)
+		checker.report(err)
 
 		// NOTE: declare type with invalid type to silence rest of program
-		checker.declareType(identifier, &InvalidType{})
+		err = checker.typeActivations.Declare(identifier, &InvalidType{})
+		checker.report(err)
 	}
 
 	return nil
@@ -3555,7 +3458,7 @@ func (checker *Checker) importValues(
 			continue
 		}
 
-		checker.declareVariable(
+		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
 			variable.Kind,
@@ -3563,6 +3466,7 @@ func (checker *Checker) importValues(
 			true,
 			variable.ArgumentLabels,
 		)
+		checker.report(err)
 	}
 }
 
@@ -3607,7 +3511,8 @@ func (checker *Checker) importTypes(
 			Identifier: name,
 			Pos:        declaration.LocationPos,
 		}
-		checker.declareType(identifier, ty)
+		err := checker.typeActivations.Declare(identifier, ty)
+		checker.report(err)
 	}
 }
 

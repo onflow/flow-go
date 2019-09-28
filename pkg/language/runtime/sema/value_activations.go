@@ -2,6 +2,8 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/raviqqe/hamt"
 )
 
@@ -49,4 +51,65 @@ func (a *ValueActivations) Find(name string) *Variable {
 
 func (a *ValueActivations) Depth() int {
 	return a.activations.Depth()
+}
+
+func (a *ValueActivations) Declare(
+	identifier string,
+	ty Type,
+	kind common.DeclarationKind,
+	pos ast.Position,
+	isConstant bool,
+	argumentLabels []string,
+) (variable *Variable, err error) {
+
+	depth := a.activations.Depth()
+
+	// check if variable with this name is already declared in the current scope
+	existingVariable := a.Find(identifier)
+	if existingVariable != nil && existingVariable.Depth == depth {
+		err = &RedeclarationError{
+			Kind:        kind,
+			Name:        identifier,
+			Pos:         pos,
+			PreviousPos: existingVariable.Pos,
+		}
+	}
+
+	// variable with this name is not declared in current scope, declare it
+	variable = &Variable{
+		Kind:           kind,
+		IsConstant:     isConstant,
+		Depth:          depth,
+		Type:           ty,
+		Pos:            &pos,
+		ArgumentLabels: argumentLabels,
+	}
+	a.activations.Set(identifier, variable)
+	return variable, err
+}
+
+func (a *ValueActivations) DeclareFunction(
+	identifier ast.Identifier,
+	invokableType InvokableType,
+	argumentLabels []string,
+) (*Variable, error) {
+	return a.Declare(
+		identifier.Identifier,
+		invokableType,
+		common.DeclarationKindFunction,
+		identifier.Pos,
+		true,
+		argumentLabels,
+	)
+}
+
+func (a *ValueActivations) DeclareImplicitConstant(identifier string, ty Type, kind common.DeclarationKind) (*Variable, error) {
+	return a.Declare(
+		identifier,
+		ty,
+		kind,
+		ast.Position{},
+		true,
+		nil,
+	)
 }

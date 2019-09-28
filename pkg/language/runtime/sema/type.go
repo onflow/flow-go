@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/raviqqe/hamt"
-
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
@@ -801,11 +799,11 @@ type ConstructorFunctionType struct {
 
 // baseTypes are the nominal types available in programs
 
-var baseTypes hamt.Map
+var baseTypes map[string]Type
 
 func init() {
 
-	typeNames := map[string]Type{
+	baseTypes = map[string]Type{
 		"": &VoidType{},
 	}
 
@@ -831,16 +829,11 @@ func init() {
 		typeName := ty.String()
 
 		// check type is not accidentally redeclared
-		if _, ok := typeNames[typeName]; ok {
+		if _, ok := baseTypes[typeName]; ok {
 			panic(&errors.UnreachableError{})
 		}
 
-		typeNames[typeName] = ty
-	}
-
-	for name, baseType := range typeNames {
-		key := common.StringKey(name)
-		baseTypes = baseTypes.Insert(key, baseType)
+		baseTypes[typeName] = ty
 	}
 }
 
