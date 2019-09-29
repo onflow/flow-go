@@ -3,9 +3,32 @@ package sema
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := checker.findAndCheckVariable(expression.Identifier, true)
+	identifier := expression.Identifier
+	variable := checker.findAndCheckVariable(identifier, true)
 	if variable == nil {
 		return &InvalidType{}
+	}
+
+	if variable.Type.IsResourceType() {
+		if variable.MovePos != nil {
+			checker.report(
+				&ResourceUseAfterMoveError{
+					UseStartPos:  expression.StartPosition(),
+					UseEndPos:    expression.EndPosition(),
+					MoveStartPos: *variable.MovePos,
+					MoveEndPos:   variable.MovePos.Shifted(len(identifier.Identifier) - 1),
+				},
+			)
+		} else if variable.DestroyPos != nil {
+			checker.report(
+				&ResourceUseAfterDestructionError{
+					UseStartPos:         expression.StartPosition(),
+					UseEndPos:           expression.EndPosition(),
+					DestructionStartPos: *variable.MovePos,
+					DestructionEndPos:   variable.MovePos.Shifted(len(identifier.Identifier) - 1),
+				},
+			)
+		}
 	}
 
 	return variable.Type
