@@ -25,6 +25,7 @@ const (
 	DeclarationKindContractInterface
 	DeclarationKindImport
 	DeclarationKindSelf
+	DeclarationKindResult
 )
 
 func (k DeclarationKind) Name() string {
@@ -63,6 +64,8 @@ func (k DeclarationKind) Name() string {
 		return "import"
 	case DeclarationKindSelf:
 		return "self"
+	case DeclarationKindResult:
+		return "result"
 	}
 
 	panic(&errors.UnreachableError{})

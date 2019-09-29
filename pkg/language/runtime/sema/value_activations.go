@@ -27,12 +27,6 @@ func (a *ValueActivations) Leave() {
 	a.activations.Pop()
 }
 
-func (a *ValueActivations) WithScope(f func()) {
-	a.Enter()
-	defer a.Leave()
-	f()
-}
-
 func (a *ValueActivations) Set(name string, variable *Variable) {
 	a.activations.Set(name, variable)
 }
@@ -112,4 +106,33 @@ func (a *ValueActivations) DeclareImplicitConstant(identifier string, ty Type, k
 		true,
 		nil,
 	)
+}
+
+func (a *ValueActivations) VariablesDeclaredInThisScope() map[string]*Variable {
+	variables := map[string]*Variable{}
+
+	depth := a.activations.Depth()
+	values := a.activations.CurrentOrNew()
+
+	var entry hamt.Entry
+	var value interface{}
+
+	for {
+		entry, value, values = values.FirstRest()
+		if entry == nil {
+			break
+		}
+
+		variable := value.(*Variable)
+
+		if variable.Depth != depth {
+			continue
+		}
+
+		name := string(entry.(common.StringKey))
+
+		variables[name] = variable
+	}
+
+	return variables
 }

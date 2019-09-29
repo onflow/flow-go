@@ -2,9 +2,9 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
+
+// TODO: handle potential loss of target's current value if it is a resource
 
 func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
 	valueType := assignment.Value.Accept(checker).(Type)
@@ -14,6 +14,7 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
 	checker.checkTransfer(assignment.Transfer, valueType)
+	checker.recordResourceMove(assignment.Value, valueType)
 
 	return nil
 }
@@ -34,8 +35,6 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 			target: target,
 		})
 	}
-
-	panic(&errors.UnreachableError{})
 }
 
 func (checker *Checker) visitIdentifierExpressionAssignment(
@@ -46,45 +45,37 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	identifier := target.Identifier.Identifier
 
 	// check identifier was declared before
-	variable := checker.valueActivations.Find(identifier)
+	variable := checker.findAndCheckVariable(target.Identifier, true)
 	if variable == nil {
+		return &InvalidType{}
+	}
+
+	// check identifier is not a constant
+	if variable.IsConstant {
 		checker.report(
-			&NotDeclaredError{
-				ExpectedKind: common.DeclarationKindVariable,
-				Name:         identifier,
-				Pos:          target.StartPosition(),
+			&AssignmentToConstantError{
+				Name:     identifier,
+				StartPos: target.StartPosition(),
+				EndPos:   target.EndPosition(),
 			},
 		)
-
-		return &InvalidType{}
-	} else {
-		// check identifier is not a constant
-		if variable.IsConstant {
-			checker.report(
-				&AssignmentToConstantError{
-					Name:     identifier,
-					StartPos: target.StartPosition(),
-					EndPos:   target.EndPosition(),
-				},
-			)
-		}
-
-		// check value type is subtype of variable type
-		if !IsInvalidType(valueType) &&
-			!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
-
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: variable.Type,
-					ActualType:   valueType,
-					StartPos:     assignment.Value.StartPosition(),
-					EndPos:       assignment.Value.EndPosition(),
-				},
-			)
-		}
-
-		return variable.Type
 	}
+
+	// check value type is subtype of variable type
+	if !IsInvalidType(valueType) &&
+		!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: variable.Type,
+				ActualType:   valueType,
+				StartPos:     assignment.Value.StartPosition(),
+				EndPos:       assignment.Value.EndPosition(),
+			},
+		)
+	}
+
+	return variable.Type
 }
 
 func (checker *Checker) visitIndexExpressionAssignment(

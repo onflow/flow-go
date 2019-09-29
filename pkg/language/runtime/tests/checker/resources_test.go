@@ -78,10 +78,15 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              fun test(r: <-T) {}
-	        `, kind.Keyword()))
+              fun test(r: <-T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -122,10 +127,15 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              fun test(r: T) {}
-	        `, kind.Keyword()))
+              fun test(r: T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -485,10 +495,15 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              let test = fun (r: <-T) {}
-	        `, kind.Keyword()))
+              let test = fun (r: <-T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -529,10 +544,15 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              let test = fun (r: T) {}
-	        `, kind.Keyword()))
+              let test = fun (r: T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -669,10 +689,15 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              let test: ((<-T): Void) = fun (r: <-T) {}
-	        `, kind.Keyword()))
+              let test: ((<-T): Void) = fun (r: <-T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -713,10 +738,15 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
 			RegisterTestingT(t)
 
 			_, err := ParseAndCheck(fmt.Sprintf(`
-              %s T {}
+              %[1]s T {}
 
-              let test: ((T): Void) = fun (r: T) {}
-	        `, kind.Keyword()))
+              let test: ((T): Void) = fun (r: T) {
+                  %[2]s r
+              }
+	        `,
+				kind.Keyword(),
+				kind.DestructionKeyword(),
+			))
 
 			switch kind {
 			case common.CompositeKindResource:
@@ -1277,7 +1307,9 @@ func TestCheckResourceArgument(t *testing.T) {
 	_, err := ParseAndCheck(`
       resource X {}
 
-      fun foo(_ x: <-X) {}
+      fun foo(_ x: <-X) {
+          destroy x
+      }
 
       fun bar() {
           foo(<-create X())
@@ -1298,7 +1330,9 @@ func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
 	_, err := ParseAndCheck(`
       resource X {}
 
-      fun foo(_ x: <-X) {}
+      fun foo(_ x: <-X) {
+          destroy x
+      }
 
       fun bar() {
           foo(create X())

@@ -23,10 +23,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	if expressionType.IsResourceType() {
 		if _, isIdentifier := expression.Expression.(*ast.IdentifierExpression); !isIdentifier {
-			checker.report(&ResourceLossError{
-				StartPos: expression.Expression.StartPosition(),
-				EndPos:   expression.Expression.EndPosition(),
-			})
+			checker.report(
+				&ResourceLossError{
+					StartPos: expression.Expression.StartPosition(),
+					EndPos:   expression.Expression.EndPosition(),
+				},
+			)
 		}
 	}
 

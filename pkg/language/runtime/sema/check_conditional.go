@@ -19,7 +19,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		checker.visitConditional(test, thenElement, elseElement)
 
 	case *ast.VariableDeclaration:
-		checker.valueActivations.WithScope(func() {
+		checker.withValueScope(func() {
 
 			checker.visitVariableDeclaration(test, true)
 

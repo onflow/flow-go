@@ -740,15 +740,34 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 				kind.TransferOperator(),
 			))
 
-			// TODO: add support for non-structure declarations
-
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure:
 				Expect(err).
 					To(Not(HaveOccurred()))
-			} else {
+
+			case common.CompositeKindContract:
+				// TODO: add support for contract declarations
+
 				errs := ExpectCheckerErrors(err, 1)
 
 				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+			case common.CompositeKindResource:
+
+				errs := ExpectCheckerErrors(err, 3)
+
+				// TODO: remove once `self` is handled properly
+
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+
+				// TODO: add support for resource declarations
+
+				Expect(errs[2]).
 					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 			}
 		})
@@ -1046,10 +1065,12 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 
                   init(x: Int) {
                       let test: %[2]sTest %[3]s %[4]s Test(x: 1)
+                      %[5]s test
                   }
 
                   fun test() {
                       let test: %[2]sTest %[3]s %[4]s Test(x: 2)
+                      %[5]s test
                   }
               }
 
@@ -1059,6 +1080,7 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 				kind.Annotation(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
+				kind.DestructionKeyword(),
 			))
 
 			// TODO: add support for non-structure declarations
@@ -1545,13 +1567,16 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
               fun test2(): %[2]sTest {
                   let test %[4]s %[3]s Test()
-                  return %[2]s test.test()
+                  let res %[4]s test.test()
+                  %[5]s test
+                  return %[2]sres
               }
             `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
 				kind.TransferOperator(),
+				kind.DestructionKeyword(),
 			))
 
 			// TODO: add support for non-structure declarations

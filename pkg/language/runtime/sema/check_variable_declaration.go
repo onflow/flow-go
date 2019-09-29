@@ -77,9 +77,8 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declarationType = optionalValueType.Type
 	}
 
-	if declarationType != nil {
-		checker.checkTransfer(declaration.Transfer, declarationType)
-	}
+	checker.checkTransfer(declaration.Transfer, declarationType)
+	checker.recordResourceMove(declaration.Value, declarationType)
 
 	checker.Elaboration.VariableDeclarationTargetTypes[declaration] = declarationType
 

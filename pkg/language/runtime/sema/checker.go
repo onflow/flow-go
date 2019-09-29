@@ -282,15 +282,35 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 		return
 	}
 
-	if unaryExpression, ok := valueExpression.(*ast.UnaryExpression); !ok ||
-		unaryExpression.Operation != ast.OperationMove {
-
+	unaryExpression, ok := valueExpression.(*ast.UnaryExpression)
+	if !ok || unaryExpression.Operation != ast.OperationMove {
 		checker.report(
 			&MissingMoveOperationError{
 				Pos: valueExpression.StartPosition(),
 			},
 		)
+		return
 	}
+
+	checker.recordResourceMove(unaryExpression.Expression, valueType)
+}
+
+func (checker *Checker) recordResourceMove(valueExpression ast.Expression, valueType Type) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	identifierExpression, ok := valueExpression.(*ast.IdentifierExpression)
+	if !ok {
+		return
+	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
+	if variable == nil {
+		return
+	}
+
+	variable.MovePos = &identifierExpression.Pos
 }
 
 func (checker *Checker) inLoop() bool {
@@ -302,7 +322,7 @@ func (checker *Checker) findAndCheckVariable(identifier ast.Identifier, recordOc
 	if variable == nil {
 		checker.report(
 			&NotDeclaredError{
-				ExpectedKind: common.DeclarationKindValue,
+				ExpectedKind: common.DeclarationKindVariable,
 				Name:         identifier.Identifier,
 				Pos:          identifier.StartPosition(),
 			},
@@ -494,4 +514,45 @@ func (checker *Checker) recordFunctionDeclarationOrigin(
 		origin,
 	)
 	return origin
+}
+
+func (checker *Checker) enterValueActivation() {
+	checker.valueActivations.Enter()
+}
+
+func (checker *Checker) leaveValueActivation() {
+	checker.checkResourceLoss()
+	checker.valueActivations.Leave()
+}
+
+// checkResourceLoss reports an error if there is a variable in the current scope
+// that has a resource type and which was not moved or destroyed
+//
+func (checker *Checker) checkResourceLoss() {
+
+	for name, variable := range checker.valueActivations.VariablesDeclaredInThisScope() {
+
+		// TODO: handle `self` and `result` properly
+
+		if variable.Type.IsResourceType() &&
+			variable.Kind != common.DeclarationKindSelf &&
+			variable.Kind != common.DeclarationKindResult &&
+			variable.MovePos == nil &&
+			variable.DestroyPos == nil {
+
+			checker.report(
+				&ResourceLossError{
+					StartPos: *variable.Pos,
+					EndPos:   variable.Pos.Shifted(len(name) - 1),
+				},
+			)
+
+		}
+	}
+}
+
+func (checker *Checker) withValueScope(f func()) {
+	checker.enterValueActivation()
+	defer checker.leaveValueActivation()
+	f()
 }
