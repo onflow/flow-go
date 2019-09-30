@@ -110,7 +110,7 @@ func (checker *Checker) checkFunction(
 func (checker *Checker) checkParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
 	for i, parameter := range parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.StartPos)
+		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
 	}
 }
 

@@ -1661,7 +1661,7 @@ func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckInvalidResourceUseAfterMoveToVariable(t *testing.T) {
@@ -1685,7 +1685,7 @@ func TestCheckInvalidResourceUseAfterMoveToVariable(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 
 	// NOTE: still two resource losses reported for `y` and `z`
 
@@ -1726,7 +1726,7 @@ func TestCheckInvalidResourceFieldUseAfterMoveToVariable(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
@@ -1756,7 +1756,7 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckResourceUseInIfStatement(t *testing.T) {
@@ -1846,11 +1846,17 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 
-	Expect(errs[1].(*sema.ResourceUseAfterMoveError).Moves).
+	Expect(errs[1].(*sema.ResourceUseAfterInvalidationError).Invalidations).
 		To(ConsistOf(
-			ast.Position{Offset: 165, Line: 9, Column: 23},
-			ast.Position{Offset: 120, Line: 7, Column: 23},
+			&sema.ResourceInvalidation{
+				Kind: sema.ResourceInvalidationKindMove,
+				Pos:  ast.Position{Offset: 165, Line: 9, Column: 23},
+			},
+			&sema.ResourceInvalidation{
+				Kind: sema.ResourceInvalidationKindMove,
+				Pos:  ast.Position{Offset: 120, Line: 7, Column: 23},
+			},
 		))
 }

@@ -10,26 +10,16 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		moves := checker.movePositions.Get(variable)
-		if len(moves) > 0 {
+		invalidations := checker.resourceInvalidations.Get(variable)
+
+		if len(invalidations) > 0 {
 			checker.report(
-				&ResourceUseAfterMoveError{
-					Name:  expression.Identifier.Identifier,
-					Pos:   expression.Identifier.Pos,
-					Moves: moves,
+				&ResourceUseAfterInvalidationError{
+					Name:          expression.Identifier.Identifier,
+					Pos:           expression.Identifier.Pos,
+					Invalidations: invalidations,
 				},
 			)
-		} else {
-			destructions := checker.destructionPositions.Get(variable)
-			if len(destructions) > 0 {
-				checker.report(
-					&ResourceUseAfterDestructionError{
-						Name:         expression.Identifier.Identifier,
-						Pos:          expression.Identifier.Pos,
-						Destructions: destructions,
-					},
-				)
-			}
 		}
 	}
 

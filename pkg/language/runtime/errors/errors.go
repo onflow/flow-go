@@ -24,6 +24,16 @@ type SecondaryError interface {
 	SecondaryError() string
 }
 
+// ErrorNotes is an interface for errors that provide notes
+//
+type ErrorNotes interface {
+	ErrorNotes() []ErrorNote
+}
+
+type ErrorNote interface {
+	Message() string
+}
+
 // ParentError is an error that contains one or more child errors.
 type ParentError interface {
 	ChildErrors() []error

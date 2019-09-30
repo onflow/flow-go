@@ -112,23 +112,19 @@ func (checker *Checker) visitConditionalBranches(
 ) (
 	thenType, elseType Type,
 ) {
-	initialMovePositions := checker.movePositions.Clone()
-	initialDestructionPositions := checker.destructionPositions.Clone()
+	initialResourceInvalidations := checker.resourceInvalidations.Clone()
 
 	thenType = checkThen()
 
-	movePositionsAfterThen := checker.movePositions
-	destructionPositionsAfterThen := checker.destructionPositions
+	resourceInvalidationsAfterThen := checker.resourceInvalidations
 
-	// NOTE: reset moves and destruction positions for else branch
+	// NOTE: reset invalidations for else branch
 
-	checker.movePositions = initialMovePositions
-	checker.destructionPositions = initialDestructionPositions
+	checker.resourceInvalidations = initialResourceInvalidations
 
 	elseType = checkElse()
 
-	checker.movePositions.Merge(movePositionsAfterThen)
-	checker.destructionPositions.Merge(destructionPositionsAfterThen)
+	checker.resourceInvalidations.Merge(resourceInvalidationsAfterThen)
 
 	return
 }
