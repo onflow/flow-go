@@ -18,7 +18,7 @@ func TestCheckFailableDowncastingAny(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	Expect(checker.FailableDowncastingTypes).
+	Expect(checker.Elaboration.FailableDowncastingTypes).
 		To(Not(BeEmpty()))
 }
 

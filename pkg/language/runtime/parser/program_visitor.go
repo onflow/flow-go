@@ -55,10 +55,10 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
-	var parameters []*ast.Parameter
+	var parameters ast.Parameters
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
-		parameters = parameterList.Accept(v).([]*ast.Parameter)
+		parameters = parameterList.Accept(v).(ast.Parameters)
 	}
 
 	// NOTE: in e.g interface declarations, function blocks are optional
@@ -272,10 +272,10 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	var parameters []*ast.Parameter
+	var parameters ast.Parameters
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
-		parameters = parameterList.Accept(v).([]*ast.Parameter)
+		parameters = parameterList.Accept(v).(ast.Parameters)
 	}
 
 	// NOTE: in e.g interface declarations, function blocks are optional
@@ -331,10 +331,10 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
-	var parameters []*ast.Parameter
+	var parameters ast.Parameters
 	parameterList := ctx.ParameterList()
 	if parameterList != nil {
-		parameters = parameterList.Accept(v).([]*ast.Parameter)
+		parameters = parameterList.Accept(v).(ast.Parameters)
 	}
 
 	functionBlock := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
@@ -350,7 +350,7 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 }
 
 func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
-	var parameters []*ast.Parameter
+	var parameters ast.Parameters
 
 	for _, parameter := range ctx.AllParameter() {
 		parameters = append(
