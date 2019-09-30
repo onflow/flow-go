@@ -3,7 +3,7 @@ package sema
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
-	checker.valueActivations.WithScope(func() {
+	checker.withValueScope(func() {
 		checker.visitStatements(block.Statements)
 	})
 	return nil

@@ -73,8 +73,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.valueActivations.Enter()
-	defer checker.valueActivations.Leave()
+	checker.enterValueActivation()
+	defer checker.leaveValueActivation()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -218,8 +218,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.valueActivations.Enter()
-	defer checker.valueActivations.Leave()
+	checker.enterValueActivation()
+	defer checker.leaveValueActivation()
 
 	checker.visitConditions(functionBlock.PreConditions)
 
@@ -250,7 +250,7 @@ func (checker *Checker) declareResult(ty Type) {
 	_, err := checker.valueActivations.DeclareImplicitConstant(
 		ResultIdentifier,
 		ty,
-		common.DeclarationKindConstant,
+		common.DeclarationKindResult,
 	)
 	checker.report(err)
 	// TODO: record occurrence - but what position?

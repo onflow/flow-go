@@ -480,8 +480,8 @@ func (checker *Checker) checkInitializer(
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
-	checker.valueActivations.Enter()
-	defer checker.valueActivations.Leave()
+	checker.enterValueActivation()
+	defer checker.leaveValueActivation()
 
 	checker.declareSelfValue(containerType)
 
@@ -529,7 +529,7 @@ func (checker *Checker) checkCompositeFunctions(
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.valueActivations.WithScope(func() {
+		checker.withValueScope(func() {
 
 			checker.declareSelfValue(selfType)
 

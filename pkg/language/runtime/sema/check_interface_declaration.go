@@ -89,7 +89,7 @@ func (checker *Checker) checkInterfaceFunctions(
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.valueActivations.WithScope(func() {
+		checker.withValueScope(func() {
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
