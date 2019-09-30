@@ -1861,7 +1861,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 		))
 }
 
-func TestCheckResourceLossAfterDestroyInIfStatementThenBranch(t *testing.T) {
+func TestCheckInvalidResourceLossAfterDestroyInIfStatementThenBranch(t *testing.T) {
 	RegisterTestingT(t)
 
 	_, err := ParseAndCheck(`
@@ -1883,5 +1883,39 @@ func TestCheckResourceLossAfterDestroyInIfStatementThenBranch(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceLossAndUseAfterDestroyInIfStatementThenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          if 1 > 2 {
+             destroy x
+          }
+          x.id
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
 		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
 }
