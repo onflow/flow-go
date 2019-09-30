@@ -6,8 +6,8 @@ type ResourceInvalidationSet struct {
 	invalidations hamt.Set
 }
 
-func (rs ResourceInvalidationSet) All() (result []ResourceInvalidation) {
-	s := rs.invalidations
+func (ris ResourceInvalidationSet) All() (result []ResourceInvalidation) {
+	s := ris.invalidations
 	for s.Size() != 0 {
 		var e hamt.Entry
 		e, s = s.FirstRest()
@@ -17,19 +17,23 @@ func (rs ResourceInvalidationSet) All() (result []ResourceInvalidation) {
 	return
 }
 
-func (rs ResourceInvalidationSet) Include(invalidation ResourceInvalidation) bool {
-	return rs.invalidations.Include(ResourceInvalidationEntry{
+func (ris ResourceInvalidationSet) Include(invalidation ResourceInvalidation) bool {
+	return ris.invalidations.Include(ResourceInvalidationEntry{
 		ResourceInvalidation: invalidation,
 	})
 }
 
-func (rs ResourceInvalidationSet) Insert(invalidation ResourceInvalidation) ResourceInvalidationSet {
+func (ris ResourceInvalidationSet) Insert(invalidation ResourceInvalidation) ResourceInvalidationSet {
 	entry := ResourceInvalidationEntry{invalidation}
-	newInvalidations := rs.invalidations.Insert(entry)
+	newInvalidations := ris.invalidations.Insert(entry)
 	return ResourceInvalidationSet{newInvalidations}
 }
 
-func (rs ResourceInvalidationSet) Merge(other ResourceInvalidationSet) ResourceInvalidationSet {
-	newInvalidations := rs.invalidations.Merge(other.invalidations)
+func (ris ResourceInvalidationSet) Merge(other ResourceInvalidationSet) ResourceInvalidationSet {
+	newInvalidations := ris.invalidations.Merge(other.invalidations)
 	return ResourceInvalidationSet{newInvalidations}
+}
+
+func (ris ResourceInvalidationSet) Size() int {
+	return ris.invalidations.Size()
 }

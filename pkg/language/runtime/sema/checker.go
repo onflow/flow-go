@@ -540,12 +540,10 @@ func (checker *Checker) checkResourceLoss() {
 
 		// TODO: handle `self` and `result` properly
 
-		// TODO: only if only potential, not if a definite invalidation exists
-
 		if variable.Type.IsResourceType() &&
 			variable.Kind != common.DeclarationKindSelf &&
 			variable.Kind != common.DeclarationKindResult &&
-			len(checker.resourceInvalidations.Get(variable).All()) == 0 {
+			!checker.resourceInvalidations.Get(variable).DefinitivelyInvalidated {
 
 			checker.report(
 				&ResourceLossError{

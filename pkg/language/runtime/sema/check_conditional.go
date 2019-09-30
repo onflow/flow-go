@@ -119,10 +119,10 @@ func (checker *Checker) visitConditionalBranches(
 	thenType = checker.visitConditionalBranch(checkThen, thenInvalidations)
 	elseType = checker.visitConditionalBranch(checkElse, elseInvalidations)
 
-	// TODO: merge. invalidations in both then and else are definite, others only potential
-
-	thenInvalidations.Merge(elseInvalidations)
-	checker.resourceInvalidations = thenInvalidations
+	checker.resourceInvalidations.MergeBranches(
+		thenInvalidations,
+		elseInvalidations,
+	)
 
 	return
 }
