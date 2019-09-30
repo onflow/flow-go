@@ -4964,3 +4964,16 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 	Expect(actual).
 		To(Equal(expected))
 }
+
+func TestParseIdentifiers(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, name := range []string{"foo", "from", "create", "destroy"} {
+		_, _, err := parser.ParseProgram(fmt.Sprintf(`
+          let %s = 1
+	    `, name))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
+}

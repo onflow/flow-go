@@ -159,6 +159,14 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	checker.recordVariableDeclarationOccurrence(name, variable)
 }
 
+func (checker *Checker) enterValueScope() {
+	checker.valueActivations.PushCurrent()
+}
+
+func (checker *Checker) leaveValueScope() {
+	checker.valueActivations.Pop()
+}
+
 func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
 	identifier := ast.Identifier{
 		Identifier: name,
@@ -375,16 +383,6 @@ func (checker *Checker) FindType(name string) Type {
 	return ty
 }
 
-func (checker *Checker) pushActivations() {
-	checker.valueActivations.PushCurrent()
-	checker.typeActivations.PushCurrent()
-}
-
-func (checker *Checker) popActivations() {
-	checker.valueActivations.Pop()
-	checker.typeActivations.Pop()
-}
-
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// pre-declare interfaces, composites, and functions (check afterwards)
@@ -491,8 +489,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -852,8 +850,8 @@ func (checker *Checker) declareGlobalType(name string) {
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.visitStatements(block.Statements)
 
@@ -904,8 +902,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.pushActivations()
-	defer checker.popActivations()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.visitConditions(functionBlock.PreConditions)
 
@@ -1127,8 +1125,8 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 
 	case *ast.VariableDeclaration:
 		func() {
-			checker.pushActivations()
-			defer checker.popActivations()
+			checker.enterValueScope()
+			defer checker.leaveValueScope()
 
 			checker.visitVariableDeclaration(test, true)
 
@@ -2873,7 +2871,7 @@ func (checker *Checker) checkFieldsInitialized(
 	compositeType *CompositeType,
 ) {
 	for _, initializer := range declaration.Members.Initializers {
-		unassigned, errors := CheckFieldAssignments(
+		unassigned, errs := CheckFieldAssignments(
 			declaration.Members.Fields,
 			initializer.FunctionBlock,
 		)
@@ -2889,7 +2887,7 @@ func (checker *Checker) checkFieldsInitialized(
 			)
 		}
 
-		checker.report(errors...)
+		checker.report(errs...)
 	}
 }
 
@@ -3112,8 +3110,8 @@ func (checker *Checker) checkInitializer(
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
-	checker.valueActivations.PushCurrent()
-	defer checker.valueActivations.Pop()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.declareSelfValue(containerType)
 
@@ -3161,8 +3159,8 @@ func (checker *Checker) checkCompositeFunctions(
 			// NOTE: new activation, as function declarations
 			// shouldn'T be visible in other function declarations,
 			// and `self` is is only visible inside function
-			checker.valueActivations.PushCurrent()
-			defer checker.valueActivations.Pop()
+			checker.enterValueScope()
+			defer checker.leaveValueScope()
 
 			checker.declareSelfValue(selfType)
 
@@ -3179,7 +3177,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	depth := checker.valueActivations.Depth() + 1
 
 	self := &Variable{
-		Kind:       common.DeclarationKindConstant,
+		Kind:       common.DeclarationKindSelf,
 		Type:       selfType,
 		IsConstant: true,
 		Depth:      depth,
@@ -3366,8 +3364,8 @@ func (checker *Checker) checkInterfaceFunctions(
 			// NOTE: new activation, as function declarations
 			// shouldn'T be visible in other function declarations,
 			// and `self` is is only visible inside function
-			checker.valueActivations.PushCurrent()
-			defer checker.valueActivations.Pop()
+			checker.enterValueScope()
+			defer checker.leaveValueScope()
 
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)

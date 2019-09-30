@@ -516,32 +516,35 @@ func TestCheckArraySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := ParseAndCheck(fmt.Sprintf(`
-          %[1]s interface I {}
-          %[1]s S: I {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          let xs: %[2]s[S] %[3]s []
-          let ys: %[2]s[I] %[3]s xs
-	    `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-		))
+			_, err := ParseAndCheck(fmt.Sprintf(`
+              %[1]s interface I {}
+              %[1]s S: I {}
 
-		// TODO: add support for non-structure declarations
+              let xs: %[2]s[S] %[3]s []
+              let ys: %[2]s[I] %[3]s xs
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+			))
 
-		if kind == common.CompositeKindStructure {
-			Expect(err).
-				To(Not(HaveOccurred()))
-		} else {
-			errs := ExpectCheckerErrors(err, 2)
+			// TODO: add support for non-structure declarations
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			if kind == common.CompositeKindStructure {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := ExpectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
-		}
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
+		})
 	}
 }
 
@@ -563,32 +566,35 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := ParseAndCheck(fmt.Sprintf(`
-          %[1]s interface I {}
-          %[1]s S: I {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          let xs: %[2]s{String: S} %[3]s {}
-          let ys: %[2]s{String: I} %[3]s xs
-	    `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-		))
+			_, err := ParseAndCheck(fmt.Sprintf(`
+              %[1]s interface I {}
+              %[1]s S: I {}
 
-		// TODO: add support for non-structure declarations
+              let xs: %[2]s{String: S} %[3]s {}
+              let ys: %[2]s{String: I} %[3]s xs
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+			))
 
-		if kind == common.CompositeKindStructure {
-			Expect(err).
-				To(Not(HaveOccurred()))
-		} else {
-			errs := ExpectCheckerErrors(err, 2)
+			// TODO: add support for non-structure declarations
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			if kind == common.CompositeKindStructure {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := ExpectCheckerErrors(err, 2)
 
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
-		}
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
+		})
 	}
 }
 

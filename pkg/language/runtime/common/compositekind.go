@@ -65,3 +65,10 @@ func (k CompositeKind) ConstructionKeyword() string {
 	}
 	return "create"
 }
+
+func (k CompositeKind) DestructionKeyword() interface{} {
+	if k != CompositeKindResource {
+		return ""
+	}
+	return "destroy"
+}

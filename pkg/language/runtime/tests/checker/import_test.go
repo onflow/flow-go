@@ -168,46 +168,49 @@ func TestCheckImportTypes(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		checker, err := ParseAndCheck(fmt.Sprintf(`
-	       %s Test {}
-	    `, kind.Keyword()))
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-		// TODO: add support for non-structure declarations
+			checker, err := ParseAndCheck(fmt.Sprintf(`
+	           %s Test {}
+	        `, kind.Keyword()))
 
-		if kind == common.CompositeKindStructure {
-			Expect(err).
-				To(Not(HaveOccurred()))
-		} else {
-			errs := ExpectCheckerErrors(err, 1)
+			// TODO: add support for non-structure declarations
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
-		}
+			if kind == common.CompositeKindStructure {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := ExpectCheckerErrors(err, 1)
 
-		_, err = ParseAndCheckWithExtra(
-			`
-               import "imported"
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
 
-               let x: Test = Test()
-            `,
-			nil,
-			nil,
-			func(location ast.ImportLocation) (program *ast.Program, e error) {
-				return checker.Program, nil
-			},
-		)
+			_, err = ParseAndCheckWithExtra(
+				`
+                 import "imported"
 
-		// TODO: add support for non-structure declarations
+                 let x: Test = Test()
+              `,
+				nil,
+				nil,
+				func(location ast.ImportLocation) (program *ast.Program, e error) {
+					return checker.Program, nil
+				},
+			)
 
-		if kind == common.CompositeKindStructure {
-			Expect(err).
-				To(Not(HaveOccurred()))
-		} else {
-			errs := ExpectCheckerErrors(err, 3)
+			// TODO: add support for non-structure declarations
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
-		}
+			if kind == common.CompositeKindStructure {
+				Expect(err).
+					To(Not(HaveOccurred()))
+			} else {
+				errs := ExpectCheckerErrors(err, 3)
 
+				Expect(errs[0]).
+					To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
+			}
+
+		})
 	}
 }
