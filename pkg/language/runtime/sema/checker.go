@@ -61,7 +61,7 @@ func NewChecker(
 		PredeclaredTypes:      predeclaredTypes,
 		ImportCheckers:        map[ast.ImportLocation]*Checker{},
 		valueActivations:      NewValueActivations(),
-		resourceInvalidations: NewResourceInvalidations(),
+		resourceInvalidations: &ResourceInvalidations{},
 		typeActivations:       NewTypeActivations(baseTypes),
 		functionActivations:   &FunctionActivations{},
 		GlobalValues:          map[string]*Variable{},
@@ -540,10 +540,12 @@ func (checker *Checker) checkResourceLoss() {
 
 		// TODO: handle `self` and `result` properly
 
+		// TODO: only if only potential, not if a definite invalidation exists
+
 		if variable.Type.IsResourceType() &&
 			variable.Kind != common.DeclarationKindSelf &&
 			variable.Kind != common.DeclarationKindResult &&
-			len(checker.resourceInvalidations.Get(variable)) == 0 {
+			len(checker.resourceInvalidations.Get(variable).All()) == 0 {
 
 			checker.report(
 				&ResourceLossError{
@@ -568,7 +570,7 @@ func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType
 		return
 	}
 	checker.resourceInvalidations.Add(variable,
-		&ResourceInvalidation{
+		ResourceInvalidation{
 			Kind: kind,
 			Pos:  pos,
 		},

@@ -1292,7 +1292,7 @@ func (e *ResourceLossError) EndPosition() ast.Position {
 type ResourceUseAfterInvalidationError struct {
 	Name          string
 	Pos           ast.Position
-	Invalidations []*ResourceInvalidation
+	Invalidations []ResourceInvalidation
 	wasMoved      bool
 	wasDestroyed  bool
 }
@@ -1374,7 +1374,7 @@ func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
 // ResourceInvalidationNote
 
 type ResourceInvalidationNote struct {
-	*ResourceInvalidation
+	ResourceInvalidation
 	StartPos ast.Position
 	EndPos   ast.Position
 }

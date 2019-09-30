@@ -9,7 +9,7 @@ import (
 func TestResourceInvalidations_Add(t *testing.T) {
 	RegisterTestingT(t)
 
-	invalidations := NewResourceInvalidations()
+	invalidations := &ResourceInvalidations{}
 
 	varX := &Variable{
 		Type: &IntType{},
@@ -23,78 +23,77 @@ func TestResourceInvalidations_Add(t *testing.T) {
 		Type: &IntType{},
 	}
 
-	Expect(invalidations.Get(varX)).
-		To(BeNil())
-	Expect(invalidations.Get(varY)).
-		To(BeNil())
-	Expect(invalidations.Get(varZ)).
-		To(BeNil())
+	Expect(invalidations.Get(varX).All()).
+		To(BeEmpty())
+	Expect(invalidations.Get(varY).All()).
+		To(BeEmpty())
+	Expect(invalidations.Get(varZ).All()).
+		To(BeEmpty())
 
-	invalidations.Add(varX, &ResourceInvalidation{
+	invalidations.Add(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
 
-	Expect(invalidations.Get(varX)).
+	Expect(invalidations.Get(varX).All()).
 		To(ConsistOf(
-			&ResourceInvalidation{
+			ResourceInvalidation{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
 		))
-	Expect(invalidations.Get(varY)).
-		To(BeNil())
-	Expect(invalidations.Get(varZ)).
-		To(BeNil())
+	Expect(invalidations.Get(varY).All()).
+		To(BeEmpty())
+	Expect(invalidations.Get(varZ).All()).
+		To(BeEmpty())
 
-	invalidations.Add(varX, &ResourceInvalidation{
+	invalidations.Add(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
-	Expect(invalidations.Get(varX)).
+	Expect(invalidations.Get(varX).All()).
 		To(ConsistOf(
-			&ResourceInvalidation{
+			ResourceInvalidation{
 
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			&ResourceInvalidation{
+			ResourceInvalidation{
 
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
 		))
-	Expect(invalidations.Get(varY)).
-		To(BeNil())
-	Expect(invalidations.Get(varZ)).
-		To(BeNil())
+	Expect(invalidations.Get(varY).All()).
+		To(BeEmpty())
+	Expect(invalidations.Get(varZ).All()).
+		To(BeEmpty())
 
-	invalidations.Add(varY, &ResourceInvalidation{
+	invalidations.Add(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
 
-	Expect(invalidations.Get(varX)).
+	Expect(invalidations.Get(varX).All()).
 		To(ConsistOf(
-			&ResourceInvalidation{
+			ResourceInvalidation{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			&ResourceInvalidation{
+			ResourceInvalidation{
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
 		))
-	Expect(invalidations.Get(varY)).
+	Expect(invalidations.Get(varY).All()).
 		To(ConsistOf(
-			&ResourceInvalidation{
+			ResourceInvalidation{
 				Pos: ast.Position{Line: 3, Column: 3},
 			},
 		))
-	Expect(invalidations.Get(varZ)).
-		To(BeNil())
-
+	Expect(invalidations.Get(varZ).All()).
+		To(BeEmpty())
 }
 
 //
 //func TestResourceInvalidations_Merge(t *testing.T) {
 //	RegisterTestingT(t)
 //
-//	positions1 := NewResourceInvalidations()
-//	positions2 := NewResourceInvalidations()
+//	positions1 := &ResourceInvalidations{}
+//	positions2 := &ResourceInvalidations{}
 //
 //	varX := &Variable{
 //		Type: &IntType{},

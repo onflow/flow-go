@@ -21,18 +21,18 @@ type Variable struct {
 	Pos *ast.Position
 }
 
-// VariableKey allows using variable pointers as keys in `hamt` structures
+// VariableEntry allows using variable pointers as entries in `hamt` structures
 //
-type VariableKey struct {
+type VariableEntry struct {
 	variable *Variable
 }
 
-func (k VariableKey) Hash() uint32 {
+func (k VariableEntry) Hash() uint32 {
 	return uint32(uintptr(unsafe.Pointer(k.variable)))
 }
 
-func (k VariableKey) Equal(e hamt.Entry) bool {
-	other, ok := e.(VariableKey)
+func (k VariableEntry) Equal(e hamt.Entry) bool {
+	other, ok := e.(VariableEntry)
 	if !ok {
 		return false
 	}

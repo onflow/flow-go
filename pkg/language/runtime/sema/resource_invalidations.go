@@ -1,40 +1,27 @@
 package sema
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/raviqqe/hamt"
 )
-
-type ResourceInvalidation struct {
-	Kind ResourceInvalidationKind
-	Pos  ast.Position
-}
 
 type ResourceInvalidations struct {
 	invalidations hamt.Map
 }
 
-func NewResourceInvalidations() *ResourceInvalidations {
-	return &ResourceInvalidations{
-		invalidations: hamt.NewMap(),
-	}
-}
-
 // Get returns all invalidations for the given variable.
 //
-func (p *ResourceInvalidations) Get(variable *Variable) []*ResourceInvalidation {
-	key := VariableKey{variable: variable}
+func (p *ResourceInvalidations) Get(variable *Variable) ResourceInvalidationSet {
+	key := VariableEntry{variable: variable}
 	existing := p.invalidations.Find(key)
 	if existing == nil {
-		return nil
+		return ResourceInvalidationSet{}
 	}
-	return existing.([]*ResourceInvalidation)
+	return existing.(ResourceInvalidationSet)
 }
 
-func (p *ResourceInvalidations) Add(variable *Variable, invalidation *ResourceInvalidation) {
-	invalidations := p.Get(variable)
-	invalidations = append(invalidations, invalidation)
-	key := VariableKey{variable: variable}
+func (p *ResourceInvalidations) Add(variable *Variable, invalidation ResourceInvalidation) {
+	key := VariableEntry{variable: variable}
+	invalidations := p.Get(variable).Insert(invalidation)
 	p.invalidations = p.invalidations.Insert(key, invalidations)
 }
 
@@ -51,10 +38,8 @@ func (p *ResourceInvalidations) Merge(other *ResourceInvalidations) {
 		var entry hamt.Entry
 		var value interface{}
 		entry, value, otherInvalidations = otherInvalidations.FirstRest()
-
-		variable := entry.(VariableKey).variable
-
-		mergedInvalidations := append(p.Get(variable), value.([]*ResourceInvalidation)...)
+		variable := entry.(VariableEntry).variable
+		mergedInvalidations := p.Get(variable).Merge(value.(ResourceInvalidationSet))
 		p.invalidations = p.invalidations.Insert(entry, mergedInvalidations)
 	}
 }

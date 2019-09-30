@@ -27,7 +27,7 @@ func (a *Activations) Find(key string) interface{} {
 	if current == nil {
 		return nil
 	}
-	return current.Find(common.StringKey(key))
+	return current.Find(common.StringEntry(key))
 }
 
 func (a *Activations) Set(name string, value interface{}) {
@@ -39,7 +39,7 @@ func (a *Activations) Set(name string, value interface{}) {
 
 	count := len(a.activations)
 	a.activations[count-1] = current.
-		Insert(common.StringKey(name), value)
+		Insert(common.StringEntry(name), value)
 }
 
 func (a *Activations) PushCurrent() {

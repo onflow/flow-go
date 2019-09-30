@@ -129,7 +129,7 @@ func (a *ValueActivations) VariablesDeclaredInThisScope() map[string]*Variable {
 			continue
 		}
 
-		name := string(entry.(common.StringKey))
+		name := string(entry.(common.StringEntry))
 
 		variables[name] = variable
 	}

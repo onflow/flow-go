@@ -10,7 +10,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		invalidations := checker.resourceInvalidations.Get(variable)
+		invalidations := checker.resourceInvalidations.Get(variable).All()
 
 		if len(invalidations) > 0 {
 			checker.report(

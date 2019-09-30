@@ -1850,11 +1850,11 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 
 	Expect(errs[1].(*sema.ResourceUseAfterInvalidationError).Invalidations).
 		To(ConsistOf(
-			&sema.ResourceInvalidation{
+			sema.ResourceInvalidation{
 				Kind: sema.ResourceInvalidationKindMove,
 				Pos:  ast.Position{Offset: 165, Line: 9, Column: 23},
 			},
-			&sema.ResourceInvalidation{
+			sema.ResourceInvalidation{
 				Kind: sema.ResourceInvalidationKindMove,
 				Pos:  ast.Position{Offset: 120, Line: 7, Column: 23},
 			},
