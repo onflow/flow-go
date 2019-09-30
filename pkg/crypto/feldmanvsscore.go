@@ -5,7 +5,6 @@ package crypto
 // #include "dkg_include.h"
 import "C"
 import (
-	"fmt"
 	"unsafe"
 
 	log "github.com/sirupsen/logrus"
@@ -23,10 +22,10 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	}
 
 	// prepare the DKGToSend slice and compute the shares
-	out := &(DKGoutput{
+	out := &DKGoutput{
 		result: valid,
 		err:    nil,
-	})
+	}
 
 	// s.size-1 DKGToSend to be sent to the other nodes
 	// One DKGToSend to be broadcasted
@@ -67,8 +66,8 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 }
 
 func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, error) {
-	log.Debug(fmt.Sprintf("%d Receiving a share from %d\n", s.currentIndex, origin))
-	log.Debug(fmt.Sprintf("the share is %d\n", data))
+	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
+	log.Debugf("the share is %d\n", data)
 	if s.xReceived {
 		return invalid, nil
 	}
@@ -89,8 +88,8 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, erro
 }
 
 func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult, error) {
-	log.Debug(fmt.Sprintf("%d Receiving vector from %d\n", s.currentIndex, origin))
-	log.Debug(fmt.Sprintf("the vector is %d\n", data))
+	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
+	log.Debugf("the vector is %d\n", data)
 	if s.AReceived {
 		return invalid, nil
 	}

@@ -127,7 +127,7 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 	return sk.pk
 }
 
-// PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
+// PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
 type PubKeyBLS_BLS12381 struct {
 	// public key data
 	point pointG2

@@ -6,13 +6,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DKGtype is the supported DKG type
-type DKGtype int
+// DKGType is the supported DKG type
+type DKGType int
 
 // Supported DKG protocols
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
-	FeldmanVSS DKGtype = iota
+	FeldmanVSS DKGType = iota
 	// Joint Feldman (Pedersen)
 	JointFeldman
 	// Gennaro et.al protocol
@@ -35,11 +35,12 @@ type DKGstate interface {
 // NewDKG creates a new instance of a DKG protocol.
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
-func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
+func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
 	if currentIndex >= size || leaderIndex >= size {
 		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}
 	}
-	if size < 3 {
+	minSize := 3
+	if size < minSize {
 		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
 	}
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -48,17 +49,17 @@ func NewDKG(dkg DKGtype, size int, currentIndex int, leaderIndex int) (DKGstate,
 	//   n-m<=t+1 for robustness
 	threshold := (size - 1) / 2
 	if dkg == FeldmanVSS {
-		common := &(DKGcommon{
+		common := &DKGcommon{
 			size:         size,
 			threshold:    threshold,
 			currentIndex: currentIndex,
-		})
-		fvss := &(feldmanVSSstate{
+		}
+		fvss := &feldmanVSSstate{
 			DKGcommon:   common,
 			leaderIndex: leaderIndex,
-		})
+		}
 		fvss.init()
-		log.Debug(fmt.Sprintf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex))
+		log.Debugf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
 		return fvss, nil
 	}
 
@@ -71,7 +72,7 @@ type DKGcommon struct {
 	threshold    int
 	currentIndex int
 	// running is true when the DKG protocol is runnig, is false otherwise
-	isrunning bool
+	running bool
 }
 
 // Size returns the size of the DKG group n

@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -24,34 +23,35 @@ type toProcess struct {
 }
 
 func send(orig int, dest int, msg DKGmsg, dkg []DKGstate, chans []chan *toProcess) {
-	log.Info(fmt.Sprintf("%d Sending to %d:\n", orig, dest))
+	log.Infof("%d Sending to %d:\n", orig, dest)
 	log.Debug(msg)
-	new := &toProcess{orig, msg}
-	chans[dest] <- new
+	newMsg := &toProcess{orig, msg}
+	chans[dest] <- newMsg
 }
 
 func broadcast(orig int, dkg []DKGstate, msg DKGmsg, chans []chan *toProcess) {
-	log.Info(fmt.Sprintf("%d Broadcasting:", orig))
+	log.Infof("%d Broadcasting:", orig)
 	log.Debug(msg)
-	new := &toProcess{orig, msg}
+	newMsg := &toProcess{orig, msg}
 	for i := 0; i < len(dkg); i++ {
 		if i != orig {
-			chans[i] <- new
+			chans[i] <- newMsg
 		}
 	}
 }
 
-func processChan(current int, dkg []DKGstate, chans []chan *toProcess, quit chan int) {
+func processChan(current int, dkg []DKGstate, chans []chan *toProcess,
+	quit chan int, t *testing.T) {
 	for {
 		select {
-		case new := <-chans[current]:
-			log.Info(fmt.Sprintf("%d Receiving from %d:", current, new.orig))
-			out := dkg[current].ProcessDKGmsg(new.orig, new.msg)
-			out.processOutput(current, dkg, chans)
+		case newMsg := <-chans[current]:
+			log.Infof("%d Receiving from %d:", current, newMsg.orig)
+			out := dkg[current].ProcessDKGmsg(newMsg.orig, newMsg.msg)
+			out.processOutput(current, dkg, chans, t)
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
-			log.Info(fmt.Sprintf("%d quit \n", current))
-			_, _, _, _ = dkg[current].EndDKG()
+			log.Infof("%d quit \n", current)
+			dkg[current].EndDKG()
 			quit <- 1
 			return
 		}
@@ -59,13 +59,13 @@ func processChan(current int, dkg []DKGstate, chans []chan *toProcess, quit chan
 }
 
 func (out *DKGoutput) processOutput(current int, dkg []DKGstate,
-	chans []chan *toProcess) {
-	assert.Nil(x, out.err)
+	chans []chan *toProcess, t *testing.T) {
+	assert.Nil(t, out.err)
 	if out.err != nil {
 		log.Error("DKG output error: " + out.err.Error())
 	}
 
-	assert.Equal(x, out.result, valid, "they should be equal")
+	assert.Equal(t, out.result, valid, "they should be equal")
 
 	for _, msg := range out.action {
 		if msg.broadcast {
@@ -76,10 +76,7 @@ func (out *DKGoutput) processOutput(current int, dkg []DKGstate,
 	}
 }
 
-var x *testing.T
-
 func TestFeldmanVSS(t *testing.T) {
-	x = t
 	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
@@ -102,19 +99,19 @@ func TestFeldmanVSS(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go processChan(i, dkg, chans, quit)
+		go processChan(i, dkg, chans, quit, t)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
 		if current != lead {
 			out := dkg[current].StartDKG(seed)
-			out.processOutput(current, dkg, chans)
+			out.processOutput(current, dkg, chans, t)
 		}
 	}
 	// start the leader (this avoids a data racing issue)
 	out := dkg[lead].StartDKG(seed)
-	out.processOutput(lead, dkg, chans)
+	out.processOutput(lead, dkg, chans, t)
 
 	// this loop synchronizes the main thread to end all DKGs
 	for i := 0; i < n; i++ {

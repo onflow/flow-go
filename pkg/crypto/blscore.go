@@ -40,7 +40,7 @@ func (a *BLS_BLS12381Algo) init() error {
 }
 
 // reinit the context of BLS12381 curve assuming there was a previous call to init()
-// If the implementation evolves and relic has multiple contextes,
+// If the implementation evolves and relic has multiple contexts,
 // reinit should be called at every a. operation.
 func (a *BLS_BLS12381Algo) reinit() {
 	C.core_set(a.context)

@@ -13,12 +13,14 @@ var ECDSA_P256Instance *ECDSAalgo
 var ECDSA_SECp256k1Instance *ECDSAalgo
 
 //  Once variables to make sure each Signer is instanciated only once
-var once [3]sync.Once
+var BLS_BLS12381Once sync.Once
+var ECDSA_P256Once sync.Once
+var ECDSA_SECp256k1Once sync.Once
 
 // NewSignatureAlgo initializes and chooses a signature scheme
 func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
-		once[0].Do(func() {
+		BLS_BLS12381Once.Do(func() {
 			BLS_BLS12381Instance = &(BLS_BLS12381Algo{
 				SignAlgo: &SignAlgo{
 					name,
@@ -33,7 +35,7 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	}
 
 	if name == ECDSA_P256 {
-		once[1].Do(func() {
+		ECDSA_P256Once.Do(func() {
 			ECDSA_P256Instance = &(ECDSAalgo{
 				curve: elliptic.P256(),
 				SignAlgo: &SignAlgo{
@@ -48,7 +50,7 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	}
 
 	if name == ECDSA_SECp256k1 {
-		once[2].Do(func() {
+		ECDSA_SECp256k1Once.Do(func() {
 			ECDSA_SECp256k1Instance = &(ECDSAalgo{
 				curve: secp256k1(),
 				SignAlgo: &SignAlgo{

@@ -24,7 +24,7 @@ type feldmanVSSstate struct {
 }
 
 func (s *feldmanVSSstate) init() {
-	s.isrunning = false
+	s.running = false
 
 	blsSigner, _ := NewSignatureAlgo(BLS_BLS12381)
 	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
@@ -36,20 +36,20 @@ func (s *feldmanVSSstate) init() {
 }
 
 func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
-	s.isrunning = true
+	s.running = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
 		return s.generateShares(seed)
 	}
-	out := &(DKGoutput{
+	out := &DKGoutput{
 		result: valid,
 		err:    nil,
-	})
+	}
 	return out
 }
 
 func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
-	s.isrunning = false
+	s.running = false
 	// private key of the current node
 	var x PrKey
 	if s.xReceived {
@@ -57,17 +57,14 @@ func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
 			alg:    s.blsContext, // signer algo
 			scalar: s.x,          // the private share
 		}
-	} else {
-		x = nil
 	}
+
 	// Group public key
 	var Y PubKey
 	if s.A != nil {
 		Y = &PubKeyBLS_BLS12381{
 			point: s.A[0],
 		}
-	} else {
-		Y = nil
 	}
 	// The nodes public keys
 	y := make([]PubKey, s.size)
@@ -77,21 +74,17 @@ func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
 				point: p,
 			}
 		}
-	} else {
-		for i := 0; i < s.size; i++ {
-			y[i] = nil
-		}
 	}
 	return x, Y, y, nil
 }
 
 func (s *feldmanVSSstate) ProcessDKGmsg(orig int, msg DKGmsg) *DKGoutput {
-	out := &(DKGoutput{
+	out := &DKGoutput{
 		action: []DKGToSend{},
 		err:    nil,
-	})
+	}
 
-	if !s.isrunning || len(msg) == 0 {
+	if !s.running || len(msg) == 0 {
 		out.result = invalid
 		return out
 	}
