@@ -1284,6 +1284,64 @@ func (e *ResourceLossError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// ResourceUseAfterMoveError
+
+// TODO: show position of move
+
+type ResourceUseAfterMoveError struct {
+	UseStartPos  ast.Position
+	UseEndPos    ast.Position
+	MoveStartPos ast.Position
+	MoveEndPos   ast.Position
+}
+
+func (e *ResourceUseAfterMoveError) Error() string {
+	return "use of moved resource"
+}
+
+func (e *ResourceUseAfterMoveError) SecondaryError() string {
+	return "resource used here after move"
+}
+
+func (*ResourceUseAfterMoveError) isSemanticError() {}
+
+func (e *ResourceUseAfterMoveError) StartPosition() ast.Position {
+	return e.UseStartPos
+}
+
+func (e *ResourceUseAfterMoveError) EndPosition() ast.Position {
+	return e.UseEndPos
+}
+
+// ResourceUseAfterDestructionError
+
+// TODO: show position of destruction
+
+type ResourceUseAfterDestructionError struct {
+	UseStartPos         ast.Position
+	UseEndPos           ast.Position
+	DestructionStartPos ast.Position
+	DestructionEndPos   ast.Position
+}
+
+func (e *ResourceUseAfterDestructionError) Error() string {
+	return "use of destroyed resource"
+}
+
+func (e *ResourceUseAfterDestructionError) SecondaryError() string {
+	return "resource used here after destruction"
+}
+
+func (*ResourceUseAfterDestructionError) isSemanticError() {}
+
+func (e *ResourceUseAfterDestructionError) StartPosition() ast.Position {
+	return e.UseStartPos
+}
+
+func (e *ResourceUseAfterDestructionError) EndPosition() ast.Position {
+	return e.UseEndPos
+}
+
 // MissingCreateError
 
 type MissingCreateError struct {
