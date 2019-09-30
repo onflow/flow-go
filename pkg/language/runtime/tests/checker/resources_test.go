@@ -1995,3 +1995,103 @@ func TestCheckInvalidUseAfterResourceMoveIntoArray(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
+
+func TestCheckResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {"x": <-x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceMoveIntoDictionaryMissingMoveOperation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {"x": x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      let xs = {"x": <-x}
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
+
+func TestCheckInvalidUseAfterResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {
+          "x": <-x, 
+          "x2": <-x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {<-x: <-x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
