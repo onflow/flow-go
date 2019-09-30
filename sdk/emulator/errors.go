@@ -48,6 +48,15 @@ func (e *ErrDuplicateTransaction) Error() string {
 	return fmt.Sprintf("Transaction with hash %s has already been submitted", e.TxHash)
 }
 
+// ErrMissingSignature indicates that a transaction is missing a required signature.
+type ErrMissingSignature struct {
+	Account types.Address
+}
+
+func (e *ErrMissingSignature) Error() string {
+	return fmt.Sprintf("Account %s does not have sufficient signatures", e.Account)
+}
+
 // ErrInvalidSignaturePublicKey indicates that signature uses an invalid public key.
 type ErrInvalidSignaturePublicKey struct {
 	Account types.Address

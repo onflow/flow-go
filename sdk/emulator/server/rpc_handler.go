@@ -29,7 +29,7 @@ func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*o
 func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
-	tx, err := proto.MessageToSignedTransaction(txMsg)
+	tx, err := proto.MessageToTransaction(txMsg)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -160,10 +160,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 		WithField("txHash", hash).
 		Debugf("💵  GetTransaction called")
 
-	txMsg, err := proto.SignedTransactionToMessage(*tx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	txMsg := proto.TransactionToMessage(*tx)
 
 	response := &observe.GetTransactionResponse{
 		Transaction: txMsg,

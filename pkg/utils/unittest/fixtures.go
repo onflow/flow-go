@@ -1,8 +1,6 @@
 package unittest
 
 import (
-	"time"
-
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -17,13 +15,14 @@ func AccountSignatureFixture() types.AccountSignature {
 	}
 }
 
-func SignedTransactionFixture() types.SignedTransaction {
-	return types.SignedTransaction{
-		Script:         []byte("fun main() {}"),
-		Nonce:          1,
-		ComputeLimit:   10,
-		ComputeUsed:    0,
-		Timestamp:      time.Now().In(time.UTC),
-		PayerSignature: AccountSignatureFixture(),
+func TransactionFixture() types.Transaction {
+	return types.Transaction{
+		Script:             []byte("fun main() {}"),
+		ReferenceBlockHash: nil,
+		Nonce:              0,
+		ComputeLimit:       10,
+		PayerAccount:       AddressFixture(),
+		ScriptAccounts:     []types.Address{AddressFixture()},
+		Signatures:         []types.AccountSignature{AccountSignatureFixture()},
 	}
 }
