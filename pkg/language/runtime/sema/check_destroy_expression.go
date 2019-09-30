@@ -25,12 +25,7 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 		return
 	}
 
-	if identifierExpression, ok := expression.Expression.(*ast.IdentifierExpression); ok {
-		variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
-		if variable != nil {
-			variable.DestroyPos = &identifierExpression.Pos
-		}
-	}
+	checker.recordResourceDestroy(expression.Expression, valueType)
 
 	return
 }

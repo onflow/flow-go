@@ -480,8 +480,8 @@ func (checker *Checker) checkInitializer(
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.declareSelfValue(containerType)
 
