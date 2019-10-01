@@ -1287,12 +1287,11 @@ func (e *ResourceLossError) EndPosition() ast.Position {
 
 // ResourceUseAfterInvalidationError
 
-// TODO: show hints for terminations of invalidations
-
 type ResourceUseAfterInvalidationError struct {
 	Name          string
 	Pos           ast.Position
 	Invalidations []ResourceInvalidation
+	InLoop        bool
 	wasMoved      bool
 	wasDestroyed  bool
 }
@@ -1337,17 +1336,24 @@ func (e *ResourceUseAfterInvalidationError) Error() string {
 }
 
 func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
+	message := ""
 	wasMoved, wasDestroyed := e.cause()
 	switch {
 	case wasMoved && wasDestroyed:
-		return "resource used here after being moved or destroyed"
+		message = "resource used here after being moved or destroyed"
 	case wasMoved:
-		return "resource used here after being moved"
+		message = "resource used here after being moved"
 	case wasDestroyed:
-		return "resource used here after being destroyed"
+		message = "resource used here after being destroyed"
+	default:
+		panic(&errors.UnreachableError{})
 	}
 
-	panic(&errors.UnreachableError{})
+	if e.InLoop {
+		message += ", in previous iteration of loop"
+	}
+
+	return message
 }
 
 func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNote) {

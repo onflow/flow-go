@@ -6,54 +6,57 @@ import (
 	"testing"
 )
 
-func TestResourceInvalidations_Add(t *testing.T) {
+func TestResources_Add(t *testing.T) {
 	RegisterTestingT(t)
 
-	invalidations := &ResourceInvalidations{}
+	resources := &Resources{}
 
 	varX := &Variable{
-		Type: &IntType{},
+		Identifier: "x",
+		Type:       &IntType{},
 	}
 
 	varY := &Variable{
-		Type: &IntType{},
+		Identifier: "y",
+		Type:       &IntType{},
 	}
 
 	varZ := &Variable{
-		Type: &IntType{},
+		Identifier: "z",
+		Type:       &IntType{},
 	}
 
-	Expect(invalidations.Get(varX).InvalidationSet.All()).
+	Expect(resources.Get(varX).Invalidations.All()).
 		To(BeEmpty())
-	Expect(invalidations.Get(varY).InvalidationSet.All()).
+	Expect(resources.Get(varY).Invalidations.All()).
 		To(BeEmpty())
-	Expect(invalidations.Get(varZ).InvalidationSet.All()).
+	Expect(resources.Get(varZ).Invalidations.All()).
 		To(BeEmpty())
 
 	// add invalidation for X
 
-	invalidations.Add(varX, ResourceInvalidation{
+	resources.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
 
-	Expect(invalidations.Get(varX).InvalidationSet.All()).
+	Expect(resources.Get(varX).Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
 		))
-	Expect(invalidations.Get(varY).InvalidationSet.All()).
+	Expect(resources.Get(varY).Invalidations.All()).
 		To(BeEmpty())
-	Expect(invalidations.Get(varZ).InvalidationSet.All()).
+	Expect(resources.Get(varZ).Invalidations.All()).
 		To(BeEmpty())
 
 	// add invalidation for X
 
-	invalidations.Add(varX, ResourceInvalidation{
+	resources.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
-	Expect(invalidations.Get(varX).InvalidationSet.All()).
+	Expect(resources.Get(varX).Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 
@@ -64,18 +67,18 @@ func TestResourceInvalidations_Add(t *testing.T) {
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
 		))
-	Expect(invalidations.Get(varY).InvalidationSet.All()).
+	Expect(resources.Get(varY).Invalidations.All()).
 		To(BeEmpty())
-	Expect(invalidations.Get(varZ).InvalidationSet.All()).
+	Expect(resources.Get(varZ).Invalidations.All()).
 		To(BeEmpty())
 
 	// add invalidation for Y
 
-	invalidations.Add(varY, ResourceInvalidation{
+	resources.AddInvalidation(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
 
-	Expect(invalidations.Get(varX).InvalidationSet.All()).
+	Expect(resources.Get(varX).Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 1, Column: 1},
@@ -84,50 +87,52 @@ func TestResourceInvalidations_Add(t *testing.T) {
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
 		))
-	Expect(invalidations.Get(varY).InvalidationSet.All()).
+	Expect(resources.Get(varY).Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 3, Column: 3},
 			},
 		))
-	Expect(invalidations.Get(varZ).InvalidationSet.All()).
+	Expect(resources.Get(varZ).Invalidations.All()).
 		To(BeEmpty())
 }
 
-func TestResourceInvalidations_FirstRest(t *testing.T) {
+func TestResourceResources_FirstRest(t *testing.T) {
 	RegisterTestingT(t)
 
-	invalidations := &ResourceInvalidations{}
+	resources := &Resources{}
 
 	varX := &Variable{
-		Type: &IntType{},
+		Identifier: "x",
+		Type:       &IntType{},
 	}
 
 	varY := &Variable{
-		Type: &IntType{},
+		Identifier: "y",
+		Type:       &IntType{},
 	}
 
-	// add invalidations for X and Y
+	// add resources for X and Y
 
-	invalidations.Add(varX, ResourceInvalidation{
+	resources.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
 
-	invalidations.Add(varX, ResourceInvalidation{
+	resources.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
-	invalidations.Add(varY, ResourceInvalidation{
+	resources.AddInvalidation(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
 
 	result := map[*Variable][]ResourceInvalidation{}
 
 	var variable *Variable
-	var invalidationInfo ResourceInvalidationInfo
-	for invalidations.Size() != 0 {
-		variable, invalidationInfo, invalidations = invalidations.FirstRest()
-		result[variable] = invalidationInfo.InvalidationSet.All()
+	var resourceInfo ResourceInfo
+	for resources.Size() != 0 {
+		variable, resourceInfo, resources = resources.FirstRest()
+		result[variable] = resourceInfo.Invalidations.All()
 	}
 
 	Expect(result).
@@ -151,57 +156,60 @@ func TestResourceInvalidations_FirstRest(t *testing.T) {
 		))
 }
 
-func TestResourceInvalidations_MergeBranches(t *testing.T) {
+func TestResources_MergeBranches(t *testing.T) {
 	RegisterTestingT(t)
 
-	invalidationsThen := &ResourceInvalidations{}
-	invalidationsElse := &ResourceInvalidations{}
+	resourcesThen := &Resources{}
+	resourcesElse := &Resources{}
 
 	varX := &Variable{
-		Type: &IntType{},
+		Identifier: "x",
+		Type:       &IntType{},
 	}
 
 	varY := &Variable{
-		Type: &IntType{},
+		Identifier: "y",
+		Type:       &IntType{},
 	}
 
 	varZ := &Variable{
-		Type: &IntType{},
+		Identifier: "z",
+		Type:       &IntType{},
 	}
 
 	// invalidate X and Y in then branch
 
-	invalidationsThen.Add(varX, ResourceInvalidation{
+	resourcesThen.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
-	invalidationsThen.Add(varY, ResourceInvalidation{
+	resourcesThen.AddInvalidation(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
 	// invalidate Y and Z in else branch
 
-	invalidationsElse.Add(varX, ResourceInvalidation{
+	resourcesElse.AddInvalidation(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
-	invalidationsElse.Add(varZ, ResourceInvalidation{
+	resourcesElse.AddInvalidation(varZ, ResourceInvalidation{
 		Pos: ast.Position{Line: 4, Column: 4},
 	})
 
 	// treat var Y already invalidated in main
-	invalidations := &ResourceInvalidations{}
-	invalidations.Add(varY, ResourceInvalidation{
+	resources := &Resources{}
+	resources.AddInvalidation(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 0, Column: 0},
 	})
 
-	invalidations.MergeBranches(
-		invalidationsThen,
-		invalidationsElse,
+	resources.MergeBranches(
+		resourcesThen,
+		resourcesElse,
 	)
 
-	varXInfo := invalidations.Get(varX)
+	varXInfo := resources.Get(varX)
 	Expect(varXInfo.DefinitivelyInvalidated).
 		To(BeTrue())
-	Expect(varXInfo.InvalidationSet.All()).
+	Expect(varXInfo.Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 1, Column: 1},
@@ -211,10 +219,10 @@ func TestResourceInvalidations_MergeBranches(t *testing.T) {
 			},
 		))
 
-	varYInfo := invalidations.Get(varY)
+	varYInfo := resources.Get(varY)
 	Expect(varYInfo.DefinitivelyInvalidated).
 		To(BeTrue())
-	Expect(varYInfo.InvalidationSet.All()).
+	Expect(varYInfo.Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 0, Column: 0},
@@ -224,10 +232,10 @@ func TestResourceInvalidations_MergeBranches(t *testing.T) {
 			},
 		))
 
-	varZInfo := invalidations.Get(varZ)
+	varZInfo := resources.Get(varZ)
 	Expect(varZInfo.DefinitivelyInvalidated).
 		To(BeFalse())
-	Expect(varZInfo.InvalidationSet.All()).
+	Expect(varZInfo.Invalidations.All()).
 		To(ConsistOf(
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 4, Column: 4},

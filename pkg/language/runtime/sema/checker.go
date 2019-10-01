@@ -28,25 +28,25 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program               *ast.Program
-	PredeclaredValues     map[string]ValueDeclaration
-	PredeclaredTypes      map[string]TypeDeclaration
-	ImportCheckers        map[ast.ImportLocation]*Checker
-	errors                []error
-	valueActivations      *ValueActivations
-	resourceInvalidations *ResourceInvalidations
-	typeActivations       *TypeActivations
-	functionActivations   *FunctionActivations
-	GlobalValues          map[string]*Variable
-	GlobalTypes           map[string]Type
-	inCondition           bool
-	Occurrences           *Occurrences
-	variableOrigins       map[*Variable]*Origin
-	memberOrigins         map[Type]map[string]*Origin
-	seenImports           map[ast.ImportLocation]bool
-	isChecked             bool
-	inCreate              bool
-	Elaboration           *Elaboration
+	Program             *ast.Program
+	PredeclaredValues   map[string]ValueDeclaration
+	PredeclaredTypes    map[string]TypeDeclaration
+	ImportCheckers      map[ast.ImportLocation]*Checker
+	errors              []error
+	valueActivations    *ValueActivations
+	resources           *Resources
+	typeActivations     *TypeActivations
+	functionActivations *FunctionActivations
+	GlobalValues        map[string]*Variable
+	GlobalTypes         map[string]Type
+	inCondition         bool
+	Occurrences         *Occurrences
+	variableOrigins     map[*Variable]*Origin
+	memberOrigins       map[Type]map[string]*Origin
+	seenImports         map[ast.ImportLocation]bool
+	isChecked           bool
+	inCreate            bool
+	Elaboration         *Elaboration
 }
 
 func NewChecker(
@@ -56,21 +56,21 @@ func NewChecker(
 ) (*Checker, error) {
 
 	checker := &Checker{
-		Program:               program,
-		PredeclaredValues:     predeclaredValues,
-		PredeclaredTypes:      predeclaredTypes,
-		ImportCheckers:        map[ast.ImportLocation]*Checker{},
-		valueActivations:      NewValueActivations(),
-		resourceInvalidations: &ResourceInvalidations{},
-		typeActivations:       NewTypeActivations(baseTypes),
-		functionActivations:   &FunctionActivations{},
-		GlobalValues:          map[string]*Variable{},
-		GlobalTypes:           map[string]Type{},
-		Occurrences:           NewOccurrences(),
-		variableOrigins:       map[*Variable]*Origin{},
-		memberOrigins:         map[Type]map[string]*Origin{},
-		seenImports:           map[ast.ImportLocation]bool{},
-		Elaboration:           NewElaboration(),
+		Program:             program,
+		PredeclaredValues:   predeclaredValues,
+		PredeclaredTypes:    predeclaredTypes,
+		ImportCheckers:      map[ast.ImportLocation]*Checker{},
+		valueActivations:    NewValueActivations(),
+		resources:           &Resources{},
+		typeActivations:     NewTypeActivations(baseTypes),
+		functionActivations: &FunctionActivations{},
+		GlobalValues:        map[string]*Variable{},
+		GlobalTypes:         map[string]Type{},
+		Occurrences:         NewOccurrences(),
+		variableOrigins:     map[*Variable]*Origin{},
+		memberOrigins:       map[Type]map[string]*Origin{},
+		seenImports:         map[ast.ImportLocation]bool{},
+		Elaboration:         NewElaboration(),
 	}
 
 	for name, declaration := range predeclaredValues {
@@ -544,7 +544,7 @@ func (checker *Checker) checkResourceLoss() {
 		if variable.Type.IsResourceType() &&
 			variable.Kind != common.DeclarationKindSelf &&
 			variable.Kind != common.DeclarationKindResult &&
-			!checker.resourceInvalidations.Get(variable).DefinitivelyInvalidated {
+			!checker.resources.Get(variable).DefinitivelyInvalidated {
 
 			checker.report(
 				&ResourceLossError{
@@ -568,7 +568,7 @@ func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType
 	if variable == nil {
 		return
 	}
-	checker.resourceInvalidations.Add(variable,
+	checker.resources.AddInvalidation(variable,
 		ResourceInvalidation{
 			Kind: kind,
 			Pos:  pos,
@@ -576,14 +576,14 @@ func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType
 	)
 }
 
-func (checker *Checker) checkWithResourceInvalidations(
+func (checker *Checker) checkWithResources(
 	check func() Type,
-	temporaryInvalidations *ResourceInvalidations,
+	temporaryResources *Resources,
 ) Type {
-	originalInvalidations := checker.resourceInvalidations
-	checker.resourceInvalidations = temporaryInvalidations
+	originalResources := checker.resources
+	checker.resources = temporaryResources
 	defer func() {
-		checker.resourceInvalidations = originalInvalidations
+		checker.resources = originalResources
 	}()
 
 	return check()

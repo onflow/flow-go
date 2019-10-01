@@ -10,17 +10,19 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		invalidationInfo := checker.resourceInvalidations.Get(variable)
+		resourceInfo := checker.resources.Get(variable)
 
-		if invalidationInfo.InvalidationSet.Size() > 0 {
+		if resourceInfo.Invalidations.Size() > 0 {
 			checker.report(
 				&ResourceUseAfterInvalidationError{
 					Name:          expression.Identifier.Identifier,
 					Pos:           expression.Identifier.Pos,
-					Invalidations: invalidationInfo.InvalidationSet.All(),
+					Invalidations: resourceInfo.Invalidations.All(),
 				},
 			)
 		}
+
+		checker.resources.AddUse(variable, expression.Pos)
 	}
 
 	return variable.Type

@@ -37,3 +37,7 @@ func (ris ResourceInvalidationSet) Merge(other ResourceInvalidationSet) Resource
 func (ris ResourceInvalidationSet) Size() int {
 	return ris.invalidations.Size()
 }
+
+func (ris ResourceInvalidationSet) IsEmpty() bool {
+	return ris.Size() == 0
+}
