@@ -71,6 +71,7 @@ func (a *ValueActivations) Declare(
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
+		Identifier:     identifier,
 		Kind:           kind,
 		IsConstant:     isConstant,
 		Depth:          depth,

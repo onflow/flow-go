@@ -115,6 +115,7 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
+			Identifier: identifier.Identifier,
 			Kind:       declaration.TypeDeclarationKind(),
 			IsConstant: true,
 			Type:       ty,
