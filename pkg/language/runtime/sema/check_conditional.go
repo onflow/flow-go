@@ -19,15 +19,19 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		checker.visitConditional(test, thenElement, elseElement)
 
 	case *ast.VariableDeclaration:
-		checker.withValueScope(func() {
-
-			checker.visitVariableDeclaration(test, true)
-
-			thenElement.Accept(checker)
-		})
-
-		elseElement.Accept(checker)
-
+		checker.visitConditionalBranches(
+			func() Type {
+				checker.withValueScope(func() {
+					checker.visitVariableDeclaration(test, true)
+					thenElement.Accept(checker)
+				})
+				return nil
+			},
+			func() Type {
+				elseElement.Accept(checker)
+				return nil
+			},
+		)
 	default:
 		panic(&errors.UnreachableError{})
 	}
@@ -60,8 +64,10 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 	return resultType
 }
 
-// visitConditional checks a conditional. the test expression must be a boolean.
-// the then and else elements may be expressions, in which case the types are returned.
+// visitConditional checks a conditional.
+// The test expression must be a boolean.
+// The "then" and "else" elements may be expressions, in which case their types are returned.
+//
 func (checker *Checker) visitConditional(
 	test ast.Expression,
 	thenElement ast.Element,
@@ -82,15 +88,47 @@ func (checker *Checker) visitConditional(
 		)
 	}
 
-	thenResult := thenElement.Accept(checker)
-	if thenResult != nil {
-		thenType = thenResult.(Type)
-	}
+	return checker.visitConditionalBranches(
+		func() Type {
+			thenResult := thenElement.Accept(checker)
+			if thenResult == nil {
+				return nil
+			}
+			return thenResult.(Type)
+		},
+		func() Type {
+			elseResult := elseElement.Accept(checker)
+			if elseResult == nil {
+				return nil
+			}
+			return elseResult.(Type)
+		},
+	)
+}
 
-	elseResult := elseElement.Accept(checker)
-	if elseResult != nil {
-		elseType = elseResult.(Type)
-	}
+func (checker *Checker) visitConditionalBranches(
+	checkThen func() Type,
+	checkElse func() Type,
+) (
+	thenType, elseType Type,
+) {
+	initialMovePositions := checker.movePositions.Clone()
+	initialDestructionPositions := checker.destructionPositions.Clone()
+
+	thenType = checkThen()
+
+	movePositionsAfterThen := checker.movePositions
+	destructionPositionsAfterThen := checker.destructionPositions
+
+	// NOTE: reset moves and destruction positions for else branch
+
+	checker.movePositions = initialMovePositions
+	checker.destructionPositions = initialDestructionPositions
+
+	elseType = checkElse()
+
+	checker.movePositions.Merge(movePositionsAfterThen)
+	checker.destructionPositions.Merge(destructionPositionsAfterThen)
 
 	return
 }

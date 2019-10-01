@@ -10,24 +10,26 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		if variable.MovePos != nil {
+		moves := checker.movePositions.Get(variable)
+		if len(moves) > 0 {
 			checker.report(
 				&ResourceUseAfterMoveError{
-					UseStartPos:  expression.StartPosition(),
-					UseEndPos:    expression.EndPosition(),
-					MoveStartPos: *variable.MovePos,
-					MoveEndPos:   variable.MovePos.Shifted(len(identifier.Identifier) - 1),
+					Name:  expression.Identifier.Identifier,
+					Pos:   expression.Identifier.Pos,
+					Moves: moves,
 				},
 			)
-		} else if variable.DestroyPos != nil {
-			checker.report(
-				&ResourceUseAfterDestructionError{
-					UseStartPos:         expression.StartPosition(),
-					UseEndPos:           expression.EndPosition(),
-					DestructionStartPos: *variable.MovePos,
-					DestructionEndPos:   variable.MovePos.Shifted(len(identifier.Identifier) - 1),
-				},
-			)
+		} else {
+			destructions := checker.destructionPositions.Get(variable)
+			if len(destructions) > 0 {
+				checker.report(
+					&ResourceUseAfterDestructionError{
+						Name:         expression.Identifier.Identifier,
+						Pos:          expression.Identifier.Pos,
+						Destructions: destructions,
+					},
+				)
+			}
 		}
 	}
 

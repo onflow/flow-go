@@ -3,6 +3,8 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/raviqqe/hamt"
+	"unsafe"
 )
 
 type Variable struct {
@@ -17,8 +19,23 @@ type Variable struct {
 	ArgumentLabels []string
 	// Pos is the position where the variable was declared
 	Pos *ast.Position
-	// MovePos is the position where the resource-typed variable was moved
-	MovePos *ast.Position
-	// DestroyPos is the position where the resource-typed variable was destroyed
-	DestroyPos *ast.Position
+}
+
+// VariableKey allows using variable pointers as keys in `hamt` structures
+//
+type VariableKey struct {
+	variable *Variable
+}
+
+func (k VariableKey) Hash() uint32 {
+	return uint32(uintptr(unsafe.Pointer(k.variable)))
+}
+
+func (k VariableKey) Equal(e hamt.Entry) bool {
+	other, ok := e.(VariableKey)
+	if !ok {
+		return false
+	}
+
+	return other == k
 }

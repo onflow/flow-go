@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
@@ -1758,3 +1759,98 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
 }
 
+func TestCheckResourceUseInIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          if 1 > 2 {
+              absorb(<-x)
+          } else {
+              absorb(<-x)
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          if 1 > 2 {
+              if 2 > 1 {
+                  absorb(<-x)
+              }
+          } else {
+              absorb(<-x)
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          let x <- create X()
+          if 1 > 2 {
+              absorb(<-x)
+          } else {
+              absorb(<-x)
+          }
+          return <-x
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+
+	Expect(errs[1].(*sema.ResourceUseAfterMoveError).Moves).
+		To(ConsistOf(
+			ast.Position{Offset: 165, Line: 9, Column: 23},
+			ast.Position{Offset: 120, Line: 7, Column: 23},
+		))
+}

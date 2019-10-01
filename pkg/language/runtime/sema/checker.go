@@ -28,24 +28,26 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program             *ast.Program
-	PredeclaredValues   map[string]ValueDeclaration
-	PredeclaredTypes    map[string]TypeDeclaration
-	ImportCheckers      map[ast.ImportLocation]*Checker
-	errors              []error
-	valueActivations    *ValueActivations
-	typeActivations     *TypeActivations
-	functionActivations *FunctionActivations
-	GlobalValues        map[string]*Variable
-	GlobalTypes         map[string]Type
-	inCondition         bool
-	Occurrences         *Occurrences
-	variableOrigins     map[*Variable]*Origin
-	memberOrigins       map[Type]map[string]*Origin
-	seenImports         map[ast.ImportLocation]bool
-	isChecked           bool
-	inCreate            bool
-	Elaboration         *Elaboration
+	Program              *ast.Program
+	PredeclaredValues    map[string]ValueDeclaration
+	PredeclaredTypes     map[string]TypeDeclaration
+	ImportCheckers       map[ast.ImportLocation]*Checker
+	errors               []error
+	valueActivations     *ValueActivations
+	movePositions        *VariablePositions
+	destructionPositions *VariablePositions
+	typeActivations      *TypeActivations
+	functionActivations  *FunctionActivations
+	GlobalValues         map[string]*Variable
+	GlobalTypes          map[string]Type
+	inCondition          bool
+	Occurrences          *Occurrences
+	variableOrigins      map[*Variable]*Origin
+	memberOrigins        map[Type]map[string]*Origin
+	seenImports          map[ast.ImportLocation]bool
+	isChecked            bool
+	inCreate             bool
+	Elaboration          *Elaboration
 }
 
 func NewChecker(
@@ -55,20 +57,22 @@ func NewChecker(
 ) (*Checker, error) {
 
 	checker := &Checker{
-		Program:             program,
-		PredeclaredValues:   predeclaredValues,
-		PredeclaredTypes:    predeclaredTypes,
-		ImportCheckers:      map[ast.ImportLocation]*Checker{},
-		valueActivations:    NewValueActivations(),
-		typeActivations:     NewTypeActivations(baseTypes),
-		functionActivations: &FunctionActivations{},
-		GlobalValues:        map[string]*Variable{},
-		GlobalTypes:         map[string]Type{},
-		Occurrences:         NewOccurrences(),
-		variableOrigins:     map[*Variable]*Origin{},
-		memberOrigins:       map[Type]map[string]*Origin{},
-		seenImports:         map[ast.ImportLocation]bool{},
-		Elaboration:         NewElaboration(),
+		Program:              program,
+		PredeclaredValues:    predeclaredValues,
+		PredeclaredTypes:     predeclaredTypes,
+		ImportCheckers:       map[ast.ImportLocation]*Checker{},
+		valueActivations:     NewValueActivations(),
+		movePositions:        NewVariablePositions(),
+		destructionPositions: NewVariablePositions(),
+		typeActivations:      NewTypeActivations(baseTypes),
+		functionActivations:  &FunctionActivations{},
+		GlobalValues:         map[string]*Variable{},
+		GlobalTypes:          map[string]Type{},
+		Occurrences:          NewOccurrences(),
+		variableOrigins:      map[*Variable]*Origin{},
+		memberOrigins:        map[Type]map[string]*Origin{},
+		seenImports:          map[ast.ImportLocation]bool{},
+		Elaboration:          NewElaboration(),
 	}
 
 	for name, declaration := range predeclaredValues {
@@ -295,22 +299,22 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 	checker.recordResourceMove(unaryExpression.Expression, valueType)
 }
 
-func (checker *Checker) recordResourceMove(valueExpression ast.Expression, valueType Type) {
+func (checker *Checker) resourceVariable(exp ast.Expression, valueType Type) (variable *Variable, pos ast.Position) {
 	if !valueType.IsResourceType() {
 		return
 	}
 
-	identifierExpression, ok := valueExpression.(*ast.IdentifierExpression)
+	identifierExpression, ok := exp.(*ast.IdentifierExpression)
 	if !ok {
 		return
 	}
 
-	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
+	variable = checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
 	}
 
-	variable.MovePos = &identifierExpression.Pos
+	return variable, identifierExpression.Pos
 }
 
 func (checker *Checker) inLoop() bool {
@@ -516,11 +520,11 @@ func (checker *Checker) recordFunctionDeclarationOrigin(
 	return origin
 }
 
-func (checker *Checker) enterValueActivation() {
+func (checker *Checker) enterValueScope() {
 	checker.valueActivations.Enter()
 }
 
-func (checker *Checker) leaveValueActivation() {
+func (checker *Checker) leaveValueScope() {
 	checker.checkResourceLoss()
 	checker.valueActivations.Leave()
 }
@@ -537,8 +541,8 @@ func (checker *Checker) checkResourceLoss() {
 		if variable.Type.IsResourceType() &&
 			variable.Kind != common.DeclarationKindSelf &&
 			variable.Kind != common.DeclarationKindResult &&
-			variable.MovePos == nil &&
-			variable.DestroyPos == nil {
+			len(checker.movePositions.Get(variable)) == 0 &&
+			len(checker.destructionPositions.Get(variable)) == 0 {
 
 			checker.report(
 				&ResourceLossError{
@@ -552,7 +556,23 @@ func (checker *Checker) checkResourceLoss() {
 }
 
 func (checker *Checker) withValueScope(f func()) {
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 	f()
+}
+
+func (checker *Checker) recordResourceMove(expression ast.Expression, valueType Type) {
+	variable, pos := checker.resourceVariable(expression, valueType)
+	if variable == nil {
+		return
+	}
+	checker.movePositions.Add(variable, pos)
+}
+
+func (checker *Checker) recordResourceDestroy(expression ast.Expression, valueType Type) {
+	variable, pos := checker.resourceVariable(expression, valueType)
+	if variable == nil {
+		return
+	}
+	checker.destructionPositions.Add(variable, pos)
 }

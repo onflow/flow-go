@@ -73,8 +73,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -218,8 +218,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.visitConditions(functionBlock.PreConditions)
 

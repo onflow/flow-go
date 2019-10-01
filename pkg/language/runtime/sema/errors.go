@@ -1286,13 +1286,12 @@ func (e *ResourceLossError) EndPosition() ast.Position {
 
 // ResourceUseAfterMoveError
 
-// TODO: show position of move
+// TODO: show positions of moves
 
 type ResourceUseAfterMoveError struct {
-	UseStartPos  ast.Position
-	UseEndPos    ast.Position
-	MoveStartPos ast.Position
-	MoveEndPos   ast.Position
+	Name  string
+	Pos   ast.Position
+	Moves []ast.Position
 }
 
 func (e *ResourceUseAfterMoveError) Error() string {
@@ -1306,22 +1305,21 @@ func (e *ResourceUseAfterMoveError) SecondaryError() string {
 func (*ResourceUseAfterMoveError) isSemanticError() {}
 
 func (e *ResourceUseAfterMoveError) StartPosition() ast.Position {
-	return e.UseStartPos
+	return e.Pos
 }
 
 func (e *ResourceUseAfterMoveError) EndPosition() ast.Position {
-	return e.UseEndPos
+	return e.Pos.Shifted(len(e.Name) - 1)
 }
 
 // ResourceUseAfterDestructionError
 
-// TODO: show position of destruction
+// TODO: show positions of destructions
 
 type ResourceUseAfterDestructionError struct {
-	UseStartPos         ast.Position
-	UseEndPos           ast.Position
-	DestructionStartPos ast.Position
-	DestructionEndPos   ast.Position
+	Name         string
+	Pos          ast.Position
+	Destructions []ast.Position
 }
 
 func (e *ResourceUseAfterDestructionError) Error() string {
@@ -1335,11 +1333,11 @@ func (e *ResourceUseAfterDestructionError) SecondaryError() string {
 func (*ResourceUseAfterDestructionError) isSemanticError() {}
 
 func (e *ResourceUseAfterDestructionError) StartPosition() ast.Position {
-	return e.UseStartPos
+	return e.Pos
 }
 
 func (e *ResourceUseAfterDestructionError) EndPosition() ast.Position {
-	return e.UseEndPos
+	return e.Pos.Shifted(len(e.Name) - 1)
 }
 
 // MissingCreateError
