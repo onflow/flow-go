@@ -54,13 +54,19 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 
 		invalidations := info.Invalidations.All()
 
-		for _, usePosition := range info.UsePositions.All() {
+		for _, usePosition := range info.UsePositions.AllPositions() {
 			// only report if the variable is inside the loop
 			if usePosition.Compare(startPos) < 0 ||
 				usePosition.Compare(endPos) > 0 {
 
 				continue
 			}
+
+			if checker.resources.IsUseAfterInvalidationReported(variable, usePosition) {
+				continue
+			}
+
+			checker.resources.MarkUseAfterInvalidationReported(variable, usePosition)
 
 			checker.report(
 				&ResourceUseAfterInvalidationError{

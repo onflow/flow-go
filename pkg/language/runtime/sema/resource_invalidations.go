@@ -2,11 +2,11 @@ package sema
 
 import "github.com/raviqqe/hamt"
 
-type ResourceInvalidationSet struct {
+type ResourceInvalidations struct {
 	invalidations hamt.Set
 }
 
-func (ris ResourceInvalidationSet) All() (result []ResourceInvalidation) {
+func (ris ResourceInvalidations) All() (result []ResourceInvalidation) {
 	s := ris.invalidations
 	for s.Size() != 0 {
 		var e hamt.Entry
@@ -17,27 +17,27 @@ func (ris ResourceInvalidationSet) All() (result []ResourceInvalidation) {
 	return
 }
 
-func (ris ResourceInvalidationSet) Include(invalidation ResourceInvalidation) bool {
+func (ris ResourceInvalidations) Include(invalidation ResourceInvalidation) bool {
 	return ris.invalidations.Include(ResourceInvalidationEntry{
 		ResourceInvalidation: invalidation,
 	})
 }
 
-func (ris ResourceInvalidationSet) Insert(invalidation ResourceInvalidation) ResourceInvalidationSet {
+func (ris ResourceInvalidations) Insert(invalidation ResourceInvalidation) ResourceInvalidations {
 	entry := ResourceInvalidationEntry{invalidation}
 	newInvalidations := ris.invalidations.Insert(entry)
-	return ResourceInvalidationSet{newInvalidations}
+	return ResourceInvalidations{newInvalidations}
 }
 
-func (ris ResourceInvalidationSet) Merge(other ResourceInvalidationSet) ResourceInvalidationSet {
+func (ris ResourceInvalidations) Merge(other ResourceInvalidations) ResourceInvalidations {
 	newInvalidations := ris.invalidations.Merge(other.invalidations)
-	return ResourceInvalidationSet{newInvalidations}
+	return ResourceInvalidations{newInvalidations}
 }
 
-func (ris ResourceInvalidationSet) Size() int {
+func (ris ResourceInvalidations) Size() int {
 	return ris.invalidations.Size()
 }
 
-func (ris ResourceInvalidationSet) IsEmpty() bool {
+func (ris ResourceInvalidations) IsEmpty() bool {
 	return ris.Size() == 0
 }

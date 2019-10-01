@@ -12,9 +12,9 @@ type ResourceInfo struct {
 	// can be considered definitive
 	DefinitivelyInvalidated bool
 	// Invalidations is the set of invalidations
-	Invalidations ResourceInvalidationSet
+	Invalidations ResourceInvalidations
 	// UsePositions is the set of uses
-	UsePositions Positions
+	UsePositions ResourceUses
 }
 
 // Resources is a map which contains invalidation info for resource variables.
@@ -48,10 +48,22 @@ func (ris *Resources) AddInvalidation(variable *Variable, invalidation ResourceI
 // AddUse adds the given use position to the set of use positions for the given resource variable.
 //
 func (ris *Resources) AddUse(variable *Variable, use ast.Position) {
-	key := VariableEntry{variable: variable}
 	info := ris.Get(variable)
 	info.UsePositions = info.UsePositions.Insert(use)
+	key := VariableEntry{variable: variable}
 	ris.resources = ris.resources.Insert(key, info)
+}
+
+func (ris *Resources) MarkUseAfterInvalidationReported(variable *Variable, pos ast.Position) {
+	info := ris.Get(variable)
+	info.UsePositions = info.UsePositions.MarkUseAfterInvalidationReported(pos)
+	key := VariableEntry{variable: variable}
+	ris.resources = ris.resources.Insert(key, info)
+}
+
+func (ris *Resources) IsUseAfterInvalidationReported(variable *Variable, pos ast.Position) bool {
+	info := ris.Get(variable)
+	return info.UsePositions.IsUseAfterInvalidationReported(pos)
 }
 
 func (ris *Resources) Clone() *Resources {
