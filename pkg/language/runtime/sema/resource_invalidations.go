@@ -98,9 +98,13 @@ func (ris *ResourceInvalidations) MergeBranches(
 		// the invalidation of the variable can be considered definitive
 		// iff the variable was invalidated in both branches
 
-		definitelyInvalidated :=
+		definitelyInvalidatedInBranches :=
 			!infoTuple.thenInfo.IsEmpty() &&
 				!infoTuple.elseInfo.IsEmpty()
+
+		definitelyInvalidated :=
+			info.DefinitivelyInvalidated ||
+				definitelyInvalidatedInBranches
 
 		invalidationSet := info.InvalidationSet.
 			Merge(infoTuple.thenInfo.InvalidationSet).

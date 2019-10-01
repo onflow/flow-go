@@ -154,8 +154,8 @@ func TestResourceInvalidations_FirstRest(t *testing.T) {
 func TestResourceInvalidations_MergeBranches(t *testing.T) {
 	RegisterTestingT(t)
 
-	positions1 := &ResourceInvalidations{}
-	positions2 := &ResourceInvalidations{}
+	invalidationsThen := &ResourceInvalidations{}
+	invalidationsElse := &ResourceInvalidations{}
 
 	varX := &Variable{
 		Type: &IntType{},
@@ -169,23 +169,36 @@ func TestResourceInvalidations_MergeBranches(t *testing.T) {
 		Type: &IntType{},
 	}
 
-	positions1.Add(varX, ResourceInvalidation{
+	// invalidate X and Y in then branch
+
+	invalidationsThen.Add(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
-	positions1.Add(varY, ResourceInvalidation{
+	invalidationsThen.Add(varY, ResourceInvalidation{
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
-	positions2.Add(varX, ResourceInvalidation{
+	// invalidate Y and Z in else branch
+
+	invalidationsElse.Add(varX, ResourceInvalidation{
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
-	positions2.Add(varZ, ResourceInvalidation{
+	invalidationsElse.Add(varZ, ResourceInvalidation{
 		Pos: ast.Position{Line: 4, Column: 4},
 	})
 
-	positions1.MergeBranches(positions1, positions2)
+	// treat var Y already invalidated in main
+	invalidations := &ResourceInvalidations{}
+	invalidations.Add(varY, ResourceInvalidation{
+		Pos: ast.Position{Line: 0, Column: 0},
+	})
 
-	varXInfo := positions1.Get(varX)
+	invalidations.MergeBranches(
+		invalidationsThen,
+		invalidationsElse,
+	)
+
+	varXInfo := invalidations.Get(varX)
 	Expect(varXInfo.DefinitivelyInvalidated).
 		To(BeTrue())
 	Expect(varXInfo.InvalidationSet.All()).
@@ -198,17 +211,20 @@ func TestResourceInvalidations_MergeBranches(t *testing.T) {
 			},
 		))
 
-	varYInfo := positions1.Get(varY)
+	varYInfo := invalidations.Get(varY)
 	Expect(varYInfo.DefinitivelyInvalidated).
-		To(BeFalse())
+		To(BeTrue())
 	Expect(varYInfo.InvalidationSet.All()).
 		To(ConsistOf(
+			ResourceInvalidation{
+				Pos: ast.Position{Line: 0, Column: 0},
+			},
 			ResourceInvalidation{
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
 		))
 
-	varZInfo := positions1.Get(varZ)
+	varZInfo := invalidations.Get(varZ)
 	Expect(varZInfo.DefinitivelyInvalidated).
 		To(BeFalse())
 	Expect(varZInfo.InvalidationSet.All()).
