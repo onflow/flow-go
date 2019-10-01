@@ -528,6 +528,10 @@ func (checker *Checker) enterValueScope() {
 }
 
 func (checker *Checker) leaveValueScope() {
+	// TODO: prune resource variables declared in this scope
+	//    from `checker.resources`, so they don't get checked anymore
+	//    when detecting resource use after invalidation in loops
+
 	checker.checkResourceLoss()
 	checker.valueActivations.Leave()
 }
