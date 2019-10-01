@@ -1292,14 +1292,17 @@ type ResourceUseAfterInvalidationError struct {
 	Pos           ast.Position
 	Invalidations []ResourceInvalidation
 	InLoop        bool
-	wasMoved      bool
-	wasDestroyed  bool
+	// NOTE: cached values, use `Cause()`
+	_wasMoved     bool
+	_wasDestroyed bool
+	// NOTE: cached value, use `HasInvalidationInPreviousLoopIteration()`
+	_hasInvalidationInPreviousLoop *bool
 }
 
-func (e *ResourceUseAfterInvalidationError) cause() (wasMoved, wasDestroyed bool) {
+func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool) {
 	// check cache
-	if e.wasMoved || e.wasDestroyed {
-		return e.wasMoved, e.wasDestroyed
+	if e._wasMoved || e._wasDestroyed {
+		return e._wasMoved, e._wasDestroyed
 	}
 
 	// update cache
@@ -1312,15 +1315,15 @@ func (e *ResourceUseAfterInvalidationError) cause() (wasMoved, wasDestroyed bool
 		}
 	}
 
-	e.wasMoved = wasMoved
-	e.wasDestroyed = wasDestroyed
+	e._wasMoved = wasMoved
+	e._wasDestroyed = wasDestroyed
 
 	return
 }
 
 func (e *ResourceUseAfterInvalidationError) Error() string {
 	message := ""
-	wasMoved, wasDestroyed := e.cause()
+	wasMoved, wasDestroyed := e.Cause()
 	switch {
 	case wasMoved && wasDestroyed:
 		message = "use of moved or destroyed resource"
@@ -1337,7 +1340,7 @@ func (e *ResourceUseAfterInvalidationError) Error() string {
 
 func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
 	message := ""
-	wasMoved, wasDestroyed := e.cause()
+	wasMoved, wasDestroyed := e.Cause()
 	switch {
 	case wasMoved && wasDestroyed:
 		message = "resource used here after being moved or destroyed"
@@ -1350,10 +1353,35 @@ func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
 	}
 
 	if e.InLoop {
-		message += ", in previous iteration of loop"
+		site := "later"
+		if e.HasInvalidationInPreviousLoopIteration() {
+			site = "previous"
+		}
+		message += fmt.Sprintf(", in %s iteration of loop", site)
 	}
 
 	return message
+}
+
+func (e *ResourceUseAfterInvalidationError) HasInvalidationInPreviousLoopIteration() (result bool) {
+	if e._hasInvalidationInPreviousLoop != nil {
+		return *e._hasInvalidationInPreviousLoop
+	}
+
+	defer func() {
+		e._hasInvalidationInPreviousLoop = &result
+	}()
+
+	// invalidation occurred in previous loop
+	// if all invalidations occur after the use
+
+	for _, invalidation := range e.Invalidations {
+		if invalidation.Pos.Compare(e.Pos) < 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNote) {
