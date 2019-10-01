@@ -40,12 +40,8 @@ func (ris *Resources) Get(variable *Variable) ResourceInfo {
 func (ris *Resources) AddInvalidation(variable *Variable, invalidation ResourceInvalidation) {
 	key := VariableEntry{variable: variable}
 	info := ris.Get(variable)
-	invalidations := info.Invalidations.Insert(invalidation)
-	info = ResourceInfo{
-		DefinitivelyInvalidated: true,
-		Invalidations:           invalidations,
-		UsePositions:            info.UsePositions,
-	}
+	info.DefinitivelyInvalidated = true
+	info.Invalidations = info.Invalidations.Insert(invalidation)
 	ris.resources = ris.resources.Insert(key, info)
 }
 
@@ -54,12 +50,7 @@ func (ris *Resources) AddInvalidation(variable *Variable, invalidation ResourceI
 func (ris *Resources) AddUse(variable *Variable, use ast.Position) {
 	key := VariableEntry{variable: variable}
 	info := ris.Get(variable)
-	uses := info.UsePositions.Insert(use)
-	info = ResourceInfo{
-		UsePositions:            uses,
-		DefinitivelyInvalidated: info.DefinitivelyInvalidated,
-		Invalidations:           info.Invalidations,
-	}
+	info.UsePositions = info.UsePositions.Insert(use)
 	ris.resources = ris.resources.Insert(key, info)
 }
 
@@ -112,32 +103,26 @@ func (ris *Resources) MergeBranches(thenResources *Resources, elseResources *Res
 		info := ris.Get(variable)
 
 		// the invalidation of the variable can be considered definitive
-		// iff the variable was invalidated in both branches
+		// iff it was already invalidated,
+		// or the variable was invalidated in both branches
 
 		definitelyInvalidatedInBranches :=
 			!infoTuple.thenInfo.Invalidations.IsEmpty() &&
 				!infoTuple.elseInfo.Invalidations.IsEmpty()
 
-		definitelyInvalidated :=
+		info.DefinitivelyInvalidated =
 			info.DefinitivelyInvalidated ||
 				definitelyInvalidatedInBranches
 
-		invalidations := info.Invalidations.
+		info.Invalidations = info.Invalidations.
 			Merge(infoTuple.thenInfo.Invalidations).
 			Merge(infoTuple.elseInfo.Invalidations)
 
-		uses := info.UsePositions.
+		info.UsePositions = info.UsePositions.
 			Merge(infoTuple.thenInfo.UsePositions).
 			Merge(infoTuple.elseInfo.UsePositions)
 
 		key := VariableEntry{variable: variable}
-
-		ris.resources = ris.resources.Insert(key,
-			ResourceInfo{
-				DefinitivelyInvalidated: definitelyInvalidated,
-				Invalidations:           invalidations,
-				UsePositions:            uses,
-			},
-		)
+		ris.resources = ris.resources.Insert(key, info)
 	}
 }
