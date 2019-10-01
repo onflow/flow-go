@@ -368,7 +368,7 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	// make the function itself available inside the function
-	lexicalScope = lexicalScope.Insert(common.StringKey(identifier), variable)
+	lexicalScope = lexicalScope.Insert(common.StringEntry(identifier), variable)
 
 	functionExpression := declaration.ToExpression()
 	variable.Value = newInterpretedFunction(
@@ -1279,7 +1279,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 
 	// make the constructor available in the initializer
 	lexicalScope = lexicalScope.
-		Insert(common.StringKey(identifier), variable)
+		Insert(common.StringEntry(identifier), variable)
 
 	// TODO: support multiple overloaded initializers
 

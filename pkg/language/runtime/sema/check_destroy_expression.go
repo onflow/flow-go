@@ -25,7 +25,11 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 		return
 	}
 
-	checker.recordResourceDestroy(expression.Expression, valueType)
+	checker.recordResourceInvalidation(
+		expression.Expression,
+		valueType,
+		ResourceInvalidationKindDestroy,
+	)
 
 	return
 }
