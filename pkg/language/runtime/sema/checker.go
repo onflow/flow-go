@@ -574,3 +574,16 @@ func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType
 		},
 	)
 }
+
+func (checker *Checker) checkWithResourceInvalidations(
+	check func() Type,
+	temporaryInvalidations *ResourceInvalidations,
+) Type {
+	originalInvalidations := checker.resourceInvalidations
+	checker.resourceInvalidations = temporaryInvalidations
+	defer func() {
+		checker.resourceInvalidations = originalInvalidations
+	}()
+
+	return check()
+}

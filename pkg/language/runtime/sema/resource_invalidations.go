@@ -67,6 +67,7 @@ func (ris *ResourceInvalidations) FirstRest() (*Variable, ResourceInvalidationIn
 // MergeBranches merges the given invalidations from two branches into these invalidations.
 // Invalidations occurring in both branches are considered definitive,
 // other new invalidations are only considered potential.
+// The else invalidations are optional.
 //
 func (ris *ResourceInvalidations) MergeBranches(
 	thenInvalidations *ResourceInvalidations,
@@ -85,11 +86,14 @@ func (ris *ResourceInvalidations) MergeBranches(
 			thenInfo: info,
 		}
 	}
-	for elseInvalidations.Size() != 0 {
-		variable, info, elseInvalidations = elseInvalidations.FirstRest()
-		infoTuple := infoTuples[variable]
-		infoTuple.elseInfo = info
-		infoTuples[variable] = infoTuple
+
+	if elseInvalidations != nil {
+		for elseInvalidations.Size() != 0 {
+			variable, info, elseInvalidations = elseInvalidations.FirstRest()
+			infoTuple := infoTuples[variable]
+			infoTuple.elseInfo = info
+			infoTuples[variable] = infoTuple
+		}
 	}
 
 	for variable, infoTuple := range infoTuples {

@@ -116,8 +116,8 @@ func (checker *Checker) visitConditionalBranches(
 	thenInvalidations := initialInvalidations.Clone()
 	elseInvalidations := initialInvalidations.Clone()
 
-	thenType = checker.visitConditionalBranch(checkThen, thenInvalidations)
-	elseType = checker.visitConditionalBranch(checkElse, elseInvalidations)
+	thenType = checker.checkWithResourceInvalidations(checkThen, thenInvalidations)
+	elseType = checker.checkWithResourceInvalidations(checkElse, elseInvalidations)
 
 	checker.resourceInvalidations.MergeBranches(
 		thenInvalidations,
@@ -125,14 +125,4 @@ func (checker *Checker) visitConditionalBranches(
 	)
 
 	return
-}
-
-func (checker *Checker) visitConditionalBranch(check func() Type, temporaryInvalidations *ResourceInvalidations) Type {
-	originalInvalidations := checker.resourceInvalidations
-	checker.resourceInvalidations = temporaryInvalidations
-	defer func() {
-		checker.resourceInvalidations = originalInvalidations
-	}()
-
-	return check()
 }

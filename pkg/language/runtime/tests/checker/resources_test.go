@@ -2095,3 +2095,31 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
+
+func TestCheckResourceUseInWhileStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              x.id
+          }
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}

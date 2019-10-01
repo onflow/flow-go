@@ -21,9 +21,18 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 		)
 	}
 
-	checker.functionActivations.WithLoop(func() {
-		statement.Block.Accept(checker)
-	})
+	initialInvalidations := checker.resourceInvalidations
+	temporaryInvalidations := initialInvalidations.Clone()
+
+	checkLoop := func() Type {
+		checker.functionActivations.WithLoop(func() {
+			statement.Block.Accept(checker)
+		})
+		return &VoidType{}
+	}
+	checker.checkWithResourceInvalidations(checkLoop, temporaryInvalidations)
+
+	checker.resourceInvalidations.MergeBranches(temporaryInvalidations, nil)
 
 	return nil
 }
