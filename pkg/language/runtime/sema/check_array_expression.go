@@ -11,6 +11,8 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 	for _, value := range expression.Values {
 		valueType := value.Accept(checker).(Type)
 
+		checker.checkResourceMoveOperation(value, valueType)
+
 		// infer element type from first element
 		// TODO: find common super type?
 		if elementType == nil {
