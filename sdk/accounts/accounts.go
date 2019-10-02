@@ -8,17 +8,17 @@ import (
 )
 
 // CreateAccount generates a transaction that creates a new account.
-func CreateAccount(publicKey, code []byte) []byte {
-	publicKeyStr := bytesToString(publicKey)
+func CreateAccount(publicKeys [][]byte, code []byte) []byte {
+	publicKeysStr := bytesArrayToString(publicKeys)
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
-			let publicKey: Int[]? = %s
+			let publicKeys: %s
 			let code: Int[]? = %s
-			createAccount(publicKey, code)
+			createAccount(publicKeys, code)
 		}
-	`, publicKeyStr, codeStr)
+	`, publicKeysStr, codeStr)
 
 	return []byte(script)
 }
@@ -41,6 +41,15 @@ func UpdateAccountCode(account types.Address, code []byte) []byte {
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
+	if b == nil || len(b) == 0 {
+		return "nil"
+	}
+
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+}
+
+// TODO: come up with better naming for this util
+func bytesArrayToString(b [][]byte) string {
 	if b == nil || len(b) == 0 {
 		return "nil"
 	}
