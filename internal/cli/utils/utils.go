@@ -13,8 +13,8 @@ func Exit(msg string, code int) {
 	os.Exit(1)
 }
 
-func DecodePrivateKey(derHex string) (crypto.PrKey, error) {
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+func DecodePrivateKey(derHex string) (crypto.PrivateKey, error) {
+	salg, err := crypto.NewSigner(crypto.ECDSA_P256)
 	if err != nil {
 		return nil, err
 	}
@@ -27,13 +27,8 @@ func DecodePrivateKey(derHex string) (crypto.PrKey, error) {
 	return salg.DecodePrKey(prKeyDer)
 }
 
-func EncodePrKey(sk crypto.PrKey) (string, error) {
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	if err != nil {
-		return "", err
-	}
-
-	skBytes, err := salg.EncodePrKey(sk)
+func EncodePrKey(sk crypto.PrivateKey) (string, error) {
+	skBytes, err := sk.Encode()
 	if err != nil {
 		return "", err
 	}
@@ -41,11 +36,6 @@ func EncodePrKey(sk crypto.PrKey) (string, error) {
 	return hex.EncodeToString(skBytes), nil
 }
 
-func EncodePublicKey(pubKey crypto.PubKey) ([]byte, error) {
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	if err != nil {
-		return nil, err
-	}
-
-	return salg.EncodePubKey(pubKey)
+func EncodePublicKey(pubKey crypto.PublicKey) ([]byte, error) {
+	return pubKey.Encode()
 }

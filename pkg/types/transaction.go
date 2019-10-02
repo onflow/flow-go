@@ -38,8 +38,8 @@ type RawTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *RawTransaction) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
-	return hasher.ComputeStructHash(tx)
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	return hasher.ComputeHash(tx.Encode())
 }
 
 // Encode returns the encoded transaction as bytes.
@@ -55,19 +55,13 @@ func (tx *RawTransaction) Encode() []byte {
 // SignPayer signs the transaction with the given account and keypair.
 //
 // The function returns a new SignedTransaction that includes the generated signature.
-func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrKey) (*SignedTransaction, error) {
-	// TODO: don't hard-code signature algo
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+func (tx *RawTransaction) SignPayer(account Address, prKey crypto.PrivateKey) (*SignedTransaction, error) {
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
 	if err != nil {
 		return nil, err
 	}
 
-	hasher, err := crypto.NewHashAlgo(crypto.SHA3_256)
-	if err != nil {
-		return nil, err
-	}
-
-	sig, err := salg.SignStruct(prKey, tx, hasher)
+	sig, err := prKey.Sign(tx.Encode(), hasher)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +93,8 @@ type SignedTransaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *SignedTransaction) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
-	return hasher.ComputeStructHash(tx)
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	return hasher.ComputeHash(tx.Encode())
 }
 
 // UnsignedHash computes the hash of the original unsigned transaction.

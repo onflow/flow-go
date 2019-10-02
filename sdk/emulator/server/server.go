@@ -32,7 +32,7 @@ type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey crypto.PrKey
+	RootAccountKey crypto.PrivateKey
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.

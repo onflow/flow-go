@@ -30,12 +30,12 @@ type EmulatedBlockchain struct {
 	mutex              sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
-	rootAccountKey     crypto.PrKey
+	rootAccountKey     crypto.PrivateKey
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
-	RootAccountKey crypto.PrKey
+	RootAccountKey crypto.PrivateKey
 	RuntimeLogger  func(string)
 }
 
@@ -77,7 +77,7 @@ func (b *EmulatedBlockchain) RootAccount() types.Address {
 	return b.rootAccountAddress
 }
 
-func (b *EmulatedBlockchain) RootKey() crypto.PrKey {
+func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
 	return b.rootAccountKey
 }
 
@@ -311,7 +311,8 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 	}
 
 	// TODO: replace hard-coded signature algorithm
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
+	halg, _ := crypto.NewHasher(crypto.SHA3_256)
 
 	for _, publicKeyBytes := range account.PublicKeys {
 		publicKey, err := salg.DecodePubKey(publicKeyBytes)
@@ -319,7 +320,7 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 			continue
 		}
 
-		valid, err := salg.VerifyHash(publicKey, crypto.Signature(signature.Signature), unsignedTxHash)
+		valid, err := publicKey.Verify(crypto.Signature(signature.Signature), unsignedTxHash, halg)
 		if err != nil {
 			continue
 		}
@@ -335,16 +336,16 @@ func (b *EmulatedBlockchain) validateSignature(signature types.AccountSignature,
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address, crypto.PrKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Address, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
 
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
 
 	if prKey == nil {
 		prKey, _ = salg.GeneratePrKey([]byte("elephant ears"))
 	}
 
-	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
+	pubKeyBytes, _ := prKey.Pubkey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})

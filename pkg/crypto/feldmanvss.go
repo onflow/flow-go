@@ -26,7 +26,7 @@ type feldmanVSSstate struct {
 func (s *feldmanVSSstate) init() {
 	s.running = false
 
-	blsSigner, _ := NewSignatureAlgo(BLS_BLS12381)
+	blsSigner, _ := NewSigner(BLS_BLS12381)
 	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
 
 	s.A = nil
@@ -48,10 +48,10 @@ func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
 	return out
 }
 
-func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
+func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	s.running = false
 	// private key of the current node
-	var x PrKey
+	var x PrivateKey
 	if s.xReceived {
 		x = &PrKeyBLS_BLS12381{
 			alg:    s.blsContext, // signer algo
@@ -60,14 +60,14 @@ func (s *feldmanVSSstate) EndDKG() (PrKey, PubKey, []PubKey, error) {
 	}
 
 	// Group public key
-	var Y PubKey
+	var Y PublicKey
 	if s.A != nil {
 		Y = &PubKeyBLS_BLS12381{
 			point: s.A[0],
 		}
 	}
 	// The nodes public keys
-	y := make([]PubKey, s.size)
+	y := make([]PublicKey, s.size)
 	if s.y != nil {
 		for i, p := range s.y {
 			y[i] = &PubKeyBLS_BLS12381{

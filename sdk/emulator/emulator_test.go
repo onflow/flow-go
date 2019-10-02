@@ -223,7 +223,7 @@ func TestSubmitTransactionInvalidKeyPair(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// use key pair that does not exist on root account
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
 	invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
 
 	tx1, _ := (&types.RawTransaction{
@@ -407,8 +407,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
+	pubKey, _ := b.RootKey().Pubkey().Encode()
 
 	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
 
