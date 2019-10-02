@@ -33,7 +33,7 @@ func (i *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 	return nil
 }
 
-func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err error) {
+func (i *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (id []byte, err error) {
 	latestAccountID, _ := i.registers.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -44,7 +44,7 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	accountID := accountAddress.Bytes()
 
 	i.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
-	i.registers.Set(fullKey(string(accountID), string(accountID), keyPublicKey), publicKey)
+	i.registers.Set(fullKey(string(accountID), string(accountID), keyPublicKey), allPublicKeys(publicKeys))
 	i.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
 	i.registers.Set(keyLatestAccount, accountID)
@@ -121,4 +121,13 @@ const (
 
 func fullKey(owner, controller, key string) string {
 	return strings.Join([]string{owner, controller, key}, "__")
+}
+
+// TODO: update to allocate space for keys based on pubkey size
+func allPublicKeys(publicKeys [][]byte) []byte {
+	publicKeysBytes := make([]byte, 0)
+	for _, pkBytes := range publicKeys {
+		publicKeysBytes = append(publicKeysBytes, pkBytes...)
+	}
+	return publicKeysBytes
 }
