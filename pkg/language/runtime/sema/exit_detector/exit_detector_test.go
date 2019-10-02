@@ -1,4 +1,4 @@
-package sema
+package exit_detector
 
 import (
 	"fmt"

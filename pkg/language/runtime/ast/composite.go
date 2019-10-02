@@ -89,7 +89,7 @@ func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 
 type InitializerDeclaration struct {
 	Identifier    Identifier
-	Parameters    []*Parameter
+	Parameters    Parameters
 	FunctionBlock *FunctionBlock
 	StartPos      Position
 }

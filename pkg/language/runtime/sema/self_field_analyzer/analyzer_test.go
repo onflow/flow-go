@@ -1,4 +1,4 @@
-package sema
+package self_field_analyzer
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 	fields := structDeclaration.Members.Fields
 	initializer := structDeclaration.Members.Initializers[0]
 
-	return CheckFieldAssignments(fields, initializer.FunctionBlock)
+	return CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
 }
 
 func TestAssignmentInEmptyInitializer(t *testing.T) {

@@ -18,31 +18,33 @@ import (
 
 type transactionTestCase struct {
 	title         string
-	tx            types.SignedTransaction
+	tx            types.Transaction
 	shouldSucceed bool
 }
 
 var transactionTests = []transactionTestCase{
 	{
 		title:         "valid transaction",
-		tx:            unittest.SignedTransactionFixture(),
+		tx:            unittest.TransactionFixture(),
 		shouldSucceed: true,
 	},
 	{
 		title: "transaction with no script should be rejected",
-		tx: types.SignedTransaction{
-			Nonce:          10,
-			ComputeLimit:   5,
-			PayerSignature: unittest.AccountSignatureFixture(),
+		tx: types.Transaction{
+			Nonce:        10,
+			ComputeLimit: 5,
+			PayerAccount: unittest.AddressFixture(),
+			Signatures:   []types.AccountSignature{unittest.AccountSignatureFixture()},
 		},
 		shouldSucceed: false,
 	},
 	{
 		title: "transaction with no compute limit should be rejected",
-		tx: types.SignedTransaction{
-			Nonce:          10,
-			Script:         []byte("fun main() {}"),
-			PayerSignature: unittest.AccountSignatureFixture(),
+		tx: types.Transaction{
+			Nonce:        10,
+			Script:       []byte("fun main() {}"),
+			PayerAccount: unittest.AddressFixture(),
+			Signatures:   []types.AccountSignature{unittest.AccountSignatureFixture()},
 		},
 		shouldSucceed: false,
 	},
@@ -55,10 +57,9 @@ func TestSubmitTransaction(t *testing.T) {
 
 			c := controller.New(storage.NewMockStorage(), txpool.New(), logrus.New())
 
-			txMsg, err := proto.SignedTransactionToMessage(tt.tx)
-			Expect(err).ToNot(HaveOccurred())
+			txMsg := proto.TransactionToMessage(tt.tx)
 
-			_, err = c.SubmitTransaction(
+			_, err := c.SubmitTransaction(
 				context.Background(),
 				&svc.SubmitTransactionRequest{Transaction: txMsg},
 			)
@@ -81,12 +82,11 @@ func TestSubmitTransactionStorage(t *testing.T) {
 
 	c := controller.New(store, txPool, logrus.New())
 
-	txA := unittest.SignedTransactionFixture()
-	txMsg, err := proto.SignedTransactionToMessage(txA)
-	Expect(err).ToNot(HaveOccurred())
+	txA := unittest.TransactionFixture()
+	txMsg := proto.TransactionToMessage(txA)
 
 	// submit transaction
-	_, err = c.SubmitTransaction(
+	_, err := c.SubmitTransaction(
 		context.Background(),
 		&svc.SubmitTransactionRequest{Transaction: txMsg},
 	)
@@ -110,12 +110,11 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 
 	c := controller.New(storage.NewMockStorage(), txPool, logrus.New())
 
-	txA := unittest.SignedTransactionFixture()
-	txMsg, err := proto.SignedTransactionToMessage(txA)
-	Expect(err).ToNot(HaveOccurred())
+	txA := unittest.TransactionFixture()
+	txMsg := proto.TransactionToMessage(txA)
 
 	// submit transaction
-	_, err = c.SubmitTransaction(
+	_, err := c.SubmitTransaction(
 		context.Background(),
 		&svc.SubmitTransactionRequest{Transaction: txMsg},
 	)

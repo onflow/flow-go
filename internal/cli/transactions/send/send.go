@@ -44,12 +44,15 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := types.RawTransaction{
-			Script:       code,
-			Nonce:        conf.Nonce,
-			ComputeLimit: 10,
+		tx := types.Transaction{
+			Script:         code,
+			Nonce:          conf.Nonce,
+			ComputeLimit:   10,
+			PayerAccount:   signerAddr,
+			ScriptAccounts: []types.Address{signerAddr},
 		}
-		signedTx, err := tx.SignPayer(signerAddr, signerKey)
+
+		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
 			utils.Exit("Failed to sign transaction", 1)
 		}
@@ -59,7 +62,7 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to connect to emulator", 1)
 		}
 
-		err = client.SendTransaction(context.Background(), *signedTx)
+		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
 			utils.Exit("Failed to send transaction", 1)
 		}

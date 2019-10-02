@@ -995,7 +995,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		Parameters: []*Parameter{
+		Parameters: Parameters{
 			{
 				Label: "",
 				Identifier: Identifier{
@@ -1058,7 +1058,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
-		Parameters: []*Parameter{
+		Parameters: Parameters{
 			{
 				Label: "x",
 				Identifier: Identifier{
@@ -1732,7 +1732,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 			Identifier: "test",
 			Pos:        Position{Offset: 11, Line: 2, Column: 10},
 		},
-		Parameters: []*Parameter{
+		Parameters: Parameters{
 			{
 				Identifier: Identifier{
 					Identifier: "a",
@@ -3276,7 +3276,7 @@ func TestParseStructure(t *testing.T) {
 						Identifier: "init",
 						Pos:        Position{Offset: 70, Line: 5, Column: 12},
 					},
-					Parameters: []*Parameter{
+					Parameters: Parameters{
 						{
 							Label: "",
 							Identifier: Identifier{
@@ -3472,7 +3472,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 					Identifier: "test",
 					Pos:        Position{Offset: 13, Line: 2, Column: 12},
 				},
-				Parameters: []*Parameter{
+				Parameters: Parameters{
 					{
 						Label: "",
 						Identifier: Identifier{
@@ -3718,7 +3718,7 @@ func TestParseConditionMessage(t *testing.T) {
 					Identifier: "test",
 					Pos:        Position{Offset: 13, Line: 2, Column: 12},
 				},
-				Parameters: []*Parameter{
+				Parameters: Parameters{
 					{
 						Label: "",
 						Identifier: Identifier{Identifier: "n",
@@ -4053,7 +4053,7 @@ func TestParseInterface(t *testing.T) {
 							Identifier: "init",
 							Pos:        Position{Offset: 79, Line: 5, Column: 16},
 						},
-						Parameters: []*Parameter{
+						Parameters: Parameters{
 							{
 								Label: "",
 								Identifier: Identifier{
@@ -4554,7 +4554,7 @@ func TestParseMoveParameterType(t *testing.T) {
 			},
 			StartPos: Position{Offset: 24, Line: 2, Column: 23},
 		},
-		Parameters: []*Parameter{
+		Parameters: Parameters{
 			{
 				Label: "",
 				Identifier: Identifier{
@@ -4963,4 +4963,17 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 
 	Expect(actual).
 		To(Equal(expected))
+}
+
+func TestParseIdentifiers(t *testing.T) {
+	RegisterTestingT(t)
+
+	for _, name := range []string{"foo", "from", "create", "destroy"} {
+		_, _, err := parser.ParseProgram(fmt.Sprintf(`
+          let %s = 1
+	    `, name))
+
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 }

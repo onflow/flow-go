@@ -5,13 +5,13 @@ import (
 	"github.com/segmentio/fasthash/fnv1a"
 )
 
-type StringKey string
+type StringEntry string
 
-func (key StringKey) Hash() uint32 {
+func (key StringEntry) Hash() uint32 {
 	return fnv1a.HashString32(string(key))
 }
 
-func (key StringKey) Equal(other hamt.Entry) bool {
-	otherKey, isPointerKey := other.(StringKey)
+func (key StringEntry) Equal(other hamt.Entry) bool {
+	otherKey, isPointerKey := other.(StringEntry)
 	return isPointerKey && string(otherKey) == string(key)
 }

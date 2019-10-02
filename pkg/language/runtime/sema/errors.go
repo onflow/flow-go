@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
@@ -1156,28 +1157,6 @@ func (e *UnsupportedExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// UnassignedFieldAccessError
-
-type UnassignedFieldAccessError struct {
-	Identifier ast.Identifier
-	Pos        ast.Position
-}
-
-func (e *UnassignedFieldAccessError) Error() string {
-	return fmt.Sprintf("cannot access unassigned field %s", e.Identifier.String())
-}
-
-func (*UnassignedFieldAccessError) isSemanticError() {}
-
-func (e *UnassignedFieldAccessError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *UnassignedFieldAccessError) EndPosition() ast.Position {
-	length := len(e.Identifier.Identifier)
-	return e.Pos.Shifted(length - 1)
-}
-
 // MissingMoveAnnotationError
 
 type MissingMoveAnnotationError struct {
@@ -1215,7 +1194,7 @@ func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
 }
 
 func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
-	return e.Pos
+	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
 }
 
 // IncorrectTransferOperationError
@@ -1304,6 +1283,119 @@ func (e *ResourceLossError) StartPosition() ast.Position {
 
 func (e *ResourceLossError) EndPosition() ast.Position {
 	return e.EndPos
+}
+
+// ResourceUseAfterInvalidationError
+
+// TODO: show hints for terminations of invalidations
+
+type ResourceUseAfterInvalidationError struct {
+	Name          string
+	Pos           ast.Position
+	Invalidations []ResourceInvalidation
+	wasMoved      bool
+	wasDestroyed  bool
+}
+
+func (e *ResourceUseAfterInvalidationError) cause() (wasMoved, wasDestroyed bool) {
+	// check cache
+	if e.wasMoved || e.wasDestroyed {
+		return e.wasMoved, e.wasDestroyed
+	}
+
+	// update cache
+	for _, invalidation := range e.Invalidations {
+		switch invalidation.Kind {
+		case ResourceInvalidationKindMove:
+			wasMoved = true
+		case ResourceInvalidationKindDestroy:
+			wasDestroyed = true
+		}
+	}
+
+	e.wasMoved = wasMoved
+	e.wasDestroyed = wasDestroyed
+
+	return
+}
+
+func (e *ResourceUseAfterInvalidationError) Error() string {
+	message := ""
+	wasMoved, wasDestroyed := e.cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		message = "use of moved or destroyed resource"
+	case wasMoved:
+		message = "use of moved resource"
+	case wasDestroyed:
+		message = "use of destroyed resource"
+	default:
+		panic(&errors.UnreachableError{})
+	}
+
+	return fmt.Sprintf("%s: `%s`", message, e.Name)
+}
+
+func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
+	wasMoved, wasDestroyed := e.cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		return "resource used here after being moved or destroyed"
+	case wasMoved:
+		return "resource used here after being moved"
+	case wasDestroyed:
+		return "resource used here after being destroyed"
+	}
+
+	panic(&errors.UnreachableError{})
+}
+
+func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNote) {
+	for _, invalidation := range e.Invalidations {
+		notes = append(notes, ResourceInvalidationNote{
+			ResourceInvalidation: invalidation,
+			StartPos:             invalidation.Pos,
+			EndPos:               invalidation.Pos.Shifted(len(e.Name) - 1),
+		})
+	}
+	return
+}
+
+func (*ResourceUseAfterInvalidationError) isSemanticError() {}
+
+func (e *ResourceUseAfterInvalidationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
+	return e.Pos.Shifted(len(e.Name) - 1)
+}
+
+// ResourceInvalidationNote
+
+type ResourceInvalidationNote struct {
+	ResourceInvalidation
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (n ResourceInvalidationNote) StartPosition() ast.Position {
+	return n.StartPos
+}
+
+func (n ResourceInvalidationNote) EndPosition() ast.Position {
+	return n.EndPos
+}
+
+func (n ResourceInvalidationNote) Message() string {
+	var action string
+	switch n.Kind {
+	case ResourceInvalidationKindMove:
+		action = "moved"
+	case ResourceInvalidationKindDestroy:
+		action = "destroyed"
+	}
+	return fmt.Sprintf("resource %s here", action)
 }
 
 // MissingCreateError
