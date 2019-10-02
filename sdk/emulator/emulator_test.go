@@ -38,12 +38,12 @@ const sampleCall = `
 	}
 `
 
-func generateCreateAccountScript(publicKey, code []byte) []byte {
+func generateCreateAccountScript(publicKeys [][]byte, code []byte) []byte {
 	script := fmt.Sprintf(`
 		fun main() {
 			createAccount(%s, %s)
 		}
-	`, bytesToString(publicKey), bytesToString(code))
+	`, bytesArrayToString(publicKeys), bytesToString(code))
 	return []byte(script)
 }
 
@@ -231,7 +231,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-	createAccountScript := generateCreateAccountScript(pubKeyB, nil)
+	createAccountScript := generateCreateAccountScript([][]byte{pubKeyB}, nil)
 
 	accountAddressA := b.RootAccount()
 	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -405,7 +405,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-		createAccountScript := generateCreateAccountScript(pubKeyB, nil)
+		createAccountScript := generateCreateAccountScript([][]byte{pubKeyB}, nil)
 
 		accountAddressA := b.RootAccount()
 		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -529,7 +529,7 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScriptA := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+	createAccountScriptA := generateCreateAccountScript([][]byte{[]byte{1}, []byte{2}, []byte{3}}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -553,7 +553,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
+	createAccountScriptB := generateCreateAccountScript([][]byte{[]byte{7}, []byte{8}, []byte{9}}, []byte{10, 11, 12})
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptB,
@@ -583,7 +583,7 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScript := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+	createAccountScript := generateCreateAccountScript([][]byte{[]byte{1}, []byte{2}, []byte{3}}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -638,7 +638,7 @@ func TestImportAccountCode(t *testing.T) {
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
 
-	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
+	createAccountScript := generateCreateAccountScript([][]byte{pubKey}, accountScript)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -819,5 +819,14 @@ func TestRuntimeLogger(t *testing.T) {
 
 // bytesToString converts a byte slice to a comma-separted list of uint8 integers.
 func bytesToString(b []byte) string {
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+}
+
+// TODO: maybe consolidate this util with the one in sdk/accounts?
+func bytesArrayToString(b [][]byte) string {
+	if b == nil || len(b) == 0 {
+		return "nil"
+	}
+
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
