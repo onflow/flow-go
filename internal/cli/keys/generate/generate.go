@@ -21,8 +21,7 @@ var Cmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate a new key-pair",
 	Run: func(cmd *cobra.Command, args []string) {
-		salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
-		prKey, err := salg.GeneratePrKey([]byte(conf.Seed))
+		prKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte(conf.Seed))
 		if err != nil {
 			fmt.Printf("Failed to generate private key\n")
 			return

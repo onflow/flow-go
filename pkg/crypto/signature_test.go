@@ -25,9 +25,9 @@ func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
 	}
 }
 
-func benchSign(b *testing.B, salg Signer, halg Hasher) {
+func benchSign(b *testing.B, alg AlgoName, halg Hasher) {
 	seed := []byte("keyseed")
-	sk, _ := salg.GeneratePrKey(seed)
+	sk, _ := GeneratePrivateKey(alg, seed)
 
 	input := []byte("Bench input")
 
@@ -38,9 +38,9 @@ func benchSign(b *testing.B, salg Signer, halg Hasher) {
 	b.StopTimer()
 }
 
-func benchVerify(b *testing.B, salg Signer, halg Hasher) {
+func benchVerify(b *testing.B, alg AlgoName, halg Hasher) {
 	seed := []byte("keyseed")
-	sk, _ := salg.GeneratePrKey(seed)
+	sk, _ := GeneratePrivateKey(alg, seed)
 	pk := sk.Pubkey()
 
 	input := []byte("Bench input")
@@ -56,13 +56,8 @@ func benchVerify(b *testing.B, salg Signer, halg Hasher) {
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	salg, err := NewSigner(BLS_BLS12381)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
 	seed := []byte{1, 2, 3, 4}
-	sk, err := salg.GeneratePrKey(seed)
+	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -74,22 +69,12 @@ func TestBLS_BLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLS_BLS12381Sign(b *testing.B) {
-	salg, err := NewSigner(BLS_BLS12381)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	benchSign(b, salg, nil)
+	benchSign(b, BLS_BLS12381, nil)
 }
 
 // Verifying bench
 func BenchmarkBLS_BLS12381Verify(b *testing.B) {
-	salg, err := NewSigner(BLS_BLS12381)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	benchVerify(b, salg, nil)
+	benchVerify(b, BLS_BLS12381, nil)
 }
 
 // ECDSA tests
@@ -97,18 +82,14 @@ func TestECDSA(t *testing.T) {
 	ECDSAcurves := []AlgoName{ECDSA_P256, ECDSA_SECp256k1}
 	for _, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
-		salg, err := NewSigner(curve)
-		if err != nil {
-			log.Error(err.Error())
-			return
-		}
+
 		halg, err := NewHasher(SHA3_256)
 		if err != nil {
 			log.Error(err.Error())
 			return
 		}
 		seed := []byte{1, 2, 3, 4}
-		sk, err := salg.GeneratePrKey(seed)
+		sk, err := GeneratePrivateKey(curve, seed)
 		if err != nil {
 			log.Error(err.Error())
 			return
@@ -120,28 +101,24 @@ func TestECDSA(t *testing.T) {
 
 // Signing bench
 func BenchmarkECDSA_P256Sign(b *testing.B) {
-	salg, _ := NewSigner(ECDSA_P256)
 	halg, _ := NewHasher(SHA3_256)
-	benchSign(b, salg, halg)
+	benchSign(b, ECDSA_P256, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_P256Verify(b *testing.B) {
-	salg, _ := NewSigner(ECDSA_P256)
 	halg, _ := NewHasher(SHA3_256)
-	benchVerify(b, salg, halg)
+	benchVerify(b, ECDSA_P256, halg)
 }
 
 // Signing bench
 func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
-	salg, _ := NewSigner(ECDSA_SECp256k1)
 	halg, _ := NewHasher(SHA3_256)
-	benchSign(b, salg, halg)
+	benchSign(b, ECDSA_SECp256k1, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
-	salg, _ := NewSigner(ECDSA_SECp256k1)
 	halg, _ := NewHasher(SHA3_256)
-	benchVerify(b, salg, halg)
+	benchVerify(b, ECDSA_SECp256k1, halg)
 }

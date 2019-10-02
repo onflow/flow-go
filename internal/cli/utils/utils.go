@@ -14,17 +14,12 @@ func Exit(msg string, code int) {
 }
 
 func DecodePrivateKey(derHex string) (crypto.PrivateKey, error) {
-	salg, err := crypto.NewSigner(crypto.ECDSA_P256)
-	if err != nil {
-		return nil, err
-	}
-
 	prKeyDer, err := hex.DecodeString(derHex)
 	if err != nil {
 		return nil, err
 	}
 
-	return salg.DecodePrKey(prKeyDer)
+	return crypto.DecodePrivateKey(crypto.ECDSA_P256, prKeyDer)
 }
 
 func EncodePrKey(sk crypto.PrivateKey) (string, error) {

@@ -34,7 +34,7 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool
 }
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
-func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) (PrivateKey, error) {
+func (a *BLS_BLS12381Algo) generatePrKey(seed []byte) (PrivateKey, error) {
 	var sk PrKeyBLS_BLS12381
 	// seed the RNG
 	seedRelic(seed)
@@ -50,12 +50,12 @@ func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) (PrivateKey, error) {
 	return &sk, nil
 }
 
-func (a *BLS_BLS12381Algo) DecodePrKey([]byte) (PrivateKey, error) {
+func (a *BLS_BLS12381Algo) decodePrKey([]byte) (PrivateKey, error) {
 	// TODO: implement DecodePrKey
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) DecodePubKey([]byte) (PublicKey, error) {
+func (a *BLS_BLS12381Algo) decodePubKey([]byte) (PublicKey, error) {
 	// TODO: implement DecodePubKey
 	return nil, nil
 }
@@ -71,11 +71,11 @@ type PrKeyBLS_BLS12381 struct {
 }
 
 func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
-	return sk.alg.Name()
+	return sk.alg.name
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return sk.alg.prKeySize()
+	return sk.alg.prKeyLength
 }
 
 func (sk *PrKeyBLS_BLS12381) computePubKey() {
@@ -109,11 +109,11 @@ type PubKeyBLS_BLS12381 struct {
 }
 
 func (pk *PubKeyBLS_BLS12381) AlgoName() AlgoName {
-	return pk.alg.Name()
+	return pk.alg.name
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {
-	return pubKeyLengthBLS_BLS12381
+	return pk.alg.pubKeyLength
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {

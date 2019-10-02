@@ -74,7 +74,7 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, err
 
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
-func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrivateKey, error) {
+func (a *ECDSAalgo) generatePrKey(seed []byte) (PrivateKey, error) {
 	sk, err := goecdsa.GenerateKey(a.curve, rand.Reader)
 	if err != nil {
 		return nil, cryptoError{"The ECDSA key generation has failed"}
@@ -82,7 +82,7 @@ func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, sk}, nil
 }
 
-func (a *ECDSAalgo) DecodePrKey(der []byte) (PrivateKey, error) {
+func (a *ECDSAalgo) decodePrKey(der []byte) (PrivateKey, error) {
 	sk, err := x509.ParseECPrivateKey(der)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (a *ECDSAalgo) DecodePrKey(der []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, sk}, nil
 }
 
-func (a *ECDSAalgo) DecodePubKey(der []byte) (PublicKey, error) {
+func (a *ECDSAalgo) decodePubKey(der []byte) (PublicKey, error) {
 	i, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ type PrKeyECDSA struct {
 
 // AlgoName returns the name of the algo related to the private key
 func (sk *PrKeyECDSA) AlgoName() AlgoName {
-	return sk.alg.Name()
+	return sk.alg.name
 }
 
 // KeySize returns the length of the private key
@@ -142,7 +142,7 @@ type PubKeyECDSA struct {
 
 // AlgoName returns the name of the algo related to the private key
 func (pk *PubKeyECDSA) AlgoName() AlgoName {
-	return pk.alg.Name()
+	return pk.alg.name
 }
 
 // KeySize returns the length of the public key

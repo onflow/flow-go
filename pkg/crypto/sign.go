@@ -17,6 +17,28 @@ var BLS_BLS12381Once sync.Once
 var ECDSA_P256Once sync.Once
 var ECDSA_SECp256k1Once sync.Once
 
+// Signer interface
+type Signer interface {
+	// Size returns the signature output length in bytes
+	//signatureSize() int
+	// prKeySize() returns the private key length in bytes
+	//prKeySize() int
+	// generatePrKey generates a private key
+	generatePrKey([]byte) (PrivateKey, error)
+	// decodePrKey loads a private key from a byte array
+	decodePrKey([]byte) (PrivateKey, error)
+	// decodePubKey loads a public key from a byte array
+	decodePubKey([]byte) (PublicKey, error)
+}
+
+// commonSigner holds the common data for all signers
+type commonSigner struct {
+	name            AlgoName
+	prKeyLength     int
+	pubKeyLength    int
+	signatureLength int
+}
+
 // NewSignatureAlgo initializes and chooses a signature scheme
 func NewSigner(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
@@ -66,42 +88,38 @@ func NewSigner(name AlgoName) (Signer, error) {
 	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", name)}
 }
 
-// Signer interface
-type Signer interface {
-	Name() AlgoName
-	// Size returns the signature output length in bytes
-	SignatureSize() int
-	// prKeySize() returns the private key length in bytes
-	prKeySize() int
-	// Private key functions
-	GeneratePrKey([]byte) (PrivateKey, error)
-	// DecodePrKey loads a private key from a byte array
-	DecodePrKey([]byte) (PrivateKey, error)
-	// DecodePubKey loads a public key from a byte array
-	DecodePubKey([]byte) (PublicKey, error)
+func GeneratePrivateKey(name AlgoName, seed []byte) (PrivateKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.generatePrKey(seed)
 }
 
-// commonSigner holds the common data for all signers
-type commonSigner struct {
-	name            AlgoName
-	PrKeyLength     int
-	PubKeyLength    int
-	SignatureLength int
+func DecodePrivateKey(name AlgoName, data []byte) (PrivateKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.decodePrKey(data)
 }
 
-// Name returns the name of the algorithm
-func (a *commonSigner) Name() AlgoName {
-	return a.name
+func DecodePublicKey(name AlgoName, data []byte) (PublicKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.decodePubKey(data)
 }
 
-// SignatureSize returns the size of a signature in bytes
-func (a *commonSigner) SignatureSize() int {
-	return a.SignatureLength
-}
+// signatureSize returns the size of a signature in bytes
+/*func (a *commonSigner) signatureSize() int {
+	return a.signatureLength
+}*/
 
-func (a *commonSigner) prKeySize() int {
-	return a.PrKeyLength
-}
+/*func (a *commonSigner) prKeySize() int {
+	return a.prKeyLength
+}*/
 
 // Signature type tools
 
