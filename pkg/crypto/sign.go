@@ -19,10 +19,6 @@ var ECDSA_SECp256k1Once sync.Once
 
 // Signer interface
 type Signer interface {
-	// Size returns the signature output length in bytes
-	//signatureSize() int
-	// prKeySize() returns the private key length in bytes
-	//prKeySize() int
 	// generatePrKey generates a private key
 	generatePrKey([]byte) (PrivateKey, error)
 	// decodePrKey loads a private key from a byte array
@@ -39,7 +35,7 @@ type commonSigner struct {
 	signatureLength int
 }
 
-// NewSignatureAlgo initializes and chooses a signature scheme
+// NewSigner chooses and initializes a signature scheme
 func NewSigner(name AlgoName) (Signer, error) {
 	if name == BLS_BLS12381 {
 		BLS_BLS12381Once.Do(func() {
@@ -88,6 +84,7 @@ func NewSigner(name AlgoName) (Signer, error) {
 	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", name)}
 }
 
+// GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
 func GeneratePrivateKey(name AlgoName, seed []byte) (PrivateKey, error) {
 	signer, err := NewSigner(name)
 	if err != nil {
@@ -96,6 +93,7 @@ func GeneratePrivateKey(name AlgoName, seed []byte) (PrivateKey, error) {
 	return signer.generatePrKey(seed)
 }
 
+// DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
 func DecodePrivateKey(name AlgoName, data []byte) (PrivateKey, error) {
 	signer, err := NewSigner(name)
 	if err != nil {
@@ -104,6 +102,7 @@ func DecodePrivateKey(name AlgoName, data []byte) (PrivateKey, error) {
 	return signer.decodePrKey(data)
 }
 
+// DecodePublicKey decodes an array of bytes into a public key of the given algorithm
 func DecodePublicKey(name AlgoName, data []byte) (PublicKey, error) {
 	signer, err := NewSigner(name)
 	if err != nil {
@@ -111,15 +110,6 @@ func DecodePublicKey(name AlgoName, data []byte) (PublicKey, error) {
 	}
 	return signer.decodePubKey(data)
 }
-
-// signatureSize returns the size of a signature in bytes
-/*func (a *commonSigner) signatureSize() int {
-	return a.signatureLength
-}*/
-
-/*func (a *commonSigner) prKeySize() int {
-	return a.prKeyLength
-}*/
 
 // Signature type tools
 
