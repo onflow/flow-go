@@ -227,9 +227,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	privateKeyA := b.RootKey()
 
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
-	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+	pubKeyB, _ := privateKeyB.Pubkey().Encode()
 
 	createAccountScript := generateCreateAccountScript(pubKeyB, nil)
 
@@ -347,7 +347,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := NewEmulatedBlockchain(DefaultOptions)
 
 		// use key-pair that does not exist on root account
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
 		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
 
 		tx1 := &types.Transaction{
@@ -401,9 +401,9 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		privateKeyA := b.RootKey()
 
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+		salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
 		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
-		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+		pubKeyB, _ := privateKeyB.Pubkey().Encode()
 
 		createAccountScript := generateCreateAccountScript(pubKeyB, nil)
 

@@ -349,7 +349,6 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 
 	// TODO: replace hard-coded signature algorithm
 	salg, _ := crypto.NewSigner(crypto.ECDSA_P256)
-	halg, _ := crypto.NewHasher(crypto.SHA3_256)
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
 	for _, publicKeyBytes := range account.PublicKeys {
