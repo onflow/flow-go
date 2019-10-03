@@ -77,8 +77,8 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	}
 }
 
-// RootAccount returns the root account address for this blockchain.
-func (b *EmulatedBlockchain) RootAccount() types.Address {
+// RootAccountAddress returns the root account address for this blockchain.
+func (b *EmulatedBlockchain) RootAccountAddress() types.Address {
 	return b.rootAccountAddress
 }
 
