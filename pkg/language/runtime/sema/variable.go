@@ -8,7 +8,8 @@ import (
 )
 
 type Variable struct {
-	Kind common.DeclarationKind
+	Identifier string
+	Kind       common.DeclarationKind
 	// Type is the type of the variable
 	Type Type
 	// IsConstant indicates if the variable is read-only

@@ -200,6 +200,7 @@ func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTy
 		parameterType := parameterTypeAnnotation.Type
 
 		variable := &Variable{
+			Identifier: identifier.Identifier,
 			Kind:       common.DeclarationKindParameter,
 			IsConstant: true,
 			Type:       parameterType,

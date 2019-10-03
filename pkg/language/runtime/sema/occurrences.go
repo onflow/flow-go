@@ -19,7 +19,7 @@ func (pos Position) String() string {
 	return fmt.Sprintf("Position{%d, %d}", pos.Line, pos.Column)
 }
 
-func (pos Position) CompareTo(other intervalst.Position) int {
+func (pos Position) Compare(other intervalst.Position) int {
 	if _, ok := other.(intervalst.MinPosition); ok {
 		return 1
 	}
