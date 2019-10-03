@@ -311,12 +311,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	accountWeights := make(map[types.Address]uint)
 
 	for _, accountSig := range tx.Signatures {
-		weight, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		accountWeights[accountSig.Account] += weight
+		accountWeights[accountSig.Account] += accountKey.Weight
 	}
 
 	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
@@ -334,17 +334,17 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // verifyAccountSignature verifies a that an account signature is valid for the account and given message.
 //
-// If the signature is valid, this function returns the weight of the associated account key.
+// If the signature is valid, this function returns the associated account key.
 //
 // An error is returned if the account does not contain a public key that correctly verifies the signature
 // against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) (uint, error) {
+) (accountKey types.AccountKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return 0, &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
@@ -368,11 +368,11 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 		}
 
 		if valid {
-			return accountKey.Weight, nil
+			return accountKey, nil
 		}
 	}
 
-	return 0, &ErrInvalidSignaturePublicKey{
+	return accountKey, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }
