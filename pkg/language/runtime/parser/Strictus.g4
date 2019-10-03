@@ -206,6 +206,7 @@ statements
     : (statement eos)*
     ;
 
+// NOTE: important to have expression last
 statement
     : returnStatement
     | breakStatement
@@ -220,8 +221,13 @@ statement
     | expression
     ;
 
+// only parse the return value expression if it is
+// on the same line. this prevents the return statement
+// from greedily taking an expression from a potentialy
+// following expression statement
+//
 returnStatement
-    : Return expression?
+    : Return ({!p.lineTerminatorAhead()}? expression)?
     ;
 
 breakStatement
