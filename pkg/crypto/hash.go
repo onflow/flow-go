@@ -43,6 +43,7 @@ func (h Hash) IsEqual(input Hash) bool {
 	return true
 }
 
+// Hex returns the hex string representation of the hash.
 func (h Hash) Hex() string {
 	return hex.EncodeToString(h)
 }
