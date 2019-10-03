@@ -31,7 +31,7 @@ type EmulatedBlockchain struct {
 	pendingWorldState *state.WorldState
 	// txPool is a pool of pending transactions waiting to be committed (already executed)
 	txPool             map[string]*types.Transaction
-	mutex              sync.RWMutex
+	mut                sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
 	rootAccountKey     crypto.PrKey
@@ -116,8 +116,8 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, err
 //
 // First looks in pending txPool, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.Transaction, error) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+	b.mut.RLock()
+	defer b.mut.RUnlock()
 
 	if tx, ok := b.txPool[string(txHash)]; ok {
 		return tx, nil
@@ -180,8 +180,8 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	if _, exists := b.txPool[string(tx.Hash())]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
@@ -248,8 +248,8 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 // Note: this clears the pending transaction pool and indexes the committed blockchain
 // state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
@@ -279,8 +279,8 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 // Note that this only seeks to a committed world state (not intermediate world state)
 // and this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	if bytes, ok := b.worldStates[string(hash)]; ok {
 		ws := state.Decode(bytes)
