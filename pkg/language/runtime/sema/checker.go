@@ -528,20 +528,20 @@ func (checker *Checker) enterValueScope() {
 }
 
 func (checker *Checker) leaveValueScope() {
-	// TODO: prune resource variables declared in this scope
-	//    from `checker.resources`, so they don't get checked anymore
-	//    when detecting resource use after invalidation in loops
-
-	checker.checkResourceLoss()
+	checker.checkResourceLoss(checker.valueActivations.Depth())
 	checker.valueActivations.Leave()
 }
+
+// TODO: prune resource variables declared in function's scope
+//    from `checker.resources`, so they don't get checked anymore
+//    when detecting resource use after invalidation in loops
 
 // checkResourceLoss reports an error if there is a variable in the current scope
 // that has a resource type and which was not moved or destroyed
 //
-func (checker *Checker) checkResourceLoss() {
+func (checker *Checker) checkResourceLoss(depth int) {
 
-	for name, variable := range checker.valueActivations.VariablesDeclaredInThisScope() {
+	for name, variable := range checker.valueActivations.VariablesDeclaredInAndBelow(depth) {
 
 		// TODO: handle `self` and `result` properly
 
