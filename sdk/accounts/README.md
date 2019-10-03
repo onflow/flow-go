@@ -11,8 +11,8 @@
 
 
 ## <a name="pkg-index">Index</a>
-* [func CreateAccount(publicKey, code []byte) []byte](#CreateAccount)
-* [func UpdateAccountCode(account types.Address, code []byte) []byte](#UpdateAccountCode)
+* [func CreateAccount(publicKey, code []byte) *types.RawTransaction](#CreateAccount)
+* [func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction](#UpdateAccountCode)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -22,17 +22,17 @@
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=161:210#L11)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=161:225#L11)
 ``` go
-func CreateAccount(publicKey, code []byte) []byte
+func CreateAccount(publicKey, code []byte) *types.RawTransaction
 ```
 CreateAccount generates a transaction that creates a new account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=586:651#L27)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=638:718#L29)
 ``` go
-func UpdateAccountCode(account types.Address, code []byte) []byte
+func UpdateAccountCode(account types.Address, code []byte) *types.RawTransaction
 ```
 UpdateAccountCode generates a transaction that updates the code associated with an account.
 

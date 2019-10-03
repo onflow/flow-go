@@ -18,8 +18,6 @@
   * [func (c *Controller) Ping(context.Context, *svc.PingRequest) (*svc.PingResponse, error)](#Controller.Ping)
   * [func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequest) (*svc.SubmitCollectionResponse, error)](#Controller.SubmitCollection)
   * [func (c *Controller) SubmitTransaction(ctx context.Context, req *svc.SubmitTransactionRequest) (*svc.SubmitTransactionResponse, error)](#Controller.SubmitTransaction)
-* [type InvalidTransactionError](#InvalidTransactionError)
-  * [func (e InvalidTransactionError) Error() string](#InvalidTransactionError.Error)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -79,7 +77,7 @@ func (c *Controller) SubmitCollection(context.Context, *svc.SubmitCollectionRequ
 
 
 
-### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go?s=921:1059#L32)
+### <a name="Controller.SubmitTransaction">func</a> (\*Controller) [SubmitTransaction](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go?s=860:998#L29)
 ``` go
 func (c *Controller) SubmitTransaction(
     ctx context.Context, req *svc.SubmitTransactionRequest,
@@ -96,32 +94,6 @@ The submitted transaction will be stored for future inclusion in a collection
 if it belongs to this node's cluster, but otherwise it will be forwarded to the
 correct cluster.
 
-
-
-
-## <a name="InvalidTransactionError">type</a> [InvalidTransactionError](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go?s=2001:2064#L69)
-``` go
-type InvalidTransactionError struct {
-    // contains filtered or unexported fields
-}
-
-```
-InvalidTransactionError indicates that a transaction does not contain all
-required information.
-
-
-
-
-
-
-
-
-
-
-### <a name="InvalidTransactionError.Error">func</a> (InvalidTransactionError) [Error](https://github.com/dapperlabs/flow-go/tree/master/internal/roles/collect/controller/submit_transaction.go?s=2066:2113#L73)
-``` go
-func (e InvalidTransactionError) Error() string
-```
 
 
 
