@@ -96,3 +96,15 @@ message SignedCollectionHash {
   bytes collectionHash = 1;
   repeated bytes signatures = 2;
 }
+
+message Account {
+  bytes address = 1;
+  uint64 balance = 2;
+  bytes code = 3;
+  repeated AccountKey keys = 4;
+}
+
+message AccountKey {
+  bytes public_key = 1;
+  uint32 weight = 2;
+}

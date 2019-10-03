@@ -70,3 +70,58 @@ func TransactionToMessage(t types.Transaction) *shared.Transaction {
 		Signatures:         signatures,
 	}
 }
+
+func MessageToAccount(m *shared.Account) (types.Account, error) {
+	if m == nil {
+		return types.Account{}, ErrEmptyMessage
+	}
+
+	accountKeys := make([]types.AccountKey, len(m.Keys))
+	for i, key := range m.Keys {
+		accountKey, err := MessageToAccountKey(key)
+		if err != nil {
+			return types.Account{}, err
+		}
+
+		accountKeys[i] = accountKey
+	}
+
+	return types.Account{
+		Address: types.BytesToAddress(m.Address),
+		Balance: m.Balance,
+		Code:    m.Code,
+		Keys:    accountKeys,
+	}, nil
+}
+
+func AccountToMessage(a types.Account) *shared.Account {
+	accountKeys := make([]*shared.AccountKey, len(a.Keys))
+	for i, key := range a.Keys {
+		accountKeys[i] = AccountKeyToMessage(key)
+	}
+
+	return &shared.Account{
+		Address: a.Address.Bytes(),
+		Balance: a.Balance,
+		Code:    a.Code,
+		Keys:    accountKeys,
+	}
+}
+
+func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
+	if m == nil {
+		return types.AccountKey{}, ErrEmptyMessage
+	}
+
+	return types.AccountKey{
+		PublicKey: m.PublicKey,
+		Weight:    uint(m.Weight),
+	}, nil
+}
+
+func AccountKeyToMessage(a types.AccountKey) *shared.AccountKey {
+	return &shared.AccountKey{
+		PublicKey: a.PublicKey,
+		Weight:    uint32(a.Weight),
+	}
+}

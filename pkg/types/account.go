@@ -4,8 +4,13 @@ package types
 //
 // An account can be an externally owned account or a contract account with code.
 type Account struct {
-	Address    Address
-	Balance    uint64
-	Code       []byte
-	PublicKeys [][]byte
+	Address Address
+	Balance uint64
+	Code    []byte
+	Keys    []AccountKey
+}
+
+type AccountKey struct {
+	PublicKey []byte
+	Weight    uint
 }

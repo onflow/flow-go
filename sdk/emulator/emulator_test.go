@@ -550,7 +550,7 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
+	Expect(account.Keys[0].PublicKey).To(Equal([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
@@ -574,7 +574,7 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
+	Expect(account.Keys[0].PublicKey).To(Equal([]byte{7, 8, 9}))
 	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
 }
 

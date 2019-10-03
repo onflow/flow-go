@@ -307,24 +307,23 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]int)
+	accountWeights := make(map[types.Address]uint)
 
 	for _, accountSig := range tx.Signatures {
-		err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		weight, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		// TODO: add key weights
-		accountWeights[accountSig.Account] = 1
+		accountWeights[accountSig.Account] += weight
 	}
 
-	if accountWeights[tx.PayerAccount] < 1 {
+	if accountWeights[tx.PayerAccount] < 1000 {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < 1 {
+		if accountWeights[account] < 1000 {
 			return &ErrMissingSignature{account}
 		}
 	}
@@ -334,15 +333,17 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // verifyAccountSignature verifies a that an account signature is valid for the account and given message.
 //
+// If the signature is valid, this function returns the weight of the associated account key.
+//
 // An error is returned if the account does not contain a public key that correctly verifies the signature
 // against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) error {
+) (uint, error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return 0, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
@@ -351,8 +352,8 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
-	for _, publicKeyBytes := range account.PublicKeys {
-		publicKey, err := salg.DecodePubKey(publicKeyBytes)
+	for _, accountKey := range account.Keys {
+		publicKey, err := salg.DecodePubKey(accountKey.PublicKey)
 		if err != nil {
 			continue
 		}
@@ -366,11 +367,11 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 		}
 
 		if valid {
-			return nil
+			return accountKey.Weight, nil
 		}
 	}
 
-	return &ErrInvalidSignaturePublicKey{
+	return 0, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }
