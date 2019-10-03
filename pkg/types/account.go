@@ -10,6 +10,9 @@ type Account struct {
 	Keys    []AccountKey
 }
 
+// AccountKey is a public key associated with an account.
+//
+// An account key contains the public key encoded as bytes and a key weight.
 type AccountKey struct {
 	PublicKey []byte
 	Weight    uint
