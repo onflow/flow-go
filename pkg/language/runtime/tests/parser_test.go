@@ -4977,3 +4977,70 @@ func TestParseIdentifiers(t *testing.T) {
 			To(Not(HaveOccurred()))
 	}
 }
+
+// TestParseExpressionStatementAfterReturnStatement tests that a return statement
+// does *not* consume an expression from the next statement as the return value
+//
+func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+          return
+          destroy x
+      }
+	`)
+
+	Expect(err).
+		To(Not(HaveOccurred()))
+
+	test := &FunctionDeclaration{
+		Access: AccessNotSpecified,
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&ReturnStatement{
+						Expression: nil,
+						StartPos:   Position{Offset: 30, Line: 3, Column: 10},
+						EndPos:     Position{Offset: 35, Line: 3, Column: 15},
+					},
+					&ExpressionStatement{
+						Expression: &DestroyExpression{
+							Expression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "x",
+									Pos:        Position{Offset: 55, Line: 4, Column: 18},
+								},
+							},
+							StartPos: Position{Offset: 47, Line: 4, Column: 10},
+						},
+					},
+				},
+				StartPos: Position{Offset: 18, Line: 2, Column: 17},
+				EndPos:   Position{Offset: 63, Line: 5, Column: 6},
+			},
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	Expect(actual).
+		To(Equal(expected))
+}

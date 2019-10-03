@@ -30,6 +30,17 @@ func (position Position) Hash() (result uint32) {
 	return
 }
 
+func (position Position) Compare(other Position) int {
+	switch {
+	case position.Offset < other.Offset:
+		return -1
+	case position.Offset > other.Offset:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func PositionFromToken(token antlr.Token) Position {
 	return Position{
 		Offset: token.GetStart(),

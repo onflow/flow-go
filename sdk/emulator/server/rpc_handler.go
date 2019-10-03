@@ -39,7 +39,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
 			s.logger.
-				WithField("txHash", tx.Hash()).
+				WithField("txHash", tx.Hash().Hex()).
 				Infof("💸  Transaction #%d mined", tx.Nonce)
 			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *emulator.ErrDuplicateTransaction:
@@ -53,7 +53,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		}
 	} else {
 		s.logger.
-			WithField("txHash", tx.Hash()).
+			WithField("txHash", tx.Hash().Hex()).
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
@@ -61,7 +61,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
-		"blockHash": block.Hash(),
+		"blockHash": block.Hash().Hex(),
 		"blockSize": len(block.TransactionHashes),
 	}).Infof("️⛏  Block #%d mined", block.Number)
 
@@ -88,7 +88,7 @@ func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlo
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
-		"blockHash": hash,
+		"blockHash": hash.Hex(),
 		"blockSize": len(block.TransactionHashes),
 	}).Debugf("🎁  GetBlockByHash called")
 
@@ -114,7 +114,7 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  number,
-		"blockHash": block.Hash(),
+		"blockHash": block.Hash().Hex(),
 		"blockSize": len(block.TransactionHashes),
 	}).Debugf("🎁  GetBlockByNumber called")
 
@@ -131,7 +131,7 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 
 	s.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
-		"blockHash": block.Hash(),
+		"blockHash": block.Hash().Hex(),
 		"blockSize": len(block.TransactionHashes),
 	}).Debugf("🎁  GetLatestBlock called")
 
@@ -157,7 +157,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 	}
 
 	s.logger.
-		WithField("txHash", hash).
+		WithField("txHash", hash.Hex()).
 		Debugf("💵  GetTransaction called")
 
 	txMsg := proto.TransactionToMessage(*tx)
