@@ -4,7 +4,7 @@ package crypto
 
 type feldmanVSSstate struct {
 	// common DKG state
-	*DKGcommon
+	*dkgCommon
 	// node leader index
 	leaderIndex int
 	// internal context of BLS on BLS12381A
