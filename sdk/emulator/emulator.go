@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -318,12 +319,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 		accountWeights[accountSig.Account] += weight
 	}
 
-	if accountWeights[tx.PayerAccount] < 1000 {
+	if accountWeights[tx.PayerAccount] < constants.MaxAccountKeyWeight {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < 1000 {
+		if accountWeights[account] < constants.MaxAccountKeyWeight {
 			return &ErrMissingSignature{account}
 		}
 	}

@@ -3,6 +3,7 @@ package execution
 import (
 	"errors"
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"math/big"
 	"strings"
 
@@ -85,7 +86,7 @@ func (i *RuntimeContext) GetAccount(address types.Address) *types.Account {
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
-		Keys:    []types.AccountKey{{PublicKey: publicKey, Weight: 1000}},
+		Keys:    []types.AccountKey{{PublicKey: publicKey, Weight: constants.MaxAccountKeyWeight}},
 	}
 }
 
