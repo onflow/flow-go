@@ -49,13 +49,13 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 	//   n-m<=t+1 for robustness
 	threshold := (size - 1) / 2
 	if dkg == FeldmanVSS {
-		common := &DKGcommon{
+		common := &dkgCommon{
 			size:         size,
 			threshold:    threshold,
 			currentIndex: currentIndex,
 		}
 		fvss := &feldmanVSSstate{
-			DKGcommon:   common,
+			dkgCommon:   common,
 			leaderIndex: leaderIndex,
 		}
 		fvss.init()
@@ -66,8 +66,8 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 	return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 }
 
-// DKGcommon holds the common data of all DKG protocols
-type DKGcommon struct {
+// dkgCommon holds the common data of all DKG protocols
+type dkgCommon struct {
 	size         int
 	threshold    int
 	currentIndex int
@@ -76,12 +76,12 @@ type DKGcommon struct {
 }
 
 // Size returns the size of the DKG group n
-func (s *DKGcommon) Size() int {
+func (s *dkgCommon) Size() int {
 	return s.size
 }
 
 // Threshold returns the threshold value t
-func (s *DKGcommon) Threshold() int {
+func (s *dkgCommon) Threshold() int {
 	return s.threshold
 }
 

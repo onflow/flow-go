@@ -22,6 +22,8 @@ type toProcess struct {
 	msg  DKGmsg
 }
 
+// This is a testing function
+// it simulates sending a message from one node to another
 func send(orig int, dest int, msg DKGmsg, dkg []DKGstate, chans []chan *toProcess) {
 	log.Infof("%d Sending to %d:\n", orig, dest)
 	log.Debug(msg)
@@ -29,6 +31,8 @@ func send(orig int, dest int, msg DKGmsg, dkg []DKGstate, chans []chan *toProces
 	chans[dest] <- newMsg
 }
 
+// This is a testing function
+// it simulates broadcasting a message from one node to all nodes
 func broadcast(orig int, dkg []DKGstate, msg DKGmsg, chans []chan *toProcess) {
 	log.Infof("%d Broadcasting:", orig)
 	log.Debug(msg)
@@ -40,6 +44,8 @@ func broadcast(orig int, dkg []DKGstate, msg DKGmsg, chans []chan *toProcess) {
 	}
 }
 
+// This is a testing function
+// It simulates processing incoming messages by a node
 func processChan(current int, dkg []DKGstate, chans []chan *toProcess,
 	quit chan int, t *testing.T) {
 	for {
@@ -58,6 +64,8 @@ func processChan(current int, dkg []DKGstate, chans []chan *toProcess,
 	}
 }
 
+// This is a testing function
+// It processes the output of a the DKG library
 func (out *DKGoutput) processOutput(current int, dkg []DKGstate,
 	chans []chan *toProcess, t *testing.T) {
 	assert.Nil(t, out.err)
@@ -76,6 +84,7 @@ func (out *DKGoutput) processOutput(current int, dkg []DKGstate,
 	}
 }
 
+// Testing the happy path of Feldman VSS by simulating a network of n nodes
 func TestFeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS starts")
