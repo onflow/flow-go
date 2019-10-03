@@ -3,10 +3,10 @@ package execution
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/constants"
 	"math/big"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
