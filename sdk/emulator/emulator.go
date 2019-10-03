@@ -319,12 +319,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 		accountWeights[accountSig.Account] += weight
 	}
 
-	if accountWeights[tx.PayerAccount] < constants.MaxAccountKeyWeight {
+	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < constants.MaxAccountKeyWeight {
+		if accountWeights[account] < constants.AccountKeyWeightThreshold {
 			return &ErrMissingSignature{account}
 		}
 	}

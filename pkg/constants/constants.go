@@ -2,6 +2,6 @@
 package constants
 
 const (
-	// MaxAccountKeyWeight is the maximum weight of an account key.
-	MaxAccountKeyWeight uint = 1000
+	// AccountKeyWeightThreshold is the total weight required to authorize a set of keys for an account.
+	AccountKeyWeightThreshold uint = 1000
 )

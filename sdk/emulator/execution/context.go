@@ -86,7 +86,7 @@ func (i *RuntimeContext) GetAccount(address types.Address) *types.Account {
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
-		Keys:    []types.AccountKey{{PublicKey: publicKey, Weight: constants.MaxAccountKeyWeight}},
+		Keys:    []types.AccountKey{{PublicKey: publicKey, Weight: constants.AccountKeyWeightThreshold}},
 	}
 }
 
