@@ -12,19 +12,24 @@ import (
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
-// EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
+// EmulatedBlockchain simulates a blockchain for testing purposes.
 //
-// Contains a versioned World State store and a pending transaction pool for granular state update tests.
-// Both "committed" and "intermediate" world states are logged for query by version (state hash) utilities,
-// but only "committed" world states are enabled for the SeekToState feature.
+// An emulated blockchain contains a versioned world state store and a pending transaction pool
+// for granular state update tests.
+//
+// The intermediate world state is stored after each transaction is executed and can be used
+// to check the output of a single transaction.
+//
+// The final world state is committed after each block. An index of committed world states is maintained
+// to allow a test to seek to previously committed world state.
 type EmulatedBlockchain struct {
-	// mapping of committed world states (updated after CommitBlock)
+	// worldStates is a mapping of committed world states (updated after CommitBlock)
 	worldStates map[string][]byte
-	// mapping of intermediate world states (updated after SubmitTransaction)
+	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[string][]byte
-	// current world state
+	// pendingWorldState is the current working world state
 	pendingWorldState *state.WorldState
-	// pool of pending transactions waiting to be committed (already executed)
+	// txPool is a pool of pending transactions waiting to be committed (already executed)
 	txPool             map[string]*types.Transaction
 	mutex              sync.RWMutex
 	computer           *execution.Computer
@@ -72,10 +77,12 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	}
 }
 
+// RootAccount returns the root account address for this blockchain.
 func (b *EmulatedBlockchain) RootAccount() types.Address {
 	return b.rootAccountAddress
 }
 
+// RootKey returns the root private key for this blockchain.
 func (b *EmulatedBlockchain) RootKey() crypto.PrKey {
 	return b.rootAccountKey
 }
@@ -238,8 +245,8 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 
 // CommitBlock takes all pending transactions and commits them into a block.
 //
-// Note that this clears the pending transaction pool and indexes the committed
-// blockchain state for testing purposes.
+// Note: this clears the pending transaction pool and indexes the committed blockchain
+// state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
