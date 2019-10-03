@@ -109,7 +109,7 @@ func TestWorldStates(t *testing.T) {
 	Expect(err).To(HaveOccurred())
 
 	ws3 := b.pendingWorldState.Hash()
-	t.Logf("world state after dup tx1: \t%s\n", ws3)
+	t.Logf("world state after dup tx1: %x\n", ws3)
 
 	// tx1 not included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
@@ -121,7 +121,7 @@ func TestWorldStates(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	ws4 := b.pendingWorldState.Hash()
-	t.Logf("world state after tx2: \t%s\n", ws4)
+	t.Logf("world state after tx2: %x\n", ws4)
 
 	// tx2 included in tx pool
 	Expect(b.txPool).To(HaveLen(2))
@@ -131,7 +131,7 @@ func TestWorldStates(t *testing.T) {
 	// Commit new block
 	b.CommitBlock()
 	ws5 := b.pendingWorldState.Hash()
-	t.Logf("world state after commit: \t%s\n", ws5)
+	t.Logf("world state after commit: %x\n", ws5)
 
 	// Tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
@@ -145,7 +145,7 @@ func TestWorldStates(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	ws6 := b.pendingWorldState.Hash()
-	t.Logf("world state after tx3: \t%s\n", ws6)
+	t.Logf("world state after tx3: %x\n", ws6)
 
 	// tx3 included in tx pool
 	Expect(b.txPool).To(HaveLen(1))
@@ -155,7 +155,7 @@ func TestWorldStates(t *testing.T) {
 	// Seek to committed block/world state
 	b.SeekToState(ws5)
 	ws7 := b.pendingWorldState.Hash()
-	t.Logf("world state after seek: \t%s\n", ws7)
+	t.Logf("world state after seek: %x\n", ws7)
 
 	// Tx pool cleared
 	Expect(b.txPool).To(HaveLen(0))
@@ -167,7 +167,7 @@ func TestWorldStates(t *testing.T) {
 	// Seek to non-committed world state
 	b.SeekToState(ws4)
 	ws8 := b.pendingWorldState.Hash()
-	t.Logf("world state after failed seek: \t%s\n", ws8)
+	t.Logf("world state after failed seek: %x\n", ws8)
 
 	// World state does not rollback to ws4 (before commit block)
 	Expect(ws8).ToNot(Equal(ws4))
