@@ -5,7 +5,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
-
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -15,7 +14,7 @@ type WorldState struct {
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
-	Transactions      map[string]*types.SignedTransaction
+	Transactions      map[string]*types.Transaction
 	transactionsMutex sync.RWMutex
 	Registers         types.Registers
 	registersMutex    sync.RWMutex
@@ -27,7 +26,7 @@ type WorldState struct {
 func NewWorldState() *WorldState {
 	blocks := make(map[string]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
-	transactions := make(map[string]*types.SignedTransaction)
+	transactions := make(map[string]*types.Transaction)
 	registers := make(types.Registers)
 
 	genesis := etypes.GenesisBlock()
@@ -86,7 +85,7 @@ func (ws *WorldState) GetBlockByNumber(number uint64) *etypes.Block {
 }
 
 // GetTransaction gets a transaction by hash.
-func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
+func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.Transaction {
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
@@ -133,7 +132,7 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 }
 
 // InsertTransaction inserts a new transaction into the state.
-func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
+func (ws *WorldState) InsertTransaction(tx *types.Transaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 

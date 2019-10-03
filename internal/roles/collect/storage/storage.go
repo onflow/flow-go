@@ -9,11 +9,11 @@ import (
 // Storage provides methods to store and retrieve data required by a collection node.
 type Storage interface {
 	// InsertTransaction inserts a signed transaction into storage.
-	InsertTransaction(types.SignedTransaction) error
+	InsertTransaction(types.Transaction) error
 	// GetTransaction returns the transaction with the provided hash.
 	//
 	// This function returns error if the hash does not exist in storage.
-	GetTransaction(crypto.Hash) (types.SignedTransaction, error)
+	GetTransaction(crypto.Hash) (types.Transaction, error)
 	// ContainsTransaction returns true if a transaction with the given hash exists
 	// in storage and false otherwise.
 	ContainsTransaction(crypto.Hash) bool
@@ -30,7 +30,7 @@ func NewDatabaseStorage(db keyvalue.DBConnector) Storage {
 }
 
 // InsertTransaction inserts a signed transaction into storage.
-func (d *DatabaseStorage) InsertTransaction(tx types.SignedTransaction) error {
+func (d *DatabaseStorage) InsertTransaction(tx types.Transaction) error {
 	// TODO: implement InsertTransaction
 	return nil
 }
@@ -38,9 +38,9 @@ func (d *DatabaseStorage) InsertTransaction(tx types.SignedTransaction) error {
 // GetTransaction returns the transaction with the provided hash.
 //
 // This function returns error if the hash does not exist in storage.
-func (d *DatabaseStorage) GetTransaction(crypto.Hash) (types.SignedTransaction, error) {
+func (d *DatabaseStorage) GetTransaction(crypto.Hash) (types.Transaction, error) {
 	// TODO: implement GetTransaction
-	return types.SignedTransaction{}, nil
+	return types.Transaction{}, nil
 }
 
 // ContainsTransaction returns true if a transaction with the given hash exists

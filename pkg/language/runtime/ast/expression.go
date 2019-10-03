@@ -499,7 +499,7 @@ func (e *BinaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters           []*Parameter
+	Parameters           Parameters
 	ReturnTypeAnnotation *TypeAnnotation
 	FunctionBlock        *FunctionBlock
 	StartPos             Position

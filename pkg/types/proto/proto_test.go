@@ -20,15 +20,14 @@ func TestAccountSignature(t *testing.T) {
 	Expect(sigA).To(Equal(sigB))
 }
 
-func TestSignedTransaction(t *testing.T) {
+func TestTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
-	txA := unittest.SignedTransactionFixture()
+	txA := unittest.TransactionFixture()
 
-	message, err := proto.SignedTransactionToMessage(txA)
-	Expect(err).ToNot(HaveOccurred())
+	message := proto.TransactionToMessage(txA)
 
-	txB, err := proto.MessageToSignedTransaction(message)
+	txB, err := proto.MessageToTransaction(message)
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(txA).To(Equal(txB))

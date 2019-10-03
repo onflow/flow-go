@@ -234,13 +234,12 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 			OriginEndPos:    &sema.Position{Line: 5, Column: 12},
 			DeclarationKind: common.DeclarationKindField,
 		},
-		// self
 		{
 			StartPos:        sema.Position{Line: 7, Column: 11},
 			EndPos:          sema.Position{Line: 7, Column: 14},
 			OriginStartPos:  nil,
 			OriginEndPos:    nil,
-			DeclarationKind: common.DeclarationKindConstant,
+			DeclarationKind: common.DeclarationKindSelf,
 		},
 		{
 			StartPos:        sema.Position{Line: 7, Column: 16},
@@ -249,13 +248,12 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 			OriginEndPos:    &sema.Position{Line: 5, Column: 12},
 			DeclarationKind: common.DeclarationKindField,
 		},
-		// self
 		{
 			StartPos:        sema.Position{Line: 8, Column: 11},
 			EndPos:          sema.Position{Line: 8, Column: 14},
 			OriginStartPos:  nil,
 			OriginEndPos:    nil,
-			DeclarationKind: common.DeclarationKindConstant,
+			DeclarationKind: common.DeclarationKindSelf,
 		},
 		{
 			StartPos:        sema.Position{Line: 8, Column: 16},

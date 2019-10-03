@@ -26,7 +26,7 @@ func TestSendTransaction(t *testing.T) {
 	c := client.NewFromRPCClient(mockRPC)
 	ctx := context.Background()
 
-	tx := unittest.SignedTransactionFixture()
+	tx := unittest.TransactionFixture()
 
 	// client should return non-error if RPC call succeeds
 	mockRPC.EXPECT().

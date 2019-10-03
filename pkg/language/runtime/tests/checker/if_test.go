@@ -20,6 +20,24 @@ func TestCheckIfStatementTest(t *testing.T) {
 		To(Not(HaveOccurred()))
 }
 
+func TestCheckIfStatementScoping(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      fun test() {
+          if true {
+              let x = 1
+          }
+          x
+      }
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+}
+
 func TestCheckInvalidIfStatementTest(t *testing.T) {
 	RegisterTestingT(t)
 

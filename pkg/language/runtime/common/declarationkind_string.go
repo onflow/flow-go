@@ -25,11 +25,13 @@ func _() {
 	_ = x[DeclarationKindResourceInterface-14]
 	_ = x[DeclarationKindContractInterface-15]
 	_ = x[DeclarationKindImport-16]
+	_ = x[DeclarationKindSelf-17]
+	_ = x[DeclarationKindResult-18]
 }
 
-const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindResourceDeclarationKindContractDeclarationKindFieldDeclarationKindInitializerDeclarationKindStructureInterfaceDeclarationKindResourceInterfaceDeclarationKindContractInterfaceDeclarationKindImport"
+const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindResourceDeclarationKindContractDeclarationKindFieldDeclarationKindInitializerDeclarationKindStructureInterfaceDeclarationKindResourceInterfaceDeclarationKindContractInterfaceDeclarationKindImportDeclarationKindSelfDeclarationKindResult"
 
-var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 229, 252, 272, 298, 331, 363, 395, 416}
+var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 229, 252, 272, 298, 331, 363, 395, 416, 435, 456}
 
 func (i DeclarationKind) String() string {
 	if i < 0 || i >= DeclarationKind(len(_DeclarationKind_index)-1) {

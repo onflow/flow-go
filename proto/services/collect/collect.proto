@@ -27,7 +27,7 @@ message PingResponse {
 }
 
 message SubmitTransactionRequest {
-  flow.shared.messages.SignedTransaction transaction = 1;
+  flow.shared.messages.Transaction transaction = 1;
 }
   
 message SubmitTransactionResponse {}
@@ -46,7 +46,7 @@ message GetTransactionRequest {
 }
 
 message GetTransactionResponse {
-  flow.shared.messages.SignedTransaction transaction = 1;
+  flow.shared.messages.Transaction transaction = 1;
 }
 
 message GetCollectionRequest {

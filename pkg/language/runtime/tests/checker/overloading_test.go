@@ -13,28 +13,31 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
-		_, err := ParseAndCheck(fmt.Sprintf(`
-          %s X {
-              init() {}
-              init(y: Int) {}
-          }
-	    `, kind.Keyword()))
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-		// TODO: add support for non-structure declarations
+			_, err := ParseAndCheck(fmt.Sprintf(`
+              %s X {
+                  init() {}
+                  init(y: Int) {}
+              }
+	        `, kind.Keyword()))
 
-		expectedErrorCount := 1
-		if kind != common.CompositeKindStructure {
-			expectedErrorCount += 1
-		}
+			// TODO: add support for non-structure declarations
 
-		errs := ExpectCheckerErrors(err, expectedErrorCount)
+			expectedErrorCount := 1
+			if kind != common.CompositeKindStructure {
+				expectedErrorCount += 1
+			}
 
-		Expect(errs[0]).
-			To(BeAssignableToTypeOf(&sema.UnsupportedOverloadingError{}))
+			errs := ExpectCheckerErrors(err, expectedErrorCount)
 
-		if kind != common.CompositeKindStructure {
-			Expect(errs[1]).
-				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
-		}
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedOverloadingError{}))
+
+			if kind != common.CompositeKindStructure {
+				Expect(errs[1]).
+					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+			}
+		})
 	}
 }

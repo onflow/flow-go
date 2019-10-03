@@ -137,7 +137,7 @@ func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
 	Expect(errs[0].(*sema.NotDeclaredError).Name).
 		To(Equal("y"))
 	Expect(errs[0].(*sema.NotDeclaredError).ExpectedKind).
-		To(Equal(common.DeclarationKindValue))
+		To(Equal(common.DeclarationKindVariable))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))

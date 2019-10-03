@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/dapperlabs/flow-go/sdk/client"
-
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/accounts"
+	"github.com/dapperlabs/flow-go/sdk/client"
 )
 
 type Config struct {
@@ -60,8 +59,15 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := accounts.CreateAccount(publicKey, code)
-		signedTx, err := tx.SignPayer(signerAddr, signerKey)
+		script := accounts.CreateAccount(publicKey, code)
+
+		tx := types.Transaction{
+			Script:       script,
+			ComputeLimit: 10,
+			PayerAccount: signerAddr,
+		}
+
+		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
 			utils.Exit("Failed to sign transaction", 1)
 		}
@@ -71,7 +77,7 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to connect to emulator", 1)
 		}
 
-		err = client.SendTransaction(context.Background(), *signedTx)
+		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
 			utils.Exit("Failed to send account creation transaction", 1)
 		}
