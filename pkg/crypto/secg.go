@@ -11,7 +11,6 @@ package crypto
 import (
 	goec "crypto/elliptic"
 	"math/big"
-	"sync"
 )
 
 // A SECCurve represents a short-form Weierstrass curve with a=0
@@ -210,22 +209,15 @@ func (curve *SECCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	return curve.ScalarMult(curve.Gx, curve.Gy, k)
 }
 
-var initonce sync.Once
-var secp256k1Curve *SECCurve
-
-func initsecp256k1() {
+// SECp256k1 returns a SECCurve which implements secp256k1
+func secp256k1() *SECCurve {
 	// See SEC 2 section 2.7.1
-	secp256k1Curve = new(SECCurve)
+	secp256k1Curve := new(SECCurve)
 	secp256k1Curve.P, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
 	secp256k1Curve.N, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
 	secp256k1Curve.B, _ = new(big.Int).SetString("0000000000000000000000000000000000000000000000000000000000000007", 16)
 	secp256k1Curve.Gx, _ = new(big.Int).SetString("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
 	secp256k1Curve.Gy, _ = new(big.Int).SetString("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
 	secp256k1Curve.BitSize = 256
-}
-
-// SECp256k1 returns a SECCurve which implements secp256k1
-func secp256k1() *SECCurve {
-	initonce.Do(initsecp256k1)
 	return secp256k1Curve
 }

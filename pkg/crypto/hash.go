@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/hex"
+	"fmt"
 	"hash"
 
 	"golang.org/x/crypto/sha3"
@@ -13,7 +14,7 @@ func NewHashAlgo(name AlgoName) (Hasher, error) {
 		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
 		// Output length sanity check, size() is provided by Hash.hash
 		if a.outputSize != a.Size() {
-			return nil, cryptoError{string(SHA3_256) + " requires an output length " + string(a.Size())}
+			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_256, a.Size())}
 		}
 		return a, nil
 	}
@@ -21,11 +22,11 @@ func NewHashAlgo(name AlgoName) (Hasher, error) {
 		a := &(sha3_384Algo{&HashAlgo{name, HashLengthSha3_384, sha3.New384()}})
 		// Output length sanity check, size() is provided by Hash.hash
 		if a.outputSize != a.Size() {
-			return nil, cryptoError{string(SHA3_384) + " requires an output length " + string(a.Size())}
+			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_384, a.Size())}
 		}
 		return a, nil
 	}
-	return nil, cryptoError{"the hashing algorithm " + string(name) + " is not supported."}
+	return nil, cryptoError{fmt.Sprintf("the hashing algorithm %s is not supported.", name)}
 }
 
 // Hash is the hash algorithms output types

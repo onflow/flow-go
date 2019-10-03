@@ -108,7 +108,7 @@ func (a *ECDSAalgo) GeneratePrKey(seed []byte) (PrKey, error) {
 	if err != nil {
 		return nil, cryptoError{"The ECDSA key generation has failed"}
 	}
-	return &(PrKeyECDSA{a, sk}), nil
+	return &PrKeyECDSA{a, sk}, nil
 }
 
 func (a *ECDSAalgo) EncodePrKey(sk PrKey) ([]byte, error) {
@@ -126,7 +126,7 @@ func (a *ECDSAalgo) DecodePrKey(der []byte) (PrKey, error) {
 		return nil, err
 	}
 
-	return &(PrKeyECDSA{a, sk}), nil
+	return &PrKeyECDSA{a, sk}, nil
 }
 
 func (a *ECDSAalgo) EncodePubKey(pk PubKey) ([]byte, error) {
@@ -162,6 +162,11 @@ type PrKeyECDSA struct {
 // AlgoName returns the name of the algo related to the private key
 func (sk *PrKeyECDSA) AlgoName() AlgoName {
 	return sk.alg.Name()
+}
+
+// Signer returns the signer structure associated with the private key
+func (sk *PrKeyECDSA) Signer() Signer {
+	return sk.alg
 }
 
 // KeySize returns the length of the private key
