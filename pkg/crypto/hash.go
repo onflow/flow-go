@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"hash"
 
 	"golang.org/x/crypto/sha3"
@@ -40,6 +41,10 @@ func (h Hash) IsEqual(input Hash) bool {
 		}
 	}
 	return true
+}
+
+func (h Hash) Hex() string {
+	return hex.EncodeToString(h)
 }
 
 // Hasher interface
