@@ -13,7 +13,7 @@ install-tools: build-relic
 
 .PHONY: test
 test:
-	go test ./...
+	GO111MODULE=on go test ./...
 
 .PHONY: generate-godoc
 generate-godoc:
