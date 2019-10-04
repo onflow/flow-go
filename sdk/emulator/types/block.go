@@ -19,13 +19,13 @@ type Block struct {
 
 func (b *Block) Hash() crypto.Hash {
 	// TODO: generate proper hash
-	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
 	d, _ := rlp.EncodeToBytes([]interface{}{
 		b.Number,
 	})
 
-	return hasher.ComputeBytesHash(d)
+	return hasher.ComputeHash(d)
 }
 
 func (b *Block) ToMessage() *observe.Block {

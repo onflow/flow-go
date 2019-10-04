@@ -17,12 +17,30 @@ var BLS_BLS12381Once sync.Once
 var ECDSA_P256Once sync.Once
 var ECDSA_SECp256k1Once sync.Once
 
-// NewSignatureAlgo initializes and chooses a signature scheme
-func NewSignatureAlgo(name AlgoName) (Signer, error) {
+// Signer interface
+type signer interface {
+	// generatePrKey generates a private key
+	generatePrivateKey([]byte) (PrivateKey, error)
+	// decodePrKey loads a private key from a byte array
+	decodePrivateKey([]byte) (PrivateKey, error)
+	// decodePubKey loads a public key from a byte array
+	decodePublicKey([]byte) (PublicKey, error)
+}
+
+// commonSigner holds the common data for all signers
+type commonSigner struct {
+	name            AlgoName
+	prKeyLength     int
+	pubKeyLength    int
+	signatureLength int
+}
+
+// NewSigner chooses and initializes a signature scheme
+func NewSigner(name AlgoName) (signer, error) {
 	if name == BLS_BLS12381 {
 		BLS_BLS12381Once.Do(func() {
 			BLS_BLS12381Instance = &(BLS_BLS12381Algo{
-				SignAlgo: &SignAlgo{
+				commonSigner: &commonSigner{
 					name,
 					prKeyLengthBLS_BLS12381,
 					pubKeyLengthBLS_BLS12381,
@@ -38,7 +56,7 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 		ECDSA_P256Once.Do(func() {
 			ECDSA_P256Instance = &(ECDSAalgo{
 				curve: elliptic.P256(),
-				SignAlgo: &SignAlgo{
+				commonSigner: &commonSigner{
 					name,
 					PrKeyLengthECDSA_P256,
 					PubKeyLengthECDSA_P256,
@@ -53,7 +71,7 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 		ECDSA_SECp256k1Once.Do(func() {
 			ECDSA_SECp256k1Instance = &(ECDSAalgo{
 				curve: secp256k1(),
-				SignAlgo: &SignAlgo{
+				commonSigner: &commonSigner{
 					name,
 					PrKeyLengthECDSA_SECp256k1,
 					PubKeyLengthECDSA_SECp256k1,
@@ -66,49 +84,31 @@ func NewSignatureAlgo(name AlgoName) (Signer, error) {
 	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", name)}
 }
 
-// Signer interface
-type Signer interface {
-	Name() AlgoName
-	// Size returns the signature output length in bytes
-	SignatureSize() int
-	// PrKeySize() returns the private key length in bytes
-	PrKeySize() int
-	// Signature functions
-	SignHash(PrKey, Hash) (Signature, error)
-	SignBytes(PrKey, []byte, Hasher) (Signature, error)
-	SignStruct(PrKey, Encoder, Hasher) (Signature, error)
-	// Verification functions
-	VerifyHash(PubKey, Signature, Hash) (bool, error)
-	VerifyBytes(PubKey, Signature, []byte, Hasher) (bool, error)
-	VerifyStruct(PubKey, Signature, Encoder, Hasher) (bool, error)
-	// Private key functions
-	GeneratePrKey([]byte) (PrKey, error)
-	EncodePrKey(PrKey) ([]byte, error)
-	DecodePrKey([]byte) (PrKey, error)
-	EncodePubKey(PubKey) ([]byte, error)
-	DecodePubKey([]byte) (PubKey, error)
+// GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
+func GeneratePrivateKey(name AlgoName, seed []byte) (PrivateKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.generatePrivateKey(seed)
 }
 
-// SignAlgo
-type SignAlgo struct {
-	name            AlgoName
-	PrKeyLength     int
-	PubKeyLength    int
-	SignatureLength int
+// DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
+func DecodePrivateKey(name AlgoName, data []byte) (PrivateKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.decodePrivateKey(data)
 }
 
-// Name returns the name of the algorithm
-func (a *SignAlgo) Name() AlgoName {
-	return a.name
-}
-
-// SignatureSize returns the size of a signature in bytes
-func (a *SignAlgo) SignatureSize() int {
-	return a.SignatureLength
-}
-
-func (a *SignAlgo) PrKeySize() int {
-	return a.PrKeyLength
+// DecodePublicKey decodes an array of bytes into a public key of the given algorithm
+func DecodePublicKey(name AlgoName, data []byte) (PublicKey, error) {
+	signer, err := NewSigner(name)
+	if err != nil {
+		return nil, err
+	}
+	return signer.decodePublicKey(data)
 }
 
 // Signature type tools
@@ -133,20 +133,28 @@ func (s Signature) String() string {
 
 // Key Pair
 
-// PrKey is an unspecified signature scheme private key
-type PrKey interface {
+// PrivateKey is an unspecified signature scheme private key
+type PrivateKey interface {
 	// returns the name of the algorithm related to the private key
 	AlgoName() AlgoName
-	// returns the signer structure associated to the private key
-	Signer() Signer
 	// return the size in bytes
 	KeySize() int
+	// Signature generation function
+	Sign([]byte, Hasher) (Signature, error)
 	// returns the public key
-	Pubkey() PubKey
+	Publickey() PublicKey
+	// Encode returns a bytes representation of the private key
+	Encode() ([]byte, error)
 }
 
-// PubKey is an unspecified signature scheme public key
-type PubKey interface {
+// PublicKey is an unspecified signature scheme public key
+type PublicKey interface {
+	// returns the name of the algorithm related to the public key
+	AlgoName() AlgoName
 	// return the size in bytes
 	KeySize() int
+	// Signature verification function
+	Verify(Signature, []byte, Hasher) (bool, error)
+	// Encode returns a bytes representation of the public key
+	Encode() ([]byte, error)
 }

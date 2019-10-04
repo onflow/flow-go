@@ -24,9 +24,9 @@ var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() error {
 	// sanity checks of lengths
-	if a.PrKeyLength != PrKeyLengthBLS_BLS12381 ||
-		a.PubKeyLength != PubKeyLengthBLS_BLS12381 ||
-		a.SignatureLength != SignatureLengthBLS_BLS12381 {
+	if a.prKeyLength != PrKeyLengthBLS_BLS12381 ||
+		a.pubKeyLength != PubKeyLengthBLS_BLS12381 ||
+		a.signatureLength != SignatureLengthBLS_BLS12381 {
 		return cryptoError{"BLS Lengths in types.go are not matching bls_include.h"}
 	}
 
@@ -93,7 +93,7 @@ func (x *scalar) setInt(a int) {
 
 // computes a bls signature
 func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, a.SignatureLength)
+	s := make([]byte, a.signatureLength)
 
 	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])),
 		(*C.bn_st)(sk),

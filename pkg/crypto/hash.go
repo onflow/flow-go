@@ -8,23 +8,32 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// NewHashAlgo initializes and chooses a hashing algorithm
-func NewHashAlgo(name AlgoName) (Hasher, error) {
+// NewHasher initializes and chooses a hashing algorithm
+func NewHasher(name AlgoName) (Hasher, error) {
 	if name == SHA3_256 {
-		a := &(sha3_256Algo{&HashAlgo{name, HashLengthSha3_256, sha3.New256()}})
+		algo := &sha3_256Algo{
+			commonHasher: &commonHasher{
+				name:       name,
+				outputSize: HashLengthSha3_256,
+				Hash:       sha3.New256()}}
+
 		// Output length sanity check, size() is provided by Hash.hash
-		if a.outputSize != a.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_256, a.Size())}
+		if algo.outputSize != algo.Size() {
+			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_256, algo.Size())}
 		}
-		return a, nil
+		return algo, nil
 	}
 	if name == SHA3_384 {
-		a := &(sha3_384Algo{&HashAlgo{name, HashLengthSha3_384, sha3.New384()}})
+		algo := &sha3_384Algo{
+			commonHasher: &commonHasher{
+				name:       name,
+				outputSize: HashLengthSha3_384,
+				Hash:       sha3.New384()}}
 		// Output length sanity check, size() is provided by Hash.hash
-		if a.outputSize != a.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_384, a.Size())}
+		if algo.outputSize != algo.Size() {
+			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_384, algo.Size())}
 		}
-		return a, nil
+		return algo, nil
 	}
 	return nil, cryptoError{fmt.Sprintf("the hashing algorithm %s is not supported.", name)}
 }
@@ -55,43 +64,36 @@ type Hasher interface {
 	Name() AlgoName
 	// Size returns the hash output length
 	Size() int
-	// Compute hash
-	ComputeBytesHash([]byte) Hash
-	ComputeStructHash(Encoder) Hash
-	// Write adds more bytes to the current hash state (a Hash.hash method)
-	AddBytes([]byte)
-	AddStruct(Encoder)
+	// ComputeHash returns the hash output
+	ComputeHash([]byte) Hash
+	// Adds more bytes to the current hash state (a Hash.hash method)
+	Add([]byte)
 	// SumHash returns the hash output and resets the hash state a
 	SumHash() Hash
 	// Reset resets the hash state
 	Reset()
 }
 
-// HashAlgo
-type HashAlgo struct {
+// commonHasher holds the common data for all hashers
+type commonHasher struct {
 	name       AlgoName
 	outputSize int
 	hash.Hash
 }
 
 // Name returns the name of the algorithm
-func (a *HashAlgo) Name() AlgoName {
+func (a *commonHasher) Name() AlgoName {
 	return a.name
 }
 
 // Name returns the size of the output
-func (a *HashAlgo) Size() int {
+func (a *commonHasher) Size() int {
 	return a.outputSize
 }
 
 // AddBytes adds bytes to the current hash state
-func (a *HashAlgo) AddBytes(data []byte) {
+func (a *commonHasher) Add(data []byte) {
 	a.Write(data)
-}
-
-// AddStruct adds a structure to the current hash state
-func (a *HashAlgo) AddStruct(struc Encoder) {
-	a.Write(struc.Encode())
 }
 
 func BytesToHash(b []byte) Hash {
