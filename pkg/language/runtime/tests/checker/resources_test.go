@@ -2401,19 +2401,13 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(err, 3)
+	errs := ExpectCheckerErrors(err, 2)
 
 	Expect(errs[0]).
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
 		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
-
-	// TODO: false positive, actually because the statement is dead code:
-	//   both branches of the if-statement return
-
-	Expect(errs[2]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *testing.T) {
@@ -2445,3 +2439,30 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *test
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 }
 
+func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(y: Int) {
+          let x <- create X()
+          if y == 42 {
+              absorb(<-x)
+              return
+          }
+          destroy x
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
