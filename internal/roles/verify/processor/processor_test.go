@@ -129,7 +129,7 @@ func Test(t *testing.T) {
 				QueueBuffer: 100,
 				CacheBuffer: 100,
 			}
-			hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+			hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 			p := processor.NewReceiptProcessor(test.m, c, hasher)
 
 			receipt := &types.ExecutionReceipt{}

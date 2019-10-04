@@ -68,7 +68,7 @@ func (p *ReceiptProcessor) run() {
 		receipt := rdc.receipt
 		done := rdc.done
 
-		receiptHash := p.hasher.ComputeStructHash(receipt)
+		receiptHash := p.hasher.ComputeHash(receipt.Encode())
 
 		// If cached result exists (err == nil), reuse it
 		if v, err := p.cache.Get(string(receiptHash)); err == nil {

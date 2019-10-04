@@ -21,6 +21,7 @@ type ResourceInfo struct {
 //
 type Resources struct {
 	resources hamt.Map
+	Returns   bool
 }
 
 // Get returns the invalidation info for the given variable.
@@ -67,7 +68,10 @@ func (ris *Resources) IsUseAfterInvalidationReported(variable *Variable, pos ast
 }
 
 func (ris *Resources) Clone() *Resources {
-	return &Resources{ris.resources}
+	return &Resources{
+		resources: ris.resources,
+		Returns:   ris.Returns,
+	}
 }
 
 func (ris *Resources) Size() int {
@@ -88,53 +92,100 @@ func (ris *Resources) FirstRest() (*Variable, ResourceInfo, *Resources) {
 // The else resources are optional.
 //
 func (ris *Resources) MergeBranches(thenResources *Resources, elseResources *Resources) {
-	var variable *Variable
-	var info ResourceInfo
 
-	infoTuples := map[*Variable]struct {
-		thenInfo, elseInfo ResourceInfo
-	}{}
+	infoTuples := NewBranchesResourceInfos(thenResources, elseResources)
 
-	for thenResources.Size() != 0 {
-		variable, info, thenResources = thenResources.FirstRest()
-		infoTuples[variable] = struct{ thenInfo, elseInfo ResourceInfo }{
-			thenInfo: info,
-		}
-	}
-
+	elseReturns := false
 	if elseResources != nil {
-		for elseResources.Size() != 0 {
-			variable, info, elseResources = elseResources.FirstRest()
-			infoTuple := infoTuples[variable]
-			infoTuple.elseInfo = info
-			infoTuples[variable] = infoTuple
-		}
+		elseReturns = elseResources.Returns
 	}
 
 	for variable, infoTuple := range infoTuples {
 		info := ris.Get(variable)
 
-		// the invalidation of the variable can be considered definitive
-		// iff it was already invalidated,
-		// or the variable was invalidated in both branches
+		// The resource variable can be considered definitely invalidated in both branches
+		// if in both branches, there were invalidations or the branch returned.
+		//
+		// The assumption that a returning branch results in a definitive invalidation
+		// can be made, because we check at the point of the return if the variable
+		// was invalidated.
 
 		definitelyInvalidatedInBranches :=
-			!infoTuple.thenInfo.Invalidations.IsEmpty() &&
-				!infoTuple.elseInfo.Invalidations.IsEmpty()
+			(!infoTuple.thenInfo.Invalidations.IsEmpty() || thenResources.Returns) &&
+				(!infoTuple.elseInfo.Invalidations.IsEmpty() || elseReturns)
+
+		// The resource variable can be considered definitively invalidated
+		// if it was already invalidated,
+		// or the variable was invalidated in both branches
 
 		info.DefinitivelyInvalidated =
 			info.DefinitivelyInvalidated ||
 				definitelyInvalidatedInBranches
 
-		info.Invalidations = info.Invalidations.
-			Merge(infoTuple.thenInfo.Invalidations).
-			Merge(infoTuple.elseInfo.Invalidations)
+		// If the a branch returns, the invalidations and uses won't have occurred in the outer scope,
+		// so only merge invalidations and uses if the branch did not return
 
-		info.UsePositions = info.UsePositions.
-			Merge(infoTuple.thenInfo.UsePositions).
-			Merge(infoTuple.elseInfo.UsePositions)
+		if !thenResources.Returns {
+			info.Invalidations = info.Invalidations.
+				Merge(infoTuple.thenInfo.Invalidations)
+
+			info.UsePositions = info.UsePositions.
+				Merge(infoTuple.thenInfo.UsePositions)
+		}
+
+		if !elseReturns {
+			info.Invalidations = info.Invalidations.
+				Merge(infoTuple.elseInfo.Invalidations)
+
+			info.UsePositions = info.UsePositions.
+				Merge(infoTuple.elseInfo.UsePositions)
+		}
 
 		key := VariableEntry{variable: variable}
 		ris.resources = ris.resources.Insert(key, info)
 	}
+
+	ris.Returns = ris.Returns ||
+		(thenResources.Returns && elseReturns)
+}
+
+type BranchesResourceInfo struct {
+	thenInfo ResourceInfo
+	elseInfo ResourceInfo
+}
+
+type BranchesResourceInfos map[*Variable]BranchesResourceInfo
+
+func (infos BranchesResourceInfos) Add(
+	resources *Resources,
+	setValue func(*BranchesResourceInfo, ResourceInfo),
+) {
+	var variable *Variable
+	var resourceInfo ResourceInfo
+
+	for resources.Size() != 0 {
+		variable, resourceInfo, resources = resources.FirstRest()
+		branchesResourceInfo := infos[variable]
+		setValue(&branchesResourceInfo, resourceInfo)
+		infos[variable] = branchesResourceInfo
+	}
+}
+
+func NewBranchesResourceInfos(thenResources *Resources, elseResources *Resources) BranchesResourceInfos {
+	infoTuples := make(BranchesResourceInfos)
+	infoTuples.Add(
+		thenResources,
+		func(branchesResourceInfo *BranchesResourceInfo, resourceInfo ResourceInfo) {
+			branchesResourceInfo.thenInfo = resourceInfo
+		},
+	)
+	if elseResources != nil {
+		infoTuples.Add(
+			elseResources,
+			func(branchesResourceInfo *BranchesResourceInfo, resourceInfo ResourceInfo) {
+				branchesResourceInfo.elseInfo = resourceInfo
+			},
+		)
+	}
+	return infoTuples
 }
