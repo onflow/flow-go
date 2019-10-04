@@ -7,27 +7,24 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckInvalidImport(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        import "unknown"
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnresolvedImportError{}))
+	assert.IsType(t, &sema.UnresolvedImportError{}, errs[0])
 }
 
 func TestCheckInvalidRepeatedImport(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheckWithExtra(
+	_, err := ParseAndCheckWithExtra(t,
 		`
            import "unknown"
            import "unknown"
@@ -39,25 +36,22 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 		},
 	)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RepeatedImportError{}))
+	assert.IsType(t, &sema.RepeatedImportError{}, errs[0])
 }
 
 func TestCheckImportAll(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
 	   fun answer(): Int {
 	       return 42
 		}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(
+	_, err = ParseAndCheckWithExtra(t,
 		`
            import "imported"
 
@@ -70,21 +64,18 @@ func TestCheckImportAll(t *testing.T) {
 		},
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidImportUnexported(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
        let x = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(
+	_, err = ParseAndCheckWithExtra(t,
 		`
            import answer from "imported"
 
@@ -97,16 +88,14 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 		},
 	)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotExportedError{}))
+	assert.IsType(t, &sema.NotExportedError{}, errs[0])
 }
 
 func TestCheckImportSome(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
 	   fun answer(): Int {
 	       return 42
        }
@@ -114,10 +103,9 @@ func TestCheckImportSome(t *testing.T) {
        let x = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(
+	_, err = ParseAndCheckWithExtra(t,
 		`
            import answer from "imported"
 
@@ -130,12 +118,10 @@ func TestCheckImportSome(t *testing.T) {
 		},
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidImportedError(t *testing.T) {
-	RegisterTestingT(t)
 
 	// NOTE: only parse, don't check imported program.
 	// will be checked by checker checking importing program
@@ -144,10 +130,9 @@ func TestCheckInvalidImportedError(t *testing.T) {
        let x: Bool = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(
+	_, err = ParseAndCheckWithExtra(t,
 		`
            import x from "imported"
         `,
@@ -158,35 +143,31 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		},
 	)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
+	assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
 }
 
 func TestCheckImportTypes(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			checker, err := ParseAndCheck(fmt.Sprintf(`
+			checker, err := ParseAndCheck(t, fmt.Sprintf(`
 	           %s Test {}
 	        `, kind.Keyword()))
 
 			// TODO: add support for non-structure declarations
 
 			if kind == common.CompositeKindStructure {
-				Expect(err).
-					To(Not(HaveOccurred()))
+				assert.Nil(t, err)
 			} else {
-				errs := ExpectCheckerErrors(err, 1)
+				errs := ExpectCheckerErrors(t, err, 1)
 
-				Expect(errs[0]).
-					To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 			}
 
-			_, err = ParseAndCheckWithExtra(
+			_, err = ParseAndCheckWithExtra(t,
 				`
                  import "imported"
 
@@ -202,13 +183,11 @@ func TestCheckImportTypes(t *testing.T) {
 			// TODO: add support for non-structure declarations
 
 			if kind == common.CompositeKindStructure {
-				Expect(err).
-					To(Not(HaveOccurred()))
+				assert.Nil(t, err)
 			} else {
-				errs := ExpectCheckerErrors(err, 3)
+				errs := ExpectCheckerErrors(t, err, 3)
 
-				Expect(errs[0]).
-					To(BeAssignableToTypeOf(&sema.ImportedProgramError{}))
+				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
 			}
 
 		})

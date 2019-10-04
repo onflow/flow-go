@@ -3,27 +3,24 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckMissingReturnStatement(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(): Int {}
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+	assert.IsType(t, &sema.MissingReturnStatementError{}, errs[0])
 }
 
 func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       	struct interface Test {
 			fun test(x: Int): Int {
 				pre {
@@ -33,14 +30,12 @@ func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
 		}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
-func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
-	RegisterTestingT(t)
+func TestCheckInvalidMissingReturnStatementStructFunction(t *testing.T) {
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
 		struct Test {
 			pub(set) var foo: Int
 
@@ -56,8 +51,10 @@ func TestCheckMissingReturnStatementStructFunction(t *testing.T) {
 		}
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingReturnStatementError{}))
+	assert.IsType(t,
+		&sema.MissingReturnStatementError{},
+		errs[0],
+	)
 }

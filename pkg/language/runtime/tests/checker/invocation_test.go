@@ -3,14 +3,13 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -20,16 +19,14 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
 }
 
 func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -39,14 +36,12 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(_ x: Int): Int {
           return x
       }
@@ -56,14 +51,12 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(_ x: Int): Int {
           return x
       }
@@ -73,16 +66,14 @@ func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+	assert.IsType(t, &sema.IncorrectArgumentLabelError{}, errs[0])
 }
 
 func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -93,14 +84,12 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -110,16 +99,14 @@ func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[0])
 }
 
 func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -129,16 +116,14 @@ func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.IncorrectArgumentLabelError{}))
+	assert.IsType(t, &sema.IncorrectArgumentLabelError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -148,49 +133,42 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ArgumentCountError{}))
+	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[1])
 }
 
 func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(): Int {
           return true()
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+	assert.IsType(t, &sema.NotCallableError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(): Int {
           return 2()
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotCallableError{}))
+	assert.IsType(t, &sema.NotCallableError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -200,16 +178,14 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionCallWithWrongTypeAndMissingArgumentLabel(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun f(x: Int): Int {
           return x
       }
@@ -219,11 +195,9 @@ func TestCheckInvalidFunctionCallWithWrongTypeAndMissingArgumentLabel(t *testing
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.MissingArgumentLabelError{}))
+	assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[1])
 }

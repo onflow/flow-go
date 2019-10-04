@@ -4,200 +4,169 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckNilCoalescingNilIntToOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let one = 1
       let none: Int? = nil
       let x: Int? = none ?? one
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckNilCoalescingNilIntToOptionals(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let one = 1
       let none: Int?? = nil
       let x: Int? = none ?? one
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let one = 1
       let x: Int? = nil ?? one
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidNilCoalescingMismatch(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Int? = nil ?? false
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckNilCoalescingRightSubtype(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Int? = nil ?? nil
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckNilCoalescingNilInt(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let one = 1
       let none: Int? = nil
       let x: Int = none ?? one
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidNilCoalescingOptionalsInt(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let one = 1
       let none: Int?? = nil
       let x: Int = none ?? one
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckNilCoalescingNilLiteralInt(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      let one = 1
      let x: Int = nil ?? one
    `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidNilCoalescingMismatchNonOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      let x: Int = nil ?? false
    `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidNilCoalescingRightSubtype(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      let x: Int = nil ?? nil
    `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidNilCoalescingNonMatchingTypes(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Int? = 1
       let y = x ?? false
    `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}))
+	assert.IsType(t, &sema.InvalidBinaryOperandError{}, errs[0])
 }
 
 func TestCheckNilCoalescingAny(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      let x: Any? = 1
      let y = x ?? false
   `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckNilCoalescingOptionalRightHandSide(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
      let x: Int? = 1
      let y: Int? = 2
      let z = x ?? y
   `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["z"].Type).
-		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
+	assert.IsType(t, &sema.OptionalType{Type: &sema.IntType{}}, checker.GlobalValues["z"].Type)
 }
 
 func TestCheckNilCoalescingBothOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
      let x: Int?? = 1
      let y: Int? = 2
      let z = x ?? y
   `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["z"].Type).
-		To(BeAssignableToTypeOf(&sema.OptionalType{Type: &sema.IntType{}}))
+	assert.IsType(t, &sema.OptionalType{Type: &sema.IntType{}}, checker.GlobalValues["z"].Type)
 }
 
 func TestCheckNilCoalescingWithNever(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheckWithExtra(
+	_, err := ParseAndCheckWithExtra(t,
 		`
           let x: Int? = nil
           let y = x ?? panic("nope")
@@ -209,6 +178,5 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
 		nil,
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
