@@ -13,16 +13,24 @@ import (
 type RuntimeContext struct {
 	registers        *types.RegistersView
 	Accounts         []types.Address
-	Logger           func(string)
-	OnAccountCreated func(account *types.Account)
+	onLog            func(string)
+	onAccountCreated func(account types.Account)
 }
 
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
 		registers:        registers,
-		Logger:           func(string) {},
-		OnAccountCreated: func(*types.Account) {},
+		onLog:            func(string) {},
+		onAccountCreated: func(types.Account) {},
 	}
+}
+
+func (i *RuntimeContext) SetLogger(callback func(string)) {
+	i.onLog = callback
+}
+
+func (i *RuntimeContext) SetOnAccountCreated(callback func(account types.Account)) {
+	i.onAccountCreated = callback
 }
 
 func (i *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -55,7 +63,8 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	i.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	i.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
-	i.OnAccountCreated(i.GetAccount(accountAddress))
+	account := i.GetAccount(accountAddress)
+	i.onAccountCreated(*account)
 
 	return accountID, nil
 }
@@ -110,12 +119,12 @@ func (i *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 	return code, nil
 }
 
-func (i *RuntimeContext) GetSigningAccounts() []types.Address {
-	return i.Accounts
+func (i *RuntimeContext) Log(message string) {
+	i.onLog(message)
 }
 
-func (i *RuntimeContext) Log(message string) {
-	i.Logger(message)
+func (i *RuntimeContext) GetSigningAccounts() []types.Address {
+	return i.Accounts
 }
 
 const (

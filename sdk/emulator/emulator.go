@@ -28,9 +28,9 @@ type EmulatedBlockchain struct {
 	txPool             map[string]*types.Transaction
 	mutex              sync.RWMutex
 	computer           *execution.Computer
-	rootAccountAddress types.Address
+	rootAccount        types.Account
 	rootAccountKey     crypto.PrKey
-	lastCreatedAccount *types.Account
+	lastCreatedAccount types.Account
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
@@ -68,13 +68,14 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	)
 
 	b.computer = computer
-	b.rootAccountAddress, b.rootAccountKey = createRootAccount(ws, opt.RootAccountKey)
+	b.rootAccount, b.rootAccountKey = createRootAccount(ws, opt.RootAccountKey)
+	b.lastCreatedAccount = b.rootAccount
 
 	return b
 }
 
 func (b *EmulatedBlockchain) RootAccount() types.Address {
-	return b.rootAccountAddress
+	return b.rootAccount.Address
 }
 
 func (b *EmulatedBlockchain) RootKey() crypto.PrKey {
@@ -304,12 +305,12 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
-func (b *EmulatedBlockchain) onAccountCreated(account *types.Account) {
+func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
 	b.lastCreatedAccount = account
 }
 
 // lastCreatedAccount returns the last account that was created in the blockchain.
-func (b *EmulatedBlockchain) LastCreatedAccount() *types.Account {
+func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 	return b.lastCreatedAccount
 }
 
@@ -386,7 +387,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address, crypto.PrKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Account, crypto.PrKey) {
 	registers := ws.Registers.NewView()
 
 	// TODO: replace hard-coded signature algorithm
@@ -403,5 +404,8 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address,
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	return types.BytesToAddress(accountID), prKey
+	accountAddress := types.BytesToAddress(accountID)
+	account := runtimeContext.GetAccount(accountAddress)
+
+	return *account, prKey
 }

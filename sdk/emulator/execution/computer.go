@@ -9,14 +9,14 @@ import (
 type Computer struct {
 	runtime          runtime.Runtime
 	runtimeLogger    func(string)
-	onAccountCreated func(*types.Account)
+	onAccountCreated func(types.Account)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
 func NewComputer(
 	runtime runtime.Runtime,
 	runtimeLogger func(string),
-	onAccountCreated func(*types.Account),
+	onAccountCreated func(types.Account),
 ) *Computer {
 	return &Computer{
 		runtime:          runtime,
@@ -35,8 +35,8 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 	runtimeContext := NewRuntimeContext(registers)
 
 	runtimeContext.Accounts = tx.ScriptAccounts
-	runtimeContext.Logger = c.runtimeLogger
-	runtimeContext.OnAccountCreated = c.onAccountCreated
+	runtimeContext.SetLogger(c.runtimeLogger)
+	runtimeContext.SetOnAccountCreated(c.onAccountCreated)
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
 	return err
@@ -47,7 +47,7 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 // This function initializes a new runtime context using the provided registers view.
 func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, error) {
 	runtimeContext := NewRuntimeContext(registers)
-	runtimeContext.Logger = c.runtimeLogger
+	runtimeContext.SetLogger(c.runtimeLogger)
 
 	return c.runtime.ExecuteScript(script, runtimeContext)
 }
