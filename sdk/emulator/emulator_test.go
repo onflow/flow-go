@@ -236,7 +236,6 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
-	t.Log(err)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
