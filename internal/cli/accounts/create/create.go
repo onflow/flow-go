@@ -59,7 +59,7 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := accounts.CreateAccount(publicKey, code)
+		script := accounts.CreateAccount([][]byte{publicKey}, code)
 
 		tx := types.Transaction{
 			Script:       script,
