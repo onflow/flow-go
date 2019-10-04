@@ -12,7 +12,7 @@ import (
 
 type RuntimeContext struct {
 	registers        *types.RegistersView
-	Accounts         []types.Address
+	signingAccounts  []types.Address
 	onLog            func(string)
 	onAccountCreated func(account types.Account)
 }
@@ -23,6 +23,10 @@ func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 		onLog:            func(string) {},
 		onAccountCreated: func(types.Account) {},
 	}
+}
+
+func (i *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
+	i.signingAccounts = accounts
 }
 
 func (i *RuntimeContext) SetLogger(callback func(string)) {

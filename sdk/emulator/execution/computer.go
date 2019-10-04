@@ -34,7 +34,7 @@ func NewComputer(
 func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) error {
 	runtimeContext := NewRuntimeContext(registers)
 
-	runtimeContext.Accounts = tx.ScriptAccounts
+	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
 	runtimeContext.SetLogger(c.runtimeLogger)
 	runtimeContext.SetOnAccountCreated(c.onAccountCreated)
 
