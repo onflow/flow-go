@@ -529,7 +529,11 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScriptA := generateCreateAccountScript([][]byte{{1, 2, 3}}, []byte{4, 5, 6})
+	publicKeyA := []byte{1, 2, 3}
+	publicKeyB := []byte{4, 5, 6}
+	codeA := []byte("fun main() {}")
+
+	createAccountScriptA := generateCreateAccountScript([][]byte{publicKeyA, publicKeyB}, codeA)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -550,10 +554,14 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
-	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+	Expect(account.PublicKeys).To(ContainElement(publicKeyA))
+	Expect(account.PublicKeys).To(ContainElement(publicKeyB))
+	Expect(account.Code).To(Equal(codeA))
 
-	createAccountScriptB := generateCreateAccountScript([][]byte{{7, 8, 9}}, []byte{10, 11, 12})
+	publicKeyC := []byte{7, 8, 9}
+	codeB := []byte("fun main() {}")
+
+	createAccountScriptB := generateCreateAccountScript([][]byte{publicKeyC}, codeB)
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptB,
@@ -574,8 +582,8 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
-	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
+	Expect(account.PublicKeys).To(ContainElement(publicKeyC))
+	Expect(account.Code).To(Equal(codeB))
 }
 
 func TestUpdateAccountCode(t *testing.T) {
