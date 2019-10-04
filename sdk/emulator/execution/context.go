@@ -170,12 +170,3 @@ func fullKey(owner, controller, key string) string {
 func keyPublicKey(index int) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
-
-// TODO: update to allocate space for keys based on pubkey size
-func allPublicKeys(publicKeys [][]byte) []byte {
-	publicKeysBytes := make([]byte, 0)
-	for _, pkBytes := range publicKeys {
-		publicKeysBytes = append(publicKeysBytes, pkBytes...)
-	}
-	return publicKeysBytes
-}
