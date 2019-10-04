@@ -23,15 +23,6 @@ const addTwoScript = `
 	}
 `
 
-// updateAccountCodeScript runs a script that updates the code for an account.
-const updateAccountCodeScript = `
-	fun main() {
-		let account = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]
-		let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
-		updateAccountCode(account, code)
-	}
-`
-
 const sampleCall = `
 	fun main(): Int {
 		return getValue([1], [2], [3])
@@ -583,42 +574,57 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScript := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+	privateKeyA := b.RootKey()
+
+	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
+	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
+	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+
+	createAccountScript := generateCreateAccountScript(pubKeyB, []byte{4, 5, 6})
+
+	accountAddressA := b.RootAccount()
+	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccount(),
+		PayerAccount:       accountAddressA,
 	}
 
-	tx1.AddSignature(b.RootAccount(), b.RootKey())
+	tx1.AddSignature(accountAddressA, privateKeyA)
 
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	// root account has ID 1, so expect this account to have ID 2
-	address := types.HexToAddress("0000000000000000000000000000000000000002")
-
-	account, err := b.GetAccount(address)
+	account, err := b.GetAccount(accountAddressB)
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
+	const updateAccountCodeScript = `
+		fun main(account: Account) {
+			let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
+			updateAccountCode(account.address, code)
+		}
+	`
 
 	tx2 := &types.Transaction{
 		Script:             []byte(updateAccountCodeScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccount(),
+		PayerAccount:       accountAddressA,
+		ScriptAccounts:     []types.Address{accountAddressB},
 	}
 
-	tx2.AddSignature(b.RootAccount(), b.RootKey())
+	tx2.AddSignature(accountAddressA, privateKeyA)
+	tx2.AddSignature(accountAddressB, privateKeyB)
 
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
 
-	account, err = b.GetAccount(address)
+	account, err = b.GetAccount(accountAddressB)
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
