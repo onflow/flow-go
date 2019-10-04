@@ -38,6 +38,26 @@ func generateCreateAccountScript(publicKey, code []byte) []byte {
 	return []byte(script)
 }
 
+func createAccount(b *EmulatedBlockchain, publicKey, code []byte) (types.Address, error) {
+	createAccountScript := generateCreateAccountScript(publicKey, code)
+
+	tx1 := &types.Transaction{
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccount(),
+	}
+
+	tx1.AddSignature(b.RootAccount(), b.RootKey())
+
+	err := b.SubmitTransaction(tx1)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return b.LastCreatedAccount().Address, nil
+}
+
 func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -580,21 +600,8 @@ func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-	createAccountScript := generateCreateAccountScript(pubKeyB, []byte{4, 5, 6})
-
 	accountAddressA := b.RootAccount()
-	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
-
-	tx1 := &types.Transaction{
-		Script:             createAccountScript,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       accountAddressA,
-	}
-
-	tx1.AddSignature(accountAddressA, privateKeyA)
-
-	err := b.SubmitTransaction(tx1)
+	accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
 	Expect(err).ToNot(HaveOccurred())
 
 	account, err := b.GetAccount(accountAddressB)

@@ -7,15 +7,21 @@ import (
 
 // Computer uses a runtime instance to execute transactions and scripts.
 type Computer struct {
-	runtime       runtime.Runtime
-	runtimeLogger func(string)
+	runtime          runtime.Runtime
+	runtimeLogger    func(string)
+	onAccountCreated func(*types.Account)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
-func NewComputer(runtime runtime.Runtime, runtimeLogger func(string)) *Computer {
+func NewComputer(
+	runtime runtime.Runtime,
+	runtimeLogger func(string),
+	onAccountCreated func(*types.Account),
+) *Computer {
 	return &Computer{
-		runtime:       runtime,
-		runtimeLogger: runtimeLogger,
+		runtime:          runtime,
+		runtimeLogger:    runtimeLogger,
+		onAccountCreated: onAccountCreated,
 	}
 }
 
@@ -30,6 +36,7 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 
 	runtimeContext.Accounts = tx.ScriptAccounts
 	runtimeContext.Logger = c.runtimeLogger
+	runtimeContext.OnAccountCreated = c.onAccountCreated
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
 	return err

@@ -11,15 +11,17 @@ import (
 )
 
 type RuntimeContext struct {
-	registers *types.RegistersView
-	Accounts  []types.Address
-	Logger    func(string)
+	registers        *types.RegistersView
+	Accounts         []types.Address
+	Logger           func(string)
+	OnAccountCreated func(account *types.Account)
 }
 
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers: registers,
-		Logger:    func(string) {},
+		registers:        registers,
+		Logger:           func(string) {},
+		OnAccountCreated: func(*types.Account) {},
 	}
 }
 
@@ -52,6 +54,8 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	i.Log("Creating new account\n")
 	i.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	i.Log(fmt.Sprintf("Code:\n%s", string(code)))
+
+	i.OnAccountCreated(i.GetAccount(accountAddress))
 
 	return accountID, nil
 }
