@@ -529,7 +529,7 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScriptA := generateCreateAccountScript([][]byte{[]byte{1}, []byte{2}, []byte{3}}, []byte{4, 5, 6})
+	createAccountScriptA := generateCreateAccountScript([][]byte{{1, 2, 3}}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -553,7 +553,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	createAccountScriptB := generateCreateAccountScript([][]byte{[]byte{7}, []byte{8}, []byte{9}}, []byte{10, 11, 12})
+	createAccountScriptB := generateCreateAccountScript([][]byte{{7, 8, 9}}, []byte{10, 11, 12})
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptB,
