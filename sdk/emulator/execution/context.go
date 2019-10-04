@@ -168,7 +168,7 @@ func fullKey(owner, controller, key string) string {
 }
 
 func keyPublicKey(index int) string {
-	return fmt.Sprint("public_key_%d", index)
+	return fmt.Sprintf("public_key_%d", index)
 }
 
 // TODO: update to allocate space for keys based on pubkey size
