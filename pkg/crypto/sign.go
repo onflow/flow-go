@@ -18,13 +18,13 @@ var ECDSA_P256Once sync.Once
 var ECDSA_SECp256k1Once sync.Once
 
 // Signer interface
-type Signer interface {
+type signer interface {
 	// generatePrKey generates a private key
-	generatePrKey([]byte) (PrivateKey, error)
+	generatePrivateKey([]byte) (PrivateKey, error)
 	// decodePrKey loads a private key from a byte array
-	decodePrKey([]byte) (PrivateKey, error)
+	decodePrivateKey([]byte) (PrivateKey, error)
 	// decodePubKey loads a public key from a byte array
-	decodePubKey([]byte) (PublicKey, error)
+	decodePublicKey([]byte) (PublicKey, error)
 }
 
 // commonSigner holds the common data for all signers
@@ -36,7 +36,7 @@ type commonSigner struct {
 }
 
 // NewSigner chooses and initializes a signature scheme
-func NewSigner(name AlgoName) (Signer, error) {
+func NewSigner(name AlgoName) (signer, error) {
 	if name == BLS_BLS12381 {
 		BLS_BLS12381Once.Do(func() {
 			BLS_BLS12381Instance = &(BLS_BLS12381Algo{
@@ -90,7 +90,7 @@ func GeneratePrivateKey(name AlgoName, seed []byte) (PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return signer.generatePrKey(seed)
+	return signer.generatePrivateKey(seed)
 }
 
 // DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
@@ -99,7 +99,7 @@ func DecodePrivateKey(name AlgoName, data []byte) (PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return signer.decodePrKey(data)
+	return signer.decodePrivateKey(data)
 }
 
 // DecodePublicKey decodes an array of bytes into a public key of the given algorithm
@@ -108,7 +108,7 @@ func DecodePublicKey(name AlgoName, data []byte) (PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return signer.decodePubKey(data)
+	return signer.decodePublicKey(data)
 }
 
 // Signature type tools
@@ -142,7 +142,7 @@ type PrivateKey interface {
 	// Signature generation function
 	Sign([]byte, Hasher) (Signature, error)
 	// returns the public key
-	Pubkey() PublicKey
+	Publickey() PublicKey
 	// Encode returns a bytes representation of the private key
 	Encode() ([]byte, error)
 }

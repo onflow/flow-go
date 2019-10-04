@@ -34,7 +34,7 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool
 }
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
-func (a *BLS_BLS12381Algo) generatePrKey(seed []byte) (PrivateKey, error) {
+func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	var sk PrKeyBLS_BLS12381
 	// seed the RNG
 	seedRelic(seed)
@@ -50,12 +50,12 @@ func (a *BLS_BLS12381Algo) generatePrKey(seed []byte) (PrivateKey, error) {
 	return &sk, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePrKey([]byte) (PrivateKey, error) {
+func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
 	// TODO: implement DecodePrKey
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePubKey([]byte) (PublicKey, error) {
+func (a *BLS_BLS12381Algo) decodePublicKey([]byte) (PublicKey, error) {
 	// TODO: implement DecodePubKey
 	return nil, nil
 }
@@ -78,7 +78,7 @@ func (sk *PrKeyBLS_BLS12381) KeySize() int {
 	return sk.alg.prKeyLength
 }
 
-func (sk *PrKeyBLS_BLS12381) computePubKey() {
+func (sk *PrKeyBLS_BLS12381) computePublicKey() {
 	newPk := &PubKeyBLS_BLS12381{
 		alg: sk.alg,
 	}
@@ -87,11 +87,11 @@ func (sk *PrKeyBLS_BLS12381) computePubKey() {
 	sk.pk = newPk
 }
 
-func (sk *PrKeyBLS_BLS12381) Pubkey() PublicKey {
+func (sk *PrKeyBLS_BLS12381) Publickey() PublicKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
-	sk.computePubKey()
+	sk.computePublicKey()
 	return sk.pk
 }
 

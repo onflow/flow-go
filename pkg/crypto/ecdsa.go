@@ -74,7 +74,7 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, err
 
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
-func (a *ECDSAalgo) generatePrKey(seed []byte) (PrivateKey, error) {
+func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	sk, err := goecdsa.GenerateKey(a.curve, rand.Reader)
 	if err != nil {
 		return nil, cryptoError{"The ECDSA key generation has failed"}
@@ -82,7 +82,7 @@ func (a *ECDSAalgo) generatePrKey(seed []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, sk}, nil
 }
 
-func (a *ECDSAalgo) decodePrKey(der []byte) (PrivateKey, error) {
+func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 	sk, err := x509.ParseECPrivateKey(der)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (a *ECDSAalgo) decodePrKey(der []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, sk}, nil
 }
 
-func (a *ECDSAalgo) decodePubKey(der []byte) (PublicKey, error) {
+func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 	i, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (sk *PrKeyECDSA) KeySize() int {
 }
 
 // Pubkey returns the public key associated to the private key
-func (sk *PrKeyECDSA) Pubkey() PublicKey {
+func (sk *PrKeyECDSA) Publickey() PublicKey {
 	return &PubKeyECDSA{
 		alg:      sk.alg,
 		goPubKey: &sk.goPrKey.PublicKey,

@@ -55,7 +55,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}
 
 	address := server.blockchain.RootAccount().String()
-	prKey, _ := utils.EncodePrKey(server.blockchain.RootKey())
+	prKey, _ := utils.EncodePrivateKey(server.blockchain.RootKey())
 
 	logger.WithFields(log.Fields{
 		"address": address,

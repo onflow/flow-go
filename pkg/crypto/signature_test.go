@@ -12,7 +12,7 @@ func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
 		log.Error(err.Error())
 		return
 	}
-	pk := sk.Pubkey()
+	pk := sk.Publickey()
 	result, err := pk.Verify(s, input, halg)
 	if err != nil {
 		log.Error(err.Error())
@@ -41,7 +41,7 @@ func benchSign(b *testing.B, alg AlgoName, halg Hasher) {
 func benchVerify(b *testing.B, alg AlgoName, halg Hasher) {
 	seed := []byte("keyseed")
 	sk, _ := GeneratePrivateKey(alg, seed)
-	pk := sk.Pubkey()
+	pk := sk.Publickey()
 
 	input := []byte("Bench input")
 	s, _ := sk.Sign(input, halg)

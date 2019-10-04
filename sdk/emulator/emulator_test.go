@@ -228,7 +228,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyA := b.RootKey()
 
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	pubKeyB, _ := privateKeyB.Pubkey().Encode()
+	pubKeyB, _ := privateKeyB.Publickey().Encode()
 
 	createAccountScript := generateCreateAccountScript(pubKeyB, nil)
 
@@ -400,7 +400,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		pubKeyB, _ := privateKeyB.Pubkey().Encode()
+		pubKeyB, _ := privateKeyB.Publickey().Encode()
 
 		createAccountScript := generateCreateAccountScript(pubKeyB, nil)
 
@@ -632,7 +632,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	pubKey, _ := b.RootKey().Pubkey().Encode()
+	pubKey, _ := b.RootKey().Publickey().Encode()
 
 	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
 

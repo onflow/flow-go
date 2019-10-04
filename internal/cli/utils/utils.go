@@ -22,7 +22,7 @@ func DecodePrivateKey(derHex string) (crypto.PrivateKey, error) {
 	return crypto.DecodePrivateKey(crypto.ECDSA_P256, prKeyDer)
 }
 
-func EncodePrKey(sk crypto.PrivateKey) (string, error) {
+func EncodePrivateKey(sk crypto.PrivateKey) (string, error) {
 	skBytes, err := sk.Encode()
 	if err != nil {
 		return "", err
