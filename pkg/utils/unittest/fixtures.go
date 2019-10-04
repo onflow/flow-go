@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -24,5 +25,21 @@ func TransactionFixture() types.Transaction {
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []types.Address{AddressFixture()},
 		Signatures:         []types.AccountSignature{AccountSignatureFixture()},
+	}
+}
+
+func AccountFixture() types.Account {
+	return types.Account{
+		Address: AddressFixture(),
+		Balance: 10,
+		Code:    []byte("fun main() {}"),
+		Keys:    []types.AccountKey{AccountKeyFixture()},
+	}
+}
+
+func AccountKeyFixture() types.AccountKey {
+	return types.AccountKey{
+		PublicKey: []byte{1, 2, 3},
+		Weight:    constants.AccountKeyWeightThreshold,
 	}
 }

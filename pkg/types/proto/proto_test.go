@@ -32,3 +32,29 @@ func TestTransaction(t *testing.T) {
 
 	Expect(txA).To(Equal(txB))
 }
+
+func TestAccount(t *testing.T) {
+	RegisterTestingT(t)
+
+	accA := unittest.AccountFixture()
+
+	message := proto.AccountToMessage(accA)
+
+	accB, err := proto.MessageToAccount(message)
+	Expect(err).ToNot(HaveOccurred())
+
+	Expect(accA).To(Equal(accB))
+}
+
+func TestAccountKey(t *testing.T) {
+	RegisterTestingT(t)
+
+	keyA := unittest.AccountKeyFixture()
+
+	message := proto.AccountKeyToMessage(keyA)
+
+	keyB, err := proto.MessageToAccountKey(message)
+	Expect(err).ToNot(HaveOccurred())
+
+	Expect(keyA).To(Equal(keyB))
+}

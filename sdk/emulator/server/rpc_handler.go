@@ -162,11 +162,9 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 
 	txMsg := proto.TransactionToMessage(*tx)
 
-	response := &observe.GetTransactionResponse{
+	return &observe.GetTransactionResponse{
 		Transaction: txMsg,
-	}
-
-	return response, nil
+	}, nil
 }
 
 // GetAccount returns the info associated with an address.
@@ -186,18 +184,11 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 		WithField("address", address).
 		Debugf("👤  GetAccount called")
 
-	accMsg := &observe.GetAccountResponse_Account{
-		Address:    account.Address.Bytes(),
-		Balance:    account.Balance,
-		Code:       account.Code,
-		PublicKeys: account.PublicKeys,
-	}
+	accMsg := proto.AccountToMessage(*account)
 
-	response := &observe.GetAccountResponse{
+	return &observe.GetAccountResponse{
 		Account: accMsg,
-	}
-
-	return response, nil
+	}, nil
 }
 
 // CallScript performs a call.

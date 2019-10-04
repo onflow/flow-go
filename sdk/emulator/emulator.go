@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -314,24 +315,23 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]int)
+	accountWeights := make(map[types.Address]uint32)
 
 	for _, accountSig := range tx.Signatures {
-		err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		// TODO: add key weights
-		accountWeights[accountSig.Account] = 1
+		accountWeights[accountSig.Account] += accountKey.Weight
 	}
 
-	if accountWeights[tx.PayerAccount] < 1 {
+	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < 1 {
+		if accountWeights[account] < constants.AccountKeyWeightThreshold {
 			return &ErrMissingSignature{account}
 		}
 	}
@@ -339,24 +339,26 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	return nil
 }
 
-// verifyAccountSignature verifies a that an account signature is valid for the account and given message.
+// verifyAccountSignature verifies that an account signature is valid for the account and given message.
+//
+// If the signature is valid, this function returns the associated account key.
 //
 // An error is returned if the account does not contain a public key that correctly verifies the signature
 // against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) error {
+) (accountKey types.AccountKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
-	for _, publicKeyBytes := range account.PublicKeys {
-		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, publicKeyBytes)
+	for _, accountKey := range account.Keys {
+		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, accountKey.PublicKey)
 		if err != nil {
 			continue
 		}
@@ -370,11 +372,11 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 		}
 
 		if valid {
-			return nil
+			return accountKey, nil
 		}
 	}
 
-	return &ErrInvalidSignaturePublicKey{
+	return accountKey, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }

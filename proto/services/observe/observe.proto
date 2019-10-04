@@ -92,13 +92,7 @@ message GetAccountRequest {
 }
 
 message GetAccountResponse {
-  message Account {
-    bytes address = 1;
-    uint64 balance = 2;
-    bytes code = 3;
-    repeated bytes public_keys = 4;
-  }
-  Account account = 1;
+  flow.shared.messages.Account account = 1;
 }
 
 message CallScriptRequest {
