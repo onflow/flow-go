@@ -9,18 +9,18 @@ import (
 
 // MockStorage is an in-memory storage implementation.
 type MockStorage struct {
-	transactions map[string]types.SignedTransaction
+	transactions map[string]types.Transaction
 }
 
 // NewMockStorage initializes and returns a new MockStorage.
 func NewMockStorage() Storage {
 	return &MockStorage{
-		transactions: make(map[string]types.SignedTransaction),
+		transactions: make(map[string]types.Transaction),
 	}
 }
 
 // InsertTransaction inserts a signed transaction into storage.
-func (d *MockStorage) InsertTransaction(tx types.SignedTransaction) error {
+func (d *MockStorage) InsertTransaction(tx types.Transaction) error {
 	d.transactions[string(tx.Hash())] = tx
 	return nil
 }
@@ -28,10 +28,10 @@ func (d *MockStorage) InsertTransaction(tx types.SignedTransaction) error {
 // GetTransaction returns the transaction with the provided hash.
 //
 // This function returns error if the hash does not exist in storage.
-func (d *MockStorage) GetTransaction(hash crypto.Hash) (types.SignedTransaction, error) {
+func (d *MockStorage) GetTransaction(hash crypto.Hash) (types.Transaction, error) {
 	tx, exists := d.transactions[string(hash)]
 	if !exists {
-		return types.SignedTransaction{}, errors.New("transaction does not exist")
+		return types.Transaction{}, errors.New("transaction does not exist")
 	}
 
 	return tx, nil

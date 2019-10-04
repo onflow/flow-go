@@ -3,8 +3,6 @@ package proto
 import (
 	"errors"
 
-	"github.com/golang/protobuf/ptypes"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -25,38 +23,50 @@ func AccountSignatureToMessage(t types.AccountSignature) *shared.AccountSignatur
 	}
 }
 
-func MessageToSignedTransaction(m *shared.SignedTransaction) (types.SignedTransaction, error) {
+func MessageToTransaction(m *shared.Transaction) (types.Transaction, error) {
 	if m == nil {
-		return types.SignedTransaction{}, ErrEmptyMessage
+		return types.Transaction{}, ErrEmptyMessage
 	}
 
-	timestamp, err := ptypes.Timestamp(m.GetTimestamp())
-	if err != nil {
-		return types.SignedTransaction{}, err
+	scriptAccounts := make([]types.Address, len(m.ScriptAccounts))
+	for i, account := range m.ScriptAccounts {
+		scriptAccounts[i] = types.BytesToAddress(account)
 	}
 
-	return types.SignedTransaction{
-		Script:         m.GetScript(),
-		Nonce:          m.GetNonce(),
-		ComputeLimit:   m.GetComputeLimit(),
-		ComputeUsed:    m.GetComputeUsed(),
-		Timestamp:      timestamp,
-		PayerSignature: MessageToAccountSignature(m.GetPayerSignature()),
+	signatures := make([]types.AccountSignature, len(m.Signatures))
+	for i, accountSig := range m.Signatures {
+		signatures[i] = MessageToAccountSignature(accountSig)
+	}
+
+	return types.Transaction{
+		Script:             m.GetScript(),
+		ReferenceBlockHash: m.ReferenceBlockHash,
+		Nonce:              m.GetNonce(),
+		ComputeLimit:       m.GetComputeLimit(),
+		PayerAccount:       types.BytesToAddress(m.PayerAccount),
+		ScriptAccounts:     scriptAccounts,
+		Signatures:         signatures,
 	}, nil
 }
 
-func SignedTransactionToMessage(t types.SignedTransaction) (*shared.SignedTransaction, error) {
-	timestamp, err := ptypes.TimestampProto(t.Timestamp)
-	if err != nil {
-		return nil, err
+func TransactionToMessage(t types.Transaction) *shared.Transaction {
+	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
+	for i, account := range t.ScriptAccounts {
+		scriptAccounts[i] = account.Bytes()
 	}
 
-	return &shared.SignedTransaction{
-		Script:         t.Script,
-		Nonce:          t.Nonce,
-		ComputeLimit:   t.ComputeLimit,
-		ComputeUsed:    t.ComputeUsed,
-		Timestamp:      timestamp,
-		PayerSignature: AccountSignatureToMessage(t.PayerSignature),
-	}, nil
+	signatures := make([]*shared.AccountSignature, len(t.Signatures))
+	for i, accountSig := range t.Signatures {
+		signatures[i] = AccountSignatureToMessage(accountSig)
+	}
+
+	return &shared.Transaction{
+		Script:             t.Script,
+		ReferenceBlockHash: t.ReferenceBlockHash,
+		Nonce:              t.Nonce,
+		ComputeLimit:       t.ComputeLimit,
+		PayerAccount:       t.PayerAccount.Bytes(),
+		ScriptAccounts:     scriptAccounts,
+		Signatures:         signatures,
+	}
 }

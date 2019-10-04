@@ -66,7 +66,7 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 
 // visitConditional checks a conditional.
 // The test expression must be a boolean.
-// The then and else elements may be expressions, in which case their types are returned.
+// The "then" and "else" elements may be expressions, in which case their types are returned.
 //
 func (checker *Checker) visitConditional(
 	test ast.Expression,

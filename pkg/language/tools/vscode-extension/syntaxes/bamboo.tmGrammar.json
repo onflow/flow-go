@@ -178,22 +178,22 @@
               "binary":  {
                 "comment": "",
                 "match": "(\\B\\-|\\b)0b[01]([_01]*[01])?\\b",
-                "name": "constant.numeric.integer.binary"
+                "name": "constant.numeric.integer.binary.bamboo"
               },
               "octal":  {
                 "comment": "",
                 "match": "(\\B\\-|\\b)0o[0-7]([_0-7]*[0-7])?\\b",
-                "name": "constant.numeric.integer.octal"
+                "name": "constant.numeric.integer.octal.bamboo"
               },
               "decimal":  {
                 "comment": "",
                 "match": "(\\B\\-|\\b)[0-9]([_0-9]*[0-9])?\\b",
-                "name": "constant.numeric.integer.decimal"
+                "name": "constant.numeric.integer.decimal.bamboo"
               },
               "hexadecimal":  {
                 "comment": "",
                 "match": "(\\B\\-|\\b)0x[0-9A-Fa-f]([_0-9A-Fa-f]*[0-9A-Fa-f])?\\b",
-                "name": "constant.numeric.integer.hexadecimal"
+                "name": "constant.numeric.integer.hexadecimal.bamboo"
               }
             }
           },
@@ -256,6 +256,10 @@
             "name": "keyword.operator.assignment.bamboo"
           },
           {
+            "match": "<-",
+            "name": "keyword.operator.move.bamboo"
+          },
+          {
             "match": "\\+|\\-|\\*|/",
             "name": "keyword.operator.arithmetic.bamboo"
           },
@@ -296,12 +300,8 @@
             "name": "keyword.control.loop.bamboo"
           },
           {
-            "match": "(?<!\\.)\\b(?:import|from)\\b",
-            "name": "keyword.control.import"
-          },
-          {
-            "match": "(?<!\\.)\\b(?:pre|post|prepare|execute)\\b",
-            "name": "keyword.other"
+            "match": "(?<!\\.)\\b(?:pre|post|prepare|execute|import|from|create|destroy)\\b",
+            "name": "keyword.other.bamboo"
           },
           {
             "match": "(?<!\\.)\\b(?:private|pub(?:\\(set\\))?)\\b",
@@ -526,7 +526,7 @@
             "name": "entity.name.type.$1.bamboo"
           }
         },
-        "end": "=|$",
+        "end": "=|<-|$",
         "patterns": [
           { "include": "#type" }
         ]
