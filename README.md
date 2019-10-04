@@ -138,13 +138,13 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
 | Verification | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
+| Observation | [Peter Siemens](https://github.com/psiemens)     | [/internal/roles/observe](/internal/roles/observe) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/pkg/network](/pkg/network) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/pkg/crypto](/pkg/crypto) |
-| Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/internal/emulator](/internal/emulator) |
-| Client Library | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/client](/client), [/internal/cli](/internal/cli), [/cmd/flow](/cmd/flow) |
-| Observation | [Peter Siemens](https://github.com/psiemens)     | [/internal/roles/observe](/internal/roles/observe) |
-| Ops & Performance | [Timofey Smirnov](https://github.com/tsmirnov) | |
-| Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [/language](/language) |
+| Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens), [Jordan Schalm](https://github.com/jordanschalm) | [/sdk/emulator](/sdk/emulator) |
+| Client Library | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/sdk/client](/sdk/client), [/internal/cli](/internal/cli), [/cmd/flow](/cmd/flow) |
+| Ops & Performance | [Leo Zhang](https://github.com/zhangchiqing) | |
+| Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [/pkg/language](/pkg/language) |
 
 ### Workflow
 

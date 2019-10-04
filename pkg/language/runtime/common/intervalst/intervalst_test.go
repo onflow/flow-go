@@ -13,7 +13,7 @@ type lineAndColumn struct {
 	Column int
 }
 
-func (l lineAndColumn) CompareTo(other Position) int {
+func (l lineAndColumn) Compare(other Position) int {
 	if _, ok := other.(MinPosition); ok {
 		return 1
 	}

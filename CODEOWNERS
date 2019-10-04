@@ -10,10 +10,10 @@
 /cmd/collect @psiemens
 
 # Consensus Stream
-/internal/roles/consensus @AlexHentschel
-/proto/services/consensus @AlexHentschel
-/grpc/services/consensus @AlexHentschel
-/cmd/consensus @AlexHentschel
+/internal/roles/consensus @AlexHentschel @awishformore
+/proto/services/consensus @AlexHentschel @awishformore
+/grpc/services/consensus @AlexHentschel @awishformore
+/cmd/consensus @AlexHentschel @awishformore
 
 # Execution Stream
 /internal/roles/execute @turbolent
@@ -34,9 +34,9 @@
 /pkg/crypto @tarakby
 
 # Emulator Stream
-/internal/emulator @mrbrianhobo @psiemens
+/sdk/emulator @mrbrianhobo @psiemens @jordanschalm
 
-# Client Library Stream
+# SDK Stream
 /sdk @mrbrianhobo @psiemens
 
 # Language Stream

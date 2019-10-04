@@ -3,7 +3,7 @@ package intervalst
 import "fmt"
 
 type Position interface {
-	CompareTo(other Position) int
+	Compare(other Position) int
 }
 
 type Interval struct {
@@ -11,25 +11,25 @@ type Interval struct {
 }
 
 func NewInterval(min, max Position) Interval {
-	if min.CompareTo(max) > 0 {
+	if min.Compare(max) > 0 {
 		panic("illegal interval: min > max")
 	}
 	return Interval{min, max}
 }
 
 func (i Interval) Intersects(other Interval) bool {
-	return !(other.Max.CompareTo(i.Min) == -1 ||
-		i.Max.CompareTo(other.Min) == -1)
+	return !(other.Max.Compare(i.Min) == -1 ||
+		i.Max.Compare(other.Min) == -1)
 }
 
 func (i Interval) Contains(x Position) bool {
-	return i.Min.CompareTo(x) <= 0 &&
-		x.CompareTo(i.Max) <= 0
+	return i.Min.Compare(x) <= 0 &&
+		x.Compare(i.Max) <= 0
 }
 
-func (i Interval) CompareTo(other Interval) int {
-	mins := i.Min.CompareTo(other.Min)
-	maxs := i.Max.CompareTo(other.Max)
+func (i Interval) Compare(other Interval) int {
+	mins := i.Min.Compare(other.Min)
+	maxs := i.Max.Compare(other.Max)
 	if mins < 0 {
 		return -1
 	} else if mins > 0 {

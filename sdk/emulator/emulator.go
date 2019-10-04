@@ -30,12 +30,12 @@ type EmulatedBlockchain struct {
 	mutex              sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
-	rootAccountKey     crypto.PrKey
+	rootAccountKey     crypto.PrivateKey
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
-	RootAccountKey crypto.PrKey
+	RootAccountKey crypto.PrivateKey
 	RuntimeLogger  func(string)
 }
 
@@ -77,7 +77,7 @@ func (b *EmulatedBlockchain) RootAccount() types.Address {
 	return b.rootAccountAddress
 }
 
-func (b *EmulatedBlockchain) RootKey() crypto.PrKey {
+func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
 	return b.rootAccountKey
 }
 
@@ -349,20 +349,17 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 
 	signature := crypto.Signature(accountSig.Signature)
 
-	// TODO: replace hard-coded signature algorithm
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
 	for _, accountKey := range account.Keys {
-		publicKey, err := salg.DecodePubKey(accountKey.PublicKey)
+		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, accountKey.PublicKey)
 		if err != nil {
 			continue
 		}
 
 		// TODO: replace hard-coded hashing algorithm
-		hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+		hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
-		valid, err := salg.VerifyBytes(publicKey, signature, message, hasher)
+		valid, err := publicKey.Verify(signature, message, hasher)
 		if err != nil {
 			continue
 		}
@@ -378,17 +375,14 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Address, crypto.PrKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Address, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
 
-	// TODO: replace hard-coded signature algorithm
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-
 	if prKey == nil {
-		prKey, _ = salg.GeneratePrKey([]byte("elephant ears"))
+		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	}
 
-	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
+	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})

@@ -14,7 +14,7 @@ type TypeActivations struct {
 func NewTypeActivations(baseTypes map[string]Type) *TypeActivations {
 	var activation hamt.Map
 	for name, baseType := range baseTypes {
-		key := common.StringKey(name)
+		key := common.StringEntry(name)
 		activation = activation.Insert(key, baseType)
 	}
 

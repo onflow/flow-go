@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
@@ -1660,7 +1661,7 @@ func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckInvalidResourceUseAfterMoveToVariable(t *testing.T) {
@@ -1684,7 +1685,7 @@ func TestCheckInvalidResourceUseAfterMoveToVariable(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 
 	// NOTE: still two resource losses reported for `y` and `z`
 
@@ -1725,7 +1726,7 @@ func TestCheckInvalidResourceFieldUseAfterMoveToVariable(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
 func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
@@ -1755,6 +1756,713 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
 		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
 
 	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.ResourceUseAfterMoveError{}))
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
 }
 
+func TestCheckResourceUseInIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          if 1 > 2 {
+              absorb(<-x)
+          } else {
+              absorb(<-x)
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          if 1 > 2 {
+              if 2 > 1 {
+                  absorb(<-x)
+              }
+          } else {
+              absorb(<-x)
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(): <-X {
+          let x <- create X()
+          if 1 > 2 {
+              absorb(<-x)
+          } else {
+              absorb(<-x)
+          }
+          return <-x
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[1].(*sema.ResourceUseAfterInvalidationError).Invalidations).
+		To(ConsistOf(
+			sema.ResourceInvalidation{
+				Kind: sema.ResourceInvalidationKindMove,
+				Pos:  ast.Position{Offset: 165, Line: 9, Column: 23},
+			},
+			sema.ResourceInvalidation{
+				Kind: sema.ResourceInvalidationKindMove,
+				Pos:  ast.Position{Offset: 120, Line: 7, Column: 23},
+			},
+		))
+}
+
+func TestCheckInvalidResourceLossAfterDestroyInIfStatementThenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          if 1 > 2 {
+             destroy x
+          }
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceLossAndUseAfterDestroyInIfStatementThenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          if 1 > 2 {
+             destroy x
+          }
+          x.id
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckResourceMoveIntoArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- [<-x]
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceMoveIntoArrayMissingMoveOperation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- [x]
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceMoveIntoArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      let xs = [<-x]
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
+
+func TestCheckInvalidUseAfterResourceMoveIntoArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- [<-x, <-x]
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {"x": <-x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceMoveIntoDictionaryMissingMoveOperation(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {"x": x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.MissingMoveOperationError{}))
+}
+
+func TestCheckInvalidNonResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      struct X {}
+
+      let x = X()
+      let xs = {"x": <-x}
+	`)
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.InvalidMoveOperationError{}))
+}
+
+func TestCheckInvalidUseAfterResourceMoveIntoDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {
+          "x": <-x, 
+          "x2": <-x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      let x <- create X()
+      let xs <- {<-x: <-x}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckInvalidResourceUseAfterMoveInWhileStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          while true {
+              destroy x
+          }
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckResourceUseInWhileStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              x.id
+          }
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceUseInWhileStatementAfterDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              x.id
+              destroy x
+          }
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 4)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[3]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+}
+
+func TestCheckInvalidResourceUseInWhileStatementAfterDestroyAndLoss(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          while true {
+              destroy x
+          }
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 3)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceUseInNestedWhileStatementAfterDestroyAndLoss1(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              while true {
+                  x.id
+                  destroy x
+              }
+          }
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 4)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[3]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceUseInNestedWhileStatementAfterDestroyAndLoss2(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              while true {
+                  x.id
+              }
+              destroy x
+          }
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 4)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[2]).
+		To(BeAssignableToTypeOf(&sema.ResourceUseAfterInvalidationError{}))
+
+	Expect(errs[3]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckResourceUseInNestedWhileStatement(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test() {
+          let x <- create X(id: 1)
+          while true {
+              while true {
+                  x.id
+              }
+          }
+		  destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckInvalidResourceLossThroughReturn(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test() {
+          let x <- create X()
+          return
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceLossThroughReturnInIfStatementThrenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(y: Int) {
+          let x <- create X()
+          if y == 42 {
+              return
+          }
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(y: Int) {
+          let x <- create X()
+          if y == 42 {
+              absorb(<-x)
+              return
+          } else {
+              return
+          }
+          destroy x
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 2)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+
+	Expect(errs[1]).
+		To(BeAssignableToTypeOf(&sema.ResourceLossError{}))
+}
+
+func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(y: Int) {
+          let x <- create X()
+          if y == 42 {
+              absorb(<-x)
+              return
+          } else {
+              destroy x
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}
+
+func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
+	RegisterTestingT(t)
+
+	_, err := ParseAndCheck(`
+      resource X {}
+
+      fun test(y: Int) {
+          let x <- create X()
+          if y == 42 {
+              absorb(<-x)
+              return
+          }
+          destroy x
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(err, 1)
+
+	Expect(errs[0]).
+		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+}

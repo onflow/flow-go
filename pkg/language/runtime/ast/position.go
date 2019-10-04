@@ -1,6 +1,9 @@
 package ast
 
-import "github.com/antlr/antlr4/runtime/Go/antlr"
+import (
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"github.com/segmentio/fasthash/fnv1"
+)
 
 type Position struct {
 	// offset, starting at 0
@@ -16,6 +19,25 @@ func (position Position) Shifted(length int) Position {
 		Line:   position.Line,
 		Column: position.Column + length,
 		Offset: position.Offset + length,
+	}
+}
+
+func (position Position) Hash() (result uint32) {
+	result = fnv1.Init32
+	result = fnv1.AddUint32(result, uint32(position.Offset))
+	result = fnv1.AddUint32(result, uint32(position.Line))
+	result = fnv1.AddUint32(result, uint32(position.Column))
+	return
+}
+
+func (position Position) Compare(other Position) int {
+	switch {
+	case position.Offset < other.Offset:
+		return -1
+	case position.Offset > other.Offset:
+		return 1
+	default:
+		return 0
 	}
 }
 

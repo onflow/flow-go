@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
@@ -1193,7 +1194,7 @@ func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
 }
 
 func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
-	return e.Pos
+	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
 }
 
 // IncorrectTransferOperationError
@@ -1284,62 +1285,151 @@ func (e *ResourceLossError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// ResourceUseAfterMoveError
+// ResourceUseAfterInvalidationError
 
-// TODO: show position of move
-
-type ResourceUseAfterMoveError struct {
-	UseStartPos  ast.Position
-	UseEndPos    ast.Position
-	MoveStartPos ast.Position
-	MoveEndPos   ast.Position
+type ResourceUseAfterInvalidationError struct {
+	Name          string
+	Pos           ast.Position
+	Invalidations []ResourceInvalidation
+	InLoop        bool
+	// NOTE: cached values, use `Cause()`
+	_wasMoved     bool
+	_wasDestroyed bool
+	// NOTE: cached value, use `HasInvalidationInPreviousLoopIteration()`
+	_hasInvalidationInPreviousLoop *bool
 }
 
-func (e *ResourceUseAfterMoveError) Error() string {
-	return "use of moved resource"
+func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool) {
+	// check cache
+	if e._wasMoved || e._wasDestroyed {
+		return e._wasMoved, e._wasDestroyed
+	}
+
+	// update cache
+	for _, invalidation := range e.Invalidations {
+		switch invalidation.Kind {
+		case ResourceInvalidationKindMove:
+			wasMoved = true
+		case ResourceInvalidationKindDestroy:
+			wasDestroyed = true
+		}
+	}
+
+	e._wasMoved = wasMoved
+	e._wasDestroyed = wasDestroyed
+
+	return
 }
 
-func (e *ResourceUseAfterMoveError) SecondaryError() string {
-	return "resource used here after move"
+func (e *ResourceUseAfterInvalidationError) Error() string {
+	message := ""
+	wasMoved, wasDestroyed := e.Cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		message = "use of moved or destroyed resource"
+	case wasMoved:
+		message = "use of moved resource"
+	case wasDestroyed:
+		message = "use of destroyed resource"
+	default:
+		panic(&errors.UnreachableError{})
+	}
+
+	return fmt.Sprintf("%s: `%s`", message, e.Name)
 }
 
-func (*ResourceUseAfterMoveError) isSemanticError() {}
+func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
+	message := ""
+	wasMoved, wasDestroyed := e.Cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		message = "resource used here after being moved or destroyed"
+	case wasMoved:
+		message = "resource used here after being moved"
+	case wasDestroyed:
+		message = "resource used here after being destroyed"
+	default:
+		panic(&errors.UnreachableError{})
+	}
 
-func (e *ResourceUseAfterMoveError) StartPosition() ast.Position {
-	return e.UseStartPos
+	if e.InLoop {
+		site := "later"
+		if e.HasInvalidationInPreviousLoopIteration() {
+			site = "previous"
+		}
+		message += fmt.Sprintf(", in %s iteration of loop", site)
+	}
+
+	return message
 }
 
-func (e *ResourceUseAfterMoveError) EndPosition() ast.Position {
-	return e.UseEndPos
+func (e *ResourceUseAfterInvalidationError) HasInvalidationInPreviousLoopIteration() (result bool) {
+	if e._hasInvalidationInPreviousLoop != nil {
+		return *e._hasInvalidationInPreviousLoop
+	}
+
+	defer func() {
+		e._hasInvalidationInPreviousLoop = &result
+	}()
+
+	// invalidation occurred in previous loop
+	// if all invalidations occur after the use
+
+	for _, invalidation := range e.Invalidations {
+		if invalidation.Pos.Compare(e.Pos) < 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
-// ResourceUseAfterDestructionError
-
-// TODO: show position of destruction
-
-type ResourceUseAfterDestructionError struct {
-	UseStartPos         ast.Position
-	UseEndPos           ast.Position
-	DestructionStartPos ast.Position
-	DestructionEndPos   ast.Position
+func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNote) {
+	for _, invalidation := range e.Invalidations {
+		notes = append(notes, ResourceInvalidationNote{
+			ResourceInvalidation: invalidation,
+			StartPos:             invalidation.Pos,
+			EndPos:               invalidation.Pos.Shifted(len(e.Name) - 1),
+		})
+	}
+	return
 }
 
-func (e *ResourceUseAfterDestructionError) Error() string {
-	return "use of destroyed resource"
+func (*ResourceUseAfterInvalidationError) isSemanticError() {}
+
+func (e *ResourceUseAfterInvalidationError) StartPosition() ast.Position {
+	return e.Pos
 }
 
-func (e *ResourceUseAfterDestructionError) SecondaryError() string {
-	return "resource used here after destruction"
+func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
+	return e.Pos.Shifted(len(e.Name) - 1)
 }
 
-func (*ResourceUseAfterDestructionError) isSemanticError() {}
+// ResourceInvalidationNote
 
-func (e *ResourceUseAfterDestructionError) StartPosition() ast.Position {
-	return e.UseStartPos
+type ResourceInvalidationNote struct {
+	ResourceInvalidation
+	StartPos ast.Position
+	EndPos   ast.Position
 }
 
-func (e *ResourceUseAfterDestructionError) EndPosition() ast.Position {
-	return e.UseEndPos
+func (n ResourceInvalidationNote) StartPosition() ast.Position {
+	return n.StartPos
+}
+
+func (n ResourceInvalidationNote) EndPosition() ast.Position {
+	return n.EndPos
+}
+
+func (n ResourceInvalidationNote) Message() string {
+	var action string
+	switch n.Kind {
+	case ResourceInvalidationKindMove:
+		action = "moved"
+	case ResourceInvalidationKindDestroy:
+		action = "destroyed"
+	}
+	return fmt.Sprintf("resource %s here", action)
 }
 
 // MissingCreateError

@@ -14,7 +14,11 @@ func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast
 	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
 	checker.checkTransfer(assignment.Transfer, valueType)
-	checker.recordResourceMove(assignment.Value, valueType)
+	checker.recordResourceInvalidation(
+		assignment.Value,
+		valueType,
+		ResourceInvalidationKindMove,
+	)
 
 	return nil
 }

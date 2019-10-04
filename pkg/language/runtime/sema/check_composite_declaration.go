@@ -95,6 +95,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
+			Identifier: identifier.Identifier,
 			Kind:       declaration.DeclarationKind(),
 			IsConstant: true,
 			Type:       compositeType,
@@ -480,8 +481,8 @@ func (checker *Checker) checkInitializer(
 	// NOTE: new activation, so `self`
 	// is only visible inside initializer
 
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.declareSelfValue(containerType)
 
@@ -546,6 +547,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	depth := checker.valueActivations.Depth() + 1
 
 	self := &Variable{
+		Identifier: SelfIdentifier,
 		Kind:       common.DeclarationKindSelf,
 		Type:       selfType,
 		IsConstant: true,

@@ -73,8 +73,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
@@ -87,12 +87,16 @@ func (checker *Checker) checkFunction(
 	}
 
 	if functionBlock != nil {
-		checker.functionActivations.WithFunction(functionType, func() {
-			checker.visitFunctionBlock(
-				functionBlock,
-				functionType.ReturnTypeAnnotation,
-			)
-		})
+		checker.functionActivations.WithFunction(
+			functionType,
+			checker.valueActivations.Depth(),
+			func() {
+				checker.visitFunctionBlock(
+					functionBlock,
+					functionType.ReturnTypeAnnotation,
+				)
+			},
+		)
 
 		if _, returnTypeIsVoid := functionType.ReturnTypeAnnotation.Type.(*VoidType); !returnTypeIsVoid {
 			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
@@ -110,7 +114,7 @@ func (checker *Checker) checkFunction(
 func (checker *Checker) checkParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
 	for i, parameter := range parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.StartPos)
+		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
 	}
 }
 
@@ -200,6 +204,7 @@ func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTy
 		parameterType := parameterTypeAnnotation.Type
 
 		variable := &Variable{
+			Identifier: identifier.Identifier,
 			Kind:       common.DeclarationKindParameter,
 			IsConstant: true,
 			Type:       parameterType,
@@ -218,8 +223,8 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
 
-	checker.enterValueActivation()
-	defer checker.leaveValueActivation()
+	checker.enterValueScope()
+	defer checker.leaveValueScope()
 
 	checker.visitConditions(functionBlock.PreConditions)
 
