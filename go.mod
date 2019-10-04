@@ -18,7 +18,6 @@ require (
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
-	github.com/psiemens/godoc2md v1.0.1 // indirect
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/rivo/uniseg v0.1.0
@@ -27,7 +26,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
 	github.com/spf13/cobra v0.0.5
-	github.com/uber/prototool v1.8.0 // indirect
+	github.com/stretchr/testify v1.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
