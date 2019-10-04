@@ -58,7 +58,7 @@ var Cmd = &cobra.Command{
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
-				utils.Exit(fmt.Sprintf("Failed to load Cadence code from %s", conf.Code), 1)
+				utils.Exit(fmt.Sprintf("Failed to parse Cadence code from %s", conf.Code), 1)
 			}
 		}
 
