@@ -58,10 +58,43 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	return accountID, nil
 }
 
-func (i *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
+func (i *RuntimeContext) AddAccountKey(accountID, publicKey []byte) error {
 	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("Account with ID %s does not exist", accountID)
+	}
+
+	_, keyExists := i.registers.Get(fullKey(string(accountID), string(accountID), keyPublicKey))
+	if keyExists {
+		// TODO: support multiple keys
+		return fmt.Errorf("account with ID %s already has a key", accountID)
+	}
+
+	// TODO: store key weight
+	// TODO: support multiple keys
+	i.registers.Set(fullKey(string(accountID), string(accountID), keyPublicKey), publicKey)
+
+	return nil
+}
+
+func (i *RuntimeContext) RemoveAccountKey(accountID []byte, index int) error {
+	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
+	if !exists {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
+	}
+
+	// TODO: support multiple keys
+	// TODO: remove key at specified index
+	// TODO: throw error if index is invalid
+	i.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKey))
+
+	return nil
+}
+
+func (i *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
+	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
+	if !exists {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	i.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
