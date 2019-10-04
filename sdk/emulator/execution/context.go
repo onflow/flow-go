@@ -56,7 +56,9 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	return accountID, nil
 }
 
-func (i *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
+func (i *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
+	accountID := address.Bytes()
+
 	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("Account with ID %s does not exist", accountID)
