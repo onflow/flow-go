@@ -108,12 +108,10 @@ func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.
 		return nil, err
 	}
 
-	account := res.GetAccount()
+	account, err := proto.MessageToAccount(res.GetAccount())
+	if err != nil {
+		return nil, err
+	}
 
-	return &types.Account{
-		Address:    types.BytesToAddress(account.GetAddress()),
-		Balance:    account.GetBalance(),
-		Code:       account.GetCode(),
-		PublicKeys: account.GetPublicKeys(),
-	}, nil
+	return &account, nil
 }

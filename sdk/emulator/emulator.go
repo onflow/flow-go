@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -33,14 +34,14 @@ type EmulatedBlockchain struct {
 	txPool             map[string]*types.Transaction
 	mut                sync.RWMutex
 	computer           *execution.Computer
-	rootAccount        types.Account
-	rootAccountKey     crypto.PrKey
+	rootAccountAddress types.Address
+	rootAccountKey     crypto.PrivateKey
 	lastCreatedAccount types.Account
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
-	RootAccountKey crypto.PrKey
+	RootAccountKey crypto.PrivateKey
 	RuntimeLogger  func(string)
 }
 
@@ -73,19 +74,22 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	)
 
 	b.computer = computer
-	b.rootAccount, b.rootAccountKey = createRootAccount(ws, opt.RootAccountKey)
-	b.lastCreatedAccount = b.rootAccount
+	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
+
+	b.rootAccountAddress = rootAccount.Address
+	b.rootAccountKey = rootAccountKey
+	b.lastCreatedAccount = rootAccount
 
 	return b
 }
 
 // RootAccountAddress returns the root account address for this blockchain.
 func (b *EmulatedBlockchain) RootAccountAddress() types.Address {
-	return b.rootAccount.Address
+	return b.rootAccountAddress
 }
 
 // RootKey returns the root private key for this blockchain.
-func (b *EmulatedBlockchain) RootKey() crypto.PrKey {
+func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
 	return b.rootAccountKey
 }
 
@@ -325,24 +329,23 @@ func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]int)
+	accountWeights := make(map[types.Address]uint32)
 
 	for _, accountSig := range tx.Signatures {
-		err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		// TODO: add key weights
-		accountWeights[accountSig.Account] = 1
+		accountWeights[accountSig.Account] += accountKey.Weight
 	}
 
-	if accountWeights[tx.PayerAccount] < 1 {
+	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < 1 {
+		if accountWeights[account] < constants.AccountKeyWeightThreshold {
 			return &ErrMissingSignature{account}
 		}
 	}
@@ -350,61 +353,57 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	return nil
 }
 
-// verifyAccountSignature verifies a that an account signature is valid for the account and given message.
+// verifyAccountSignature verifies that an account signature is valid for the account and given message.
+//
+// If the signature is valid, this function returns the associated account key.
 //
 // An error is returned if the account does not contain a public key that correctly verifies the signature
 // against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) error {
+) (accountKey types.AccountKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
 
-	// TODO: replace hard-coded signature algorithm
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
-	for _, publicKeyBytes := range account.PublicKeys {
-		publicKey, err := salg.DecodePubKey(publicKeyBytes)
+	for _, accountKey := range account.Keys {
+		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, accountKey.PublicKey)
 		if err != nil {
 			continue
 		}
 
 		// TODO: replace hard-coded hashing algorithm
-		hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
+		hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
-		valid, err := salg.VerifyBytes(publicKey, signature, message, hasher)
+		valid, err := publicKey.Verify(signature, message, hasher)
 		if err != nil {
 			continue
 		}
 
 		if valid {
-			return nil
+			return accountKey, nil
 		}
 	}
 
-	return &ErrInvalidSignaturePublicKey{
+	return accountKey, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrKey) (types.Account, crypto.PrKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Account, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
 
-	// TODO: replace hard-coded signature algorithm
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-
 	if prKey == nil {
-		prKey, _ = salg.GeneratePrKey([]byte("elephant ears"))
+		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	}
 
-	pubKeyBytes, _ := salg.EncodePubKey(prKey.Pubkey())
+	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})

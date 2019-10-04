@@ -27,7 +27,7 @@ type DKGstate interface {
 	// StartDKG starts running a DKG
 	StartDKG(seed []byte) *DKGoutput
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
-	EndDKG() (PrKey, PubKey, []PubKey, error)
+	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ProcessDKGmsg processes a new DKG message received by the current node
 	ProcessDKGmsg(int, DKGmsg) *DKGoutput
 }

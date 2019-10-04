@@ -49,7 +49,7 @@ var Cmd = &cobra.Command{
 	},
 }
 
-func getRootKey(projectConf *project.Config) crypto.PrKey {
+func getRootKey(projectConf *project.Config) crypto.PrivateKey {
 	if conf.RootKey != "" {
 		prKey, err := utils.DecodePrivateKey(conf.RootKey)
 		if err != nil {

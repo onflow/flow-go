@@ -239,9 +239,8 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	privateKeyA := b.RootKey()
 
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
-	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	pubKeyB, _ := privateKeyB.Publickey().Encode()
 
 	accountAddressA := b.RootAccountAddress()
 	accountAddressB, err := createAccount(b, pubKeyB, nil)
@@ -342,8 +341,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := NewEmulatedBlockchain(DefaultOptions)
 
 		// use key-pair that does not exist on root account
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-		invalidKey, _ := salg.GeneratePrKey([]byte("invalid key"))
+		invalidKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("invalid key"))
 
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
@@ -396,9 +394,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		privateKeyA := b.RootKey()
 
-		salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
-		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+		pubKeyB, _ := privateKeyB.Publickey().Encode()
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := createAccount(b, pubKeyB, nil)
@@ -530,7 +527,7 @@ func TestCreateAccount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
+	Expect(account.Keys[0].PublicKey).To(Equal([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
@@ -552,7 +549,7 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement([]byte{7, 8, 9}))
+	Expect(account.Keys[0].PublicKey).To(Equal([]byte{7, 8, 9}))
 	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
 }
 
@@ -699,8 +696,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
+	pubKey, _ := b.RootKey().Publickey().Encode()
 
 	_, err := createAccount(b, pubKey, accountScript)
 	Expect(err).ToNot(HaveOccurred())

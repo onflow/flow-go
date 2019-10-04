@@ -6,7 +6,7 @@ import (
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
-	NewSignatureAlgo(BLS_BLS12381)
+	NewSigner(BLS_BLS12381)
 
 	seedRelic([]byte{0})
 	var expo scalar
@@ -18,7 +18,7 @@ func TestG1(t *testing.T) {
 
 // G1 bench
 func BenchmarkG1(b *testing.B) {
-	NewSignatureAlgo(BLS_BLS12381)
+	NewSigner(BLS_BLS12381)
 	seedRelic([]byte{0})
 	var expo scalar
 	randZr(&expo)
@@ -35,7 +35,7 @@ func BenchmarkG1(b *testing.B) {
 // TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
 
-	NewSignatureAlgo(BLS_BLS12381)
+	NewSigner(BLS_BLS12381)
 
 	var expo scalar
 	(&expo).setInt(1)
@@ -46,7 +46,7 @@ func TestG2(t *testing.T) {
 
 // G2 bench
 func BenchmarkG2(b *testing.B) {
-	NewSignatureAlgo(BLS_BLS12381)
+	NewSigner(BLS_BLS12381)
 	seedRelic([]byte{0})
 	var expo scalar
 	randZr(&expo)
@@ -62,7 +62,7 @@ func BenchmarkG2(b *testing.B) {
 
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
-	NewSignatureAlgo(BLS_BLS12381)
+	NewSigner(BLS_BLS12381)
 	input := []byte("Bench input")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

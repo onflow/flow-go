@@ -1,20 +1,19 @@
-export GO111MODULE := on
-
 .PHONY: build-relic
 build-relic:
 	./pkg/crypto/relic_build.sh
 
 .PHONY: install-tools
 install-tools: build-relic
-	go get github.com/psiemens/godoc2md@v1.0.1
-	go get github.com/google/wire/cmd/wire@v0.3.0
-	go get github.com/golang/protobuf/protoc-gen-go@v1.3.2
-	go get github.com/uber/prototool/cmd/prototool@v1.8.0
-	go get github.com/golang/mock/mockgen@v1.3.1
+	cd ${GOPATH}; \
+	GO111MODULE=on go get github.com/psiemens/godoc2md@v1.0.1; \
+	GO111MODULE=on go get github.com/google/wire/cmd/wire@v0.3.0; \
+	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@7df3b957ffe3d09dc57fe4e1eb96694614db8c7a; \
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1
 
 .PHONY: test
 test:
-	go test ./...
+	GO111MODULE=on go test ./...
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -33,14 +32,14 @@ generate-proto:
 
 .PHONY: generate-wire
 generate-wire:
-	wire ./internal/roles/collect/
-	wire ./internal/roles/consensus/
-	wire ./internal/roles/execute/
-	wire ./internal/roles/verify/
+	GO111MODULE=on wire ./internal/roles/collect/
+	GO111MODULE=on wire ./internal/roles/consensus/
+	GO111MODULE=on wire ./internal/roles/execute/
+	GO111MODULE=on wire ./internal/roles/verify/
 
 .PHONY: generate-mocks
 generate-mocks:
-	mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
+	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-wire generate-mocks

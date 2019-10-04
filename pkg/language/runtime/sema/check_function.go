@@ -87,12 +87,16 @@ func (checker *Checker) checkFunction(
 	}
 
 	if functionBlock != nil {
-		checker.functionActivations.WithFunction(functionType, func() {
-			checker.visitFunctionBlock(
-				functionBlock,
-				functionType.ReturnTypeAnnotation,
-			)
-		})
+		checker.functionActivations.WithFunction(
+			functionType,
+			checker.valueActivations.Depth(),
+			func() {
+				checker.visitFunctionBlock(
+					functionBlock,
+					functionType.ReturnTypeAnnotation,
+				)
+			},
+		)
 
 		if _, returnTypeIsVoid := functionType.ReturnTypeAnnotation.Type.(*VoidType); !returnTypeIsVoid {
 			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {

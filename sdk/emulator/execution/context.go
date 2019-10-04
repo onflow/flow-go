@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -58,6 +59,7 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 	accountID := accountAddress.Bytes()
 
 	i.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	// TODO: store key weight
 	i.registers.Set(fullKey(string(accountID), string(accountID), keyPublicKey), publicKey)
 	i.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
@@ -104,10 +106,11 @@ func (i *RuntimeContext) GetAccount(address types.Address) *types.Account {
 	code, _ := i.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
 
 	return &types.Account{
-		Address:    address,
-		Balance:    balanceInt.Uint64(),
-		Code:       code,
-		PublicKeys: [][]byte{publicKey},
+		Address: address,
+		Balance: balanceInt.Uint64(),
+		Code:    code,
+		// TODO: use stored key weight
+		Keys: []types.AccountKey{{PublicKey: publicKey, Weight: constants.AccountKeyWeightThreshold}},
 	}
 }
 
