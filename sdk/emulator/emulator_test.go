@@ -662,7 +662,7 @@ func TestUpdateAccountCode(t *testing.T) {
 			fun main(account: Account) {
 				let address = %s
 				let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
-				updateAccountCode(, code)
+				updateAccountCode(address, code)
 			}
 		`, bytesToString(accountAddressB.Bytes())))
 
