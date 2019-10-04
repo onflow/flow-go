@@ -38,6 +38,7 @@ func generateCreateAccountScript(publicKey, code []byte) []byte {
 	return []byte(script)
 }
 
+// createAccount is a test utility to add a new account to the emulated blockchain.
 func createAccount(b *EmulatedBlockchain, publicKey, code []byte) (types.Address, error) {
 	createAccountScript := generateCreateAccountScript(publicKey, code)
 
@@ -242,34 +243,19 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-	createAccountScript := generateCreateAccountScript(pubKeyB, nil)
-
 	accountAddressA := b.RootAccount()
-	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
-
-	tx1 := &types.Transaction{
-		Script:             createAccountScript,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccount(),
-	}
-
-	tx1.AddSignature(b.RootAccount(), b.RootKey())
-
-	err := b.SubmitTransaction(tx1)
+	accountAddressB, err := createAccount(b, pubKeyB, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		// script only support one account
-		script := `
-			fun main(account: Account) {}
-		`
+		// script only supports one account
+		script := []byte("fun main(account: Account) {}")
 
 		// create transaction with two accounts
 		tx1 := &types.Transaction{
-			Script:             []byte(script),
+			Script:             script,
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
@@ -286,14 +272,12 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
 		RegisterTestingT(t)
 
-		// script only support one account
-		script := `
-			fun main(accountA: Account, accountB: Account) {}
-		`
+		// script requires two accounts
+		script := []byte("fun main(accountA: Account, accountB: Account) {}")
 
 		// create transaction with two accounts
 		tx1 := &types.Transaction{
-			Script:             []byte(script),
+			Script:             script,
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
@@ -416,32 +400,19 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-		createAccountScript := generateCreateAccountScript(pubKeyB, nil)
-
 		accountAddressA := b.RootAccount()
-		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
-
-		tx1 := &types.Transaction{
-			Script:             createAccountScript,
-			ReferenceBlockHash: nil,
-			ComputeLimit:       10,
-			PayerAccount:       b.RootAccount(),
-		}
-
-		tx1.AddSignature(b.RootAccount(), b.RootKey())
-
-		err := b.SubmitTransaction(tx1)
+		accountAddressB, err := createAccount(b, pubKeyB, nil)
 		Expect(err).ToNot(HaveOccurred())
 
-		multipleAccountScript := `
+		multipleAccountScript := []byte(`
 			fun main(accountA: Account, accountB: Account) {
 				log(accountA.address)
 				log(accountB.address)
 			}
-		`
+		`)
 
 		tx2 := &types.Transaction{
-			Script:             []byte(multipleAccountScript),
+			Script:             multipleAccountScript,
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
@@ -554,12 +525,9 @@ func TestCreateAccount(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	Expect(err).ToNot(HaveOccurred())
 
-	// root account has ID 1, so expect this account to have ID 2
-	address := types.HexToAddress("0000000000000000000000000000000000000002")
-
-	account, err := b.GetAccount(address)
-
+	account, err := b.GetAccount(b.LastCreatedAccount().Address)
 	Expect(err).ToNot(HaveOccurred())
+
 	Expect(account.Balance).To(Equal(uint64(0)))
 	Expect(account.PublicKeys).To(ContainElement([]byte{1, 2, 3}))
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
@@ -579,9 +547,7 @@ func TestCreateAccount(t *testing.T) {
 	err = b.SubmitTransaction(tx2)
 	Expect(err).ToNot(HaveOccurred())
 
-	address = types.HexToAddress("0000000000000000000000000000000000000003")
-
-	account, err = b.GetAccount(address)
+	account, err = b.GetAccount(b.LastCreatedAccount().Address)
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
@@ -609,15 +575,15 @@ func TestUpdateAccountCode(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-	const updateAccountCodeScript = `
+	updateAccountCodeScript := []byte(`
 		fun main(account: Account) {
 			let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
 			updateAccountCode(account.address, code)
 		}
-	`
+	`)
 
 	tx2 := &types.Transaction{
-		Script:             []byte(updateAccountCodeScript),
+		Script:             updateAccountCodeScript,
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -651,18 +617,7 @@ func TestImportAccountCode(t *testing.T) {
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
 
-	createAccountScript := generateCreateAccountScript(pubKey, accountScript)
-
-	tx1 := &types.Transaction{
-		Script:             createAccountScript,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccount(),
-	}
-
-	tx1.AddSignature(b.RootAccount(), b.RootKey())
-
-	err := b.SubmitTransaction(tx1)
+	_, err := createAccount(b, pubKey, accountScript)
 	Expect(err).ToNot(HaveOccurred())
 
 	script := []byte(`
@@ -821,11 +776,13 @@ func TestRuntimeLogger(t *testing.T) {
 		},
 	})
 
-	_, err := b.CallScript([]byte(`
+	script := []byte(`
 		fun main() {
 			log("elephant ears")
 		}
-	`))
+	`)
+
+	_, err := b.CallScript(script)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(loggedMessages).To(Equal([]string{`"elephant ears"`}))
 }
