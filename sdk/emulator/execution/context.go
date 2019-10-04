@@ -72,6 +72,10 @@ func (i *RuntimeContext) CreateAccount(publicKey, code []byte) (id []byte, err e
 func (i *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
 	accountID := address.Bytes()
 
+	if !i.isValidSigningAccount(address) {
+		return fmt.Errorf("not permitted to update account with ID %s", accountID)
+	}
+
 	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("Account with ID %s does not exist", accountID)
@@ -125,6 +129,16 @@ func (i *RuntimeContext) Log(message string) {
 
 func (i *RuntimeContext) GetSigningAccounts() []types.Address {
 	return i.Accounts
+}
+
+func (i *RuntimeContext) isValidSigningAccount(address types.Address) bool {
+	for _, accountAddress := range i.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+
+	return false
 }
 
 const (
