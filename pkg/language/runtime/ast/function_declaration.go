@@ -5,7 +5,7 @@ import "github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 type FunctionDeclaration struct {
 	Access               Access
 	Identifier           Identifier
-	Parameters           []*Parameter
+	Parameters           Parameters
 	ReturnTypeAnnotation *TypeAnnotation
 	FunctionBlock        *FunctionBlock
 	StartPos             Position

@@ -106,7 +106,7 @@ func convertError(err error) *protocol.Diagnostic {
 
 func (s server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
 	start := time.Now()
-	program, err := parser.ParseProgram(code)
+	program, _, err := parser.ParseProgram(code)
 	elapsed := time.Since(start)
 
 	connection.LogMessage(&protocol.LogMessageParams{
@@ -205,15 +205,15 @@ func (s server) Hover(
 		return nil, nil
 	}
 
-	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if origin == nil {
+	if occurrence == nil {
 		return nil, nil
 	}
 
 	contents := protocol.MarkupContent{
 		Kind:  protocol.Markdown,
-		Value: fmt.Sprintf("* Type: `%s`", origin.Variable.Type.String()),
+		Value: fmt.Sprintf("* Type: `%s`", occurrence.Origin.Type.String()),
 	}
 	return &protocol.Hover{Contents: contents}, nil
 }
@@ -229,20 +229,20 @@ func (s server) Definition(
 		return nil, nil
 	}
 
-	origin := checker.Origins.Find(protocolToSemaPosition(params.Position))
+	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if origin == nil {
+	if occurrence == nil {
 		return nil, nil
 	}
 
-	variable := origin.Variable
-	if variable == nil {
+	origin := occurrence.Origin
+	if origin == nil || origin.StartPos == nil || origin.EndPos == nil {
 		return nil, nil
 	}
 
 	return &protocol.Location{
 		URI:   uri,
-		Range: astToProtocolRange(*variable.Pos, *variable.Pos),
+		Range: astToProtocolRange(*origin.StartPos, *origin.EndPos),
 	}, nil
 }
 
@@ -284,7 +284,7 @@ func (s server) resolveImport(
 		return nil, nil
 	}
 
-	program, _, err := parser.ParseProgramFromFile(filename)
+	program, _, _, err := parser.ParseProgramFromFile(filename)
 	// TODO: publish diagnostic file does not exist?
 	if err != nil {
 		return nil, nil

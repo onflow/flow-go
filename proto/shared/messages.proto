@@ -76,18 +76,19 @@ enum TransactionStatus {
   STATUS_SEALED = 3;
 }
 
-message SignedTransaction {
+message Transaction {
   bytes script = 1;
-  uint64 nonce = 2;
-  uint64 compute_limit = 3;
-  uint64 compute_used = 4;
-  google.protobuf.Timestamp timestamp = 5;
-  AccountSignature payer_signature = 6;
-  TransactionStatus status = 7;
+  bytes reference_block_hash = 2;
+  uint64 nonce = 3;
+  uint64 compute_limit = 4;
+  bytes PayerAccount = 5;
+  repeated bytes ScriptAccounts = 6;
+  repeated AccountSignature signatures = 7;
+  TransactionStatus status = 8;
 }
 
 message Collection {
-  repeated SignedTransaction transactions = 1;
+  repeated Transaction transactions = 1;
   bytes foundationBlockHash = 2;
 }
 

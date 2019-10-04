@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
@@ -681,6 +682,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
+	Initializer   *ast.InitializerDeclaration
 	Pos           ast.Position
 }
 
@@ -812,9 +814,12 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []Type
-	InterfaceParameterTypes []Type
+	CompositeParameterTypes []*TypeAnnotation
+	InterfaceParameterTypes []*TypeAnnotation
 }
+
+// TODO: improve error message:
+//  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
 	CompositeType       *CompositeType
@@ -1103,5 +1108,388 @@ func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
 }
 
 func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingReturnStatementError
+
+type MissingReturnStatementError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingReturnStatementError) Error() string {
+	return "missing return statement"
+}
+
+func (*MissingReturnStatementError) isSemanticError() {}
+
+func (e *MissingReturnStatementError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingReturnStatementError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// UnsupportedExpressionError
+
+type UnsupportedExpressionError struct {
+	ExpressionKind common.ExpressionKind
+	StartPos       ast.Position
+	EndPos         ast.Position
+}
+
+func (e *UnsupportedExpressionError) Error() string {
+	return fmt.Sprintf(
+		"%s expressions are not supported yet",
+		e.ExpressionKind.Name(),
+	)
+}
+
+func (*UnsupportedExpressionError) isSemanticError() {}
+
+func (e *UnsupportedExpressionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *UnsupportedExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingMoveAnnotationError
+
+type MissingMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveAnnotationError) Error() string {
+	return "missing move annotation: `<-`"
+}
+
+func (*MissingMoveAnnotationError) isSemanticError() {}
+
+func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveAnnotationError
+
+type InvalidMoveAnnotationError struct {
+	Pos ast.Position
+}
+
+func (e *InvalidMoveAnnotationError) Error() string {
+	return "invalid move annotation: `<-`"
+}
+
+func (*InvalidMoveAnnotationError) isSemanticError() {}
+
+func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
+}
+
+// IncorrectTransferOperationError
+
+type IncorrectTransferOperationError struct {
+	ActualOperation   ast.TransferOperation
+	ExpectedOperation ast.TransferOperation
+	Pos               ast.Position
+}
+
+func (e *IncorrectTransferOperationError) Error() string {
+	return fmt.Sprintf(
+		"incorrect transfer operation: expected `%s`",
+		e.ExpectedOperation.Operator(),
+	)
+}
+
+func (*IncorrectTransferOperationError) isSemanticError() {}
+
+func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidConstructionError
+
+type InvalidConstructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidConstructionError) Error() string {
+	return "cannot create value: not a resource"
+}
+
+func (*InvalidConstructionError) isSemanticError() {}
+
+func (e *InvalidConstructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidConstructionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidDestructionError
+
+type InvalidDestructionError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructionError) Error() string {
+	return "cannot destroy value: not a resource"
+}
+
+func (*InvalidDestructionError) isSemanticError() {}
+
+func (e *InvalidDestructionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// ResourceLossError
+
+type ResourceLossError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *ResourceLossError) Error() string {
+	return "loss of resource"
+}
+
+func (*ResourceLossError) isSemanticError() {}
+
+func (e *ResourceLossError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *ResourceLossError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// ResourceUseAfterInvalidationError
+
+type ResourceUseAfterInvalidationError struct {
+	Name          string
+	Pos           ast.Position
+	Invalidations []ResourceInvalidation
+	InLoop        bool
+	// NOTE: cached values, use `Cause()`
+	_wasMoved     bool
+	_wasDestroyed bool
+	// NOTE: cached value, use `HasInvalidationInPreviousLoopIteration()`
+	_hasInvalidationInPreviousLoop *bool
+}
+
+func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool) {
+	// check cache
+	if e._wasMoved || e._wasDestroyed {
+		return e._wasMoved, e._wasDestroyed
+	}
+
+	// update cache
+	for _, invalidation := range e.Invalidations {
+		switch invalidation.Kind {
+		case ResourceInvalidationKindMove:
+			wasMoved = true
+		case ResourceInvalidationKindDestroy:
+			wasDestroyed = true
+		}
+	}
+
+	e._wasMoved = wasMoved
+	e._wasDestroyed = wasDestroyed
+
+	return
+}
+
+func (e *ResourceUseAfterInvalidationError) Error() string {
+	message := ""
+	wasMoved, wasDestroyed := e.Cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		message = "use of moved or destroyed resource"
+	case wasMoved:
+		message = "use of moved resource"
+	case wasDestroyed:
+		message = "use of destroyed resource"
+	default:
+		panic(&errors.UnreachableError{})
+	}
+
+	return fmt.Sprintf("%s: `%s`", message, e.Name)
+}
+
+func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
+	message := ""
+	wasMoved, wasDestroyed := e.Cause()
+	switch {
+	case wasMoved && wasDestroyed:
+		message = "resource used here after being moved or destroyed"
+	case wasMoved:
+		message = "resource used here after being moved"
+	case wasDestroyed:
+		message = "resource used here after being destroyed"
+	default:
+		panic(&errors.UnreachableError{})
+	}
+
+	if e.InLoop {
+		site := "later"
+		if e.HasInvalidationInPreviousLoopIteration() {
+			site = "previous"
+		}
+		message += fmt.Sprintf(", in %s iteration of loop", site)
+	}
+
+	return message
+}
+
+func (e *ResourceUseAfterInvalidationError) HasInvalidationInPreviousLoopIteration() (result bool) {
+	if e._hasInvalidationInPreviousLoop != nil {
+		return *e._hasInvalidationInPreviousLoop
+	}
+
+	defer func() {
+		e._hasInvalidationInPreviousLoop = &result
+	}()
+
+	// invalidation occurred in previous loop
+	// if all invalidations occur after the use
+
+	for _, invalidation := range e.Invalidations {
+		if invalidation.Pos.Compare(e.Pos) < 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNote) {
+	for _, invalidation := range e.Invalidations {
+		notes = append(notes, ResourceInvalidationNote{
+			ResourceInvalidation: invalidation,
+			StartPos:             invalidation.Pos,
+			EndPos:               invalidation.Pos.Shifted(len(e.Name) - 1),
+		})
+	}
+	return
+}
+
+func (*ResourceUseAfterInvalidationError) isSemanticError() {}
+
+func (e *ResourceUseAfterInvalidationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
+	return e.Pos.Shifted(len(e.Name) - 1)
+}
+
+// ResourceInvalidationNote
+
+type ResourceInvalidationNote struct {
+	ResourceInvalidation
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (n ResourceInvalidationNote) StartPosition() ast.Position {
+	return n.StartPos
+}
+
+func (n ResourceInvalidationNote) EndPosition() ast.Position {
+	return n.EndPos
+}
+
+func (n ResourceInvalidationNote) Message() string {
+	var action string
+	switch n.Kind {
+	case ResourceInvalidationKindMove:
+		action = "moved"
+	case ResourceInvalidationKindDestroy:
+		action = "destroyed"
+	}
+	return fmt.Sprintf("resource %s here", action)
+}
+
+// MissingCreateError
+
+type MissingCreateError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *MissingCreateError) Error() string {
+	return "cannot create resource: expected `create`"
+}
+
+func (*MissingCreateError) isSemanticError() {}
+
+func (e *MissingCreateError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *MissingCreateError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingMoveOperationError
+
+type MissingMoveOperationError struct {
+	Pos ast.Position
+}
+
+func (e *MissingMoveOperationError) Error() string {
+	return "missing move operation: `<-`"
+}
+
+func (*MissingMoveOperationError) isSemanticError() {}
+
+func (e *MissingMoveOperationError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingMoveOperationError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidMoveOperationError
+
+type InvalidMoveOperationError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidMoveOperationError) Error() string {
+	return "invalid move operation for non-resource: unexpected `<-`"
+}
+
+func (*InvalidMoveOperationError) isSemanticError() {}
+
+func (e *InvalidMoveOperationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidMoveOperationError) EndPosition() ast.Position {
 	return e.EndPos
 }

@@ -12,7 +12,8 @@ import (
 
 type errorListener struct {
 	*antlr.DefaultErrorListener
-	syntaxErrors []*SyntaxError
+	syntaxErrors      []*SyntaxError
+	inputIsIncomplete bool
 }
 
 func (l *errorListener) SyntaxError(
@@ -22,54 +23,72 @@ func (l *errorListener) SyntaxError(
 	message string,
 	e antlr.RecognitionException,
 ) {
-	position := ast.PositionFromToken(offendingSymbol.(antlr.Token))
+	offendingToken := offendingSymbol.(antlr.Token)
 
-	l.syntaxErrors = append(l.syntaxErrors, &SyntaxError{
-		Pos:     position,
-		Message: message,
-	})
+	if l.isIncompleteInputException(e, offendingToken) {
+		l.inputIsIncomplete = true
+	}
+
+	position := ast.PositionFromToken(offendingToken)
+
+	l.syntaxErrors = append(l.syntaxErrors,
+		&SyntaxError{
+			Pos:     position,
+			Message: message,
+		},
+	)
 }
 
-func ParseProgram(code string) (*ast.Program, error) {
-	result, errors := parse(
+func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException, offendingToken antlr.Token) bool {
+	if _, ok := e.(*antlr.InputMisMatchException); !ok {
+		return false
+	}
+
+	if offendingToken.GetTokenType() != antlr.TokenEOF {
+		return false
+	}
+
+	return true
+}
+
+func ParseProgram(code string) (program *ast.Program, inputIsComplete bool, err error) {
+	result, inputIsComplete, errors := parse(
 		code,
 		func(parser *StrictusParser) antlr.ParserRuleContext {
 			return parser.Program()
 		},
 	)
 
-	var err error
 	if len(errors) > 0 {
 		err = Error{errors}
 	}
 
 	program, ok := result.(*ast.Program)
 	if !ok {
-		return nil, err
+		return nil, inputIsComplete, err
 	}
 
-	return program, err
+	return program, inputIsComplete, err
 }
 
-func ParseExpression(code string) (ast.Expression, error) {
-	result, errors := parse(
+func ParseExpression(code string) (expression ast.Expression, inputIsComplete bool, err error) {
+	result, inputIsComplete, errors := parse(
 		code,
 		func(parser *StrictusParser) antlr.ParserRuleContext {
 			return parser.Expression()
 		},
 	)
 
-	var err error
 	if len(errors) > 0 {
 		err = Error{errors}
 	}
 
 	program, ok := result.(ast.Expression)
 	if !ok {
-		return nil, err
+		return nil, inputIsComplete, err
 	}
 
-	return program, err
+	return program, inputIsComplete, err
 }
 
 func parse(
@@ -77,6 +96,7 @@ func parse(
 	parse func(*StrictusParser) antlr.ParserRuleContext,
 ) (
 	result ast.Repr,
+	inputIsComplete bool,
 	errors []error,
 ) {
 	input := antlr.NewInputStream(code)
@@ -90,7 +110,9 @@ func parse(
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(listener)
 
-	appendSyntaxErrors := func() {
+	appendParseErrors := func() {
+		inputIsComplete = !listener.inputIsIncomplete
+
 		for _, syntaxError := range listener.syntaxErrors {
 			errors = append(errors, syntaxError)
 		}
@@ -110,7 +132,7 @@ func parse(
 			if !ok {
 				err = fmt.Errorf("%v", r)
 			}
-			appendSyntaxErrors()
+			appendParseErrors()
 			errors = append(errors, err)
 			result = nil
 		}
@@ -118,27 +140,37 @@ func parse(
 
 	parsed := parse(parser)
 
-	appendSyntaxErrors()
+	appendParseErrors()
 
 	if len(errors) > 0 {
-		return nil, errors
+		return nil, inputIsComplete, errors
 	}
 
-	return parsed.Accept(&ProgramVisitor{}), errors
+	visitor := &ProgramVisitor{}
+	result = parsed.Accept(visitor)
+	errors = append(errors, visitor.parseErrors...)
+	return result, inputIsComplete, errors
 }
 
-func ParseProgramFromFile(filename string) (program *ast.Program, code string, err error) {
+func ParseProgramFromFile(
+	filename string,
+) (
+	program *ast.Program,
+	inputIsComplete bool,
+	code string,
+	err error,
+) {
 	var data []byte
 	data, err = ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, "", err
+		return nil, true, "", err
 	}
 
 	code = string(data)
 
-	program, err = ParseProgram(code)
+	program, inputIsComplete, err = ParseProgram(code)
 	if err != nil {
-		return nil, code, err
+		return nil, inputIsComplete, code, err
 	}
-	return program, code, nil
+	return program, inputIsComplete, code, nil
 }

@@ -10,56 +10,56 @@ type BLS_BLS12381Algo struct {
 
 // SignHash implements BLS signature on BLS12381 curve
 func (a *BLS_BLS12381Algo) SignHash(sk PrKey, h Hash) (Signature, error) {
-	hashBytes := h.Bytes()
-	return a.SignBytes(sk, hashBytes, nil)
-}
-
-// SignBytes signs an array of bytes
-// Hasher is not used in the specific case of BLS
-func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) (Signature, error) {
 	blsPrKey, ok := sk.(*PrKeyBLS_BLS12381)
 	if !ok {
 		return nil, cryptoError{"BLS sigature can only be called using a BLS private key"}
 	}
 	skScalar := blsPrKey.scalar
-	return a.blsSign(&skScalar, data), nil
+	return a.blsSign(&skScalar, h), nil
+}
+
+// SignBytes signs an array of bytes
+func (a *BLS_BLS12381Algo) SignBytes(sk PrKey, data []byte, alg Hasher) (Signature, error) {
+	h := alg.ComputeBytesHash(data)
+	return a.SignHash(sk, h)
 }
 
 // SignStruct signs a structure
-// Hasher is not used in the specific case of BLS
 func (a *BLS_BLS12381Algo) SignStruct(sk PrKey, data Encoder, alg Hasher) (Signature, error) {
-	dataBytes := data.Encode()
-	return a.SignBytes(sk, dataBytes, nil)
+	h := alg.ComputeStructHash(data)
+	return a.SignHash(sk, h)
 }
 
 // VerifyHash implements BLS signature verification on BLS12381 curve
 func (a *BLS_BLS12381Algo) VerifyHash(pk PubKey, s Signature, h Hash) (bool, error) {
-	hashBytes := h.Bytes()
-	return a.VerifyBytes(pk, s, hashBytes, nil)
-}
-
-// VerifyBytes verifies a signature of a byte array
-func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) (bool, error) {
-	blsPubKey, ok := pk.(*PubKey_BLS_BLS12381)
+	blsPubKey, ok := pk.(*PubKeyBLS_BLS12381)
 	if !ok {
 		return false, cryptoError{"BLS signature verification can only be called using a BLS public key"}
 	}
 
 	pkPoint := &(blsPubKey.point)
-	return a.blsVerify(pkPoint, s, data), nil
+	return a.blsVerify(pkPoint, s, h), nil
+}
+
+// VerifyBytes verifies a signature of a byte array
+func (a *BLS_BLS12381Algo) VerifyBytes(pk PubKey, s Signature, data []byte, alg Hasher) (bool, error) {
+	h := alg.ComputeBytesHash(data)
+	return a.VerifyHash(pk, s, h)
 }
 
 // VerifyStruct verifies a signature of a structure
 func (a *BLS_BLS12381Algo) VerifyStruct(pk PubKey, s Signature, data Encoder, alg Hasher) (bool, error) {
-	dataBytes := data.Encode()
-	return a.VerifyBytes(pk, s, dataBytes, nil)
+	h := alg.ComputeStructHash(data)
+	return a.VerifyHash(pk, s, h)
 }
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
 func (a *BLS_BLS12381Algo) GeneratePrKey(seed []byte) (PrKey, error) {
 	var sk PrKeyBLS_BLS12381
+	// seed the RNG
+	seedRelic(seed)
 	// Generate private key here
-	err := randZr(&(sk.scalar), seed)
+	err := randZr(&(sk.scalar))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ type PrKeyBLS_BLS12381 struct {
 	// the signature algo
 	alg *BLS_BLS12381Algo
 	// public key
-	pk *PubKey_BLS_BLS12381
+	pk *PubKeyBLS_BLS12381
 	// private key data
 	scalar scalar
 }
@@ -104,12 +104,16 @@ func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
 	return sk.alg.Name()
 }
 
+func (sk *PrKeyBLS_BLS12381) Signer() Signer {
+	return sk.alg
+}
+
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return prKeyLengthBLS_BLS12381
+	return sk.alg.PrKeySize()
 }
 
 func (sk *PrKeyBLS_BLS12381) computePubKey() {
-	var newPk PubKey_BLS_BLS12381
+	var newPk PubKeyBLS_BLS12381
 	// compute public key pk = g2^sk
 	_G2scalarGenMult(&(newPk.point), &(sk.scalar))
 	sk.pk = &newPk
@@ -123,12 +127,12 @@ func (sk *PrKeyBLS_BLS12381) Pubkey() PubKey {
 	return sk.pk
 }
 
-// PubKey_BLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
-type PubKey_BLS_BLS12381 struct {
+// PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381, it implements PubKey
+type PubKeyBLS_BLS12381 struct {
 	// public key data
 	point pointG2
 }
 
-func (pk *PubKey_BLS_BLS12381) KeySize() int {
+func (pk *PubKeyBLS_BLS12381) KeySize() int {
 	return pubKeyLengthBLS_BLS12381
 }

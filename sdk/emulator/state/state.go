@@ -5,8 +5,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
-
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -16,9 +14,9 @@ type WorldState struct {
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
-	Transactions      map[string]*types.SignedTransaction
+	Transactions      map[string]*types.Transaction
 	transactionsMutex sync.RWMutex
-	Registers         execution.Registers
+	Registers         types.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -28,11 +26,11 @@ type WorldState struct {
 func NewWorldState() *WorldState {
 	blocks := make(map[string]*etypes.Block)
 	blockchain := make([]crypto.Hash, 0)
-	transactions := make(map[string]*types.SignedTransaction)
-	registers := make(execution.Registers)
+	transactions := make(map[string]*types.Transaction)
+	registers := make(types.Registers)
 
 	genesis := etypes.GenesisBlock()
-	blocks[string(genesis.Hash().Bytes())] = genesis
+	blocks[string(genesis.Hash())] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
@@ -65,7 +63,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
-	if block, ok := ws.Blocks[string(hash.Bytes())]; ok {
+	if block, ok := ws.Blocks[string(hash)]; ok {
 		return block
 	}
 
@@ -87,11 +85,11 @@ func (ws *WorldState) GetBlockByNumber(number uint64) *etypes.Block {
 }
 
 // GetTransaction gets a transaction by hash.
-func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction {
+func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.Transaction {
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
-	if tx, ok := ws.Transactions[string(hash.Bytes())]; ok {
+	if tx, ok := ws.Transactions[string(hash)]; ok {
 		return tx
 	}
 
@@ -100,12 +98,12 @@ func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.SignedTransaction 
 
 // ContainsTransaction returns true if the transaction exists in the state, false otherwise.
 func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
-	_, exists := ws.Transactions[string(hash.Bytes())]
+	_, exists := ws.Transactions[string(hash)]
 	return exists
 }
 
 // SetRegisters commits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers execution.Registers) {
+func (ws *WorldState) SetRegisters(registers types.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
@@ -119,11 +117,11 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 	defer ws.blocksMutex.Unlock()
 	defer ws.blockchainMutex.Unlock()
 
-	if _, exists := ws.Blocks[string(block.Hash().Bytes())]; exists {
+	if _, exists := ws.Blocks[string(block.Hash())]; exists {
 		return
 	}
 
-	ws.Blocks[string(block.Hash().Bytes())] = block
+	ws.Blocks[string(block.Hash())] = block
 
 	ws.Blockchain = append(ws.Blockchain, block.Hash())
 
@@ -134,15 +132,15 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 }
 
 // InsertTransaction inserts a new transaction into the state.
-func (ws *WorldState) InsertTransaction(tx *types.SignedTransaction) {
+func (ws *WorldState) InsertTransaction(tx *types.Transaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
-	if _, exists := ws.Transactions[string(tx.Hash().Bytes())]; exists {
+	if _, exists := ws.Transactions[string(tx.Hash())]; exists {
 		return
 	}
 
-	ws.Transactions[string(tx.Hash().Bytes())] = tx
+	ws.Transactions[string(tx.Hash())] = tx
 
 	ws.latestStateMutex.Lock()
 	defer ws.latestStateMutex.Unlock()
@@ -161,5 +159,5 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.Transa
 	defer ws.transactionsMutex.Unlock()
 
 	tx.Status = status
-	ws.Transactions[string(tx.Hash().Bytes())] = tx
+	ws.Transactions[string(tx.Hash())] = tx
 }

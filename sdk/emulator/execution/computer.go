@@ -25,9 +25,10 @@ func NewComputer(runtime runtime.Runtime, runtimeLogger func(string)) *Computer 
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *RegistersView, tx *types.SignedTransaction) error {
+func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) error {
 	runtimeContext := NewRuntimeContext(registers)
-	runtimeContext.Accounts = []types.Address{tx.PayerSignature.Account}
+
+	runtimeContext.Accounts = tx.ScriptAccounts
 	runtimeContext.Logger = c.runtimeLogger
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
@@ -37,7 +38,7 @@ func (c *Computer) ExecuteTransaction(registers *RegistersView, tx *types.Signed
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(registers *RegistersView, script []byte) (interface{}, error) {
+func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, error) {
 	runtimeContext := NewRuntimeContext(registers)
 	runtimeContext.Logger = c.runtimeLogger
 

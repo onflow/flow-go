@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -14,7 +15,7 @@ func TestConstantSizedType_String(t *testing.T) {
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("Int[2][]"))
+	Expect(ty.String()).To(Equal("[[Int]; 2]"))
 }
 
 func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
@@ -22,15 +23,17 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &ConstantSizedType{
 		Type: &FunctionType{
-			ParameterTypes: []Type{
+			ParameterTypeAnnotations: NewTypeAnnotations(
 				&Int8Type{},
-			},
-			ReturnType: &Int16Type{},
+			),
+			ReturnTypeAnnotation: NewTypeAnnotation(
+				&Int16Type{},
+			),
 		},
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("((Int8): Int16)[2]"))
+	Expect(ty.String()).To(Equal("[((Int8): Int16); 2]"))
 }
 
 func TestVariableSizedType_String(t *testing.T) {
@@ -43,7 +46,7 @@ func TestVariableSizedType_String(t *testing.T) {
 		},
 	}
 
-	Expect(ty.String()).To(Equal("Int[][2]"))
+	Expect(ty.String()).To(Equal("[[Int; 2]]"))
 }
 
 func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
@@ -51,12 +54,70 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &VariableSizedType{
 		Type: &FunctionType{
-			ParameterTypes: []Type{
+			ParameterTypeAnnotations: NewTypeAnnotations(
 				&Int8Type{},
-			},
-			ReturnType: &Int16Type{},
+			),
+			ReturnTypeAnnotation: NewTypeAnnotation(
+				&Int16Type{},
+			),
 		},
 	}
 
-	Expect(ty.String()).To(Equal("((Int8): Int16)[]"))
+	Expect(ty.String()).To(Equal("[((Int8): Int16)]"))
+}
+
+func TestIsResourceType_AnyNestedInArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &VariableSizedType{
+		Type: &AnyType{},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeFalse())
+}
+
+func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &VariableSizedType{
+		&CompositeType{
+			Kind: common.CompositeKindResource,
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeTrue())
+}
+
+func TestIsResourceType_ResourceNestedInDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &DictionaryType{
+		KeyType: &StringType{},
+		ValueType: &VariableSizedType{
+			Type: &CompositeType{
+				Kind: common.CompositeKindResource,
+			},
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeTrue())
+}
+
+func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
+	RegisterTestingT(t)
+
+	ty := &DictionaryType{
+		KeyType: &StringType{},
+		ValueType: &VariableSizedType{
+			Type: &CompositeType{
+				Kind: common.CompositeKindStructure,
+			},
+		},
+	}
+
+	Expect(ty.IsResourceType()).
+		To(BeFalse())
 }

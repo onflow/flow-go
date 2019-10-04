@@ -2,12 +2,14 @@ package tests
 
 import (
 	"fmt"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"math/big"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
@@ -18,18 +20,24 @@ import (
 )
 
 func parseCheckAndInterpret(code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithExtra(code, nil, nil)
+	return parseCheckAndInterpretWithExtra(code, nil, nil, nil)
 }
 
 func parseCheckAndInterpretWithExtra(
 	code string,
 	predefinedValueTypes map[string]sema.ValueDeclaration,
 	predefinedValues map[string]interpreter.Value,
+	handleCheckerError func(error),
 ) *interpreter.Interpreter {
 
-	checker, err := parseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
-	Expect(err).
-		To(Not(HaveOccurred()))
+	checker, err := ParseAndCheckWithExtra(code, predefinedValueTypes, nil, nil)
+
+	if handleCheckerError != nil {
+		handleCheckerError(err)
+	} else {
+		Expect(err).
+			To(Not(HaveOccurred()))
+	}
 
 	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
@@ -112,7 +120,7 @@ func TestInterpretInvalidNonFunctionDeclarationInvocation(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	Expect(err).
-		To(BeAssignableToTypeOf(&interpreter.NotCallableError{}))
+		To(BeAssignableToTypeOf(&interpreter.NotInvokableError{}))
 }
 
 func TestInterpretLexicalScope(t *testing.T) {
@@ -393,6 +401,46 @@ func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
 
 	Expect(inter.Invoke("test")).
 		To(Equal(interpreter.NewStringValue("def")))
+}
+
+type stringSliceTest struct {
+	str      string
+	from     int
+	to       int
+	result   string
+	matchers []types.GomegaMatcher
+}
+
+func TestInterpretStringSlicing(t *testing.T) {
+	tests := []stringSliceTest{
+		{"abcdef", 0, 6, "abcdef", nil},
+		{"abcdef", 0, 0, "", nil},
+		{"abcdef", 0, 1, "a", nil},
+		{"abcdef", 0, 2, "ab", nil},
+		{"abcdef", 1, 2, "b", nil},
+		{"abcdef", 2, 3, "c", nil},
+		{"abcdef", 5, 6, "f", nil},
+		// TODO: check invalid arguments
+		// {"abcdef", -1, 0, "", []types.GomegaMatcher{
+		// 	BeAssignableToTypeOf(InvalidIndexError),
+		// }},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+				fun test(): String {
+				  let s = "%s"
+				  return s.slice(from: %d, upTo: %d)
+				}
+			`, test.str, test.from, test.to))
+
+			Expect(inter.Invoke("test")).
+				To(Equal(interpreter.NewStringValue(test.result)))
+		})
+	}
 }
 
 func TestInterpretReturnWithoutExpression(t *testing.T) {
@@ -1218,7 +1266,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 	RegisterTestingT(t)
 
-	program, err := parser.ParseProgram(`
+	program, _, err := parser.ParseProgram(`
       let a = test(1, 2)
 	`)
 
@@ -1228,11 +1276,13 @@ func TestInterpretHostFunction(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypes: []sema.Type{
+			ParameterTypeAnnotations: sema.NewTypeAnnotations(
 				&sema.IntType{},
 				&sema.IntType{},
-			},
-			ReturnType: &sema.IntType{},
+			),
+			ReturnTypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
 		},
 		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
@@ -1824,7 +1874,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.wasFed = true
@@ -1857,7 +1907,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cat = Cat()
           let kitty = cat
           kitty.feed()
@@ -1886,7 +1936,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           var cat = Cat()
           let kitty = Cat()
           cat = kitty
@@ -1916,7 +1966,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let cats = [Cat()]
           let kitty = Cat()
           cats[0] = kitty
@@ -1953,7 +2003,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
           }
       }
 
-      fun test(): Bool[] {
+      fun test(): [Bool] {
           let carrier = Carrier(cat: Cat())
           let kitty = Cat()
           carrier.cat = kitty
@@ -2003,12 +2053,12 @@ func TestInterpretArrayCopy(t *testing.T) {
 
 	inter := parseCheckAndInterpret(`
 
-      fun change(_ numbers: Int[]): Int[] {
+      fun change(_ numbers: [Int]): [Int] {
           numbers[0] = 1
           return numbers
       }
 
-      fun test(): Int[] {
+      fun test(): [Int] {
           let numbers = [0]
           let numbers2 = change(numbers)
           return [
@@ -2659,16 +2709,19 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface Test {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          %s TestImpl: Test {}
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+              %s interface Test {}
 
-          let test: Test = TestImpl()
-	    `, kind.Keyword(), kind.Keyword()))
+              %s TestImpl: Test {}
 
-		Expect(inter.Globals["test"].Value).
-			To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
+              let test: Test = TestImpl()
+	        `, kind.Keyword(), kind.Keyword()))
+
+			Expect(inter.Globals["test"].Value).
+				To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
+		})
 	}
 }
 
@@ -2682,26 +2735,29 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface Test {
-              x: Int
-          }
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          %s TestImpl: Test {
-              var x: Int
-
-              init(x: Int) {
-                  self.x = x
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+              %s interface Test {
+                  x: Int
               }
-          }
 
-          let test: Test = TestImpl(x: 1)
+              %s TestImpl: Test {
+                  var x: Int
 
-          let x = test.x
-	    `, kind.Keyword(), kind.Keyword()))
+                  init(x: Int) {
+                      self.x = x
+                  }
+              }
 
-		Expect(inter.Globals["x"].Value).
-			To(Equal(interpreter.NewIntValue(1)))
+              let test: Test = TestImpl(x: 1)
+
+              let x = test.x
+	        `, kind.Keyword(), kind.Keyword()))
+
+			Expect(inter.Globals["x"].Value).
+				To(Equal(interpreter.NewIntValue(1)))
+		})
 	}
 }
 
@@ -2715,24 +2771,27 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface Test {
-              fun test(): Int
-          }
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          %s TestImpl: Test {
-              fun test(): Int {
-                  return 2
-              }
-          }
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+            %s interface Test {
+                fun test(): Int
+            }
 
-          let test: Test = TestImpl()
+            %s TestImpl: Test {
+                fun test(): Int {
+                    return 2
+                }
+            }
 
-          let val = test.test()
-	    `, kind.Keyword(), kind.Keyword()))
+            let test: Test = TestImpl()
 
-		Expect(inter.Globals["val"].Value).
-			To(Equal(interpreter.NewIntValue(2)))
+            let val = test.test()
+	      `, kind.Keyword(), kind.Keyword()))
+
+			Expect(inter.Globals["val"].Value).
+				To(Equal(interpreter.NewIntValue(2)))
+		})
 	}
 }
 
@@ -2746,41 +2805,44 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface Test {
-              fun test(x: Int): Int {
-                  pre {
-                      x > 0: "x must be positive"
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+              %s interface Test {
+                  fun test(x: Int): Int {
+                      pre {
+                          x > 0: "x must be positive"
+                      }
                   }
               }
-          }
 
-          %s TestImpl: Test {
-              fun test(x: Int): Int {
-                  pre {
-                      x < 2: "x must be smaller than 2"
+              %s TestImpl: Test {
+                  fun test(x: Int): Int {
+                      pre {
+                          x < 2: "x must be smaller than 2"
+                      }
+                      return x
                   }
-                  return x
               }
-          }
 
-          let test: Test = TestImpl()
+              let test: Test = TestImpl()
 
-          fun callTest(x: Int): Int {
-              return test.test(x: x)
-          }
-	    `, kind.Keyword(), kind.Keyword()))
+              fun callTest(x: Int): Int {
+                  return test.test(x: x)
+              }
+	        `, kind.Keyword(), kind.Keyword()))
 
-		_, err := inter.Invoke("callTest", big.NewInt(0))
-		Expect(err).
-			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+			_, err := inter.Invoke("callTest", big.NewInt(0))
+			Expect(err).
+				To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
-		Expect(inter.Invoke("callTest", big.NewInt(1))).
-			To(Equal(interpreter.NewIntValue(1)))
+			Expect(inter.Invoke("callTest", big.NewInt(1))).
+				To(Equal(interpreter.NewIntValue(1)))
 
-		_, err = inter.Invoke("callTest", big.NewInt(2))
-		Expect(err).
-			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+			_, err = inter.Invoke("callTest", big.NewInt(2))
+			Expect(err).
+				To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		})
 	}
 }
 
@@ -2794,38 +2856,41 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface Test {
-              init(x: Int) {
-                  pre {
-                      x > 0: "x must be positive"
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+              %s interface Test {
+                  init(x: Int) {
+                      pre {
+                          x > 0: "x must be positive"
+                      }
                   }
               }
-          }
 
-          %s TestImpl: Test {
-              init(x: Int) {
-                  pre {
-                      x < 2: "x must be smaller than 2"
+              %s TestImpl: Test {
+                  init(x: Int) {
+                      pre {
+                          x < 2: "x must be smaller than 2"
+                      }
                   }
               }
-          }
 
-          fun test(x: Int): Test {
-              return TestImpl(x: x)
-          }
-	    `, kind.Keyword(), kind.Keyword()))
+              fun test(x: Int): Test {
+                  return TestImpl(x: x)
+              }
+	        `, kind.Keyword(), kind.Keyword()))
 
-		_, err := inter.Invoke("test", big.NewInt(0))
-		Expect(err).
-			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+			_, err := inter.Invoke("test", big.NewInt(0))
+			Expect(err).
+				To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
 
-		Expect(inter.Invoke("test", big.NewInt(1))).
-			To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
+			Expect(inter.Invoke("test", big.NewInt(1))).
+				To(BeAssignableToTypeOf(interpreter.CompositeValue{}))
 
-		_, err = inter.Invoke("test", big.NewInt(2))
-		Expect(err).
-			To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+			_, err = inter.Invoke("test", big.NewInt(2))
+			Expect(err).
+				To(BeAssignableToTypeOf(&interpreter.ConditionError{}))
+		})
 	}
 }
 
@@ -2840,21 +2905,24 @@ func TestInterpretInterfaceTypeAsValue(t *testing.T) {
 			continue
 		}
 
-		inter := parseCheckAndInterpret(fmt.Sprintf(`
-          %s interface X {}
+		t.Run(kind.Keyword(), func(t *testing.T) {
 
-          let x = X
-	    `, kind.Keyword()))
+			inter := parseCheckAndInterpret(fmt.Sprintf(`
+              %s interface X {}
 
-		Expect(inter.Globals["x"].Value).
-			To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+              let x = X
+	        `, kind.Keyword()))
+
+			Expect(inter.Globals["x"].Value).
+				To(BeAssignableToTypeOf(interpreter.MetaTypeValue{}))
+		})
 	}
 }
 
 func TestInterpretImport(t *testing.T) {
 	RegisterTestingT(t)
 
-	checkerImported, err := parseAndCheck(`
+	checkerImported, err := ParseAndCheck(`
       fun answer(): Int {
           return 42
       }
@@ -2862,7 +2930,7 @@ func TestInterpretImport(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -2902,7 +2970,7 @@ func TestInterpretImportError(t *testing.T) {
 			stdlib.PanicFunction,
 		}.ToValueDeclarations()
 
-	checkerImported, err := parseAndCheckWithExtra(
+	checkerImported, err := ParseAndCheckWithExtra(
 		`
           fun answer(): Int {
               return panic("?!")
@@ -2915,7 +2983,7 @@ func TestInterpretImportError(t *testing.T) {
 	Expect(err).
 		To(Not(HaveOccurred()))
 
-	checkerImporting, err := parseAndCheckWithExtra(
+	checkerImporting, err := ParseAndCheckWithExtra(
 		`
           import answer from "imported"
 
@@ -3260,7 +3328,7 @@ func TestInterpretArrayAppend(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.append(4)
           return x
@@ -3282,7 +3350,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           let y = x.append
           y(4)
@@ -3305,7 +3373,7 @@ func TestInterpretArrayConcat(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           return a.concat([3, 4])
       }
@@ -3326,7 +3394,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let a = [1, 2]
           let b = a.concat
           return b([3, 4])
@@ -3348,7 +3416,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	RegisterTestingT(t)
 
 	inter := parseCheckAndInterpret(`
-      fun test(): Int[] {
+      fun test(): [Int] {
           let x = [1, 2, 3]
           x.insert(at: 1, 4)
           return x
@@ -3483,7 +3551,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	inter := parseCheckAndInterpret(`
       var removed: Int? = nil
 
-      fun test(): Int[String] {
+      fun test(): {String: Int} {
           let x = {"abc": 1, "def": 2}
           removed = x.remove(key: "abc")
           return x
@@ -3656,4 +3724,37 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 		To(Equal(interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		}))
+}
+
+func TestInterpretIndirectDestroy(t *testing.T) {
+	RegisterTestingT(t)
+
+	inter := parseCheckAndInterpretWithExtra(
+		`
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              destroy x
+          }
+	    `,
+		nil,
+		nil,
+		func(checkerError error) {
+			// TODO: add support for resources
+
+			errs := ExpectCheckerErrors(checkerError, 1)
+
+			Expect(errs[0]).
+				To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+		},
+	)
+
+	// TODO: add create expression once supported
+
+	value, err := inter.Invoke("test")
+	Expect(err).
+		To(Not(HaveOccurred()))
+	Expect(value).
+		To(Equal(interpreter.VoidValue{}))
 }

@@ -106,11 +106,13 @@ var assertRequiredArgumentCount = 1
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
 			&sema.BoolType{},
 			&sema.StringType{},
-		},
-		ReturnType:            &sema.VoidType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VoidType{},
+		),
 		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
@@ -161,10 +163,12 @@ func (e PanicError) ImportLocation() ast.ImportLocation {
 var PanicFunction = NewStandardLibraryFunction(
 	"panic",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
 			&sema.StringType{},
-		},
-		ReturnType: &sema.NeverType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.NeverType{},
+		),
 	},
 	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
@@ -189,8 +193,12 @@ var BuiltinFunctions = StandardLibraryFunctions{
 var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
-		ParameterTypes: []sema.Type{&sema.AnyType{}},
-		ReturnType:     &sema.VoidType{},
+		ParameterTypeAnnotations: sema.NewTypeAnnotations(
+			&sema.AnyType{},
+		),
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VoidType{},
+		),
 	},
 	func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])

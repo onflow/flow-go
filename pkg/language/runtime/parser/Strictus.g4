@@ -54,6 +54,11 @@ program
     : (declaration ';'?)* EOF
     ;
 
+replInput
+    : program
+    | statements
+    ;
+
 declaration
     : compositeDeclaration
     | interfaceDeclaration
@@ -139,22 +144,38 @@ typeAnnotation
     ;
 
 fullType
-    : baseType
-      ({p.noWhitespace()}? typeIndex)*
-      ({p.noWhitespace()}? optionals+=Optional)*
-    ;
-
-typeIndex
-    : '[' (DecimalLiteral|fullType)? ']'
+    : baseType ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
-    : identifier
+    : nominalType
     | functionType
+    | variableSizedType
+    | constantSizedType
+    | dictionaryType
+    ;
+
+nominalType
+    : identifier
     ;
 
 functionType
-    : '(' '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')' ':' returnType=typeAnnotation ')'
+    : '('
+        '(' (parameterTypes+=typeAnnotation (',' parameterTypes+=typeAnnotation)*)? ')'
+        ':' returnType=typeAnnotation
+      ')'
+    ;
+
+variableSizedType
+    : '[' fullType ']'
+    ;
+
+constantSizedType
+    : '[' fullType ';' size=DecimalLiteral ']'
+    ;
+
+dictionaryType
+    : '{' keyType=fullType ':' valueType=fullType '}'
     ;
 
 block
@@ -185,6 +206,7 @@ statements
     : (statement eos)*
     ;
 
+// NOTE: important to have expression last
 statement
     : returnStatement
     | breakStatement
@@ -199,8 +221,13 @@ statement
     | expression
     ;
 
+// only parse the return value expression if it is
+// on the same line. this prevents the return statement
+// from greedily taking an expression from a potentialy
+// following expression statement
+//
 returnStatement
-    : Return expression?
+    : Return ({!p.lineTerminatorAhead()}? expression)?
     ;
 
 breakStatement
@@ -223,11 +250,16 @@ whileStatement
     ;
 
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)? ('='| Move) expression
+    : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
 assignment
-    : identifier expressionAccess* ('=' | Move) expression
+    : identifier expressionAccess* transfer expression
+    ;
+
+transfer
+    : '='
+    | Move
     ;
 
 expression
@@ -285,10 +317,18 @@ multiplicativeExpression
 
 unaryExpression
     : primaryExpression
+    // NOTE: allow multiple unary operators, but reject in visitor
+    // to provide better error for invalid juxtaposition
     | unaryOp+ unaryExpression
     ;
 
 primaryExpression
+    : createExpression
+    | destroyExpression
+    | composedExpression
+    ;
+
+composedExpression
     : primaryExpressionStart primaryExpressionSuffix*
     ;
 
@@ -353,10 +393,34 @@ NilCoalescing : WS '??';
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
-    : identifier                                                        # IdentifierExpression
-    | literal                                                           # LiteralExpression
-    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock  # FunctionExpression
-    | '(' expression ')'                                                # NestedExpression
+    : identifierExpression
+    | literalExpression
+    | functionExpression
+    | nestedExpression
+    ;
+
+createExpression
+    : Create identifier invocation
+    ;
+
+destroyExpression
+    : Destroy expression
+    ;
+
+identifierExpression
+    : identifier
+    ;
+
+literalExpression
+    : literal
+    ;
+
+functionExpression
+    : Fun parameterList (':' returnType=typeAnnotation)? functionBlock
+    ;
+
+nestedExpression
+    : '(' expression ')'
     ;
 
 expressionAccess
@@ -466,9 +530,14 @@ Nil : 'nil' ;
 Import : 'import' ;
 From : 'from' ;
 
+Create : 'create' ;
+Destroy : 'destroy' ;
+
 identifier
     : Identifier
     | From
+    | Create
+    | Destroy
     ;
 
 Identifier

@@ -66,6 +66,14 @@ type FailableDowncastExtractor interface {
 	ExtractFailableDowncast(extractor *ExpressionExtractor, expression *FailableDowncastExpression) ExpressionExtraction
 }
 
+type CreateExtractor interface {
+	ExtractCreate(extractor *ExpressionExtractor, expression *CreateExpression) ExpressionExtraction
+}
+
+type DestroyExtractor interface {
+	ExtractDestroy(extractor *ExpressionExtractor, expression *DestroyExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
 	nextIdentifier            int
 	BoolExtractor             BoolExtractor
@@ -83,6 +91,8 @@ type ExpressionExtractor struct {
 	BinaryExtractor           BinaryExtractor
 	FunctionExtractor         FunctionExtractor
 	FailableDowncastExtractor FailableDowncastExtractor
+	CreateExtractor           CreateExtractor
+	DestroyExtractor          DestroyExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -336,7 +346,6 @@ func (extractor *ExpressionExtractor) VisitInvocationExpression(expression *Invo
 }
 
 func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationExpression) ExpressionExtraction {
-
 	var extractedExpressions []ExtractedExpression
 
 	invokedExpression := expression.InvokedExpression
@@ -355,8 +364,27 @@ func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationEx
 
 	// rewrite all arguments
 
-	var newArguments []*Argument
-	for _, argument := range expression.Arguments {
+	newArguments, argumentExtractedExpressions := extractor.extractArguments(expression.Arguments)
+	extractedExpressions = append(
+		extractedExpressions,
+		argumentExtractedExpressions...,
+	)
+
+	newExpression.Arguments = newArguments
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: extractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) extractArguments(
+	arguments []*Argument,
+) (
+	newArguments []*Argument,
+	extractedExpressions []ExtractedExpression,
+) {
+	for _, argument := range arguments {
 
 		// copy the argument
 		newArgument := *argument
@@ -372,13 +400,7 @@ func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationEx
 
 		newArguments = append(newArguments, &newArgument)
 	}
-
-	newExpression.Arguments = newArguments
-
-	return ExpressionExtraction{
-		RewrittenExpression:  &newExpression,
-		ExtractedExpressions: extractedExpressions,
-	}
+	return newArguments, extractedExpressions
 }
 
 func (extractor *ExpressionExtractor) VisitMemberExpression(expression *MemberExpression) Repr {
@@ -569,6 +591,62 @@ func (extractor *ExpressionExtractor) VisitFailableDowncastExpression(expression
 }
 
 func (extractor *ExpressionExtractor) ExtractFailableDowncast(expression *FailableDowncastExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitCreateExpression(expression *CreateExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.CreateExtractor != nil {
+		return extractor.CreateExtractor.ExtractCreate(extractor, expression)
+	} else {
+		return extractor.ExtractCreate(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractCreate(expression *CreateExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.InvocationExpression)
+
+	newExpression.InvocationExpression = result.RewrittenExpression.(*InvocationExpression)
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitDestroyExpression(expression *DestroyExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.DestroyExtractor != nil {
+		return extractor.DestroyExtractor.ExtractDestroy(extractor, expression)
+	} else {
+		return extractor.ExtractDestroy(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractDestroy(expression *DestroyExpression) ExpressionExtraction {
 
 	// copy the expression
 	newExpression := *expression

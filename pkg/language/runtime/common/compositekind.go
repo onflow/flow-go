@@ -44,3 +44,31 @@ func (k CompositeKind) Keyword() string {
 
 	panic(&errors.UnreachableError{})
 }
+
+func (k CompositeKind) Annotation() string {
+	if k != CompositeKindResource {
+		return ""
+	}
+	return "<-"
+}
+
+func (k CompositeKind) TransferOperator() string {
+	if k != CompositeKindResource {
+		return "="
+	}
+	return "<-"
+}
+
+func (k CompositeKind) ConstructionKeyword() string {
+	if k != CompositeKindResource {
+		return ""
+	}
+	return "create"
+}
+
+func (k CompositeKind) DestructionKeyword() interface{} {
+	if k != CompositeKindResource {
+		return ""
+	}
+	return "destroy"
+}

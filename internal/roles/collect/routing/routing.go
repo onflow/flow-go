@@ -12,11 +12,11 @@ type TransactionRouter struct {
 }
 
 // Route returns the routed cluster for a transaction in the given epoch.
-func (tr *TransactionRouter) Route(transaction *types.SignedTransaction, epoch uint64) *clusters.Cluster {
+func (tr *TransactionRouter) Route(transaction *types.Transaction, epoch uint64) *clusters.Cluster {
 	return nil
 }
 
 // InRange returns true if the transaction belongs in the given cluster, and false otherwise.
-func (tr *TransactionRouter) InRange(transaction *types.SignedTransaction, cluster *clusters.Cluster) bool {
+func (tr *TransactionRouter) InRange(transaction *types.Transaction, cluster *clusters.Cluster) bool {
 	return false
 }

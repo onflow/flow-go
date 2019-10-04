@@ -26,12 +26,12 @@ func TestSendTransaction(t *testing.T) {
 	c := client.NewFromRPCClient(mockRPC)
 	ctx := context.Background()
 
-	tx := unittest.SignedTransactionFixture()
+	tx := unittest.TransactionFixture()
 
 	// client should return non-error if RPC call succeeds
 	mockRPC.EXPECT().
 		SendTransaction(ctx, gomock.Any()).
-		Return(&observe.SendTransactionResponse{Hash: tx.Hash().Bytes()}, nil).
+		Return(&observe.SendTransactionResponse{Hash: tx.Hash()}, nil).
 		Times(1)
 
 	err := c.SendTransaction(ctx, tx)

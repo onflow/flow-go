@@ -12,9 +12,11 @@ import (
 func TestBeforeExtractor(t *testing.T) {
 	RegisterTestingT(t)
 
-	expression, err := parser.ParseExpression(`
+	expression, inputIsComplete, err := parser.ParseExpression(`
         before(x + before(y)) + z
 	`)
+
+	Expect(inputIsComplete).To(BeTrue())
 
 	Expect(err).
 		To(Not(HaveOccurred()))

@@ -34,11 +34,11 @@ func (b *Block) ToMessage() *observe.Block {
 	var prevBlockHash []byte
 
 	if b.PreviousBlockHash != nil {
-		prevBlockHash = b.PreviousBlockHash.Bytes()
+		prevBlockHash = b.PreviousBlockHash
 	}
 
 	blockMsg := &observe.Block{
-		Hash:              b.Hash().Bytes(),
+		Hash:              b.Hash(),
 		Number:            b.Number,
 		PrevBlockHash:     prevBlockHash,
 		Timestamp:         timestamp,
