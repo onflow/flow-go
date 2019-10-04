@@ -23,18 +23,18 @@ func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	}
 }
 
-func (i *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := i.registers.Get(fullKey(string(owner), string(controller), string(key)))
+func (r *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
+	v, _ := r.registers.Get(fullKey(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
-func (i *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
-	i.registers.Set(fullKey(string(owner), string(controller), string(key)), value)
+func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
+	r.registers.Set(fullKey(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
-func (i *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (id []byte, err error) {
-	latestAccountID, _ := i.registers.Get(keyLatestAccount)
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (rd []byte, err error) {
+	latestAccountID, _ := r.registers.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
@@ -43,52 +43,96 @@ func (i *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (id []b
 
 	accountID := accountAddress.Bytes()
 
-	i.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
-	i.registers.Set(fullKey(string(accountID), string(accountID), keyPublicKey), allPublicKeys(publicKeys))
-	i.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.setAccountPublicKeys(accountID, publicKeys)
 
-	i.registers.Set(keyLatestAccount, accountID)
+	r.registers.Set(keyLatestAccount, accountID)
 
-	i.Log("Creating new account\n")
-	i.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
-	i.Log(fmt.Sprintf("Code:\n%s", string(code)))
+	r.Log("Creating new account\n")
+	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
+	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
 	return accountID, nil
 }
 
-func (i *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
-	_, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
+func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) {
+	count := big.NewInt(int64(len(publicKeys)))
+
+	r.registers.Set(
+		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+		count.Bytes(),
+	)
+
+	for i, publicKey := range publicKeys {
+		r.registers.Set(
+			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
+			publicKey,
+		)
+	}
+}
+
+func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) ([][]byte, error) {
+	countBytes, exists := r.registers.Get(
+		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+	)
+	if !exists {
+		return [][]byte{}, nil
+	}
+
+	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
+
+	publicKeys := make([][]byte, count)
+
+	for i := 0; i < count; i++ {
+		publicKey, exists := r.registers.Get(
+			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
+		)
+
+		if !exists {
+			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
+		}
+
+		publicKeys[i] = publicKey
+	}
+
+	return publicKeys, nil
+}
+
+func (r *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
+	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("Account with ID %s does not exist", accountID)
 	}
 
-	i.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
 	return nil
 }
 
-func (i *RuntimeContext) GetAccount(address types.Address) *types.Account {
+func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 	accountID := address.Bytes()
 
-	balanceBytes, exists := i.registers.Get(fullKey(string(accountID), "", keyBalance))
+	balanceBytes, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return nil
 	}
 
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
-	publicKey, _ := i.registers.Get(fullKey(string(accountID), string(accountID), keyPublicKey))
-	code, _ := i.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	// TODO: handle errors properly
+	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	publicKeys, _ := r.getAccountPublicKeys(accountID)
 
 	return &types.Account{
 		Address:    address,
 		Balance:    balanceInt.Uint64(),
 		Code:       code,
-		PublicKeys: [][]byte{publicKey},
+		PublicKeys: publicKeys,
 	}
 }
 
-func (i *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
+func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressImportLocation)
 	if !ok {
 		return nil, errors.New("import location must be an account address")
@@ -96,7 +140,7 @@ func (i *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 
 	accountID := []byte(addressLocation)
 
-	code, exists := i.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	code, exists := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
 	if !exists {
 		return nil, fmt.Errorf("no code deployed at address %x", accountID)
 	}
@@ -104,23 +148,27 @@ func (i *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 	return code, nil
 }
 
-func (i *RuntimeContext) GetSigningAccounts() []types.Address {
-	return i.Accounts
+func (r *RuntimeContext) GetSigningAccounts() []types.Address {
+	return r.Accounts
 }
 
-func (i *RuntimeContext) Log(message string) {
-	i.Logger(message)
+func (r *RuntimeContext) Log(message string) {
+	r.Logger(message)
 }
 
 const (
-	keyLatestAccount = "latest_account"
-	keyBalance       = "balance"
-	keyPublicKey     = "public_key"
-	keyCode          = "code"
+	keyLatestAccount  = "latest_account"
+	keyBalance        = "balance"
+	keyCode           = "code"
+	keyPublicKeyCount = "public_key_count"
 )
 
 func fullKey(owner, controller, key string) string {
 	return strings.Join([]string{owner, controller, key}, "__")
+}
+
+func keyPublicKey(index int) string {
+	return fmt.Sprint("public_key_%d", index)
 }
 
 // TODO: update to allocate space for keys based on pubkey size
