@@ -1,4 +1,6 @@
-#include "include.h"
+#include "misc.h"
+#include "bls_include.h"
+
 
 // DEBUG related functions
 void _bytes_print(char* s, byte* data, int len) {
@@ -32,9 +34,13 @@ void _ep2_print(char* s, ep2_st* p) {
     g2_print(p);
 }
 
-// generates a random number less than the order r
-void _bn_randZr(bn_t x, byte* seed, int len) {
+// seeds relic PRG
+void _seed_relic(byte* seed, int len) {
     rand_seed(seed, len);
+}
+
+// generates a random number less than the order r
+void _bn_randZr(bn_t x) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
@@ -47,7 +53,7 @@ void _bn_randZr(bn_t x, byte* seed, int len) {
 }
 
 // ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.
-// The coding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
@@ -67,12 +73,12 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a) {
     TRY {
         ep_new(t);
         ep_norm(t, a);
-        fp_write_bin(bin, FP_BYTES, t->x);
+        fp_write_bin(bin, Fp_BYTES, t->x);
 
         if (SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp_get_bit(t->y, 0) << 5);
         } else {
-            fp_write_bin(bin + FP_BYTES, FP_BYTES, t->y);
+            fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
     } CATCH_ANY {
         THROW(ERR_CAUGHT);
@@ -84,7 +90,7 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a) {
 
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// The coding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
 void _ep_read_bin_compact(ep_st* a, byte *bin) {
     if (bin[0] & 0x40) {
@@ -114,11 +120,11 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
 	a->norm = 1;
 	fp_set_dig(a->z, 1);
     bin[0] &= 0x1F;
-	fp_read_bin(a->x, bin, FP_BYTES);
+	fp_read_bin(a->x, bin, Fp_BYTES);
     bin[0] = temp;
 
     if (SERIALIZATION == UNCOMPRESSED) {
-        fp_read_bin(a->y, bin + FP_BYTES, FP_BYTES);
+        fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
     }
     else {
         fp_zero(a->y);

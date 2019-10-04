@@ -45,7 +45,7 @@ var Cmd = &cobra.Command{
 				utils.Exit("Failed to decode private key", 1)
 			}
 
-			publicKey, err := utils.EncodePublicKey(accountKey.Pubkey())
+			publicKey, err := utils.EncodePublicKey(accountKey.Publickey())
 			if err != nil {
 				utils.Exit("Failed to encode public key", 1)
 			}

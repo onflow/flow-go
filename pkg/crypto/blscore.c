@@ -1,5 +1,5 @@
 
-#include "include.h"
+#include "bls_include.h"
 
 #define DOUBADD 0 
 #define SLIDW   1 
@@ -12,13 +12,16 @@
 #define G1MULT RELIC
 #define G2MULT RELIC
 
+ctx_t bls_ctx;
+
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* _relic_init_BLS12_381() { 
     // check Relic was compiled with the right conf 
     if (ALLOC != AUTO) return NULL;
 
-    // init relic core
-	if (core_init() != RLC_OK) return NULL;
+    // initialize relic core with a new context
+    core_set(&bls_ctx);
+    if (core_init() != RLC_OK) return NULL;
 
     // init BLS curve
     int ret = RLC_OK;
@@ -200,7 +203,7 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
 // Exponentiation of fixed g1 in G1
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
 void _G1scalarGenMult(ep_st* res, bn_st *expo) {
-#define GENERIC_POINT 1
+#define GENERIC_POINT 0
 #define FIXED_MULT    (GENERIC_POINT^1)
 
 #if GENERIC_POINT
@@ -219,7 +222,6 @@ void _G2scalarPointMult(ep2_st* res, ep2_st* p, bn_st *expo) {
     #else 
         ep2_mul_lwnaf(res, p, expo);
     #endif
-    
 }
 
 // Exponentiation of fixed g2 in G2
@@ -238,7 +240,6 @@ void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h);
-
     ep_free(&p);
 }
 
@@ -258,6 +259,7 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 	// check s is in G1
     if (!ep_is_valid(elemsG1[0]))
         return SIG_INVALID;
+    // check s is in G1
     ep_st inf;
     ep_new(&inf);
     // check s^order == infinity
@@ -302,13 +304,14 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
     int res = fp12_cmp(pair1, pair2);
 #endif
     fp12_free(&one);
-    ep_new(elemsG1[0]);
-    ep_new(elemsG1[1]);
-    ep2_new(elemsG2[0]);
-    ep2_new(elemsG2[1]);
+    ep_free(elemsG1[0]);
+    ep_free(elemsG1[1]);
+    ep2_free(elemsG2[0]);
+    ep2_free(elemsG2[1]);
     
     if (res == RLC_EQ && core_get()->code == RLC_OK) 
         return SIG_VALID;
     else 
         return SIG_INVALID;
 }
+

@@ -16,7 +16,7 @@ func (t *IntervalST) get(x *node, interval Interval) interface{} {
 	if x == nil {
 		return nil
 	}
-	switch cmp := interval.CompareTo(x.interval); {
+	switch cmp := interval.Compare(x.interval); {
 	case cmp < 0:
 		return t.get(x.left, interval)
 	case cmp > 0:
@@ -47,7 +47,7 @@ func (t *IntervalST) randomizedInsert(x *node, interval Interval, value interfac
 		return t.rootInsert(x, interval, value)
 	}
 
-	cmp := interval.CompareTo(x.interval)
+	cmp := interval.Compare(x.interval)
 	if cmp < 0 {
 		x.left = t.randomizedInsert(x.left, interval, value)
 	} else {
@@ -64,7 +64,7 @@ func (t *IntervalST) rootInsert(x *node, interval Interval, value interface{}) *
 		return newNode(interval, value)
 	}
 
-	cmp := interval.CompareTo(x.interval)
+	cmp := interval.Compare(x.interval)
 	if cmp < 0 {
 		x.left = t.rootInsert(x.left, interval, value)
 		x = x.rotR()
@@ -84,7 +84,7 @@ func (t *IntervalST) searchInterval(x *node, interval Interval) (*Interval, inte
 	for x != nil {
 		if x.interval.Intersects(interval) {
 			return &x.interval, x.value
-		} else if x.left == nil || x.left.max.CompareTo(interval.Min) < 0 {
+		} else if x.left == nil || x.left.max.Compare(interval.Min) < 0 {
 			x = x.right
 		} else {
 			x = x.left
@@ -101,7 +101,7 @@ func (t *IntervalST) search(x *node, p Position) (*Interval, interface{}) {
 	for x != nil {
 		if x.interval.Contains(p) {
 			return &x.interval, x.value
-		} else if x.left == nil || x.left.max.CompareTo(p) < 0 {
+		} else if x.left == nil || x.left.max.Compare(p) < 0 {
 			x = x.right
 		} else {
 			x = x.left

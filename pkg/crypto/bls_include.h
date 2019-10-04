@@ -1,21 +1,26 @@
-#ifndef _REL_INCLUDE_H
-#define _REL_INCLUDE_H
+#ifndef _REL_BLS_INCLUDE_H
+#define _REL_BLS_INCLUDE_H
 
 #include "relic.h"
-
-typedef uint8_t byte;
+#include "misc.h"
 
 // Fp length
-#define BITS_TO_BYTES(x) ((x+7)/8)
-#define FP_BITS  381
-#define FP_BYTES BITS_TO_BYTES(FP_BITS)
+
+#define Fp_BITS  381
+#define Fr_BITS  256  
+
+#define Fp_BYTES BITS_TO_BYTES(Fp_BITS)
+#define Fr_BYTES BITS_TO_BYTES(Fr_BITS)
+
+#define G1_BYTES (2*Fp_BYTES)
+#define G2_BYTES (4*Fp_BYTES)
 
 // Signature, Public key and Private key lengths 
-#define FULL_SIGNATURE_LEN  (2*FP_BYTES)
-#define FULL_PK_LEN         (4*FP_BYTES)
+#define FULL_SIGNATURE_LEN  G1_BYTES
+#define FULL_PK_LEN         G2_BYTES
 #define SIGNATURE_LEN       (FULL_SIGNATURE_LEN/(SERIALIZATION+1))
 #define PK_LEN              (FULL_PK_LEN/(SERIALIZATION+1))
-#define SK_BITS             256
+#define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
 #define SIG_VALID   1
@@ -35,17 +40,6 @@ typedef uint8_t byte;
 #define MEMBERSHIP_CHECK 0
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
-
-// Debug related functions
-void    _bytes_print(char*, byte*, int);
-void    _fp_print(char*, fp_st*);
-void    _bn_print(char*, bn_st*);
-void    _ep_print(char*, ep_st*);
-void    _ep2_print(char*, ep2_st*);
-void    _bn_randZr(bn_t, byte*, int);
-void    _G1scalarGenMult(ep_st*, bn_st*);
-ep_st*  _hashToG1(byte* data, int len);
-
 
 // bls core
 ctx_t*  _relic_init_BLS12_381();
