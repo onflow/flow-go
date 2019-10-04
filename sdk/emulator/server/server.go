@@ -19,7 +19,7 @@ import (
 
 // EmulatorServer is a local server that runs a Flow Emulator instance.
 //
-// The server wraps the Emulator Core Library with the Observation gRPC interface.
+// The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
 	blockchain *emulator.EmulatedBlockchain
 	grpcServer *grpc.Server
@@ -27,7 +27,7 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
-// Config for the EmulatorServer configuration settings.
+// Config is the configuration for an emulator server.
 type Config struct {
 	Port           int
 	HTTPPort       int
@@ -54,13 +54,13 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger:     logger,
 	}
 
-	address := server.blockchain.RootAccount().String()
+	address := server.blockchain.RootAccountAddress()
 	prKey, _ := utils.EncodePrivateKey(server.blockchain.RootKey())
 
 	logger.WithFields(log.Fields{
-		"address": address,
+		"address": address.Hex(),
 		"prKey":   prKey,
-	}).Infof("⚙️   Using root account 0x%s", address)
+	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
 	observe.RegisterObserveServiceServer(server.grpcServer, server)
 	return server
