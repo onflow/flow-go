@@ -142,11 +142,9 @@ var getValueFunctionType = sema.FunctionType{
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// key
-		&sema.OptionalType{
+		&sema.VariableSizedType{
 			Type: &sema.VariableSizedType{
-				Type: &sema.VariableSizedType{
-					Type: &sema.IntType{},
-				},
+				Type: &sema.IntType{},
 			},
 		},
 		// code
