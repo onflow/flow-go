@@ -332,7 +332,7 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	return nil
 }
 
-// verifyAccountSignature verifies a that an account signature is valid for the account and given message.
+// verifyAccountSignature verifies that an account signature is valid for the account and given message.
 //
 // If the signature is valid, this function returns the associated account key.
 //
