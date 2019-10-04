@@ -48,7 +48,7 @@ func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-// TODO: come up with better naming for this util
+// bytesArrayToString converts a slice of byte slices to a comma-separated list of uint8 integers.
 func bytesArrayToString(b [][]byte) string {
 	if b == nil || len(b) == 0 {
 		return "nil"
