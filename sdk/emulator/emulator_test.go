@@ -554,9 +554,8 @@ func TestCreateAccount(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
-	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
+	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	pubKeyB, _ := privateKeyB.Publickey().Encode()
 
 	updateAccountCodeScript := []byte(`
 		fun main(account: Account) {
