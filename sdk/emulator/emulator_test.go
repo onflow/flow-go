@@ -582,25 +582,52 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 	`)
 
-	tx2 := &types.Transaction{
-		Script:             updateAccountCodeScript,
-		ReferenceBlockHash: nil,
-		Nonce:              1,
-		ComputeLimit:       10,
-		PayerAccount:       accountAddressA,
-		ScriptAccounts:     []types.Address{accountAddressB},
-	}
+	t.Run("ValidSignature", func(t *testing.T) {
+		RegisterTestingT(t)
 
-	tx2.AddSignature(accountAddressA, privateKeyA)
-	tx2.AddSignature(accountAddressB, privateKeyB)
+		tx := &types.Transaction{
+			Script:             updateAccountCodeScript,
+			ReferenceBlockHash: nil,
+			Nonce:              1,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressB},
+		}
 
-	err = b.SubmitTransaction(tx2)
-	Expect(err).ToNot(HaveOccurred())
+		tx.AddSignature(accountAddressA, privateKeyA)
+		tx.AddSignature(accountAddressB, privateKeyB)
 
-	account, err = b.GetAccount(accountAddressB)
+		err = b.SubmitTransaction(tx)
+		Expect(err).ToNot(HaveOccurred())
 
-	Expect(err).ToNot(HaveOccurred())
-	Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
+		account, err = b.GetAccount(accountAddressB)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
+	})
+
+	t.Run("InvalidSignature", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		tx := &types.Transaction{
+			Script:             updateAccountCodeScript,
+			ReferenceBlockHash: nil,
+			Nonce:              1,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressB},
+		}
+
+		tx.AddSignature(accountAddressA, privateKeyA)
+
+		err = b.SubmitTransaction(tx)
+		Expect(err).To(HaveOccurred())
+
+		account, err = b.GetAccount(accountAddressB)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+	})
 }
 
 func TestImportAccountCode(t *testing.T) {
