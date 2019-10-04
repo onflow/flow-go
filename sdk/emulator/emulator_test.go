@@ -542,8 +542,8 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement(publicKeyA))
-	Expect(account.PublicKeys).To(ContainElement(publicKeyB))
+	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyA))
+	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyB))
 	Expect(account.Code).To(Equal(codeA))
 
 	publicKeyC := []byte{7, 8, 9}
@@ -570,7 +570,7 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.PublicKeys).To(ContainElement(publicKeyC))
+	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyC))
 	Expect(account.Code).To(Equal(codeB))
 }
 
