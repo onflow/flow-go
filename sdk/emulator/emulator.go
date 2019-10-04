@@ -308,7 +308,7 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]uint)
+	accountWeights := make(map[types.Address]uint32)
 
 	for _, accountSig := range tx.Signatures {
 		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())

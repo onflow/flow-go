@@ -3,5 +3,5 @@ package constants
 
 const (
 	// AccountKeyWeightThreshold is the total weight required for a set of keys to unlock an account.
-	AccountKeyWeightThreshold uint = 1000
+	AccountKeyWeightThreshold uint32 = 1000
 )

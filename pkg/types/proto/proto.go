@@ -115,7 +115,7 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
 
 	return types.AccountKey{
 		PublicKey: m.PublicKey,
-		Weight:    uint(m.Weight),
+		Weight:    m.Weight,
 	}, nil
 }
 
