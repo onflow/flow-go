@@ -132,7 +132,7 @@ func (i *RuntimeContext) Log(message string) {
 }
 
 func (i *RuntimeContext) GetSigningAccounts() []types.Address {
-	return i.Accounts
+	return i.signingAccounts
 }
 
 func (i *RuntimeContext) isValidSigningAccount(address types.Address) bool {
