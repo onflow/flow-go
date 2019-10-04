@@ -556,24 +556,9 @@ func TestCreateAccount(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	RegisterTestingT(t)
-
-	b := NewEmulatedBlockchain(DefaultOptions)
-
-	privateKeyA := b.RootKey()
-
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
-
-	accountAddressA := b.RootAccount()
-	accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
-	Expect(err).ToNot(HaveOccurred())
-
-	account, err := b.GetAccount(accountAddressB)
-
-	Expect(err).ToNot(HaveOccurred())
-	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 	updateAccountCodeScript := []byte(`
 		fun main(account: Account) {
@@ -584,6 +569,19 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	t.Run("ValidSignature", func(t *testing.T) {
 		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		privateKeyA := b.RootKey()
+
+		accountAddressA := b.RootAccount()
+		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		Expect(err).ToNot(HaveOccurred())
+
+		account, err := b.GetAccount(accountAddressB)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 		tx := &types.Transaction{
 			Script:             updateAccountCodeScript,
@@ -609,6 +607,19 @@ func TestUpdateAccountCode(t *testing.T) {
 	t.Run("InvalidSignature", func(t *testing.T) {
 		RegisterTestingT(t)
 
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		privateKeyA := b.RootKey()
+
+		accountAddressA := b.RootAccount()
+		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		Expect(err).ToNot(HaveOccurred())
+
+		account, err := b.GetAccount(accountAddressB)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
 		tx := &types.Transaction{
 			Script:             updateAccountCodeScript,
 			ReferenceBlockHash: nil,
@@ -625,6 +636,52 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		account, err = b.GetAccount(accountAddressB)
 
+		// code should not be updated
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+	})
+
+	t.Run("UnauthorizedAccount", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		privateKeyA := b.RootKey()
+
+		accountAddressA := b.RootAccount()
+		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		Expect(err).ToNot(HaveOccurred())
+
+		account, err := b.GetAccount(accountAddressB)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+
+		script := []byte(fmt.Sprintf(`
+			fun main(account: Account) {
+				let address = %s
+				let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
+				updateAccountCode(, code)
+			}
+		`, bytesToString(accountAddressB.Bytes())))
+
+		tx := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			Nonce:              1,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA},
+		}
+
+		tx.AddSignature(accountAddressA, privateKeyA)
+
+		err = b.SubmitTransaction(tx)
+		Expect(err).To(HaveOccurred())
+
+		account, err = b.GetAccount(accountAddressB)
+
+		// code should not be updated
 		Expect(err).ToNot(HaveOccurred())
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 	})
