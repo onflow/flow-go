@@ -37,8 +37,8 @@ type Interface interface {
 	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
-	// CreateAccount creates a new account with the given public key and code.
-	CreateAccount(publicKeys [][]byte, code []byte) (accountID []byte, err error)
+	// CreateAccount creates a new account with the given public keys and code.
+	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(accountID, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -141,11 +141,15 @@ var getValueFunctionType = sema.FunctionType{
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// key
+		// publicKeys
 		&sema.VariableSizedType{
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
+		},
+		// keyWeights
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
 		},
 		// code
 		&sema.OptionalType{
@@ -460,12 +464,17 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			publicKeys[i] = publicKey
 		}
 
-		code, err := toByteArray(arguments[1])
+		keyWeights, err := toIntArray(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
 		}
 
-		value, err := runtimeInterface.CreateAccount(publicKeys, code)
+		code, err := toByteArray(arguments[2])
+		if err != nil {
+			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
+		}
+
+		value, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
 		if err != nil {
 			panic(err)
 		}
@@ -552,6 +561,26 @@ func (r *interpreterRuntime) getOwnerControllerKey(
 }
 
 func toByteArray(value interpreter.Value) ([]byte, error) {
+	intArray, err := toIntArray(value)
+	if err != nil {
+		return nil, err
+	}
+
+	byteArray := make([]byte, len(intArray))
+
+	for i, intValue := range intArray {
+		// check 0 <= value < 256
+		if 0 >= intValue && intValue < 256 {
+			return nil, errors.New("array value is not in byte range (0-255)")
+		}
+
+		byteArray[i] = byte(intValue)
+	}
+
+	return byteArray, nil
+}
+
+func toIntArray(value interpreter.Value) ([]int, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
 		return nil, nil
@@ -567,18 +596,14 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(*array.Values))
+	result := make([]int, len(*array.Values))
 	for i, arrayValue := range *array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
 		}
-		// check 0 <= value < 256
-		if intValue.Int.Cmp(big.NewInt(-1)) != 1 || intValue.Int.Cmp(big.NewInt(256)) != -1 {
-			return nil, errors.New("array value is not in byte range (0-255)")
-		}
 
-		result[i] = byte(intValue.IntValue())
+		result[i] = intValue.IntValue()
 	}
 
 	return result, nil
