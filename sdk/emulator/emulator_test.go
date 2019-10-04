@@ -3,13 +3,13 @@ package emulator
 import (
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/accounts"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -37,15 +37,6 @@ const sampleCall = `
 		return getValue([1], [2], [3])
 	}
 `
-
-func generateCreateAccountScript(publicKeys [][]byte, code []byte) []byte {
-	script := fmt.Sprintf(`
-		fun main() {
-			createAccount(%s, %s)
-		}
-	`, bytesArrayToString(publicKeys), bytesToString(code))
-	return []byte(script)
-}
 
 func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
@@ -231,7 +222,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 	pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-	createAccountScript := generateCreateAccountScript([][]byte{pubKeyB}, nil)
+	createAccountScript := accounts.CreateAccount([][]byte{pubKeyB}, nil)
 
 	accountAddressA := b.RootAccount()
 	accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -246,6 +237,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	tx1.AddSignature(b.RootAccount(), b.RootKey())
 
 	err := b.SubmitTransaction(tx1)
+	t.Log(err)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -405,7 +397,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyB, _ := salg.GeneratePrKey([]byte("elephant ears"))
 		pubKeyB, _ := salg.EncodePubKey(privateKeyB.Pubkey())
 
-		createAccountScript := generateCreateAccountScript([][]byte{pubKeyB}, nil)
+		createAccountScript := accounts.CreateAccount([][]byte{pubKeyB}, nil)
 
 		accountAddressA := b.RootAccount()
 		accountAddressB := types.HexToAddress("0000000000000000000000000000000000000002")
@@ -533,7 +525,7 @@ func TestCreateAccount(t *testing.T) {
 	publicKeyB := []byte{4, 5, 6}
 	codeA := []byte("fun main() {}")
 
-	createAccountScriptA := generateCreateAccountScript([][]byte{publicKeyA, publicKeyB}, codeA)
+	createAccountScriptA := accounts.CreateAccount([][]byte{publicKeyA, publicKeyB}, codeA)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -561,7 +553,7 @@ func TestCreateAccount(t *testing.T) {
 	publicKeyC := []byte{7, 8, 9}
 	codeB := []byte("fun main() {}")
 
-	createAccountScriptB := generateCreateAccountScript([][]byte{publicKeyC}, codeB)
+	createAccountScriptB := accounts.CreateAccount([][]byte{publicKeyC}, codeB)
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptB,
@@ -591,7 +583,7 @@ func TestUpdateAccountCode(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScript := generateCreateAccountScript([][]byte{[]byte{1}, []byte{2}, []byte{3}}, []byte{4, 5, 6})
+	createAccountScript := accounts.CreateAccount([][]byte{[]byte{1}, []byte{2}, []byte{3}}, []byte{4, 5, 6})
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -646,7 +638,7 @@ func TestImportAccountCode(t *testing.T) {
 	salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
 	pubKey, _ := salg.EncodePubKey(b.RootKey().Pubkey())
 
-	createAccountScript := generateCreateAccountScript([][]byte{pubKey}, accountScript)
+	createAccountScript := accounts.CreateAccount([][]byte{pubKey}, accountScript)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -823,18 +815,4 @@ func TestRuntimeLogger(t *testing.T) {
 	`))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(loggedMessages).To(Equal([]string{`"elephant ears"`}))
-}
-
-// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
-func bytesToString(b []byte) string {
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
-}
-
-// TODO: maybe consolidate this util with the one in sdk/accounts?
-func bytesArrayToString(b [][]byte) string {
-	if b == nil || len(b) == 0 {
-		return "nil"
-	}
-
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
