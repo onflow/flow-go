@@ -3,172 +3,150 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckArrayIndexingWithInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [0, 3]
           z[0]
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [[0, 1], [2, 3]]
           z[0][1]
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [0, 3]
           z[true]
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+	assert.IsType(t, &sema.NotIndexingTypeError{}, errs[0])
 }
 
 func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(): Int {
           return true[0]
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
+	assert.IsType(t, &sema.NotIndexableTypeError{}, errs[0])
 }
 
 func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(): Int {
           return 2[0]
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotIndexableTypeError{}))
+	assert.IsType(t, &sema.NotIndexableTypeError{}, errs[0])
 }
 
 func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [0, 3]
           z[true] = 2
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+	assert.IsType(t, &sema.NotIndexingTypeError{}, errs[0])
 }
 
 func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [0, 3]
           z[0] = 2
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = [0, 3]
           z[0] = true
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           let z = "abc"
           z[true]
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotIndexingTypeError{}))
+	assert.IsType(t, &sema.NotIndexingTypeError{}, errs[0])
 }
 
 func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           x[0]
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           x[0] = 2
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }

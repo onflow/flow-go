@@ -3,14 +3,13 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckAssertWithoutMessage(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheckWithExtra(
+	_, err := ParseAndCheckWithExtra(t,
 		`
             fun test() {
                 assert(1 == 2)
@@ -23,14 +22,12 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 		nil,
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckAssertWithMessage(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheckWithExtra(
+	_, err := ParseAndCheckWithExtra(t,
 		`
             fun test() {
                 assert(1 == 2, message: "test message")
@@ -43,6 +40,5 @@ func TestCheckAssertWithMessage(t *testing.T) {
 		nil,
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }

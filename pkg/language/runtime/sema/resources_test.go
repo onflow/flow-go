@@ -2,13 +2,11 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestResources_Add(t *testing.T) {
-	RegisterTestingT(t)
-
 	resources := &Resources{}
 
 	varX := &Variable{
@@ -26,12 +24,9 @@ func TestResources_Add(t *testing.T) {
 		Type:       &IntType{},
 	}
 
-	Expect(resources.Get(varX).Invalidations.All()).
-		To(BeEmpty())
-	Expect(resources.Get(varY).Invalidations.All()).
-		To(BeEmpty())
-	Expect(resources.Get(varZ).Invalidations.All()).
-		To(BeEmpty())
+	assert.Empty(t, resources.Get(varX).Invalidations.All())
+	assert.Empty(t, resources.Get(varY).Invalidations.All())
+	assert.Empty(t, resources.Get(varZ).Invalidations.All())
 
 	// add invalidation for X
 
@@ -39,16 +34,16 @@ func TestResources_Add(t *testing.T) {
 		Pos: ast.Position{Line: 1, Column: 1},
 	})
 
-	Expect(resources.Get(varX).Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.ElementsMatch(t,
+		resources.Get(varX).Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-		))
-	Expect(resources.Get(varY).Invalidations.All()).
-		To(BeEmpty())
-	Expect(resources.Get(varZ).Invalidations.All()).
-		To(BeEmpty())
+		},
+	)
+	assert.Empty(t, resources.Get(varY).Invalidations.All())
+	assert.Empty(t, resources.Get(varZ).Invalidations.All())
 
 	// add invalidation for X
 
@@ -56,21 +51,21 @@ func TestResources_Add(t *testing.T) {
 		Pos: ast.Position{Line: 2, Column: 2},
 	})
 
-	Expect(resources.Get(varX).Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.ElementsMatch(t,
+		resources.Get(varX).Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			ResourceInvalidation{
+			{
 
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
-		))
-	Expect(resources.Get(varY).Invalidations.All()).
-		To(BeEmpty())
-	Expect(resources.Get(varZ).Invalidations.All()).
-		To(BeEmpty())
+		},
+	)
+	assert.Empty(t, resources.Get(varY).Invalidations.All())
+	assert.Empty(t, resources.Get(varZ).Invalidations.All())
 
 	// add invalidation for Y
 
@@ -78,27 +73,30 @@ func TestResources_Add(t *testing.T) {
 		Pos: ast.Position{Line: 3, Column: 3},
 	})
 
-	Expect(resources.Get(varX).Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.ElementsMatch(t,
+		resources.Get(varX).Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			ResourceInvalidation{
+
+			{
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
-		))
-	Expect(resources.Get(varY).Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+		},
+	)
+	assert.ElementsMatch(t,
+		resources.Get(varY).Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 3, Column: 3},
 			},
-		))
-	Expect(resources.Get(varZ).Invalidations.All()).
-		To(BeEmpty())
+		},
+	)
+	assert.Empty(t, resources.Get(varZ).Invalidations.All())
 }
 
 func TestResourceResources_FirstRest(t *testing.T) {
-	RegisterTestingT(t)
 
 	resources := &Resources{}
 
@@ -135,29 +133,31 @@ func TestResourceResources_FirstRest(t *testing.T) {
 		result[variable] = resourceInfo.Invalidations.All()
 	}
 
-	Expect(result).
-		To(HaveLen(2))
+	assert.Len(t, result, 2)
 
-	Expect(result[varX]).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.ElementsMatch(t,
+		result[varX],
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
-		))
+		},
+	)
 
-	Expect(result[varY]).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.ElementsMatch(t,
+		result[varY],
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 3, Column: 3},
 			},
-		))
+		},
+	)
 }
 
 func TestResources_MergeBranches(t *testing.T) {
-	RegisterTestingT(t)
 
 	resourcesThen := &Resources{}
 	resourcesElse := &Resources{}
@@ -207,38 +207,41 @@ func TestResources_MergeBranches(t *testing.T) {
 	)
 
 	varXInfo := resources.Get(varX)
-	Expect(varXInfo.DefinitivelyInvalidated).
-		To(BeTrue())
-	Expect(varXInfo.Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.True(t, varXInfo.DefinitivelyInvalidated)
+	assert.ElementsMatch(t,
+		varXInfo.Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 1, Column: 1},
 			},
-			ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 3, Column: 3},
 			},
-		))
+		},
+	)
 
 	varYInfo := resources.Get(varY)
-	Expect(varYInfo.DefinitivelyInvalidated).
-		To(BeTrue())
-	Expect(varYInfo.Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.True(t, varYInfo.DefinitivelyInvalidated)
+	assert.ElementsMatch(t,
+		varYInfo.Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 0, Column: 0},
 			},
-			ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 2, Column: 2},
 			},
-		))
+		},
+	)
 
 	varZInfo := resources.Get(varZ)
-	Expect(varZInfo.DefinitivelyInvalidated).
-		To(BeFalse())
-	Expect(varZInfo.Invalidations.All()).
-		To(ConsistOf(
-			ResourceInvalidation{
+	assert.False(t, varZInfo.DefinitivelyInvalidated)
+	assert.ElementsMatch(t,
+		varZInfo.Invalidations.All(),
+		[]ResourceInvalidation{
+			{
 				Pos: ast.Position{Line: 4, Column: 4},
 			},
-		))
+		},
+	)
 }

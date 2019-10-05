@@ -4,7 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -12,15 +12,13 @@ import (
 //  (e.g. conformances, conditional casting expression)
 
 func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         let x = 1
         var y = x
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -48,24 +46,26 @@ func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
 		},
 	}
 
-	ms := make([]interface{}, len(matchers))
-	for i := range matchers {
-		ms[i] = matchers[i]
+nextMatcher:
+	for _, matcher := range matchers {
+		for _, occurrence := range occurrences {
+			if matcher.Match(occurrence) {
+				continue nextMatcher
+			}
+		}
+
+		assert.Fail(t, "failed to find occurrence", "matcher: %#+v", matcher)
 	}
 
-	Expect(occurrences).
-		To(ConsistOf(ms...))
-
 	for _, matcher := range matchers {
-		Expect(checker.Occurrences.Find(matcher.StartPos)).To(Not(BeNil()))
-		Expect(checker.Occurrences.Find(matcher.EndPos)).To(Not(BeNil()))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.StartPos))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.EndPos))
 	}
 }
 
 func TestCheckOccurrencesFunction(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
 		fun f1(paramX: Int, paramY: Bool) {
 		   let x = 1
 		   var y: Int? = x
@@ -81,8 +81,7 @@ func TestCheckOccurrencesFunction(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -178,19 +177,26 @@ func TestCheckOccurrencesFunction(t *testing.T) {
 		ms[i] = matchers[i]
 	}
 
-	Expect(occurrences).
-		To(ConsistOf(ms...))
+nextMatcher:
+	for _, matcher := range matchers {
+		for _, occurrence := range occurrences {
+			if matcher.Match(occurrence) {
+				continue nextMatcher
+			}
+		}
+
+		assert.Fail(t, "failed to find occurrence", "matcher: %#+v", matcher)
+	}
 
 	for _, matcher := range matchers {
-		Expect(checker.Occurrences.Find(matcher.StartPos)).To(Not(BeNil()))
-		Expect(checker.Occurrences.Find(matcher.EndPos)).To(Not(BeNil()))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.StartPos))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.EndPos))
 	}
 }
 
 func TestCheckOccurrencesStructAndInterface(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
 		struct interface I1 {}
 
 	    struct S1: I1 {
@@ -207,8 +213,7 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 	    }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -298,11 +303,19 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 		ms[i] = matchers[i]
 	}
 
-	Expect(occurrences).
-		To(ConsistOf(ms...))
+nextMatcher:
+	for _, matcher := range matchers {
+		for _, occurrence := range occurrences {
+			if matcher.Match(occurrence) {
+				continue nextMatcher
+			}
+		}
+
+		assert.Fail(t, "failed to find occurrence", "matcher: %#+v", matcher)
+	}
 
 	for _, matcher := range matchers {
-		Expect(checker.Occurrences.Find(matcher.StartPos)).To(Not(BeNil()))
-		Expect(checker.Occurrences.Find(matcher.EndPos)).To(Not(BeNil()))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.StartPos))
+		assert.NotNil(t, checker.Occurrences.Find(matcher.EndPos))
 	}
 }

@@ -4,72 +4,60 @@ import (
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
 )
 
 func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         let x: Int8 = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.Int8Type{}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.Int8Type{})
 }
 
 func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         let x: Int8? = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.OptionalType{Type: &sema.Int8Type{}}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.OptionalType{Type: &sema.Int8Type{}})
 }
 
 func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         var x: Int8 = 1
         fun test() {
             x = 2
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.Int8Type{}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.Int8Type{})
 }
 
 func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         var x: Int8? = 1
         fun test() {
             x = 2
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIntegerLiteralRanges(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, ty := range []sema.Type{
 		&sema.Int8Type{},
@@ -82,7 +70,6 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 		&sema.UInt64Type{},
 	} {
 		t.Run(ty.String(), func(t *testing.T) {
-			RegisterTestingT(t)
 
 			code := fmt.Sprintf(`
                 let min: %s = %s
@@ -94,16 +81,14 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 				ty.(sema.Ranged).Max(),
 			)
 
-			_, err := ParseAndCheck(code)
+			_, err := ParseAndCheck(t, code)
 
-			Expect(err).
-				To(Not(HaveOccurred()))
+			assert.Nil(t, err)
 		})
 	}
 }
 
 func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, ty := range []sema.Type{
 		&sema.Int8Type{},
@@ -116,35 +101,31 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 		&sema.UInt64Type{},
 	} {
 		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
-			RegisterTestingT(t)
 
-			_, err := ParseAndCheck(fmt.Sprintf(`
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
                 let minMinusOne: %s = %s
 	        `,
 				ty.String(),
 				big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1)),
 			))
 
-			errs := ExpectCheckerErrors(err, 1)
+			errs := ExpectCheckerErrors(t, err, 1)
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+			assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
 		})
 
 		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
-			RegisterTestingT(t)
 
-			_, err := ParseAndCheck(fmt.Sprintf(`
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
                 let maxPlusOne: %s = %s
 	        `,
 				ty.String(),
 				big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1)),
 			))
 
-			errs := ExpectCheckerErrors(err, 1)
+			errs := ExpectCheckerErrors(t, err, 1)
 
-			Expect(errs[0]).
-				To(BeAssignableToTypeOf(&sema.InvalidIntegerLiteralRangeError{}))
+			assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
 		})
 	}
 }
@@ -153,66 +134,56 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 // Integer literal value fits range can't be checked when target is Never
 //
 func TestCheckInvalidIntegerLiteralWithNeverReturnType(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test(): Never {
             return 1
         }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test(_ x: Int8) {}
         let x = test(1)
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test(_ x: Int8?) {}
         let x = test(1)
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test(): Int8 {
             return 1
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test(): Int8? {
             return 1
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }

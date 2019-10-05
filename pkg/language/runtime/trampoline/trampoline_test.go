@@ -1,14 +1,12 @@
 package trampoline
 
 import (
+	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 func TestFlatMapDone(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline := Done{23}.
 		FlatMap(func(value interface{}) Trampoline {
@@ -16,12 +14,10 @@ func TestFlatMapDone(t *testing.T) {
 			return Done{number * 42}
 		})
 
-	Expect(Run(trampoline)).
-		To(Equal(23 * 42))
+	assert.Equal(t, Run(trampoline), 23*42)
 }
 
 func TestFlatMapMore(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline :=
 		More(func() Trampoline { return Done{23} }).
@@ -30,12 +26,10 @@ func TestFlatMapMore(t *testing.T) {
 				return Done{number * 42}
 			})
 
-	Expect(Run(trampoline)).
-		To(Equal(23 * 42))
+	assert.Equal(t, Run(trampoline), 23*42)
 }
 
 func TestFlatMap2(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline :=
 		More(func() Trampoline { return Done{23} }).
@@ -50,12 +44,10 @@ func TestFlatMap2(t *testing.T) {
 				return Done{str + "42"}
 			})
 
-	Expect(Run(trampoline)).
-		To(Equal("2342"))
+	assert.Equal(t, Run(trampoline), "2342")
 }
 
 func TestFlatMap3(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline :=
 		More(func() Trampoline {
@@ -70,12 +62,10 @@ func TestFlatMap3(t *testing.T) {
 				return Done{strconv.Itoa(n)}
 			})
 
-	Expect(Run(trampoline)).
-		To(Equal(strconv.Itoa(23 * 42)))
+	assert.Equal(t, Run(trampoline), strconv.Itoa(23*42))
 }
 
 func TestMap(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline :=
 		More(func() Trampoline { return Done{23} }).
@@ -84,12 +74,10 @@ func TestMap(t *testing.T) {
 				return n * 42
 			})
 
-	Expect(Run(trampoline)).
-		To(Equal(23 * 42))
+	assert.Equal(t, Run(trampoline), 23*42)
 }
 
 func TestMap2(t *testing.T) {
-	RegisterTestingT(t)
 
 	trampoline :=
 		Done{23}.
@@ -98,12 +86,10 @@ func TestMap2(t *testing.T) {
 				return n * 42
 			})
 
-	Expect(Run(trampoline)).
-		To(Equal(23 * 42))
+	assert.Equal(t, Run(trampoline), 23*42)
 }
 
 func TestEvenOdd(t *testing.T) {
-	RegisterTestingT(t)
 
 	var even, odd func(n interface{}) Trampoline
 
@@ -129,21 +115,16 @@ func TestEvenOdd(t *testing.T) {
 		})
 	}
 
-	Expect(Run(odd(99999))).
-		To(BeTrue())
+	assert.True(t, Run(odd(99999)).(bool))
 
-	Expect(Run(even(100000))).
-		To(BeTrue())
+	assert.True(t, Run(even(100000)).(bool))
 
-	Expect(Run(odd(100000))).
-		To(BeFalse())
+	assert.False(t, Run(odd(100000)).(bool))
 
-	Expect(Run(even(99999))).
-		To(BeFalse())
+	assert.False(t, Run(even(99999)).(bool))
 }
 
 func TestAckermann(t *testing.T) {
-	RegisterTestingT(t)
 
 	// The recursive implementation of the Ackermann function
 	// results in a stack overflow even for small inputs:
@@ -187,15 +168,11 @@ func TestAckermann(t *testing.T) {
 		return first.FlatMap(second)
 	}
 
-	Expect(Run(ackermann(1, 2))).
-		To(Equal(4))
+	assert.Equal(t, Run(ackermann(1, 2)), 4)
 
-	Expect(Run(ackermann(3, 2))).
-		To(Equal(29))
+	assert.Equal(t, Run(ackermann(3, 2)), 29)
 
-	Expect(Run(ackermann(3, 4))).
-		To(Equal(125))
+	assert.Equal(t, Run(ackermann(3, 4)), 125)
 
-	Expect(Run(ackermann(3, 7))).
-		To(Equal(1021))
+	assert.Equal(t, Run(ackermann(3, 7)), 1021)
 }

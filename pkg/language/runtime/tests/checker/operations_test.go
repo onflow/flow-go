@@ -5,63 +5,54 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/types"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckInvalidUnaryBooleanNegationOfInteger(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let a = !1
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+	assert.IsType(t, &sema.InvalidUnaryOperandError{}, errs[0])
 }
 
 func TestCheckUnaryBooleanNegation(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let a = !true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let a = -true
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.InvalidUnaryOperandError{}))
+	assert.IsType(t, &sema.InvalidUnaryOperandError{}, errs[0])
 }
 
 func TestCheckUnaryIntegerNegation(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let a = -1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 type operationTest struct {
-	ty          sema.Type
-	left, right string
-	matchers    []types.GomegaMatcher
+	ty             sema.Type
+	left, right    string
+	expectedErrors []error
 }
 
 type operationTests struct {
@@ -77,18 +68,18 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.IntType{}, "1", "2", nil},
-				{&sema.IntType{}, "true", "2", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
-					BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+				{&sema.IntType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+					&sema.TypeMismatchError{},
 				}},
-				{&sema.IntType{}, "1", "true", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.IntType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
 				}},
-				{&sema.IntType{}, "true", "false", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
-					BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+				{&sema.IntType{}, "true", "false", []error{
+					&sema.InvalidBinaryOperandsError{},
+					&sema.TypeMismatchError{},
 				}},
 			},
 		},
@@ -98,16 +89,16 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.BoolType{}, "1", "2", nil},
-				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
 				}},
-				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
 				}},
-				{&sema.BoolType{}, "true", "false", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "true", "false", []error{
+					&sema.InvalidBinaryOperandsError{},
 				}},
 			},
 		},
@@ -117,14 +108,14 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.BoolType{}, "true", "false", nil},
-				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+				{&sema.BoolType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandError{},
 				}},
-				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
+				{&sema.BoolType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
 				}},
-				{&sema.BoolType{}, "1", "2", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "1", "2", []error{
+					&sema.InvalidBinaryOperandsError{},
 				}},
 			},
 		},
@@ -135,11 +126,11 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			tests: []operationTest{
 				{&sema.BoolType{}, "true", "false", nil},
 				{&sema.BoolType{}, "1", "2", nil},
-				{&sema.BoolType{}, "true", "2", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandsError{},
 				}},
-				{&sema.BoolType{}, "1", "true", []types.GomegaMatcher{
-					BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+				{&sema.BoolType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandsError{},
 				}},
 				{&sema.BoolType{}, `"test"`, `"test"`, nil},
 			},
@@ -150,20 +141,18 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
 				t.Run("", func(t *testing.T) {
-					RegisterTestingT(t)
 
-					_, err := ParseAndCheck(
+					_, err := ParseAndCheck(t,
 						fmt.Sprintf(
 							`fun test(): %s { return %s %s %s }`,
 							test.ty, test.left, operation.Symbol(), test.right,
 						),
 					)
 
-					errs := ExpectCheckerErrors(err, len(test.matchers))
+					errs := ExpectCheckerErrors(t, err, len(test.expectedErrors))
 
-					for i, matcher := range test.matchers {
-						Expect(errs[i]).
-							To(matcher)
+					for i, expectedErr := range test.expectedErrors {
+						assert.IsType(t, expectedErr, errs[i])
 					}
 				})
 			}
@@ -177,18 +166,18 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 		{&sema.StringType{}, `""`, `"def"`, nil},
 		{&sema.StringType{}, `"abc"`, `""`, nil},
 		{&sema.StringType{}, `""`, `""`, nil},
-		{&sema.StringType{}, "1", `"def"`, []types.GomegaMatcher{
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
-			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		{&sema.StringType{}, "1", `"def"`, []error{
+			&sema.InvalidBinaryOperandError{},
+			&sema.InvalidBinaryOperandsError{},
+			&sema.TypeMismatchError{},
 		}},
-		{&sema.StringType{}, `"abc"`, "2", []types.GomegaMatcher{
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		{&sema.StringType{}, `"abc"`, "2", []error{
+			&sema.InvalidBinaryOperandError{},
+			&sema.InvalidBinaryOperandsError{},
 		}},
-		{&sema.StringType{}, "1", "2", []types.GomegaMatcher{
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
-			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		{&sema.StringType{}, "1", "2", []error{
+			&sema.InvalidBinaryOperandsError{},
+			&sema.TypeMismatchError{},
 		}},
 
 		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[3, 4]", nil},
@@ -196,32 +185,31 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "[]", nil},
 		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[3, 4]", nil},
 		// {&sema.VariableSizedType{Type: &sema.IntType{}}, "[]", "[]", nil},
-		{&sema.VariableSizedType{Type: &sema.IntType{}}, "1", "[3, 4]", []types.GomegaMatcher{
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
-			BeAssignableToTypeOf(&sema.TypeMismatchError{}),
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "1", "[3, 4]", []error{
+			&sema.InvalidBinaryOperandError{},
+			&sema.InvalidBinaryOperandsError{},
+			&sema.TypeMismatchError{},
 		}},
-		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "2", []types.GomegaMatcher{
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandError{}),
-			BeAssignableToTypeOf(&sema.InvalidBinaryOperandsError{}),
+		{&sema.VariableSizedType{Type: &sema.IntType{}}, "[1, 2]", "2", []error{
+			&sema.InvalidBinaryOperandError{},
+			&sema.InvalidBinaryOperandsError{},
 		}},
 	}
 
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			RegisterTestingT(t)
 
-			_, err := ParseAndCheck(
+			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`fun test(): %s { return %s %s %s }`,
 					test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
 				),
 			)
 
-			errs := ExpectCheckerErrors(err, len(test.matchers))
+			errs := ExpectCheckerErrors(t, err, len(test.expectedErrors))
 
-			for i, matcher := range test.matchers {
-				Expect(errs[i]).To(matcher)
+			for i, expectedErr := range test.expectedErrors {
+				assert.IsType(t, expectedErr, errs[i])
 			}
 		})
 	}

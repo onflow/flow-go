@@ -3,60 +3,52 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckFailableDowncastingAny(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
       let x: Any = 1
       let y: Int? = x as? Int
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.Elaboration.FailableDowncastingTypes).
-		To(Not(BeEmpty()))
+	assert.NotEmpty(t, checker.Elaboration.FailableDowncastingTypes)
 }
 
 func TestCheckInvalidFailableDowncastingAny(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Any = 1
       let y: Bool? = x as? Int
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 // TODO: add support for statically known casts
 func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Int = 1
       let y: Int? = x as? Int
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
 // TODO: add support for interfaces
 // TODO: add test this is *INVALID* for resources
 func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       struct interface I {}
 
       struct S: I {}
@@ -65,61 +57,51 @@ func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
       let y: S? = x as? S
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
 func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Any? = 1
       let y: Int?? = x as? Int?
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
 func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: [Any] = [1]
       let y: [Int]? = x as? [Int]
     `)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedTypeError{}))
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
 func TestCheckOptionalAnyFailableDowncastingNil(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
       let x: Any? = nil
       let y = x ?? 23
       let z = y as? Int
     `)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.OptionalType{Type: &sema.AnyType{}}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.OptionalType{Type: &sema.AnyType{}})
 
 	// TODO: record result type of conditional and box to any in interpreter
-	Expect(checker.GlobalValues["y"].Type).
-		To(Equal(&sema.AnyType{}))
+	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.AnyType{})
 
-	Expect(checker.GlobalValues["z"].Type).
-		To(Equal(&sema.OptionalType{Type: &sema.IntType{}}))
+	assert.Equal(t, checker.GlobalValues["z"].Type, &sema.OptionalType{Type: &sema.IntType{}})
 }

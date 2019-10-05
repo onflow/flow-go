@@ -3,53 +3,50 @@ package activations
 import (
 	"testing"
 
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestActivations(t *testing.T) {
-	RegisterTestingT(t)
-
 	activations := &Activations{}
 
 	activations.Set("a", 1)
 
-	Expect(activations.Find("a")).To(Equal(1))
-	Expect(activations.Find("b")).To(BeNil())
+	assert.Equal(t, activations.Find("a"), 1)
+	assert.Nil(t, activations.Find("b"))
 
 	activations.PushCurrent()
 
 	activations.Set("a", 2)
 	activations.Set("b", 3)
 
-	Expect(activations.Find("a")).To(Equal(2))
-	Expect(activations.Find("b")).To(Equal(3))
-	Expect(activations.Find("c")).To(BeNil())
+	assert.Equal(t, activations.Find("a"), 2)
+	assert.Equal(t, activations.Find("b"), 3)
+	assert.Nil(t, activations.Find("c"))
 
 	activations.PushCurrent()
 
 	activations.Set("a", 5)
 	activations.Set("c", 4)
 
-	Expect(activations.Find("a")).To(Equal(5))
-	Expect(activations.Find("b")).To(Equal(3))
-	Expect(activations.Find("c")).To(Equal(4))
+	assert.Equal(t, activations.Find("a"), 5)
+	assert.Equal(t, activations.Find("b"), 3)
+	assert.Equal(t, activations.Find("c"), 4)
 
 	activations.Pop()
 
-	Expect(activations.Find("a")).To(Equal(2))
-	Expect(activations.Find("b")).To(Equal(3))
-	Expect(activations.Find("c")).To(BeNil())
+	assert.Equal(t, activations.Find("a"), 2)
+	assert.Equal(t, activations.Find("b"), 3)
+	assert.Nil(t, activations.Find("c"))
 
 	activations.Pop()
 
-	Expect(activations.Find("a")).To(Equal(1))
-	Expect(activations.Find("b")).To(BeNil())
-	Expect(activations.Find("c")).To(BeNil())
+	assert.Equal(t, activations.Find("a"), 1)
+	assert.Nil(t, activations.Find("b"))
+	assert.Nil(t, activations.Find("c"))
 
 	activations.Pop()
 
-	Expect(activations.Find("a")).To(BeNil())
-	Expect(activations.Find("b")).To(BeNil())
-	Expect(activations.Find("c")).To(BeNil())
-
+	assert.Nil(t, activations.Find("a"))
+	assert.Nil(t, activations.Find("b"))
+	assert.Nil(t, activations.Find("c"))
 }
