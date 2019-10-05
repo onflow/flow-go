@@ -19,18 +19,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		return member
 	}
 
-	expressionType := expression.Expression.Accept(checker).(Type)
+	accessedExpression := expression.Expression
 
-	if expressionType.IsResourceType() {
-		if _, isIdentifier := expression.Expression.(*ast.IdentifierExpression); !isIdentifier {
-			checker.report(
-				&ResourceLossError{
-					StartPos: expression.Expression.StartPosition(),
-					EndPos:   expression.Expression.EndPosition(),
-				},
-			)
-		}
-	}
+	expressionType := accessedExpression.Accept(checker).(Type)
+
+	checker.checkNonIdentifierResourceLoss(expressionType, accessedExpression)
 
 	origins := checker.memberOrigins[expressionType]
 
