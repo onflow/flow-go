@@ -511,6 +511,9 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 
 		for _, extractedExpression := range extractedExpressions {
 
+			// TODO: update interpreter.Checker.Elaboration
+			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
+
 			beforeStatements = append(beforeStatements,
 				&ast.VariableDeclaration{
 					Identifier: extractedExpression.Identifier,
@@ -1519,8 +1522,10 @@ func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.Ini
 }
 
 func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
-	result := value.Copy()
-	return interpreter.box(result, valueType, targetType)
+	if valueType == nil || !valueType.IsResourceType() {
+		value = value.Copy()
+	}
+	return interpreter.box(value, valueType, targetType)
 }
 
 // box boxes a value in optionals and any value, if necessary
