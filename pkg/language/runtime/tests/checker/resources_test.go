@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
+	"sort"
 	"testing"
 )
 
@@ -2249,4 +2250,124 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+}
+
+func TestCheckResourceNesting(t *testing.T) {
+
+	interfacePossibilities := []bool{true, false}
+
+	for _, firstCompositeKind := range common.CompositeKinds {
+		for _, firstIsInterface := range interfacePossibilities {
+
+			firstInterfaceKeyword := ""
+			if firstIsInterface {
+				firstInterfaceKeyword = "interface"
+			}
+
+			for _, secondCompositeKind := range common.CompositeKinds {
+				for _, secondIsInterface := range interfacePossibilities {
+
+					secondInterfaceKeyword := ""
+					if secondIsInterface {
+						secondInterfaceKeyword = "interface"
+					}
+
+					testName := fmt.Sprintf(
+						"%s %s/%s %s",
+						firstCompositeKind.Keyword(),
+						firstInterfaceKeyword,
+						secondCompositeKind.Keyword(),
+						secondInterfaceKeyword,
+					)
+
+					t.Run(testName, func(t *testing.T) {
+
+						// `secondCompositeKind` is the container composite kind.
+						// If it is concrete, i.e. not an interface, it needs an initializer.
+
+						initializer := ""
+						if !secondIsInterface {
+							initializer = fmt.Sprintf(
+								`
+                                  init(t: %[1]sT) {
+                                      self.t %[2]s t
+                                  }
+                                `,
+								firstCompositeKind.Annotation(),
+								firstCompositeKind.TransferOperator(),
+							)
+						}
+
+						_, err := ParseAndCheck(t, fmt.Sprintf(`
+                              %[1]s %[2]s T {}
+
+                              %[3]s %[4]s U {
+                                  let t: %[5]sT
+                                  %[6]s
+                              }
+	                        `,
+							firstCompositeKind.Keyword(),
+							firstInterfaceKeyword,
+							secondCompositeKind.Keyword(),
+							secondInterfaceKeyword,
+							firstCompositeKind.Annotation(),
+							initializer,
+						))
+
+						// TODO: add support for non-structure declarations
+
+						expectedErrorCount := 0
+						if firstCompositeKind != common.CompositeKindStructure {
+							expectedErrorCount += 1
+						}
+						if secondCompositeKind != common.CompositeKindStructure {
+							expectedErrorCount += 1
+						}
+
+						// `firstCompositeKind` is the nested composite kind.
+						// `secondCompositeKind` is the container composite kind.
+						// Resource composites can only be nested in resource composite kinds.
+
+						expectInvalidResourceNestingErrorCount := 0
+
+						if firstCompositeKind == common.CompositeKindResource &&
+							secondCompositeKind != common.CompositeKindResource {
+
+							expectInvalidResourceNestingErrorCount = 1
+						}
+
+						if expectedErrorCount == 0 {
+							assert.Nil(t, err)
+						} else {
+
+							errs := ExpectCheckerErrors(t,
+								err,
+								expectedErrorCount+expectInvalidResourceNestingErrorCount,
+							)
+
+							sort.Slice(errs, func(i, j int) bool {
+								_, firstIsInvalidResourceFieldError :=
+									errs[i].(*sema.InvalidResourceFieldError)
+
+								_, secondIsUnsupportedDeclarationError :=
+									errs[j].(*sema.UnsupportedDeclarationError)
+
+								return !(firstIsInvalidResourceFieldError &&
+									secondIsUnsupportedDeclarationError)
+							})
+
+							i := 0
+							for ; i < expectedErrorCount; i += 1 {
+								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[i])
+							}
+
+							for ; i < expectInvalidResourceNestingErrorCount; i += 1 {
+								assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[i])
+							}
+						}
+					})
+				}
+			}
+		}
+	}
 }

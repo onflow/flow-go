@@ -1515,3 +1515,25 @@ func (e *ResourceCapturingError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// InvalidResourceFieldError
+
+type InvalidResourceFieldError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *InvalidResourceFieldError) Error() string {
+	return fmt.Sprintf("invalid resource field in non-resource: `%s`", e.Name)
+}
+
+func (*InvalidResourceFieldError) isSemanticError() {}
+
+func (e *InvalidResourceFieldError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidResourceFieldError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}

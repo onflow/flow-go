@@ -49,6 +49,12 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 	)
 
+	checker.checkResourceFieldNesting(
+		declaration.Members.FieldsByIdentifier(),
+		interfaceType.Members,
+		interfaceType.CompositeKind,
+	)
+
 	// TODO: support non-structure interfaces, such as contracts and resources
 
 	if declaration.CompositeKind != common.CompositeKindStructure {
