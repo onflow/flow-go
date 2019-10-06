@@ -3401,29 +3401,6 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 	}
 }
 
-func TestInterpretInterfaceTypeAsValue(t *testing.T) {
-
-	for _, kind := range common.CompositeKinds {
-
-		// TODO: add support for non-structure declarations
-
-		if kind != common.CompositeKindStructure {
-			continue
-		}
-
-		t.Run(kind.Keyword(), func(t *testing.T) {
-
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %s interface X {}
-
-              let x = X
-	        `, kind.Keyword()))
-
-			assert.IsType(t, interpreter.MetaTypeValue{}, inter.Globals["x"].Value)
-		})
-	}
-}
-
 func TestInterpretImport(t *testing.T) {
 
 	checkerImported, err := ParseAndCheck(t, `

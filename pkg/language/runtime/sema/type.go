@@ -941,31 +941,6 @@ func (t *InterfaceType) IsResourceType() bool {
 	return t.CompositeKind == common.CompositeKindResource
 }
 
-// InterfaceMetaType
-
-type InterfaceMetaType struct {
-	InterfaceType *InterfaceType
-}
-
-func (*InterfaceMetaType) isType() {}
-
-func (t *InterfaceMetaType) String() string {
-	return fmt.Sprintf("%s.Type", t.InterfaceType.Identifier)
-}
-
-func (t *InterfaceMetaType) Equal(other Type) bool {
-	otherInterface, ok := other.(*InterfaceMetaType)
-	if !ok {
-		return false
-	}
-
-	return otherInterface.InterfaceType.Equal(t.InterfaceType)
-}
-
-func (*InterfaceMetaType) IsResourceType() bool {
-	return false
-}
-
 // DictionaryType
 
 type DictionaryType struct {
@@ -1252,6 +1227,4 @@ func init() {
 	gob.Register(&FunctionType{})
 	gob.Register(&CompositeType{})
 	gob.Register(&InterfaceType{})
-	gob.Register(&InterfaceMetaType{})
-	gob.Register(&DictionaryType{})
 }
