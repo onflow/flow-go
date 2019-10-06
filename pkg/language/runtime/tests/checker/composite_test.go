@@ -625,12 +625,18 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 
 			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
-			assert.Equal(t, errs[0].(*sema.NotDeclaredMemberError).Name, "foo")
+			assert.Equal(t,
+				"foo",
+				errs[0].(*sema.NotDeclaredMemberError).Name,
+			)
 
 			assert.IsType(t, &self_field_analyzer.UninitializedFieldAccessError{}, errs[1])
 
 			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[2])
-			assert.Equal(t, errs[2].(*sema.NotDeclaredMemberError).Name, "bar")
+			assert.Equal(t,
+				"bar",
+				errs[2].(*sema.NotDeclaredMemberError).Name,
+			)
 
 			if kind != common.CompositeKindStructure {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
@@ -760,10 +766,16 @@ func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
-			assert.Equal(t, errs[0].(*sema.NotDeclaredMemberError).Name, "foo")
+			assert.Equal(t,
+				"foo",
+				errs[0].(*sema.NotDeclaredMemberError).Name,
+			)
 
 			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[1])
-			assert.Equal(t, errs[1].(*sema.NotDeclaredMemberError).Name, "bar")
+			assert.Equal(t,
+				"bar",
+				errs[1].(*sema.NotDeclaredMemberError).Name,
+			)
 
 			if kind != common.CompositeKindStructure {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
@@ -935,7 +947,10 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 
 			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
-			assert.Equal(t, errs[0].(*sema.AssignmentToConstantMemberError).Name, "foo")
+			assert.Equal(t,
+				"foo",
+				errs[0].(*sema.AssignmentToConstantMemberError).Name,
+			)
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 
@@ -1436,7 +1451,10 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
 				structureType := testType.(*sema.CompositeType)
 
-				assert.Equal(t, structureType.Identifier, "Test")
+				assert.Equal(t,
+					"Test",
+					structureType.Identifier,
+				)
 
 				testFunctionMember := structureType.Members["test"]
 

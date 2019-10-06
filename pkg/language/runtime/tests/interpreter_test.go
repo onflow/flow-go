@@ -60,36 +60,37 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["y"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.NewIntValue(3),
+		inter.Globals["z"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["a"].Value,
 	)
 
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
 		inter.Globals["b"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-			},
-		},
 	)
 
-	assert.Equal(t, inter.Globals["s"].Value, interpreter.NewStringValue("123"))
+	assert.Equal(t,
+		interpreter.NewStringValue("123"),
+		inter.Globals["s"].Value,
+	)
 }
 
 func TestInterpretDeclarations(t *testing.T) {
@@ -103,8 +104,8 @@ func TestInterpretDeclarations(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(42),
+		value,
 	)
 }
 
@@ -144,22 +145,22 @@ func TestInterpretLexicalScope(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(10),
+		inter.Globals["x"].Value,
 	)
 
 	value, err := inter.Invoke("f")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(10),
+		value,
 	)
 
 	value, err = inter.Invoke("g")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(10),
+		value,
 	)
 }
 
@@ -178,13 +179,13 @@ func TestInterpretFunctionSideEffects(t *testing.T) {
 	value, err := inter.Invoke("test", newValue)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["value"].Value,
 		interpreter.IntValue{Int: newValue},
+		inter.Globals["value"].Value,
 	)
 }
 
@@ -205,13 +206,13 @@ func TestInterpretNoHoisting(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -225,13 +226,13 @@ func TestInterpretFunctionExpressionsAndScope(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(10),
+		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.NewIntValue(42),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -248,8 +249,8 @@ func TestInterpretVariableAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 }
 
@@ -265,20 +266,20 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(3),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -294,15 +295,15 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 }
 
@@ -321,15 +322,15 @@ func TestInterpretParameters(t *testing.T) {
 	value, err := inter.Invoke("returnA", big.NewInt(24), big.NewInt(42))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(24),
+		value,
 	)
 
 	value, err = inter.Invoke("returnB", big.NewInt(24), big.NewInt(42))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(42),
+		value,
 	)
 }
 
@@ -345,8 +346,8 @@ func TestInterpretArrayIndexing(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 }
 
@@ -363,8 +364,8 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 }
 
@@ -378,16 +379,16 @@ func TestInterpretStringIndexing(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewStringValue("a"),
+		inter.Globals["x"].Value,
 	)
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.NewStringValue("b"),
+		inter.Globals["y"].Value,
 	)
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.NewStringValue("c"),
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -408,15 +409,15 @@ func TestInterpretStringIndexingUnicode(t *testing.T) {
 	value, err := inter.Invoke("testUnicodeA")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("\u00e9"),
+		value,
 	)
 
 	value, err = inter.Invoke("testUnicodeB")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("e\u0301"),
+		value,
 	)
 }
 
@@ -453,8 +454,8 @@ func TestInterpretStringIndexingAssignmentUnicode(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("cafe\u0301 chair"),
+		value,
 	)
 }
 
@@ -473,8 +474,8 @@ func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("def"),
+		value,
 	)
 }
 
@@ -512,7 +513,10 @@ func TestInterpretStringSlicing(t *testing.T) {
 
 			value, err := inter.Invoke("test")
 			assert.IsType(t, test.expectedError, err)
-			assert.Equal(t, value, interpreter.NewStringValue(test.result))
+			assert.Equal(t,
+				interpreter.NewStringValue(test.result),
+				value,
+			)
 		})
 	}
 }
@@ -528,8 +532,8 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 	value, err := inter.Invoke("returnNothing")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -544,7 +548,10 @@ func TestInterpretReturns(t *testing.T) {
 
 	value, err := inter.Invoke("returnEarly")
 	assert.Nil(t, err)
-	assert.Equal(t, value, interpreter.NewIntValue(2))
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		value,
+	)
 }
 
 // TODO: perform each operator test for each integer type
@@ -556,8 +563,8 @@ func TestInterpretPlusOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(6),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -568,8 +575,8 @@ func TestInterpretMinusOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(-2),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -580,8 +587,8 @@ func TestInterpretMulOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(8),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -592,8 +599,8 @@ func TestInterpretDivOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -604,8 +611,8 @@ func TestInterpretModOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -625,32 +632,30 @@ func TestInterpretConcatOperator(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
 		interpreter.NewStringValue("abcdef"),
+		inter.Globals["a"].Value,
 	)
 	assert.Equal(t,
-		inter.Globals["b"].Value,
 		interpreter.NewStringValue("def"),
+		inter.Globals["b"].Value,
 	)
 	assert.Equal(t,
-		inter.Globals["c"].Value,
 		interpreter.NewStringValue("abc"),
+		inter.Globals["c"].Value,
 	)
 	assert.Equal(t,
-		inter.Globals["d"].Value,
 		interpreter.NewStringValue(""),
+		inter.Globals["d"].Value,
 	)
 
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 		inter.Globals["e"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		},
 	)
 
 	// TODO: support empty arrays
@@ -717,63 +722,63 @@ func TestInterpretEqualOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersUnequal")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueAndTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueAndFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseAndTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseAndFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testEqualStrings")
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testUnequalStrings")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testUnicodeStrings")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 }
 
@@ -808,43 +813,43 @@ func TestInterpretUnequalOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersUnequal")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueAndTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueAndFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseAndTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseAndFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -867,22 +872,22 @@ func TestInterpretLessOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersGreater")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersLess")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 }
 
@@ -905,22 +910,22 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersGreater")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersLess")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 }
 
@@ -943,22 +948,22 @@ func TestInterpretGreaterOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersGreater")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersLess")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -981,22 +986,22 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 	value, err := inter.Invoke("testIntegersGreater")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersEqual")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testIntegersLess")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -1023,29 +1028,29 @@ func TestInterpretOrOperator(t *testing.T) {
 	value, err := inter.Invoke("testTrueTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -1069,18 +1074,18 @@ func TestInterpretOrOperatorShortCircuitLeftSuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["test"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["x"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -1104,18 +1109,18 @@ func TestInterpretOrOperatorShortCircuitLeftFailure(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["test"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["x"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -1142,29 +1147,29 @@ func TestInterpretAndOperator(t *testing.T) {
 	value, err := inter.Invoke("testTrueTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("testTrueFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalseFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -1188,18 +1193,18 @@ func TestInterpretAndOperatorShortCircuitLeftSuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["test"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["x"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -1223,18 +1228,18 @@ func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.BoolValue(false),
 		inter.Globals["test"].Value,
-		interpreter.BoolValue(false),
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -1279,29 +1284,29 @@ func TestInterpretIfStatement(t *testing.T) {
 	value, err := inter.Invoke("testTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 
 	value, err = inter.Invoke("testNoElse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	value, err = inter.Invoke("testElseIf")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 }
 
@@ -1321,8 +1326,8 @@ func TestInterpretWhileStatement(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(6),
+		value,
 	)
 }
 
@@ -1344,8 +1349,8 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(6),
+		value,
 	)
 }
 
@@ -1369,8 +1374,8 @@ func TestInterpretWhileStatementWithContinue(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(6),
+		value,
 	)
 }
 
@@ -1392,8 +1397,8 @@ func TestInterpretWhileStatementWithBreak(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(5),
+		value,
 	)
 }
 
@@ -1412,18 +1417,21 @@ func TestInterpretExpressionStatement(t *testing.T) {
        }
 	`)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(0))
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["x"].Value,
+	)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -1442,15 +1450,15 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	value, err := inter.Invoke("testTrue")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	value, err = inter.Invoke("testFalse")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(3),
+		value,
 	)
 }
 
@@ -1483,8 +1491,8 @@ func TestInterpretRecursionFib(t *testing.T) {
 	value, err := inter.Invoke("fib", big.NewInt(14))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(377),
+		value,
 	)
 }
 
@@ -1503,8 +1511,8 @@ func TestInterpretRecursionFactorial(t *testing.T) {
 	value, err := inter.Invoke("factorial", big.NewInt(5))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(120),
+		value,
 	)
 }
 
@@ -1516,13 +1524,13 @@ func TestInterpretUnaryIntegerNegation(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(-2),
+		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -1536,23 +1544,23 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 	`)
 
 	assert.Equal(t,
+		interpreter.BoolValue(false),
 		inter.Globals["a"].Value,
-		interpreter.BoolValue(false),
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["b"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["c"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["d"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["d"].Value,
 	)
 }
 
@@ -1610,8 +1618,8 @@ func TestInterpretHostFunction(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
 		interpreter.NewIntValue(3),
+		inter.Globals["a"].Value,
 	)
 }
 
@@ -1659,8 +1667,8 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.Globals["value"].Value,
 		interpreter.IntValue{Int: newValue},
+		inter.Globals["value"].Value,
 	)
 }
 
@@ -1683,8 +1691,8 @@ func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -1746,8 +1754,8 @@ func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -1770,8 +1778,8 @@ func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -1798,8 +1806,8 @@ func TestInterpretStructureDeclarationWithField(t *testing.T) {
 	value, err := inter.Invoke("test", newValue)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.IntValue{Int: newValue},
+		value,
 	)
 }
 
@@ -1825,13 +1833,13 @@ func TestInterpretStructureDeclarationWithFunction(t *testing.T) {
 	value, err := inter.Invoke("test", newValue)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["value"].Value,
 		interpreter.IntValue{Int: newValue},
+		inter.Globals["value"].Value,
 	)
 }
 
@@ -1852,8 +1860,8 @@ func TestInterpretStructureFunctionCall(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["value"].Value,
 		interpreter.NewIntValue(42),
+		inter.Globals["value"].Value,
 	)
 }
 
@@ -1885,21 +1893,21 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 
 	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
 	assert.Equal(t,
-		actual,
 		interpreter.NewIntValue(1),
+		actual,
 	)
 
 	value, err := inter.Invoke("callTest")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 
 	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
 	assert.Equal(t,
-		actual,
 		interpreter.NewIntValue(3),
+		actual,
 	)
 }
 
@@ -1919,8 +1927,8 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
 
 	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
 	assert.Equal(t,
-		actual,
 		interpreter.NewIntValue(42),
+		actual,
 	)
 }
 
@@ -1950,8 +1958,8 @@ func TestInterpretStructureFunctionMutatesSelf(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 }
 
@@ -1973,8 +1981,8 @@ func TestInterpretFunctionPreCondition(t *testing.T) {
 	value, err := inter.Invoke("test", zero)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.IntValue{Int: zero},
+		value,
 	)
 }
 
@@ -1997,8 +2005,8 @@ func TestInterpretFunctionPostCondition(t *testing.T) {
 	value, err := inter.Invoke("test", zero)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.IntValue{Int: zero},
+		value,
 	)
 }
 
@@ -2020,8 +2028,8 @@ func TestInterpretFunctionWithResultAndPostConditionWithResult(t *testing.T) {
 	value, err := inter.Invoke("test", zero)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.IntValue{Int: zero},
+		value,
 	)
 }
 
@@ -2039,8 +2047,8 @@ func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -2063,8 +2071,8 @@ func TestInterpretFunctionPostConditionWithBefore(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 }
 
@@ -2089,8 +2097,8 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPreCondition(t *testing.
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
 	assert.Equal(t,
-		err.(*interpreter.ConditionError).ConditionKind,
 		ast.ConditionKindPre,
+		err.(*interpreter.ConditionError).ConditionKind,
 	)
 }
 
@@ -2115,8 +2123,8 @@ func TestInterpretFunctionPostConditionWithBeforeFailingPostCondition(t *testing
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
 	assert.Equal(t,
-		err.(*interpreter.ConditionError).ConditionKind,
 		ast.ConditionKindPost,
+		err.(*interpreter.ConditionError).ConditionKind,
 	)
 }
 
@@ -2135,14 +2143,17 @@ func TestInterpretFunctionPostConditionWithMessageUsingStringLiteral(t *testing.
 	_, err := inter.Invoke("test", big.NewInt(42))
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
-	assert.Equal(t, err.(*interpreter.ConditionError).Message, "y should be zero")
+	assert.Equal(t,
+		"y should be zero",
+		err.(*interpreter.ConditionError).Message,
+	)
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.IntValue{Int: zero},
+		value,
 	)
 }
 
@@ -2161,14 +2172,17 @@ func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
 	_, err := inter.Invoke("test", big.NewInt(42))
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
-	assert.Equal(t, err.(*interpreter.ConditionError).Message, "return value")
+	assert.Equal(t,
+		"return value",
+		err.(*interpreter.ConditionError).Message,
+	)
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("return value"),
+		value,
 	)
 }
 
@@ -2187,8 +2201,8 @@ func TestInterpretFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
 	assert.Equal(t,
-		err.(*interpreter.ConditionError).Message,
 		"parameter value",
+		err.(*interpreter.ConditionError).Message,
 	)
 }
 
@@ -2207,8 +2221,8 @@ func TestInterpretFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 
 	assert.Equal(t,
-		err.(*interpreter.ConditionError).Message,
 		"parameter value",
+		err.(*interpreter.ConditionError).Message,
 	)
 }
 
@@ -2234,13 +2248,11 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
 	)
 }
 
@@ -2270,13 +2282,11 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
 	)
 }
 
@@ -2303,13 +2313,11 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
 	)
 }
 
@@ -2336,13 +2344,11 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
 	)
 }
 
@@ -2376,13 +2382,11 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
 	)
 }
 
@@ -2411,8 +2415,8 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -2500,15 +2504,15 @@ func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	value, err := inter.Invoke("isEven", four)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("isOdd", four)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -2529,8 +2533,8 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["tests"].Value,
 		interpreter.NewIntValue(0),
+		inter.Globals["tests"].Value,
 	)
 
 	value, err := inter.Invoke("test")
@@ -2541,8 +2545,8 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.Globals["tests"].Value,
 		interpreter.NewIntValue(1),
+		inter.Globals["tests"].Value,
 	)
 
 	value, err = inter.Invoke("test")
@@ -2553,8 +2557,9 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	)
 
 	assert.Equal(t,
+		interpreter.NewIntValue(2),
 		inter.Globals["tests"].Value,
-		interpreter.NewIntValue(2))
+	)
 }
 
 func TestInterpretOptionalVariableDeclaration(t *testing.T) {
@@ -2564,12 +2569,12 @@ func TestInterpretOptionalVariableDeclaration(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2584,12 +2589,12 @@ func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
+		value,
 	)
 }
 
@@ -2608,12 +2613,12 @@ func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
+		value,
 	)
 }
 
@@ -2628,12 +2633,12 @@ func TestInterpretOptionalReturn(t *testing.T) {
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
+		value,
 	)
 }
 
@@ -2650,17 +2655,17 @@ func TestInterpretOptionalAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2671,8 +2676,8 @@ func TestInterpretNil(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2683,8 +2688,8 @@ func TestInterpretOptionalNestingNil(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2699,8 +2704,8 @@ func TestInterpretNilReturnValue(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NilValue{},
+		value,
 	)
 }
 
@@ -2713,10 +2718,10 @@ func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2729,10 +2734,10 @@ func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2744,10 +2749,10 @@ func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2758,8 +2763,8 @@ func TestInterpretNilCoalescingRightSubtype(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2772,8 +2777,8 @@ func TestInterpretNilCoalescingNilInt(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2784,7 +2789,10 @@ func TestInterpretNilCoalescingNilLiteralInt(t *testing.T) {
       let x: Int = nil ?? one
     `)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
@@ -2807,18 +2815,18 @@ func TestInterpretNilCoalescingShortCircuitLeftSuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["test"].Value,
 		interpreter.NewIntValue(1),
+		inter.Globals["test"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2842,18 +2850,18 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["test"].Value,
 		interpreter.NewIntValue(2),
+		inter.Globals["test"].Value,
 	)
 
 	assert.Equal(t,
+		interpreter.BoolValue(true),
 		inter.Globals["x"].Value,
-		interpreter.BoolValue(true),
 	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2865,11 +2873,11 @@ func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.AnyValue{
 			Type:  &sema.BoolType{},
 			Value: interpreter.BoolValue(true),
 		},
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2881,11 +2889,11 @@ func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(2),
 		},
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2898,10 +2906,10 @@ func TestInterpretNilCoalescingOptionalRightHandSide(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -2914,10 +2922,10 @@ func TestInterpretNilCoalescingBothOptional(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -2930,10 +2938,10 @@ func TestInterpretNilCoalescingBothOptionalLeftNil(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -2944,8 +2952,8 @@ func TestInterpretNilsComparison(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["x"].Value,
 	)
 }
 
@@ -2957,8 +2965,8 @@ func TestInterpretNonOptionalNilComparison(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2970,8 +2978,8 @@ func TestInterpretNonOptionalNilComparisonSwapped(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2983,8 +2991,8 @@ func TestInterpretOptionalNilComparison(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -2996,8 +3004,8 @@ func TestInterpretNestedOptionalNilComparison(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -3009,8 +3017,8 @@ func TestInterpretOptionalNilComparisonSwapped(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -3022,8 +3030,8 @@ func TestInterpretNestedOptionalNilComparisonSwapped(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -3036,8 +3044,8 @@ func TestInterpretNestedOptionalComparisonNils(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -3050,8 +3058,8 @@ func TestInterpretNestedOptionalComparisonValues(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.BoolValue(true),
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -3064,8 +3072,8 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
 		interpreter.BoolValue(false),
+		inter.Globals["z"].Value,
 	)
 }
 
@@ -3084,15 +3092,15 @@ func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(2),
+		value,
 	)
 
 	value, err = inter.Invoke("test", nil)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(0),
+		value,
 	)
 }
 
@@ -3109,13 +3117,16 @@ func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
 
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
-	assert.Equal(t, value, interpreter.NewIntValue(2))
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		value,
+	)
 
 	value, err = inter.Invoke("test", nil)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(0),
+		value,
 	)
 }
 
@@ -3134,19 +3145,19 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
+		value,
 	)
 
 	value, err = inter.Invoke("test", nil)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(0),
 		},
+		value,
 	)
 }
 
@@ -3165,19 +3176,19 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
+		value,
 	)
 
 	value, err = inter.Invoke("test", nil)
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(0),
 		},
+		value,
 	)
 }
 
@@ -3238,8 +3249,8 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 	        `, kind.Keyword(), kind.Keyword()))
 
 			assert.Equal(t,
-				inter.Globals["x"].Value,
 				interpreter.NewIntValue(1),
+				inter.Globals["x"].Value,
 			)
 		})
 	}
@@ -3272,7 +3283,10 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
             let val = test.test()
 	      `, kind.Keyword(), kind.Keyword()))
 
-			assert.Equal(t, inter.Globals["val"].Value, interpreter.NewIntValue(2))
+			assert.Equal(t,
+				interpreter.NewIntValue(2),
+				inter.Globals["val"].Value,
+			)
 		})
 	}
 }
@@ -3319,8 +3333,8 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 			value, err := inter.Invoke("callTest", big.NewInt(1))
 			assert.Nil(t, err)
 			assert.Equal(t,
-				value,
 				interpreter.NewIntValue(1),
+				value,
 			)
 
 			_, err = inter.Invoke("callTest", big.NewInt(2))
@@ -3430,7 +3444,10 @@ func TestInterpretImport(t *testing.T) {
 		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t, location, ast.StringImportLocation("imported"))
+			assert.Equal(t,
+				ast.StringImportLocation("imported"),
+				location,
+			)
 			return checkerImported.Program, nil
 		},
 	)
@@ -3445,8 +3462,8 @@ func TestInterpretImport(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewIntValue(42),
+		value,
 	)
 }
 
@@ -3480,7 +3497,10 @@ func TestInterpretImportError(t *testing.T) {
 		valueDeclarations,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t, location, ast.StringImportLocation("imported"))
+			assert.Equal(t,
+				ast.StringImportLocation("imported"),
+				location,
+			)
 			return checkerImported.Program, nil
 		},
 	)
@@ -3499,7 +3519,10 @@ func TestInterpretImportError(t *testing.T) {
 	_, err = inter.Invoke("test")
 
 	assert.IsType(t, stdlib.PanicError{}, err)
-	assert.Equal(t, err.(stdlib.PanicError).Message, "?!")
+	assert.Equal(t,
+		"?!",
+		err.(stdlib.PanicError).Message,
+	)
 }
 
 func TestInterpretDictionary(t *testing.T) {
@@ -3509,11 +3532,13 @@ func TestInterpretDictionary(t *testing.T) {
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.DictionaryValue{
 			"a": interpreter.NewIntValue(1),
 			"b": interpreter.NewIntValue(2),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
+}
 
 func TestInterpretDictionaryNonLexicalOrder(t *testing.T) {
 
@@ -3541,22 +3566,22 @@ func TestInterpretDictionaryIndexingString(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
-
-	assert.Equal(t,
-		inter.Globals["b"].Value,
-		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(2),
 		},
+		inter.Globals["a"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["c"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(2),
+		},
+		inter.Globals["b"].Value,
+	)
+
+	assert.Equal(t,
 		interpreter.NilValue{},
+		inter.Globals["c"].Value,
 	)
 }
 
@@ -3569,18 +3594,18 @@ func TestInterpretDictionaryIndexingBool(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
+		},
+		inter.Globals["a"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["b"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
-		})
+		},
+		inter.Globals["b"].Value,
+	)
 }
 
 func TestInterpretDictionaryIndexingInt(t *testing.T) {
@@ -3593,20 +3618,23 @@ func TestInterpretDictionaryIndexingInt(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["a"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewStringValue("a"),
-		})
+		},
+		inter.Globals["a"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["b"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewStringValue("b"),
-		})
+		},
+		inter.Globals["b"].Value,
+	)
 
-	assert.Equal(t, inter.Globals["c"].Value, interpreter.NilValue{})
+	assert.Equal(t,
+		interpreter.NilValue{},
+		inter.Globals["c"].Value,
+	)
 }
 
 func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
@@ -3621,13 +3649,13 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.VoidValue{},
+		value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.NewStringValue("abc")),
 		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
+		inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.NewStringValue("abc")),
 	)
 }
 
@@ -3639,17 +3667,19 @@ func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
-		})
+		},
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretFailableDowncastingAnyFailure(t *testing.T) {
@@ -3660,8 +3690,8 @@ func TestInterpretFailableDowncastingAnyFailure(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.NilValue{},
+		inter.Globals["y"].Value,
 	)
 }
 
@@ -3672,13 +3702,14 @@ func TestInterpretOptionalAny(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
@@ -3689,19 +3720,21 @@ func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
-		})
+		},
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
@@ -3713,29 +3746,29 @@ func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(23),
 			},
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
-
 		interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(23),
-		})
+		},
+		inter.Globals["y"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(23),
-		})
+		},
+		inter.Globals["z"].Value,
+	)
 }
 
 func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
@@ -3746,22 +3779,25 @@ func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
       let z = y as? Int
     `)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NilValue{})
+	assert.Equal(t,
+		interpreter.NilValue{},
+		inter.Globals["x"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["y"].Value,
-
 		interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
-		})
+		},
+		inter.Globals["y"].Value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["z"].Value,
-
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
-		})
+		},
+		inter.Globals["z"].Value,
+	)
 }
 
 func TestInterpretLength(t *testing.T) {
@@ -3771,9 +3807,15 @@ func TestInterpretLength(t *testing.T) {
       let y = [1, 2, 3].length
     `)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(4))
+	assert.Equal(t,
+		interpreter.NewIntValue(4),
+		inter.Globals["x"].Value,
+	)
 
-	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(3))
+	assert.Equal(t,
+		interpreter.NewIntValue(3),
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretStructureFunctionBindingInside(t *testing.T) {
@@ -3841,15 +3883,14 @@ func TestInterpretArrayAppend(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+	)
 }
 
 func TestInterpretArrayAppendBound(t *testing.T) {
@@ -3866,15 +3907,14 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+	)
 }
 
 func TestInterpretArrayConcat(t *testing.T) {
@@ -3889,15 +3929,14 @@ func TestInterpretArrayConcat(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+	)
 }
 
 func TestInterpretArrayConcatBound(t *testing.T) {
@@ -3913,15 +3952,14 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+	)
 }
 
 func TestInterpretArrayInsert(t *testing.T) {
@@ -3937,15 +3975,14 @@ func TestInterpretArrayInsert(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(4),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(4),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-			},
-		})
+	)
 }
 
 func TestInterpretArrayRemove(t *testing.T) {
@@ -3956,15 +3993,17 @@ func TestInterpretArrayRemove(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(3),
+		),
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(3),
-			},
-		})
+	)
 
-	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(2))
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretArrayRemoveFirst(t *testing.T) {
@@ -3975,15 +4014,17 @@ func TestInterpretArrayRemoveFirst(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+		),
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-			},
-		})
+	)
 
-	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretArrayRemoveLast(t *testing.T) {
@@ -3994,15 +4035,17 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
     `)
 
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-			},
-		})
+	)
 
-	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(3))
+	assert.Equal(t,
+		interpreter.NewIntValue(3),
+		inter.Globals["y"].Value,
+	)
 }
 
 func TestInterpretArrayContains(t *testing.T) {
@@ -4022,15 +4065,15 @@ func TestInterpretArrayContains(t *testing.T) {
 	value, err := inter.Invoke("doesContain")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(true),
+		value,
 	)
 
 	value, err = inter.Invoke("doesNotContain")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.BoolValue(false),
+		value,
 	)
 }
 
@@ -4046,8 +4089,8 @@ func TestInterpretStringConcat(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("abcdef"),
+		value,
 	)
 }
 
@@ -4064,8 +4107,8 @@ func TestInterpretStringConcatBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.NewStringValue("abcdef"),
+		value,
 	)
 }
 
@@ -4084,39 +4127,19 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.DictionaryValue{
 			"def": interpreter.NewIntValue(2),
-		})
+		},
+		value,
+	)
 
 	assert.Equal(t,
-		inter.Globals["removed"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
+		},
+		inter.Globals["removed"].Value,
+	)
 }
-
-// TODO:
-//func TestInterpretUnaryMove(t *testing.T) {
-//
-//	inter := parseCheckAndInterpret(t, `
-//      resource X {}
-//
-//      fun foo(x: <-X): <-X {
-//          return x
-//      }
-//
-//      var x <- foo(x: <-X())
-//
-//      fun bar() {
-//          x <- X()
-//      }
-//	`)
-//
-//	_, err := inter.Invoke("bar")
-//	Expect(err).
-//		To(Not(HaveOccurred()))
-//}
 
 func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
 
@@ -4124,7 +4147,10 @@ func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T
         let x: Int8 = 1
 	`)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
@@ -4134,10 +4160,11 @@ func TestInterpretIntegerLiteralTypeConversionInVariableDeclarationOptional(t *t
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
@@ -4149,12 +4176,18 @@ func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
         }
 	`)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
+	)
 
 	_, err := inter.Invoke("test")
 	assert.Nil(t, err)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(2))
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
@@ -4167,19 +4200,21 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 
 	_, err := inter.Invoke("test")
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
@@ -4191,7 +4226,10 @@ func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.
         let x = test(1)
 	`)
 
-	assert.Equal(t, inter.Globals["x"].Value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
@@ -4204,10 +4242,11 @@ func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *
 	`)
 
 	assert.Equal(t,
-		inter.Globals["x"].Value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
-		})
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInReturn(t *testing.T) {
@@ -4220,7 +4259,10 @@ func TestInterpretIntegerLiteralTypeConversionInReturn(t *testing.T) {
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
-	assert.Equal(t, value, interpreter.NewIntValue(1))
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		value,
+	)
 }
 
 func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
@@ -4234,10 +4276,10 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		value,
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
+		value,
 	)
 }
 
@@ -4263,9 +4305,122 @@ func TestInterpretIndirectDestroy(t *testing.T) {
 		},
 	)
 
-	// TODO: add create expression once supported
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.VoidValue{},
+		value,
+	)
+}
+
+func TestInterpretUnaryMove(t *testing.T) {
+
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
+          resource X {}
+
+          fun foo(x: <-X): <-X {
+              return <-x
+          }
+
+          fun bar() {
+              let x <- foo(x: <-create X())
+              destroy x
+          }
+	    `,
+		nil,
+		nil,
+		func(checkerError error) {
+			// TODO: add support for resources
+
+			errs := ExpectCheckerErrors(t, checkerError, 1)
+
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+		},
+	)
+
+	value, err := inter.Invoke("bar")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.VoidValue{},
+		value,
+	)
+}
+
+// TODO: requires https://github.com/dapperlabs/flow-go/issues/816
+//
+//func TestInterpretResourceMoveInArray(t *testing.T) {
+//
+//	inter := parseCheckAndInterpretWithExtra(t,
+//		`
+//        resource Foo {
+//            var bar: Int
+//            init(bar: Int) {
+//                self.bar = bar
+//            }
+//        }
+//
+//        fun test(): Int {
+//          let foo <- create Foo(bar: 1)
+//          let foos <- [<-foo]
+//          let bar = foos[0].bar
+//          destroy foos
+//          return bar
+//        }
+//      `,
+//		nil,
+//		nil,
+//		func(checkerError error) {
+//			// TODO: add support for resources
+//
+//			errs := ExpectCheckerErrors(t, checkerError, 1)
+//
+//			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+//		},
+//	)
+//
+//	value, err := inter.Invoke("test")
+//	assert.Nil(t, err)
+//	assert.Equal(t,
+//		interpreter.NewIntValue(1),
+//		value,
+//	)
+//}
+
+func TestInterpretClosure(t *testing.T) {
+	// Create a closure that increments and returns
+	// a variable each time it is invoked.
+
+	inter := parseCheckAndInterpret(t, `
+        fun makeCounter(): ((): Int) {
+            var count = 0
+            return fun (): Int {
+                count = count + 1
+                return count
+            }
+        }
+
+        let test = makeCounter()
+	`)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
-	assert.Equal(t, value, interpreter.VoidValue{})
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		value,
+	)
+
+	value, err = inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		value,
+	)
+
+	value, err = inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewIntValue(3),
+		value,
+	)
 }
