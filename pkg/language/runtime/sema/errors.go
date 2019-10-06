@@ -1493,3 +1493,25 @@ func (e *InvalidMoveOperationError) StartPosition() ast.Position {
 func (e *InvalidMoveOperationError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// ResourceCapturingError
+
+type ResourceCapturingError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *ResourceCapturingError) Error() string {
+	return fmt.Sprintf("cannot capture resource in closure: `%s`", e.Name)
+}
+
+func (*ResourceCapturingError) isSemanticError() {}
+
+func (e *ResourceCapturingError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceCapturingError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}

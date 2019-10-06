@@ -1,6 +1,8 @@
 package sema
 
-import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+)
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	identifier := expression.Identifier
@@ -10,22 +12,53 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		resourceInfo := checker.resources.Get(variable)
-
-		if resourceInfo.Invalidations.Size() > 0 {
-			checker.report(
-				&ResourceUseAfterInvalidationError{
-					Name:          expression.Identifier.Identifier,
-					Pos:           expression.Identifier.Pos,
-					Invalidations: resourceInfo.Invalidations.All(),
-				},
-			)
-		}
-
+		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
+		checker.checkResourceVariableUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
 	return variable.Type
+}
+
+// checkResourceVariableCapturingInFunction checks if a resource variable is captured in a function
+//
+func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Variable, useIdentifier ast.Identifier) {
+	currentFunctionDepth := -1
+	currentFunctionActivation := checker.functionActivations.Current()
+	if currentFunctionActivation != nil {
+		currentFunctionDepth = currentFunctionActivation.ValueActivationDepth
+	}
+
+	if currentFunctionDepth == -1 ||
+		variable.Depth > currentFunctionDepth {
+
+		return
+	}
+
+	checker.report(
+		&ResourceCapturingError{
+			Name: useIdentifier.Identifier,
+			Pos:  useIdentifier.Pos,
+		},
+	)
+}
+
+// checkResourceVariableUseAfterInvalidation checks if a resource variable
+// is used after it was previously invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Variable, useIdentifier ast.Identifier) {
+	resourceInfo := checker.resources.Get(variable)
+	if resourceInfo.Invalidations.Size() == 0 {
+		return
+	}
+
+	checker.report(
+		&ResourceUseAfterInvalidationError{
+			Name:          useIdentifier.Identifier,
+			Pos:           useIdentifier.Pos,
+			Invalidations: resourceInfo.Invalidations.All(),
+		},
+	)
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
