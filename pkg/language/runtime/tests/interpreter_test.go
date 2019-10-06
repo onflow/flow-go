@@ -2438,13 +2438,42 @@ func TestInterpretArrayCopy(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(0),
+			interpreter.NewIntValue(1),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(0),
-				interpreter.NewIntValue(1),
-			},
-		},
+	)
+}
+
+func TestInterpretStructCopyInArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): [Int] {
+        let foo = Foo(bar: 1)
+        let foos = [foo, foo]
+        foo.bar = 2
+        foos[0].bar = 3
+		return [foo.bar, foos[0].bar, foos[1].bar]
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(1),
+		),
+		value,
 	)
 }
 
@@ -3485,6 +3514,21 @@ func TestInterpretDictionary(t *testing.T) {
 			"a": interpreter.NewIntValue(1),
 			"b": interpreter.NewIntValue(2),
 		})
+
+func TestInterpretDictionaryNonLexicalOrder(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x = {"c": 3, "b": 2, "a": 1}
+	`)
+
+	assert.Equal(t,
+		interpreter.DictionaryValue{
+			"c": interpreter.NewIntValue(3),
+			"b": interpreter.NewIntValue(2),
+			"a": interpreter.NewIntValue(1),
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretDictionaryIndexingString(t *testing.T) {

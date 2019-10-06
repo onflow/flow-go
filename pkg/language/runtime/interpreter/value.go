@@ -222,6 +222,12 @@ type ArrayValue struct {
 	Values *[]Value
 }
 
+func NewArrayValue(values ...Value) ArrayValue {
+	return ArrayValue{
+		Values: &values,
+	}
+}
+
 func (ArrayValue) isValue()               {}
 func (ArrayValue) isIndexableValue()      {}
 func (ArrayValue) isConcatenatableValue() {}
@@ -1165,6 +1171,11 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 
 func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	panic(&errors.UnreachableError{})
+}
+
+type DictionaryEntryValues struct {
+	Key   Value
+	Value Value
 }
 
 // ToValue
