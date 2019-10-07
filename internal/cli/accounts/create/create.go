@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/accounts"
 	"github.com/dapperlabs/flow-go/sdk/client"
@@ -37,20 +38,23 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to load signer key", 1)
 		}
 
-		publicKeys := make([][]byte, len(conf.Keys))
+		accountKeys := make([]types.AccountKey, len(conf.Keys))
 
-		for i, privateKey := range conf.Keys {
-			accountKey, err := utils.DecodePrivateKey(privateKey)
+		for i, privateKeyBytes := range conf.Keys {
+			privateKey, err := utils.DecodePrivateKey(privateKeyBytes)
 			if err != nil {
 				utils.Exit("Failed to decode private key", 1)
 			}
 
-			publicKey, err := utils.EncodePublicKey(accountKey.Publickey())
+			publicKey, err := utils.EncodePublicKey(privateKey.Publickey())
 			if err != nil {
 				utils.Exit("Failed to encode public key", 1)
 			}
 
-			publicKeys[i] = publicKey
+			accountKeys[i] = types.AccountKey{
+				PublicKey: publicKey,
+				Weight:    constants.AccountKeyWeightThreshold,
+			}
 		}
 
 		var code []byte
@@ -62,7 +66,7 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := accounts.CreateAccount(publicKeys, code)
+		script := accounts.CreateAccount(accountKeys, code)
 
 		tx := types.Transaction{
 			Script:       script,
