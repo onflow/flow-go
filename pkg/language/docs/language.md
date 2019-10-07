@@ -552,14 +552,46 @@ let canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
 // `canadianFlag` is `🇨🇦`
 ```
 
+#### String Fields and Functions
+
+Strings have multiple built-in functions you can use.
+
+- `length: Int`: Returns the number of characters in the string as an integer.
+    ```bamboo,file=string-length-field.bpl
+        let example = "hello"
+
+        // Find the number of elements
+        let length = example.length
+        // `length` is 5
+    ```
+
+- `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
+    ```bamboo,file=string-concat.bpl
+        let example = "hello"
+        let new = "world"
+
+        // Concatenate the new string onto the example string and return the new string
+        let helloWorld = example.concat(new)
+        // `helloWorld` is now "helloworld"
+    ```
+
+- `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
+    ```bamboo,file=string-slice.bpl
+        let example = "helloworld"
+
+        // Create a new slice of part of the original string
+        let slice = example.slice(from: 3, upTo: 6)
+        // `slice` is now `"lowo"`
+
+        // Error: Out of bounds index
+        let outOfBounds = example.slice(from: 2, upTo: 10)
+    ```
 <!--
 
 TODO
 
 #### String Functions
 
-- Length, concatenate
-- Append, remove, etc. for variable-size arrays
 - Document and link to string concatenation operator `&` in operators section
 
 -->
@@ -650,16 +682,108 @@ numbers[1] = 2
 
 #### Array Fields and Functions
 
+Arrays have multiple built-in functions you can use to manipulate the elements. `length`, `concat`, and `contains` apply to all array types whether they are statically sized or dynamic.
+
 - `length: Int`: Returns the number of elements in the array.
-- `append(_ value: V)`: Adds a value of type `V` to the array.
+    ```bamboo,file=array-length-field.bpl
+    let numbers = [42, 23, 31, 12]
+
+    // Find the number of elements
+    let length = numbers.length
+
+    // `length` is 4
+    ```
+
+- `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
+    ```bamboo,file=array-concat.bpl
+    let numbers = [42, 23, 31, 12]
+    let moreNumbers = [11, 27]
+
+    // Concatenate the array `moreNumbers` to the array `numbers` 
+    // and declare a new variable for the result
+    let allNumbers = numbers.concat(moreNumbers)
+
+    // `allNumbers` is `[42, 23, 31, 12, 11, 27]`
+    // `numbers` is still `[42, 23, 31, 12]`
+    // `moreNumbers` is still `[11, 27]`
+    ```
+
+- `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
+    ```bamboo,file=array-contains.bpl
+    let numbers = [42, 23, 31, 12]
+
+    // Check if the array contains 11
+    let containsEleven = numbers.contains(11)
+    // `containsEleven` is false
+
+    // Check if the array contains 12
+    let containsTwelve = numbers.contains(12)
+    // `containsTwelve` is true
+
+    // Invalid: Check if the array contains the string "Kitty". 
+    // This results in a type error, as the array only contains integers
+    //
+    let containsKitty = numbers.contains("Kitty")
+    ```
+
+##### Variable-size Array Functions
+The following functions can only be used on variable-sized arrays.  It is invalid to use one of these functions on a statically sized array.
+
+- `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.  
+    ```bamboo,file=array-append.bpl
+    let numbers = [42, 23, 31, 12]
+
+    // Add a new element
+    numbers.append(20)
+    // `numbers` is now `[42, 23, 31, 12, 20]`
+
+    // Invalid: Wrong type
+    numbers.append("SneakyString")
+    ```
+
+- `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
+    ```bamboo,file=array-insert.bpl
+    let numbers = [42, 23, 31, 12]
+
+    // Insert a new element at position 1 of the array
+    numbers.insert(at: 1, 20)
+    // `numbers` is now `[42, 20, 23, 31, 12]`
+
+    // Error: Out of bounds index
+    numbers.insert(at: 12, 39)
+    ```
+
+- `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
+- `removeFirst(): T`: Removes the first element from the array and returns it.
+- `removeLast(): T`: Removes the last element from the array and returns it.
+    ```bamboo,file=array-remove.bpl
+    let numbers = [42, 23, 31, 12]
+
+    // Remove element at position 1 of the array
+    let twentyThree = numbers.remove(at: 1)
+    // `numbers` is now `[42, 31, 12]`
+    // `twentyThree` is `23`
+
+    // Invalid: Out of Bounds index
+    numbers.remove(at: 19)
+
+    // remove the first element of the array
+    let fortytwo = numbers.removeFirst()
+    // `numbers` is now `[31, 12]`
+    // `fortywo` is `42`
+
+    // Remove the last element of the array
+    let twelve = numbers.removeLast()
+    // `numbers` is now `[31]`
+    // `twelve` is `12`
+    ```
 
 <!--
 
 TODO
 
-- concatenate, filter, etc. for all array types
-- remove, etc. for variable-size arrays
-- Document and link to array concatenation operator `+` in operators section
+- filter, etc. for all array types
+- Document and link to array concatenation operator `&` in operators section
 
 -->
 
