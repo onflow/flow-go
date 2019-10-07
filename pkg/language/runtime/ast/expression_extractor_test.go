@@ -1,10 +1,9 @@
 package ast
 
 import (
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 type testIntExtractor struct{}
@@ -32,7 +31,6 @@ func (testIntExtractor) ExtractInt(
 }
 
 func TestExpressionExtractorBinaryExpressionNothingExtracted(t *testing.T) {
-	RegisterTestingT(t)
 
 	expression := &BinaryExpression{
 		Operation: OperationEqual,
@@ -50,8 +48,9 @@ func TestExpressionExtractorBinaryExpressionNothingExtracted(t *testing.T) {
 
 	result := extractor.Extract(expression)
 
-	Expect(result).
-		To(Equal(ExpressionExtraction{
+	assert.Equal(t,
+		result,
+		ExpressionExtraction{
 			RewrittenExpression: &BinaryExpression{
 				Operation: OperationEqual,
 				Left: &IdentifierExpression{
@@ -62,11 +61,11 @@ func TestExpressionExtractorBinaryExpressionNothingExtracted(t *testing.T) {
 				},
 			},
 			ExtractedExpressions: nil,
-		}))
+		},
+	)
 }
 
 func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
-	RegisterTestingT(t)
 
 	expression := &BinaryExpression{
 		Operation: OperationEqual,
@@ -84,8 +83,9 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 
 	newIdentifier := extractor.FormatIdentifier(0)
 
-	Expect(result).
-		To(Equal(ExpressionExtraction{
+	assert.Equal(t,
+		result,
+		ExpressionExtraction{
 			RewrittenExpression: &BinaryExpression{
 				Operation: OperationEqual,
 				Left: &IdentifierExpression{
@@ -101,5 +101,6 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 					Expression: &IntExpression{Value: big.NewInt(1)},
 				},
 			},
-		}))
+		},
+	)
 }

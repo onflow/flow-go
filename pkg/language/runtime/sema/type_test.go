@@ -2,24 +2,21 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/stretchr/testify/assert"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 func TestConstantSizedType_String(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &ConstantSizedType{
 		Type: &VariableSizedType{Type: &IntType{}},
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("[[Int]; 2]"))
+	assert.Equal(t, ty.String(), "[[Int]; 2]")
 }
 
 func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &ConstantSizedType{
 		Type: &FunctionType{
@@ -33,11 +30,10 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 		Size: 2,
 	}
 
-	Expect(ty.String()).To(Equal("[((Int8): Int16); 2]"))
+	assert.Equal(t, ty.String(), "[((Int8): Int16); 2]")
 }
 
 func TestVariableSizedType_String(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &VariableSizedType{
 		Type: &ConstantSizedType{
@@ -46,11 +42,10 @@ func TestVariableSizedType_String(t *testing.T) {
 		},
 	}
 
-	Expect(ty.String()).To(Equal("[[Int; 2]]"))
+	assert.Equal(t, ty.String(), "[[Int; 2]]")
 }
 
 func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &VariableSizedType{
 		Type: &FunctionType{
@@ -63,22 +58,19 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 		},
 	}
 
-	Expect(ty.String()).To(Equal("[((Int8): Int16)]"))
+	assert.Equal(t, ty.String(), "[((Int8): Int16)]")
 }
 
 func TestIsResourceType_AnyNestedInArray(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &VariableSizedType{
 		Type: &AnyType{},
 	}
 
-	Expect(ty.IsResourceType()).
-		To(BeFalse())
+	assert.False(t, ty.IsResourceType())
 }
 
 func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &VariableSizedType{
 		&CompositeType{
@@ -86,12 +78,10 @@ func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
 		},
 	}
 
-	Expect(ty.IsResourceType()).
-		To(BeTrue())
+	assert.True(t, ty.IsResourceType())
 }
 
 func TestIsResourceType_ResourceNestedInDictionary(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &DictionaryType{
 		KeyType: &StringType{},
@@ -102,12 +92,10 @@ func TestIsResourceType_ResourceNestedInDictionary(t *testing.T) {
 		},
 	}
 
-	Expect(ty.IsResourceType()).
-		To(BeTrue())
+	assert.True(t, ty.IsResourceType())
 }
 
 func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
-	RegisterTestingT(t)
 
 	ty := &DictionaryType{
 		KeyType: &StringType{},
@@ -118,6 +106,5 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 		},
 	}
 
-	Expect(ty.IsResourceType()).
-		To(BeFalse())
+	assert.False(t, ty.IsResourceType())
 }

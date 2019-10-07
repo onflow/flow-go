@@ -3,122 +3,91 @@ package tests
 import (
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
-
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
-func init() {
-	format.TruncatedDiff = false
-	format.MaxDepth = 100
-}
-
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    le
 	`)
 
-	Expect(actual).
-		To(BeNil())
+	assert.Nil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.SyntaxError)
 
-	Expect(syntaxError.Pos).
-		To(Equal(Position{Offset: 6, Line: 2, Column: 5}))
+	assert.Equal(t, syntaxError.Pos, Position{Offset: 6, Line: 2, Column: 5})
 
-	Expect(syntaxError.Message).
-		To(ContainSubstring("extraneous input"))
+	assert.Contains(t, syntaxError.Message, "extraneous input")
 }
 
 func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, inputIsComplete, err := parser.ParseProgram(`
 	    let
 	`)
 
-	Expect(inputIsComplete).
-		To(BeFalse())
+	assert.False(t, inputIsComplete)
 
-	Expect(actual).
-		To(BeNil())
+	assert.Nil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError1 := errors[0].(*parser.SyntaxError)
 
-	Expect(syntaxError1.Pos).
-		To(Equal(Position{Offset: 11, Line: 3, Column: 1}))
+	assert.Equal(t, syntaxError1.Pos, Position{Offset: 11, Line: 3, Column: 1})
 
-	Expect(syntaxError1.Message).
-		To(ContainSubstring("mismatched input"))
+	assert.Contains(t, syntaxError1.Message, "mismatched input")
 }
 
 func TestParseInvalidIncompleteConstantDeclaration2(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, inputIsComplete, err := parser.ParseProgram(`
 	    let =
 	`)
 
-	Expect(inputIsComplete).
-		To(BeFalse())
+	assert.False(t, inputIsComplete)
 
-	Expect(actual).
-		To(BeNil())
+	assert.Nil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(2))
+	assert.Len(t, errors, 2)
 
 	syntaxError1 := errors[0].(*parser.SyntaxError)
 
-	Expect(syntaxError1.Pos).
-		To(Equal(Position{Offset: 10, Line: 2, Column: 9}))
+	assert.Equal(t, syntaxError1.Pos, Position{Offset: 10, Line: 2, Column: 9})
 
-	Expect(syntaxError1.Message).
-		To(ContainSubstring("missing"))
+	assert.Contains(t, syntaxError1.Message, "missing")
 
 	syntaxError2 := errors[1].(*parser.SyntaxError)
 
-	Expect(syntaxError2.Pos).
-		To(Equal(Position{Offset: 13, Line: 3, Column: 1}))
+	assert.Equal(t, syntaxError2.Pos, Position{Offset: 13, Line: 3, Column: 1})
 
-	Expect(syntaxError2.Message).
-		To(ContainSubstring("mismatched input"))
+	assert.Contains(t, syntaxError2.Message, "mismatched input")
 }
 
 func TestParseBoolExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -142,19 +111,16 @@ func TestParseBoolExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIdentifierExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let b = a
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	b := &VariableDeclaration{
 		IsConstant: true,
@@ -179,19 +145,16 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Declarations: []Declaration{b},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseArrayExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = [1, 2]
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -225,19 +188,16 @@ func TestParseArrayExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseDictionaryExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let x = {"a": 1, "b": 2}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -285,19 +245,16 @@ func TestParseDictionaryExpression(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = b(1, 2)
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -343,19 +300,16 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = b(x: 1, y: 2)
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -405,19 +359,16 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMemberExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = b.c
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -448,19 +399,16 @@ func TestParseMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIndexExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let a = b[1]
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -494,19 +442,16 @@ func TestParseIndexExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseUnaryExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let foo = -boo
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -536,19 +481,16 @@ func TestParseUnaryExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseOrExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = false || true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -580,19 +522,16 @@ func TestParseOrExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseAndExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = false && true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -624,19 +563,16 @@ func TestParseAndExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseEqualityExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = false == true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -668,19 +604,16 @@ func TestParseEqualityExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseRelationalExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = 1 < 2
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -712,19 +645,16 @@ func TestParseRelationalExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseAdditiveExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = 1 + 2
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -756,19 +686,16 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMultiplicativeExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = 1 * 2
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -800,19 +727,16 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseConcatenatingExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = [1, 2] & [3, 4]
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -866,19 +790,16 @@ func TestParseConcatenatingExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let test = fun (): Int { return 1 }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -927,19 +848,16 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionAndBlock(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() { return }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -975,19 +893,16 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test(x: Int) { }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1038,19 +953,16 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionParameterWithLabel(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test(x y: Int) { }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1101,12 +1013,10 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIfStatement(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1121,8 +1031,7 @@ func TestParseIfStatement(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1220,12 +1129,10 @@ func TestParseIfStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1237,8 +1144,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1317,12 +1223,10 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIfStatementNoElse(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1332,8 +1236,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1384,12 +1287,10 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseWhileStatement(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1401,8 +1302,7 @@ func TestParseWhileStatement(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1462,12 +1362,10 @@ func TestParseWhileStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseAssignment(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1475,8 +1373,7 @@ func TestParseAssignment(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1525,12 +1422,10 @@ func TestParseAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseAccessAssignment(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() {
@@ -1538,8 +1433,7 @@ func TestParseAccessAssignment(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1624,19 +1518,16 @@ func TestParseAccessAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseExpressionStatementWithAccess(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1712,19 +1603,16 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseParametersAndArrayTypes(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		pub fun test(a: Int32, b: [Int32; 2], c: [[Int32; 3]]): [[Int64]] {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessPublic,
@@ -1832,19 +1720,16 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseDictionaryType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let x: {String: Int} = {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -1886,12 +1771,10 @@ func TestParseDictionaryType(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIntegerLiterals(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32
@@ -1900,8 +1783,7 @@ func TestParseIntegerLiterals(t *testing.T) {
         let decimal = 1234567890
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -1979,12 +1861,10 @@ func TestParseIntegerLiterals(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32_45
@@ -1993,8 +1873,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
         let decimal = 1_234_567_890
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -2072,269 +1951,203 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let octal = 0o_32_45
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 15, Line: 2, Column: 14}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 15, Line: 2, Column: 14})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 22, Line: 2, Column: 21}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 22, Line: 2, Column: 21})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindOctal))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindOctal)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let octal = 0o32_45_
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 15, Line: 2, Column: 14}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 15, Line: 2, Column: 14})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 22, Line: 2, Column: 21}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 22, Line: 2, Column: 21})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindOctal))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindOctal)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let binary = 0b_101010_101010
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 16, Line: 2, Column: 15}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 16, Line: 2, Column: 15})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 31, Line: 2, Column: 30}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 31, Line: 2, Column: 30})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindBinary))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindBinary)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let binary = 0b101010_101010_
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 16, Line: 2, Column: 15}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 16, Line: 2, Column: 15})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 31, Line: 2, Column: 30}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 31, Line: 2, Column: 30})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindBinary))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindBinary)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
 }
 
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let decimal = 1_234_567_890_
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 17, Line: 2, Column: 16}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 17, Line: 2, Column: 16})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 30, Line: 2, Column: 29}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 30, Line: 2, Column: 29})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindDecimal))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindDecimal)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let hex = 0x_f2_09
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 13, Line: 2, Column: 12}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 20, Line: 2, Column: 19}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 20, Line: 2, Column: 19})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindHexadecimal))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindHexadecimal)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindLeadingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let hex = 0xf2_09_
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 13, Line: 2, Column: 12}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 20, Line: 2, Column: 19}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 20, Line: 2, Column: 19})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindHexadecimal))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindHexadecimal)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindTrailingUnderscore))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
 
 }
 
 func TestParseInvalidIntegerLiteral(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let hex = 0z123
 	`)
 
-	Expect(actual).
-		To(Not(BeNil()))
+	assert.NotNil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	Expect(syntaxError.StartPos).
-		To(Equal(Position{Offset: 13, Line: 2, Column: 12}))
+	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
 
-	Expect(syntaxError.EndPos).
-		To(Equal(Position{Offset: 17, Line: 2, Column: 16}))
+	assert.Equal(t, syntaxError.EndPos, Position{Offset: 17, Line: 2, Column: 16})
 
-	Expect(syntaxError.IntegerLiteralKind).
-		To(Equal(parser.IntegerLiteralKindUnknown))
+	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindUnknown)
 
-	Expect(syntaxError.InvalidIntegerLiteralKind).
-		To(Equal(parser.InvalidIntegerLiteralKindUnknownPrefix))
+	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindUnknownPrefix)
 }
 
 func TestParseIntegerTypes(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let a: Int8 = 1
@@ -2347,8 +2160,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		let h: UInt64 = 8
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2572,19 +2384,16 @@ func TestParseIntegerTypes(t *testing.T) {
 		Declarations: []Declaration{a, b, c, d, e, f, g, h},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	add := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2649,19 +2458,16 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations: []Declaration{add},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionArrayType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let test: [((Int8): Int16); 2] = []
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2720,19 +2526,16 @@ func TestParseFunctionArrayType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let test: ((Int8): [Int16; 2]) = nothing
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2793,19 +2596,16 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2880,19 +2680,16 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2968,20 +2765,17 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMissingReturnType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 		let noop: ((): Void) =
             fun () { return }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	noop := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3043,19 +2837,16 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations: []Declaration{noop},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseLeftAssociativity(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = 1 + 2 + 3
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3095,55 +2886,51 @@ func TestParseLeftAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
-	RegisterTestingT(t)
 
 	program, _, err := parser.ParseProgram(`
 	   var a = 1
 	   let b = --a
 	`)
 
-	Expect(program).
-		To(Not(BeNil()))
+	assert.NotNil(t, program)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
-	Expect(err.(parser.Error).Errors).
-		To(Equal([]error{
+	assert.Equal(t,
+		err.(parser.Error).Errors,
+		[]error{
 			&parser.JuxtaposedUnaryOperatorsError{
 				Pos: Position{Offset: 27, Line: 3, Column: 12},
 			},
-		}))
+		},
+	)
 }
 
 func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
-	RegisterTestingT(t)
 
 	program, _, err := parser.ParseProgram(`
 	   let b = !!true
 	`)
 
-	Expect(program).
-		To(Not(BeNil()))
+	assert.NotNil(t, program)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
-	Expect(err.(parser.Error).Errors).
-		To(Equal([]error{
+	assert.Equal(t,
+		err.(parser.Error).Errors,
+		[]error{
 			&parser.JuxtaposedUnaryOperatorsError{
 				Pos: Position{Offset: 13, Line: 2, Column: 12},
 			},
-		}))
+		},
+	)
 }
 
 func TestParseTernaryRightAssociativity(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let a = 2 > 1
@@ -3151,8 +2938,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
           : 3 > 2 ? 1 : 2
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3216,12 +3002,10 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseStructure(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         struct Test {
@@ -3237,8 +3021,7 @@ func TestParseStructure(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -3385,19 +3168,16 @@ func TestParseStructure(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseStructureWithConformances(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         struct Test: Foo, Bar {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -3428,12 +3208,10 @@ func TestParseStructureWithConformances(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
-	RegisterTestingT(t)
 
 	_, _, err := parser.ParseProgram(`
         struct Test {
@@ -3441,12 +3219,10 @@ func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(HaveOccurred())
+	assert.NotNil(t, err)
 }
 
 func TestParsePreAndPostConditions(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         fun test(n: Int) {
@@ -3461,8 +3237,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3580,19 +3355,16 @@ func TestParsePreAndPostConditions(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseExpression(`
         before(x + before(y)) + z
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &BinaryExpression{
 		Operation: OperationPlus,
@@ -3651,19 +3423,16 @@ func TestParseExpression(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseString(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseExpression(`
        "test \0\n\r\t\"\'\\ xyz"
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &StringExpression{
 		Value:    "test \x00\n\r\t\"'\\ xyz",
@@ -3671,19 +3440,16 @@ func TestParseString(t *testing.T) {
 		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseStringWithUnicode(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseExpression(`
       "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &StringExpression{
 		Value:    "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
@@ -3691,12 +3457,10 @@ func TestParseStringWithUnicode(t *testing.T) {
 		EndPos:   Position{Offset: 68, Line: 2, Column: 67},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseConditionMessage(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         fun test(n: Int) {
@@ -3707,8 +3471,7 @@ func TestParseConditionMessage(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3796,19 +3559,16 @@ func TestParseConditionMessage(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseOptionalType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
        let x: Int?? = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3848,19 +3608,16 @@ func TestParseOptionalType(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseNilCoalescing(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
        let x = nil ?? 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3890,20 +3647,17 @@ func TestParseNilCoalescing(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseNilCoalescingRightAssociativity(t *testing.T) {
-	RegisterTestingT(t)
 
 	// NOTE: only syntactically, not semantically valid
 	actual, _, err := parser.ParseProgram(`
        let x = 1 ?? 2 ?? 3
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3943,19 +3697,16 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFailableDowncasting(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
        let x = 0 as? Int
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -3991,12 +3742,10 @@ func TestParseFailableDowncasting(t *testing.T) {
 		},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseInterface(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, kind := range common.CompositeKinds {
 		actual, _, err := parser.ParseProgram(fmt.Sprintf(`
@@ -4009,8 +3758,7 @@ func TestParseInterface(t *testing.T) {
             }
 	    `, kind.Keyword()))
 
-		Expect(err).
-			To(Not(HaveOccurred()))
+		assert.Nil(t, err)
 
 		// only compare AST for one kind: structs
 
@@ -4108,20 +3856,17 @@ func TestParseInterface(t *testing.T) {
 			Declarations: []Declaration{test},
 		}
 
-		Expect(actual).
-			To(Equal(expected))
+		assert.Equal(t, actual, expected)
 	}
 }
 
 func TestParseImportWithString(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         import "test.bpl"
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4135,31 +3880,32 @@ func TestParseImportWithString(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 
-	Expect(actual.Imports()).
-		To(Equal(map[ImportLocation]*Program{
+	assert.Equal(t,
+		actual.Imports(),
+		map[ImportLocation]*Program{
 			StringImportLocation("test.bpl"): nil,
-		}))
+		},
+	)
 
 	actual.Imports()[StringImportLocation("test.bpl")] = &Program{}
 
-	Expect(actual.Imports()).
-		To(Equal(map[ImportLocation]*Program{
+	assert.Equal(t,
+		actual.Imports(),
+		map[ImportLocation]*Program{
 			StringImportLocation("test.bpl"): {},
-		}))
+		},
+	)
 }
 
 func TestParseImportWithAddress(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         import 0x1234
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4173,32 +3919,32 @@ func TestParseImportWithAddress(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 
-	Expect(actual.Imports()).
-		To(Equal(map[ImportLocation]*Program{
+	assert.Equal(t,
+		actual.Imports(),
+		map[ImportLocation]*Program{
 			AddressImportLocation([]byte{18, 52}): nil,
-		}))
+		},
+	)
 
 	actual.Imports()[AddressImportLocation([]byte{18, 52})] = &Program{}
 
-	Expect(actual.Imports()).
-		To(Equal(map[ImportLocation]*Program{
+	assert.Equal(t,
+		actual.Imports(),
+		map[ImportLocation]*Program{
 			AddressImportLocation([]byte{18, 52}): {},
-		}))
-
+		},
+	)
 }
 
 func TestParseImportWithIdentifiers(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         import A, b from 0x0
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{
@@ -4221,12 +3967,10 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFieldWithFromIdentifier(t *testing.T) {
-	RegisterTestingT(t)
 
 	_, _, err := parser.ParseProgram(`
       struct S {
@@ -4234,79 +3978,64 @@ func TestParseFieldWithFromIdentifier(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestParseFunctionWithFromIdentifier(t *testing.T) {
-	RegisterTestingT(t)
 
 	_, _, err := parser.ParseProgram(`
         fun send(from: String, to: String) {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestParseImportWithFromIdentifier(t *testing.T) {
-	RegisterTestingT(t)
 
 	_, _, err := parser.ParseProgram(`
         import from from 0x0
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
 	_, _, err := parser.ParseProgram(`
         import from from 0x0;
         fun foo() {}; 
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestParseInvalidTypeWithWhitespace(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
 	    let x: Int ? = 1
 	`)
 
-	Expect(actual).
-		To(BeNil())
+	assert.Nil(t, actual)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(parser.Error{}))
+	assert.IsType(t, parser.Error{}, err)
 
 	errors := err.(parser.Error).Errors
-	Expect(errors).
-		To(HaveLen(1))
+	assert.Len(t, errors, 1)
 
 	syntaxError := errors[0].(*parser.SyntaxError)
 
-	Expect(syntaxError.Pos).
-		To(Equal(Position{Offset: 17, Line: 2, Column: 16}))
+	assert.Equal(t, syntaxError.Pos, Position{Offset: 17, Line: 2, Column: 16})
 
-	Expect(syntaxError.Message).
-		To(ContainSubstring("no viable alternative"))
+	assert.Contains(t, syntaxError.Message, "no viable alternative")
 }
 
 func TestParseResource(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         resource Test {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindResource,
@@ -4324,19 +4053,16 @@ func TestParseResource(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMoveReturnType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         fun test(): <-X {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -4366,19 +4092,16 @@ func TestParseMoveReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMovingVariableDeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let x <- y
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4403,12 +4126,10 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMoveStatement(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         fun test() {
@@ -4416,8 +4137,7 @@ func TestParseMoveStatement(t *testing.T) {
         }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -4467,19 +4187,16 @@ func TestParseMoveStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMoveOperator(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
       let x = foo(<-y)
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4525,19 +4242,16 @@ func TestParseMoveOperator(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMoveParameterType(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         fun test(x: <-X) {}
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -4588,19 +4302,16 @@ func TestParseMoveParameterType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let x: <-R <- y
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4635,19 +4346,16 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         struct X { x: <-R }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -4688,19 +4396,16 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let f: ((): <-R) = g
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4744,19 +4449,16 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let f = fun (): <-R { return X }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4806,19 +4508,16 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
         let y = x as? <-R
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -4855,12 +4554,10 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
       fun test() {
@@ -4869,8 +4566,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -4961,20 +4657,17 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }
 
 func TestParseIdentifiers(t *testing.T) {
-	RegisterTestingT(t)
 
 	for _, name := range []string{"foo", "from", "create", "destroy"} {
 		_, _, err := parser.ParseProgram(fmt.Sprintf(`
           let %s = 1
 	    `, name))
 
-		Expect(err).
-			To(Not(HaveOccurred()))
+		assert.Nil(t, err)
 	}
 }
 
@@ -4982,7 +4675,6 @@ func TestParseIdentifiers(t *testing.T) {
 // does *not* consume an expression from the next statement as the return value
 //
 func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
-	RegisterTestingT(t)
 
 	actual, _, err := parser.ParseProgram(`
       fun test() {
@@ -4991,8 +4683,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -5041,6 +4732,5 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	Expect(actual).
-		To(Equal(expected))
+	assert.Equal(t, actual, expected)
 }

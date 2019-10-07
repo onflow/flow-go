@@ -1,25 +1,22 @@
 package interpreter
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
-
-	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
 func TestBeforeExtractor(t *testing.T) {
-	RegisterTestingT(t)
 
 	expression, inputIsComplete, err := parser.ParseExpression(`
         before(x + before(y)) + z
 	`)
 
-	Expect(inputIsComplete).To(BeTrue())
+	assert.True(t, inputIsComplete)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	extractor := NewBeforeExtractor()
 
@@ -32,8 +29,9 @@ func TestBeforeExtractor(t *testing.T) {
 
 	result := extractor.ExtractBefore(expression)
 
-	Expect(result).
-		To(Equal(ast.ExpressionExtraction{
+	assert.Equal(t,
+		result,
+		ast.ExpressionExtraction{
 			RewrittenExpression: &ast.BinaryExpression{
 				Operation: ast.OperationPlus,
 				Left: &ast.IdentifierExpression{
@@ -72,5 +70,6 @@ func TestBeforeExtractor(t *testing.T) {
 					},
 				},
 			},
-		}))
+		},
+	)
 }

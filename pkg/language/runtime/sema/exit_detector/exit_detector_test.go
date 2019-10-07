@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
@@ -25,7 +25,6 @@ func parseFunctionBlock(code string) (*ast.FunctionBlock, error) {
 }
 
 func assertExits(t *testing.T, code string, expected bool) {
-	RegisterTestingT(t)
 
 	functionBlock, err := parseFunctionBlock(code)
 	if err != nil {
@@ -34,7 +33,7 @@ func assertExits(t *testing.T, code string, expected bool) {
 
 	exits := FunctionBlockExits(functionBlock)
 
-	Expect(exits).To(Equal(expected))
+	assert.Equal(t, exits, expected)
 }
 
 type exitTest struct {

@@ -40,7 +40,7 @@ type Interface interface {
 	// CreateAccount creates a new account with the given public key and code.
 	CreateAccount(publicKeys [][]byte, code []byte) (accountID []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(accountID, code []byte) (err error)
+	UpdateAccountCode(adddress types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
 	GetSigningAccounts() []types.Address
 	// Log logs a string.
@@ -165,9 +165,7 @@ var createAccountFunctionType = sema.FunctionType{
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// accountID
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
+		&sema.StringType{},
 		// code
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -481,9 +479,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 		}
 
-		accountID, err := toByteArray(arguments[0])
-		if err != nil {
-			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be a string"))
 		}
 
 		code, err := toByteArray(arguments[1])
@@ -491,7 +489,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
-		err = runtimeInterface.UpdateAccountCode(accountID, code)
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err = runtimeInterface.UpdateAccountCode(accountAddress, code)
 		if err != nil {
 			panic(err)
 		}
