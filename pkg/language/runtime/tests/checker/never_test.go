@@ -3,14 +3,13 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckNever(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheckWithExtra(
+	_, err := ParseAndCheckWithExtra(t,
 		`
             fun test(): Int {
                 return panic("XXX")
@@ -23,6 +22,5 @@ func TestCheckNever(t *testing.T) {
 		nil,
 	)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }

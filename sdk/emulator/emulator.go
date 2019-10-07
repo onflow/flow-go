@@ -13,24 +13,30 @@ import (
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
-// EmulatedBlockchain simulates a blockchain in the background to enable easy smart contract testing.
+// EmulatedBlockchain simulates a blockchain for testing purposes.
 //
-// Contains a versioned World State store and a pending transaction pool for granular state update tests.
-// Both "committed" and "intermediate" world states are logged for query by version (state hash) utilities,
-// but only "committed" world states are enabled for the SeekToState feature.
+// An emulated blockchain contains a versioned world state store and a pending transaction pool
+// for granular state update tests.
+//
+// The intermediate world state is stored after each transaction is executed and can be used
+// to check the output of a single transaction.
+//
+// The final world state is committed after each block. An index of committed world states is maintained
+// to allow a test to seek to a previously committed world state.
 type EmulatedBlockchain struct {
-	// mapping of committed world states (updated after CommitBlock)
+	// worldStates is a mapping of committed world states (updated after CommitBlock)
 	worldStates map[string][]byte
-	// mapping of intermediate world states (updated after SubmitTransaction)
+	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
 	intermediateWorldStates map[string][]byte
-	// current world state
+	// pendingWorldState is the current working world state
 	pendingWorldState *state.WorldState
-	// pool of pending transactions waiting to be committed (already executed)
+	// txPool is a pool of pending transactions waiting to be committed (already executed)
 	txPool             map[string]*types.Transaction
-	mutex              sync.RWMutex
+	mut                sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
 	rootAccountKey     crypto.PrivateKey
+	lastCreatedAccount types.Account
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
@@ -51,32 +57,38 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	txPool := make(map[string]*types.Transaction)
 	ws := state.NewWorldState()
 
-	runtime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(
-		runtime,
-		opt.RuntimeLogger,
-	)
+	worldStates[string(ws.Hash())] = ws.Encode()
 
-	rootAccountAddress, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
-
-	bytes := ws.Encode()
-	worldStates[string(ws.Hash())] = bytes
-
-	return &EmulatedBlockchain{
+	b := &EmulatedBlockchain{
 		worldStates:             worldStates,
 		intermediateWorldStates: intermediateWorldStates,
 		pendingWorldState:       ws,
 		txPool:                  txPool,
-		computer:                computer,
-		rootAccountAddress:      rootAccountAddress,
-		rootAccountKey:          rootAccountKey,
 	}
+
+	runtime := runtime.NewInterpreterRuntime()
+	computer := execution.NewComputer(
+		runtime,
+		opt.RuntimeLogger,
+		b.onAccountCreated,
+	)
+
+	b.computer = computer
+	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
+
+	b.rootAccountAddress = rootAccount.Address
+	b.rootAccountKey = rootAccountKey
+	b.lastCreatedAccount = rootAccount
+
+	return b
 }
 
-func (b *EmulatedBlockchain) RootAccount() types.Address {
+// RootAccountAddress returns the root account address for this blockchain.
+func (b *EmulatedBlockchain) RootAccountAddress() types.Address {
 	return b.rootAccountAddress
 }
 
+// RootKey returns the root private key for this blockchain.
 func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
 	return b.rootAccountKey
 }
@@ -110,8 +122,8 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, err
 //
 // First looks in pending txPool, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*types.Transaction, error) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+	b.mut.RLock()
+	defer b.mut.RUnlock()
 
 	if tx, ok := b.txPool[string(txHash)]; ok {
 		return tx, nil
@@ -174,8 +186,8 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	if _, exists := b.txPool[string(tx.Hash())]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
@@ -239,11 +251,11 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 
 // CommitBlock takes all pending transactions and commits them into a block.
 //
-// Note that this clears the pending transaction pool and indexes the committed
-// blockchain state for testing purposes.
+// Note: this clears the pending transaction pool and indexes the committed blockchain
+// state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
@@ -273,8 +285,8 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 // Note that this only seeks to a committed world state (not intermediate world state)
 // and this clears all pending transactions in txPool.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	b.mut.Lock()
+	defer b.mut.Unlock()
 
 	if bytes, ok := b.worldStates[string(hash)]; ok {
 		ws := state.Decode(bytes)
@@ -302,6 +314,15 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 
 	bytes := b.pendingWorldState.Encode()
 	b.worldStates[string(blockHash)] = bytes
+}
+
+func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
+	b.lastCreatedAccount = account
+}
+
+// lastCreatedAccount returns the last account that was created in the blockchain.
+func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
+	return b.lastCreatedAccount
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
@@ -375,7 +396,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Address, crypto.PrivateKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Account, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
 
 	if prKey == nil {
@@ -393,5 +414,8 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Add
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	return types.BytesToAddress(accountID), prKey
+	accountAddress := types.BytesToAddress(accountID)
+	account := runtimeContext.GetAccount(accountAddress)
+
+	return *account, prKey
 }

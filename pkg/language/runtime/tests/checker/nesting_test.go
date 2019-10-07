@@ -3,53 +3,47 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 // TODO: add support for nested composite declarations
 
 func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       contract TestContract {
           resource TestResource {}
       }
     `)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	// TODO: add support for contracts
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 	// TODO: add support for nested composite declarations
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 
 }
 
 func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       contract interface TestContract {
           resource TestResource {}
       }
     `)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	// TODO: add support for contracts
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 	// TODO: add support for nested composite declarations
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.UnsupportedDeclarationError{}))
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 }

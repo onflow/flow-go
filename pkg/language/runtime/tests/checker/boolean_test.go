@@ -3,20 +3,17 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckBoolean(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         let x = true
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.BoolType{}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.BoolType{})
 }

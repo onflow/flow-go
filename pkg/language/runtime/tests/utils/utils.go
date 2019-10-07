@@ -4,14 +4,16 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-func ParseAndCheck(code string) (*sema.Checker, error) {
-	return ParseAndCheckWithExtra(code, nil, nil, nil)
+func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
+	return ParseAndCheckWithExtra(t, code, nil, nil, nil)
 }
 
 func ParseAndCheckWithExtra(
+	t *testing.T,
 	code string,
 	values map[string]sema.ValueDeclaration,
 	types map[string]sema.TypeDeclaration,
@@ -19,8 +21,7 @@ func ParseAndCheckWithExtra(
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	if resolver != nil {
 		err := program.ResolveImports(resolver)
@@ -38,19 +39,18 @@ func ParseAndCheckWithExtra(
 	return checker, err
 }
 
-func ExpectCheckerErrors(err error, len int) []error {
+func ExpectCheckerErrors(t *testing.T, err error, len int) []error {
 	if len <= 0 && err == nil {
 		return nil
 	}
 
-	Expect(err).To(HaveOccurred())
+	assert.Error(t, err)
 
-	Expect(err).
-		To(BeAssignableToTypeOf(&sema.CheckerError{}))
+	assert.IsType(t, &sema.CheckerError{}, err)
 
 	errs := err.(*sema.CheckerError).Errors
 
-	Expect(errs).To(HaveLen(len))
+	assert.Len(t, errs, len)
 
 	return errs
 }

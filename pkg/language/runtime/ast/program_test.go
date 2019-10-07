@@ -2,13 +2,11 @@ package ast
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 func TestProgram_ResolveImports(t *testing.T) {
-	RegisterTestingT(t)
 
 	makeImportingProgram := func(imported string) *Program {
 		return &Program{
@@ -35,17 +33,20 @@ func TestProgram_ResolveImports(t *testing.T) {
 		}
 	})
 
-	Expect(err).To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(a.Imports()[StringImportLocation("b")]).
-		To(BeIdenticalTo(b))
+	actual := a.Imports()[StringImportLocation("b")]
+	if actual != b {
+		assert.Fail(t, "not b", actual)
+	}
 
-	Expect(b.Imports()[StringImportLocation("c")]).
-		To(BeIdenticalTo(c))
+	actual = b.Imports()[StringImportLocation("c")]
+	if actual != c {
+		assert.Fail(t, "not c", actual)
+	}
 }
 
 func TestProgram_ResolveImportsCycle(t *testing.T) {
-	RegisterTestingT(t)
 
 	makeImportingProgram := func(imported string) *Program {
 		return &Program{
@@ -74,8 +75,10 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 		}
 	})
 
-	Expect(err).
-		To(Equal(CyclicImportsError{
+	assert.Equal(t,
+		err,
+		CyclicImportsError{
 			Location: StringImportLocation("b"),
-		}))
+		},
+	)
 }

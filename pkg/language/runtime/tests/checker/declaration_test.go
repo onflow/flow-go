@@ -4,80 +4,69 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckConstantAndVariableDeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
-	checker, err := ParseAndCheck(`
+	checker, err := ParseAndCheck(t, `
         let x = 1
         var y = 1
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(checker.GlobalValues["x"].Type).
-		To(Equal(&sema.IntType{}))
+	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.IntType{})
 
-	Expect(checker.GlobalValues["y"].Type).
-		To(Equal(&sema.IntType{}))
+	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.IntType{})
 }
 
 func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun x() {}
 
         let y = true
         let y = false
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckInvalidGlobalFunctionRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         let x = true
 
         fun y() {}
         fun y() {}
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckInvalidLocalRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test() {
             let x = true
             let x = false
         }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
         fun test() {
             let x = true
 
@@ -86,123 +75,101 @@ func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
         }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckInvalidUnknownDeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        fun test() {
            return x
        }
 	`)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.InvalidReturnValueError{}))
+	assert.IsType(t, &sema.InvalidReturnValueError{}, errs[1])
 }
 
 func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        let x = y
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        let x: X = y
 	`)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-	Expect(errs[0].(*sema.NotDeclaredError).Name).
-		To(Equal("y"))
-	Expect(errs[0].(*sema.NotDeclaredError).ExpectedKind).
-		To(Equal(common.DeclarationKindVariable))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "y")
+	assert.Equal(t, errs[0].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindVariable)
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
-	Expect(errs[1].(*sema.NotDeclaredError).Name).
-		To(Equal("X"))
-	Expect(errs[1].(*sema.NotDeclaredError).ExpectedKind).
-		To(Equal(common.DeclarationKindType))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
+	assert.Equal(t, errs[1].(*sema.NotDeclaredError).Name, "X")
+	assert.Equal(t, errs[1].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindType)
 }
 
 func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        let x = y()
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidRedeclarations(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(a: Int, a: Int) {
         let x = 1
         let x = 2
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 2)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 
-	Expect(errs[1]).
-		To(BeAssignableToTypeOf(&sema.RedeclarationError{}))
+	assert.IsType(t, &sema.RedeclarationError{}, errs[1])
 }
 
 func TestCheckInvalidConstantValue(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       let x: Bool = 1
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidReference(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           testX
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }

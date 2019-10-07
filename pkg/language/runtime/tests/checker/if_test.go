@@ -3,27 +3,24 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckIfStatementTest(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           if true {}
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIfStatementScoping(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           if true {
               let x = 1
@@ -32,31 +29,27 @@ func TestCheckIfStatementScoping(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidIfStatementTest(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           if 1 {}
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidIfStatementElse(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           if true {} else {
               x
@@ -64,16 +57,14 @@ func TestCheckInvalidIfStatementElse(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(x: Int?): Int {
           if var y = x {
               return y
@@ -83,14 +74,12 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(x: Int?) {
           if var y = x {
               // ...
@@ -100,16 +89,14 @@ func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T)
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      fun test(x: Int??): Int? {
          if var y = x {
              return y
@@ -119,14 +106,12 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      fun test(x: Int??): Int? {
          if var y: Int? = x {
              return y
@@ -136,14 +121,12 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
      fun test(x: Int) {
          if var y = x {
              // ...
@@ -153,16 +136,14 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
      }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test(x: Int?): Int? {
           if var y: Int? = x {
              return y
@@ -172,8 +153,7 @@ func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }

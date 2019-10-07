@@ -3,57 +3,50 @@ package checker
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCheckInvalidWhileTest(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           while 1 {}
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.TypeMismatchError{}))
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
 func TestCheckWhileTest(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           while true {}
       }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidWhileBlock(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
       fun test() {
           while true { x }
       }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.NotDeclaredError{}))
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckBreakStatement(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        fun test() {
            while true {
                break
@@ -61,14 +54,12 @@ func TestCheckBreakStatement(t *testing.T) {
        }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidBreakStatement(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        fun test() {
            while true {
                fun () {
@@ -78,16 +69,14 @@ func TestCheckInvalidBreakStatement(t *testing.T) {
        }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ControlStatementError{}))
+	assert.IsType(t, &sema.ControlStatementError{}, errs[0])
 }
 
 func TestCheckContinueStatement(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        fun test() {
            while true {
                continue
@@ -95,14 +84,12 @@ func TestCheckContinueStatement(t *testing.T) {
        }
 	`)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 }
 
 func TestCheckInvalidContinueStatement(t *testing.T) {
-	RegisterTestingT(t)
 
-	_, err := ParseAndCheck(`
+	_, err := ParseAndCheck(t, `
        fun test() {
            while true {
                fun () {
@@ -112,8 +99,7 @@ func TestCheckInvalidContinueStatement(t *testing.T) {
        }
 	`)
 
-	errs := ExpectCheckerErrors(err, 1)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	Expect(errs[0]).
-		To(BeAssignableToTypeOf(&sema.ControlStatementError{}))
+	assert.IsType(t, &sema.ControlStatementError{}, errs[0])
 }

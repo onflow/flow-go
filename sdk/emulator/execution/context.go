@@ -11,16 +11,30 @@ import (
 )
 
 type RuntimeContext struct {
-	registers *types.RegistersView
-	Accounts  []types.Address
-	Logger    func(string)
+	registers        *types.RegistersView
+	signingAccounts  []types.Address
+	onLog            func(string)
+	onAccountCreated func(account types.Account)
 }
 
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers: registers,
-		Logger:    func(string) {},
+		registers:        registers,
+		onLog:            func(string) {},
+		onAccountCreated: func(types.Account) {},
 	}
+}
+
+func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
+	r.signingAccounts = accounts
+}
+
+func (r *RuntimeContext) SetLogger(callback func(string)) {
+	r.onLog = callback
+}
+
+func (r *RuntimeContext) SetOnAccountCreated(callback func(account types.Account)) {
+	r.onAccountCreated = callback
 }
 
 func (r *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
@@ -61,6 +75,9 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
+
+	account := r.GetAccount(accountAddress)
+	r.onAccountCreated(*account)
 
 	return accountID, nil
 }
@@ -121,7 +138,13 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]
 	return publicKeys, keyWeights, nil
 }
 
-func (r *RuntimeContext) UpdateAccountCode(accountID, code []byte) (err error) {
+func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
+	accountID := address.Bytes()
+
+	if !r.isValidSigningAccount(address) {
+		return fmt.Errorf("not permitted to update account with ID %s", accountID)
+	}
+
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
@@ -179,11 +202,21 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 }
 
 func (r *RuntimeContext) GetSigningAccounts() []types.Address {
-	return r.Accounts
+	return r.signingAccounts
 }
 
 func (r *RuntimeContext) Log(message string) {
-	r.Logger(message)
+	r.onLog(message)
+}
+
+func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {
+	for _, accountAddress := range r.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+
+	return false
 }
 
 const (

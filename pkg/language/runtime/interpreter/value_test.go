@@ -1,45 +1,29 @@
 package interpreter
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 func TestToExpression(t *testing.T) {
-	RegisterTestingT(t)
-
 	_, err := ToValue(1)
-	Expect(err).
-		To(HaveOccurred())
+	assert.Error(t, err)
 
-	Expect(ToValue(int8(1))).
-		To(Equal(Int8Value(1)))
+	testValue := func(expected Value) func(actual Value, err error) {
+		return func(actual Value, err error) {
+			assert.Nil(t, err)
+			assert.Equal(t, actual, expected)
+		}
+	}
 
-	Expect(ToValue(int16(2))).
-		To(Equal(Int16Value(2)))
-
-	Expect(ToValue(int32(3))).
-		To(Equal(Int32Value(3)))
-
-	Expect(ToValue(int64(4))).
-		To(Equal(Int64Value(4)))
-
-	Expect(ToValue(uint8(1))).
-		To(Equal(UInt8Value(1)))
-
-	Expect(ToValue(uint16(2))).
-		To(Equal(UInt16Value(2)))
-
-	Expect(ToValue(uint32(3))).
-		To(Equal(UInt32Value(3)))
-
-	Expect(ToValue(uint64(4))).
-		To(Equal(UInt64Value(4)))
-
-	Expect(ToValue(true)).
-		To(Equal(BoolValue(true)))
-
-	Expect(ToValue(false)).
-		To(Equal(BoolValue(false)))
+	testValue(Int8Value(1))(ToValue(int8(1)))
+	testValue(Int16Value(2))(ToValue(int16(2)))
+	testValue(Int32Value(3))(ToValue(int32(3)))
+	testValue(Int64Value(4))(ToValue(int64(4)))
+	testValue(UInt8Value(1))(ToValue(uint8(1)))
+	testValue(UInt16Value(2))(ToValue(uint16(2)))
+	testValue(UInt32Value(3))(ToValue(uint32(3)))
+	testValue(UInt64Value(4))(ToValue(uint64(4)))
+	testValue(BoolValue(true))(ToValue(true))
+	testValue(BoolValue(false))(ToValue(false))
 }
