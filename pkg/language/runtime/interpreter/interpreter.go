@@ -753,18 +753,25 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
 	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(IndexableValue)
+			switch typedResult := result.(type) {
+			case IndexableValue:
+				return target.IndexingExpression.Accept(interpreter).(Trampoline).
+					FlatMap(func(result interface{}) Trampoline {
+						indexingValue := result.(Value)
+						typedResult.Set(indexingValue, value)
 
-			// TODO: handle indexing into storage using target.IndexingType
+						// NOTE: no result, so it does *not* act like a return-statement
+						return Done{}
+					})
 
-			return target.IndexingExpression.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					indexingValue := result.(Value)
-					indexedValue.Set(indexingValue, value)
+			case StorageValue:
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
+				typedResult.Set(indexingType, value)
+				return Done{}
 
-					// NOTE: no result, so it does *not* act like a return-statement
-					return Done{}
-				})
+			default:
+				panic(&errors.UnreachableError{})
+			}
 		})
 }
 
@@ -1134,16 +1141,31 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			indexedValue := result.(IndexableValue)
+			switch typedResult := result.(type) {
+			case IndexableValue:
+				return expression.IndexingExpression.Accept(interpreter).(Trampoline).
+					FlatMap(func(result interface{}) Trampoline {
+						indexingValue := result.(Value)
+						value := typedResult.Get(indexingValue)
+						return Done{Result: value}
+					})
 
-			// TODO: handle indexing into storage using target.IndexingType
+			case StorageValue:
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
 
-			return expression.IndexingExpression.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					indexingValue := result.(Value)
-					value := indexedValue.Get(indexingValue)
-					return Done{Result: value}
-				})
+				var result Value
+				value := typedResult.Get(indexingType)
+				if value == nil {
+					result = NilValue{}
+				} else {
+					result = SomeValue{Value: value}
+				}
+
+				return Done{Result: result}
+
+			default:
+				panic(&errors.UnreachableError{})
+			}
 		})
 }
 
