@@ -643,6 +643,140 @@ func TestCreateAccount(t *testing.T) {
 	Expect(account.Code).To(Equal(codeB))
 }
 
+func TestAddAccountKey(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	publicKeyA, _ := privateKeyA.Publickey().Encode()
+
+	accountKeyA := types.AccountKey{
+		PublicKey: publicKeyA,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
+	tx1 := &types.Transaction{
+		Script:             accounts.AddAccountKey(accountKeyA),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(Not(HaveOccurred()))
+
+	script := []byte("fun main(account: Account) {}")
+
+	tx2 := &types.Transaction{
+		Script:             script,
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx2.AddSignature(b.RootAccountAddress(), privateKeyA)
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).To(Not(HaveOccurred()))
+}
+
+func TestRemoveAccountKey(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	publicKeyA, _ := privateKeyA.Publickey().Encode()
+
+	accountKeyA := types.AccountKey{
+		PublicKey: publicKeyA,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
+	tx1 := &types.Transaction{
+		Script:             accounts.AddAccountKey(accountKeyA),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(Not(HaveOccurred()))
+
+	account, err := b.GetAccount(b.RootAccountAddress())
+	Expect(err).To(Not(HaveOccurred()))
+
+	Expect(account.Keys).To(HaveLen(2))
+
+	tx2 := &types.Transaction{
+		Script:             accounts.RemoveAccountKey(0),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err = b.SubmitTransaction(tx2)
+	Expect(err).To(Not(HaveOccurred()))
+
+	account, err = b.GetAccount(b.RootAccountAddress())
+	Expect(err).To(Not(HaveOccurred()))
+
+	Expect(account.Keys).To(HaveLen(1))
+
+	tx3 := &types.Transaction{
+		Script:             accounts.RemoveAccountKey(0),
+		ReferenceBlockHash: nil,
+		Nonce:              1,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err = b.SubmitTransaction(tx3)
+	Expect(err).To(HaveOccurred())
+
+	account, err = b.GetAccount(b.RootAccountAddress())
+	Expect(err).To(Not(HaveOccurred()))
+
+	Expect(account.Keys).To(HaveLen(1))
+
+	tx4 := &types.Transaction{
+		Script:             accounts.RemoveAccountKey(0),
+		ReferenceBlockHash: nil,
+		Nonce:              2,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx4.AddSignature(b.RootAccountAddress(), privateKeyA)
+
+	err = b.SubmitTransaction(tx4)
+	Expect(err).To(Not(HaveOccurred()))
+
+	account, err = b.GetAccount(b.RootAccountAddress())
+	Expect(err).To(Not(HaveOccurred()))
+
+	Expect(account.Keys).To(HaveLen(0))
+}
+
 func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKeyB, _ := privateKeyB.Publickey().Encode()
@@ -651,13 +785,6 @@ func TestUpdateAccountCode(t *testing.T) {
 		PublicKey: publicKeyB,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
-
-	updateAccountCodeScript := []byte(`
-		fun main(account: Account) {
-			let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
-			updateAccountCode(account.address, code)
-		}
-	`)
 
 	t.Run("ValidSignature", func(t *testing.T) {
 		RegisterTestingT(t)
@@ -676,7 +803,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 		tx := &types.Transaction{
-			Script:             updateAccountCodeScript,
+			Script:             accounts.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              1,
 			ComputeLimit:       10,
@@ -693,7 +820,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err = b.GetAccount(accountAddressB)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(account.Code).To(Equal([]byte{102, 117, 110, 32, 109, 97, 105, 110, 40, 41, 32, 123, 125}))
+		Expect(account.Code).To(Equal([]byte{7, 8, 9}))
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
@@ -713,7 +840,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 		tx := &types.Transaction{
-			Script:             updateAccountCodeScript,
+			Script:             accounts.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              1,
 			ComputeLimit:       10,
@@ -749,10 +876,15 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-		script := accounts.UpdateAccountCode(accountAddressB, []byte{7, 8, 9})
+		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
+			fun main(account: Account) {
+				let code = [7, 8, 9]
+				updateAccountCode(%s, code)
+			}
+		`, accountAddressB.Hex()))
 
 		tx := &types.Transaction{
-			Script:             script,
+			Script:             unauthorizedUpdateAccountCodeScript,
 			ReferenceBlockHash: nil,
 			Nonce:              1,
 			ComputeLimit:       10,
