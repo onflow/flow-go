@@ -751,11 +751,13 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
-	return target.Expression.Accept(interpreter).(Trampoline).
+	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(IndexableValue)
 
-			return target.Index.Accept(interpreter).(Trampoline).
+			// TODO: handle indexing into storage using target.IndexingType
+
+			return target.IndexingExpression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexingValue := result.(Value)
 					indexedValue.Set(indexingValue, value)
@@ -1130,11 +1132,13 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return expression.Expression.Accept(interpreter).(Trampoline).
+	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(IndexableValue)
 
-			return expression.Index.Accept(interpreter).(Trampoline).
+			// TODO: handle indexing into storage using target.IndexingType
+
+			return expression.IndexingExpression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexingValue := result.(Value)
 					value := indexedValue.Get(indexingValue)

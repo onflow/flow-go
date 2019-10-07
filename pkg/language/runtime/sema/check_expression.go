@@ -98,7 +98,7 @@ func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) 
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression.Expression, expression.Index, false)
+	return checker.visitIndexingExpression(expression, false)
 }
 
 // visitIndexingExpression checks if the indexed expression is indexable,
@@ -106,13 +106,12 @@ func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) as
 // and returns the expected element type
 //
 func (checker *Checker) visitIndexingExpression(
-	indexedExpression ast.Expression,
-	indexingExpression ast.Expression,
+	indexExpression *ast.IndexExpression,
 	isAssignment bool,
 ) Type {
 
-	indexedType := indexedExpression.Accept(checker).(Type)
-	indexingType := indexingExpression.Accept(checker).(Type)
+	targetExpression := indexExpression.TargetExpression
+	indexedType := targetExpression.Accept(checker).(Type)
 
 	// NOTE: check indexed type first for UX reasons
 
@@ -123,10 +122,72 @@ func (checker *Checker) visitIndexingExpression(
 		return &InvalidType{}
 	}
 
-	elementType := IndexableElementType(indexedType, isAssignment)
-	if elementType == nil {
-		elementType = &InvalidType{}
+	_, isStorage := indexedType.(*StorageType)
+	if isStorage {
 
+		indexingType := indexExpression.IndexingType
+
+		// indexing into storage using expression?
+		if indexExpression.IndexingExpression != nil {
+
+			// Identifier expressions are valid, as the parser can't differentiate
+			// between identifier expressions and nominal types.
+
+			identifierExpression, isIdentifier := indexExpression.IndexingExpression.(*ast.IdentifierExpression)
+
+			if isIdentifier {
+				indexingType = &ast.NominalType{
+					Identifier: identifierExpression.Identifier,
+				}
+			} else {
+				checker.report(
+					&InvalidStorageIndexingError{
+						StartPos: indexExpression.IndexingExpression.StartPosition(),
+						EndPos:   indexExpression.IndexingExpression.EndPosition(),
+					},
+				)
+
+				return &InvalidType{}
+			}
+		}
+
+		return checker.visitStorageIndexingExpression(
+			targetExpression,
+			indexingType,
+			isAssignment,
+		)
+	} else {
+		// indexing into non-storage value using type?
+		if indexExpression.IndexingType != nil {
+			checker.report(
+				&InvalidIndexingError{
+					StartPos: indexExpression.IndexingType.StartPosition(),
+					EndPos:   indexExpression.IndexingType.EndPosition(),
+				},
+			)
+
+			return &InvalidType{}
+		}
+
+		return checker.visitNormalIndexingExpression(
+			targetExpression,
+			indexedType,
+			indexExpression.IndexingExpression,
+			isAssignment,
+		)
+	}
+}
+
+func (checker *Checker) visitNormalIndexingExpression(
+	indexedExpression ast.Expression,
+	indexedType Type,
+	indexingExpression ast.Expression,
+	isAssignment bool,
+) Type {
+	indexingType := indexingExpression.Accept(checker).(Type)
+
+	indexableType, isIndexableType := indexedType.(IndexableType)
+	if !isIndexableType {
 		checker.report(
 			&NotIndexableTypeError{
 				Type:     indexedType,
@@ -135,14 +196,16 @@ func (checker *Checker) visitIndexingExpression(
 			},
 		)
 
-		return elementType
+		return &InvalidType{}
 	}
+
+	elementType := indexableType.ElementType(isAssignment)
 
 	// check indexing expression's type can be used to index
 	// into indexed expression's type
 
 	if !IsInvalidType(indexingType) &&
-		!IsIndexingType(indexingType, indexedType) {
+		!IsSubType(indexingType, indexableType.IndexingType()) {
 
 		checker.report(
 			&NotIndexingTypeError{
@@ -156,4 +219,22 @@ func (checker *Checker) visitIndexingExpression(
 	checker.checkNonIdentifierResourceLoss(indexedType, indexedExpression)
 
 	return elementType
+}
+
+func (checker *Checker) visitStorageIndexingExpression(
+	indexedExpression ast.Expression,
+	indexingType ast.Type,
+	isAssignment bool,
+) Type {
+
+	keyType := checker.ConvertType(indexingType)
+	if IsInvalidType(keyType) {
+		return &InvalidType{}
+	}
+
+	if isAssignment {
+		return keyType
+	} else {
+		return &OptionalType{Type: keyType}
+	}
 }
