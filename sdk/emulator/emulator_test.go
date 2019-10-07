@@ -360,6 +360,73 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		err := b.SubmitTransaction(tx1)
 		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccount()}))
 	})
+
+	t.Run("KeyWeights", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+		publicKeyA, _ := privateKeyA.Publickey().Encode()
+
+		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("space cowboy"))
+		publicKeyB, _ := privateKeyB.Publickey().Encode()
+
+		accountKeyA := types.AccountKey{
+			PublicKey: publicKeyA,
+			Weight:    constants.AccountKeyWeightThreshold / 2,
+		}
+
+		accountKeyB := types.AccountKey{
+			PublicKey: publicKeyB,
+			Weight:    constants.AccountKeyWeightThreshold / 2,
+		}
+
+		createAccountScript := accounts.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+
+		accountAddressA := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccount(),
+		}
+
+		tx1.AddSignature(b.RootAccount(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).ToNot(HaveOccurred())
+
+		script := []byte("fun main(account: Account) {}")
+
+		tx2 := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA},
+		}
+
+		t.Run("InsufficientKeyWeight", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			tx2.AddSignature(accountAddressA, privateKeyB)
+
+			err = b.SubmitTransaction(tx2)
+			Expect(err).To(MatchError(&ErrMissingSignature{Account: accountAddressA}))
+		})
+
+		t.Run("SufficientKeyWeight", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			tx2.AddSignature(accountAddressA, privateKeyA)
+			tx2.AddSignature(accountAddressA, privateKeyB)
+
+			err = b.SubmitTransaction(tx2)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+	})
 }
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
