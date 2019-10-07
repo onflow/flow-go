@@ -15,8 +15,8 @@ type testRuntimeInterface struct {
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
 	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
-	addAccountKey      func(accountID, publicKey []byte, keyWeight int) error
-	removeAccountKey   func(accountID []byte, index int) error
+	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
+	removeAccountKey   func(address types.Address, index int) error
 	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
@@ -38,12 +38,12 @@ func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []i
 	return i.createAccount(publicKeys, keyWeights, code)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(accountID, publicKey []byte, keyWeight int) error {
-	return i.addAccountKey(accountID, publicKey, keyWeight)
+func (i *testRuntimeInterface) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+	return i.addAccountKey(address, publicKey, keyWeight)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(accountID []byte, index int) error {
-	return i.removeAccountKey(accountID, index)
+func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) error {
+	return i.removeAccountKey(address, index)
 }
 
 func (i *testRuntimeInterface) UpdateAccountCode(address types.Address, code []byte) (err error) {

@@ -40,9 +40,9 @@ type Interface interface {
 	// CreateAccount creates a new account with the given public keys and code.
 	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(accountID, publicKey []byte, keyWeight int) error
+	AddAccountKey(adddress types.Address, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(accountID []byte, index int) error
+	RemoveAccountKey(adddress types.Address, index int) error
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(adddress types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -172,10 +172,8 @@ var createAccountFunctionType = sema.FunctionType{
 // TODO: improve types
 var addAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// accountID
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
+		// address
+		&sema.StringType{},
 		// key
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -192,10 +190,8 @@ var addAccountKeyFunctionType = sema.FunctionType{
 // TODO: improve types
 var removeAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// accountID
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
+		// address
+		&sema.StringType{},
 		// index
 		&sema.IntType{},
 	),
@@ -208,7 +204,7 @@ var removeAccountKeyFunctionType = sema.FunctionType{
 // TODO: improve types
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// accountID
+		// address
 		&sema.StringType{},
 		// code
 		&sema.VariableSizedType{
@@ -540,9 +536,9 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires 3 parameters"))
 		}
 
-		accountID, err := toByteArray(arguments[0])
-		if err != nil {
-			panic(fmt.Sprintf("addAccountKey requires the first parameter to be an array"))
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("addAccountKey requires the first parameter to be a string"))
 		}
 
 		publicKey, err := toByteArray(arguments[1])
@@ -555,7 +551,9 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the third parameter to be an integer"))
 		}
 
-		err = runtimeInterface.AddAccountKey(accountID, publicKey, keyWeight.IntValue())
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err = runtimeInterface.AddAccountKey(accountAddress, publicKey, keyWeight.IntValue())
 		if err != nil {
 			panic(err)
 		}
@@ -571,9 +569,9 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
 		}
 
-		accountID, err := toByteArray(arguments[0])
-		if err != nil {
-			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be an array"))
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be a string"))
 		}
 
 		index, ok := arguments[1].(interpreter.IntValue)
@@ -582,7 +580,9 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		}
 
-		err = runtimeInterface.RemoveAccountKey(accountID, index.IntValue())
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err := runtimeInterface.RemoveAccountKey(accountAddress, index.IntValue())
 		if err != nil {
 			panic(err)
 		}

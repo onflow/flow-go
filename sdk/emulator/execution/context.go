@@ -86,7 +86,9 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	return accountID, nil
 }
 
-func (r *RuntimeContext) AddAccountKey(accountID, publicKey []byte, keyWeight int) error {
+func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+	accountID := address.Bytes()
+
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
@@ -105,7 +107,9 @@ func (r *RuntimeContext) AddAccountKey(accountID, publicKey []byte, keyWeight in
 	return nil
 }
 
-func (r *RuntimeContext) RemoveAccountKey(accountID []byte, index int) error {
+func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) error {
+	accountID := address.Bytes()
+
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
