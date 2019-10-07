@@ -433,7 +433,8 @@ memberAccess
     ;
 
 bracketExpression
-    : '[' expression ']'
+    // storage is accessed using types
+    : '[' (expression | fullType) ']'
     ;
 
 invocation
