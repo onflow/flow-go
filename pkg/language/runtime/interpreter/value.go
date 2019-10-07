@@ -1317,7 +1317,10 @@ type StorageValue struct {
 func (StorageValue) isValue() {}
 
 func (v StorageValue) Copy() Value {
-	return StorageValue{}
+	return StorageValue{
+		Getter: v.Getter,
+		Setter: v.Setter,
+	}
 }
 
 func (StorageValue) isIndexableValue() {}
