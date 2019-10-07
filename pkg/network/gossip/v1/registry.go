@@ -1,76 +1,90 @@
 package gnode
 
-import "fmt"
+// registry provides a (function name, function body) on-memory key-value store with adding and invoking msgTypes functionalities
+import (
+	"context"
+	"fmt"
+)
 
 // HandleFunc is the function signature expected from all registered functions
-// maybe also pass the context as a parameter?
-type HandleFunc func([]byte) ([]byte, error)
+type HandleFunc func(context.Context, []byte) ([]byte, error)
 
-// Registry supplies the methods to be called by Gossip Messages
+// Registry supplies the msgTypes to be called by Gossip Messages
+// We assume each registry to enclose the set of functions of a single type of node e.g., execution node
 type Registry interface {
-	Methods() map[string]HandleFunc
+	MessageTypes() map[string]HandleFunc
 }
 
-// MultiRegistry provides a way to combine multiple registries into one
+// MultiRegistry supports combining multiple registries into one
+// It is suited for scenarios where multiple nodes are running on the same machine and share the
+// same gossip layer
 type MultiRegistry struct {
-	methods map[string]HandleFunc
+	msgTypes map[string]HandleFunc
 }
 
-func (mr *MultiRegistry) Methods() map[string]HandleFunc {
-	return mr.methods
+// MessageTypes returns the list of msgTypes to be served
+func (mr *MultiRegistry) MessageTypes() map[string]HandleFunc {
+	return mr.msgTypes
 }
 
-// NewMultiRegistry returns a new Registry which is a combination of all given
-// registries.
-// Note: If there are registries containing the same method name, then one of
+// NewMultiRegistry receives a set of arbitrary number of registers and consolidates them into a MultiRegistry type
+// Note: If there are registries containing the same msgType name, then one of
 // them will be overwritten.
 func NewMultiRegistry(registries ...Registry) *MultiRegistry {
 
-	mr := MultiRegistry{methods: make(map[string]HandleFunc)}
+	mr := MultiRegistry{msgTypes: make(map[string]HandleFunc)}
 
 	for _, reg := range registries {
-		for name, method := range reg.Methods() {
-			mr.methods[name] = method
+		for name, msgType := range reg.MessageTypes() {
+			mr.msgTypes[name] = msgType
 		}
 	}
-
 	return &mr
 }
 
 // registryRunner is used internally to wrap Registries and provide an invocation
 // interface
 type registryManager struct {
-	methods map[string]HandleFunc
+	msgTypes map[string]HandleFunc
 }
 
+// newRegistryManager initializes a registry manager which manges a given registry
 func newRegistryManager(registry Registry) *registryManager {
-	return &registryManager{methods: registry.Methods()}
-}
-
-func newEmptyRegistryManager() *registryManager {
-	return &registryManager{methods: make(map[string]HandleFunc)}
-}
-
-func (r *registryManager) Invoke(method string, payloadBytes []byte) (*invokeResponse, error) {
-	if _, ok := r.methods[method]; !ok {
-		return nil, fmt.Errorf("could not run method %v: method does not exist", method)
+	if registry == nil {
+		return &registryManager{msgTypes: make(map[string]HandleFunc)}
 	}
 
-	resp, err := r.methods[method](payloadBytes)
+	return &registryManager{msgTypes: registry.MessageTypes()}
+}
+
+// Invoke passes input parameters to given msgType name in the registry
+func (r *registryManager) Invoke(ctx context.Context, msgType string, payloadBytes []byte) (*invokeResponse, error) {
+	if _, ok := r.msgTypes[msgType]; !ok {
+		return nil, fmt.Errorf("could not run msgType %v: msgType does not exist", msgType)
+	}
+
+	resp, err := r.msgTypes[msgType](ctx, payloadBytes)
 
 	return &invokeResponse{Resp: resp, Err: err}, nil
 }
 
-func (r *registryManager) AddMethod(method string, f HandleFunc) error {
-	if _, ok := r.methods[method]; ok {
-		return fmt.Errorf("could not add method %v: method with the same name already exists", method)
+// AddMessageType allows a registryManager of adding a msgType to registries inside of it
+func (r *registryManager) AddMessageType(msgType string, f HandleFunc) error {
+
+	if msgType == "" {
+		return fmt.Errorf("msgType name cannot be an empty string")
 	}
 
-	r.methods[method] = f
+	if _, ok := r.msgTypes[msgType]; ok {
+		return fmt.Errorf("could not add msgType %v: msgType with the same name already exists", msgType)
+	}
+
+	r.msgTypes[msgType] = f
 
 	return nil
 }
 
+// invokeResponse encapsulates results from invoked function
 type invokeResponse struct {
 	Resp []byte
 	Err  error

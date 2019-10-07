@@ -14,9 +14,9 @@ Package gossip implements the functionality to epidemically dessiminate a messag
 
 
 ## <a name="pkg-index">Index</a>
-* [type GossipMode](#GossipMode)
-  * [func (gm GossipMode) String() string](#GossipMode.String)
-* [type GossipService](#GossipService)
+* [type Mode](#Mode)
+  * [func (m Mode) String() string](#Mode.String)
+* [type Service](#Service)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -27,21 +27,21 @@ Package gossip implements the functionality to epidemically dessiminate a messag
 
 
 
-## <a name="GossipMode">type</a> [GossipMode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=333:352#L12)
+## <a name="Mode">type</a> [Mode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=302:315#L11)
 ``` go
-type GossipMode int
+type Mode int
 ```
-Defines mode of the gossip based on the set of recipients
+Mode defines mode of the gossip based on the set of recipients
 
 
 ``` go
 const (
-    ONE_TO_ONE GossipMode = iota
-    ONE_TO_MANY
-    ONE_TO_ALL
+    ModeOneToOne Mode = iota
+    ModeOneToMany
+    ModeOneToAll
 )
 ```
-The legitimate values for the GossipMode
+The legitimate values for the a gossip Mode
 
 
 
@@ -52,20 +52,21 @@ The legitimate values for the GossipMode
 
 
 
-### <a name="GossipMode.String">func</a> (GossipMode) [String](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=464:500#L21)
+### <a name="Mode.String">func</a> (Mode) [String](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=430:459#L20)
 ``` go
-func (gm GossipMode) String() string
+func (m Mode) String() string
 ```
 
 
 
-## <a name="GossipService">type</a> [GossipService](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=785:900#L27)
+## <a name="Service">type</a> [Service](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/gossip.go?s=743:1002#L26)
 ``` go
-type GossipService interface {
-    Gossip(ctx context.Context, request *shared.GossipMessage) (proto.Message, error)
+type Service interface {
+    SyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*shared.GossipReply, error)
+    AsyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*shared.GossipReply, error)
 }
 ```
-GossipService is the interface of the network package and hence the networking streams with all
+Service is the interface of the network package and hence the networking streams with all
 other streams of the system. It defines the function call, the type of input arguments, and the output result
 
 

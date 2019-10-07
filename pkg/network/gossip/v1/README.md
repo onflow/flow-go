@@ -1,10 +1,11 @@
 
 
-# async
+# gnode
 `import "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
+* [Subdirectories](#pkg-subdirectories)
 
 ## <a name="pkg-overview">Overview</a>
 
@@ -12,30 +13,90 @@
 
 ## <a name="pkg-index">Index</a>
 * [Constants](#pkg-constants)
+* [type HandleFunc](#HandleFunc)
+* [type MultiRegistry](#MultiRegistry)
+  * [func NewMultiRegistry(registries ...Registry) *MultiRegistry](#NewMultiRegistry)
+  * [func (mr *MultiRegistry) MessageTypes() map[string]HandleFunc](#MultiRegistry.MessageTypes)
 * [type Node](#Node)
-  * [func NewNode(address string) *Node](#NewNode)
-  * [func (a *Node) AsyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.VoidReply, error)](#Node.AsyncQueue)
-  * [func (a *Node) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) ([]proto.Message, error)](#Node.Gossip)
-  * [func (a *Node) RegisterFunc(name string, f func(msg *shared.GossipMessage) (*shared.MessageReply, error)) error](#Node.RegisterFunc)
-  * [func (a *Node) Serve()](#Node.Serve)
-  * [func (a *Node) SyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.MessageReply, error)](#Node.SyncQueue)
+  * [func NewNode(msgTypesRegistry Registry) *Node](#NewNode)
+  * [func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.AsyncGossip)
+  * [func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.AsyncQueue)
+  * [func (n *Node) RegisterFunc(msgType string, f HandleFunc) error](#Node.RegisterFunc)
+  * [func (n *Node) Serve(listener net.Listener)](#Node.Serve)
+  * [func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.SyncGossip)
+  * [func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.SyncQueue)
+* [type Registry](#Registry)
 
 
 #### <a name="pkg-files">Package files</a>
-[async.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go) [messageTracker.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/messageTracker.go)
+[gerror.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gerror.go) [gnode.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go) [message.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/message.go) [registry.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go) [tracker.go](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/tracker.go)
 
 
 ## <a name="pkg-constants">Constants</a>
 ``` go
 const QueueSize int = 10
 ```
-QueueSize is the buffer size for holding incoming Gossip Messages
+QueueSize is the buffer size of the node for holding incoming Gossip Messages
+Once buffer of a node gets full, it does not accept incoming messages
 
 
 
 
 
-## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=357:539#L19)
+## <a name="HandleFunc">type</a> [HandleFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=254:315#L10)
+``` go
+type HandleFunc func(context.Context, []byte) ([]byte, error)
+```
+HandleFunc is the function signature expected from all registered functions
+
+
+
+
+
+
+
+
+
+
+## <a name="MultiRegistry">type</a> [MultiRegistry](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=738:799#L21)
+``` go
+type MultiRegistry struct {
+    // contains filtered or unexported fields
+}
+
+```
+MultiRegistry supports combining multiple registries into one
+It is suited for scenarios where multiple nodes are running on the same machine and share the
+same gossip layer
+
+
+
+
+
+
+
+### <a name="NewMultiRegistry">func</a> [NewMultiRegistry](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=1170:1230#L33)
+``` go
+func NewMultiRegistry(registries ...Registry) *MultiRegistry
+```
+NewMultiRegistry receives a set of arbitrary number of registers and consolidates them into a MultiRegistry type
+Note: If there are registries containing the same msgType name, then one of
+them will be overwritten.
+
+
+
+
+
+### <a name="MultiRegistry.MessageTypes">func</a> (\*MultiRegistry) [MessageTypes](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=859:920#L26)
+``` go
+func (mr *MultiRegistry) MessageTypes() map[string]HandleFunc
+```
+MessageTypes returns the list of msgTypes to be served
+
+
+
+
+## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=554:645#L23)
 ``` go
 type Node struct {
     // contains filtered or unexported fields
@@ -50,59 +111,93 @@ Node is holding the required information for a functioning async gossip node
 
 
 
-### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=619:653#L28)
+### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=996:1041#L37)
 ``` go
-func NewNode(address string) *Node
+func NewNode(msgTypesRegistry Registry) *Node
 ```
-NewNode returns a new gossip async node that can be used as a grpc service
+NewNode returns a new instance of a Gossip node with a predefined registry of message types
+passing nil instead of the messageTypeRegistry results in creation of an empty registry for the node
 
 
 
 
 
-### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2588:2688#L101)
+### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1669:1800#L53)
 ``` go
-func (a *Node) AsyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.VoidReply, error)
+func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
-AsyncQueue places a given gossip message to the node's queue
-TODO: Maybe change the name to QueueMessage? or PlaceMessage?
+AsyncGossip synchronizes over the delivery
+i.e., sends a message to all recipients, and only blocks for delivery without blocking for their response
 
 
 
 
-### <a name="Node.Gossip">func</a> (\*Node) [Gossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=1340:1440#L51)
+### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=2190:2292#L61)
 ``` go
-func (a *Node) Gossip(ctx context.Context, gossipMsg *shared.GossipMessage) ([]proto.Message, error)
+func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```
-Gossip sends a message to all peers specified in the given gossip message
-its only job is to place the message to the peers' queues
+AsyncQueue is invoked remotely using the gRPC stub,
+it receives a message from a remote node and places it inside the local nodes queue
+it is synchronized with the remote node on the message reception (and NOT reply), i.e., blocks the remote node until either
+a timeout or placement of the message into the queue
 
 
 
 
-### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=950:1061#L39)
+### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=4538:4601#L133)
 ``` go
-func (a *Node) RegisterFunc(name string, f func(msg *shared.GossipMessage) (*shared.MessageReply, error)) error
+func (n *Node) RegisterFunc(msgType string, f HandleFunc) error
 ```
-RegisterFunc adds a new method to be used by GossipMessages
+RegisterFunc allows the addition of new message types to the node's registry
 
 
 
 
-### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2043:2065#L82)
+### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=4193:4236#L121)
 ``` go
-func (a *Node) Serve()
+func (n *Node) Serve(listener net.Listener)
 ```
-Serve starts the async node's grpc server, and its sweeper as well
+Serve starts an async node grpc server, and its sweeper as well
 
 
 
 
-### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/async.go?s=2940:3042#L111)
+### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1320:1450#L47)
 ``` go
-func (a *Node) SyncQueue(ctx context.Context, req *shared.GossipMessage) (*shared.MessageReply, error)
+func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
-SyncQueue places a given gossip message to the node's queue and blocks waiting for a reply.
+SyncGossip synchronizes over the reply of recipients
+i.e., it sends a message to all recipients and blocks for their reply
+
+
+
+
+### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=3000:3101#L83)
+``` go
+func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
+```
+SyncQueue is invoked remotely using the gRPC stub,
+it receives a message from a remote node and places it inside the local nodes queue
+it is synchronized with the remote node on the message reply, i.e., blocks the remote node until either
+a timeout or a reply is getting prepared
+
+
+
+
+## <a name="Registry">type</a> [Registry](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=488:553#L14)
+``` go
+type Registry interface {
+    MessageTypes() map[string]HandleFunc
+}
+```
+Registry supplies the msgTypes to be called by Gossip Messages
+We assume each registry to enclose the set of functions of a single type of node e.g., execution node
+
+
+
+
+
+
 
 
 
