@@ -15,5 +15,5 @@ type Account struct {
 // An account key contains the public key encoded as bytes and a key weight.
 type AccountKey struct {
 	PublicKey []byte
-	Weight    uint32
+	Weight    int
 }

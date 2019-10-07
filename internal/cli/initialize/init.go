@@ -26,9 +26,8 @@ var Cmd = &cobra.Command{
 	Short: "Initialize a new account profile",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
-			salg, _ := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-			prKey, _ := salg.GeneratePrKey([]byte{})
-			prKeyBytes, _ := salg.EncodePrKey(prKey)
+			prKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
+			prKeyBytes, _ := prKey.Encode()
 			prKeyHex := hex.EncodeToString(prKeyBytes)
 			address := types.HexToAddress("01").Hex()
 

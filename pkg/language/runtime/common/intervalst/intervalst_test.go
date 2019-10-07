@@ -2,10 +2,9 @@ package intervalst
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
-
-	. "github.com/onsi/gomega"
 )
 
 type lineAndColumn struct {
@@ -13,7 +12,7 @@ type lineAndColumn struct {
 	Column int
 }
 
-func (l lineAndColumn) CompareTo(other Position) int {
+func (l lineAndColumn) Compare(other Position) int {
 	if _, ok := other.(MinPosition); ok {
 		return 1
 	}
@@ -38,7 +37,6 @@ func (l lineAndColumn) CompareTo(other Position) int {
 }
 
 func TestIntervalST(t *testing.T) {
-	RegisterTestingT(t)
 
 	st := &IntervalST{}
 
@@ -51,37 +49,37 @@ func TestIntervalST(t *testing.T) {
 	)
 
 	interval, value := st.Search(lineAndColumn{1, 3})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	interval, value = st.Search(lineAndColumn{2, 1})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	interval, value = st.Search(lineAndColumn{2, 2})
-	Expect(interval).To(Equal(&Interval{
+	assert.Equal(t, interval, &Interval{
 		lineAndColumn{2, 2},
 		lineAndColumn{2, 4},
-	}))
-	Expect(value).To(Equal(100))
+	})
+	assert.Equal(t, value, 100)
 
 	interval, value = st.Search(lineAndColumn{2, 3})
-	Expect(interval).To(Equal(&Interval{
+	assert.Equal(t, interval, &Interval{
 		lineAndColumn{2, 2},
 		lineAndColumn{2, 4},
-	}))
-	Expect(value).To(Equal(100))
+	})
+	assert.Equal(t, value, 100)
 
 	interval, value = st.Search(lineAndColumn{2, 4})
-	Expect(interval).To(Equal(&Interval{
+	assert.Equal(t, interval, &Interval{
 		lineAndColumn{2, 2},
 		lineAndColumn{2, 4},
-	}))
-	Expect(value).To(Equal(100))
+	})
+	assert.Equal(t, value, 100)
 
 	interval, value = st.Search(lineAndColumn{2, 5})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	st.Put(
 		NewInterval(
@@ -92,27 +90,27 @@ func TestIntervalST(t *testing.T) {
 	)
 
 	interval, value = st.Search(lineAndColumn{2, 8})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	interval, value = st.Search(lineAndColumn{4, 8})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	interval, value = st.Search(lineAndColumn{3, 7})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	interval, value = st.Search(lineAndColumn{3, 8})
-	Expect(interval).To(Equal(&Interval{
+	assert.Equal(t, interval, &Interval{
 		lineAndColumn{3, 8},
 		lineAndColumn{3, 8},
-	}))
-	Expect(value).To(Equal(200))
+	})
+	assert.Equal(t, value, 200)
 
 	interval, value = st.Search(lineAndColumn{3, 9})
-	Expect(interval).To(BeNil())
-	Expect(value).To(BeNil())
+	assert.Nil(t, interval)
+	assert.Nil(t, value)
 
 	if !st.check() {
 		t.Fail()
@@ -120,7 +118,6 @@ func TestIntervalST(t *testing.T) {
 }
 
 func TestIntervalST2(t *testing.T) {
-	RegisterTestingT(t)
 
 	intervals := []Interval{
 		{
@@ -209,16 +206,16 @@ func TestIntervalST2(t *testing.T) {
 
 	for _, interval := range intervals {
 		res, _ := st.Search(interval.Min)
-		Expect(res).To(Not(BeNil()))
+		assert.NotNil(t, res)
 		res, _ = st.Search(interval.Max)
-		Expect(res).To(Not(BeNil()))
+		assert.NotNil(t, res)
 	}
 
 	for _, value := range st.Values() {
 		interval := value.(Interval)
 		res, _ := st.Search(interval.Min)
-		Expect(res).To(Not(BeNil()))
+		assert.NotNil(t, res)
 		res, _ = st.Search(interval.Max)
-		Expect(res).To(Not(BeNil()))
+		assert.NotNil(t, res)
 	}
 }

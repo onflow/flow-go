@@ -7,7 +7,7 @@ Some tools offer cryptographic services that can be used in other contexts and p
 
 A cryptographic hash function is needed in Flow to provide different services:
 
-- It verifies message integrity of communications and prevents non-malicious and malicious alterations.
+- It verifies message integrity of communications and prevents some non-malicious and malicious alterations.
 - It is involved in signature schemes during signature generations and signature verifications. The signature and verification algorithms are applied over the short message digests instead of the original message. 
 - It generates pseudo random data from inputs that might have dispersed entropy and might not be distributed uniformly.
 
@@ -16,13 +16,15 @@ A cryptographic hash function can be used in this context although it is more co
 
 ### SHA3
 
-[SHA3-256](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) is used as the cryptographic hash function in Flow. The digests size is 256 bits while the input message can be of arbitrary size. The algorithm provides a 128-bits collision resistance, along with a 256-bits security strength for preimage and 2nd preimage.
+[SHA3](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf) is used as the cryptographic hash function in Flow. 
+[SHA3-384] is used to hash messages prior to applying the signature algorithm. The digest size is 384 bits which is suitable to the signature algorithm used. 
+[SHA3-256] is used when signatures are not invloved. The digest size is 256 bits while the input message can be of arbitrary size. The algorithm provides a 128-bits collision resistance, along with a 256-bits security strength for preimage and 2nd preimage.
 
 ### Interface
 
-The hash interface allows instantiating different hash algorithms (although only SHA3-256 is implemented so far) and using them together in the same protocol flow. 
+The hash interface allows instantiating different hash algorithms and using them together in the same protocol flow. 
 
-The hashing interface mainly supports the hash computation of some arbitrary data (a byte array or a structure). The digest is of type `Hash`. 
+The hashing interface mainly supports the hash computation of some arbitrary data (a byte array). The digest is of type `Hash`. 
 
 The interface also supports appending data to the hash state without computing the final hash. The hash computation can be finalized only when the complete data stream has been fed to the hash state. It is possible to reset the hash state to empty the previously added data. 
 
@@ -54,11 +56,11 @@ Signing is an exponentiation in G1 while a verification is an equility check of 
 
 ### Interface
 
-The signature interface allows using multiple signature schemes (although only BLS is implemented so far).
+The signature interface allows using multiple signature schemes.
 
 A key generation function generates a key pair given a seed.  
-The signature interface signs a hashed message given a key pair (only the private key is used in BLS). It is also possible to sign a non-hashed message (byte array or struct) given a key pair and a hash algorithm instance. The signature is of a type `Signature`.  
-The signature verification interface verifies the validity of a signature given a public key and a hash (or a byte array/struct and a hash algorithm). 
+The signature interface signs a message given a key pair (only the private key is used in BLS) and a hash algorithm instance. The signature is of a type `Signature`.  
+The signature verification interface verifies the validity of a signature given a public key and the message used for signing. 
 
 ### Aggregation
 
@@ -88,7 +90,7 @@ Only shares of the private key are known by the parties, each having a secret sh
 
 The protocol is interactive, and is robust if the number of malicious nodes does not exceed a threshold _t_. It is possible for _t+1_ parties to construct the secret private key by combining their _t+1_ secret shares. 
 
-The DKG protocol to be implemented is the [GJKR](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) protocol based on Feldman VSS.
+The DKG protocol to be implemented is the [Gennaro et al.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) protocol.
 
 ### Threshold Signature
 

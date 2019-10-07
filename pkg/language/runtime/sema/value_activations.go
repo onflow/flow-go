@@ -71,6 +71,7 @@ func (a *ValueActivations) Declare(
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
+		Identifier:     identifier,
 		Kind:           kind,
 		IsConstant:     isConstant,
 		Depth:          depth,
@@ -108,10 +109,9 @@ func (a *ValueActivations) DeclareImplicitConstant(identifier string, ty Type, k
 	)
 }
 
-func (a *ValueActivations) VariablesDeclaredInThisScope() map[string]*Variable {
+func (a *ValueActivations) VariablesDeclaredInAndBelow(depth int) map[string]*Variable {
 	variables := map[string]*Variable{}
 
-	depth := a.activations.Depth()
 	values := a.activations.CurrentOrNew()
 
 	var entry hamt.Entry
@@ -125,11 +125,11 @@ func (a *ValueActivations) VariablesDeclaredInThisScope() map[string]*Variable {
 
 		variable := value.(*Variable)
 
-		if variable.Depth != depth {
+		if variable.Depth < depth {
 			continue
 		}
 
-		name := string(entry.(common.StringKey))
+		name := string(entry.(common.StringEntry))
 
 		variables[name] = variable
 	}

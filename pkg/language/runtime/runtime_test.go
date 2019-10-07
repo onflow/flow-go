@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -14,10 +14,10 @@ type testRuntimeInterface struct {
 	resolveImport      func(ImportLocation) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKey, code []byte) (accountID []byte, err error)
-	addAccountKey      func(accountID, publicKey []byte) error
+	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	addAccountKey      func(accountID, publicKey []byte, keyWeight int) error
 	removeAccountKey   func(accountID []byte, index int) error
-	updateAccountCode  func(accountID, code []byte) (err error)
+	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
 }
@@ -34,20 +34,20 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKey, code []byte) (accountID []byte, err error) {
-	return i.createAccount(publicKey, code)
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
+	return i.createAccount(publicKeys, keyWeights, code)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(accountID, publicKey []byte) error {
-	return i.addAccountKey(accountID, publicKey)
+func (i *testRuntimeInterface) AddAccountKey(accountID, publicKey []byte, keyWeight int) error {
+	return i.addAccountKey(accountID, publicKey, keyWeight)
 }
 
 func (i *testRuntimeInterface) RemoveAccountKey(accountID []byte, index int) error {
 	return i.removeAccountKey(accountID, index)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(accountID, code []byte) (err error) {
-	return i.updateAccountCode(accountID, code)
+func (i *testRuntimeInterface) UpdateAccountCode(address types.Address, code []byte) (err error) {
+	return i.updateAccountCode(address, code)
 }
 
 func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
@@ -62,7 +62,6 @@ func (i *testRuntimeInterface) Log(message string) {
 }
 
 func TestRuntimeGetAndSetValue(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 	script := []byte(`
@@ -87,25 +86,22 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 			state.SetBytes(value)
 			return nil
 		},
-		createAccount: func(key, code []byte) (accountID []byte, err error) {
+		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
 			return nil, nil
 		},
-		updateAccountCode: func(accountID, code []byte) (err error) {
+		updateAccountCode: func(address types.Address, code []byte) (err error) {
 			return nil
 		},
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(state.Int64()).
-		To(Equal(int64(5)))
+	assert.Equal(t, state.Int64(), int64(5))
 }
 
 func TestRuntimeImport(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -140,14 +136,12 @@ func TestRuntimeImport(t *testing.T) {
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(value).To(Equal(big.NewInt(42)))
+	assert.Equal(t, value, big.NewInt(42))
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -165,12 +159,10 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(HaveOccurred())
+	assert.Error(t, err)
 }
 
 func TestRuntimeMainWithAccount(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -200,17 +192,14 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(value).To(Equal(big.NewInt(42)))
+	assert.Equal(t, value, big.NewInt(42))
 
-	Expect(loggedMessage).
-		To(Equal(`"2a00000000000000000000000000000000000000"`))
+	assert.Equal(t, loggedMessage, `"2a00000000000000000000000000000000000000"`)
 }
 
 func TestRuntimeStorage(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -248,15 +237,12 @@ func TestRuntimeStorage(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(loggedMessages).
-		To(Equal([]string{"nil", "42", "[1, 2, 3]", `"xyz"`}))
+	assert.Equal(t, loggedMessages, []string{"nil", "42", "[1, 2, 3]", `"xyz"`})
 }
 
 func TestRuntimeStorageMultipleTransactions(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -288,22 +274,18 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	_, err = runtime.ExecuteScript(script, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(loggedMessages).
-		To(Equal([]string{"nil", `["A", "B"]`}))
+	assert.Equal(t, loggedMessages, []string{"nil", `["A", "B"]`})
 }
 
 // test function call of stored structure declared in an imported program
 //
 func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -370,20 +352,16 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script1, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
 	answer, err := runtime.ExecuteScript(script2, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(answer).
-		To(Equal(big.NewInt(42)))
+	assert.Equal(t, answer, big.NewInt(42))
 }
 
 func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
-	RegisterTestingT(t)
 
 	runtime := NewInterpreterRuntime()
 
@@ -421,9 +399,9 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script1, runtimeInterface)
 
-	Expect(err).
-		To(Not(HaveOccurred()))
+	assert.Nil(t, err)
 
-	Expect(runtime.ExecuteScript(script2, runtimeInterface)).
-		To(Equal(big.NewInt(42)))
+	result, err := runtime.ExecuteScript(script2, runtimeInterface)
+	assert.Equal(t, result, big.NewInt(42))
+	assert.Nil(t, err)
 }

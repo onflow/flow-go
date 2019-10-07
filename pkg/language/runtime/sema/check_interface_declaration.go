@@ -121,6 +121,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
+			Identifier: identifier.Identifier,
 			Kind:       declaration.DeclarationKind(),
 			IsConstant: true,
 			Type:       interfaceType,

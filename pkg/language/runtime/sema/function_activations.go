@@ -1,8 +1,9 @@
 package sema
 
 type FunctionActivation struct {
-	ReturnType Type
-	Loops      int
+	ReturnType           Type
+	Loops                int
+	ValueActivationDepth int
 }
 
 func (a FunctionActivation) InLoop() bool {
@@ -13,10 +14,11 @@ type FunctionActivations struct {
 	activations []*FunctionActivation
 }
 
-func (a *FunctionActivations) EnterFunction(functionType *FunctionType) {
+func (a *FunctionActivations) EnterFunction(functionType *FunctionType, valueActivationDepth int) {
 	a.activations = append(a.activations,
 		&FunctionActivation{
-			ReturnType: functionType.ReturnTypeAnnotation.Type,
+			ReturnType:           functionType.ReturnTypeAnnotation.Type,
+			ValueActivationDepth: valueActivationDepth,
 		},
 	)
 }
@@ -26,8 +28,8 @@ func (a *FunctionActivations) LeaveFunction() {
 	a.activations = a.activations[:lastIndex]
 }
 
-func (a *FunctionActivations) WithFunction(functionType *FunctionType, f func()) {
-	a.EnterFunction(functionType)
+func (a *FunctionActivations) WithFunction(functionType *FunctionType, valueActivationDepth int, f func()) {
+	a.EnterFunction(functionType, valueActivationDepth)
 	defer a.LeaveFunction()
 	f()
 }

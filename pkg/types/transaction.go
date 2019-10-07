@@ -38,8 +38,8 @@ type Transaction struct {
 
 // Hash computes the hash over the necessary transaction data.
 func (tx *Transaction) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHashAlgo(crypto.SHA3_256)
-	return hasher.ComputeBytesHash(tx.CanonicalEncoding())
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	return hasher.ComputeHash(tx.CanonicalEncoding())
 }
 
 // CanonicalEncoding returns the encoded canonical transaction as bytes.
@@ -78,20 +78,14 @@ func (tx *Transaction) FullEncoding() []byte {
 
 // AddSignature signs the transaction with the given account and private key, then adds the signature to the list
 // of signatures.
-func (tx *Transaction) AddSignature(account Address, prKey crypto.PrKey) error {
-	// TODO: replace hard-coded signature algorithm
-	salg, err := crypto.NewSignatureAlgo(crypto.ECDSA_P256)
-	if err != nil {
-		return err
-	}
-
+func (tx *Transaction) AddSignature(account Address, prKey crypto.PrivateKey) error {
 	// TODO: replace hard-coded hashing algorithm
-	hasher, err := crypto.NewHashAlgo(crypto.SHA3_256)
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
 	if err != nil {
 		return err
 	}
 
-	sig, err := salg.SignBytes(prKey, tx.CanonicalEncoding(), hasher)
+	sig, err := prKey.Sign(tx.CanonicalEncoding(), hasher)
 	if err != nil {
 		return err
 	}

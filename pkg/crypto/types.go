@@ -4,11 +4,11 @@ package crypto
 type AlgoName string
 
 const (
-	// Hashing supported algorithms
+	// Supported Hashing algorithms
 	SHA3_256 AlgoName = "SHA3_256"
 	SHA3_384 AlgoName = "SHA3_384"
 
-	// Signing supported algorithms
+	// Supported Signing algorithms
 	BLS_BLS12381    = "BLS_BLS12381"
 	ECDSA_P256      = "ECDSA_P256"
 	ECDSA_SECp256k1 = "ECDSA_SECp256k1"

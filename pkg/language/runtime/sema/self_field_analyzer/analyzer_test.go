@@ -1,9 +1,8 @@
 package self_field_analyzer
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
-
-	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
@@ -29,7 +28,6 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 }
 
 func TestAssignmentInEmptyInitializer(t *testing.T) {
-	RegisterTestingT(t)
 
 	body := `
 		struct Test {
@@ -42,12 +40,11 @@ func TestAssignmentInEmptyInitializer(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To(HaveLen(2))
-	Expect(errors).To(HaveLen(0))
+	assert.Len(t, unassigned, 2)
+	assert.Len(t, errors, 0)
 }
 
 func TestAssignmentFromArgument(t *testing.T) {
-	RegisterTestingT(t)
 
 	body := `
 		struct Test {
@@ -61,13 +58,12 @@ func TestAssignmentFromArgument(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To(HaveLen(0))
-	Expect(errors).To(HaveLen(0))
+	assert.Len(t, unassigned, 0)
+	assert.Len(t, errors, 0)
 }
 
 func TestAssignmentInIfStatement(t *testing.T) {
 	t.Run("ValidIfStatement", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -85,12 +81,11 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(0))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 0)
 	})
 
 	t.Run("InvalidIfStatement", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -106,13 +101,12 @@ func TestAssignmentInIfStatement(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(1))
-		Expect(errors).To(HaveLen(0))
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
 	})
 }
 
 func TestAssignmentInWhileStatement(t *testing.T) {
-	RegisterTestingT(t)
 
 	body := `
 			struct Test {
@@ -128,13 +122,12 @@ func TestAssignmentInWhileStatement(t *testing.T) {
 
 	unassigned, errors := testAssignment(body)
 
-	Expect(unassigned).To(HaveLen(1))
-	Expect(errors).To(HaveLen(0))
+	assert.Len(t, unassigned, 1)
+	assert.Len(t, errors, 0)
 }
 
 func TestAssignmentFromField(t *testing.T) {
 	t.Run("FromInitializedField", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -150,12 +143,11 @@ func TestAssignmentFromField(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(0))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 0)
 	})
 
 	t.Run("FromUninitializedField", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -170,14 +162,13 @@ func TestAssignmentFromField(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(1))
-		Expect(errors).To(HaveLen(1))
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 1)
 	})
 }
 
 func TestAssignmentUsages(t *testing.T) {
 	t.Run("InitializedUsage", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			fun myFunc(x: Int) {}
@@ -194,12 +185,11 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(0))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 0)
 	})
 
 	t.Run("UninitializedUsage", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			fun myFunc(x: Int) {}
@@ -216,12 +206,11 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(1))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 1)
 	})
 
 	t.Run("IfStatementUsage", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -239,12 +228,11 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(1))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 1)
 	})
 
 	t.Run("ArrayLiteralUsage", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -260,12 +248,11 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(1))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 1)
 	})
 
 	t.Run("BinaryOperationUsage", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -281,12 +268,11 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(1))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 1)
 	})
 
 	t.Run("ComplexUsages", func(t *testing.T) {
-		RegisterTestingT(t)
 
 		body := `
 			struct Test {
@@ -314,7 +300,7 @@ func TestAssignmentUsages(t *testing.T) {
 
 		unassigned, errors := testAssignment(body)
 
-		Expect(unassigned).To(HaveLen(0))
-		Expect(errors).To(HaveLen(0))
+		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 0)
 	})
 }

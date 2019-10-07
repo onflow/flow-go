@@ -18,12 +18,12 @@ func NewAssignmentSet() AssignmentSet {
 
 // Insert inserts an identifier into the set.
 func (a AssignmentSet) Insert(identifier ast.Identifier) AssignmentSet {
-	return AssignmentSet{a.set.Insert(common.StringKey(identifier.Identifier))}
+	return AssignmentSet{a.set.Insert(common.StringEntry(identifier.Identifier))}
 }
 
 // Contains returns true if the given identifier exists in the set.
 func (a AssignmentSet) Contains(identifier ast.Identifier) bool {
-	return a.set.Include(common.StringKey(identifier.Identifier))
+	return a.set.Include(common.StringEntry(identifier.Identifier))
 }
 
 // Intersection returns a new set containing all fields that exist in both sets.

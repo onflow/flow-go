@@ -37,14 +37,14 @@ type Interface interface {
 	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
-	// CreateAccount creates a new account with the given public key and code.
-	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	// CreateAccount creates a new account with the given public keys and code.
+	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(accountID, publicKey []byte) error
+	AddAccountKey(accountID, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
 	RemoveAccountKey(accountID []byte, index int) error
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(accountID, code []byte) (err error)
+	UpdateAccountCode(adddress types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
 	GetSigningAccounts() []types.Address
 	// Log logs a string.
@@ -145,11 +145,15 @@ var getValueFunctionType = sema.FunctionType{
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// key
-		&sema.OptionalType{
+		// publicKeys
+		&sema.VariableSizedType{
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
+		},
+		// keyWeights
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
 		},
 		// code
 		&sema.OptionalType{
@@ -176,6 +180,8 @@ var addAccountKeyFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
+		// keyWeight
+		&sema.IntType{},
 	),
 	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
@@ -203,9 +209,7 @@ var removeAccountKeyFunctionType = sema.FunctionType{
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// accountID
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
+		&sema.StringType{},
 		// code
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -494,17 +498,33 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) int
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		publicKey, err := toByteArray(arguments[0])
-		if err != nil {
+		pkArray, ok := arguments[0].(interpreter.ArrayValue)
+		if !ok {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
 		}
 
-		code, err := toByteArray(arguments[1])
+		pkValues := *pkArray.Values
+		publicKeys := make([][]byte, len(pkValues))
+
+		for i, pkVal := range pkValues {
+			publicKey, err := toByteArray(pkVal)
+			if err != nil {
+				panic(fmt.Sprintf("createAccount requires the first parameter to be an array of arrays"))
+			}
+			publicKeys[i] = publicKey
+		}
+
+		keyWeights, err := toIntArray(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
 		}
 
-		value, err := runtimeInterface.CreateAccount(publicKey, code)
+		code, err := toByteArray(arguments[2])
+		if err != nil {
+			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
+		}
+
+		value, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
 		if err != nil {
 			panic(err)
 		}
@@ -516,8 +536,8 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 2 {
-			panic(fmt.Sprintf("addAccountKey requires 2 parameters"))
+		if len(arguments) != 3 {
+			panic(fmt.Sprintf("addAccountKey requires 3 parameters"))
 		}
 
 		accountID, err := toByteArray(arguments[0])
@@ -530,7 +550,12 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
-		err = runtimeInterface.AddAccountKey(accountID, publicKey)
+		keyWeight, ok := arguments[2].(interpreter.IntValue)
+		if !ok {
+			panic(fmt.Sprintf("addAccountKey requires the third parameter to be an integer"))
+		}
+
+		err = runtimeInterface.AddAccountKey(accountID, publicKey, keyWeight.IntValue())
 		if err != nil {
 			panic(err)
 		}
@@ -573,9 +598,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 		}
 
-		accountID, err := toByteArray(arguments[0])
-		if err != nil {
-			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an array"))
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be a string"))
 		}
 
 		code, err := toByteArray(arguments[1])
@@ -583,7 +608,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
-		err = runtimeInterface.UpdateAccountCode(accountID, code)
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err = runtimeInterface.UpdateAccountCode(accountAddress, code)
 		if err != nil {
 			panic(err)
 		}
@@ -644,6 +671,26 @@ func (r *interpreterRuntime) getOwnerControllerKey(
 }
 
 func toByteArray(value interpreter.Value) ([]byte, error) {
+	intArray, err := toIntArray(value)
+	if err != nil {
+		return nil, err
+	}
+
+	byteArray := make([]byte, len(intArray))
+
+	for i, intValue := range intArray {
+		// check 0 <= value < 256
+		if !(0 <= intValue && intValue < 256) {
+			return nil, errors.New("array value is not in byte range (0-255)")
+		}
+
+		byteArray[i] = byte(intValue)
+	}
+
+	return byteArray, nil
+}
+
+func toIntArray(value interpreter.Value) ([]int, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
 		return nil, nil
@@ -659,18 +706,14 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(*array.Values))
+	result := make([]int, len(*array.Values))
 	for i, arrayValue := range *array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
 		}
-		// check 0 <= value < 256
-		if intValue.Int.Cmp(big.NewInt(-1)) != 1 || intValue.Int.Cmp(big.NewInt(256)) != -1 {
-			return nil, errors.New("array value is not in byte range (0-255)")
-		}
 
-		result[i] = byte(intValue.IntValue())
+		result[i] = intValue.IntValue()
 	}
 
 	return result, nil

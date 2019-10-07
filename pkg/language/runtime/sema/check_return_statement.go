@@ -3,6 +3,10 @@ package sema
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
+	defer func() {
+		checker.checkResourceLossForFunction()
+		checker.resources.Returns = true
+	}()
 
 	// check value type matches enclosing function's return type
 
@@ -49,4 +53,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	return nil
+}
+
+func (checker *Checker) checkResourceLossForFunction() {
+	functionValueActivationDepth :=
+		checker.functionActivations.Current().ValueActivationDepth
+	checker.checkResourceLoss(functionValueActivationDepth)
 }
