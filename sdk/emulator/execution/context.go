@@ -29,6 +29,10 @@ func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
 	r.signingAccounts = accounts
 }
 
+func (r *RuntimeContext) GetSigningAccounts() []types.Address {
+	return r.signingAccounts
+}
+
 func (r *RuntimeContext) SetLogger(callback func(string)) {
 	r.onLog = callback
 }
@@ -260,10 +264,6 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 	}
 
 	return code, nil
-}
-
-func (r *RuntimeContext) GetSigningAccounts() []types.Address {
-	return r.signingAccounts
 }
 
 func (r *RuntimeContext) Log(message string) {
