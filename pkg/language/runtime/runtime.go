@@ -570,7 +570,7 @@ func toByteArray(value interpreter.Value) ([]byte, error) {
 
 	for i, intValue := range intArray {
 		// check 0 <= value < 256
-		if 0 >= intValue && intValue < 256 {
+		if !(0 <= intValue && intValue < 256) {
 			return nil, errors.New("array value is not in byte range (0-255)")
 		}
 
