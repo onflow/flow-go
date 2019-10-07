@@ -557,35 +557,39 @@ let canadianFlag: Character = "\u{1F1E8}\u{1F1E6}"
 Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
-    ```bamboo,file=string-length-field.bpl
-        let example = "hello"
 
-        // Find the number of elements
-        let length = example.length
-        // `length` is 5
+    ```bamboo,file=string-length-field.bpl
+    let example = "hello"
+
+    // Find the number of elements
+    let length = example.length
+    // `length` is 5
     ```
 
 - `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
-    ```bamboo,file=string-concat.bpl
-        let example = "hello"
-        let new = "world"
 
-        // Concatenate the new string onto the example string and return the new string
-        let helloWorld = example.concat(new)
-        // `helloWorld` is now "helloworld"
+    ```bamboo,file=string-concat.bpl
+    let example = "hello"
+    let new = "world"
+
+    // Concatenate the new string onto the example string and return the new string
+    let helloWorld = example.concat(new)
+    // `helloWorld` is now "helloworld"
     ```
 
 - `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
+
     ```bamboo,file=string-slice.bpl
-        let example = "helloworld"
+    let example = "helloworld"
 
-        // Create a new slice of part of the original string
-        let slice = example.slice(from: 3, upTo: 6)
-        // `slice` is now `"lowo"`
+    // Create a new slice of part of the original string
+    let slice = example.slice(from: 3, upTo: 6)
+    // `slice` is now `"lowo"`
 
-        // Error: Out of bounds index
-        let outOfBounds = example.slice(from: 2, upTo: 10)
+    // Error: Out of bounds index
+    let outOfBounds = example.slice(from: 2, upTo: 10)
     ```
+
 <!--
 
 TODO
@@ -685,6 +689,7 @@ numbers[1] = 2
 Arrays have multiple built-in functions you can use to manipulate the elements. `length`, `concat`, and `contains` apply to all array types whether they are statically sized or dynamic.
 
 - `length: Int`: Returns the number of elements in the array.
+
     ```bamboo,file=array-length-field.bpl
     let numbers = [42, 23, 31, 12]
 
@@ -695,11 +700,12 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     ```
 
 - `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
+
     ```bamboo,file=array-concat.bpl
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
 
-    // Concatenate the array `moreNumbers` to the array `numbers` 
+    // Concatenate the array `moreNumbers` to the array `numbers`
     // and declare a new variable for the result
     let allNumbers = numbers.concat(moreNumbers)
 
@@ -709,6 +715,7 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     ```
 
 - `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
+
     ```bamboo,file=array-contains.bpl
     let numbers = [42, 23, 31, 12]
 
@@ -720,16 +727,18 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     let containsTwelve = numbers.contains(12)
     // `containsTwelve` is true
 
-    // Invalid: Check if the array contains the string "Kitty". 
+    // Invalid: Check if the array contains the string "Kitty".
     // This results in a type error, as the array only contains integers
     //
     let containsKitty = numbers.contains("Kitty")
     ```
 
 ##### Variable-size Array Functions
+
 The following functions can only be used on variable-sized arrays.  It is invalid to use one of these functions on a statically sized array.
 
-- `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.  
+- `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.
+
     ```bamboo,file=array-append.bpl
     let numbers = [42, 23, 31, 12]
 
@@ -742,6 +751,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
     ```
 
 - `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
+
     ```bamboo,file=array-insert.bpl
     let numbers = [42, 23, 31, 12]
 
@@ -756,6 +766,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
 - `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
 - `removeFirst(): T`: Removes the first element from the array and returns it.
 - `removeLast(): T`: Removes the last element from the array and returns it.
+
     ```bamboo,file=array-remove.bpl
     let numbers = [42, 23, 31, 12]
 
