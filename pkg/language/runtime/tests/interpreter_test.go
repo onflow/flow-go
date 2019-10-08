@@ -81,12 +81,10 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 
 	assert.Equal(t,
 		inter.Globals["b"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
 	)
 
 	assert.Equal(t, inter.Globals["s"].Value, interpreter.NewStringValue("123"))
@@ -643,14 +641,12 @@ func TestInterpretConcatOperator(t *testing.T) {
 
 	assert.Equal(t,
 		inter.Globals["e"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
 	)
 
 	// TODO: support empty arrays
@@ -2235,12 +2231,10 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 	)
 }
 
@@ -2271,12 +2265,10 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 	)
 }
 
@@ -2304,12 +2296,10 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 	)
 }
 
@@ -2337,12 +2327,10 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 	)
 }
 
@@ -2377,12 +2365,10 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.BoolValue(false),
-				interpreter.BoolValue(true),
-			},
-		},
+		interpreter.NewArrayValue(
+			interpreter.BoolValue(false),
+			interpreter.BoolValue(true),
+		),
 	)
 }
 
@@ -2438,13 +2424,42 @@ func TestInterpretArrayCopy(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(0),
+			interpreter.NewIntValue(1),
+		),
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(0),
-				interpreter.NewIntValue(1),
-			},
-		},
+	)
+}
+
+func TestInterpretStructCopyInArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): [Int] {
+        let foo = Foo(bar: 1)
+        let foos = [foo, foo]
+        foo.bar = 2
+        foos[0].bar = 3
+		return [foo.bar, foos[0].bar, foos[1].bar]
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(1),
+		),
+		value,
 	)
 }
 
@@ -3484,7 +3499,24 @@ func TestInterpretDictionary(t *testing.T) {
 		interpreter.DictionaryValue{
 			"a": interpreter.NewIntValue(1),
 			"b": interpreter.NewIntValue(2),
-		})
+		},
+	)
+}
+
+func TestInterpretDictionaryNonLexicalOrder(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x = {"c": 3, "b": 2, "a": 1}
+	`)
+
+	assert.Equal(t,
+		interpreter.DictionaryValue{
+			"c": interpreter.NewIntValue(3),
+			"b": interpreter.NewIntValue(2),
+			"a": interpreter.NewIntValue(1),
+		},
+		inter.Globals["x"].Value,
+	)
 }
 
 func TestInterpretDictionaryIndexingString(t *testing.T) {
@@ -3798,14 +3830,13 @@ func TestInterpretArrayAppend(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
+	)
 }
 
 func TestInterpretArrayAppendBound(t *testing.T) {
@@ -3823,14 +3854,13 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
+	)
 }
 
 func TestInterpretArrayConcat(t *testing.T) {
@@ -3846,14 +3876,13 @@ func TestInterpretArrayConcat(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
+	)
 }
 
 func TestInterpretArrayConcatBound(t *testing.T) {
@@ -3870,14 +3899,13 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-				interpreter.NewIntValue(4),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(4),
+		),
+	)
 }
 
 func TestInterpretArrayInsert(t *testing.T) {
@@ -3894,14 +3922,13 @@ func TestInterpretArrayInsert(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(4),
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(4),
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+		),
+	)
 }
 
 func TestInterpretArrayRemove(t *testing.T) {
@@ -3913,12 +3940,11 @@ func TestInterpretArrayRemove(t *testing.T) {
 
 	assert.Equal(t,
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(3),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(3),
+		),
+	)
 
 	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(2))
 }
@@ -3932,12 +3958,11 @@ func TestInterpretArrayRemoveFirst(t *testing.T) {
 
 	assert.Equal(t,
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(2),
-				interpreter.NewIntValue(3),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(3),
+		),
+	)
 
 	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(1))
 }
@@ -3951,12 +3976,11 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
 
 	assert.Equal(t,
 		inter.Globals["x"].Value,
-		interpreter.ArrayValue{
-			Values: &[]interpreter.Value{
-				interpreter.NewIntValue(1),
-				interpreter.NewIntValue(2),
-			},
-		})
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
+	)
 
 	assert.Equal(t, inter.Globals["y"].Value, interpreter.NewIntValue(3))
 }

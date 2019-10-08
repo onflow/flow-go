@@ -1023,6 +1023,11 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 	}
 }
 
+type DictionaryEntryType struct {
+	KeyType   Type
+	ValueType Type
+}
+
 ////
 
 func IsSubType(subType Type, superType Type) bool {

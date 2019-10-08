@@ -8,8 +8,12 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 
 	var elementType Type
 
-	for _, value := range expression.Values {
+	argumentTypes := make([]Type, len(expression.Values))
+
+	for i, value := range expression.Values {
 		valueType := value.Accept(checker).(Type)
+
+		argumentTypes[i] = valueType
 
 		checker.checkResourceMoveOperation(value, valueType)
 
@@ -29,9 +33,13 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 		}
 	}
 
+	checker.Elaboration.ArrayExpressionArgumentTypes[expression] = argumentTypes
+
 	if elementType == nil {
 		elementType = &NeverType{}
 	}
+
+	checker.Elaboration.ArrayExpressionElementType[expression] = elementType
 
 	return &VariableSizedType{
 		Type: elementType,
