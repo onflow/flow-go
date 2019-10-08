@@ -59,44 +59,6 @@ func (ossr *ObserveServiceServerRegistry) SendTransaction(ctx context.Context, p
 	return respByte, respErr
 }
 
-func (ossr *ObserveServiceServerRegistry) GetBlockByHash(ctx context.Context, payloadByte []byte) ([]byte, error) {
-	// Unmarshaling payload
-	payload := &GetBlockByHashRequest{}
-	err := proto.Unmarshal(payloadByte, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal payload: %v", err)
-	}
-
-	resp, respErr := ossr.oss.GetBlockByHash(ctx, payload)
-
-	// Marshaling response
-	respByte, err := proto.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal response: %v", err)
-	}
-
-	return respByte, respErr
-}
-
-func (ossr *ObserveServiceServerRegistry) GetBlockByNumber(ctx context.Context, payloadByte []byte) ([]byte, error) {
-	// Unmarshaling payload
-	payload := &GetBlockByNumberRequest{}
-	err := proto.Unmarshal(payloadByte, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal payload: %v", err)
-	}
-
-	resp, respErr := ossr.oss.GetBlockByNumber(ctx, payload)
-
-	// Marshaling response
-	respByte, err := proto.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal response: %v", err)
-	}
-
-	return respByte, respErr
-}
-
 func (ossr *ObserveServiceServerRegistry) GetLatestBlock(ctx context.Context, payloadByte []byte) ([]byte, error) {
 	// Unmarshaling payload
 	payload := &GetLatestBlockRequest{}
@@ -175,13 +137,11 @@ func (ossr *ObserveServiceServerRegistry) CallScript(ctx context.Context, payloa
 
 func (ossr *ObserveServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
 	return map[string]gnode.HandleFunc{
-		"Ping":             ossr.Ping,
-		"SendTransaction":  ossr.SendTransaction,
-		"GetBlockByHash":   ossr.GetBlockByHash,
-		"GetBlockByNumber": ossr.GetBlockByNumber,
-		"GetLatestBlock":   ossr.GetLatestBlock,
-		"GetTransaction":   ossr.GetTransaction,
-		"GetAccount":       ossr.GetAccount,
-		"CallScript":       ossr.CallScript,
+		"Ping":            ossr.Ping,
+		"SendTransaction": ossr.SendTransaction,
+		"GetLatestBlock":  ossr.GetLatestBlock,
+		"GetTransaction":  ossr.GetTransaction,
+		"GetAccount":      ossr.GetAccount,
+		"CallScript":      ossr.CallScript,
 	}
 }
