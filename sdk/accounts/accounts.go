@@ -7,29 +7,29 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
-// CreateAccount generates a transaction that creates a new account.
-func CreateAccount(publicKey, code []byte) []byte {
-	publicKeyStr := bytesToString(publicKey)
+// CreateAccount generates a script that creates a new account.
+func CreateAccount(publicKeys [][]byte, code []byte) []byte {
+	publicKeysStr := bytesArrayToString(publicKeys)
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
-			let publicKey: Int[]? = %s
-			let code: Int[]? = %s
-			createAccount(publicKey, code)
+		fun main() {
+			let publicKeys = %s
+			let code: [Int]? = %s
+			createAccount(publicKeys, code)
 		}
-	`, publicKeyStr, codeStr)
+	`, publicKeysStr, codeStr)
 
 	return []byte(script)
 }
 
-// UpdateAccountCode generates a transaction that updates the code associated with an account.
+// UpdateAccountCode generates a script that updates the code associated with an account.
 func UpdateAccountCode(account types.Address, code []byte) []byte {
 	accountStr := bytesToString(account.Bytes())
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
+		fun main() {
 			let account = %s
 			let code = %s
 			updateAccountCode(account, code)
@@ -39,8 +39,19 @@ func UpdateAccountCode(account types.Address, code []byte) []byte {
 	return []byte(script)
 }
 
-// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
+// bytesToString converts a byte slice to a comma-separated list of uint8 integers.
 func bytesToString(b []byte) string {
+	if b == nil || len(b) == 0 {
+		return "nil"
+	}
+
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+}
+
+// bytesArrayToString converts a slice of byte slices to a comma-separated list of uint8 integers.
+//
+// Example: [][]byte{[]byte{1}, []byte{2,3}} -> "[[1],[2,3]]"
+func bytesArrayToString(b [][]byte) string {
 	if b == nil || len(b) == 0 {
 		return "nil"
 	}

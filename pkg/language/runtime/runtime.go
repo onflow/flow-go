@@ -38,7 +38,7 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public key and code.
-	CreateAccount(publicKey []byte, code []byte) (accountID []byte, err error)
+	CreateAccount(publicKeys [][]byte, code []byte) (accountID []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(adddress types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -142,7 +142,7 @@ var getValueFunctionType = sema.FunctionType{
 var createAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// key
-		&sema.OptionalType{
+		&sema.VariableSizedType{
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
@@ -442,9 +442,20 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) int
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		publicKey, err := toByteArray(arguments[0])
-		if err != nil {
+		pkArray, ok := arguments[0].(interpreter.ArrayValue)
+		if !ok {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
+		}
+
+		pkValues := *pkArray.Values
+		publicKeys := make([][]byte, len(pkValues))
+
+		for i, pkVal := range pkValues {
+			publicKey, err := toByteArray(pkVal)
+			if err != nil {
+				panic(fmt.Sprintf("createAccount requires the first parameter to be an array of arrays"))
+			}
+			publicKeys[i] = publicKey
 		}
 
 		code, err := toByteArray(arguments[1])
@@ -452,7 +463,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
 		}
 
-		value, err := runtimeInterface.CreateAccount(publicKey, code)
+		value, err := runtimeInterface.CreateAccount(publicKeys, code)
 		if err != nil {
 			panic(err)
 		}

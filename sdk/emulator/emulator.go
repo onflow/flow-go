@@ -406,7 +406,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
-	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})
+	accountID, _ := runtimeContext.CreateAccount([][]byte{pubKeyBytes}, []byte{})
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 

@@ -3,13 +3,13 @@ package emulator
 import (
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/accounts"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -29,18 +29,9 @@ const sampleCall = `
 	}
 `
 
-func generateCreateAccountScript(publicKey, code []byte) []byte {
-	script := fmt.Sprintf(`
-		fun main() {
-			createAccount(%s, %s)
-		}
-	`, bytesToString(publicKey), bytesToString(code))
-	return []byte(script)
-}
-
 // createAccount is a test utility to add a new account to the emulated blockchain.
-func createAccount(b *EmulatedBlockchain, publicKey, code []byte) (types.Address, error) {
-	createAccountScript := generateCreateAccountScript(publicKey, code)
+func createAccount(b *EmulatedBlockchain, publicKeys [][]byte, code []byte) (types.Address, error) {
+	createAccountScript := accounts.CreateAccount(publicKeys, code)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -240,10 +231,10 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyA := b.RootKey()
 
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	pubKeyB, _ := privateKeyB.Publickey().Encode()
+	publicKeyB, _ := privateKeyB.Publickey().Encode()
 
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := createAccount(b, pubKeyB, nil)
+	accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -395,11 +386,10 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		pubKeyB, _ := privateKeyB.Publickey().Encode()
+		publicKeyB, _ := privateKeyB.Publickey().Encode()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, pubKeyB, nil)
-
+		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		multipleAccountScript := []byte(`
@@ -509,7 +499,11 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	createAccountScriptA := generateCreateAccountScript([]byte{1, 2, 3}, []byte{4, 5, 6})
+	publicKeyA := []byte{1, 2, 3}
+	publicKeyB := []byte{4, 5, 6}
+	codeA := []byte("fun main() {}")
+
+	createAccountScriptA := accounts.CreateAccount([][]byte{publicKeyA, publicKeyB}, codeA)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -527,10 +521,14 @@ func TestCreateAccount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.Keys[0].PublicKey).To(Equal([]byte{1, 2, 3}))
-	Expect(account.Code).To(Equal([]byte{4, 5, 6}))
+	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyA))
+	Expect(account.Keys[1].PublicKey).To(Equal(publicKeyB))
+	Expect(account.Code).To(Equal(codeA))
 
-	createAccountScriptB := generateCreateAccountScript([]byte{7, 8, 9}, []byte{10, 11, 12})
+	publicKeyC := []byte{7, 8, 9}
+	codeB := []byte("fun main() {}")
+
+	createAccountScriptB := accounts.CreateAccount([][]byte{publicKeyC}, codeB)
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptB,
@@ -549,13 +547,13 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.Keys[0].PublicKey).To(Equal([]byte{7, 8, 9}))
-	Expect(account.Code).To(Equal([]byte{10, 11, 12}))
+	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyC))
+	Expect(account.Code).To(Equal(codeB))
 }
 
 func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	pubKeyB, _ := privateKeyB.Publickey().Encode()
+	publicKeyB, _ := privateKeyB.Publickey().Encode()
 
 	updateAccountCodeScript := []byte(`
 		fun main(account: Account) {
@@ -572,7 +570,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -609,7 +607,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -646,7 +644,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, pubKeyB, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -654,13 +652,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
-		script := []byte(fmt.Sprintf(`
-			fun main(account: Account) {
-				let address = %s
-				let code = [102,117,110,32,109,97,105,110,40,41,32,123,125]
-				updateAccountCode(address, code)
-			}
-		`, bytesToString(accountAddressB.Bytes())))
+		script := accounts.UpdateAccountCode(accountAddressB, []byte{7, 8, 9})
 
 		tx := &types.Transaction{
 			Script:             script,
@@ -695,9 +687,9 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	pubKey, _ := b.RootKey().Publickey().Encode()
+	publicKey, _ := b.RootKey().Publickey().Encode()
 
-	_, err := createAccount(b, pubKey, accountScript)
+	_, err := createAccount(b, [][]byte{publicKey}, accountScript)
 	Expect(err).ToNot(HaveOccurred())
 
 	script := []byte(`
@@ -865,9 +857,4 @@ func TestRuntimeLogger(t *testing.T) {
 	_, err := b.CallScript(script)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(loggedMessages).To(Equal([]string{`"elephant ears"`}))
-}
-
-// bytesToString converts a byte slice to a comma-separted list of uint8 integers.
-func bytesToString(b []byte) string {
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
