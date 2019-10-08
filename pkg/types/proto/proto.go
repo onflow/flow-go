@@ -14,7 +14,7 @@ func MessageToBlockHeader(m *shared.BlockHeader) types.BlockHeader {
 	return types.BlockHeader{
 		Hash:              crypto.BytesToHash(m.GetHash()),
 		PreviousBlockHash: crypto.BytesToHash(m.GetPreviousBlockHash()),
-		Height:            m.GetHeight(),
+		Number:            m.GetNumber(),
 		TransactionCount:  m.GetTransactionCount(),
 	}
 }
@@ -23,7 +23,7 @@ func BlockHeaderToMessage(b types.BlockHeader) *shared.BlockHeader {
 	return &shared.BlockHeader{
 		Hash:              b.Hash,
 		PreviousBlockHash: b.PreviousBlockHash,
-		Height:            b.Height,
+		Number:            b.Number,
 		TransactionCount:  b.TransactionCount,
 	}
 }

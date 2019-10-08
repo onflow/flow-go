@@ -9,7 +9,7 @@ import (
 )
 
 type Block struct {
-	Height            uint64
+	Number            uint64
 	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
 	TransactionHashes []crypto.Hash
@@ -19,7 +19,7 @@ func (b *Block) Hash() crypto.Hash {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
 	d, _ := rlp.EncodeToBytes([]interface{}{
-		b.Height,
+		b.Number,
 		b.PreviousBlockHash,
 	})
 
@@ -28,7 +28,7 @@ func (b *Block) Hash() crypto.Hash {
 
 func GenesisBlock() *Block {
 	return &Block{
-		Height:            0,
+		Number:            0,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
 		TransactionHashes: make([]crypto.Hash, 0),

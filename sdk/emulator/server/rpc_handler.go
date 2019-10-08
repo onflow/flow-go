@@ -60,10 +60,10 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	block := s.blockchain.CommitBlock()
 
 	s.logger.WithFields(log.Fields{
-		"blockHeight": block.Height,
-		"blockHash":   block.Hash().Hex(),
-		"blockSize":   len(block.TransactionHashes),
-	}).Infof("️⛏  Block #%d mined", block.Height)
+		"blockNum":  block.Number,
+		"blockHash": block.Hash().Hex(),
+		"blockSize": len(block.TransactionHashes),
+	}).Infof("️⛏  Block #%d mined", block.Number)
 
 	response := &observe.SendTransactionResponse{
 		Hash: tx.Hash(),
@@ -80,14 +80,14 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 	blockHeader := types.BlockHeader{
 		Hash:              block.Hash(),
 		PreviousBlockHash: block.PreviousBlockHash,
-		Height:            block.Height,
+		Number:            block.Number,
 		TransactionCount:  uint32(len(block.TransactionHashes)),
 	}
 
 	s.logger.WithFields(log.Fields{
-		"blockHeight": blockHeader.Height,
-		"blockHash":   blockHeader.Hash.Hex(),
-		"blockSize":   blockHeader.TransactionCount,
+		"blockNum":  blockHeader.Number,
+		"blockHash": blockHeader.Hash.Hex(),
+		"blockSize": blockHeader.TransactionCount,
 	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observe.GetLatestBlockResponse{

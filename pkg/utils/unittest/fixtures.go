@@ -21,7 +21,7 @@ func BlockHeaderFixture() types.BlockHeader {
 	return types.BlockHeader{
 		Hash:              crypto.Hash("abc"),
 		PreviousBlockHash: crypto.Hash("def"),
-		Height:            100,
+		Number:            100,
 		TransactionCount:  2000,
 	}
 }

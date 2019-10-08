@@ -85,10 +85,10 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 			block := s.blockchain.CommitBlock()
 
 			s.logger.WithFields(log.Fields{
-				"blockHeight": block.Height,
-				"blockHash":   block.Hash(),
-				"blockSize":   len(block.TransactionHashes),
-			}).Tracef("️⛏  Block #%d mined", block.Height)
+				"blockNum":  block.Number,
+				"blockHash": block.Hash(),
+				"blockSize": len(block.TransactionHashes),
+			}).Tracef("️⛏  Block #%d mined", block.Number)
 
 		case <-ctx.Done():
 			return
