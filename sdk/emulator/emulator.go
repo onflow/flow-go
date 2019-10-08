@@ -268,7 +268,7 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	block := &etypes.Block{
-		Number:            prevBlock.Number + 1,
+		Height:            prevBlock.Height + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),
 		TransactionHashes: txHashes,
