@@ -29,6 +29,10 @@ func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
 	r.signingAccounts = accounts
 }
 
+func (r *RuntimeContext) GetSigningAccounts() []types.Address {
+	return r.signingAccounts
+}
+
 func (r *RuntimeContext) SetLogger(callback func(string)) {
 	r.onLog = callback
 }
@@ -82,27 +86,50 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	return accountID, nil
 }
 
-func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte, keyWeights []int) {
-	count := big.NewInt(int64(len(publicKeys)))
+func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+	accountID := address.Bytes()
 
-	r.registers.Set(
-		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
-		count.Bytes(),
-	)
-
-	for i, publicKey := range publicKeys {
-		r.registers.Set(
-			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
-			publicKey,
-		)
-
-		weight := big.NewInt(int64(keyWeights[i]))
-
-		r.registers.Set(
-			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
-			weight.Bytes(),
-		)
+	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	if !exists {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
+
+	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		return err
+	}
+
+	publicKeys = append(publicKeys, publicKey)
+	keyWeights = append(keyWeights, keyWeight)
+
+	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+
+	return nil
+}
+
+func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) error {
+	accountID := address.Bytes()
+
+	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	if !exists {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
+	}
+
+	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		return err
+	}
+
+	if index < 0 || index > len(publicKeys)-1 {
+		return fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
+	}
+
+	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
+	keyWeights = append(keyWeights[:index], keyWeights[index+1:]...)
+
+	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+
+	return nil
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {
@@ -110,7 +137,7 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if !exists {
-		return [][]byte{}, []int{}, nil
+		return [][]byte{}, []int{}, fmt.Errorf("key count not set")
 	}
 
 	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
@@ -136,6 +163,48 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]
 	}
 
 	return publicKeys, keyWeights, nil
+}
+
+func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte, keyWeights []int) error {
+	var existingCount int
+
+	countBytes, exists := r.registers.Get(
+		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+	)
+	if exists {
+		existingCount = int(big.NewInt(0).SetBytes(countBytes).Int64())
+	} else {
+		existingCount = 0
+	}
+
+	newCount := len(publicKeys)
+
+	r.registers.Set(
+		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+		big.NewInt(int64(newCount)).Bytes(),
+	)
+
+	for i, publicKey := range publicKeys {
+		r.registers.Set(
+			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
+			publicKey,
+		)
+
+		weight := big.NewInt(int64(keyWeights[i]))
+
+		r.registers.Set(
+			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
+			weight.Bytes(),
+		)
+	}
+
+	// delete leftover keys
+	for i := newCount; i < existingCount; i++ {
+		r.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKey(i)))
+		r.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)))
+	}
+
+	return nil
 }
 
 func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
@@ -199,10 +268,6 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 	}
 
 	return code, nil
-}
-
-func (r *RuntimeContext) GetSigningAccounts() []types.Address {
-	return r.signingAccounts
 }
 
 func (r *RuntimeContext) Log(message string) {

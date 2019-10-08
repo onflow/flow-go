@@ -39,6 +39,10 @@ type Interface interface {
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
 	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	// AddAccountKey appends a key to an account.
+	AddAccountKey(adddress types.Address, publicKey []byte, keyWeight int) error
+	// RemoveAccountKey removes a key from an account by index.
+	RemoveAccountKey(adddress types.Address, index int) error
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(adddress types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -166,9 +170,41 @@ var createAccountFunctionType = sema.FunctionType{
 }
 
 // TODO: improve types
+var addAccountKeyFunctionType = sema.FunctionType{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		// address
+		&sema.StringType{},
+		// key
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+		// keyWeight
+		&sema.IntType{},
+	),
+	// nothing
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
+}
+
+// TODO: improve types
+var removeAccountKeyFunctionType = sema.FunctionType{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		// address
+		&sema.StringType{},
+		// index
+		&sema.IntType{},
+	),
+	// nothing
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
+}
+
+// TODO: improve types
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// accountID
+		// address
 		&sema.StringType{},
 		// code
 		&sema.VariableSizedType{
@@ -256,6 +292,18 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			"createAccount",
 			&createAccountFunctionType,
 			r.newCreateAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"addAccountKey",
+			&addAccountKeyFunctionType,
+			r.addAccountKeyFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"removeAccountKey",
+			&removeAccountKeyFunctionType,
+			r.removeAccountKeyFunction(runtimeInterface),
 			nil,
 		),
 		stdlib.NewStandardLibraryFunction(
@@ -478,6 +526,68 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 		}
 
 		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 3 {
+			panic(fmt.Sprintf("addAccountKey requires 3 parameters"))
+		}
+
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("addAccountKey requires the first parameter to be a string"))
+		}
+
+		publicKey, err := toByteArray(arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
+		}
+
+		keyWeight, ok := arguments[2].(interpreter.IntValue)
+		if !ok {
+			panic(fmt.Sprintf("addAccountKey requires the third parameter to be an integer"))
+		}
+
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err = runtimeInterface.AddAccountKey(accountAddress, publicKey, keyWeight.IntValue())
+		if err != nil {
+			panic(err)
+		}
+
+		result := &interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 2 {
+			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
+		}
+
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		if !ok {
+			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be a string"))
+		}
+
+		index, ok := arguments[1].(interpreter.IntValue)
+		if !ok {
+			panic(fmt.Sprintf("removeAccountKey requires the second parameter to be an integer"))
+
+		}
+
+		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+
+		err := runtimeInterface.RemoveAccountKey(accountAddress, index.IntValue())
+		if err != nil {
+			panic(err)
+		}
+
+		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }

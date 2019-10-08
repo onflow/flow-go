@@ -34,17 +34,42 @@ func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
 }
 
 // UpdateAccountCode generates a script that updates the code associated with an account.
-func UpdateAccountCode(account types.Address, code []byte) []byte {
-	accountStr := bytesToString(account.Bytes())
+func UpdateAccountCode(code []byte) []byte {
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
-		fun main() {
-			let account = %s
+		fun main(account: Account) {
 			let code = %s
-			updateAccountCode(account, code)
+			updateAccountCode(account.address, code)
 		}
-	`, accountStr, codeStr)
+	`, codeStr)
+
+	return []byte(script)
+}
+
+// AddAccountKey generates a script that adds a key to an account.
+func AddAccountKey(accountKey types.AccountKey) []byte {
+	publicKeyStr := bytesToString(accountKey.PublicKey)
+
+	script := fmt.Sprintf(`
+		fun main(account: Account) {
+			let code = %s
+			let weight = %d
+			addAccountKey(account.address, code, weight)
+		}
+	`, publicKeyStr, accountKey.Weight)
+
+	return []byte(script)
+}
+
+// RemoveAccountKey generates a script that removes a key from an account.
+func RemoveAccountKey(index int) []byte {
+	script := fmt.Sprintf(`
+		fun main(account: Account) {
+			let index = %d
+			removeAccountKey(account.address, index)
+		}
+	`, index)
 
 	return []byte(script)
 }
