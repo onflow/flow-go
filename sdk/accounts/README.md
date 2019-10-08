@@ -11,8 +11,10 @@
 
 
 ## <a name="pkg-index">Index</a>
-* [func CreateAccount(publicKey, code []byte) []byte](#CreateAccount)
-* [func UpdateAccountCode(account types.Address, code []byte) []byte](#UpdateAccountCode)
+* [func AddAccountKey(accountKey types.AccountKey) []byte](#AddAccountKey)
+* [func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte](#CreateAccount)
+* [func RemoveAccountKey(index int) []byte](#RemoveAccountKey)
+* [func UpdateAccountCode(code []byte) []byte](#UpdateAccountCode)
 
 
 #### <a name="pkg-files">Package files</a>
@@ -22,19 +24,35 @@
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=161:210#L11)
+## <a name="AddAccountKey">func</a> [AddAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=1201:1255#L51)
 ``` go
-func CreateAccount(publicKey, code []byte) []byte
+func AddAccountKey(accountKey types.AccountKey) []byte
 ```
-CreateAccount generates a transaction that creates a new account.
+AddAccountKey generates a script that adds a key to an account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=586:651#L27)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=156:226#L11)
 ``` go
-func UpdateAccountCode(account types.Address, code []byte) []byte
+func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte
 ```
-UpdateAccountCode generates a transaction that updates the code associated with an account.
+CreateAccount generates a script that creates a new account.
+
+
+
+## <a name="RemoveAccountKey">func</a> [RemoveAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=1595:1634#L66)
+``` go
+func RemoveAccountKey(index int) []byte
+```
+RemoveAccountKey generates a script that removes a key from an account.
+
+
+
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=895:937#L37)
+``` go
+func UpdateAccountCode(code []byte) []byte
+```
+UpdateAccountCode generates a script that updates the code associated with an account.
 
 
 

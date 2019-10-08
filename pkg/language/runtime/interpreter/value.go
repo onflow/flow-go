@@ -238,7 +238,7 @@ func (v ArrayValue) Copy() Value {
 	for i, value := range *v.Values {
 		copies[i] = value.Copy()
 	}
-	return ArrayValue{Values: &copies}
+	return NewArrayValue(copies...)
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -254,7 +254,7 @@ func (v ArrayValue) ToGoValue() interface{} {
 func (v ArrayValue) Concat(other ConcatenatableValue) Value {
 	otherArray := other.(ArrayValue)
 	values := append(*v.Values, *otherArray.Values...)
-	return ArrayValue{Values: &values}
+	return NewArrayValue(values...)
 }
 
 func (v ArrayValue) Get(key Value) Value {
