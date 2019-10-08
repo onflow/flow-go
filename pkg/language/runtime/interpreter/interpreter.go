@@ -1085,7 +1085,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
 			}
 
-			return Done{Result: ArrayValue{Values: &copies}}
+			return Done{Result: NewArrayValue(copies...)}
 		})
 }
 
@@ -1239,7 +1239,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 }
 
 func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: ArrayValue{Values: &[]Value{}}}
+	var trampoline Trampoline = Done{Result: NewArrayValue()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1255,7 +1255,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 					value := result.(Value)
 
 					newValues := append(*array.Values, value)
-					return Done{Result: ArrayValue{Values: &newValues}}
+					return Done{Result: NewArrayValue(newValues...)}
 				})
 		})
 	}
