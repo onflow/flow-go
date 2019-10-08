@@ -49,6 +49,8 @@ func bytesToString(b []byte) string {
 }
 
 // bytesArrayToString converts a slice of byte slices to a comma-separated list of uint8 integers.
+//
+// Example: [][]byte{[]byte{1}, []byte{2,3}} -> "[[1],[2,3]]"
 func bytesArrayToString(b [][]byte) string {
 	if b == nil || len(b) == 0 {
 		return "nil"
