@@ -592,3 +592,20 @@ func (checker *Checker) checkWithResources(
 
 	return check()
 }
+
+func (checker *Checker) checkNonIdentifierResourceLoss(expressionType Type, expression ast.Expression) {
+	if !expressionType.IsResourceType() {
+		return
+	}
+
+	if _, isIdentifier := expression.(*ast.IdentifierExpression); isIdentifier {
+		return
+	}
+
+	checker.report(
+		&ResourceLossError{
+			StartPos: expression.StartPosition(),
+			EndPos:   expression.EndPosition(),
+		},
+	)
+}

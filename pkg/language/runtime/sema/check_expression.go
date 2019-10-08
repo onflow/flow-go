@@ -101,23 +101,26 @@ func (checker *Checker) visitIndexingExpression(
 				EndPos:   indexedExpression.EndPosition(),
 			},
 		)
-	} else {
 
-		// check indexing expression's type can be used to index
-		// into indexed expression's type
-
-		if !IsInvalidType(indexingType) &&
-			!IsIndexingType(indexingType, indexedType) {
-
-			checker.report(
-				&NotIndexingTypeError{
-					Type:     indexingType,
-					StartPos: indexingExpression.StartPosition(),
-					EndPos:   indexingExpression.EndPosition(),
-				},
-			)
-		}
+		return elementType
 	}
+
+	// check indexing expression's type can be used to index
+	// into indexed expression's type
+
+	if !IsInvalidType(indexingType) &&
+		!IsIndexingType(indexingType, indexedType) {
+
+		checker.report(
+			&NotIndexingTypeError{
+				Type:     indexingType,
+				StartPos: indexingExpression.StartPosition(),
+				EndPos:   indexingExpression.EndPosition(),
+			},
+		)
+	}
+
+	checker.checkNonIdentifierResourceLoss(indexedType, indexedExpression)
 
 	return elementType
 }

@@ -1085,6 +1085,53 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 	})
+
+	t.Run("ImmediateIndexing", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+			resource Foo {}
+
+			fun test() {
+				let x <- [<-create Foo(), <-create Foo()][0]
+                destroy x
+			}
+		`)
+
+		// TODO: add support for resources
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+
+		assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	})
+
+	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+			resource Foo {}
+
+			fun test() {
+				let x <- makeFoos()[0]
+                destroy x
+			}
+
+            fun makeFoos(): <-[Foo] {
+                return <-[
+                    <-create Foo(),
+                    <-create Foo()
+                ]
+            }
+		`)
+
+		// TODO: add support for resources
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+
+		assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	})
 }
 
 func TestCheckResourceReturn(t *testing.T) {
