@@ -144,7 +144,28 @@ func (s *AssignmentStatement) EndPosition() Position {
 func (*AssignmentStatement) isStatement() {}
 
 func (s *AssignmentStatement) Accept(visitor Visitor) Repr {
-	return visitor.VisitAssignment(s)
+	return visitor.VisitAssignmentStatement(s)
+}
+
+// SwapStatement
+
+type SwapStatement struct {
+	Left  Expression
+	Right Expression
+}
+
+func (s *SwapStatement) StartPosition() Position {
+	return s.Left.StartPosition()
+}
+
+func (s *SwapStatement) EndPosition() Position {
+	return s.Right.EndPosition()
+}
+
+func (*SwapStatement) isStatement() {}
+
+func (s *SwapStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitSwapStatement(s)
 }
 
 // ExpressionStatement

@@ -131,6 +131,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#assignment.
 	VisitAssignment(ctx *AssignmentContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#swap.
+	VisitSwap(ctx *SwapContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#transfer.
 	VisitTransfer(ctx *TransferContext) interface{}
 

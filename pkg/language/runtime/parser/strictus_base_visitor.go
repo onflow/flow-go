@@ -167,6 +167,10 @@ func (v *BaseStrictusVisitor) VisitAssignment(ctx *AssignmentContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitSwap(ctx *SwapContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 	return v.VisitChildren(ctx)
 }

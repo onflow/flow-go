@@ -218,6 +218,7 @@ statement
     // in semantic analysis to provide better error
     | declaration
     | assignment
+    | swap
     | expression
     ;
 
@@ -255,6 +256,14 @@ variableDeclaration
 
 assignment
     : identifier expressionAccess* transfer expression
+    ;
+
+
+// NOTE: we allow expressions on both sides when parsing, but ensure
+//   that both sides are targets (identifier, member access, or index access)
+//   in the semantic analysis. This allows us to provide better error messages
+swap
+    : left=expression '<->' right=expression
     ;
 
 transfer
