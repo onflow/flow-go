@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -48,7 +47,15 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 	return nil
 }
 
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (rd []byte, err error) {
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) ([]byte, error) {
+	if len(publicKeys) != len(keyWeights) {
+		return nil, fmt.Errorf(
+			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
+			len(publicKeys),
+			len(keyWeights),
+		)
+	}
+
 	latestAccountID, _ := r.registers.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -61,8 +68,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (rd []b
 	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
-	// TODO: store key weight
-	r.setAccountPublicKeys(accountID, publicKeys)
+	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
 
 	r.registers.Set(keyLatestAccount, accountID)
 
@@ -76,7 +82,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (rd []b
 	return accountID, nil
 }
 
-func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) {
+func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte, keyWeights []int) {
 	count := big.NewInt(int64(len(publicKeys)))
 
 	r.registers.Set(
@@ -89,34 +95,47 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
 		)
+
+		weight := big.NewInt(int64(keyWeights[i]))
+
+		r.registers.Set(
+			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
+			weight.Bytes(),
+		)
 	}
 }
 
-func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) ([][]byte, error) {
+func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {
 	countBytes, exists := r.registers.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if !exists {
-		return [][]byte{}, nil
+		return [][]byte{}, []int{}, nil
 	}
 
 	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
 
-	publicKeys := make([][]byte, count)
+	publicKeys = make([][]byte, count)
+	keyWeights = make([]int, count)
 
 	for i := 0; i < count; i++ {
-		publicKey, exists := r.registers.Get(
+		publicKey, publicKeyExists := r.registers.Get(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 		)
 
-		if !exists {
-			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
+		keyWeightBytes, keyWeightExists := r.registers.Get(
+			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
+		)
+
+		if !publicKeyExists || !keyWeightExists {
+			return nil, nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
 		publicKeys[i] = publicKey
+		keyWeights[i] = int(big.NewInt(0).SetBytes(keyWeightBytes).Int64())
 	}
 
-	return publicKeys, nil
+	return publicKeys, keyWeights, nil
 }
 
 func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
@@ -148,14 +167,13 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 
 	// TODO: handle errors properly
 	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
-	publicKeys, _ := r.getAccountPublicKeys(accountID)
+	publicKeys, keyWeights, _ := r.getAccountPublicKeys(accountID)
 
 	accountKeys := make([]types.AccountKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
 		accountKeys[i] = types.AccountKey{
 			PublicKey: publicKey,
-			// TODO: use stored key weight
-			Weight: constants.AccountKeyWeightThreshold,
+			Weight:    keyWeights[i],
 		}
 	}
 
@@ -214,4 +232,8 @@ func fullKey(owner, controller, key string) string {
 
 func keyPublicKey(index int) string {
 	return fmt.Sprintf("public_key_%d", index)
+}
+
+func keyPublicKeyWeight(index int) string {
+	return fmt.Sprintf("public_key_weight_%d", index)
 }

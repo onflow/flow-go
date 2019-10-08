@@ -329,7 +329,7 @@ func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]uint32)
+	accountWeights := make(map[types.Address]int)
 
 	for _, accountSig := range tx.Signatures {
 		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
@@ -406,7 +406,11 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
-	accountID, _ := runtimeContext.CreateAccount([][]byte{pubKeyBytes}, []byte{})
+	accountID, _ := runtimeContext.CreateAccount(
+		[][]byte{pubKeyBytes},
+		[]int{constants.AccountKeyWeightThreshold},
+		[]byte{},
+	)
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 

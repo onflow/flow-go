@@ -8,17 +8,27 @@ import (
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(publicKeys [][]byte, code []byte) []byte {
+func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
+	publicKeys := make([][]byte, len(accountKeys))
+	keyWeights := make([]int, len(accountKeys))
+
+	for i, accountKey := range accountKeys {
+		publicKeys[i] = accountKey.PublicKey
+		keyWeights[i] = accountKey.Weight
+	}
+
 	publicKeysStr := bytesArrayToString(publicKeys)
+	keyWeightsStr := intArrayToString(keyWeights)
 	codeStr := bytesToString(code)
 
 	script := fmt.Sprintf(`
 		fun main() {
 			let publicKeys = %s
+			let keyWeights = %s
 			let code: [Int]? = %s
-			createAccount(publicKeys, code)
+			createAccount(publicKeys, keyWeights, code)
 		}
-	`, publicKeysStr, codeStr)
+	`, publicKeysStr, keyWeightsStr, codeStr)
 
 	return []byte(script)
 }
@@ -57,4 +67,13 @@ func bytesArrayToString(b [][]byte) string {
 	}
 
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+}
+
+// intArrayToString converts a slice of integers to a comma-separated list.
+func intArrayToString(i []int) string {
+	if i == nil || len(i) == 0 {
+		return "nil"
+	}
+
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", i)), ",")
 }

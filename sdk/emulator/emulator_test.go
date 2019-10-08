@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/accounts"
@@ -30,8 +31,8 @@ const sampleCall = `
 `
 
 // createAccount is a test utility to add a new account to the emulated blockchain.
-func createAccount(b *EmulatedBlockchain, publicKeys [][]byte, code []byte) (types.Address, error) {
-	createAccountScript := accounts.CreateAccount(publicKeys, code)
+func createAccount(b *EmulatedBlockchain, accountKeys []types.AccountKey, code []byte) (types.Address, error) {
+	createAccountScript := accounts.CreateAccount(accountKeys, code)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -226,6 +227,8 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
+	RegisterTestingT(t)
+
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	privateKeyA := b.RootKey()
@@ -233,8 +236,13 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKeyB, _ := privateKeyB.Publickey().Encode()
 
+	accountKeyB := types.AccountKey{
+		PublicKey: publicKeyB,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, nil)
+	accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -347,6 +355,73 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		err := b.SubmitTransaction(tx1)
 		Expect(err).To(MatchError(&ErrInvalidSignaturePublicKey{Account: b.RootAccountAddress()}))
 	})
+
+	t.Run("KeyWeights", func(t *testing.T) {
+		RegisterTestingT(t)
+
+		b := NewEmulatedBlockchain(DefaultOptions)
+
+		privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+		publicKeyA, _ := privateKeyA.Publickey().Encode()
+
+		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("space cowboy"))
+		publicKeyB, _ := privateKeyB.Publickey().Encode()
+
+		accountKeyA := types.AccountKey{
+			PublicKey: publicKeyA,
+			Weight:    constants.AccountKeyWeightThreshold / 2,
+		}
+
+		accountKeyB := types.AccountKey{
+			PublicKey: publicKeyB,
+			Weight:    constants.AccountKeyWeightThreshold / 2,
+		}
+
+		createAccountScript := accounts.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+
+		accountAddressA := types.HexToAddress("0000000000000000000000000000000000000002")
+
+		tx1 := &types.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err := b.SubmitTransaction(tx1)
+		Expect(err).ToNot(HaveOccurred())
+
+		script := []byte("fun main(account: Account) {}")
+
+		tx2 := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       accountAddressA,
+			ScriptAccounts:     []types.Address{accountAddressA},
+		}
+
+		t.Run("InsufficientKeyWeight", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			tx2.AddSignature(accountAddressA, privateKeyB)
+
+			err = b.SubmitTransaction(tx2)
+			Expect(err).To(MatchError(&ErrMissingSignature{Account: accountAddressA}))
+		})
+
+		t.Run("SufficientKeyWeight", func(t *testing.T) {
+			RegisterTestingT(t)
+
+			tx2.AddSignature(accountAddressA, privateKeyA)
+			tx2.AddSignature(accountAddressA, privateKeyB)
+
+			err = b.SubmitTransaction(tx2)
+			Expect(err).To(Not(HaveOccurred()))
+		})
+	})
 }
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
@@ -388,8 +463,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 		publicKeyB, _ := privateKeyB.Publickey().Encode()
 
+		accountKeyB := types.AccountKey{
+			PublicKey: publicKeyB,
+			Weight:    constants.AccountKeyWeightThreshold,
+		}
+
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, nil)
+		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		multipleAccountScript := []byte(`
@@ -499,11 +579,19 @@ func TestCreateAccount(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	publicKeyA := []byte{1, 2, 3}
-	publicKeyB := []byte{4, 5, 6}
+	accountKeyA := types.AccountKey{
+		PublicKey: []byte{1, 2, 3},
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
+	accountKeyB := types.AccountKey{
+		PublicKey: []byte{4, 5, 6},
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
 	codeA := []byte("fun main() {}")
 
-	createAccountScriptA := accounts.CreateAccount([][]byte{publicKeyA, publicKeyB}, codeA)
+	createAccountScriptA := accounts.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, codeA)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -521,17 +609,21 @@ func TestCreateAccount(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyA))
-	Expect(account.Keys[1].PublicKey).To(Equal(publicKeyB))
+	Expect(account.Keys[0]).To(Equal(accountKeyA))
+	Expect(account.Keys[1]).To(Equal(accountKeyB))
 	Expect(account.Code).To(Equal(codeA))
 
-	publicKeyC := []byte{7, 8, 9}
+	accountKeyC := types.AccountKey{
+		PublicKey: []byte{7, 8, 9},
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
 	codeB := []byte("fun main() {}")
 
-	createAccountScriptB := accounts.CreateAccount([][]byte{publicKeyC}, codeB)
+	createAccountScriptC := accounts.CreateAccount([]types.AccountKey{accountKeyC}, codeB)
 
 	tx2 := &types.Transaction{
-		Script:             createAccountScriptB,
+		Script:             createAccountScriptC,
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -547,13 +639,18 @@ func TestCreateAccount(t *testing.T) {
 
 	Expect(err).ToNot(HaveOccurred())
 	Expect(account.Balance).To(Equal(uint64(0)))
-	Expect(account.Keys[0].PublicKey).To(Equal(publicKeyC))
+	Expect(account.Keys[0]).To(Equal(accountKeyC))
 	Expect(account.Code).To(Equal(codeB))
 }
 
 func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKeyB, _ := privateKeyB.Publickey().Encode()
+
+	accountKeyB := types.AccountKey{
+		PublicKey: publicKeyB,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
 
 	updateAccountCodeScript := []byte(`
 		fun main(account: Account) {
@@ -570,7 +667,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -607,7 +704,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -644,7 +741,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, [][]byte{publicKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -687,9 +784,14 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	publicKey, _ := b.RootKey().Publickey().Encode()
+	publicKeyA, _ := b.RootKey().Publickey().Encode()
 
-	_, err := createAccount(b, [][]byte{publicKey}, accountScript)
+	accountKeyA := types.AccountKey{
+		PublicKey: publicKeyA,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
+	_, err := createAccount(b, []types.AccountKey{accountKeyA}, accountScript)
 	Expect(err).ToNot(HaveOccurred())
 
 	script := []byte(`
