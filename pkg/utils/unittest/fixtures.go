@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -13,6 +14,15 @@ func AccountSignatureFixture() types.AccountSignature {
 	return types.AccountSignature{
 		Account:   AddressFixture(),
 		Signature: []byte{},
+	}
+}
+
+func BlockHeaderFixture() types.BlockHeader {
+	return types.BlockHeader{
+		Hash:              crypto.Hash("abc"),
+		PreviousBlockHash: crypto.Hash("def"),
+		Height:            100,
+		TransactionCount:  2000,
 	}
 }
 

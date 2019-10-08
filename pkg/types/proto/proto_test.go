@@ -9,6 +9,17 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 )
 
+func TestBlockHeader(t *testing.T) {
+	RegisterTestingT(t)
+
+	blockHeaderA := unittest.BlockHeaderFixture()
+
+	message := proto.BlockHeaderToMessage(blockHeaderA)
+	blockHeaderB := proto.MessageToBlockHeader(message)
+
+	Expect(blockHeaderA).To(Equal(blockHeaderB))
+}
+
 func TestAccountSignature(t *testing.T) {
 	RegisterTestingT(t)
 
