@@ -6,6 +6,13 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
+type BlockHeader struct {
+	Hash              crypto.Hash
+	PreviousBlockHash crypto.Hash
+	Height            uint64
+	TransactionCount  uint32
+}
+
 type Block struct {
 	ChainID                string
 	Height                 uint64

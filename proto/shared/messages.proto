@@ -6,6 +6,12 @@ package flow.shared.messages;
 
 option go_package = "shared";
 
+message BlockHeader {
+  bytes hash = 1;
+  bytes previousBlockHash = 2;
+  uint64 height = 3;
+  uint32 transactionCount = 4;
+}
 
 message Block {
   string chainID = 1;
