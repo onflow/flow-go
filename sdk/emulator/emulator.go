@@ -109,7 +109,7 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*etypes.Block, er
 }
 
 // GetBlockByNumber gets a block by number.
-func (b *EmulatedBlockchain) GetBlockByHeight(number uint64) (*etypes.Block, error) {
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*etypes.Block, error) {
 	block := b.pendingWorldState.GetBlockByNumber(number)
 	if block == nil {
 		return nil, &ErrBlockNotFound{BlockNum: number}
