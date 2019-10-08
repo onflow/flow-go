@@ -119,8 +119,12 @@ func (detector *ExitDetector) VisitVariableDeclaration(node *ast.VariableDeclara
 	return detector.nodeExits(node.Value)
 }
 
-func (detector *ExitDetector) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
+func (detector *ExitDetector) VisitAssignmentStatement(node *ast.AssignmentStatement) ast.Repr {
 	return detector.nodeExits(node.Target) || detector.nodeExits(node.Value)
+}
+
+func (detector *ExitDetector) VisitSwapStatement(node *ast.SwapStatement) ast.Repr {
+	return detector.nodeExits(node.Left) || detector.nodeExits(node.Right)
 }
 
 func (detector *ExitDetector) VisitExpressionStatement(node *ast.ExpressionStatement) ast.Repr {
