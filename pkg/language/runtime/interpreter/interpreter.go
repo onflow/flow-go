@@ -715,7 +715,7 @@ func (interpreter *Interpreter) declareVariable(identifier string, value Value) 
 	return variable
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
+func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
@@ -724,16 +724,36 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 
 			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
-			return interpreter.visitAssignmentValue(assignment, valueCopy)
+			return interpreter.visitAssignmentValue(assignment.Target, valueCopy)
 		})
 }
 
-func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentStatement, value Value) Trampoline {
-	switch target := assignment.Target.(type) {
+func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
+	// Evaluate the left expression
+	return swap.Left.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			leftValue := result.(Value)
+
+			// Evaluate the right expression
+			return swap.Right.Accept(interpreter).(Trampoline).
+				FlatMap(func(result interface{}) Trampoline {
+					rightValue := result.(Value)
+
+					// Assign the right-hand side value to the left-hand side
+					return interpreter.visitAssignmentValue(swap.Left, rightValue).
+						FlatMap(func(_ interface{}) Trampoline {
+
+							// Assign the left-hand side value to the right-hand side
+							return interpreter.visitAssignmentValue(swap.Right, leftValue)
+						})
+				})
+		})
+}
+
+func (interpreter *Interpreter) visitAssignmentValue(target ast.Expression, value Value) Trampoline {
+	switch target := target.(type) {
 	case *ast.IdentifierExpression:
-		interpreter.visitIdentifierExpressionAssignment(target, value)
-		// NOTE: no result, so it does *not* act like a return-statement
-		return Done{}
+		return interpreter.visitIdentifierExpressionAssignment(target, value)
 
 	case *ast.IndexExpression:
 		return interpreter.visitIndexExpressionAssignment(target, value)
@@ -745,9 +765,11 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
+func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) Trampoline {
 	variable := interpreter.findVariable(target.Identifier.Identifier)
 	variable.Value = value
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
