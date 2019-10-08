@@ -325,6 +325,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 }
 
 func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -350,7 +351,6 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 
 			case common.CompositeKindContract:
@@ -362,11 +362,8 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				// NOTE: one invalid move annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[2])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
 
 			case common.CompositeKindStructure:
@@ -376,7 +373,6 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				// NOTE: one invalid move annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
 			}
 		})
@@ -846,10 +842,9 @@ func TestCheckUnaryMove(t *testing.T) {
           return <-x
       }
 
-      var x <- foo(x: <-create X())
-
       fun bar() {
-          x <- create X()
+          let x <- foo(x: <-create X())
+          destroy x
       }
 	`)
 
@@ -858,7 +853,6 @@ func TestCheckUnaryMove(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 }
 
 func TestCheckImmediateDestroy(t *testing.T) {
@@ -1341,7 +1335,7 @@ func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 }
 
-func TestCheckResourceAssignmentTransfer(t *testing.T) {
+func TestCheckInvalidResourceAssignmentTransfer(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource X {}
@@ -1360,9 +1354,11 @@ func TestCheckResourceAssignmentTransfer(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 3)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
@@ -1384,11 +1380,13 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 4)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[1])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[2])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[3])
+
 }
 
 func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
@@ -1461,11 +1459,12 @@ func TestCheckInvalidResourceLossThroughAssignment(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 4)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[3])
 }
 
 func TestCheckResourceMoveThroughReturn(t *testing.T) {
