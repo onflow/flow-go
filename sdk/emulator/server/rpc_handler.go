@@ -60,66 +60,13 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 	block := s.blockchain.CommitBlock()
 
 	s.logger.WithFields(log.Fields{
-		"blockNum":  block.Number,
-		"blockHash": block.Hash().Hex(),
-		"blockSize": len(block.TransactionHashes),
-	}).Infof("️⛏  Block #%d mined", block.Number)
+		"blockHeight": block.Height,
+		"blockHash":   block.Hash().Hex(),
+		"blockSize":   len(block.TransactionHashes),
+	}).Infof("️⛏  Block #%d mined", block.Height)
 
 	response := &observe.SendTransactionResponse{
 		Hash: tx.Hash(),
-	}
-
-	return response, nil
-}
-
-// GetBlockByHash gets a block by hash.
-func (s *EmulatorServer) GetBlockByHash(ctx context.Context, req *observe.GetBlockByHashRequest) (*observe.GetBlockByHashResponse, error) {
-	hash := crypto.BytesToHash(req.GetHash())
-
-	block, err := s.blockchain.GetBlockByHash(hash)
-	if err != nil {
-		switch err.(type) {
-		case *emulator.ErrBlockNotFound:
-			return nil, status.Error(codes.NotFound, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-
-	s.logger.WithFields(log.Fields{
-		"blockNum":  block.Number,
-		"blockHash": hash.Hex(),
-		"blockSize": len(block.TransactionHashes),
-	}).Debugf("🎁  GetBlockByHash called")
-
-	response := &observe.GetBlockByHashResponse{
-		Block: block.ToMessage(),
-	}
-
-	return response, nil
-}
-
-// GetBlockByNumber gets a block by number.
-func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetBlockByNumberRequest) (*observe.GetBlockByNumberResponse, error) {
-	number := req.GetNumber()
-	block, err := s.blockchain.GetBlockByNumber(number)
-	if err != nil {
-		switch err.(type) {
-		case *emulator.ErrBlockNotFound:
-			return nil, status.Error(codes.NotFound, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-
-	s.logger.WithFields(log.Fields{
-		"blockNum":  number,
-		"blockHash": block.Hash().Hex(),
-		"blockSize": len(block.TransactionHashes),
-	}).Debugf("🎁  GetBlockByNumber called")
-
-	response := &observe.GetBlockByNumberResponse{
-		Block: block.ToMessage(),
 	}
 
 	return response, nil
@@ -129,14 +76,22 @@ func (s *EmulatorServer) GetBlockByNumber(ctx context.Context, req *observe.GetB
 func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
 	block := s.blockchain.GetLatestBlock()
 
+	// create block header for block
+	blockHeader := types.BlockHeader{
+		Hash:              block.Hash(),
+		PreviousBlockHash: block.PreviousBlockHash,
+		Height:            block.Height,
+		TransactionCount:  uint32(len(block.TransactionHashes)),
+	}
+
 	s.logger.WithFields(log.Fields{
-		"blockNum":  block.Number,
-		"blockHash": block.Hash().Hex(),
-		"blockSize": len(block.TransactionHashes),
+		"blockHeight": blockHeader.Height,
+		"blockHash":   blockHeader.Hash.Hex(),
+		"blockSize":   blockHeader.TransactionCount,
 	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observe.GetLatestBlockResponse{
-		Block: block.ToMessage(),
+		Block: proto.BlockHeaderToMessage(blockHeader),
 	}
 
 	return response, nil
