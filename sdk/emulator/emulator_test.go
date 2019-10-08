@@ -620,10 +620,10 @@ func TestCreateAccount(t *testing.T) {
 
 	codeB := []byte("fun main() {}")
 
-	createAccountScriptB := accounts.CreateAccount([]types.AccountKey{accountKeyC}, codeB)
+	createAccountScriptC := accounts.CreateAccount([]types.AccountKey{accountKeyC}, codeB)
 
 	tx2 := &types.Transaction{
-		Script:             createAccountScriptB,
+		Script:             createAccountScriptC,
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
