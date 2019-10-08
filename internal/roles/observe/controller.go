@@ -27,14 +27,6 @@ func (c *Controller) SendTransaction(context.Context, *observeSvc.SendTransactio
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) GetBlockByHash(context.Context, *observeSvc.GetBlockByHashRequest) (*observeSvc.GetBlockByHashResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (c *Controller) GetBlockByNumber(context.Context, *observeSvc.GetBlockByNumberRequest) (*observeSvc.GetBlockByNumberResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
 func (c *Controller) GetLatestBlock(context.Context, *observeSvc.GetLatestBlockRequest) (*observeSvc.GetLatestBlockResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

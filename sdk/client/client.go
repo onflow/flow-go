@@ -63,6 +63,21 @@ func (c *Client) SendTransaction(ctx context.Context, tx types.Transaction) erro
 	return err
 }
 
+// GetLatestBlock gets the header of the latest sealed or unsealed block.
+func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*types.BlockHeader, error) {
+	res, err := c.rpcClient.GetLatestBlock(
+		ctx,
+		&observe.GetLatestBlockRequest{IsSealed: isSealed},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	blockHeader := proto.MessageToBlockHeader(res.GetBlock())
+
+	return &blockHeader, nil
+}
+
 // CallScript executes a script against the current world state.
 func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, error) {
 	res, err := c.rpcClient.CallScript(ctx, &observe.CallScriptRequest{Script: script})
