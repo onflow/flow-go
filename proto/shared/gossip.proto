@@ -7,7 +7,7 @@ option go_package = "shared";
 // Message models a single message that is supposed to get exchanged by the gossip network
 message GossipMessage {
   bytes Payload = 1;
-  string Method = 2;                // Name of RPC method to be invoked on the message
+  string messageType = 2;           // Name of RPC method to be invoked on the message
   repeated string Recipients = 3;   // Address of the recipients to which the message should be delivered
   string Sender = 4;                // Address of the sender of this message
   repeated string Path = 5;         // Address of the nodes that this message visited so far
@@ -18,7 +18,7 @@ message GossipMessage {
 ////////////////////////////////////////////////////////////////////////////
 // 2 testing messages + rpc service to be deleted later
 
-service MessageReciever {
+service MessageReceiver {
   rpc AsyncQueue (GossipMessage) returns (GossipReply) {}
   rpc SyncQueue  (GossipMessage) returns (GossipReply) {}
 }

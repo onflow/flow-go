@@ -116,10 +116,10 @@ var fileDescriptor_33c57e4bae7b9afd = []byte{
 	0xb2, 0xe6, 0x62, 0xf7, 0x85, 0x08, 0x0b, 0x89, 0x71, 0xb1, 0x15, 0xa7, 0xe6, 0xa5, 0xa4, 0x16,
 	0x49, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x06, 0x41, 0x79, 0x42, 0x12, 0x5c, 0xec, 0xc9, 0xf9, 0x79,
 	0x25, 0xa9, 0x79, 0x25, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x3c, 0x41, 0x30, 0xae, 0x12, 0x1b, 0x17,
-	0x4b, 0x58, 0x7e, 0x66, 0x8a, 0x91, 0x39, 0x17, 0x47, 0x50, 0x6a, 0x72, 0x66, 0x6a, 0x59, 0x6a,
+	0x4b, 0x58, 0x7e, 0x66, 0x8a, 0x91, 0x39, 0x17, 0x47, 0x50, 0x6a, 0x72, 0x6a, 0x66, 0x59, 0x6a,
 	0x91, 0x90, 0x36, 0x17, 0x9f, 0x4b, 0x66, 0x71, 0x41, 0x4e, 0x62, 0x25, 0xcc, 0x5c, 0x5e, 0x3d,
 	0x90, 0x4d, 0x7a, 0x50, 0xae, 0x14, 0x17, 0x84, 0x0b, 0xd2, 0x98, 0xc4, 0x06, 0x76, 0x8a, 0x31,
-	0x20, 0x00, 0x00, 0xff, 0xff, 0x84, 0x30, 0x9e, 0x1a, 0x9b, 0x00, 0x00, 0x00,
+	0x20, 0x00, 0x00, 0xff, 0xff, 0x62, 0xa4, 0xa5, 0x76, 0x9b, 0x00, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -130,72 +130,72 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// RecieverClient is the client API for Reciever service.
+// ReceiverClient is the client API for Receiver service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type RecieverClient interface {
+type ReceiverClient interface {
 	DisplayMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Void, error)
 }
 
-type recieverClient struct {
+type receiverClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewRecieverClient(cc *grpc.ClientConn) RecieverClient {
-	return &recieverClient{cc}
+func NewReceiverClient(cc *grpc.ClientConn) ReceiverClient {
+	return &receiverClient{cc}
 }
 
-func (c *recieverClient) DisplayMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Void, error) {
+func (c *receiverClient) DisplayMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Void, error) {
 	out := new(Void)
-	err := c.cc.Invoke(ctx, "/main.Reciever/DisplayMessage", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/main.Receiver/DisplayMessage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// RecieverServer is the server API for Reciever service.
-type RecieverServer interface {
+// ReceiverServer is the server API for Receiver service.
+type ReceiverServer interface {
 	DisplayMessage(context.Context, *Message) (*Void, error)
 }
 
-// UnimplementedRecieverServer can be embedded to have forward compatible implementations.
-type UnimplementedRecieverServer struct {
+// UnimplementedReceiverServer can be embedded to have forward compatible implementations.
+type UnimplementedReceiverServer struct {
 }
 
-func (*UnimplementedRecieverServer) DisplayMessage(ctx context.Context, req *Message) (*Void, error) {
+func (*UnimplementedReceiverServer) DisplayMessage(ctx context.Context, req *Message) (*Void, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisplayMessage not implemented")
 }
 
-func RegisterRecieverServer(s *grpc.Server, srv RecieverServer) {
-	s.RegisterService(&_Reciever_serviceDesc, srv)
+func RegisterReceiverServer(s *grpc.Server, srv ReceiverServer) {
+	s.RegisterService(&_Receiver_serviceDesc, srv)
 }
 
-func _Reciever_DisplayMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Receiver_DisplayMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Message)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RecieverServer).DisplayMessage(ctx, in)
+		return srv.(ReceiverServer).DisplayMessage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/main.Reciever/DisplayMessage",
+		FullMethod: "/main.Receiver/DisplayMessage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RecieverServer).DisplayMessage(ctx, req.(*Message))
+		return srv.(ReceiverServer).DisplayMessage(ctx, req.(*Message))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Reciever_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "main.Reciever",
-	HandlerType: (*RecieverServer)(nil),
+var _Receiver_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "main.Receiver",
+	HandlerType: (*ReceiverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "DisplayMessage",
-			Handler:    _Reciever_DisplayMessage_Handler,
+			Handler:    _Receiver_DisplayMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

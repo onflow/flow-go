@@ -1087,7 +1087,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
 			}
 
-			return Done{Result: ArrayValue{Values: &copies}}
+			return Done{Result: NewArrayValue(copies...)}
 		})
 }
 
@@ -1243,7 +1243,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 }
 
 func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: ArrayValue{Values: &[]Value{}}}
+	var trampoline Trampoline = Done{Result: NewArrayValue()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1259,7 +1259,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 					value := result.(Value)
 
 					newValues := append(*array.Values, value)
-					return Done{Result: ArrayValue{Values: &newValues}}
+					return Done{Result: NewArrayValue(newValues...)}
 				})
 		})
 	}
@@ -1272,33 +1272,33 @@ func (interpreter *Interpreter) visitEntries(entries []ast.Entry) Trampoline {
 
 	for _, entry := range entries {
 		// NOTE: important: rebind entry, because it is captured in the closure below
-		entry := entry
+		func(entry ast.Entry) {
+			// append the evaluation of this entry
+			trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
+				resultEntries := result.([]DictionaryEntryValues)
 
-		// append the evaluation of this entry
-		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
-			resultEntries := result.([]DictionaryEntryValues)
+				// evaluate the key expression
+				return entry.Key.Accept(interpreter).(Trampoline).
+					FlatMap(func(result interface{}) Trampoline {
+						key := result.(Value)
 
-			// evaluate the key expression
-			return entry.Key.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					key := result.(Value)
+						// evaluate the value expression
+						return entry.Value.Accept(interpreter).(Trampoline).
+							FlatMap(func(result interface{}) Trampoline {
+								value := result.(Value)
 
-					// evaluate the value expression
-					return entry.Value.Accept(interpreter).(Trampoline).
-						FlatMap(func(result interface{}) Trampoline {
-							value := result.(Value)
-
-							newResultEntries := append(
-								resultEntries,
-								DictionaryEntryValues{
-									Key:   key,
-									Value: value,
-								},
-							)
-							return Done{Result: newResultEntries}
-						})
-				})
-		})
+								newResultEntries := append(
+									resultEntries,
+									DictionaryEntryValues{
+										Key:   key,
+										Value: value,
+									},
+								)
+								return Done{Result: newResultEntries}
+							})
+					})
+			})
+		}(entry)
 	}
 
 	return trampoline

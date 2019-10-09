@@ -10,6 +10,6 @@ message Message {
 
 message Void {}
 
-service Reciever {
+service Receiver {
   rpc DisplayMessage(Message) returns (Void);
 }
