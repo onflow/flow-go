@@ -3,13 +3,14 @@ package gnode
 import (
 	"context"
 	"fmt"
-	"log"
-	"net"
-
-	"google.golang.org/grpc"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
+	"net"
+	"os"
+	"reflect"
 )
 
 // QueueSize is the buffer size of the node for holding incoming Gossip Messages
@@ -21,6 +22,7 @@ var _ gossip.Service = (*Node)(nil)
 
 // Node is holding the required information for a functioning async gossip node
 type Node struct {
+	logger  zerolog.Logger
 	regMngr *registryManager
 	tracker messageTracker
 	queue   chan *entry
@@ -32,14 +34,26 @@ type entry struct {
 	ctx context.Context
 }
 
-// NewNode returns a new instance of a Gossip node with a predefined registry of message types
-// passing nil instead of the messageTypeRegistry results in creation of an empty registry for the node
-func NewNode(msgTypesRegistry Registry) *Node {
-	return &Node{
+
+// NewNode returns a new instance of a Gossip node with a predefined logger and a predefined
+// registry of message types passing nil instead of the messageTypeRegistry results
+// in creation of an empty registry for the node.
+func NewNode(logger zerolog.Logger, msgTypesRegistry Registry) *Node {
+	node := &Node{
+		logger:  logger,
 		regMngr: newRegistryManager(msgTypesRegistry),
 		queue:   make(chan *entry, QueueSize),
 		tracker: make(messageTracker, 0),
 	}
+
+
+	if reflect.DeepEqual(node.logger, zerolog.Logger{}){
+		// enabling human-friendly and colorized output logging in case the default logger is
+		// in its zero value state
+		node.logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	}
+
+	return node
 }
 
 // SyncGossip synchronizes over the reply of recipients
@@ -60,17 +74,23 @@ func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []str
 // a timeout or placement of the message into the queue
 func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error) {
 
+	log := n.logger.With().
+		Str("function", "AsyncQueue").
+		Logger()
+
 	//if context timed out already, return an error
 	select {
 	case <-ctx.Done():
-		return &shared.GossipReply{}, fmt.Errorf("request timed out")
+		log.Debug().Err(ErrTimedOut).Send()
+		return &shared.GossipReply{}, ErrTimedOut
 	default:
 	}
 
 	// Wait until the context expires, or if the msg got placed on the queue
 	select {
 	case <-ctx.Done():
-		return &shared.GossipReply{}, fmt.Errorf("request timed out")
+		log.Debug().Err(ErrTimedOut).Send()
+		return &shared.GossipReply{}, ErrTimedOut
 	case n.queue <- &entry{ctx: ctx, msg: msg}:
 		return &shared.GossipReply{}, nil
 	}
@@ -82,10 +102,15 @@ func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shar
 // a timeout or a reply is getting prepared
 func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error) {
 
+	log := n.logger.With().
+		Str("function", "SyncQueue").
+		Logger()
+
 	//if context timed out already, return an error
 	select {
 	case <-ctx.Done():
-		return &shared.GossipReply{}, fmt.Errorf("request timed out")
+		log.Debug().Err(ErrTimedOut).Send()
+		return &shared.GossipReply{}, ErrTimedOut
 	default:
 	}
 
@@ -93,21 +118,25 @@ func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*share
 	// or the message getting placed into the local nodes queue
 	select {
 	case <-ctx.Done():
-		return &shared.GossipReply{}, fmt.Errorf("request timed out")
+		log.Debug().Err(ErrTimedOut).Send()
+		return &shared.GossipReply{}, ErrTimedOut
 	case n.queue <- &entry{ctx: ctx, msg: msg}:
 	}
 
 	messageUUID := msg.Uuid
 
 	if err := n.tracker.TrackMessage(messageUUID); err != nil {
-		return &shared.GossipReply{}, fmt.Errorf("could not track message %v: %v", messageUUID, err)
+		err := fmt.Errorf("could not track message %v: %v", messageUUID, err)
+		log.Error().Err(err).Send()
+		return &shared.GossipReply{}, err
 	}
 
 	// getting blocked until either a timeout
 	// or the message getting processed out of the queue of the local node
 	select {
 	case <-ctx.Done():
-		return &shared.GossipReply{}, fmt.Errorf("request timed out")
+		log.Debug().Err(ErrTimedOut).Send()
+		return &shared.GossipReply{}, ErrTimedOut
 	case <-n.tracker.Done(messageUUID):
 		msgReply, msgErr, err := n.tracker.GetReply(messageUUID)
 		if err != nil {
@@ -118,15 +147,24 @@ func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*share
 }
 
 // Serve starts an async node grpc server, and its sweeper as well
-func (n *Node) Serve(listener net.Listener) {
+func (n *Node) Serve(listener net.Listener) error {
+	log := n.logger.With().
+		Str("function", "Serve").
+		Logger()
+
 	// Send of the sweeper to monitor the queue
 	go n.sweeper()
 
 	s := grpc.NewServer()
 	shared.RegisterMessageReceiverServer(s, n)
 	if err := s.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		//todo for v1.2: investigate making this a panic
+		err := fmt.Errorf("failed to serve: %v", err)
+		log.Panic().Err(err).Send()
+		return err
 	}
+
+	return nil
 }
 
 // RegisterFunc allows the addition of new message types to the node's registry
@@ -135,9 +173,15 @@ func (n *Node) RegisterFunc(msgType string, f HandleFunc) error {
 }
 
 func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, msgType string, isSynchronous bool) ([]*shared.GossipReply, error) {
+	log := n.logger.With().
+		Str("function", "gossip").
+		Logger()
+
 	gossipMsg, err := generateGossipMessage(payload, recipients, msgType)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate gossip message. \n error: %v \n payload: %v\n, recipients: %v\n, msgType %v\n", err, payload, recipients, msgType)
+		err := fmt.Errorf("could not generate gossip message:  %v", err)
+		log.Error().Err(err).Send()
+		return nil, err
 	}
 
 	gossipErrChan := make(chan error)
@@ -177,9 +221,16 @@ func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, 
 // whether to use sync or async mode (true for sync, false for async)
 // placeMessage establishes and manages a gRPC client inside
 func (n *Node) placeMessage(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool) (*shared.GossipReply, error) {
+	log := n.logger.With().
+		Str("function", "placeMessage").
+		Str("address", addr).
+		Logger()
+
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		return nil, fmt.Errorf("could not connect to %s: %v", addr, err)
+		err := fmt.Errorf("could not connect to %s: %v", addr, err)
+		log.Error().Err(err).Send()
+		return nil, err
 	}
 	defer closeConnection(conn)
 	client := shared.NewMessageReceiverClient(conn)
@@ -190,7 +241,9 @@ func (n *Node) placeMessage(ctx context.Context, addr string, msg *shared.Gossip
 		reply, err = client.AsyncQueue(ctx, msg)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
+		err := fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
+		log.Error().Err(err).Send()
+		return nil, err
 	}
 	return reply, nil
 }
@@ -204,9 +257,15 @@ func (n *Node) sweeper() {
 
 // messageHandler is responsible to handle how to interpret incoming messages.
 func (n *Node) messageHandler(e *entry) error {
+	log := n.logger.With().
+		Str("function", "messageHandler").
+		Logger()
+
 	///entry checking
 	if e == nil || e.msg == nil {
-		return fmt.Errorf("entry is invalid")
+		err := fmt.Errorf("entry is invalid")
+		log.Error().Err(err).Send()
+		return err
 	}
 
 	messageUUID := e.msg.Uuid
@@ -218,7 +277,9 @@ func (n *Node) messageHandler(e *entry) error {
 	}
 
 	if err != nil {
-		n.tracker.FillMessageReply(messageUUID, nil, fmt.Errorf("could not invoke: %v", err))
+		err := fmt.Errorf("could not invoke: %v", err)
+		log.Debug().Err(err).Send()
+		n.tracker.FillMessageReply(messageUUID, nil, err)
 		return err
 	}
 
@@ -226,6 +287,7 @@ func (n *Node) messageHandler(e *entry) error {
 	return nil
 }
 
+//TODO: Discuss logging errors in cases where the only option is to initialize a logger
 //closeConnection closes a grpc client connection and prints the errors, if any,
 func closeConnection(conn *grpc.ClientConn) {
 	err := conn.Close()
@@ -236,8 +298,12 @@ func closeConnection(conn *grpc.ClientConn) {
 
 //concurrentHandler closes invokes messageHandler and prints the errors, if any,
 func concurrentHandler(n *Node, e *entry) {
+	log := n.logger.With().
+		Str("function", "messageHandler").
+		Logger()
+
 	err := n.messageHandler(e)
 	if err != nil {
-		fmt.Printf("Error handling message: %v\n", err)
+		log.Error().Msgf("Error handling message: %v", err)
 	}
 }

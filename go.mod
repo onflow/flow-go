@@ -16,12 +16,14 @@ require (
 	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
+	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/rivo/uniseg v0.1.0
 	github.com/rs/cors v1.7.0 // indirect
+	github.com/rs/zerolog v1.15.0
 	github.com/segmentio/fasthash v1.0.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
@@ -32,6 +34,8 @@ require (
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2
 	google.golang.org/grpc v1.21.1
+	gopkg.in/myesui/uuid.v1 v1.0.0
+	gotest.tools v2.2.0+incompatible // indirect
 	mellium.im/sasl v0.2.1 // indirect
 )
 

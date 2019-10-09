@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"log"
 	"net"
 	"os"
-
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/golang/protobuf/proto"
+
 )
 
 // Demo of a simple chat application based on the gossip node implementation
@@ -41,7 +42,7 @@ func main() {
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
 	// Registering the gRPC services provided by the messageReceiver to the gossip registry
-	node := gnode.NewNode(NewReceiverServerRegistry(&messageReceiver{}))
+	node := gnode.NewNode(zerolog.Logger{}, NewReceiverServerRegistry(&messageReceiver{}))
 	myPort := listener.Addr().String()
 	fmt.Println("Chat app serves at port: ", myPort)
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"log"
 	"net"
 	"time"
@@ -32,7 +33,7 @@ func main() {
 
 	// step 2: registering the grpc services if any
 	// Note: this example is not built upon any grpc service, hence we pass nil
-	node := gnode.NewNode(nil)
+	node := gnode.NewNode(zerolog.Logger{}, nil)
 
 	// step 3: passing the listener to the instance of gnode
 	go node.Serve(listener)
@@ -52,8 +53,6 @@ func main() {
 
 	// add the Time function to the node's registry
 	node.RegisterFunc("Time", Time)
-
-
 
 	peers := make([]string, 0)
 	for _, port := range portPool {

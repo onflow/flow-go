@@ -45,7 +45,7 @@ generate-mocks:
 
 .PHONY: generate-registries
 generate-registries:
-	go build -o /tmp/registry-generator ./pkg/network/gossip/v1/scripts/
+	GO111MODULE=on go build -o /tmp/registry-generator ./pkg/network/gossip/v1/scripts/
 	find ./pkg/grpc/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
 	rm /tmp/registry-generator
 
