@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/accounts"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -32,7 +32,7 @@ const sampleCall = `
 
 // createAccount is a test utility to add a new account to the emulated blockchain.
 func createAccount(b *EmulatedBlockchain, accountKeys []types.AccountKey, code []byte) (types.Address, error) {
-	createAccountScript := accounts.CreateAccount(accountKeys, code)
+	createAccountScript := templates.CreateAccount(accountKeys, code)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
@@ -377,7 +377,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
-		createAccountScript := accounts.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
 
 		accountAddressA := types.HexToAddress("0000000000000000000000000000000000000002")
 
@@ -591,7 +591,7 @@ func TestCreateAccount(t *testing.T) {
 
 	codeA := []byte("fun main() {}")
 
-	createAccountScriptA := accounts.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, codeA)
+	createAccountScriptA := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, codeA)
 
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
@@ -620,7 +620,7 @@ func TestCreateAccount(t *testing.T) {
 
 	codeB := []byte("fun main() {}")
 
-	createAccountScriptC := accounts.CreateAccount([]types.AccountKey{accountKeyC}, codeB)
+	createAccountScriptC := templates.CreateAccount([]types.AccountKey{accountKeyC}, codeB)
 
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptC,
@@ -657,7 +657,7 @@ func TestAddAccountKey(t *testing.T) {
 	}
 
 	tx1 := &types.Transaction{
-		Script:             accounts.AddAccountKey(accountKeyA),
+		Script:             templates.AddAccountKey(accountKeyA),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -701,7 +701,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	tx1 := &types.Transaction{
-		Script:             accounts.AddAccountKey(accountKeyA),
+		Script:             templates.AddAccountKey(accountKeyA),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -720,7 +720,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	Expect(account.Keys).To(HaveLen(2))
 
 	tx2 := &types.Transaction{
-		Script:             accounts.RemoveAccountKey(0),
+		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -739,7 +739,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	Expect(account.Keys).To(HaveLen(1))
 
 	tx3 := &types.Transaction{
-		Script:             accounts.RemoveAccountKey(0),
+		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
@@ -758,7 +758,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	Expect(account.Keys).To(HaveLen(1))
 
 	tx4 := &types.Transaction{
-		Script:             accounts.RemoveAccountKey(0),
+		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
@@ -803,7 +803,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 		tx := &types.Transaction{
-			Script:             accounts.UpdateAccountCode([]byte{7, 8, 9}),
+			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              1,
 			ComputeLimit:       10,
@@ -840,7 +840,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		Expect(account.Code).To(Equal([]byte{4, 5, 6}))
 
 		tx := &types.Transaction{
-			Script:             accounts.UpdateAccountCode([]byte{7, 8, 9}),
+			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              1,
 			ComputeLimit:       10,

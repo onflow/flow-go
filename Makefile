@@ -26,7 +26,7 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip > pkg/network/gossip/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip/v1 > pkg/network/gossip/v1/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
-	godoc2md github.com/dapperlabs/flow-go/sdk/accounts > sdk/accounts/README.md
+	godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
 
 .PHONY: generate-proto
 generate-proto:

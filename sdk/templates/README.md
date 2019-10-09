@@ -1,12 +1,14 @@
 
 
-# accounts
-`import "github.com/dapperlabs/flow-go/sdk/accounts"`
+# templates
+`import "github.com/dapperlabs/flow-go/sdk/templates"`
 
 * [Overview](#pkg-overview)
 * [Index](#pkg-index)
 
 ## <a name="pkg-overview">Overview</a>
+Package templates provides functions for generating common Cadence scripts.
+
 
 
 
@@ -18,13 +20,13 @@
 
 
 #### <a name="pkg-files">Package files</a>
-[accounts.go](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go)
+[accounts.go](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go) [doc.go](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/doc.go)
 
 
 
 
 
-## <a name="AddAccountKey">func</a> [AddAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=1201:1255#L51)
+## <a name="AddAccountKey">func</a> [AddAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1202:1256#L51)
 ``` go
 func AddAccountKey(accountKey types.AccountKey) []byte
 ```
@@ -32,7 +34,7 @@ AddAccountKey generates a script that adds a key to an account.
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=156:226#L11)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=157:227#L11)
 ``` go
 func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte
 ```
@@ -40,7 +42,7 @@ CreateAccount generates a script that creates a new account.
 
 
 
-## <a name="RemoveAccountKey">func</a> [RemoveAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=1595:1634#L66)
+## <a name="RemoveAccountKey">func</a> [RemoveAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1596:1635#L66)
 ``` go
 func RemoveAccountKey(index int) []byte
 ```
@@ -48,7 +50,7 @@ RemoveAccountKey generates a script that removes a key from an account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/accounts/accounts.go?s=895:937#L37)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=896:938#L37)
 ``` go
 func UpdateAccountCode(code []byte) []byte
 ```
