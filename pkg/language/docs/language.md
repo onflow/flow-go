@@ -409,7 +409,7 @@ If the left-hand side is non-nil, the right-hand side is not evaluated.
 let a: Int? = nil
 
 // Declare a constant with a non-optional integer type,
-// which is initialized to b if it is non-nil, or 42 otherwise
+// which is initialized to a if it is non-nil, or 42 otherwise
 //
 let b: Int = a ?? 42
 // `b` is 42, as `a` is nil
@@ -441,11 +441,11 @@ must be the non-optional or optional type matching the type of the left-hand sid
 ```bamboo
 // Declare a constant with a non-optional integer type
 //
-let a = 1
+let a: Int? = 1
 
 // Invalid: nil-coalescing operator is applied to a value of type `Int`,
 // but the alternative has type `Bool`
-//
+// 
 let b = a ?? false
 ```
 
@@ -483,7 +483,7 @@ let boolean = something as? Bool
 Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.
 
 ```bamboo,file=conditional-downcasting-any-array.bpl
-// Declare a constant named `numbers` which has type `[Any]`,
+// Declare a constant named `values` which has type `[Any]`,
 // i.e. an array of arbitrarily typed values
 //
 let values: [Any] = [1, true]
@@ -558,28 +558,28 @@ Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
 
-    ```bamboo,file=string-length-field.bpl
+```bamboo,file=string-length-field.bpl
     let example = "hello"
 
     // Find the number of elements
     let length = example.length
     // `length` is 5
-    ```
+```
 
 - `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
 
-    ```bamboo,file=string-concat.bpl
+```bamboo,file=string-concat.bpl
     let example = "hello"
     let new = "world"
 
     // Concatenate the new string onto the example string and return the new string
     let helloWorld = example.concat(new)
     // `helloWorld` is now "helloworld"
-    ```
+```
 
 - `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
 
-    ```bamboo,file=string-slice.bpl
+```bamboo,file=string-slice.bpl
     let example = "helloworld"
 
     // Create a new slice of part of the original string
@@ -588,7 +588,7 @@ Strings have multiple built-in functions you can use.
 
     // Error: Out of bounds index
     let outOfBounds = example.slice(from: 2, upTo: 10)
-    ```
+```
 
 <!--
 
@@ -627,6 +627,8 @@ For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
 
 Variable-size arrays have the form `[T]`, where `T` is the element type.
 For example, the type `[Int16]` specifies a variable-size array of elements that have type `Int16`.
+
+It is important to understand that arrays are value types and are only ever copied when used as an initial value for a constant or variable, when assigning to a variable, as function parameter, or returned from a function call.
 
 ```bamboo,file=array-types.bpl
 let array: [Int8; 2] = [1, 2]
@@ -690,18 +692,18 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
 
 - `length: Int`: Returns the number of elements in the array.
 
-    ```bamboo,file=array-length-field.bpl
+```bamboo,file=array-length-field.bpl
     let numbers = [42, 23, 31, 12]
 
     // Find the number of elements
     let length = numbers.length
 
     // `length` is 4
-    ```
+```
 
 - `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
 
-    ```bamboo,file=array-concat.bpl
+```bamboo,file=array-concat.bpl
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
 
@@ -712,11 +714,11 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // `allNumbers` is `[42, 23, 31, 12, 11, 27]`
     // `numbers` is still `[42, 23, 31, 12]`
     // `moreNumbers` is still `[11, 27]`
-    ```
+```
 
 - `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
 
-    ```bamboo,file=array-contains.bpl
+```bamboo,file=array-contains.bpl
     let numbers = [42, 23, 31, 12]
 
     // Check if the array contains 11
@@ -731,7 +733,7 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // This results in a type error, as the array only contains integers
     //
     let containsKitty = numbers.contains("Kitty")
-    ```
+```
 
 ##### Variable-size Array Functions
 
@@ -739,7 +741,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
 - `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.
 
-    ```bamboo,file=array-append.bpl
+```bamboo,file=array-append.bpl
     let numbers = [42, 23, 31, 12]
 
     // Add a new element
@@ -748,11 +750,11 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Invalid: Wrong type
     numbers.append("SneakyString")
-    ```
+```
 
 - `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
 
-    ```bamboo,file=array-insert.bpl
+```bamboo,file=array-insert.bpl
     let numbers = [42, 23, 31, 12]
 
     // Insert a new element at position 1 of the array
@@ -761,13 +763,13 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Error: Out of bounds index
     numbers.insert(at: 12, 39)
-    ```
+```
 
 - `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
 - `removeFirst(): T`: Removes the first element from the array and returns it.
 - `removeLast(): T`: Removes the last element from the array and returns it.
 
-    ```bamboo,file=array-remove.bpl
+```bamboo,file=array-remove.bpl
     let numbers = [42, 23, 31, 12]
 
     // Remove element at position 1 of the array
@@ -787,7 +789,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
     let twelve = numbers.removeLast()
     // `numbers` is now `[31]`
     // `twelve` is `12`
-    ```
+```
 
 <!--
 
@@ -903,7 +905,7 @@ booleans[0] = true
 #### Dictionary Fields and Functions
 
 - `length: Int`: Returns the number of elements in the dictionary.
-- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the dictionary as an optional, otherwise `nil`.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the value as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -1909,6 +1911,8 @@ fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
 
+// these parameters are not declared with a specific type,
+// but they are inferred to be `int8` since the parameter types are `int8`
 add(1, 2) // returns 3
 
 // Declare two constants which have type `Int32`
@@ -2009,7 +2013,9 @@ and when the value is returned from a function:
     Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-    We think resources are a great way to represent such assets.
+    Structs are not an ideal way to represent this ownership because they can be copied.  This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
+
+    We think resources are a great way to represent all types of assets.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2053,9 +2059,9 @@ Fields are declared like variables and constants, however, they have no initial 
 
 There are three kinds of fields.
 
-Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
-
 Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
+
+Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
 Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
@@ -2558,9 +2564,9 @@ Access control allows making certain parts of the program accessible/visible and
 
 **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
+**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
 
-By default, everything is private. The `pub` keyword is used to make declarations public.
+**By default, everything is private.** The `pub` keyword is used to make declarations publicly readable.
 
 The `(set)` suffix can be used to make variables also publicly writable.
 
@@ -3309,13 +3315,13 @@ struct interface Account {
 
 ## Account Storage
 
-Accounts have a `storage` object which contains the stored values of the account.
+All accounts in flow are the same and have a `storage` object which contains the stored values of the account.  
 
-Only **resources** can be stored.
+Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually be storing a mixture of contracts, resources, and structs within their storage.
 
-Stored values are keyed by a **type**, i.e., the access operator `[]` is used for both reading and writing stored values.
+The stored value must be a subtype of the type it is keyed by.  This means that if you are storing a `Vault` type as the key, the value must be a value that has the type vault or any of the subtypes of vault.
 
-The stored value must be a subtype of the type it is keyed by.
+Initializing values, otherwise know as deploying, in account storage can only happen within the body of a transaction.  You cannot, for example, initialize a storage value within a member function of a struct or resource that is already in your account storage.
 
 ```bamboo
 // Declare a resource named `Counter`
@@ -3338,44 +3344,47 @@ let account: Account = // ...
 account.storage[Counter] <- create Counter(count: 0)
 ```
 
-## Usage of External Types
-
-> 🚧 Status: The usage of external types is not implemented yet.
-
-It is possible to use external types through the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
-
-```bamboo
-// Declaration for an interface named `Counter`,
-// declared and deployed externally
-//
-resource interface Counter {
-    pub count: Int
-    pub fun increment(_ count: Int)
-}
-
-// Use the type `Counter` from address
-// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
-//
-import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
-```
-
 ## Transactions
 
 Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
-Transactions have three phases: Preparation, execution, and postconditions.
+Transactions are structured as such:
 
-The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-The preparer has the permissions to read and write to storage of all signer accounts.
+Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, you must include that account's `Address`.
+
+```bamboo
+    // local file import
+    import Counter from "examples/counter.bpl"
+
+    // external account import
+    import Counter from 0x299F20A29311B9248F12
+```
+
+
+> 🚧 Status: The usage of external types is not implemented yet.
+
+
+Next is where you can define any new types you would like to use or deploy.  
+
+Then, when you get into the there are the three main phases: Preparation, execution, and postconditions.  Each phase has a block of bpl code that executes sequentially.  Transactions can do some things that normal contracts cannot, and vice versa.
+
+The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+The preparer has the permissions to read and write to storage of all the accounts the signed the transaction.
+
+The **execute phase** is where all interaction with contracts happens.  This can be interacting with the signers' contracts or with contracts with public types and functions that are deployed in other accounts.
+
+The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
 The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
 ```bamboo,file=transaction-declaration.bpl
+// Optional: Importing external types from other accounts using `import`
+
 transaction {
 
-    // Optional: fields, which must be initialized in `prepare`
+    // Optional: type declarations and fields, which must be initialized in `prepare`
 
     // The preparer needs to have as many account parameters
     // as there are signers for the transaction
@@ -3396,15 +3405,14 @@ transaction {
 
 ### Deployment
 
-Transactions can deploy resources and resource interfaces.
+Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that we would like to deploy to our account.  Imagine it is in a file called `FungibleToken.bpl`.
 
 ```bamboo,file=fungible-token-interface.bpl
 // Declare a resource interface for a fungible token.
 //
-// It requires implementing types to provide a resource named `Vault`,
+// It requires implementing types to provide a resource implementation named `Vault`,
 // which needs to implement the interfaces `Provider` and `Receiver`
 //
-resource interface FungibleToken {
 
     pub resource interface Provider {
 
@@ -3424,9 +3432,16 @@ resource interface FungibleToken {
         pub fun deposit(vault: <-Vault)
     }
 
-    pub resource Vault: Provider, Receiver {
+    // Vault is an interface that implements both Provider and Receiver
+    pub resource interface Vault: Provider, Receiver {
 
         pub balance: Int {
+            set {
+                post {
+                    self.balance >= 0:
+                        "Balances are always non-negative"
+                }
+            }
             get {
                 post {
                     result >= 0:
@@ -3460,10 +3475,10 @@ resource interface FungibleToken {
             }
         }
     }
-}
 ```
 
-Transactions can refer to local code with the `import` keyword,
+In our transaction code, we will import the above file to use it in our code.  
+Transactions can refer to local code with the `import` keyword, 
 followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
 
@@ -3473,48 +3488,47 @@ and the string literal for the path of the file which contains the code of the t
 -->
 
 The preparer can use the signing account's `deploy` function to deploy
-the resource interface.
+the resource interface.  This essentially stores the resource interface in the account storage so it can be used again.
 
-Once deployed, the resource interfaces is available in the account's `types` object.
+Once deployed, the resource interfaces is available in the account's `types` object, which is how we access storage.
 
-The `publish` operator is used to make the resource interface type publicly available.
+When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone.  
+
+The `publish` operator is used to make the resource interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to call the functions defined in the interface on the resource that implements that interface.
 
 ```bamboo,file=deploy-resource-interface.bpl
 
-// Refer to the resource interface type `FungibleToken`
+// Refer to the resource interface type `Vault`
 // in the local file "FungibleToken.bpl"
 //
-import FungibleToken from "FungibleToken.bpl"
+import Vault from "FungibleToken.bpl"
 
-// Execute a transaction which deploys the code for
-// the resource interface `FungibleToken`, and makes
-// the deployed type publicly available
+// Define a transaction which deploys the code for
+// the resource interface `Vault`, and makes
+// the deployed interface type publicly available
 //
 transaction {
 
     prepare(signer: Account) {
-        // Deploy the  resource interface type `FungibleToken`
+        // Deploy the  resource interface type `Vault`
         // in the signing account
-        signer.deploy(FungibleToken)
+        signer.deploy(Vault)
 
         // Make the deployed type publicly available
-        //
-        publish signer.types[FungibleToken]
+        publish signer.types[Vault]
     }
 }
 ```
+Now, anybody can import the vault interface from your account storage if they want to use it for their resources.
 
-Just like resource interfaces it is possible to deploy resources.
+Just like resource interfaces it is possible to deploy resources.  Imagine this resource definition below is also in the local file `FungibleToken.bpl` that we used above.
 
 ```bamboo,file=example-token.bpl
-// Declare a resource named `ExampleToken` which implements
-// the resource interface `FungibleToken`
+// Declare a resource named `FungibleToken` which implements
+// the resource interface `Vault`
 //
-resource ExampleToken {}
+resource FungibleToken: Vault {
 
-impl FungibleToken for ExampleToken {
-
-    resource Vault {
         pub var balance: Int
 
         init(balance: Int) {
@@ -3530,33 +3544,37 @@ impl FungibleToken for ExampleToken {
             self.balance = self.balance + vault.balance
             destroy vault
         }
-    }
-
-    impl Receiver for Vault {}
-    impl Provider for Vault {}
 }
 ```
 
+Now, in the same transaction that we used to deploy and publish our interface, we can also deploy and publish our resource.
+
 ```bamboo,file=deploy-resource.bpl
-import ExampleToken from "ExampleToken.bpl"
+import FungibleToken from "FungibleToken.bpl"
 
 // Execute a transaction which deploys the code for
-// the resource `ExampleToken`, and makes the deployed
+// the resource `FungibleToken`, and makes the deployed
 // type publicly available
 //
 transaction {
 
     prepare(signer: Account) {
-        signer.deploy(ExampleToken)
-        publish signer.types[ExampleToken]
+        signer.deploy(Vault)
+        publish signer.types[Vault]
+
+        signer.deploy(FungibleToken)
+        publish signer.types[FungibleToken]
     }
 }
 ```
 
-### Interacting with Deployed Resources
+Now, our Vault interface and our FungibleToken resource are deployed to our account and published so that anyone who wants to use them or interact with them can easily do so by importing the types into their bpl code! 
 
-Transactions can also refer to deployed code with the `import` keyword
-and the address of the account which contains the publicly available type.
+In many scenarios, publishing the entire interface for your resource may be necessary because you want everyone to be able to access all functionality of your type.  In most situations though, including this one, you will want to expose only a subset of the functionality of your resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface, you would only publish the receiver interface.  
+
+In the next section, we will see how to deploy your own instance of `FungibleToken` based on an external type and publish the correct interface.
+
+### Interacting with Deployed Resources
 
 <!-- TODO:
      move explanation for using statement into separate section?
@@ -3570,13 +3588,13 @@ References are created by using the `&` operator, followed by the stored resourc
 the `as` operator, and the resource interface type.
 
 ```bamboo,file=setup-transaction.bpl
-// Refer to the resource type `ExampleToken` deployed
+// Refer to the resource type `FungibleToken`  which was "deployed" above
 // at example address 0x42
 //
-import ExampleToken from 0x42
+import FungibleToken from 0x42
 
 // Execute a transaction which creates a new example token vault
-// for the signing account
+// for the new signing account
 //
 transaction {
 
@@ -3585,38 +3603,42 @@ transaction {
         //
         // NOTE: the vault is not publicly accessible
         //
-        signer.storage[ExampleToken.Vault] <- create ExampleToken.Vault()
+        signer.storage[FungibleToken] <- create FungibleToken()
 
         // Store two storage references in the signing account:
         // One reference to the stored vault, keyed by the resource
         // interface `Provider`, and another reference to the stored vault,
         // keyed by the resource interface `Provider`
         //
-        signer.storage[ExampleToken.Provider] =
-            &signer.storage[ExampleToken.Vault] as ExampleToken.Provider
+        // these are the references to the different ways that your token can be
+        // interacted with.  Provider for the owner(you) Receiver for any 
+        // external accounts.
+        //
+        signer.storage[FungibleToken.Provider] =
+            &signer.storage[FungibleToken.Vault] as FungibleToken.Provider
 
-        signer.storage[ExampleToken.Receiver] =
-            &signer.storage[ExampleToken.Vault] as ExampleToken.Receiver
+        signer.storage[FungibleToken.Receiver] =
+            &signer.storage[FungibleToken.Vault] as FungibleToken.Receiver
 
         // Publish only the receiver so it can be accessed publicly.
         //
         // NOTE: neither the vault nor the publisher are published
         //
-        publish signer.storage[ExampleToken.Receiver]
+        publish signer.storage[FungibleToken.Receiver]
     }
 }
 ```
 
 ```bamboo,file=send-transaction.bpl
-// Refer to the resource type `ExampleToken` deployed
+// Refer to the resource type `FungibleToken` deployed
 // at example address 0x42
 //
-import ExampleToken from 0x42
+import FungibleToken from 0x42
 
 // Execute a transaction which sends five coins from one account to another.
 //
-// The transaction fails unless there is a `ExampleToken.Provider` available
-// for the sending account and there is a public `ExampleToken.Receiver`
+// The transaction fails unless there is a `FungibleToken.Provider` available
+// for the sending account and there is a public `FungibleToken.Receiver`
 // available for the recipient account.
 //
 // Only a signature from the sender is required.
@@ -3625,21 +3647,23 @@ import ExampleToken from 0x42
 //
 transaction {
 
-    let sentFunds: ExampleToken.Vault
+    let sentFunds: FungibleToken.Vault
 
     prepare(signer: Account) {
         // Get the stored provider for the signing account.
         //
         // As the access is performed in the preparer,
-        // the unpublished reference `ExampleToken.Provider`
+        // the unpublished reference `FungibleToken.Provider`
         // can be accessed (if it exists)
         //
-        let provider <- signer.storage[ExampleToken.Provider]
+        let provider <- signer.storage[FungibleToken.Provider]
 
         // Withdraw five coins (as a vault) from the provider
         // and move it into the field `sentFunds`
         //
         self.sentFunds <- provider.withdraw(amount: 5)
+
+        // does the provider need to be re-deposited into the signers account?
     }
 
     execute {
@@ -3660,6 +3684,8 @@ transaction {
 ```
 
 ## Built-in Functions
+
+#### There is currently no built-in function that allows you to get the address of the sender of a transaction or the current block number or timestamp.  These are being worked on.
 
 ### `panic`
 
