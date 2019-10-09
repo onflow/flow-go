@@ -10,10 +10,28 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 
 	valueType := expression.Expression.Accept(checker).(Type)
 
+	checker.recordResourceInvalidation(
+		expression.Expression,
+		valueType,
+		ResourceInvalidationKindDestroy,
+	)
+
+	// TODO: allow destruction of any resource type (even compound resource types):
+	//  Simply check `isResourceType`.
+	//  See https://github.com/dapperlabs/flow-go/issues/816
+
 	// NOTE: not using `isResourceType`,
-	// as only direct resource types can be destructed
-	if compositeType, ok := valueType.(*CompositeType); !ok ||
-		compositeType.Kind != common.CompositeKindResource {
+	// as only direct resources and resource interfaces can be destructed (for now)
+
+	compositeType, isCompositeType := valueType.(*CompositeType)
+	isResource := isCompositeType &&
+		compositeType.Kind == common.CompositeKindResource
+
+	interfaceType, isInterfaceType := valueType.(*InterfaceType)
+	isResourceInterface := isInterfaceType &&
+		interfaceType.CompositeKind == common.CompositeKindResource
+
+	if !isResource && !isResourceInterface {
 
 		checker.report(
 			&InvalidDestructionError{
@@ -24,12 +42,6 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 
 		return
 	}
-
-	checker.recordResourceInvalidation(
-		expression.Expression,
-		valueType,
-		ResourceInvalidationKindDestroy,
-	)
 
 	return
 }
