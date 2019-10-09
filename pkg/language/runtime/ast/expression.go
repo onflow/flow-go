@@ -352,7 +352,7 @@ func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitMemberExpression(e)
 }
 
-// IndexingExpression
+// IndexExpression
 
 type IndexExpression struct {
 	TargetExpression Expression
