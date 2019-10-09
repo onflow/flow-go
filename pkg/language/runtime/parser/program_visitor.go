@@ -1097,10 +1097,11 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 	switch partialAccessExpression := partialAccessExpression.(type) {
 	case *ast.IndexExpression:
 		return &ast.IndexExpression{
-			Expression: wrapped,
-			Index:      partialAccessExpression.Index,
-			StartPos:   partialAccessExpression.StartPos,
-			EndPos:     partialAccessExpression.EndPos,
+			TargetExpression:   wrapped,
+			IndexingExpression: partialAccessExpression.IndexingExpression,
+			IndexingType:       partialAccessExpression.IndexingType,
+			StartPos:           partialAccessExpression.StartPos,
+			EndPos:             partialAccessExpression.EndPos,
 		}
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{
@@ -1130,14 +1131,24 @@ func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) interface{} {
-	index := ctx.Expression().Accept(v).(ast.Expression)
+	var indexExpression ast.Expression
+	var indexType ast.Type
+
+	expressionContext := ctx.Expression()
+	if expressionContext != nil {
+		indexExpression = expressionContext.Accept(v).(ast.Expression)
+	} else {
+		indexType = ctx.FullType().Accept(v).(ast.Type)
+	}
+
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	// NOTE: partial, expression is filled later
 	return &ast.IndexExpression{
-		Index:    index,
-		StartPos: startPosition,
-		EndPos:   endPosition,
+		IndexingExpression: indexExpression,
+		IndexingType:       indexType,
+		StartPos:           startPosition,
+		EndPos:             endPosition,
 	}
 }
 

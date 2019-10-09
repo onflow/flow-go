@@ -1105,7 +1105,7 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (v DictionaryValue) isIndexableValue() {}
+func (DictionaryValue) isIndexableValue() {}
 
 func (v DictionaryValue) Get(keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]

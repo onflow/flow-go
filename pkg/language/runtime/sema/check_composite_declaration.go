@@ -151,8 +151,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
 
-	// declare constructor
-
 	checker.declareCompositeConstructor(declaration, compositeType, parameterTypeAnnotations)
 }
 

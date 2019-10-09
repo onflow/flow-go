@@ -355,16 +355,25 @@ func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 // IndexExpression
 
 type IndexExpression struct {
-	Expression Expression
-	Index      Expression
-	StartPos   Position
-	EndPos     Position
+	TargetExpression Expression
+	// only IndexingExpression or IndexingType is set
+	IndexingExpression Expression
+	IndexingType       Type
+	StartPos           Position
+	EndPos             Position
 }
 
 func (e *IndexExpression) String() string {
+	var indexString string
+	if e.IndexingExpression != nil {
+		indexString = e.IndexingExpression.String()
+	} else {
+		indexString = e.IndexingType.String()
+	}
+
 	return fmt.Sprintf(
 		"%s[%s]",
-		e.Expression, e.Index,
+		e.TargetExpression, indexString,
 	)
 }
 
