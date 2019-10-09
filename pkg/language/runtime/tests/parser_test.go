@@ -2,12 +2,13 @@ package tests
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
