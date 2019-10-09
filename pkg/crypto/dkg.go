@@ -32,6 +32,14 @@ type DKGstate interface {
 	ProcessDKGmsg(int, DKGmsg) *DKGoutput
 }
 
+// optimal threshold (t) to allow the largest number of malicious nodes (m)
+// assuming the protocol requires:
+//   m<=t for unforgeability
+//   n-m<=t+1 for robustness
+func optimalThreshold(size int) int {
+	return (size - 1) / 2
+}
+
 // NewDKG creates a new instance of a DKG protocol.
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
@@ -44,10 +52,7 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
 	}
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
-	// assuming the protocol requires:
-	//   m<=t for unforgeability
-	//   n-m<=t+1 for robustness
-	threshold := (size - 1) / 2
+	threshold := optimalThreshold(size)
 	if dkg == FeldmanVSS {
 		common := &dkgCommon{
 			size:         size,

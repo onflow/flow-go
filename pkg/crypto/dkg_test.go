@@ -122,6 +122,8 @@ func TestFeldmanVSS(t *testing.T) {
 	out := dkg[lead].StartDKG(seed)
 	out.processOutput(lead, dkg, chans, t)
 
+	// TODO: check the reconstructed key is equal to a_0
+
 	// this loop synchronizes the main thread to end all DKGs
 	for i := 0; i < n; i++ {
 		<-quit
