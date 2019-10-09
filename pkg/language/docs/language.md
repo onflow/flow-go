@@ -2564,7 +2564,7 @@ Access control allows making certain parts of the program accessible/visible and
 
 **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
+**Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and all other outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
 
 **By default, everything is private.** The `pub` keyword is used to make declarations publicly readable.
 
@@ -3346,17 +3346,17 @@ account.storage[Counter] <- create Counter(count: 0)
 
 ## Transactions
 
-Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
+Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.  Transactions can do some things that normal contracts cannot, like writing to account storage.
 
 Transactions are structured as such:
 
 Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, you must include that account's `Address`.
 
 ```bamboo
-    // local file import
+    // type import from a local file
     import Counter from "examples/counter.bpl"
 
-    // external account import
+    // type import from an external account
     import Counter from 0x299F20A29311B9248F12
 ```
 
@@ -3364,14 +3364,14 @@ Before the transaction declaration, you can import any necessary local or extern
 > 🚧 Status: The usage of external types is not implemented yet.
 
 
-Next is where you can define any new types you would like to use or deploy.  
+Next is where you can define any new types you would like to use or deploy within your transaction.  These are kind of like global constants or variables.
 
-Then, when you get into the there are the three main phases: Preparation, execution, and postconditions.  Each phase has a block of bpl code that executes sequentially.  Transactions can do some things that normal contracts cannot, and vice versa.
+Then, you have the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase has a block of bpl code that executes sequentially.
 
 The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-The preparer has the permissions to read and write to storage of all the accounts the signed the transaction.
+The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
 
-The **execute phase** is where all interaction with contracts happens.  This can be interacting with the signers' contracts or with contracts with public types and functions that are deployed in other accounts.
+The **execute phase** is where all interaction with external contracts happens.  This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
 
 The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
 
@@ -3490,7 +3490,7 @@ and the string literal for the path of the file which contains the code of the t
 The preparer can use the signing account's `deploy` function to deploy
 the resource interface.  This essentially stores the resource interface in the account storage so it can be used again.
 
-Once deployed, the resource interfaces is available in the account's `types` object, which is how we access storage.
+Once deployed, the resource interface is available in the account's `types` object, which is how we access storage.
 
 When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone.  
 
@@ -3611,7 +3611,7 @@ transaction {
         // keyed by the resource interface `Provider`
         //
         // these are the references to the different ways that your token can be
-        // interacted with.  Provider for the owner(you) Receiver for any 
+        // interacted with.  Provider for the owner(you). Receiver for any 
         // external accounts.
         //
         signer.storage[FungibleToken.Provider] =

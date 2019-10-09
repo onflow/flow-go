@@ -2533,7 +2533,7 @@ resource[1]
         </blockquote>
         <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
         <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.</p>
-        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope. This does not allow the declaration to be publicly writeable though.</p>
+        <p><strong>Public</strong> means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and all other outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope. This does not allow the declaration to be publicly writeable though.</p>
         <p><strong>By default, everything is private.</strong> The <code>pub</code> keyword is used to make declarations publicly readable.</p>
         <p>The <code>(set)</code> suffix can be used to make variables also publicly writable.</p>
         <p>To summarize the behavior for variable declarations, constant declarations, and fields:</p>
@@ -3821,25 +3821,25 @@ account.storage[Counter] &#x3C;- create Counter(count: 0)
       </section>
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
-        <p>Transactions are objects that are signed by one or more <a href="#accounts">accounts</a> and are sent to the chain to interact with it.</p>
+        <p>Transactions are objects that are signed by one or more <a href="#accounts">accounts</a> and are sent to the chain to interact with it. Transactions can do some things that normal contracts cannot, like writing to account storage.</p>
         <p>Transactions are structured as such:</p>
         <p>Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the <code>import</code> keyword, followed by <code>from</code>, and then followed by the location. If importing a local file's definition, the location will be the path to the file that has the definition. If importing an external type that has been published by another account, you must include that account's <code>Address</code>.</p>
-        <pre><code class="language-bamboo">    // local file import
+        <pre><code class="language-bamboo">    // type import from a local file
     import Counter from "examples/counter.bpl"
 
-    // external account import
+    // type import from an external account
     import Counter from 0x299F20A29311B9248F12
 </code></pre>
         <blockquote>
           <p>🚧 Status: The usage of external types is not implemented yet.</p>
         </blockquote>
-        <p>Next is where you can define any new types you would like to use or deploy.</p>
-        <p>Then, when you get into the there are the three main phases: Preparation, execution, and postconditions. Each phase has a block of bpl code that executes sequentially. Transactions can do some things that normal contracts cannot, and vice versa.</p>
+        <p>Next is where you can define any new types you would like to use or deploy within your transaction. These are kind of like global constants or variables.</p>
+        <p>Then, you have the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order. Each phase has a block of bpl code that executes sequentially.</p>
         <p>
           The <strong>prepare phase</strong> acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-          The preparer has the permissions to read and write to storage of all the accounts the signed the transaction.
+          The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
         </p>
-        <p>The <strong>execute phase</strong> is where all interaction with contracts happens. This can be interacting with the signers' contracts or with contracts with public types and functions that are deployed in other accounts.</p>
+        <p>The <strong>execute phase</strong> is where all interaction with external contracts happens. This usually involves interacting with contracts with public types and functions that are deployed in other accounts.</p>
         <p>The <strong>postcondition phase</strong> is where the transaction can check that its functionality was executed correctly.</p>
         <p>
           Transactions are declared using the <code>transaction</code> keyword.
@@ -3948,7 +3948,7 @@ transaction {
             The preparer can use the signing account's <code>deploy</code> function to deploy
             the resource interface. This essentially stores the resource interface in the account storage so it can be used again.
           </p>
-          <p>Once deployed, the resource interfaces is available in the account's <code>types</code> object, which is how we access storage.</p>
+          <p>Once deployed, the resource interface is available in the account's <code>types</code> object, which is how we access storage.</p>
           <p>When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources. This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone.</p>
           <p>The <code>publish</code> operator is used to make the resource interface type publicly available. After a resource or interface is published, any account can import it into a transaction and use it to call the functions defined in the interface on the resource that implements that interface.</p>
           <pre><code class="language-bamboo,file=deploy-resource-interface.bpl">
@@ -4052,7 +4052,7 @@ transaction {
         // keyed by the resource interface `Provider`
         //
         // these are the references to the different ways that your token can be
-        // interacted with.  Provider for the owner(you) Receiver for any 
+        // interacted with.  Provider for the owner(you). Receiver for any 
         // external accounts.
         //
         signer.storage[FungibleToken.Provider] =
