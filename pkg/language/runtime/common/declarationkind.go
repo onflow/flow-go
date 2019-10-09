@@ -18,11 +18,13 @@ const (
 	DeclarationKindStructure
 	DeclarationKindResource
 	DeclarationKindContract
+	DeclarationKindEvent
 	DeclarationKindField
 	DeclarationKindInitializer
 	DeclarationKindStructureInterface
 	DeclarationKindResourceInterface
 	DeclarationKindContractInterface
+	DeclarationKindEventInterface
 	DeclarationKindImport
 	DeclarationKindSelf
 	DeclarationKindResult
@@ -50,6 +52,8 @@ func (k DeclarationKind) Name() string {
 		return "resource"
 	case DeclarationKindContract:
 		return "contract"
+	case DeclarationKindEvent:
+		return "event"
 	case DeclarationKindField:
 		return "field"
 	case DeclarationKindInitializer:
@@ -60,6 +64,8 @@ func (k DeclarationKind) Name() string {
 		return "resource interface"
 	case DeclarationKindContractInterface:
 		return "contract interface"
+	case DeclarationKindEventInterface:
+		return "event interface"
 	case DeclarationKindImport:
 		return "import"
 	case DeclarationKindSelf:

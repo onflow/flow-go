@@ -47,6 +47,8 @@ func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
 		return common.DeclarationKindResource
 	case common.CompositeKindContract:
 		return common.DeclarationKindContract
+	case common.CompositeKindEvent:
+		return common.DeclarationKindEvent
 	}
 
 	panic(&errors.UnreachableError{})

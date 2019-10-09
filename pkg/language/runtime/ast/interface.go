@@ -46,6 +46,8 @@ func (d *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
 		return common.DeclarationKindResourceInterface
 	case common.CompositeKindContract:
 		return common.DeclarationKindContractInterface
+	case common.CompositeKindEvent:
+		return common.DeclarationKindEventInterface
 	}
 
 	panic(&errors.UnreachableError{})
