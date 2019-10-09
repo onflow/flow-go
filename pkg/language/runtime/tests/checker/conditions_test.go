@@ -39,10 +39,16 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "y")
+	assert.Equal(t,
+		"y",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).Name, "z")
+	assert.Equal(t,
+		"z",
+		errs[1].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
@@ -109,7 +115,10 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "before")
+	assert.Equal(t,
+		"before",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
@@ -168,7 +177,10 @@ func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "result")
+	assert.Equal(t,
+		"result",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
@@ -214,7 +226,10 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "result")
+	assert.Equal(t,
+		"result",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {

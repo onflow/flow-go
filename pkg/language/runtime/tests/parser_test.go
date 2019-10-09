@@ -26,7 +26,10 @@ func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.SyntaxError)
 
-	assert.Equal(t, syntaxError.Pos, Position{Offset: 6, Line: 2, Column: 5})
+	assert.Equal(t,
+		Position{Offset: 6, Line: 2, Column: 5},
+		syntaxError.Pos,
+	)
 
 	assert.Contains(t, syntaxError.Message, "extraneous input")
 }
@@ -48,7 +51,10 @@ func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
 
 	syntaxError1 := errors[0].(*parser.SyntaxError)
 
-	assert.Equal(t, syntaxError1.Pos, Position{Offset: 11, Line: 3, Column: 1})
+	assert.Equal(t,
+		Position{Offset: 11, Line: 3, Column: 1},
+		syntaxError1.Pos,
+	)
 
 	assert.Contains(t, syntaxError1.Message, "mismatched input")
 }
@@ -70,13 +76,19 @@ func TestParseInvalidIncompleteConstantDeclaration2(t *testing.T) {
 
 	syntaxError1 := errors[0].(*parser.SyntaxError)
 
-	assert.Equal(t, syntaxError1.Pos, Position{Offset: 10, Line: 2, Column: 9})
+	assert.Equal(t,
+		Position{Offset: 10, Line: 2, Column: 9},
+		syntaxError1.Pos,
+	)
 
 	assert.Contains(t, syntaxError1.Message, "missing")
 
 	syntaxError2 := errors[1].(*parser.SyntaxError)
 
-	assert.Equal(t, syntaxError2.Pos, Position{Offset: 13, Line: 3, Column: 1})
+	assert.Equal(t,
+		Position{Offset: 13, Line: 3, Column: 1},
+		syntaxError2.Pos,
+	)
 
 	assert.Contains(t, syntaxError2.Message, "mismatched input")
 }
@@ -111,7 +123,7 @@ func TestParseBoolExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIdentifierExpression(t *testing.T) {
@@ -145,7 +157,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Declarations: []Declaration{b},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseArrayExpression(t *testing.T) {
@@ -188,7 +200,7 @@ func TestParseArrayExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseDictionaryExpression(t *testing.T) {
@@ -245,7 +257,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
@@ -300,7 +312,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
@@ -359,7 +371,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMemberExpression(t *testing.T) {
@@ -399,7 +411,7 @@ func TestParseMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIndexExpression(t *testing.T) {
@@ -442,7 +454,7 @@ func TestParseIndexExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseUnaryExpression(t *testing.T) {
@@ -481,7 +493,7 @@ func TestParseUnaryExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseOrExpression(t *testing.T) {
@@ -522,7 +534,7 @@ func TestParseOrExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseAndExpression(t *testing.T) {
@@ -563,7 +575,7 @@ func TestParseAndExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseEqualityExpression(t *testing.T) {
@@ -604,7 +616,7 @@ func TestParseEqualityExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseRelationalExpression(t *testing.T) {
@@ -645,7 +657,7 @@ func TestParseRelationalExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseAdditiveExpression(t *testing.T) {
@@ -686,7 +698,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMultiplicativeExpression(t *testing.T) {
@@ -727,7 +739,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseConcatenatingExpression(t *testing.T) {
@@ -790,7 +802,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
@@ -848,7 +860,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionAndBlock(t *testing.T) {
@@ -893,7 +905,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
@@ -953,7 +965,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithLabel(t *testing.T) {
@@ -1013,7 +1025,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIfStatement(t *testing.T) {
@@ -1129,7 +1141,7 @@ func TestParseIfStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
@@ -1223,7 +1235,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIfStatementNoElse(t *testing.T) {
@@ -1287,7 +1299,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseWhileStatement(t *testing.T) {
@@ -1362,7 +1374,7 @@ func TestParseWhileStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseAssignment(t *testing.T) {
@@ -1422,7 +1434,7 @@ func TestParseAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseAccessAssignment(t *testing.T) {
@@ -1518,7 +1530,7 @@ func TestParseAccessAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseExpressionStatementWithAccess(t *testing.T) {
@@ -1603,7 +1615,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseParametersAndArrayTypes(t *testing.T) {
@@ -1720,7 +1732,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseDictionaryType(t *testing.T) {
@@ -1771,7 +1783,7 @@ func TestParseDictionaryType(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIntegerLiterals(t *testing.T) {
@@ -1861,7 +1873,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
@@ -1951,7 +1963,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
@@ -1969,13 +1981,25 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 15, Line: 2, Column: 14})
+	assert.Equal(t,
+		Position{Offset: 15, Line: 2, Column: 14},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 22, Line: 2, Column: 21})
+	assert.Equal(t,
+		Position{Offset: 22, Line: 2, Column: 21},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindOctal)
+	assert.Equal(t,
+		parser.IntegerLiteralKindOctal,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindLeadingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -1993,13 +2017,25 @@ func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 15, Line: 2, Column: 14})
+	assert.Equal(t,
+		Position{Offset: 15, Line: 2, Column: 14},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 22, Line: 2, Column: 21})
+	assert.Equal(t,
+		Position{Offset: 22, Line: 2, Column: 21},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindOctal)
+	assert.Equal(t,
+		parser.IntegerLiteralKindOctal,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindTrailingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
@@ -2017,13 +2053,25 @@ func TestParseInvalidBinaryIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 16, Line: 2, Column: 15})
+	assert.Equal(t,
+		Position{Offset: 16, Line: 2, Column: 15},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 31, Line: 2, Column: 30})
+	assert.Equal(t,
+		Position{Offset: 31, Line: 2, Column: 30},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindBinary)
+	assert.Equal(t,
+		parser.IntegerLiteralKindBinary,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindLeadingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2041,13 +2089,25 @@ func TestParseInvalidBinaryIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 16, Line: 2, Column: 15})
+	assert.Equal(t,
+		Position{Offset: 16, Line: 2, Column: 15},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 31, Line: 2, Column: 30})
+	assert.Equal(t,
+		Position{Offset: 31, Line: 2, Column: 30},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindBinary)
+	assert.Equal(t,
+		parser.IntegerLiteralKindBinary,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindTrailingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2065,13 +2125,25 @@ func TestParseInvalidDecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 17, Line: 2, Column: 16})
+	assert.Equal(t,
+		Position{Offset: 17, Line: 2, Column: 16},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 30, Line: 2, Column: 29})
+	assert.Equal(t,
+		Position{Offset: 30, Line: 2, Column: 29},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindDecimal)
+	assert.Equal(t,
+		parser.IntegerLiteralKindDecimal,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindTrailingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
@@ -2089,13 +2161,25 @@ func TestParseInvalidHexadecimalIntegerLiteralWithLeadingUnderscore(t *testing.T
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
+	assert.Equal(t,
+		Position{Offset: 13, Line: 2, Column: 12},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 20, Line: 2, Column: 19})
+	assert.Equal(t,
+		Position{Offset: 20, Line: 2, Column: 19},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindHexadecimal)
+	assert.Equal(t,
+		parser.IntegerLiteralKindHexadecimal,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindLeadingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindLeadingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2113,13 +2197,25 @@ func TestParseInvalidHexadecimalIntegerLiteralWithTrailingUnderscore(t *testing.
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
+	assert.Equal(t,
+		Position{Offset: 13, Line: 2, Column: 12},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 20, Line: 2, Column: 19})
+	assert.Equal(t,
+		Position{Offset: 20, Line: 2, Column: 19},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindHexadecimal)
+	assert.Equal(t,
+		parser.IntegerLiteralKindHexadecimal,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindTrailingUnderscore)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindTrailingUnderscore,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 
 }
 
@@ -2138,13 +2234,25 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
 
-	assert.Equal(t, syntaxError.StartPos, Position{Offset: 13, Line: 2, Column: 12})
+	assert.Equal(t,
+		Position{Offset: 13, Line: 2, Column: 12},
+		syntaxError.StartPos,
+	)
 
-	assert.Equal(t, syntaxError.EndPos, Position{Offset: 17, Line: 2, Column: 16})
+	assert.Equal(t,
+		Position{Offset: 17, Line: 2, Column: 16},
+		syntaxError.EndPos,
+	)
 
-	assert.Equal(t, syntaxError.IntegerLiteralKind, parser.IntegerLiteralKindUnknown)
+	assert.Equal(t,
+		parser.IntegerLiteralKindUnknown,
+		syntaxError.IntegerLiteralKind,
+	)
 
-	assert.Equal(t, syntaxError.InvalidIntegerLiteralKind, parser.InvalidIntegerLiteralKindUnknownPrefix)
+	assert.Equal(t,
+		parser.InvalidIntegerLiteralKindUnknownPrefix,
+		syntaxError.InvalidIntegerLiteralKind,
+	)
 }
 
 func TestParseIntegerTypes(t *testing.T) {
@@ -2384,7 +2492,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		Declarations: []Declaration{a, b, c, d, e, f, g, h},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionType(t *testing.T) {
@@ -2458,7 +2566,7 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations: []Declaration{add},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionArrayType(t *testing.T) {
@@ -2526,7 +2634,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
@@ -2596,7 +2704,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
@@ -2680,7 +2788,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
@@ -2765,7 +2873,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMissingReturnType(t *testing.T) {
@@ -2837,7 +2945,7 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations: []Declaration{noop},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseLeftAssociativity(t *testing.T) {
@@ -2886,7 +2994,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
@@ -2901,12 +3009,12 @@ func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
 	assert.IsType(t, parser.Error{}, err)
 
 	assert.Equal(t,
-		err.(parser.Error).Errors,
 		[]error{
 			&parser.JuxtaposedUnaryOperatorsError{
 				Pos: Position{Offset: 27, Line: 3, Column: 12},
 			},
 		},
+		err.(parser.Error).Errors,
 	)
 }
 
@@ -2921,12 +3029,12 @@ func TestParseInvalidDoubleBooleanUnary(t *testing.T) {
 	assert.IsType(t, parser.Error{}, err)
 
 	assert.Equal(t,
-		err.(parser.Error).Errors,
 		[]error{
 			&parser.JuxtaposedUnaryOperatorsError{
 				Pos: Position{Offset: 13, Line: 2, Column: 12},
 			},
 		},
+		err.(parser.Error).Errors,
 	)
 }
 
@@ -3002,7 +3110,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseStructure(t *testing.T) {
@@ -3168,7 +3276,7 @@ func TestParseStructure(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseStructureWithConformances(t *testing.T) {
@@ -3208,7 +3316,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
@@ -3355,7 +3463,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseExpression(t *testing.T) {
@@ -3423,7 +3531,7 @@ func TestParseExpression(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseString(t *testing.T) {
@@ -3440,7 +3548,7 @@ func TestParseString(t *testing.T) {
 		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseStringWithUnicode(t *testing.T) {
@@ -3457,7 +3565,7 @@ func TestParseStringWithUnicode(t *testing.T) {
 		EndPos:   Position{Offset: 68, Line: 2, Column: 67},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseConditionMessage(t *testing.T) {
@@ -3559,7 +3667,7 @@ func TestParseConditionMessage(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseOptionalType(t *testing.T) {
@@ -3608,7 +3716,7 @@ func TestParseOptionalType(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseNilCoalescing(t *testing.T) {
@@ -3647,7 +3755,7 @@ func TestParseNilCoalescing(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseNilCoalescingRightAssociativity(t *testing.T) {
@@ -3697,7 +3805,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFailableDowncasting(t *testing.T) {
@@ -3742,7 +3850,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInterface(t *testing.T) {
@@ -3856,7 +3964,7 @@ func TestParseInterface(t *testing.T) {
 			Declarations: []Declaration{test},
 		}
 
-		assert.Equal(t, actual, expected)
+		assert.Equal(t, expected, actual)
 	}
 }
 
@@ -3880,22 +3988,22 @@ func TestParseImportWithString(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 
 	assert.Equal(t,
-		actual.Imports(),
 		map[ImportLocation]*Program{
 			StringImportLocation("test.bpl"): nil,
 		},
+		actual.Imports(),
 	)
 
 	actual.Imports()[StringImportLocation("test.bpl")] = &Program{}
 
 	assert.Equal(t,
-		actual.Imports(),
 		map[ImportLocation]*Program{
 			StringImportLocation("test.bpl"): {},
 		},
+		actual.Imports(),
 	)
 }
 
@@ -3919,22 +4027,22 @@ func TestParseImportWithAddress(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 
 	assert.Equal(t,
-		actual.Imports(),
 		map[ImportLocation]*Program{
 			AddressImportLocation([]byte{18, 52}): nil,
 		},
+		actual.Imports(),
 	)
 
 	actual.Imports()[AddressImportLocation([]byte{18, 52})] = &Program{}
 
 	assert.Equal(t,
-		actual.Imports(),
 		map[ImportLocation]*Program{
 			AddressImportLocation([]byte{18, 52}): {},
 		},
+		actual.Imports(),
 	)
 }
 
@@ -3967,7 +4075,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFieldWithFromIdentifier(t *testing.T) {
@@ -4024,7 +4132,10 @@ func TestParseInvalidTypeWithWhitespace(t *testing.T) {
 
 	syntaxError := errors[0].(*parser.SyntaxError)
 
-	assert.Equal(t, syntaxError.Pos, Position{Offset: 17, Line: 2, Column: 16})
+	assert.Equal(t,
+		Position{Offset: 17, Line: 2, Column: 16},
+		syntaxError.Pos,
+	)
 
 	assert.Contains(t, syntaxError.Message, "no viable alternative")
 }
@@ -4053,7 +4164,7 @@ func TestParseResource(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMoveReturnType(t *testing.T) {
@@ -4092,7 +4203,7 @@ func TestParseMoveReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclaration(t *testing.T) {
@@ -4126,7 +4237,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMoveStatement(t *testing.T) {
@@ -4187,7 +4298,7 @@ func TestParseMoveStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMoveOperator(t *testing.T) {
@@ -4242,7 +4353,7 @@ func TestParseMoveOperator(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMoveParameterType(t *testing.T) {
@@ -4302,7 +4413,7 @@ func TestParseMoveParameterType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
@@ -4346,7 +4457,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
@@ -4396,7 +4507,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
@@ -4449,7 +4560,7 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
@@ -4508,7 +4619,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
@@ -4554,7 +4665,7 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
@@ -4657,7 +4768,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIdentifiers(t *testing.T) {
@@ -4732,5 +4843,5 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, actual, expected)
+	assert.Equal(t, expected, actual)
 }

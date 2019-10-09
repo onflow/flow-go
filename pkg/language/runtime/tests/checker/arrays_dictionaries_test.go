@@ -91,7 +91,10 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.OptionalType{Type: &sema.IntType{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.IntType{}},
+		checker.GlobalValues["y"].Type,
+	)
 }
 
 func TestCheckDictionaryIndexingBool(t *testing.T) {

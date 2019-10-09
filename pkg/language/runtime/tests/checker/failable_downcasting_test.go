@@ -98,10 +98,19 @@ func TestCheckOptionalAnyFailableDowncastingNil(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.OptionalType{Type: &sema.AnyType{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.AnyType{}},
+		checker.GlobalValues["x"].Type,
+	)
 
 	// TODO: record result type of conditional and box to any in interpreter
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.AnyType{})
+	assert.Equal(t,
+		&sema.AnyType{},
+		checker.GlobalValues["y"].Type,
+	)
 
-	assert.Equal(t, checker.GlobalValues["z"].Type, &sema.OptionalType{Type: &sema.IntType{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.IntType{}},
+		checker.GlobalValues["z"].Type,
+	)
 }
