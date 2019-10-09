@@ -763,13 +763,13 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Error: Out of bounds index
     numbers.insert(at: 12, 39)
-```
+    ```
 
 - `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
 - `removeFirst(): T`: Removes the first element from the array and returns it.
 - `removeLast(): T`: Removes the last element from the array and returns it.
 
-```bamboo,file=array-remove.bpl
+    ```bamboo,file=array-remove.bpl
     let numbers = [42, 23, 31, 12]
 
     // Remove element at position 1 of the array
@@ -789,7 +789,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
     let twelve = numbers.removeLast()
     // `numbers` is now `[31]`
     // `twelve` is `12`
-```
+    ```
 
 <!--
 
@@ -3650,20 +3650,16 @@ transaction {
     let sentFunds: FungibleToken.Vault
 
     prepare(signer: Account) {
-        // Get the stored provider for the signing account.
-        //
+
+        // Call the stored provider's withdraw function
+        // and move a 5 token instance of it to the field `sentFunds`
+
         // As the access is performed in the preparer,
         // the unpublished reference `FungibleToken.Provider`
         // can be accessed (if it exists)
-        //
-        let provider <- signer.storage[FungibleToken.Provider]
 
-        // Withdraw five coins (as a vault) from the provider
-        // and move it into the field `sentFunds`
-        //
-        self.sentFunds <- provider.withdraw(amount: 5)
+        self.sentFunds <- signer.storage[FungibleToken.Provider].withdraw(amount: 5)
 
-        // does the provider need to be re-deposited into the signers account?
     }
 
     execute {
@@ -3671,14 +3667,11 @@ transaction {
         //
         let recipient: Account = // ...
 
-        // Get the stored receiver for the recipient account
-        //
-        let receiver <- recipient.storage[ExampleToken.Receiver]
-
         // Deposit the amount withdrawn from the signer
-        // in the recipient's vault through the receiver
+        // in the recipient's vault through the stored receiver in the recipient account
         //
-        receiver.deposit(vault: <-self.sentFunds)
+
+        recipient.storage[ExampleToken.Receiver].deposit(vault: <-self.sentFunds)
     }
 }
 ```

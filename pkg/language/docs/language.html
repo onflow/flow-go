@@ -89,15 +89,18 @@
                       <li><a href="#variable-size-array-functions">Variable-size Array Functions</a></li>
                     </ul>
                   </li>
-                </ul>
-              </li>
-              <li>
-                <p><a href="#dictionaries">Dictionaries</a></p>
-                <ul>
-                  <li><a href="#dictionary-types">Dictionary Types</a></li>
-                  <li><a href="#dictionary-access">Dictionary Access</a></li>
-                  <li><a href="#dictionary-fields-and-functions">Dictionary Fields and Functions</a></li>
-                  <li><a href="#dictionary-keys">Dictionary Keys</a></li>
+                  <li>
+                    <p><a href="#dictionary-types">Dictionary Types</a></p>
+                  </li>
+                  <li>
+                    <p><a href="#dictionary-access">Dictionary Access</a></p>
+                  </li>
+                  <li>
+                    <p><a href="#dictionary-fields-and-functions">Dictionary Fields and Functions</a></p>
+                  </li>
+                  <li>
+                    <p><a href="#dictionary-keys">Dictionary Keys</a></p>
+                  </li>
                 </ul>
               </li>
             </ul>
@@ -916,13 +919,14 @@ numbers[1] = 2
 
     // Error: Out of bounds index
     numbers.insert(at: 12, 39)
-</code></pre>
-              <ul>
-                <li><code>remove(at index: Int): T</code>: Removes the element at the given index from the array and returns it. <code>index</code> must be within the bounds of the array.</li>
-                <li><code>removeFirst(): T</code>: Removes the first element from the array and returns it.</li>
-                <li><code>removeLast(): T</code>: Removes the last element from the array and returns it.</li>
-              </ul>
-              <pre><code class="language-bamboo,file=array-remove.bpl">    let numbers = [42, 23, 31, 12]
+    ```
+
+- `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
+- `removeFirst(): T`: Removes the first element from the array and returns it.
+- `removeLast(): T`: Removes the last element from the array and returns it.
+
+    ```bamboo,file=array-remove.bpl
+    let numbers = [42, 23, 31, 12]
 
     // Remove element at position 1 of the array
     let twentyThree = numbers.remove(at: 1)
@@ -941,15 +945,25 @@ numbers[1] = 2
     let twelve = numbers.removeLast()
     // `numbers` is now `[31]`
     // `twelve` is `12`
-</code></pre>
-            </section>
-          </section>
-        </section>
-        <section>
-          <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
-          <p>Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.</p>
-          <p>Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>. Keys are separated from values by a colon, and key-value associations are separated by commas.</p>
-          <pre><code class="language-bamboo,file=dictionaries.bpl">// An empty dictionary
+    ```
+
+&#x3C;!--
+
+TODO
+
+- filter, etc. for all array types
+- Document and link to array concatenation operator `&#x26;` in operators section
+
+-->
+
+### Dictionaries
+
+Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
+
+Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
+
+```bamboo,file=dictionaries.bpl
+// An empty dictionary
 //
 {}
 
@@ -967,6 +981,8 @@ numbers[1] = 2
     false: 2
 }
 </code></pre>
+            </section>
+          </section>
           <section>
             <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
             <p>
@@ -4073,20 +4089,16 @@ transaction {
     let sentFunds: FungibleToken.Vault
 
     prepare(signer: Account) {
-        // Get the stored provider for the signing account.
-        //
+
+        // Call the stored provider's withdraw function
+        // and move a 5 token instance of it to the field `sentFunds`
+
         // As the access is performed in the preparer,
         // the unpublished reference `FungibleToken.Provider`
         // can be accessed (if it exists)
-        //
-        let provider &#x3C;- signer.storage[FungibleToken.Provider]
 
-        // Withdraw five coins (as a vault) from the provider
-        // and move it into the field `sentFunds`
-        //
-        self.sentFunds &#x3C;- provider.withdraw(amount: 5)
+        self.sentFunds &#x3C;- signer.storage[FungibleToken.Provider].withdraw(amount: 5)
 
-        // does the provider need to be re-deposited into the signers account?
     }
 
     execute {
@@ -4094,14 +4106,11 @@ transaction {
         //
         let recipient: Account = // ...
 
-        // Get the stored receiver for the recipient account
-        //
-        let receiver &#x3C;- recipient.storage[ExampleToken.Receiver]
-
         // Deposit the amount withdrawn from the signer
-        // in the recipient's vault through the receiver
+        // in the recipient's vault through the stored receiver in the recipient account
         //
-        receiver.deposit(vault: &#x3C;-self.sentFunds)
+
+        recipient.storage[ExampleToken.Receiver].deposit(vault: &#x3C;-self.sentFunds)
     }
 }
 </code></pre>
