@@ -19,7 +19,7 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 68, 731,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 69, 731,
 	4, 2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7,
 	4, 8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13,
 	9, 13, 4, 14, 9, 14, 4, 15, 9, 15, 4, 16, 9, 16, 4, 17, 9, 17, 4, 18, 9,
@@ -102,9 +102,9 @@ var parserATN = []uint16{
 	56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90,
 	92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120,
 	122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150,
-	152, 154, 156, 158, 160, 162, 164, 166, 168, 2, 12, 3, 2, 46, 47, 3, 2,
-	34, 36, 4, 2, 10, 10, 27, 27, 3, 2, 14, 15, 3, 2, 16, 19, 3, 2, 20, 21,
-	3, 2, 22, 24, 4, 2, 21, 21, 26, 27, 3, 2, 51, 52, 3, 2, 55, 58, 2, 739,
+	152, 154, 156, 158, 160, 162, 164, 166, 168, 2, 12, 3, 2, 47, 48, 3, 2,
+	34, 37, 4, 2, 10, 10, 27, 27, 3, 2, 14, 15, 3, 2, 16, 19, 3, 2, 20, 21,
+	3, 2, 22, 24, 4, 2, 21, 21, 26, 27, 3, 2, 52, 53, 3, 2, 56, 59, 2, 739,
 	2, 176, 3, 2, 2, 2, 4, 183, 3, 2, 2, 2, 6, 190, 3, 2, 2, 2, 8, 192, 3,
 	2, 2, 2, 10, 212, 3, 2, 2, 2, 12, 214, 3, 2, 2, 2, 14, 231, 3, 2, 2, 2,
 	16, 233, 3, 2, 2, 2, 18, 235, 3, 2, 2, 2, 20, 243, 3, 2, 2, 2, 22, 254,
@@ -138,14 +138,14 @@ var parserATN = []uint16{
 	184, 5, 3, 2, 2, 2, 185, 191, 5, 12, 7, 2, 186, 191, 5, 20, 11, 2, 187,
 	191, 5, 30, 16, 2, 188, 191, 5, 78, 40, 2, 189, 191, 5, 8, 5, 2, 190, 185,
 	3, 2, 2, 2, 190, 186, 3, 2, 2, 2, 190, 187, 3, 2, 2, 2, 190, 188, 3, 2,
-	2, 2, 190, 189, 3, 2, 2, 2, 191, 7, 3, 2, 2, 2, 192, 203, 7, 54, 2, 2,
+	2, 2, 190, 189, 3, 2, 2, 2, 191, 7, 3, 2, 2, 2, 192, 203, 7, 55, 2, 2,
 	193, 198, 5, 166, 84, 2, 194, 195, 7, 4, 2, 2, 195, 197, 5, 166, 84, 2,
 	196, 194, 3, 2, 2, 2, 197, 200, 3, 2, 2, 2, 198, 196, 3, 2, 2, 2, 198,
 	199, 3, 2, 2, 2, 199, 201, 3, 2, 2, 2, 200, 198, 3, 2, 2, 2, 201, 202,
-	7, 55, 2, 2, 202, 204, 3, 2, 2, 2, 203, 193, 3, 2, 2, 2, 203, 204, 3, 2,
-	2, 2, 204, 207, 3, 2, 2, 2, 205, 208, 5, 154, 78, 2, 206, 208, 7, 62, 2,
+	7, 56, 2, 2, 202, 204, 3, 2, 2, 2, 203, 193, 3, 2, 2, 2, 203, 204, 3, 2,
+	2, 2, 204, 207, 3, 2, 2, 2, 205, 208, 5, 154, 78, 2, 206, 208, 7, 63, 2,
 	2, 207, 205, 3, 2, 2, 2, 207, 206, 3, 2, 2, 2, 208, 9, 3, 2, 2, 2, 209,
-	213, 3, 2, 2, 2, 210, 213, 7, 41, 2, 2, 211, 213, 7, 42, 2, 2, 212, 209,
+	213, 3, 2, 2, 2, 210, 213, 7, 42, 2, 2, 211, 213, 7, 43, 2, 2, 212, 209,
 	3, 2, 2, 2, 212, 210, 3, 2, 2, 2, 212, 211, 3, 2, 2, 2, 213, 11, 3, 2,
 	2, 2, 214, 215, 5, 10, 6, 2, 215, 216, 5, 26, 14, 2, 216, 217, 5, 166,
 	84, 2, 217, 218, 5, 14, 8, 2, 218, 219, 7, 5, 2, 2, 219, 220, 5, 22, 12,
@@ -157,7 +157,7 @@ var parserATN = []uint16{
 	234, 17, 3, 2, 2, 2, 235, 237, 5, 10, 6, 2, 236, 238, 5, 16, 9, 2, 237,
 	236, 3, 2, 2, 2, 237, 238, 3, 2, 2, 2, 238, 239, 3, 2, 2, 2, 239, 240,
 	5, 166, 84, 2, 240, 241, 7, 7, 2, 2, 241, 242, 5, 36, 19, 2, 242, 19, 3,
-	2, 2, 2, 243, 244, 5, 10, 6, 2, 244, 245, 5, 26, 14, 2, 245, 246, 7, 37,
+	2, 2, 2, 243, 244, 5, 10, 6, 2, 244, 245, 5, 26, 14, 2, 245, 246, 7, 38,
 	2, 2, 246, 247, 5, 166, 84, 2, 247, 248, 7, 5, 2, 2, 248, 249, 5, 22, 12,
 	2, 249, 250, 7, 6, 2, 2, 250, 21, 3, 2, 2, 2, 251, 253, 5, 24, 13, 2, 252,
 	251, 3, 2, 2, 2, 253, 256, 3, 2, 2, 2, 254, 252, 3, 2, 2, 2, 254, 255,
@@ -168,7 +168,7 @@ var parserATN = []uint16{
 	25, 3, 2, 2, 2, 264, 265, 9, 3, 2, 2, 265, 27, 3, 2, 2, 2, 266, 267, 5,
 	166, 84, 2, 267, 269, 5, 32, 17, 2, 268, 270, 5, 54, 28, 2, 269, 268, 3,
 	2, 2, 2, 269, 270, 3, 2, 2, 2, 270, 271, 3, 2, 2, 2, 271, 272, 6, 15, 2,
-	3, 272, 29, 3, 2, 2, 2, 273, 274, 5, 10, 6, 2, 274, 275, 7, 38, 2, 2, 275,
+	3, 272, 29, 3, 2, 2, 2, 273, 274, 5, 10, 6, 2, 274, 275, 7, 39, 2, 2, 275,
 	276, 5, 166, 84, 2, 276, 279, 5, 32, 17, 2, 277, 278, 7, 7, 2, 2, 278,
 	280, 5, 36, 19, 2, 279, 277, 3, 2, 2, 2, 279, 280, 3, 2, 2, 2, 280, 282,
 	3, 2, 2, 2, 281, 283, 5, 54, 28, 2, 282, 281, 3, 2, 2, 2, 282, 283, 3,
@@ -197,16 +197,16 @@ var parserATN = []uint16{
 	5, 36, 19, 2, 343, 344, 7, 32, 2, 2, 344, 45, 3, 2, 2, 2, 345, 346, 7,
 	8, 2, 2, 346, 347, 5, 38, 20, 2, 347, 348, 7, 9, 2, 2, 348, 47, 3, 2, 2,
 	2, 349, 350, 7, 8, 2, 2, 350, 351, 5, 38, 20, 2, 351, 352, 7, 3, 2, 2,
-	352, 353, 7, 59, 2, 2, 353, 354, 7, 9, 2, 2, 354, 49, 3, 2, 2, 2, 355,
+	352, 353, 7, 60, 2, 2, 353, 354, 7, 9, 2, 2, 354, 49, 3, 2, 2, 2, 355,
 	356, 7, 5, 2, 2, 356, 357, 5, 38, 20, 2, 357, 358, 7, 7, 2, 2, 358, 359,
 	5, 38, 20, 2, 359, 360, 7, 6, 2, 2, 360, 51, 3, 2, 2, 2, 361, 362, 7, 5,
 	2, 2, 362, 363, 5, 64, 33, 2, 363, 364, 7, 6, 2, 2, 364, 53, 3, 2, 2, 2,
 	365, 367, 7, 5, 2, 2, 366, 368, 5, 56, 29, 2, 367, 366, 3, 2, 2, 2, 367,
 	368, 3, 2, 2, 2, 368, 370, 3, 2, 2, 2, 369, 371, 5, 58, 30, 2, 370, 369,
 	3, 2, 2, 2, 370, 371, 3, 2, 2, 2, 371, 372, 3, 2, 2, 2, 372, 373, 5, 64,
-	33, 2, 373, 374, 7, 6, 2, 2, 374, 55, 3, 2, 2, 2, 375, 376, 7, 39, 2, 2,
+	33, 2, 373, 374, 7, 6, 2, 2, 374, 55, 3, 2, 2, 2, 375, 376, 7, 40, 2, 2,
 	376, 377, 7, 5, 2, 2, 377, 378, 5, 60, 31, 2, 378, 379, 7, 6, 2, 2, 379,
-	57, 3, 2, 2, 2, 380, 381, 7, 40, 2, 2, 381, 382, 7, 5, 2, 2, 382, 383,
+	57, 3, 2, 2, 2, 380, 381, 7, 41, 2, 2, 381, 382, 7, 5, 2, 2, 382, 383,
 	5, 60, 31, 2, 383, 384, 7, 6, 2, 2, 384, 59, 3, 2, 2, 2, 385, 386, 5, 62,
 	32, 2, 386, 387, 5, 168, 85, 2, 387, 389, 3, 2, 2, 2, 388, 385, 3, 2, 2,
 	2, 389, 392, 3, 2, 2, 2, 390, 388, 3, 2, 2, 2, 390, 391, 3, 2, 2, 2, 391,
@@ -220,15 +220,15 @@ var parserATN = []uint16{
 	6, 4, 2, 412, 415, 5, 80, 41, 2, 413, 415, 5, 84, 43, 2, 414, 406, 3, 2,
 	2, 2, 414, 407, 3, 2, 2, 2, 414, 408, 3, 2, 2, 2, 414, 409, 3, 2, 2, 2,
 	414, 410, 3, 2, 2, 2, 414, 411, 3, 2, 2, 2, 414, 412, 3, 2, 2, 2, 414,
-	413, 3, 2, 2, 2, 415, 67, 3, 2, 2, 2, 416, 419, 7, 43, 2, 2, 417, 418,
+	413, 3, 2, 2, 2, 415, 67, 3, 2, 2, 2, 416, 419, 7, 44, 2, 2, 417, 418,
 	6, 35, 5, 2, 418, 420, 5, 84, 43, 2, 419, 417, 3, 2, 2, 2, 419, 420, 3,
-	2, 2, 2, 420, 69, 3, 2, 2, 2, 421, 422, 7, 44, 2, 2, 422, 71, 3, 2, 2,
-	2, 423, 424, 7, 45, 2, 2, 424, 73, 3, 2, 2, 2, 425, 428, 7, 48, 2, 2, 426,
+	2, 2, 2, 420, 69, 3, 2, 2, 2, 421, 422, 7, 45, 2, 2, 422, 71, 3, 2, 2,
+	2, 423, 424, 7, 46, 2, 2, 424, 73, 3, 2, 2, 2, 425, 428, 7, 49, 2, 2, 426,
 	429, 5, 84, 43, 2, 427, 429, 5, 78, 40, 2, 428, 426, 3, 2, 2, 2, 428, 427,
 	3, 2, 2, 2, 429, 430, 3, 2, 2, 2, 430, 436, 5, 52, 27, 2, 431, 434, 7,
-	49, 2, 2, 432, 435, 5, 74, 38, 2, 433, 435, 5, 52, 27, 2, 434, 432, 3,
+	50, 2, 2, 432, 435, 5, 74, 38, 2, 433, 435, 5, 52, 27, 2, 434, 432, 3,
 	2, 2, 2, 434, 433, 3, 2, 2, 2, 435, 437, 3, 2, 2, 2, 436, 431, 3, 2, 2,
-	2, 436, 437, 3, 2, 2, 2, 437, 75, 3, 2, 2, 2, 438, 439, 7, 50, 2, 2, 439,
+	2, 436, 437, 3, 2, 2, 2, 437, 75, 3, 2, 2, 2, 438, 439, 7, 51, 2, 2, 439,
 	440, 5, 84, 43, 2, 440, 441, 5, 52, 27, 2, 441, 77, 3, 2, 2, 2, 442, 443,
 	5, 16, 9, 2, 443, 446, 5, 166, 84, 2, 444, 445, 7, 7, 2, 2, 445, 447, 5,
 	36, 19, 2, 446, 444, 3, 2, 2, 2, 446, 447, 3, 2, 2, 2, 447, 448, 3, 2,
@@ -289,11 +289,11 @@ var parserATN = []uint16{
 	603, 121, 3, 2, 2, 2, 604, 605, 9, 9, 2, 2, 605, 123, 3, 2, 2, 2, 606,
 	611, 5, 130, 66, 2, 607, 611, 5, 132, 67, 2, 608, 611, 5, 134, 68, 2, 609,
 	611, 5, 136, 69, 2, 610, 606, 3, 2, 2, 2, 610, 607, 3, 2, 2, 2, 610, 608,
-	3, 2, 2, 2, 610, 609, 3, 2, 2, 2, 611, 125, 3, 2, 2, 2, 612, 613, 7, 56,
+	3, 2, 2, 2, 610, 609, 3, 2, 2, 2, 611, 125, 3, 2, 2, 2, 612, 613, 7, 57,
 	2, 2, 613, 614, 5, 166, 84, 2, 614, 615, 5, 144, 73, 2, 615, 127, 3, 2,
-	2, 2, 616, 617, 7, 57, 2, 2, 617, 618, 5, 84, 43, 2, 618, 129, 3, 2, 2,
+	2, 2, 616, 617, 7, 58, 2, 2, 617, 618, 5, 84, 43, 2, 618, 129, 3, 2, 2,
 	2, 619, 620, 5, 166, 84, 2, 620, 131, 3, 2, 2, 2, 621, 622, 5, 148, 75,
-	2, 622, 133, 3, 2, 2, 2, 623, 624, 7, 38, 2, 2, 624, 627, 5, 32, 17, 2,
+	2, 622, 133, 3, 2, 2, 2, 623, 624, 7, 39, 2, 2, 624, 627, 5, 32, 17, 2,
 	625, 626, 7, 7, 2, 2, 626, 628, 5, 36, 19, 2, 627, 625, 3, 2, 2, 2, 627,
 	628, 3, 2, 2, 2, 628, 629, 3, 2, 2, 2, 629, 630, 5, 54, 28, 2, 630, 135,
 	3, 2, 2, 2, 631, 632, 7, 31, 2, 2, 632, 633, 5, 84, 43, 2, 633, 634, 7,
@@ -313,11 +313,11 @@ var parserATN = []uint16{
 	78, 2, 671, 673, 5, 152, 77, 2, 672, 666, 3, 2, 2, 2, 672, 667, 3, 2, 2,
 	2, 672, 668, 3, 2, 2, 2, 672, 669, 3, 2, 2, 2, 672, 670, 3, 2, 2, 2, 672,
 	671, 3, 2, 2, 2, 673, 149, 3, 2, 2, 2, 674, 675, 9, 10, 2, 2, 675, 151,
-	3, 2, 2, 2, 676, 677, 7, 53, 2, 2, 677, 153, 3, 2, 2, 2, 678, 679, 7, 64,
+	3, 2, 2, 2, 676, 677, 7, 54, 2, 2, 677, 153, 3, 2, 2, 2, 678, 679, 7, 65,
 	2, 2, 679, 155, 3, 2, 2, 2, 680, 682, 7, 21, 2, 2, 681, 680, 3, 2, 2, 2,
 	681, 682, 3, 2, 2, 2, 682, 683, 3, 2, 2, 2, 683, 684, 5, 158, 80, 2, 684,
-	157, 3, 2, 2, 2, 685, 691, 7, 59, 2, 2, 686, 691, 7, 60, 2, 2, 687, 691,
-	7, 61, 2, 2, 688, 691, 7, 62, 2, 2, 689, 691, 7, 63, 2, 2, 690, 685, 3,
+	157, 3, 2, 2, 2, 685, 691, 7, 60, 2, 2, 686, 691, 7, 61, 2, 2, 687, 691,
+	7, 62, 2, 2, 688, 691, 7, 63, 2, 2, 689, 691, 7, 64, 2, 2, 690, 685, 3,
 	2, 2, 2, 690, 686, 3, 2, 2, 2, 690, 687, 3, 2, 2, 2, 690, 688, 3, 2, 2,
 	2, 690, 689, 3, 2, 2, 2, 691, 159, 3, 2, 2, 2, 692, 701, 7, 8, 2, 2, 693,
 	698, 5, 84, 43, 2, 694, 695, 7, 4, 2, 2, 695, 697, 5, 84, 43, 2, 696, 694,
@@ -346,19 +346,19 @@ var literalNames = []string{
 	"", "';'", "','", "'{'", "'}'", "':'", "'['", "']'", "'='", "'||'", "'&&'",
 	"'.'", "'=='", "'!='", "'<'", "'>'", "'<='", "'>='", "'+'", "'-'", "'*'",
 	"'/'", "'%'", "'&'", "'!'", "'<-'", "'?'", "", "'as?'", "'('", "')'", "'transaction'",
-	"'struct'", "'resource'", "'contract'", "'interface'", "'fun'", "'pre'",
-	"'post'", "'pub'", "'pub(set)'", "'return'", "'break'", "'continue'", "'let'",
-	"'var'", "'if'", "'else'", "'while'", "'true'", "'false'", "'nil'", "'import'",
-	"'from'", "'create'", "'destroy'",
+	"'struct'", "'resource'", "'contract'", "'event'", "'interface'", "'fun'",
+	"'pre'", "'post'", "'pub'", "'pub(set)'", "'return'", "'break'", "'continue'",
+	"'let'", "'var'", "'if'", "'else'", "'while'", "'true'", "'false'", "'nil'",
+	"'import'", "'from'", "'create'", "'destroy'",
 }
 var symbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal", "Less",
 	"Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul", "Div",
 	"Mod", "Concat", "Negate", "Move", "Optional", "NilCoalescing", "FailableDowncasting",
 	"OpenParen", "CloseParen", "Transaction", "Struct", "Resource", "Contract",
-	"Interface", "Fun", "Pre", "Post", "Pub", "PubSet", "Return", "Break",
-	"Continue", "Let", "Var", "If", "Else", "While", "True", "False", "Nil",
-	"Import", "From", "Create", "Destroy", "Identifier", "DecimalLiteral",
+	"Event", "Interface", "Fun", "Pre", "Post", "Pub", "PubSet", "Return",
+	"Break", "Continue", "Let", "Var", "If", "Else", "While", "True", "False",
+	"Nil", "Import", "From", "Create", "Destroy", "Identifier", "DecimalLiteral",
 	"BinaryLiteral", "OctalLiteral", "HexadecimalLiteral", "InvalidNumberLiteral",
 	"StringLiteral", "WS", "Terminator", "BlockComment", "LineComment",
 }
@@ -486,38 +486,39 @@ const (
 	StrictusParserStruct               = 32
 	StrictusParserResource             = 33
 	StrictusParserContract             = 34
-	StrictusParserInterface            = 35
-	StrictusParserFun                  = 36
-	StrictusParserPre                  = 37
-	StrictusParserPost                 = 38
-	StrictusParserPub                  = 39
-	StrictusParserPubSet               = 40
-	StrictusParserReturn               = 41
-	StrictusParserBreak                = 42
-	StrictusParserContinue             = 43
-	StrictusParserLet                  = 44
-	StrictusParserVar                  = 45
-	StrictusParserIf                   = 46
-	StrictusParserElse                 = 47
-	StrictusParserWhile                = 48
-	StrictusParserTrue                 = 49
-	StrictusParserFalse                = 50
-	StrictusParserNil                  = 51
-	StrictusParserImport               = 52
-	StrictusParserFrom                 = 53
-	StrictusParserCreate               = 54
-	StrictusParserDestroy              = 55
-	StrictusParserIdentifier           = 56
-	StrictusParserDecimalLiteral       = 57
-	StrictusParserBinaryLiteral        = 58
-	StrictusParserOctalLiteral         = 59
-	StrictusParserHexadecimalLiteral   = 60
-	StrictusParserInvalidNumberLiteral = 61
-	StrictusParserStringLiteral        = 62
-	StrictusParserWS                   = 63
-	StrictusParserTerminator           = 64
-	StrictusParserBlockComment         = 65
-	StrictusParserLineComment          = 66
+	StrictusParserEvent                = 35
+	StrictusParserInterface            = 36
+	StrictusParserFun                  = 37
+	StrictusParserPre                  = 38
+	StrictusParserPost                 = 39
+	StrictusParserPub                  = 40
+	StrictusParserPubSet               = 41
+	StrictusParserReturn               = 42
+	StrictusParserBreak                = 43
+	StrictusParserContinue             = 44
+	StrictusParserLet                  = 45
+	StrictusParserVar                  = 46
+	StrictusParserIf                   = 47
+	StrictusParserElse                 = 48
+	StrictusParserWhile                = 49
+	StrictusParserTrue                 = 50
+	StrictusParserFalse                = 51
+	StrictusParserNil                  = 52
+	StrictusParserImport               = 53
+	StrictusParserFrom                 = 54
+	StrictusParserCreate               = 55
+	StrictusParserDestroy              = 56
+	StrictusParserIdentifier           = 57
+	StrictusParserDecimalLiteral       = 58
+	StrictusParserBinaryLiteral        = 59
+	StrictusParserOctalLiteral         = 60
+	StrictusParserHexadecimalLiteral   = 61
+	StrictusParserInvalidNumberLiteral = 62
+	StrictusParserStringLiteral        = 63
+	StrictusParserWS                   = 64
+	StrictusParserTerminator           = 65
+	StrictusParserBlockComment         = 66
+	StrictusParserLineComment          = 67
 )
 
 // StrictusParser rules.
@@ -729,7 +730,7 @@ func (p *StrictusParser) Program() (localctx IProgramContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserImport-32)))) != 0 {
+	for ((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserEvent-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserImport-32)))) != 0 {
 		{
 			p.SetState(168)
 			p.Declaration()
@@ -1212,7 +1213,7 @@ func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-53)&-(0x1f+1)) == 0 && ((1<<uint((_la-53)))&((1<<(StrictusParserFrom-53))|(1<<(StrictusParserCreate-53))|(1<<(StrictusParserDestroy-53))|(1<<(StrictusParserIdentifier-53)))) != 0 {
+	if ((_la-54)&-(0x1f+1)) == 0 && ((1<<uint((_la-54)))&((1<<(StrictusParserFrom-54))|(1<<(StrictusParserCreate-54))|(1<<(StrictusParserDestroy-54))|(1<<(StrictusParserIdentifier-54)))) != 0 {
 		{
 			p.SetState(191)
 			p.Identifier()
@@ -1364,7 +1365,7 @@ func (p *StrictusParser) Access() (localctx IAccessContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserStruct, StrictusParserResource, StrictusParserContract, StrictusParserFun, StrictusParserLet, StrictusParserVar, StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier:
+	case StrictusParserStruct, StrictusParserResource, StrictusParserContract, StrictusParserEvent, StrictusParserFun, StrictusParserLet, StrictusParserVar, StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 
 	case StrictusParserPub:
@@ -2278,7 +2279,7 @@ func (p *StrictusParser) Members(functionBlockRequired bool) (localctx IMembersC
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserFrom-32))|(1<<(StrictusParserCreate-32))|(1<<(StrictusParserDestroy-32))|(1<<(StrictusParserIdentifier-32)))) != 0 {
+	for ((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserEvent-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserFrom-32))|(1<<(StrictusParserCreate-32))|(1<<(StrictusParserDestroy-32))|(1<<(StrictusParserIdentifier-32)))) != 0 {
 		{
 			p.SetState(249)
 			p.Member(functionBlockRequired)
@@ -2536,6 +2537,10 @@ func (s *CompositeKindContext) Contract() antlr.TerminalNode {
 	return s.GetToken(StrictusParserContract, 0)
 }
 
+func (s *CompositeKindContext) Event() antlr.TerminalNode {
+	return s.GetToken(StrictusParserEvent, 0)
+}
+
 func (s *CompositeKindContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -2592,7 +2597,7 @@ func (p *StrictusParser) CompositeKind() (localctx ICompositeKindContext) {
 		p.SetState(262)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32)))) != 0) {
+		if !(((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserEvent-32)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -3138,7 +3143,7 @@ func (p *StrictusParser) ParameterList() (localctx IParameterListContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-53)&-(0x1f+1)) == 0 && ((1<<uint((_la-53)))&((1<<(StrictusParserFrom-53))|(1<<(StrictusParserCreate-53))|(1<<(StrictusParserDestroy-53))|(1<<(StrictusParserIdentifier-53)))) != 0 {
+	if ((_la-54)&-(0x1f+1)) == 0 && ((1<<uint((_la-54)))&((1<<(StrictusParserFrom-54))|(1<<(StrictusParserCreate-54))|(1<<(StrictusParserDestroy-54))|(1<<(StrictusParserIdentifier-54)))) != 0 {
 		{
 			p.SetState(285)
 			p.Parameter()
@@ -4096,7 +4101,7 @@ func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-53)&-(0x1f+1)) == 0 && ((1<<uint((_la-53)))&((1<<(StrictusParserFrom-53))|(1<<(StrictusParserCreate-53))|(1<<(StrictusParserDestroy-53))|(1<<(StrictusParserIdentifier-53)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-54)&-(0x1f+1)) == 0 && ((1<<uint((_la-54)))&((1<<(StrictusParserFrom-54))|(1<<(StrictusParserCreate-54))|(1<<(StrictusParserDestroy-54))|(1<<(StrictusParserIdentifier-54)))) != 0) {
 		{
 			p.SetState(328)
 
@@ -5231,7 +5236,7 @@ func (p *StrictusParser) Conditions() (localctx IConditionsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserFun-36))|(1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserNil-36))|(1<<(StrictusParserFrom-36))|(1<<(StrictusParserCreate-36))|(1<<(StrictusParserDestroy-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36))|(1<<(StrictusParserStringLiteral-36)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(StrictusParserFun-37))|(1<<(StrictusParserTrue-37))|(1<<(StrictusParserFalse-37))|(1<<(StrictusParserNil-37))|(1<<(StrictusParserFrom-37))|(1<<(StrictusParserCreate-37))|(1<<(StrictusParserDestroy-37))|(1<<(StrictusParserIdentifier-37))|(1<<(StrictusParserDecimalLiteral-37))|(1<<(StrictusParserBinaryLiteral-37))|(1<<(StrictusParserOctalLiteral-37))|(1<<(StrictusParserHexadecimalLiteral-37))|(1<<(StrictusParserInvalidNumberLiteral-37))|(1<<(StrictusParserStringLiteral-37)))) != 0) {
 		{
 			p.SetState(383)
 			p.Condition()
@@ -5551,7 +5556,7 @@ func (p *StrictusParser) Statements() (localctx IStatementsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserReturn-32))|(1<<(StrictusParserBreak-32))|(1<<(StrictusParserContinue-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserIf-32))|(1<<(StrictusParserWhile-32))|(1<<(StrictusParserTrue-32))|(1<<(StrictusParserFalse-32))|(1<<(StrictusParserNil-32))|(1<<(StrictusParserImport-32))|(1<<(StrictusParserFrom-32))|(1<<(StrictusParserCreate-32))|(1<<(StrictusParserDestroy-32))|(1<<(StrictusParserIdentifier-32))|(1<<(StrictusParserDecimalLiteral-32))|(1<<(StrictusParserBinaryLiteral-32))|(1<<(StrictusParserOctalLiteral-32))|(1<<(StrictusParserHexadecimalLiteral-32))|(1<<(StrictusParserInvalidNumberLiteral-32))|(1<<(StrictusParserStringLiteral-32)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(StrictusParserStruct-32))|(1<<(StrictusParserResource-32))|(1<<(StrictusParserContract-32))|(1<<(StrictusParserEvent-32))|(1<<(StrictusParserFun-32))|(1<<(StrictusParserPub-32))|(1<<(StrictusParserPubSet-32))|(1<<(StrictusParserReturn-32))|(1<<(StrictusParserBreak-32))|(1<<(StrictusParserContinue-32))|(1<<(StrictusParserLet-32))|(1<<(StrictusParserVar-32))|(1<<(StrictusParserIf-32))|(1<<(StrictusParserWhile-32))|(1<<(StrictusParserTrue-32))|(1<<(StrictusParserFalse-32))|(1<<(StrictusParserNil-32))|(1<<(StrictusParserImport-32))|(1<<(StrictusParserFrom-32))|(1<<(StrictusParserCreate-32))|(1<<(StrictusParserDestroy-32))|(1<<(StrictusParserIdentifier-32))|(1<<(StrictusParserDecimalLiteral-32))|(1<<(StrictusParserBinaryLiteral-32))|(1<<(StrictusParserOctalLiteral-32))|(1<<(StrictusParserHexadecimalLiteral-32))|(1<<(StrictusParserInvalidNumberLiteral-32))|(1<<(StrictusParserStringLiteral-32)))) != 0) {
 		{
 			p.SetState(396)
 			p.Statement()
@@ -11343,7 +11348,7 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserFun-36))|(1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserNil-36))|(1<<(StrictusParserFrom-36))|(1<<(StrictusParserCreate-36))|(1<<(StrictusParserDestroy-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36))|(1<<(StrictusParserStringLiteral-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(StrictusParserFun-37))|(1<<(StrictusParserTrue-37))|(1<<(StrictusParserFalse-37))|(1<<(StrictusParserNil-37))|(1<<(StrictusParserFrom-37))|(1<<(StrictusParserCreate-37))|(1<<(StrictusParserDestroy-37))|(1<<(StrictusParserIdentifier-37))|(1<<(StrictusParserDecimalLiteral-37))|(1<<(StrictusParserBinaryLiteral-37))|(1<<(StrictusParserOctalLiteral-37))|(1<<(StrictusParserHexadecimalLiteral-37))|(1<<(StrictusParserInvalidNumberLiteral-37))|(1<<(StrictusParserStringLiteral-37)))) != 0) {
 		{
 			p.SetState(645)
 			p.Argument()
@@ -12608,7 +12613,7 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserFun-36))|(1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserNil-36))|(1<<(StrictusParserFrom-36))|(1<<(StrictusParserCreate-36))|(1<<(StrictusParserDestroy-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36))|(1<<(StrictusParserStringLiteral-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(StrictusParserFun-37))|(1<<(StrictusParserTrue-37))|(1<<(StrictusParserFalse-37))|(1<<(StrictusParserNil-37))|(1<<(StrictusParserFrom-37))|(1<<(StrictusParserCreate-37))|(1<<(StrictusParserDestroy-37))|(1<<(StrictusParserIdentifier-37))|(1<<(StrictusParserDecimalLiteral-37))|(1<<(StrictusParserBinaryLiteral-37))|(1<<(StrictusParserOctalLiteral-37))|(1<<(StrictusParserHexadecimalLiteral-37))|(1<<(StrictusParserInvalidNumberLiteral-37))|(1<<(StrictusParserStringLiteral-37)))) != 0) {
 		{
 			p.SetState(691)
 			p.Expression()
@@ -12762,7 +12767,7 @@ func (p *StrictusParser) DictionaryLiteral() (localctx IDictionaryLiteralContext
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(StrictusParserFun-36))|(1<<(StrictusParserTrue-36))|(1<<(StrictusParserFalse-36))|(1<<(StrictusParserNil-36))|(1<<(StrictusParserFrom-36))|(1<<(StrictusParserCreate-36))|(1<<(StrictusParserDestroy-36))|(1<<(StrictusParserIdentifier-36))|(1<<(StrictusParserDecimalLiteral-36))|(1<<(StrictusParserBinaryLiteral-36))|(1<<(StrictusParserOctalLiteral-36))|(1<<(StrictusParserHexadecimalLiteral-36))|(1<<(StrictusParserInvalidNumberLiteral-36))|(1<<(StrictusParserStringLiteral-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(StrictusParserFun-37))|(1<<(StrictusParserTrue-37))|(1<<(StrictusParserFalse-37))|(1<<(StrictusParserNil-37))|(1<<(StrictusParserFrom-37))|(1<<(StrictusParserCreate-37))|(1<<(StrictusParserDestroy-37))|(1<<(StrictusParserIdentifier-37))|(1<<(StrictusParserDecimalLiteral-37))|(1<<(StrictusParserBinaryLiteral-37))|(1<<(StrictusParserOctalLiteral-37))|(1<<(StrictusParserHexadecimalLiteral-37))|(1<<(StrictusParserInvalidNumberLiteral-37))|(1<<(StrictusParserStringLiteral-37)))) != 0) {
 		{
 			p.SetState(704)
 			p.DictionaryEntry()
@@ -13061,7 +13066,7 @@ func (p *StrictusParser) Identifier() (localctx IIdentifierContext) {
 		p.SetState(720)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-53)&-(0x1f+1)) == 0 && ((1<<uint((_la-53)))&((1<<(StrictusParserFrom-53))|(1<<(StrictusParserCreate-53))|(1<<(StrictusParserDestroy-53))|(1<<(StrictusParserIdentifier-53)))) != 0) {
+		if !(((_la-54)&-(0x1f+1)) == 0 && ((1<<uint((_la-54)))&((1<<(StrictusParserFrom-54))|(1<<(StrictusParserCreate-54))|(1<<(StrictusParserDestroy-54))|(1<<(StrictusParserIdentifier-54)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
