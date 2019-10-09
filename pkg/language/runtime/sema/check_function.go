@@ -73,13 +73,8 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
-
 	// check argument labels
 	checker.checkArgumentLabels(parameters)
-
-	checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
 
 	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
 	if functionType.ReturnTypeAnnotation != nil {
@@ -91,6 +86,14 @@ func (checker *Checker) checkFunction(
 			functionType,
 			checker.valueActivations.Depth(),
 			func() {
+				// NOTE: important to begin scope in function activation, so that
+				//   variable declarations will have proper function activation
+				//   associated to it, and declare parameters in this new scope
+				checker.enterValueScope()
+				defer checker.leaveValueScope()
+
+				checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
+
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,

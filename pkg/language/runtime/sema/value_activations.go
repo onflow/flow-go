@@ -98,7 +98,11 @@ func (a *ValueActivations) DeclareFunction(
 	)
 }
 
-func (a *ValueActivations) DeclareImplicitConstant(identifier string, ty Type, kind common.DeclarationKind) (*Variable, error) {
+func (a *ValueActivations) DeclareImplicitConstant(
+	identifier string,
+	ty Type,
+	kind common.DeclarationKind,
+) (*Variable, error) {
 	return a.Declare(
 		identifier,
 		ty,

@@ -1345,14 +1345,17 @@ func TestCheckResourceAssignmentTransfer(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      let x <- create X()
-
       fun test() {
+         let x <- create X()
          var x2 <- create X()
          destroy x2
          x2 <- x
       }
 	`)
+
+	// TODO: this program is actually invalid as it reintroduces
+	//   the invalidated variable `x2`:
+	//   https://github.com/dapperlabs/flow-go/issues/820
 
 	// TODO: add support for resources
 
@@ -1366,14 +1369,17 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      let x <- create X()
-
       fun test() {
+        let x <- create X()
         var x2 <- create X()
         destroy x2
         x2 = x
       }
 	`)
+
+	// TODO: this program is actually invalid as it reintroduces
+	//   the invalidated variable `x2`:
+	//   https://github.com/dapperlabs/flow-go/issues/820
 
 	// TODO: add support for resources
 
