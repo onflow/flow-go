@@ -4167,6 +4167,33 @@ func TestParseResource(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestParseEvent(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        event Test {}
+	`)
+
+	assert.Nil(t, err)
+
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindEvent,
+		Identifier: Identifier{
+			Identifier: "Test",
+			Pos:        Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Conformances: []*NominalType{},
+		Members:      &Members{},
+		StartPos:     Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:       Position{Offset: 21, Line: 2, Column: 20},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestParseMoveReturnType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
