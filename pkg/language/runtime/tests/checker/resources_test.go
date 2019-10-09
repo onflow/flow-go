@@ -2250,3 +2250,121 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 }
+
+func TestCheckResourceNesting(t *testing.T) {
+
+	compositeKindPossibilities := []common.CompositeKind{
+		common.CompositeKindResource,
+		common.CompositeKindStructure,
+	}
+	interfacePossibilities := []bool{true, false}
+
+	for _, innerCompositeKind := range compositeKindPossibilities {
+		for _, innerIsInterface := range interfacePossibilities {
+			for _, outerCompositeKind := range compositeKindPossibilities {
+				for _, outerIsInterface := range interfacePossibilities {
+
+					testName := fmt.Sprintf(
+						"%s %v/%s %v",
+						innerCompositeKind.Keyword(),
+						innerIsInterface,
+						outerCompositeKind.Keyword(),
+						outerIsInterface,
+					)
+
+					t.Run(testName, func(t *testing.T) {
+						testResourceNesting(
+							t,
+							innerCompositeKind,
+							innerIsInterface,
+							outerCompositeKind,
+							outerIsInterface,
+						)
+					})
+				}
+			}
+		}
+	}
+}
+
+func testResourceNesting(
+	t *testing.T,
+	innerCompositeKind common.CompositeKind,
+	innerIsInterface bool,
+	outerCompositeKind common.CompositeKind,
+	outerIsInterface bool,
+) {
+	innerInterfaceKeyword := ""
+	if innerIsInterface {
+		innerInterfaceKeyword = "interface"
+	}
+
+	outerInterfaceKeyword := ""
+	if outerIsInterface {
+		outerInterfaceKeyword = "interface"
+	}
+
+	// Prepare the initializer, if needed.
+	// `outerCompositeKind` is the container composite kind.
+	// If it is concrete, i.e. not an interface, it needs an initializer.
+
+	initializer := ""
+	if !outerIsInterface {
+		initializer = fmt.Sprintf(
+			`
+              init(t: %[1]sT) {
+                  self.t %[2]s t
+              }
+            `,
+			innerCompositeKind.Annotation(),
+			innerCompositeKind.TransferOperator(),
+		)
+	}
+
+	// Prepare the full program defining an empty composite,
+	// and a second composite which contains the first
+
+	program := fmt.Sprintf(
+		`
+          %[1]s %[2]s T {}
+
+          %[3]s %[4]s U {
+              let t: %[5]sT
+              %[6]s
+          }
+        `,
+		innerCompositeKind.Keyword(),
+		innerInterfaceKeyword,
+		outerCompositeKind.Keyword(),
+		outerInterfaceKeyword,
+		innerCompositeKind.Annotation(),
+		initializer,
+	)
+
+	_, err := ParseAndCheck(t, program)
+
+	// TODO: add support for non-structure declarations
+
+	switch outerCompositeKind {
+	case common.CompositeKindStructure:
+		switch innerCompositeKind {
+		case common.CompositeKindStructure:
+			assert.Nil(t, err)
+		case common.CompositeKindResource:
+			errs := ExpectCheckerErrors(t, err, 2)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[1])
+		}
+
+	case common.CompositeKindResource:
+		switch innerCompositeKind {
+		case common.CompositeKindStructure:
+			errs := ExpectCheckerErrors(t, err, 1)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+		case common.CompositeKindResource:
+			errs := ExpectCheckerErrors(t, err, 2)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+		}
+	}
+}
