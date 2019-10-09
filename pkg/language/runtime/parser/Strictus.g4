@@ -114,6 +114,7 @@ compositeKind
     : Struct
     | Resource
     | Contract
+    | Event
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -498,6 +499,7 @@ Transaction : 'transaction' ;
 Struct : 'struct' ;
 Resource : 'resource' ;
 Contract : 'contract' ;
+Event : 'event' ;
 
 Interface : 'interface' ;
 
