@@ -11,12 +11,14 @@ const (
 	CompositeKindStructure
 	CompositeKindResource
 	CompositeKindContract
+	CompositeKindEvent
 )
 
 var CompositeKinds = []CompositeKind{
 	CompositeKindStructure,
 	CompositeKindResource,
 	CompositeKindContract,
+	CompositeKindEvent,
 }
 
 func (k CompositeKind) Name() string {
@@ -27,6 +29,8 @@ func (k CompositeKind) Name() string {
 		return "resource"
 	case CompositeKindContract:
 		return "contract"
+	case CompositeKindEvent:
+		return "event"
 	}
 
 	panic(&errors.UnreachableError{})
@@ -40,6 +44,8 @@ func (k CompositeKind) Keyword() string {
 		return "resource"
 	case CompositeKindContract:
 		return "contract"
+	case CompositeKindEvent:
+		return "event"
 	}
 
 	panic(&errors.UnreachableError{})
