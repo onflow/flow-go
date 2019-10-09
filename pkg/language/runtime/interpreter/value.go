@@ -1070,7 +1070,13 @@ func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value V
 func (v CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
-	err := encoder.Encode(v.Identifier)
+	// NOTE: important: decode as pointer, so gob sees
+	// the interface, not the concrete type
+	err := encoder.Encode(&v.ImportLocation)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,7 +1091,11 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.Identifier)
+	err := decoder.Decode(&v.ImportLocation)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Identifier)
 	if err != nil {
 		return err
 	}
