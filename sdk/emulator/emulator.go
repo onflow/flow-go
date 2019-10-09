@@ -22,7 +22,7 @@ import (
 // to check the output of a single transaction.
 //
 // The final world state is committed after each block. An index of committed world states is maintained
-// to allow a test to seek to previously committed world state.
+// to allow a test to seek to a previously committed world state.
 type EmulatedBlockchain struct {
 	// worldStates is a mapping of committed world states (updated after CommitBlock)
 	worldStates map[string][]byte
@@ -36,6 +36,7 @@ type EmulatedBlockchain struct {
 	computer           *execution.Computer
 	rootAccountAddress types.Address
 	rootAccountKey     crypto.PrivateKey
+	lastCreatedAccount types.Account
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
@@ -56,26 +57,30 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	txPool := make(map[string]*types.Transaction)
 	ws := state.NewWorldState()
 
-	runtime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(
-		runtime,
-		opt.RuntimeLogger,
-	)
+	worldStates[string(ws.Hash())] = ws.Encode()
 
-	rootAccountAddress, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
-
-	bytes := ws.Encode()
-	worldStates[string(ws.Hash())] = bytes
-
-	return &EmulatedBlockchain{
+	b := &EmulatedBlockchain{
 		worldStates:             worldStates,
 		intermediateWorldStates: intermediateWorldStates,
 		pendingWorldState:       ws,
 		txPool:                  txPool,
-		computer:                computer,
-		rootAccountAddress:      rootAccountAddress,
-		rootAccountKey:          rootAccountKey,
 	}
+
+	runtime := runtime.NewInterpreterRuntime()
+	computer := execution.NewComputer(
+		runtime,
+		opt.RuntimeLogger,
+		b.onAccountCreated,
+	)
+
+	b.computer = computer
+	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
+
+	b.rootAccountAddress = rootAccount.Address
+	b.rootAccountKey = rootAccountKey
+	b.lastCreatedAccount = rootAccount
+
+	return b
 }
 
 // RootAccountAddress returns the root account address for this blockchain.
@@ -311,11 +316,20 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
+func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
+	b.lastCreatedAccount = account
+}
+
+// lastCreatedAccount returns the last account that was created in the blockchain.
+func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
+	return b.lastCreatedAccount
+}
+
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
-	accountWeights := make(map[types.Address]uint32)
+	accountWeights := make(map[types.Address]int)
 
 	for _, accountSig := range tx.Signatures {
 		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
@@ -382,7 +396,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Address, crypto.PrivateKey) {
+func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Account, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
 
 	if prKey == nil {
@@ -392,9 +406,16 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Add
 	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
-	accountID, _ := runtimeContext.CreateAccount(pubKeyBytes, []byte{})
+	accountID, _ := runtimeContext.CreateAccount(
+		[][]byte{pubKeyBytes},
+		[]int{constants.AccountKeyWeightThreshold},
+		[]byte{},
+	)
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	return types.BytesToAddress(accountID), prKey
+	accountAddress := types.BytesToAddress(accountID)
+	account := runtimeContext.GetAccount(accountAddress)
+
+	return *account, prKey
 }
