@@ -538,7 +538,13 @@ func (checker *Checker) checkCompositeFunctions(
 
 			checker.declareSelfValue(selfType)
 
-			function.Accept(checker)
+			checker.visitFunctionDeclaration(
+				function,
+				functionDeclarationOptions{
+					mustExit:        true,
+					declareFunction: false,
+				},
+			)
 		})
 	}
 }
