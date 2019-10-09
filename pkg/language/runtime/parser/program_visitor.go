@@ -324,6 +324,10 @@ func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface
 		return common.CompositeKindContract
 	}
 
+	if ctx.Event() != nil {
+		return common.CompositeKindEvent
+	}
+
 	panic(&errors.UnreachableError{})
 }
 
