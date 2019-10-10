@@ -4240,6 +4240,8 @@ func TestParseEventEmitStatement(t *testing.T) {
 		}
 	`)
 
+	// TODO: improve test case
+
 	assert.Nil(t, err)
 }
 
