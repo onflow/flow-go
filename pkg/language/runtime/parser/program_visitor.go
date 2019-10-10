@@ -171,6 +171,25 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+
+	var parameters ast.Parameters
+	parameterList := ctx.ParameterList()
+	if parameterList != nil {
+		parameters = parameterList.Accept(v).(ast.Parameters)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.EventDeclaration{
+		Identifier: identifier,
+		Parameters: parameters,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
@@ -322,10 +341,6 @@ func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface
 
 	if ctx.Contract() != nil {
 		return common.CompositeKindContract
-	}
-
-	if ctx.Event() != nil {
-		return common.CompositeKindEvent
 	}
 
 	panic(&errors.UnreachableError{})
