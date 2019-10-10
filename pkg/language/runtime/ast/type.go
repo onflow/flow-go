@@ -1,6 +1,9 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // TypeAnnotation
 
@@ -30,6 +33,7 @@ func (e *TypeAnnotation) EndPosition() Position {
 
 type Type interface {
 	HasPosition
+	fmt.Stringer
 	isType()
 }
 
@@ -50,6 +54,10 @@ type OptionalType struct {
 
 func (*OptionalType) isType() {}
 
+func (t *OptionalType) String() string {
+	return fmt.Sprintf("%s?", t.Type)
+}
+
 func (t *OptionalType) StartPosition() Position {
 	return t.Type.StartPosition()
 }
@@ -67,6 +75,10 @@ type VariableSizedType struct {
 }
 
 func (*VariableSizedType) isType() {}
+
+func (t *VariableSizedType) String() string {
+	return fmt.Sprintf("[%s]", t.Type)
+}
 
 func (t *VariableSizedType) StartPosition() Position {
 	return t.StartPos
@@ -87,6 +99,10 @@ type ConstantSizedType struct {
 
 func (*ConstantSizedType) isType() {}
 
+func (t *ConstantSizedType) String() string {
+	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
+}
+
 func (t *ConstantSizedType) StartPosition() Position {
 	return t.StartPos
 }
@@ -106,6 +122,10 @@ type DictionaryType struct {
 
 func (*DictionaryType) isType() {}
 
+func (t *DictionaryType) String() string {
+	return fmt.Sprintf("{%s: %s}", t.KeyType, t.ValueType)
+}
+
 func (t *DictionaryType) StartPosition() Position {
 	return t.StartPos
 }
@@ -124,6 +144,18 @@ type FunctionType struct {
 }
 
 func (*FunctionType) isType() {}
+
+func (t *FunctionType) String() string {
+	var parameters strings.Builder
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		if i > 0 {
+			parameters.WriteString(", ")
+		}
+		parameters.WriteString(parameterTypeAnnotation.String())
+	}
+
+	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnTypeAnnotation.String())
+}
 
 func (t *FunctionType) StartPosition() Position {
 	return t.StartPos

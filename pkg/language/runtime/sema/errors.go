@@ -1537,3 +1537,45 @@ func (e *InvalidResourceFieldError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// InvalidStorageIndexingError
+
+type InvalidStorageIndexingError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidStorageIndexingError) Error() string {
+	return "invalid index into storage: expected type"
+}
+
+func (*InvalidStorageIndexingError) isSemanticError() {}
+
+func (e *InvalidStorageIndexingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidStorageIndexingError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidIndexingError
+
+type InvalidIndexingError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidIndexingError) Error() string {
+	return "invalid index: expected expression"
+}
+
+func (*InvalidIndexingError) isSemanticError() {}
+
+func (e *InvalidIndexingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidIndexingError) EndPosition() ast.Position {
+	return e.EndPos
+}

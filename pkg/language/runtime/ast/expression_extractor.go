@@ -451,9 +451,9 @@ func (extractor *ExpressionExtractor) ExtractIndex(expression *IndexExpression) 
 
 	// rewrite the sub-expression
 
-	result := extractor.Extract(newExpression.Expression)
+	result := extractor.Extract(newExpression.TargetExpression)
 
-	newExpression.Expression = result.RewrittenExpression
+	newExpression.TargetExpression = result.RewrittenExpression
 
 	return ExpressionExtraction{
 		RewrittenExpression:  &newExpression,

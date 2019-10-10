@@ -434,13 +434,13 @@ func TestParseIndexExpression(t *testing.T) {
 			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &IndexExpression{
-			Expression: &IdentifierExpression{
+			TargetExpression: &IdentifierExpression{
 				Identifier: Identifier{
 					Identifier: "b",
 					Pos:        Position{Offset: 14, Line: 2, Column: 13},
 				},
 			},
-			Index: &IntExpression{
+			IndexingExpression: &IntExpression{
 				Value:    big.NewInt(1),
 				StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
@@ -1469,8 +1469,8 @@ func TestParseAccessAssignment(t *testing.T) {
 					&AssignmentStatement{
 						Target: &MemberExpression{
 							Expression: &IndexExpression{
-								Expression: &IndexExpression{
-									Expression: &MemberExpression{
+								TargetExpression: &IndexExpression{
+									TargetExpression: &MemberExpression{
 										Expression: &MemberExpression{
 											Expression: &IdentifierExpression{
 												Identifier: Identifier{
@@ -1488,7 +1488,7 @@ func TestParseAccessAssignment(t *testing.T) {
 											Pos:        Position{Offset: 37, Line: 3, Column: 18},
 										},
 									},
-									Index: &IntExpression{
+									IndexingExpression: &IntExpression{
 										Value:    big.NewInt(0),
 										StartPos: Position{Offset: 41, Line: 3, Column: 22},
 										EndPos:   Position{Offset: 41, Line: 3, Column: 22},
@@ -1496,7 +1496,7 @@ func TestParseAccessAssignment(t *testing.T) {
 									StartPos: Position{Offset: 40, Line: 3, Column: 21},
 									EndPos:   Position{Offset: 42, Line: 3, Column: 23},
 								},
-								Index: &IntExpression{
+								IndexingExpression: &IntExpression{
 									Value:    big.NewInt(1),
 									StartPos: Position{Offset: 44, Line: 3, Column: 25},
 									EndPos:   Position{Offset: 44, Line: 3, Column: 25},
@@ -1563,8 +1563,8 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 					&ExpressionStatement{
 						Expression: &MemberExpression{
 							Expression: &IndexExpression{
-								Expression: &IndexExpression{
-									Expression: &MemberExpression{
+								TargetExpression: &IndexExpression{
+									TargetExpression: &MemberExpression{
 										Expression: &MemberExpression{
 											Expression: &IdentifierExpression{
 												Identifier: Identifier{
@@ -1582,7 +1582,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 											Pos:        Position{Offset: 25, Line: 2, Column: 24},
 										},
 									},
-									Index: &IntExpression{
+									IndexingExpression: &IntExpression{
 										Value:    big.NewInt(0),
 										StartPos: Position{Offset: 29, Line: 2, Column: 28},
 										EndPos:   Position{Offset: 29, Line: 2, Column: 28},
@@ -1590,7 +1590,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 									StartPos: Position{Offset: 28, Line: 2, Column: 27},
 									EndPos:   Position{Offset: 30, Line: 2, Column: 29},
 								},
-								Index: &IntExpression{
+								IndexingExpression: &IntExpression{
 									Value:    big.NewInt(1),
 									StartPos: Position{Offset: 32, Line: 2, Column: 31},
 									EndPos:   Position{Offset: 32, Line: 2, Column: 31},

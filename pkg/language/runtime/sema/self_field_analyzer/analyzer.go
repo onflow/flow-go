@@ -250,8 +250,10 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitMemberExpression(node *ast.Mem
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitIndexExpression(node *ast.IndexExpression) ast.Repr {
-	analyzer.visitNode(node.Expression)
-	analyzer.visitNode(node.Index)
+	analyzer.visitNode(node.TargetExpression)
+	if node.IndexingExpression != nil {
+		analyzer.visitNode(node.IndexingExpression)
+	}
 
 	return analyzer.assignments
 }
