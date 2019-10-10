@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 
@@ -4171,10 +4172,10 @@ func TestParseResource(t *testing.T) {
 func TestParseEvent(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-      event Transfer(to: Address, from: Address)
+        event Transfer(to: Address, from: Address)
 	`)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	transfer := &EventDeclaration{
 		Identifier: Identifier{
@@ -4234,15 +4235,54 @@ func TestParseEvent(t *testing.T) {
 
 func TestParseEventEmitStatement(t *testing.T) {
 
-	_, _, err := parser.ParseProgram(`
+	actual, _, err := parser.ParseProgram(`
       fun test() {
         emit Transfer(to: 1, from: 2)
       }
 	`)
 
-	// TODO: improve test case
+	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
 
-	assert.Nil(t, err)
+	expectedStatements := []Statement{
+		&EmitStatement{
+			InvocationExpression: &InvocationExpression{
+				InvokedExpression: &IdentifierExpression{
+					Identifier: Identifier{
+						Identifier: "Transfer",
+						Pos:        Position{Offset: 33, Line: 3, Column: 13},
+					},
+				},
+				Arguments: Arguments{
+					{
+						Label:         "to",
+						LabelStartPos: &Position{Offset: 42, Line: 3, Column: 22},
+						LabelEndPos:   &Position{Offset: 43, Line: 3, Column: 23},
+						Expression: &IntExpression{
+							Value:    big.NewInt(1),
+							StartPos: Position{Offset: 46, Line: 3, Column: 26},
+							EndPos:   Position{Offset: 46, Line: 3, Column: 26},
+						},
+					},
+					{
+						Label:         "from",
+						LabelStartPos: &Position{Offset: 49, Line: 3, Column: 29},
+						LabelEndPos:   &Position{Offset: 52, Line: 3, Column: 32},
+						Expression: &IntExpression{
+							Value:    big.NewInt(2),
+							StartPos: Position{Offset: 55, Line: 3, Column: 35},
+							EndPos:   Position{Offset: 55, Line: 3, Column: 35},
+						},
+					},
+				},
+				EndPos: Position{Offset: 56, Line: 3, Column: 36},
+			},
+			StartPos: Position{Offset: 28, Line: 3, Column: 8},
+		},
+	}
+
+	require.Nil(t, err)
+
+	assert.Equal(t, expectedStatements, actualStatements)
 }
 
 func TestParseMoveReturnType(t *testing.T) {
