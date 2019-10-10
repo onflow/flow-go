@@ -1669,6 +1669,10 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		})
 }
 
+func (interpreter *Interpreter) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	panic(errors.UnreachableError{})
+}
+
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
