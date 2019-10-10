@@ -6,3 +6,9 @@ type Event struct {
 	// names, values are the parameter values and must be primitive types.
 	Values map[string]interface{}
 }
+
+type EventQuery struct {
+	ID         string
+	StartBlock uint64
+	EndBlock   uint64
+}

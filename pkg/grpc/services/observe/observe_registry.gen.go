@@ -135,6 +135,25 @@ func (ossr *ObserveServiceServerRegistry) CallScript(ctx context.Context, payloa
 	return respByte, respErr
 }
 
+func (ossr *ObserveServiceServerRegistry) GetEvents(ctx context.Context, payloadByte []byte) ([]byte, error) {
+	// Unmarshaling payload
+	payload := &GetEventsRequest{}
+	err := proto.Unmarshal(payloadByte, payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal payload: %v", err)
+	}
+
+	resp, respErr := ossr.oss.GetEvents(ctx, payload)
+
+	// Marshaling response
+	respByte, err := proto.Marshal(resp)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal response: %v", err)
+	}
+
+	return respByte, respErr
+}
+
 func (ossr *ObserveServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
 	return map[string]gnode.HandleFunc{
 		"Ping":            ossr.Ping,
@@ -143,5 +162,6 @@ func (ossr *ObserveServiceServerRegistry) MessageTypes() map[string]gnode.Handle
 		"GetTransaction":  ossr.GetTransaction,
 		"GetAccount":      ossr.GetAccount,
 		"CallScript":      ossr.CallScript,
+		"GetEvents":       ossr.GetEvents,
 	}
 }
