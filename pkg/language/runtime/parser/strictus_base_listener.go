@@ -110,6 +110,12 @@ func (s *BaseStrictusListener) EnterFunctionDeclaration(ctx *FunctionDeclaration
 // ExitFunctionDeclaration is called when production functionDeclaration is exited.
 func (s *BaseStrictusListener) ExitFunctionDeclaration(ctx *FunctionDeclarationContext) {}
 
+// EnterEventDeclaration is called when production eventDeclaration is entered.
+func (s *BaseStrictusListener) EnterEventDeclaration(ctx *EventDeclarationContext) {}
+
+// ExitEventDeclaration is called when production eventDeclaration is exited.
+func (s *BaseStrictusListener) ExitEventDeclaration(ctx *EventDeclarationContext) {}
+
 // EnterParameterList is called when production parameterList is entered.
 func (s *BaseStrictusListener) EnterParameterList(ctx *ParameterListContext) {}
 

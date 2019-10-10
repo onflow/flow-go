@@ -67,6 +67,10 @@ func (v *BaseStrictusVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationC
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
 	return v.VisitChildren(ctx)
 }

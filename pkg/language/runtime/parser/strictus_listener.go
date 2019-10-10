@@ -52,6 +52,9 @@ type StrictusListener interface {
 	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
 
+	// EnterEventDeclaration is called when entering the eventDeclaration production.
+	EnterEventDeclaration(c *EventDeclarationContext)
+
 	// EnterParameterList is called when entering the parameterList production.
 	EnterParameterList(c *ParameterListContext)
 
@@ -315,6 +318,9 @@ type StrictusListener interface {
 
 	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)
+
+	// ExitEventDeclaration is called when exiting the eventDeclaration production.
+	ExitEventDeclaration(c *EventDeclarationContext)
 
 	// ExitParameterList is called when exiting the parameterList production.
 	ExitParameterList(c *ParameterListContext)

@@ -56,6 +56,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#eventDeclaration.
+	VisitEventDeclaration(ctx *EventDeclarationContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#parameterList.
 	VisitParameterList(ctx *ParameterListContext) interface{}
 
