@@ -4,7 +4,6 @@ package flow.services.observe;
 
 option go_package = "observe";
 
-import "google/protobuf/timestamp.proto";
 import "shared/messages.proto";
 
 // ObserveService is the user-facing API provided by access nodes.
@@ -13,10 +12,6 @@ service ObserveService {
 
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
-  // GetBlockByHash gets a block by hash.
-  rpc GetBlockByHash(GetBlockByHashRequest) returns (GetBlockByHashResponse);
-  // GetBlockByNumber gets a block by number.
-  rpc GetBlockByNumber(GetBlockByNumberRequest) returns (GetBlockByNumberResponse);
   // GetLatestBlock gets the latest sealed block.
   rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
   // GetTransactions gets a transaction by hash.
@@ -42,41 +37,12 @@ message SendTransactionResponse {
   bytes hash = 1;
 }
 
-message Block {
-  enum Status {
-    STATUS_PENDING = 0;
-    STATUS_SEALED = 1;
-  }
-  bytes hash = 1;
-  uint64 number = 2;
-  bytes prev_block_hash = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  repeated bytes transaction_hashes = 5;
-  Status status = 6;
-}
-
-message GetBlockByHashRequest {
-  bytes hash = 1;
-}
-
-message GetBlockByHashResponse {
-  Block block = 1;
-}
-
-message GetBlockByNumberRequest {
-  uint64 number = 1;
-}
-
-message GetBlockByNumberResponse {
-  Block block = 1;
-}
-
 message GetLatestBlockRequest {
   bool is_sealed = 1;
 }
 
 message GetLatestBlockResponse {
-  Block block = 1;
+  flow.shared.messages.BlockHeader block = 1;
 }
 
 message GetTransactionRequest {

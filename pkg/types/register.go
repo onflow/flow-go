@@ -8,7 +8,11 @@ type Registers map[string][]byte
 // MergeWith inserts all key/value pairs from another register set into this one.
 func (r Registers) MergeWith(registers Registers) {
 	for key, value := range registers {
-		r[key] = value
+		if registers[key] == nil {
+			delete(r, key)
+		} else {
+			r[key] = value
+		}
 	}
 }
 
@@ -36,18 +40,27 @@ func (r *RegistersView) UpdatedRegisters() Registers {
 
 // Get gets a register from this view.
 func (r *RegistersView) Get(key string) (value []byte, exists bool) {
-	value, exists = r.new[key]
-	if exists {
-		return value, exists
+	value = r.new[key]
+	if value != nil {
+		return value, true
 	}
 
-	value, exists = r.old[key]
-	return value, exists
+	value = r.old[key]
+	if value == nil {
+		return nil, false
+	}
+
+	return value, true
 }
 
 // Set sets a register in this view.
 func (r *RegistersView) Set(key string, value []byte) {
 	r.new[key] = value
+}
+
+// Delete deletes a register in this view.
+func (r *RegistersView) Delete(key string) {
+	r.new[key] = nil
 }
 
 type IntermediateRegisters struct {
