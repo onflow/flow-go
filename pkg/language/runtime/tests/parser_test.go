@@ -4171,7 +4171,7 @@ func TestParseResource(t *testing.T) {
 func TestParseEvent(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        event Transfer(to: Address, from: Address)
+      event Transfer(to: Address, from: Address)
 	`)
 
 	assert.Nil(t, err)
@@ -4235,9 +4235,9 @@ func TestParseEvent(t *testing.T) {
 func TestParseEventEmitStatement(t *testing.T) {
 
 	_, _, err := parser.ParseProgram(`
-		fun test() {
-        	emit Transfer(to: 1, from: 2)
-		}
+      fun test() {
+        emit Transfer(to: 1, from: 2)
+      }
 	`)
 
 	// TODO: improve test case
