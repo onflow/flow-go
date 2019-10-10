@@ -56,6 +56,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#eventDeclaration.
+	VisitEventDeclaration(ctx *EventDeclarationContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#parameterList.
 	VisitParameterList(ctx *ParameterListContext) interface{}
 
@@ -124,6 +127,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#whileStatement.
 	VisitWhileStatement(ctx *WhileStatementContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#emitStatement.
+	VisitEmitStatement(ctx *EmitStatementContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#variableDeclaration.
 	VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{}

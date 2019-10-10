@@ -125,6 +125,27 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitWhileStatement(s)
 }
 
+// EmitStatement
+
+type EmitStatement struct {
+	InvocationExpression *InvocationExpression
+	StartPos             Position
+}
+
+func (s *EmitStatement) StartPosition() Position {
+	return s.StartPos
+}
+
+func (s *EmitStatement) EndPosition() Position {
+	return s.InvocationExpression.EndPosition()
+}
+
+func (*EmitStatement) isStatement() {}
+
+func (s *EmitStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitEmitStatement(s)
+}
+
 // AssignmentStatement
 
 type AssignmentStatement struct {
