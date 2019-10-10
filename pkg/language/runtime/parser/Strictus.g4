@@ -65,6 +65,7 @@ declaration
     | functionDeclaration[true]
     | variableDeclaration
     | importDeclaration
+    | eventDeclaration
     ;
 
 importDeclaration
@@ -114,7 +115,6 @@ compositeKind
     : Struct
     | Resource
     | Contract
-    | Event
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -130,6 +130,10 @@ functionDeclaration[bool functionBlockRequired]
     : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+    ;
+
+eventDeclaration
+    : Event identifier parameterList
     ;
 
 parameterList
@@ -499,11 +503,12 @@ Transaction : 'transaction' ;
 Struct : 'struct' ;
 Resource : 'resource' ;
 Contract : 'contract' ;
-Event : 'event' ;
 
 Interface : 'interface' ;
 
 Fun : 'fun' ;
+
+Event : 'event' ;
 
 Pre : 'pre' ;
 Post : 'post' ;
