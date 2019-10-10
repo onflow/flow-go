@@ -87,7 +87,7 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, state.Int64(), int64(5))
+	assert.Equal(t, int64(5), state.Int64())
 }
 
 func TestRuntimeImport(t *testing.T) {
@@ -124,10 +124,8 @@ func TestRuntimeImport(t *testing.T) {
 	}
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface)
-
 	assert.Nil(t, err)
-
-	assert.Equal(t, value, big.NewInt(42))
+	assert.Equal(t, big.NewInt(42), value)
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
@@ -147,7 +145,6 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
-
 	assert.Error(t, err)
 }
 
@@ -182,10 +179,8 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	value, err := runtime.ExecuteScript(script, runtimeInterface)
 
 	assert.Nil(t, err)
-
-	assert.Equal(t, value, big.NewInt(42))
-
-	assert.Equal(t, loggedMessage, `"2a00000000000000000000000000000000000000"`)
+	assert.Equal(t, big.NewInt(42), value)
+	assert.Equal(t, `"2a00000000000000000000000000000000000000"`, loggedMessage)
 }
 
 func TestRuntimeStorage(t *testing.T) {
@@ -194,16 +189,16 @@ func TestRuntimeStorage(t *testing.T) {
 
 	script := []byte(`
        fun main(account: Account) {
-           log(account.storage["nothing"])
+           log(account.storage[Int])
 
-           account.storage["answer"] = 42
-           log(account.storage["answer"])
+           account.storage[Int] = 42
+           log(account.storage[Int])
 
-           account.storage["123"] = [1, 2, 3]
-           log(account.storage["123"])
+           account.storage[[Int]] = [1, 2, 3]
+           log(account.storage[[Int]])
 
-           account.storage["xyz"] = "xyz"
-           log(account.storage["xyz"])
+           account.storage[String] = "xyz"
+           log(account.storage[String])
        }
 	`)
 
@@ -225,10 +220,10 @@ func TestRuntimeStorage(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
-
-	assert.Nil(t, err)
-
-	assert.Equal(t, loggedMessages, []string{"nil", "42", "[1, 2, 3]", `"xyz"`})
+	if !assert.Nil(t, err) {
+		println(err.Error())
+	}
+	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
 
 func TestRuntimeStorageMultipleTransactions(t *testing.T) {
@@ -237,8 +232,8 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 
 	script := []byte(`
        fun main(account: Account) {
-           log(account.storage["x"])
-           account.storage["x"] = ["A", "B"]
+           log(account.storage[[String]])
+           account.storage[[String]] = ["A", "B"]
        }
 	`)
 
@@ -262,14 +257,12 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
-
 	assert.Nil(t, err)
 
 	_, err = runtime.ExecuteScript(script, runtimeInterface)
-
 	assert.Nil(t, err)
 
-	assert.Equal(t, loggedMessages, []string{"nil", `["A", "B"]`})
+	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
 }
 
 // test function call of stored structure declared in an imported program
@@ -290,9 +283,9 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	   import "deep-thought"
 
        fun main(account: Account) {
-           account.storage["x"] = DeepThought()
+           account.storage[DeepThought] = DeepThought()
 
-           log(account.storage["x"])
+           log(account.storage[DeepThought])
        }
 	`)
 
@@ -300,13 +293,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	   import "deep-thought"
 
        fun main(account: Account): Int {
-           log(account.storage["x"])
+           log(account.storage[DeepThought])
 
-           let stored = account.storage["x"]
+           let computer = account.storage[DeepThought]
                ?? panic("missing computer")
-
-           let computer = (stored as? DeepThought)
-               ?? panic("not a computer")
 
            return computer.answer()
        }
@@ -340,14 +330,11 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script1, runtimeInterface)
-
 	assert.Nil(t, err)
 
 	answer, err := runtime.ExecuteScript(script2, runtimeInterface)
-
 	assert.Nil(t, err)
-
-	assert.Equal(t, answer, big.NewInt(42))
+	assert.Equal(t, big.NewInt(42), answer)
 }
 
 func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
@@ -356,14 +343,13 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 
 	script1 := []byte(`
 	  fun main(account: Account) {
-	      account.storage["count"] = 42
+	      account.storage[Int] = 42
 	  }
 	`)
 
 	script2 := []byte(`
 	  fun main(account: Account): Int {
-	      let count = account.storage["count"] ?? panic("stored value is nil")
-	      return (count as? Int) ?? panic("not an Int")
+	      return account.storage[Int] ?? panic("stored value is nil")
 	  }
 	`)
 
@@ -387,10 +373,9 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script1, runtimeInterface)
-
 	assert.Nil(t, err)
 
 	result, err := runtime.ExecuteScript(script2, runtimeInterface)
-	assert.Equal(t, result, big.NewInt(42))
+	assert.Equal(t, big.NewInt(42), result)
 	assert.Nil(t, err)
 }
