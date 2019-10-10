@@ -24,7 +24,6 @@ const (
 	DeclarationKindStructureInterface
 	DeclarationKindResourceInterface
 	DeclarationKindContractInterface
-	DeclarationKindEventInterface
 	DeclarationKindImport
 	DeclarationKindSelf
 	DeclarationKindResult
@@ -64,8 +63,6 @@ func (k DeclarationKind) Name() string {
 		return "resource interface"
 	case DeclarationKindContractInterface:
 		return "contract interface"
-	case DeclarationKindEventInterface:
-		return "event interface"
 	case DeclarationKindImport:
 		return "import"
 	case DeclarationKindSelf:

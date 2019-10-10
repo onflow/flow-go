@@ -66,4 +66,5 @@ type Visitor interface {
 	VisitInitializerDeclaration(*InitializerDeclaration) Repr
 	VisitCondition(*Condition) Repr
 	VisitImportDeclaration(*ImportDeclaration) Repr
+	VisitEventDeclaration(*EventDeclaration) Repr
 }
