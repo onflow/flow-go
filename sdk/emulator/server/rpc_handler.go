@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
@@ -63,7 +64,7 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		"blockNum":  block.Number,
 		"blockHash": block.Hash().Hex(),
 		"blockSize": len(block.TransactionHashes),
-	}).Infof("️⛏  Block #%d mined", block.Number)
+	}).Infof("⛏  Block #%d mined", block.Number)
 
 	response := &observe.SendTransactionResponse{
 		Hash: tx.Hash(),
@@ -170,4 +171,26 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 	}
 
 	return response, nil
+}
+
+// GetEvents supports querying events
+func (s *EmulatorServer) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
+	// TODO: Retrieve events matching query from an index in the EmulatorServer
+	mockEvent := types.Event{
+		ID: "Transfer",
+		Values: map[string]interface{}{
+			"to":   types.ZeroAddress(),
+			"from": types.ZeroAddress(),
+			"id":   1,
+		},
+	}
+	events := []*types.Event{&mockEvent}
+
+	var buf bytes.Buffer
+	json.NewEncoder(&buf).Encode(events)
+	res := observe.GetEventsResponse{
+		EventsJson: buf.Bytes(),
+	}
+
+	return &res, nil
 }
