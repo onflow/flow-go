@@ -4171,25 +4171,62 @@ func TestParseResource(t *testing.T) {
 func TestParseEvent(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        event Test {}
+        event Transfer(to: Address, from: Address)
 	`)
 
 	assert.Nil(t, err)
 
-	test := &CompositeDeclaration{
-		CompositeKind: common.CompositeKindEvent,
+	transfer := &EventDeclaration{
 		Identifier: Identifier{
-			Identifier: "Test",
+			Identifier: "Transfer",
 			Pos:        Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Conformances: []*NominalType{},
-		Members:      &Members{},
-		StartPos:     Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:       Position{Offset: 21, Line: 2, Column: 20},
+		Parameters: Parameters{
+			{
+				Label: "",
+				Identifier: Identifier{
+					Identifier: "to",
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "Address",
+							Pos:        Position{Offset: 28, Line: 2, Column: 27},
+						},
+					},
+					StartPos: Position{Offset: 28, Line: 2, Column: 27},
+				},
+				StartPos: Position{Offset: 24, Line: 2, Column: 23},
+				EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+			},
+			{
+				Label: "",
+				Identifier: Identifier{
+					Identifier: "from",
+					Pos:        Position{Offset: 37, Line: 2, Column: 36},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "Address",
+							Pos:        Position{Offset: 43, Line: 2, Column: 42},
+						},
+					},
+					StartPos: Position{Offset: 43, Line: 2, Column: 42},
+				},
+				StartPos: Position{Offset: 37, Line: 2, Column: 36},
+				EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 	}
 
 	expected := &Program{
-		Declarations: []Declaration{test},
+		Declarations: []Declaration{transfer},
 	}
 
 	assert.Equal(t, expected, actual)
