@@ -187,7 +187,10 @@ func (s *EmulatorServer) GetEvents(ctx context.Context, req *observe.GetEventsRe
 	events := []*types.Event{&mockEvent}
 
 	var buf bytes.Buffer
-	json.NewEncoder(&buf).Encode(events)
+	err := json.NewEncoder(&buf).Encode(events)
+	if err != nil {
+		return nil, err
+	}
 	res := observe.GetEventsResponse{
 		EventsJson: buf.Bytes(),
 	}
