@@ -190,6 +190,22 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 	}
 }
 
+func (v *ProgramVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	invocation.InvokedExpression =
+		&ast.IdentifierExpression{
+			Identifier: identifier,
+		}
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.EmitStatement{
+		InvocationExpression: invocation,
+		StartPos:             startPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)

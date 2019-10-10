@@ -254,6 +254,12 @@ func (s *BaseStrictusListener) EnterWhileStatement(ctx *WhileStatementContext) {
 // ExitWhileStatement is called when production whileStatement is exited.
 func (s *BaseStrictusListener) ExitWhileStatement(ctx *WhileStatementContext) {}
 
+// EnterEmitStatement is called when production emitStatement is entered.
+func (s *BaseStrictusListener) EnterEmitStatement(ctx *EmitStatementContext) {}
+
+// ExitEmitStatement is called when production emitStatement is exited.
+func (s *BaseStrictusListener) ExitEmitStatement(ctx *EmitStatementContext) {}
+
 // EnterVariableDeclaration is called when production variableDeclaration is entered.
 func (s *BaseStrictusListener) EnterVariableDeclaration(ctx *VariableDeclarationContext) {}
 

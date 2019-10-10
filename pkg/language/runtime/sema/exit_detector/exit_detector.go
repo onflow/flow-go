@@ -172,6 +172,10 @@ func (detector *ExitDetector) VisitEventDeclaration(*ast.EventDeclaration) ast.R
 	return false
 }
 
+func (detector *ExitDetector) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	return false
+}
+
 func (detector *ExitDetector) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
 	return false
 }

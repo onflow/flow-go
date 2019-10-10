@@ -193,6 +193,10 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitEventDeclaration(*ast.EventDec
 	return analyzer.assignments
 }
 
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	return analyzer.assignments
+}
+
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
 	return analyzer.assignments
 }

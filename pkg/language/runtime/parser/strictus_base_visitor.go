@@ -163,6 +163,10 @@ func (v *BaseStrictusVisitor) VisitWhileStatement(ctx *WhileStatementContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

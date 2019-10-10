@@ -4232,6 +4232,17 @@ func TestParseEvent(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestParseEventEmitStatement(t *testing.T) {
+
+	_, _, err := parser.ParseProgram(`
+		fun test() {
+        	emit Transfer(to: 1, from: 2)
+		}
+	`)
+
+	assert.Nil(t, err)
+}
+
 func TestParseMoveReturnType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
