@@ -6,5 +6,6 @@ import (
 )
 
 func (checker *Checker) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	// TODO: implement events
 	panic(errors.UnreachableError{})
 }
