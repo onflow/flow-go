@@ -17,7 +17,10 @@ func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.Int8Type{})
+	assert.Equal(t,
+		&sema.Int8Type{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
@@ -28,7 +31,10 @@ func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testi
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.OptionalType{Type: &sema.Int8Type{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.Int8Type{}},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
@@ -42,7 +48,10 @@ func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.Int8Type{})
+	assert.Equal(t,
+		&sema.Int8Type{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {

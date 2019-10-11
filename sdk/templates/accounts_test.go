@@ -1,4 +1,4 @@
-package accounts_test
+package templates_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/accounts"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 func TestCreateAccount(t *testing.T) {
@@ -21,7 +21,7 @@ func TestCreateAccount(t *testing.T) {
 	}
 
 	// create account with no code
-	scriptA := accounts.CreateAccount([]types.AccountKey{accountKey}, []byte{})
+	scriptA := templates.CreateAccount([]types.AccountKey{accountKey}, []byte{})
 
 	Expect(scriptA).To(Equal([]byte(`
 		fun main() {
@@ -33,7 +33,7 @@ func TestCreateAccount(t *testing.T) {
 	`)))
 
 	// create account with code
-	scriptB := accounts.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
+	scriptB := templates.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
 
 	Expect(scriptB).To(Equal([]byte(`
 		fun main() {
@@ -48,7 +48,7 @@ func TestCreateAccount(t *testing.T) {
 func TestUpdateAccountCode(t *testing.T) {
 	RegisterTestingT(t)
 
-	script := accounts.UpdateAccountCode([]byte("fun main() {}"))
+	script := templates.UpdateAccountCode([]byte("fun main() {}"))
 
 	Expect(script).To(Equal([]byte(`
 		fun main(account: Account) {

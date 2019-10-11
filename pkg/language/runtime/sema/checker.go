@@ -592,3 +592,48 @@ func (checker *Checker) checkWithResources(
 
 	return check()
 }
+
+func (checker *Checker) checkNonIdentifierResourceLoss(expressionType Type, expression ast.Expression) {
+	if !expressionType.IsResourceType() {
+		return
+	}
+
+	if _, isIdentifier := expression.(*ast.IdentifierExpression); isIdentifier {
+		return
+	}
+
+	checker.report(
+		&ResourceLossError{
+			StartPos: expression.StartPosition(),
+			EndPos:   expression.EndPosition(),
+		},
+	)
+}
+
+// checkResourceFieldNesting checks if any resource fields are nested
+// in non resource composites (concrete or interface)
+//
+func (checker *Checker) checkResourceFieldNesting(
+	fields map[string]*ast.FieldDeclaration,
+	members map[string]*Member,
+	compositeKind common.CompositeKind,
+) {
+	if compositeKind == common.CompositeKindResource {
+		return
+	}
+
+	for name, member := range members {
+		if !member.Type.IsResourceType() {
+			continue
+		}
+
+		field := fields[name]
+
+		checker.report(
+			&InvalidResourceFieldError{
+				Name: name,
+				Pos:  field.Identifier.Pos,
+			},
+		)
+	}
+}

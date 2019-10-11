@@ -15,5 +15,8 @@ func TestCheckBoolean(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.BoolType{})
+	assert.Equal(t,
+		&sema.BoolType{},
+		checker.GlobalValues["x"].Type,
+	)
 }

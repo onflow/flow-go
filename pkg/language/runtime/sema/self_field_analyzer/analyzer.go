@@ -189,6 +189,14 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitImportDeclaration(*ast.ImportD
 	return analyzer.assignments
 }
 
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	return analyzer.assignments
+}
+
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	return analyzer.assignments
+}
+
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
 	return analyzer.assignments
 }
@@ -242,8 +250,10 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitMemberExpression(node *ast.Mem
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitIndexExpression(node *ast.IndexExpression) ast.Repr {
-	analyzer.visitNode(node.Expression)
-	analyzer.visitNode(node.Index)
+	analyzer.visitNode(node.TargetExpression)
+	if node.IndexingExpression != nil {
+		analyzer.visitNode(node.IndexingExpression)
+	}
 
 	return analyzer.assignments
 }

@@ -1,6 +1,8 @@
 package sema
 
-import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+)
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	identifier := expression.Identifier
@@ -10,22 +12,53 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		resourceInfo := checker.resources.Get(variable)
-
-		if resourceInfo.Invalidations.Size() > 0 {
-			checker.report(
-				&ResourceUseAfterInvalidationError{
-					Name:          expression.Identifier.Identifier,
-					Pos:           expression.Identifier.Pos,
-					Invalidations: resourceInfo.Invalidations.All(),
-				},
-			)
-		}
-
+		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
+		checker.checkResourceVariableUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
 	return variable.Type
+}
+
+// checkResourceVariableCapturingInFunction checks if a resource variable is captured in a function
+//
+func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Variable, useIdentifier ast.Identifier) {
+	currentFunctionDepth := -1
+	currentFunctionActivation := checker.functionActivations.Current()
+	if currentFunctionActivation != nil {
+		currentFunctionDepth = currentFunctionActivation.ValueActivationDepth
+	}
+
+	if currentFunctionDepth == -1 ||
+		variable.Depth > currentFunctionDepth {
+
+		return
+	}
+
+	checker.report(
+		&ResourceCapturingError{
+			Name: useIdentifier.Identifier,
+			Pos:  useIdentifier.Pos,
+		},
+	)
+}
+
+// checkResourceVariableUseAfterInvalidation checks if a resource variable
+// is used after it was previously invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Variable, useIdentifier ast.Identifier) {
+	resourceInfo := checker.resources.Get(variable)
+	if resourceInfo.Invalidations.Size() == 0 {
+		return
+	}
+
+	checker.report(
+		&ResourceUseAfterInvalidationError{
+			Name:          useIdentifier.Identifier,
+			Pos:           useIdentifier.Pos,
+			Invalidations: resourceInfo.Invalidations.All(),
+		},
+	)
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
@@ -65,7 +98,7 @@ func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) 
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression.Expression, expression.Index, false)
+	return checker.visitIndexingExpression(expression, false)
 }
 
 // visitIndexingExpression checks if the indexed expression is indexable,
@@ -73,13 +106,12 @@ func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) as
 // and returns the expected element type
 //
 func (checker *Checker) visitIndexingExpression(
-	indexedExpression ast.Expression,
-	indexingExpression ast.Expression,
+	indexExpression *ast.IndexExpression,
 	isAssignment bool,
 ) Type {
 
-	indexedType := indexedExpression.Accept(checker).(Type)
-	indexingType := indexingExpression.Accept(checker).(Type)
+	targetExpression := indexExpression.TargetExpression
+	indexedType := targetExpression.Accept(checker).(Type)
 
 	// NOTE: check indexed type first for UX reasons
 
@@ -90,10 +122,72 @@ func (checker *Checker) visitIndexingExpression(
 		return &InvalidType{}
 	}
 
-	elementType := IndexableElementType(indexedType, isAssignment)
-	if elementType == nil {
-		elementType = &InvalidType{}
+	_, isStorage := indexedType.(*StorageType)
+	if isStorage {
 
+		indexingType := indexExpression.IndexingType
+
+		// indexing into storage using expression?
+		if indexExpression.IndexingExpression != nil {
+
+			// Identifier expressions are valid, as the parser can't differentiate
+			// between identifier expressions and nominal types.
+
+			identifierExpression, isIdentifier := indexExpression.IndexingExpression.(*ast.IdentifierExpression)
+
+			if isIdentifier {
+				indexingType = &ast.NominalType{
+					Identifier: identifierExpression.Identifier,
+				}
+			} else {
+				checker.report(
+					&InvalidStorageIndexingError{
+						StartPos: indexExpression.IndexingExpression.StartPosition(),
+						EndPos:   indexExpression.IndexingExpression.EndPosition(),
+					},
+				)
+
+				return &InvalidType{}
+			}
+		}
+
+		return checker.visitStorageIndexingExpression(
+			targetExpression,
+			indexingType,
+			isAssignment,
+		)
+	} else {
+		// indexing into non-storage value using type?
+		if indexExpression.IndexingType != nil {
+			checker.report(
+				&InvalidIndexingError{
+					StartPos: indexExpression.IndexingType.StartPosition(),
+					EndPos:   indexExpression.IndexingType.EndPosition(),
+				},
+			)
+
+			return &InvalidType{}
+		}
+
+		return checker.visitNormalIndexingExpression(
+			targetExpression,
+			indexedType,
+			indexExpression.IndexingExpression,
+			isAssignment,
+		)
+	}
+}
+
+func (checker *Checker) visitNormalIndexingExpression(
+	indexedExpression ast.Expression,
+	indexedType Type,
+	indexingExpression ast.Expression,
+	isAssignment bool,
+) Type {
+	indexingType := indexingExpression.Accept(checker).(Type)
+
+	indexableType, isIndexableType := indexedType.(IndexableType)
+	if !isIndexableType {
 		checker.report(
 			&NotIndexableTypeError{
 				Type:     indexedType,
@@ -101,23 +195,46 @@ func (checker *Checker) visitIndexingExpression(
 				EndPos:   indexedExpression.EndPosition(),
 			},
 		)
-	} else {
 
-		// check indexing expression's type can be used to index
-		// into indexed expression's type
-
-		if !IsInvalidType(indexingType) &&
-			!IsIndexingType(indexingType, indexedType) {
-
-			checker.report(
-				&NotIndexingTypeError{
-					Type:     indexingType,
-					StartPos: indexingExpression.StartPosition(),
-					EndPos:   indexingExpression.EndPosition(),
-				},
-			)
-		}
+		return &InvalidType{}
 	}
 
+	elementType := indexableType.ElementType(isAssignment)
+
+	// check indexing expression's type can be used to index
+	// into indexed expression's type
+
+	if !IsInvalidType(indexingType) &&
+		!IsSubType(indexingType, indexableType.IndexingType()) {
+
+		checker.report(
+			&NotIndexingTypeError{
+				Type:     indexingType,
+				StartPos: indexingExpression.StartPosition(),
+				EndPos:   indexingExpression.EndPosition(),
+			},
+		)
+	}
+
+	checker.checkNonIdentifierResourceLoss(indexedType, indexedExpression)
+
 	return elementType
+}
+
+func (checker *Checker) visitStorageIndexingExpression(
+	indexedExpression ast.Expression,
+	indexingType ast.Type,
+	isAssignment bool,
+) Type {
+
+	keyType := checker.ConvertType(indexingType)
+	if IsInvalidType(keyType) {
+		return &InvalidType{}
+	}
+
+	if isAssignment {
+		return keyType
+	} else {
+		return &OptionalType{Type: keyType}
+	}
 }

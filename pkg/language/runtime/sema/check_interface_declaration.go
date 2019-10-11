@@ -49,6 +49,12 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 	)
 
+	checker.checkResourceFieldNesting(
+		declaration.Members.FieldsByIdentifier(),
+		interfaceType.Members,
+		interfaceType.CompositeKind,
+	)
+
 	// TODO: support non-structure interfaces, such as contracts and resources
 
 	if declaration.CompositeKind != common.CompositeKindStructure {
@@ -160,10 +166,6 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	interfaceType.InitializerParameterTypeAnnotations = parameterTypeAnnotations
 
 	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
-
-	// declare value
-
-	checker.declareInterfaceMetaType(declaration, interfaceType)
 }
 
 func (checker *Checker) checkInterfaceFunctionBlock(
@@ -191,24 +193,4 @@ func (checker *Checker) checkInterfaceFunctionBlock(
 			},
 		)
 	}
-}
-
-func (checker *Checker) declareInterfaceMetaType(
-	declaration *ast.InterfaceDeclaration,
-	interfaceType *InterfaceType,
-) {
-	metaType := &InterfaceMetaType{
-		InterfaceType: interfaceType,
-	}
-
-	_, err := checker.valueActivations.Declare(
-		declaration.Identifier.Identifier,
-		metaType,
-		// TODO: check
-		declaration.DeclarationKind(),
-		declaration.Identifier.Pos,
-		true,
-		nil,
-	)
-	checker.report(err)
 }

@@ -36,6 +36,12 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
 
+	checker.checkResourceFieldNesting(
+		declaration.Members.FieldsByIdentifier(),
+		compositeType.Members,
+		compositeType.Kind,
+	)
+
 	// check composite conforms to interfaces.
 	// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
@@ -144,8 +150,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	compositeType.ConstructorParameterTypeAnnotations = parameterTypeAnnotations
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
-
-	// declare constructor
 
 	checker.declareCompositeConstructor(declaration, compositeType, parameterTypeAnnotations)
 }

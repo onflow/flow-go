@@ -110,6 +110,12 @@ func (s *BaseStrictusListener) EnterFunctionDeclaration(ctx *FunctionDeclaration
 // ExitFunctionDeclaration is called when production functionDeclaration is exited.
 func (s *BaseStrictusListener) ExitFunctionDeclaration(ctx *FunctionDeclarationContext) {}
 
+// EnterEventDeclaration is called when production eventDeclaration is entered.
+func (s *BaseStrictusListener) EnterEventDeclaration(ctx *EventDeclarationContext) {}
+
+// ExitEventDeclaration is called when production eventDeclaration is exited.
+func (s *BaseStrictusListener) ExitEventDeclaration(ctx *EventDeclarationContext) {}
+
 // EnterParameterList is called when production parameterList is entered.
 func (s *BaseStrictusListener) EnterParameterList(ctx *ParameterListContext) {}
 
@@ -247,6 +253,12 @@ func (s *BaseStrictusListener) EnterWhileStatement(ctx *WhileStatementContext) {
 
 // ExitWhileStatement is called when production whileStatement is exited.
 func (s *BaseStrictusListener) ExitWhileStatement(ctx *WhileStatementContext) {}
+
+// EnterEmitStatement is called when production emitStatement is entered.
+func (s *BaseStrictusListener) EnterEmitStatement(ctx *EmitStatementContext) {}
+
+// ExitEmitStatement is called when production emitStatement is exited.
+func (s *BaseStrictusListener) ExitEmitStatement(ctx *EmitStatementContext) {}
 
 // EnterVariableDeclaration is called when production variableDeclaration is entered.
 func (s *BaseStrictusListener) EnterVariableDeclaration(ctx *VariableDeclarationContext) {}

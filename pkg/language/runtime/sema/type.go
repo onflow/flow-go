@@ -19,6 +19,15 @@ type Type interface {
 	IsResourceType() bool
 }
 
+// IndexableType
+
+type IndexableType interface {
+	Type
+	isIndexableType()
+	ElementType(isAssignment bool) Type
+	IndexingType() Type
+}
+
 // TypeAnnotation
 
 type TypeAnnotation struct {
@@ -245,6 +254,16 @@ func (t *StringType) GetMember(field string) *Member {
 	default:
 		return nil
 	}
+}
+
+func (t *StringType) isIndexableType() {}
+
+func (t *StringType) ElementType(isAssignment bool) Type {
+	return &CharacterType{}
+}
+
+func (t *StringType) IndexingType() Type {
+	return &IntegerType{}
 }
 
 // Ranged
@@ -542,15 +561,14 @@ func (*UInt64Type) Max() *big.Int {
 // ArrayType
 
 type ArrayType interface {
-	Type
+	IndexableType
 	isArrayType()
-	elementType() Type
 }
 
 func getArrayMember(ty ArrayType, field string) *Member {
 	switch field {
 	case "append":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 		return NewMemberForType(ty, "append", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -576,7 +594,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "insert":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 		return NewMemberForType(ty, "insert", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -592,7 +610,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 	case "remove":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 		return NewMemberForType(ty, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -607,7 +625,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			ArgumentLabels: []string{"at"},
 		})
 	case "removeFirst":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 		return NewMemberForType(ty, "removeFirst", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -618,7 +636,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "removeLast":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 		return NewMemberForType(ty, "removeLast", Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -629,7 +647,7 @@ func getArrayMember(ty ArrayType, field string) *Member {
 			IsInitialized: true,
 		})
 	case "contains":
-		elementType := ty.elementType()
+		elementType := ty.ElementType(false)
 
 		// impossible for array of resources to have
 		// a `contains` function
@@ -668,10 +686,6 @@ type VariableSizedType struct {
 func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
-func (t *VariableSizedType) elementType() Type {
-	return t.Type
-}
-
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type.String())
 }
@@ -693,6 +707,16 @@ func (t *VariableSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
+func (t *VariableSizedType) isIndexableType() {}
+
+func (t *VariableSizedType) ElementType(isAssignment bool) Type {
+	return t.Type
+}
+
+func (t *VariableSizedType) IndexingType() Type {
+	return &IntegerType{}
+}
+
 // ConstantSizedType is a constant sized array type
 type ConstantSizedType struct {
 	Type
@@ -701,10 +725,6 @@ type ConstantSizedType struct {
 
 func (*ConstantSizedType) isType()      {}
 func (*ConstantSizedType) isArrayType() {}
-
-func (t *ConstantSizedType) elementType() Type {
-	return t.Type
-}
 
 func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type.String(), t.Size)
@@ -726,6 +746,16 @@ func (t *ConstantSizedType) GetMember(identifier string) *Member {
 
 func (t *ConstantSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
+}
+
+func (t *ConstantSizedType) isIndexableType() {}
+
+func (t *ConstantSizedType) ElementType(isAssignment bool) Type {
+	return t.Type
+}
+
+func (t *ConstantSizedType) IndexingType() Type {
+	return &IntegerType{}
 }
 
 // InvokableType
@@ -941,31 +971,6 @@ func (t *InterfaceType) IsResourceType() bool {
 	return t.CompositeKind == common.CompositeKindResource
 }
 
-// InterfaceMetaType
-
-type InterfaceMetaType struct {
-	InterfaceType *InterfaceType
-}
-
-func (*InterfaceMetaType) isType() {}
-
-func (t *InterfaceMetaType) String() string {
-	return fmt.Sprintf("%s.Type", t.InterfaceType.Identifier)
-}
-
-func (t *InterfaceMetaType) Equal(other Type) bool {
-	otherInterface, ok := other.(*InterfaceMetaType)
-	if !ok {
-		return false
-	}
-
-	return otherInterface.InterfaceType.Equal(t.InterfaceType)
-}
-
-func (*InterfaceMetaType) IsResourceType() bool {
-	return false
-}
-
 // DictionaryType
 
 type DictionaryType struct {
@@ -1021,6 +1026,47 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 	default:
 		return nil
 	}
+}
+
+func (t *DictionaryType) isIndexableType() {}
+
+func (t *DictionaryType) ElementType(isAssignment bool) Type {
+	valueType := t.ValueType
+	if isAssignment {
+		return valueType
+	} else {
+		return &OptionalType{Type: valueType}
+	}
+}
+
+func (t *DictionaryType) IndexingType() Type {
+	return t.KeyType
+}
+
+type DictionaryEntryType struct {
+	KeyType   Type
+	ValueType Type
+}
+
+// StorageType
+
+type StorageType struct{}
+
+func (h StorageType) isType() {}
+
+func (h StorageType) String() string {
+	return "Storage"
+}
+
+func (h StorageType) Equal(other Type) bool {
+	_, ok := other.(*StorageType)
+	return ok
+}
+
+func (h StorageType) IsResourceType() bool {
+	// NOTE: even though storage may contain resources,
+	//   we define it to not behave like a resource
+	return false
 }
 
 ////
@@ -1091,8 +1137,8 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		return IsSubType(
-			typedSubType.elementType(),
-			typedSuperType.elementType(),
+			typedSubType.ElementType(false),
+			typedSuperType.ElementType(false),
 		)
 
 	case *ConstantSizedType:
@@ -1106,45 +1152,12 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		return IsSubType(
-			typedSubType.elementType(),
-			typedSuperType.elementType(),
+			typedSubType.ElementType(false),
+			typedSuperType.ElementType(false),
 		)
 	}
 
 	// TODO: functions
-
-	return false
-}
-
-func IndexableElementType(indexedType Type, isAssignment bool) Type {
-	switch indexedType := indexedType.(type) {
-	case ArrayType:
-		return indexedType.elementType()
-	case *StringType:
-		return &CharacterType{}
-	case *DictionaryType:
-		valueType := indexedType.ValueType
-		if isAssignment {
-			return valueType
-		} else {
-			return &OptionalType{Type: valueType}
-		}
-	}
-
-	return nil
-}
-
-func IsIndexingType(indexingType Type, indexedType Type) bool {
-	switch indexedType := indexedType.(type) {
-	// arrays and strings can be indexed with integers
-	case ArrayType:
-		return IsSubType(indexingType, &IntegerType{})
-	case *StringType:
-		return IsSubType(indexingType, &IntegerType{})
-	// dictionaries can be indexed with the dictionary type's key type
-	case *DictionaryType:
-		return IsSubType(indexingType, indexedType.KeyType)
-	}
 
 	return false
 }
@@ -1247,6 +1260,4 @@ func init() {
 	gob.Register(&FunctionType{})
 	gob.Register(&CompositeType{})
 	gob.Register(&InterfaceType{})
-	gob.Register(&InterfaceMetaType{})
-	gob.Register(&DictionaryType{})
 }

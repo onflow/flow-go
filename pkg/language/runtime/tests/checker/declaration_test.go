@@ -17,9 +17,15 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.IntType{})
+	assert.Equal(t,
+		&sema.IntType{},
+		checker.GlobalValues["x"].Type,
+	)
 
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.IntType{})
+	assert.Equal(t,
+		&sema.IntType{},
+		checker.GlobalValues["y"].Type,
+	)
 }
 
 func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
@@ -115,12 +121,24 @@ func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "y")
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindVariable)
+	assert.Equal(t,
+		"y",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
+	assert.Equal(t,
+		common.DeclarationKindVariable,
+		errs[0].(*sema.NotDeclaredError).ExpectedKind,
+	)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).Name, "X")
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindType)
+	assert.Equal(t,
+		"X",
+		errs[1].(*sema.NotDeclaredError).Name,
+	)
+	assert.Equal(t,
+		common.DeclarationKindType,
+		errs[1].(*sema.NotDeclaredError).ExpectedKind,
+	)
 }
 
 func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {

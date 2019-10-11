@@ -511,6 +511,9 @@ func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.Functio
 
 		for _, extractedExpression := range extractedExpressions {
 
+			// TODO: update interpreter.Checker.Elaboration
+			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
+
 			beforeStatements = append(beforeStatements,
 				&ast.VariableDeclaration{
 					Identifier: extractedExpression.Identifier,
@@ -748,11 +751,13 @@ func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
-	return target.Expression.Accept(interpreter).(Trampoline).
+	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(IndexableValue)
 
-			return target.Index.Accept(interpreter).(Trampoline).
+			// TODO: handle indexing into storage using target.IndexingType
+
+			return target.IndexingExpression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexingValue := result.(Value)
 					indexedValue.Set(indexingValue, value)
@@ -1069,11 +1074,53 @@ func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpr
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
-	return interpreter.visitExpressions(expression.Values, nil)
+	return interpreter.visitExpressions(expression.Values).
+		FlatMap(func(result interface{}) Trampoline {
+			values := result.(ArrayValue)
+
+			argumentTypes := interpreter.Checker.Elaboration.ArrayExpressionArgumentTypes[expression]
+			elementType := interpreter.Checker.Elaboration.ArrayExpressionElementType[expression]
+
+			copies := make([]Value, len(*values.Values))
+			for i, argument := range *values.Values {
+				argumentType := argumentTypes[i]
+				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
+			}
+
+			return Done{Result: NewArrayValue(copies...)}
+		})
 }
 
 func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.DictionaryExpression) ast.Repr {
-	return interpreter.visitEntries(expression.Entries, DictionaryValue{})
+	return interpreter.visitEntries(expression.Entries).
+		FlatMap(func(result interface{}) Trampoline {
+
+			entryTypes := interpreter.Checker.Elaboration.DictionaryExpressionEntryTypes[expression]
+			dictionaryType := interpreter.Checker.Elaboration.DictionaryExpressionType[expression]
+
+			newDictionary := DictionaryValue{}
+			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
+				entryType := entryTypes[i]
+
+				key := interpreter.copyAndBox(
+					dictionaryEntryValues.Key,
+					entryType.KeyType,
+					dictionaryType.KeyType,
+				)
+
+				value := interpreter.copyAndBox(
+					dictionaryEntryValues.Value,
+					entryType.ValueType,
+					dictionaryType.ValueType,
+				)
+
+				// TODO: panic for duplicate keys?
+
+				newDictionary.Set(key, value)
+			}
+
+			return Done{Result: newDictionary}
+		})
 }
 
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
@@ -1085,11 +1132,13 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 }
 
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return expression.Expression.Accept(interpreter).(Trampoline).
+	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			indexedValue := result.(IndexableValue)
 
-			return expression.Index.Accept(interpreter).(Trampoline).
+			// TODO: handle indexing into storage using target.IndexingType
+
+			return expression.IndexingExpression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					indexingValue := result.(Value)
 					value := indexedValue.Get(indexingValue)
@@ -1123,12 +1172,14 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				argumentExpressions[i] = argument.Expression
 			}
 
-			return interpreter.visitExpressions(argumentExpressions, nil).
+			return interpreter.visitExpressions(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
 					arguments := result.(ArrayValue)
 
-					argumentTypes := interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
-					parameterTypes := interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
+					argumentTypes :=
+						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
+					parameterTypes :=
+						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
 					argumentCopies := make([]Value, len(*arguments.Values))
 					for i, argument := range *arguments.Values {
@@ -1191,52 +1242,66 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	}
 }
 
-func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression, values []Value) Trampoline {
-	count := len(expressions)
+func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
+	var trampoline Trampoline = Done{Result: NewArrayValue()}
 
-	// no expressions? stop
-	if count == 0 {
-		return Done{Result: ArrayValue{Values: &values}}
-	}
+	for _, expression := range expressions {
+		// NOTE: important: rebind expression, because it is captured in the closure below
+		expression := expression
 
-	// interpret the first expression
-	return expressions[0].Accept(interpreter).(Trampoline).
-		FlatMap(func(result interface{}) Trampoline {
-			value := result.(Value)
+		// append the evaluation of this expression
+		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
+			array := result.(ArrayValue)
 
-			// interpret the remaining expressions
-			return interpreter.visitExpressions(expressions[1:], append(values, value))
-		})
-}
+			// evaluate the expression
+			return expression.Accept(interpreter).(Trampoline).
+				FlatMap(func(result interface{}) Trampoline {
+					value := result.(Value)
 
-func (interpreter *Interpreter) visitEntries(entries []ast.Entry, result DictionaryValue) Trampoline {
-	count := len(entries)
-
-	// no entries? stop
-	if count == 0 {
-		return Done{Result: result}
-	}
-
-	entry := entries[0]
-
-	// interpret the key expression
-	return entry.Key.Accept(interpreter).(Trampoline).
-		FlatMap(func(keyResult interface{}) Trampoline {
-			key := keyResult.(Value)
-
-			// interpret the value expression
-			return entry.Value.Accept(interpreter).(Trampoline).
-				FlatMap(func(valueResult interface{}) Trampoline {
-					value := valueResult.(Value)
-
-					// NOTE: not setting using indexing,
-					// as key might need special handling
-					result.Set(key, value)
-
-					// interpret the remaining entries
-					return interpreter.visitEntries(entries[1:], result)
+					newValues := append(*array.Values, value)
+					return Done{Result: NewArrayValue(newValues...)}
 				})
 		})
+	}
+
+	return trampoline
+}
+
+func (interpreter *Interpreter) visitEntries(entries []ast.Entry) Trampoline {
+	var trampoline Trampoline = Done{Result: []DictionaryEntryValues{}}
+
+	for _, entry := range entries {
+		// NOTE: important: rebind entry, because it is captured in the closure below
+		func(entry ast.Entry) {
+			// append the evaluation of this entry
+			trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
+				resultEntries := result.([]DictionaryEntryValues)
+
+				// evaluate the key expression
+				return entry.Key.Accept(interpreter).(Trampoline).
+					FlatMap(func(result interface{}) Trampoline {
+						key := result.(Value)
+
+						// evaluate the value expression
+						return entry.Value.Accept(interpreter).(Trampoline).
+							FlatMap(func(result interface{}) Trampoline {
+								value := result.(Value)
+
+								newResultEntries := append(
+									resultEntries,
+									DictionaryEntryValues{
+										Key:   key,
+										Value: value,
+									},
+								)
+								return Done{Result: newResultEntries}
+							})
+					})
+			})
+		}(entry)
+	}
+
+	return trampoline
 }
 
 func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
@@ -1461,8 +1526,10 @@ func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.Ini
 }
 
 func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
-	result := value.Copy()
-	return interpreter.box(result, valueType, targetType)
+	if valueType == nil || !valueType.IsResourceType() {
+		value = value.Copy()
+	}
+	return interpreter.box(value, valueType, targetType)
 }
 
 // box boxes a value in optionals and any value, if necessary
@@ -1604,6 +1671,16 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				}
 			}
 		})
+}
+
+func (interpreter *Interpreter) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	// TODO: implement events
+	panic(errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	// TODO: implement events
+	panic(errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {

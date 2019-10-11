@@ -20,6 +20,10 @@ type Elaboration struct {
 	BinaryExpressionResultTypes        map[*ast.BinaryExpression]Type
 	BinaryExpressionRightTypes         map[*ast.BinaryExpression]Type
 	MemberExpressionMembers            map[*ast.MemberExpression]*Member
+	ArrayExpressionArgumentTypes       map[*ast.ArrayExpression][]Type
+	ArrayExpressionElementType         map[*ast.ArrayExpression]Type
+	DictionaryExpressionType           map[*ast.DictionaryExpression]*DictionaryType
+	DictionaryExpressionEntryTypes     map[*ast.DictionaryExpression][]DictionaryEntryType
 }
 
 func NewElaboration() *Elaboration {
@@ -41,5 +45,9 @@ func NewElaboration() *Elaboration {
 		BinaryExpressionResultTypes:        map[*ast.BinaryExpression]Type{},
 		BinaryExpressionRightTypes:         map[*ast.BinaryExpression]Type{},
 		MemberExpressionMembers:            map[*ast.MemberExpression]*Member{},
+		ArrayExpressionArgumentTypes:       map[*ast.ArrayExpression][]Type{},
+		ArrayExpressionElementType:         map[*ast.ArrayExpression]Type{},
+		DictionaryExpressionType:           map[*ast.DictionaryExpression]*DictionaryType{},
+		DictionaryExpressionEntryTypes:     map[*ast.DictionaryExpression][]DictionaryEntryType{},
 	}
 }

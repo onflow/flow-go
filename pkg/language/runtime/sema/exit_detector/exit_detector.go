@@ -168,6 +168,14 @@ func (detector *ExitDetector) VisitImportDeclaration(*ast.ImportDeclaration) ast
 	return false
 }
 
+func (detector *ExitDetector) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	return false
+}
+
+func (detector *ExitDetector) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	return false
+}
+
 func (detector *ExitDetector) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
 	return false
 }

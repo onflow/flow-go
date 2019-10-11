@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
+	"github.com/rs/zerolog"
 	"log"
 	"net"
 )
@@ -24,7 +25,7 @@ func main() {
 	// step 2: registering the grpc services if any
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
-	collector := gnode.NewNode(collect.NewCollectServiceServerRegistry(NewCollector()))
+	collector := gnode.NewNode(zerolog.Logger{}, collect.NewCollectServiceServerRegistry(NewCollector()))
 
 	// step 3: passing the listener to the instance of gnode
 	collector.Serve(listener)

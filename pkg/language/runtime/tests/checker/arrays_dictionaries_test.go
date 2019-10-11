@@ -91,7 +91,10 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.OptionalType{Type: &sema.IntType{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.IntType{}},
+		checker.GlobalValues["y"].Type,
+	)
 }
 
 func TestCheckDictionaryIndexingBool(t *testing.T) {
@@ -538,4 +541,74 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t,
+		`
+          let x = ["xyz"][String?]
+	    `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t,
+		`
+          fun test() {
+              let stuff = ["abc"]
+              stuff[String?] = "xyz"
+          }
+	    `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t,
+		`
+          let x = {"a": 1}[String?]
+	    `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t,
+		`
+          fun test() {
+              let stuff = {"a": 1}
+              stuff[String?] = "xyz"
+          }
+	    `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
 }

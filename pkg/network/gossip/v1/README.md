@@ -13,16 +13,17 @@
 
 ## <a name="pkg-index">Index</a>
 * [Constants](#pkg-constants)
+* [Variables](#pkg-variables)
 * [type HandleFunc](#HandleFunc)
 * [type MultiRegistry](#MultiRegistry)
   * [func NewMultiRegistry(registries ...Registry) *MultiRegistry](#NewMultiRegistry)
   * [func (mr *MultiRegistry) MessageTypes() map[string]HandleFunc](#MultiRegistry.MessageTypes)
 * [type Node](#Node)
-  * [func NewNode(msgTypesRegistry Registry) *Node](#NewNode)
+  * [func NewNode(logger zerolog.Logger, msgTypesRegistry Registry) *Node](#NewNode)
   * [func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.AsyncGossip)
   * [func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.AsyncQueue)
   * [func (n *Node) RegisterFunc(msgType string, f HandleFunc) error](#Node.RegisterFunc)
-  * [func (n *Node) Serve(listener net.Listener)](#Node.Serve)
+  * [func (n *Node) Serve(listener net.Listener) error](#Node.Serve)
   * [func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.SyncGossip)
   * [func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.SyncQueue)
 * [type Registry](#Registry)
@@ -40,6 +41,12 @@ QueueSize is the buffer size of the node for holding incoming Gossip Messages
 Once buffer of a node gets full, it does not accept incoming messages
 
 
+## <a name="pkg-variables">Variables</a>
+``` go
+var (
+    ErrTimedOut = errors.New("request timed out")
+)
+```
 
 
 
@@ -96,7 +103,7 @@ MessageTypes returns the list of msgTypes to be served
 
 
 
-## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=554:645#L23)
+## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=616:731#L24)
 ``` go
 type Node struct {
     // contains filtered or unexported fields
@@ -111,18 +118,19 @@ Node is holding the required information for a functioning async gossip node
 
 
 
-### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=996:1041#L37)
+### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1111:1179#L41)
 ``` go
-func NewNode(msgTypesRegistry Registry) *Node
+func NewNode(logger zerolog.Logger, msgTypesRegistry Registry) *Node
 ```
-NewNode returns a new instance of a Gossip node with a predefined registry of message types
-passing nil instead of the messageTypeRegistry results in creation of an empty registry for the node
+NewNode returns a new instance of a Gossip node with a predefined logger and a predefined
+registry of message types passing nil instead of the messageTypeRegistry results
+in creation of an empty registry for the node.
 
 
 
 
 
-### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1669:1800#L53)
+### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=2108:2239#L67)
 ``` go
 func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
@@ -132,7 +140,7 @@ i.e., sends a message to all recipients, and only blocks for delivery without bl
 
 
 
-### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=2190:2292#L61)
+### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=2629:2731#L75)
 ``` go
 func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```
@@ -144,7 +152,7 @@ a timeout or placement of the message into the queue
 
 
 
-### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=4538:4601#L133)
+### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=5434:5497#L171)
 ``` go
 func (n *Node) RegisterFunc(msgType string, f HandleFunc) error
 ```
@@ -153,16 +161,16 @@ RegisterFunc allows the addition of new message types to the node's registry
 
 
 
-### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=4193:4236#L121)
+### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=4904:4953#L150)
 ``` go
-func (n *Node) Serve(listener net.Listener)
+func (n *Node) Serve(listener net.Listener) error
 ```
 Serve starts an async node grpc server, and its sweeper as well
 
 
 
 
-### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1320:1450#L47)
+### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1759:1889#L61)
 ``` go
 func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
@@ -172,7 +180,7 @@ i.e., it sends a message to all recipients and blocks for their reply
 
 
 
-### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=3000:3101#L83)
+### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=3545:3646#L103)
 ``` go
 func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```

@@ -13,8 +13,8 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/accounts"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 type Config struct {
@@ -66,7 +66,7 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := accounts.CreateAccount(accountKeys, code)
+		script := templates.CreateAccount(accountKeys, code)
 
 		tx := types.Transaction{
 			Script:       script,

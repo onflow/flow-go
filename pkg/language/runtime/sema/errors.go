@@ -1493,3 +1493,89 @@ func (e *InvalidMoveOperationError) StartPosition() ast.Position {
 func (e *InvalidMoveOperationError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// ResourceCapturingError
+
+type ResourceCapturingError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *ResourceCapturingError) Error() string {
+	return fmt.Sprintf("cannot capture resource in closure: `%s`", e.Name)
+}
+
+func (*ResourceCapturingError) isSemanticError() {}
+
+func (e *ResourceCapturingError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceCapturingError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// InvalidResourceFieldError
+
+type InvalidResourceFieldError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *InvalidResourceFieldError) Error() string {
+	return fmt.Sprintf("invalid resource field in non-resource: `%s`", e.Name)
+}
+
+func (*InvalidResourceFieldError) isSemanticError() {}
+
+func (e *InvalidResourceFieldError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidResourceFieldError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// InvalidStorageIndexingError
+
+type InvalidStorageIndexingError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidStorageIndexingError) Error() string {
+	return "invalid index into storage: expected type"
+}
+
+func (*InvalidStorageIndexingError) isSemanticError() {}
+
+func (e *InvalidStorageIndexingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidStorageIndexingError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidIndexingError
+
+type InvalidIndexingError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidIndexingError) Error() string {
+	return "invalid index: expected expression"
+}
+
+func (*InvalidIndexingError) isSemanticError() {}
+
+func (e *InvalidIndexingError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidIndexingError) EndPosition() ast.Position {
+	return e.EndPos
+}

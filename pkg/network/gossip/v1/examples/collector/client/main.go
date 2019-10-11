@@ -8,9 +8,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/rs/zerolog"
 	"log"
 	"os"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
@@ -57,7 +57,7 @@ func main() {
 
 // PutKey distributes a text to the servers whose address is specified in serverAddress
 func PutKey(key string) error {
-	node := gnode.NewNode(nil)
+	node := gnode.NewNode(zerolog.Logger{},nil)
 	serverAddress := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 
 	subRequest, err := GenerateSubmitTransactionRequest(key)
@@ -75,7 +75,7 @@ func PutKey(key string) error {
 
 // CheckKey checks whether the key exists in the distributed storage
 func CheckKey(key string) error {
-	node := gnode.NewNode(nil)
+	node := gnode.NewNode(zerolog.Logger{},nil)
 	storageAddrs := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 
 	getRequest, err := GenerateGetTransactionRequest(key)
@@ -103,6 +103,7 @@ func CheckKey(key string) error {
 }
 
 // A Good Marshalling example
+
 // GenerateSubmitTransactionRequest creates a SubmitTransactionRequest protobuf message, fills it with the text, and
 // marshals it into bytes
 func GenerateSubmitTransactionRequest(text string) ([]byte, error) {
@@ -115,6 +116,7 @@ func GenerateSubmitTransactionRequest(text string) ([]byte, error) {
 }
 
 // A Good Marshalling example
+
 // GenerateGetTransactionRequest creates a TransactionRequest protobuf message, fills it with the text, and
 // marshals it into bytes
 func GenerateGetTransactionRequest(text string) ([]byte, error) {
@@ -127,6 +129,7 @@ func GenerateGetTransactionRequest(text string) ([]byte, error) {
 }
 
 // A Good Unmarshaling example
+
 // ExtractGetResp decodes a byte response into its original type and returns it
 func ExtractGetResp(byteResponse []byte) (*collect.GetTransactionResponse, error) {
 	reply := &collect.GetTransactionResponse{}

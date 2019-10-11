@@ -222,6 +222,12 @@ type ArrayValue struct {
 	Values *[]Value
 }
 
+func NewArrayValue(values ...Value) ArrayValue {
+	return ArrayValue{
+		Values: &values,
+	}
+}
+
 func (ArrayValue) isValue()               {}
 func (ArrayValue) isIndexableValue()      {}
 func (ArrayValue) isConcatenatableValue() {}
@@ -232,7 +238,7 @@ func (v ArrayValue) Copy() Value {
 	for i, value := range *v.Values {
 		copies[i] = value.Copy()
 	}
-	return ArrayValue{Values: &copies}
+	return NewArrayValue(copies...)
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -248,7 +254,7 @@ func (v ArrayValue) ToGoValue() interface{} {
 func (v ArrayValue) Concat(other ConcatenatableValue) Value {
 	otherArray := other.(ArrayValue)
 	values := append(*v.Values, *otherArray.Values...)
-	return ArrayValue{Values: &values}
+	return NewArrayValue(values...)
 }
 
 func (v ArrayValue) Get(key Value) Value {
@@ -1099,7 +1105,7 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (v DictionaryValue) isIndexableValue() {}
+func (DictionaryValue) isIndexableValue() {}
 
 func (v DictionaryValue) Get(keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
@@ -1165,6 +1171,11 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 
 func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
 	panic(&errors.UnreachableError{})
+}
+
+type DictionaryEntryValues struct {
+	Key   Value
+	Value Value
 }
 
 // ToValue

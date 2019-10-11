@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
+	"sort"
 	"testing"
 )
 
@@ -217,34 +218,6 @@ func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) 
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
-		})
-	}
-}
-
-func TestCheckInvalidInterfaceConstructorCall(t *testing.T) {
-
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
-
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s interface Test {}
-
-              let test = Test()
-	        `, kind.Keyword()))
-
-			// TODO: add support for non-structure declarations
-
-			if kind == common.CompositeKindStructure {
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.NotCallableError{}, errs[0])
-			} else {
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-				assert.IsType(t, &sema.NotCallableError{}, errs[1])
 			}
 		})
 	}
@@ -1006,12 +979,12 @@ func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 	}
 }
 
-func TestCheckInterfaceTypeAsValue(t *testing.T) {
+func TestCheckInvalidInterfaceTypeAsValue(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			checker, err := ParseAndCheck(t, fmt.Sprintf(`
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %s interface X {}
 
               let x = X
@@ -1020,13 +993,14 @@ func TestCheckInterfaceTypeAsValue(t *testing.T) {
 			// TODO: add support for non-structure declarations
 
 			if kind == common.CompositeKindStructure {
-				assert.Nil(t, err)
-
-				assert.IsType(t, &sema.InterfaceMetaType{}, checker.GlobalValues["x"].Type)
-			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+			} else {
+				errs := ExpectCheckerErrors(t, err, 2)
+
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 			}
 		})
 	}
@@ -1057,6 +1031,8 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 					firstKind.Annotation(),
 				))
 
+				// TODO: add support for non-structure declarations
+
 				expectedErrorCount := 0
 				if firstKind != common.CompositeKindStructure {
 					expectedErrorCount += 1
@@ -1065,13 +1041,42 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 					expectedErrorCount += 1
 				}
 
+				// `firstKind` is the nested composite kind.
+				// `secondKind` is the container composite kind.
+				// Resource composites can only be nested in resource composite kinds.
+
+				expectInvalidResourceNestingErrorCount := 0
+
+				if firstKind == common.CompositeKindResource &&
+					secondKind != common.CompositeKindResource {
+
+					expectInvalidResourceNestingErrorCount = 1
+				}
+
 				if expectedErrorCount == 0 {
 					assert.Nil(t, err)
 				} else {
-					errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 
-					for i := 0; i < expectedErrorCount; i += 1 {
+					errs := ExpectCheckerErrors(t,
+						err,
+						expectedErrorCount+expectInvalidResourceNestingErrorCount,
+					)
+
+					sort.Slice(errs, func(i, j int) bool {
+						_, firstIsInvalidResourceFieldError :=
+							errs[i].(*sema.InvalidResourceFieldError)
+						_, secondIsUnsupportedDeclarationError :=
+							errs[j].(*sema.UnsupportedDeclarationError)
+						return !(firstIsInvalidResourceFieldError &&
+							secondIsUnsupportedDeclarationError)
+					})
+
+					i := 0
+					for ; i < expectedErrorCount; i += 1 {
 						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[i])
+					}
+					for ; i < expectInvalidResourceNestingErrorCount; i += 1 {
+						assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[i])
 					}
 				}
 			})
@@ -1103,6 +1108,8 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 					secondKind.Keyword(),
 					firstKind.Annotation(),
 				))
+
+				// TODO: add support for non-structure declarations
 
 				expectedErrorCount := 0
 				if firstKind != common.CompositeKindStructure {

@@ -153,6 +153,19 @@ func TestCheckParameterRedeclaration(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckInvalidParameterAssignment(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(a: Int) {
+          a = 1
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+}
+
 func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -184,4 +197,75 @@ func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {}
+
+      fun makeKittyCloner(): ((): <-Kitty) {
+          let kitty <- create Kitty()
+          return fun (): <-Kitty {
+              return <-kitty
+          }
+      }
+
+      let test = makeKittyCloner()
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+}
+
+func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {}
+
+      fun makeKittyCloner(kitty: <-Kitty): ((): <-Kitty) {
+          return fun (): <-Kitty {
+              return <-kitty
+          }
+      }
+
+      let test = makeKittyCloner(kitty: <-create Kitty())
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+}
+
+func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {
+          fun makeCloner(): ((): <-Kitty) {
+              return fun (): <-Kitty {
+                  return <-self
+              }
+          }
+      }
+
+      let kitty <- create Kitty()
+      let test = kitty.makeCloner()
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 }

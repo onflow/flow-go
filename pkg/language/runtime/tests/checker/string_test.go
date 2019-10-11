@@ -15,7 +15,10 @@ func TestCheckCharacter(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.CharacterType{})
+	assert.Equal(t,
+		&sema.CharacterType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckCharacterUnicodeScalar(t *testing.T) {
@@ -26,7 +29,10 @@ func TestCheckCharacterUnicodeScalar(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.CharacterType{})
+	assert.Equal(t,
+		&sema.CharacterType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckString(t *testing.T) {
@@ -37,7 +43,10 @@ func TestCheckString(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.StringType{})
+	assert.Equal(t,
+		&sema.StringType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckStringConcat(t *testing.T) {
