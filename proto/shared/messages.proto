@@ -114,3 +114,4 @@ message AccountKey {
   bytes public_key = 1;
   uint32 weight = 2;
 }
+
