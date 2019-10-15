@@ -25,6 +25,10 @@ type Elaboration struct {
 	DictionaryExpressionType           map[*ast.DictionaryExpression]*DictionaryType
 	DictionaryExpressionEntryTypes     map[*ast.DictionaryExpression][]DictionaryEntryType
 	EventDeclarationTypes              map[*ast.EventDeclaration]*EventType
+	// NOTE: not indexed by `ast.Type`, as IndexExpression might index
+	//   with "type" which is an expression, i.e., an IdentifierExpression.
+	//   See `Checker.visitStorageIndexingExpression`
+	IndexExpressionIndexingTypes map[*ast.IndexExpression]Type
 }
 
 func NewElaboration() *Elaboration {
@@ -51,5 +55,6 @@ func NewElaboration() *Elaboration {
 		DictionaryExpressionType:           map[*ast.DictionaryExpression]*DictionaryType{},
 		DictionaryExpressionEntryTypes:     map[*ast.DictionaryExpression][]DictionaryEntryType{},
 		EventDeclarationTypes:              map[*ast.EventDeclaration]*EventType{},
+		IndexExpressionIndexingTypes:       map[*ast.IndexExpression]Type{},
 	}
 }

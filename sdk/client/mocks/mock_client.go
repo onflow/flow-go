@@ -75,6 +75,26 @@ func (mr *MockRPCClientMockRecorder) GetAccount(arg0, arg1 interface{}, arg2 ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockRPCClient)(nil).GetAccount), varargs...)
 }
 
+// GetEvents mocks base method
+func (m *MockRPCClient) GetEvents(arg0 context.Context, arg1 *observe.GetEventsRequest, arg2 ...grpc.CallOption) (*observe.GetEventsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetEvents", varargs...)
+	ret0, _ := ret[0].(*observe.GetEventsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEvents indicates an expected call of GetEvents
+func (mr *MockRPCClientMockRecorder) GetEvents(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEvents", reflect.TypeOf((*MockRPCClient)(nil).GetEvents), varargs...)
+}
+
 // GetLatestBlock mocks base method
 func (m *MockRPCClient) GetLatestBlock(arg0 context.Context, arg1 *observe.GetLatestBlockRequest, arg2 ...grpc.CallOption) (*observe.GetLatestBlockResponse, error) {
 	m.ctrl.T.Helper()

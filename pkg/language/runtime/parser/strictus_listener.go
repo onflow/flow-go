@@ -133,6 +133,9 @@ type StrictusListener interface {
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
 
+	// EnterSwap is called when entering the swap production.
+	EnterSwap(c *SwapContext)
+
 	// EnterTransfer is called when entering the transfer production.
 	EnterTransfer(c *TransferContext)
 
@@ -402,6 +405,9 @@ type StrictusListener interface {
 
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
+
+	// ExitSwap is called when exiting the swap production.
+	ExitSwap(c *SwapContext)
 
 	// ExitTransfer is called when exiting the transfer production.
 	ExitTransfer(c *TransferContext)

@@ -88,7 +88,7 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 				"blockNum":  block.Number,
 				"blockHash": block.Hash(),
 				"blockSize": len(block.TransactionHashes),
-			}).Tracef("️⛏  Block #%d mined", block.Number)
+			}).Tracef("⛏  Block #%d mined", block.Number)
 
 		case <-ctx.Done():
 			return

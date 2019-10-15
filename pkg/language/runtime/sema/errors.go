@@ -1580,6 +1580,31 @@ func (e *InvalidIndexingError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
+// InvalidSwapExpressionError
+
+type InvalidSwapExpressionError struct {
+	Side     common.OperandSide
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidSwapExpressionError) Error() string {
+	return fmt.Sprintf(
+		"invalid %s-hand side of swap: expected target expression",
+		e.Side.Name(),
+	)
+}
+
+func (*InvalidSwapExpressionError) isSemanticError() {}
+
+func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidEventParameterTypeError
 
 type InvalidEventParameterTypeError struct {
