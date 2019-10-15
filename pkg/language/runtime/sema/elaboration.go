@@ -24,6 +24,7 @@ type Elaboration struct {
 	ArrayExpressionElementType         map[*ast.ArrayExpression]Type
 	DictionaryExpressionType           map[*ast.DictionaryExpression]*DictionaryType
 	DictionaryExpressionEntryTypes     map[*ast.DictionaryExpression][]DictionaryEntryType
+	EventDeclarationTypes              map[*ast.EventDeclaration]*EventType
 }
 
 func NewElaboration() *Elaboration {
@@ -49,5 +50,6 @@ func NewElaboration() *Elaboration {
 		ArrayExpressionElementType:         map[*ast.ArrayExpression]Type{},
 		DictionaryExpressionType:           map[*ast.DictionaryExpression]*DictionaryType{},
 		DictionaryExpressionEntryTypes:     map[*ast.DictionaryExpression][]DictionaryEntryType{},
+		EventDeclarationTypes:              map[*ast.EventDeclaration]*EventType{},
 	}
 }

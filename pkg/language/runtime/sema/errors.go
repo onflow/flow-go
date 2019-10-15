@@ -1579,3 +1579,25 @@ func (e *InvalidIndexingError) StartPosition() ast.Position {
 func (e *InvalidIndexingError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// InvalidEventParameterTypeError
+
+type InvalidEventParameterTypeError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventParameterTypeError) Error() string {
+	return fmt.Sprintf("unsupported event parameter type %s", e.Type.String())
+}
+
+func (*InvalidEventParameterTypeError) isSemanticError() {}
+
+func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
