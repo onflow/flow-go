@@ -88,4 +88,16 @@ func TestCheckEmitEvent(t *testing.T) {
 
 		assert.IsType(t, &sema.EmitNonEventError{}, errs[0])
 	})
+
+	t.Run("EmitNotDeclared", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+			fun test() {
+              emit notAnEvent()
+			}
+		`)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	})
 }
