@@ -1614,7 +1614,7 @@ type InvalidEventParameterTypeError struct {
 }
 
 func (e *InvalidEventParameterTypeError) Error() string {
-	return fmt.Sprintf("unsupported event parameter type %s", e.Type.String())
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
 }
 
 func (*InvalidEventParameterTypeError) isSemanticError() {}
