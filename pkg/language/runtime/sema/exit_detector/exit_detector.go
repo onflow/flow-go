@@ -160,10 +160,6 @@ func (detector *ExitDetector) VisitFieldDeclaration(*ast.FieldDeclaration) ast.R
 	return false
 }
 
-func (detector *ExitDetector) VisitInitializerDeclaration(node *ast.InitializerDeclaration) ast.Repr {
-	return false
-}
-
 func (detector *ExitDetector) VisitCondition(node *ast.Condition) ast.Repr {
 	return false
 }

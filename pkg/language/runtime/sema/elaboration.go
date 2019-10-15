@@ -9,7 +9,7 @@ type Elaboration struct {
 	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
 	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
-	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*ConstructorFunctionType
+	SpecialFunctionTypes               map[*ast.SpecialFunctionDeclaration]*SpecialFunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
@@ -38,7 +38,7 @@ func NewElaboration() *Elaboration {
 		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
 		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
-		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*ConstructorFunctionType{},
+		SpecialFunctionTypes:               map[*ast.SpecialFunctionDeclaration]*SpecialFunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},

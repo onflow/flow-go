@@ -5,7 +5,7 @@ package ast
 type Members struct {
 	Fields                []*FieldDeclaration
 	fieldsByIdentifier    map[string]*FieldDeclaration
-	Initializers          []*InitializerDeclaration
+	SpecialFunctions      []*SpecialFunctionDeclaration
 	Functions             []*FunctionDeclaration
 	functionsByIdentifier map[string]*FunctionDeclaration
 	CompositeDeclarations []*CompositeDeclaration

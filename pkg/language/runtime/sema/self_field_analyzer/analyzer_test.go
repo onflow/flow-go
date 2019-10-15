@@ -22,7 +22,7 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 	structDeclaration := program.CompositeDeclarations()[0]
 
 	fields := structDeclaration.Members.Fields
-	initializer := structDeclaration.Members.Initializers[0]
+	initializer := structDeclaration.Members.SpecialFunctions[0]
 
 	return CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
 }

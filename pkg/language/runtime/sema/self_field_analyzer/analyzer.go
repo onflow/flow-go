@@ -192,10 +192,6 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitFieldDeclaration(*ast.FieldDec
 	return analyzer.assignments
 }
 
-func (analyzer *SelfFieldAssignmentAnalyzer) VisitInitializerDeclaration(*ast.InitializerDeclaration) ast.Repr {
-	return analyzer.assignments
-}
-
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitCondition(*ast.Condition) ast.Repr {
 	return analyzer.assignments
 }
