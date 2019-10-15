@@ -56,9 +56,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 	}
 
-	// TODO: support non-structure composites, such as contracts and resources
+	// TODO: support non-structure / non-resources composites, such as contracts
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),

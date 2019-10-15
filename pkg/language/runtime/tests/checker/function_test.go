@@ -214,13 +214,9 @@ func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
       let test = makeKittyCloner()
 	`)
 
-	// TODO: add support for resources
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	errs := ExpectCheckerErrors(t, err, 2)
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
 
 func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
@@ -237,13 +233,9 @@ func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
       let test = makeKittyCloner(kitty: <-create Kitty())
 	`)
 
-	// TODO: add support for resources
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	errs := ExpectCheckerErrors(t, err, 2)
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
 
 func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
@@ -261,11 +253,7 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
       let test = kitty.makeCloner()
 	`)
 
-	// TODO: add support for resources
-
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 }

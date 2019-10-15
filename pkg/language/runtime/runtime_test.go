@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 
@@ -231,9 +232,7 @@ func TestRuntimeStorage(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
-	if !assert.Nil(t, err) {
-		println(err.Error())
-	}
+	require.Nil(t, err)
 	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
 

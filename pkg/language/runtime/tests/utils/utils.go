@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -44,13 +45,13 @@ func ExpectCheckerErrors(t *testing.T, err error, len int) []error {
 		return nil
 	}
 
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	assert.IsType(t, &sema.CheckerError{}, err)
 
 	errs := err.(*sema.CheckerError).Errors
 
-	assert.Len(t, errs, len)
+	require.Len(t, errs, len)
 
 	return errs
 }
