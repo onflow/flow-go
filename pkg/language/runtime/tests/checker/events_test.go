@@ -29,7 +29,7 @@ func TestCheckEventDeclaration(t *testing.T) {
 				}
 				
 				event Transfer(token: Token)
-        `)
+		`)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
