@@ -1614,7 +1614,7 @@ type InvalidEventParameterTypeError struct {
 }
 
 func (e *InvalidEventParameterTypeError) Error() string {
-	return fmt.Sprintf("unsupported event parameter type %s", e.Type.String())
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
 }
 
 func (*InvalidEventParameterTypeError) isSemanticError() {}
@@ -1635,7 +1635,7 @@ type InvalidEventUsageError struct {
 }
 
 func (e *InvalidEventUsageError) Error() string {
-	return "events can only be invoked in an emit statement"
+	return "events can only be invoked in an `emit` statement"
 }
 
 func (*InvalidEventUsageError) isSemanticError() {}
@@ -1657,7 +1657,7 @@ type EmitNonEventError struct {
 }
 
 func (e *EmitNonEventError) Error() string {
-	return fmt.Sprintf("cannot emit non event type (%s)", e.Type.String())
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
 }
 
 func (*EmitNonEventError) isSemanticError() {}
