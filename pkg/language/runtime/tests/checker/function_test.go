@@ -257,3 +257,33 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
+
+func TestCheckInvalidResourceCapturingJustMemberAccess(t *testing.T) {
+	// Resource capturing even just for read access (e.g. reading a member) is invalid
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun makeKittyIdGetter(): ((): Int) {
+          let kitty <- create Kitty(id: 1)
+          let getId = fun (): Int {
+              return kitty.id
+          }
+          destroy kitty
+          return getId
+      }
+
+      let test = makeKittyIdGetter()
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+}
