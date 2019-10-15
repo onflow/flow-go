@@ -35,7 +35,6 @@ generate-proto:
 .PHONY: generate-wire
 generate-wire:
 	GO111MODULE=on wire ./internal/roles/collect/
-	GO111MODULE=on wire ./internal/roles/consensus/
 	GO111MODULE=on wire ./internal/roles/execute/
 	GO111MODULE=on wire ./internal/roles/verify/
 
