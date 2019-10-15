@@ -2709,6 +2709,44 @@ func TestInterpretNilReturnValue(t *testing.T) {
 	)
 }
 
+func TestInterpretSomeReturnValue(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     fun test(): Int? {
+         let x: Int? = 1
+         return x
+     }
+   `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		value,
+	)
+}
+
+func TestInterpretSomeReturnValueFromDictionary(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     fun test(): Int? {
+         let foo: {String: Int} = {"a": 1}
+         return foo["a"]
+     }
+   `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		value,
+	)
+}
+
 func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4398,6 +4436,50 @@ func TestInterpretClosure(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
+		value,
+	)
+}
+
+var storageValueDeclaration = map[string]sema.ValueDeclaration{
+	"storage": stdlib.StandardLibraryValue{
+		Name:       "storage",
+		Type:       &sema.StorageType{},
+		Kind:       common.DeclarationKindConstant,
+		IsConstant: true,
+	},
+}
+
+func TestInterpretStorage(t *testing.T) {
+
+	storedValues := map[sema.Type]interpreter.Value{}
+
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
+          fun test(): Int? {
+              storage[Int] = 42
+              return storage[Int]
+          }
+	    `,
+		storageValueDeclaration,
+		map[string]interpreter.Value{
+			"storage": interpreter.StorageValue{
+				Getter: func(key sema.Type) interpreter.Value {
+					return storedValues[key]
+				},
+				Setter: func(key sema.Type, value interpreter.Value) {
+					storedValues[key] = value
+				},
+			},
+		},
+		nil,
+	)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
 		value,
 	)
 }
