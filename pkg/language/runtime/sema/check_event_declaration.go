@@ -11,9 +11,11 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	checker.checkArgumentLabels(declaration.Parameters)
 
 	// check parameters
+	checker.checkParameters(declaration.Parameters, eventType.ParameterTypeAnnotations)
+
+	// check that parameters are primitive types
 	for i, parameter := range declaration.Parameters {
 		parameterTypeAnnotation := eventType.ParameterTypeAnnotations[i]
-		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
 
 		// only allow primitive parameters
 		if !isValidEventParameterType(parameterTypeAnnotation.Type) {
