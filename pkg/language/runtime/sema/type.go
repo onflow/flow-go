@@ -1069,6 +1069,56 @@ func (h StorageType) IsResourceType() bool {
 	return false
 }
 
+// EventType
+
+type EventType struct {
+	Identifier               string
+	ParameterTypeAnnotations []*TypeAnnotation
+	ArgumentLabels           []string
+}
+
+func (*EventType) isType() {}
+
+func (t *EventType) String() string {
+	var parameters strings.Builder
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		if i > 0 {
+			parameters.WriteString(", ")
+		}
+		parameters.WriteString(parameterTypeAnnotation.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", t.Identifier, parameters.String())
+}
+
+func (t *EventType) Equal(other Type) bool {
+	otherEvent, ok := other.(*EventType)
+	if !ok {
+		return false
+	}
+
+	if t.Identifier != otherEvent.Identifier {
+		return false
+	}
+
+	if len(t.ParameterTypeAnnotations) != len(otherEvent.ParameterTypeAnnotations) {
+		return false
+	}
+
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		otherParameterType := otherEvent.ParameterTypeAnnotations[i]
+		if !parameterTypeAnnotation.Equal(otherParameterType) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (*EventType) IsResourceType() bool {
+	return false
+}
+
 ////
 
 func IsSubType(subType Type, superType Type) bool {
