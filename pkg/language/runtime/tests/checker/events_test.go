@@ -12,8 +12,8 @@ import (
 func TestCheckEventDeclaration(t *testing.T) {
 	t.Run("ValidEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            event Transfer(to: Int, from: Int)
-        `)
+			event Transfer(to: Int, from: Int)
+		`)
 
 		assert.Nil(t, err)
 	})
@@ -38,9 +38,9 @@ func TestCheckEventDeclaration(t *testing.T) {
 
 	t.Run("RedeclaredEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            event Transfer(to: Int, from: Int)
-            event Transfer(to: Int)
-        `)
+			event Transfer(to: Int, from: Int)
+			event Transfer(to: Int)
+		`)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -51,24 +51,24 @@ func TestCheckEventDeclaration(t *testing.T) {
 func TestCheckEmitEvent(t *testing.T) {
 	t.Run("ValidEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            event Transfer(to: Int, from: Int)
-
-            fun test() {
-              emit Transfer(to: 1, from: 2)
-            }
-        `)
+			event Transfer(to: Int, from: Int)
+			
+			fun test() {
+			  emit Transfer(to: 1, from: 2)
+			}
+		`)
 
 		assert.Nil(t, err)
 	})
 
 	t.Run("MissingEmitStatement", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            event Transfer(to: Int, from: Int)
-
-            fun test() {
-              Transfer(to: 1, from: 2)
-            }
-        `)
+			event Transfer(to: Int, from: Int)
+			
+			fun test() {
+			  Transfer(to: 1, from: 2)
+			}
+		`)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -77,12 +77,12 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitNonEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            fun notAnEvent(): Int { return 1 }			
-
-            fun test() {
-              emit notAnEvent()
-            }
-        `)
+			fun notAnEvent(): Int { return 1 }			
+			
+			fun test() {
+			  emit notAnEvent()
+			}
+		`)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -91,10 +91,10 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitNotDeclared", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-            fun test() {
-              emit notAnEvent()
-            }
-        `)
+			fun test() {
+			  emit notAnEvent()
+			}
+		`)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
