@@ -3317,11 +3317,15 @@ struct interface Account {
 
 All accounts in flow are the same and have a `storage` object which contains the stored values of the account.  
 
+`account.storage[]`
+
 Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually be storing a mixture of contracts, resources, and structs within their storage.
 
-The stored value must be a subtype of the type it is keyed by.  This means that if you are storing a `Vault` type as the key, the value must be a value that has the type vault or any of the subtypes of vault.
+The stored value must be a subtype of the type it is keyed by.  This means that if you are storing a `Vault` type as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
 
-Initializing values, otherwise know as deploying, in account storage can only happen within the body of a transaction.  You cannot, for example, initialize a storage value within a member function of a struct or resource that is already in your account storage.
+Initializing values in account storage can only happen within the body of a transaction.  You cannot, for example, initialize a storage value within a member function of a struct or resource that is already in your account storage.
+
+When you store a value in account's `account.storage[]`, the type of the data you just stored is also recorded in the `account.types[]` record.  You use `account.types[]` to publish type definitions that you want other accounts to have access to, which will be covered later.  You never need to write to `account.types[]`
 
 ```bamboo
 // Declare a resource named `Counter`
@@ -3342,6 +3346,8 @@ let account: Account = // ...
 // The type `Counter` is used as the key to refer to the stored value
 //
 account.storage[Counter] <- create Counter(count: 0)
+
+account.types[Counter]  //stores the type definition of Counter
 ```
 
 ## Transactions
@@ -3366,7 +3372,7 @@ Before the transaction declaration, you can import any necessary local or extern
 
 Next is where you can define any new types you would like to use or deploy within your transaction.  These are kind of like global constants or variables.
 
-Then, you have the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase has a block of bpl code that executes sequentially.
+Then, you have the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of bpl code that executes sequentially.
 
 The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
 The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
@@ -3376,7 +3382,7 @@ The **execute phase** is where all interaction with external contracts happens. 
 The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
-The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
+The preparer is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
 ```bamboo,file=transaction-declaration.bpl
@@ -3490,9 +3496,9 @@ and the string literal for the path of the file which contains the code of the t
 The preparer can use the signing account's `deploy` function to deploy
 the resource interface.  This essentially stores the resource interface in the account storage so it can be used again.
 
-Once deployed, the resource interface is available in the account's `types` object, which is how we access storage.
+Once deployed, the resource interface is available in the account's `storage` object, which is how we access storage.
 
-When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone.  
+When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone. You can use the `publish` action to make certain subsets of your resources public. 
 
 The `publish` operator is used to make the resource interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to call the functions defined in the interface on the resource that implements that interface.
 
@@ -3515,6 +3521,7 @@ transaction {
         signer.deploy(Vault)
 
         // Make the deployed type publicly available
+        // now, anyone can import the `Vault` interface from your account
         publish signer.types[Vault]
     }
 }
