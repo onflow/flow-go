@@ -1657,7 +1657,7 @@ type EmitNonEventError struct {
 }
 
 func (e *EmitNonEventError) Error() string {
-	return fmt.Sprintf("cannot emit non event type (%s)", e.Type.String())
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
 }
 
 func (*EmitNonEventError) isSemanticError() {}
