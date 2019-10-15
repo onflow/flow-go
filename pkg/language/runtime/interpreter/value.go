@@ -1307,6 +1307,32 @@ type ValueWithMembers interface {
 	SetMember(interpreter *Interpreter, name string, value Value)
 }
 
+// StorageValue
+
+type StorageValue struct {
+	Getter func(key sema.Type) Value
+	Setter func(key sema.Type, value Value)
+}
+
+func (StorageValue) isValue() {}
+
+func (v StorageValue) Copy() Value {
+	return StorageValue{
+		Getter: v.Getter,
+		Setter: v.Setter,
+	}
+}
+
+func (StorageValue) isIndexableValue() {}
+
+func (v StorageValue) Get(key sema.Type) Value {
+	return v.Getter(key)
+}
+
+func (v StorageValue) Set(key sema.Type, value Value) {
+	v.Setter(key, value)
+}
+
 //
 
 func init() {

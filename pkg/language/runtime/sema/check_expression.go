@@ -108,7 +108,7 @@ func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) as
 func (checker *Checker) visitIndexingExpression(
 	indexExpression *ast.IndexExpression,
 	isAssignment bool,
-) Type {
+) (result Type) {
 
 	targetExpression := indexExpression.TargetExpression
 	indexedType := targetExpression.Accept(checker).(Type)
@@ -121,6 +121,10 @@ func (checker *Checker) visitIndexingExpression(
 	if IsInvalidType(indexedType) {
 		return &InvalidType{}
 	}
+
+	defer func() {
+		checker.checkNonIdentifierResourceLoss(result, targetExpression)
+	}()
 
 	_, isStorage := indexedType.(*StorageType)
 	if isStorage {
@@ -152,7 +156,7 @@ func (checker *Checker) visitIndexingExpression(
 		}
 
 		return checker.visitStorageIndexingExpression(
-			targetExpression,
+			indexExpression,
 			indexingType,
 			isAssignment,
 		)
@@ -216,13 +220,11 @@ func (checker *Checker) visitNormalIndexingExpression(
 		)
 	}
 
-	checker.checkNonIdentifierResourceLoss(indexedType, indexedExpression)
-
 	return elementType
 }
 
 func (checker *Checker) visitStorageIndexingExpression(
-	indexedExpression ast.Expression,
+	indexExpression *ast.IndexExpression,
 	indexingType ast.Type,
 	isAssignment bool,
 ) Type {
@@ -231,6 +233,8 @@ func (checker *Checker) visitStorageIndexingExpression(
 	if IsInvalidType(keyType) {
 		return &InvalidType{}
 	}
+
+	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
 
 	if isAssignment {
 		return keyType
