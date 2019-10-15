@@ -2747,9 +2747,9 @@ resource interface FungibleToken {
     // it can be either variable or constant in the implementation
     //
     pub balance: Int {
-        set {
-            post {
-                self.balance >= 0:
+        set(newBalance) {
+            pre {
+                newBalance >= 0:
                     "Balances are always non-negative"
             }
         }
@@ -2831,11 +2831,11 @@ Interfaces can only be declared globally, i.e. not inside of functions.
 
 ### Interface Implementation
 
-Declaring implementations for an interface is done in the type definition of the resource or struct.
-After you normally speicify the type and the name, follow that with a colon (`:`)
-and the name of one or more interfaces you are implementing.
+Declaring implementations for an interface is done in the type declaration of the composite data type (e.g., structure, resource).
+The kind and the name are followed by a colon (`:`)
+and the name of one or more interfaces to implement.
 
-This will tell the checker to enforce any requirements from the specified interfaces onto the type you are delcaring.
+This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.
 
 ```bamboo,file=interface-implementation.bpl
 // Declare a resource named `ExampleToken` that has to implement the `FungibleToken` interface.
@@ -2971,12 +2971,12 @@ struct interface Shape {
 // Declare a structure named `Square` the implements the `Shape` interface
 //
 struct Square: Shape {
-    // in addition to the required fields from the interface, 
-    // we can also define as many of our own as we want
+    // In addition to the required fields from the interface, 
+    // the type can also declare additional fields
     pub var length: Int
 
-    // since `area` was not specified as a constant, variable,
-    // or synthetic type, we can declare as a synthetic here
+    // Since `area` was not declared as a constant, variable,
+    // field in the interface, it can be declared 
     pub synthetic area: Int {
         get {
             return self.length * self.length
@@ -3010,8 +3010,8 @@ struct Rectangle: Shape {
         self.height = height
     }
 
-    // as long as we have the same function names and parameters 
-    // as the interface, our implementations can differ
+    // As long as the function names and parameters match those 
+    // of the required functions, the implementations can differ
     pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -3074,8 +3074,8 @@ struct interface Shape {}
 //
 struct interface Polygon: Shape {}
 
-// Declare a structure named `Hexagon` that implements the `Polygon` interface
-// This also is required to implement the `Shape` interface, because `Polygon` requires it
+// Declare a structure named `Hexagon` that implements the `Polygon` interface.
+// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it
 //
 struct Hexagon: Polygon {}
 
@@ -3100,7 +3100,7 @@ resource interface OuterInterface {
     struct interface InnerInterface {}
 }
 
-// Declare a resource named `SomeOuter` that implements `OuterInterface`
+// Declare a resource named `SomeOuter` that implements the interface `OuterInterface`
 //
 // The resource is not required to implement `OuterInterface.InnerInterface`
 //
@@ -3220,7 +3220,8 @@ struct interface Hashable: Equatable {
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
-// `Point` is declared to implement the `Hashable` interface, which also means it needs to implement the `Equatable` interface
+// `Point` is declared to implement the `Hashable` interface,
+// which also means it needs to implement the `Equatable` interface
 //
 struct Point: Hashable {
 
@@ -3232,7 +3233,8 @@ struct Point: Hashable {
         self.y = y
     }
 
-    // this wil allow points to be compared for equality and satisfies the `Equatable` interface
+    // Implementing the function `equals` will allow points to be compared 
+    // for equality and satisfies the `Equatable` interface
     pub fun equals(_ other: Self): Bool {
         // Points are equal if their coordinates match.
         //
@@ -3244,7 +3246,8 @@ struct Point: Hashable {
             && other.y == self.y
     }
 
-    // this allows points to have a hash value and satisfy the `Hashable` interface
+    // Providing an implementation for the hash value field 
+    // satisfies the `Hashable` interface
     pub synthetic hashValue: Int {
         get {
             var hash = 7
