@@ -1601,3 +1601,46 @@ func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
 func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// InvalidEventUsageError
+
+type InvalidEventUsageError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventUsageError) Error() string {
+	return "events can only be invoked in an emit statement"
+}
+
+func (*InvalidEventUsageError) isSemanticError() {}
+
+func (e *InvalidEventUsageError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventUsageError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// EmitNonEventError
+
+type EmitNonEventError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *EmitNonEventError) Error() string {
+	return fmt.Sprintf("cannot emit non event type (%s)", e.Type.String())
+}
+
+func (*EmitNonEventError) isSemanticError() {}
+
+func (e *EmitNonEventError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *EmitNonEventError) EndPosition() ast.Position {
+	return e.EndPos
+}

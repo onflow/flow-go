@@ -47,3 +47,45 @@ func TestCheckEventDeclaration(t *testing.T) {
 		assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 	})
 }
+
+func TestCheckEmitEvent(t *testing.T) {
+	t.Run("ValidEvent", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+			event Transfer(to: Int, from: Int)
+
+			fun test() {
+              emit Transfer(to: 1, from: 2)
+			}
+		`)
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("MissingEmitStatement", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+			event Transfer(to: Int, from: Int)
+
+			fun test() {
+              Transfer(to: 1, from: 2)
+			}
+		`)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
+	})
+
+	t.Run("EmitNonEvent", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+			fun notAnEvent(): Int { return 1 }			
+
+			fun test() {
+              emit notAnEvent()
+			}
+		`)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.EmitNonEventError{}, errs[0])
+	})
+}
