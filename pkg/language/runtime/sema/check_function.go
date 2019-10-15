@@ -18,7 +18,13 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 }
 
 type functionDeclarationOptions struct {
-	mustExit        bool
+	// mustExit specifies if the function declaration's function block
+	// should be checked for containing proper return statements.
+	// This check may be omitted in e.g. function declarations of interfaces
+	mustExit bool
+	// declareFunction specifies if the function should also be declared in
+	// the current scope. This might be e.g. true for global function
+	// declarations, but false for function declarations of composites
 	declareFunction bool
 }
 
