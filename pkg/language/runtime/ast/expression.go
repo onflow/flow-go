@@ -322,6 +322,7 @@ func (e *InvocationExpression) EndPosition() Position {
 
 type AccessExpression interface {
 	isAccessExpression()
+	AccessedExpression() Expression
 }
 
 // MemberExpression
@@ -333,11 +334,15 @@ type MemberExpression struct {
 
 func (*MemberExpression) isExpression() {}
 
-func (*MemberExpression) isAccessExpression() {}
-
 func (*MemberExpression) isTargetExpression() {}
 
 func (*MemberExpression) isIfStatementTest() {}
+
+func (*MemberExpression) isAccessExpression() {}
+
+func (e *MemberExpression) AccessedExpression() Expression {
+	return e.Expression
+}
 
 func (e *MemberExpression) Accept(visitor Visitor) Repr {
 	return e.AcceptExp(visitor)
@@ -375,11 +380,15 @@ type IndexExpression struct {
 
 func (*IndexExpression) isExpression() {}
 
-func (*IndexExpression) isAccessExpression() {}
-
 func (*IndexExpression) isTargetExpression() {}
 
 func (*IndexExpression) isIfStatementTest() {}
+
+func (*IndexExpression) isAccessExpression() {}
+
+func (e *IndexExpression) AccessedExpression() Expression {
+	return e.TargetExpression
+}
 
 func (e *IndexExpression) Accept(visitor Visitor) Repr {
 	return e.AcceptExp(visitor)

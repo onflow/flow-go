@@ -160,3 +160,35 @@ func TestCheckSwapOptional(t *testing.T) {
 
 	assert.Nil(t, err)
 }
+
+func TestCheckSwapResourceArrayElementAndVariable(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- [<-create X()]
+          var x <- create X()
+          x <-> xs[0]
+          destroy x
+          destroy xs
+      }
+	`)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckSwapResourceArrayElements(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- [<-create X(), <-create X()]
+          xs[0] <-> xs[1]
+          destroy xs
+      }
+	`)
+
+	assert.Nil(t, err)
+}
