@@ -2832,14 +2832,14 @@ Interfaces can only be declared globally, i.e. not inside of functions.
 ### Interface Implementation
 
 Declaring implementations for an interface is done in the type definition of the resource or struct.
-After you normally speicify the type and the name, follow that with a colon 
+After you normally speicify the type and the name, follow that with a colon (`:`)
 and the name of one or more interfaces you are implementing.
 
 This will tell the checker to enforce any requirements from the specified interfaces onto the type you are delcaring.
 
 ```bamboo,file=interface-implementation.bpl
-// Declare a resource named `ExampleToken` with a variable field named `balance`,
-// that can be written by functions of the type, but outer scopes can only read it
+// Declare a resource named `ExampleToken` that has to implement the `FungibleToken` interface.
+// It has a variable field named `balance`, that can be written by functions of the type, but outer scopes can only read it
 //
 resource ExampleToken: FungibleToken {
 
@@ -2968,13 +2968,15 @@ struct interface Shape {
     pub fun scale(factor: Int)
 }
 
-// Declare a structure named `Square` the implements the Shape interface
+// Declare a structure named `Square` the implements the `Shape` interface
 //
 struct Square: Shape {
-    // in addition to the required fields from the interface, we can also define as many of our own as we want
+    // in addition to the required fields from the interface, 
+    // we can also define as many of our own as we want
     pub var length: Int
 
-    // since `area` was not specified as a constant, var, or synthetic, we can declare as a synthetic here
+    // since `area` was not specified as a constant, variable,
+    // or synthetic type, we can declare as a synthetic here
     pub synthetic area: Int {
         get {
             return self.length * self.length
@@ -3008,7 +3010,8 @@ struct Rectangle: Shape {
         self.height = height
     }
 
-    // as long as we have the same function names and parameters as the interface, our implementations can differ
+    // as long as we have the same function names and parameters 
+    // as the interface, our implementations can differ
     pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -3072,7 +3075,7 @@ struct interface Shape {}
 struct interface Polygon: Shape {}
 
 // Declare a structure named `Hexagon` that implements the `Polygon` interface
-// This also is required to implement the Shape interface, because `Polygon` requires it
+// This also is required to implement the `Shape` interface, because `Polygon` requires it
 //
 struct Hexagon: Polygon {}
 
@@ -3168,7 +3171,7 @@ struct interface Equatable {
 // Declare a struct named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
-// Cat also will implement the interface `Equatable`
+// `Cat` also will implement the interface `Equatable`
 // to allow cats to be compared for equality.
 //
 struct Cat: Equatable {
@@ -3217,7 +3220,7 @@ struct interface Hashable: Equatable {
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
-// Point is declared to implement the `Hashable` interface, which also means it needs to implement the Equatable interface
+// `Point` is declared to implement the `Hashable` interface, which also means it needs to implement the `Equatable` interface
 //
 struct Point: Hashable {
 
@@ -3241,7 +3244,7 @@ struct Point: Hashable {
             && other.y == self.y
     }
 
-    // this allows points to have a hash value and satisfiest the `Hashable` interface
+    // this allows points to have a hash value and satisfy the `Hashable` interface
     pub synthetic hashValue: Int {
         get {
             var hash = 7
