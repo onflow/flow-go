@@ -36,7 +36,6 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	eventType := &EventType{
 		Identifier:               identifier.Identifier,
 		ParameterTypeAnnotations: convertedParameterTypeAnnotations,
-		ArgumentLabels:           declaration.Parameters.ArgumentLabels(),
 	}
 
 	typeDeclaredErr := checker.typeActivations.Declare(identifier, eventType)

@@ -1074,7 +1074,6 @@ func (h StorageType) IsResourceType() bool {
 type EventType struct {
 	Identifier               string
 	ParameterTypeAnnotations []*TypeAnnotation
-	ArgumentLabels           []string
 }
 
 func (*EventType) isType() {}
