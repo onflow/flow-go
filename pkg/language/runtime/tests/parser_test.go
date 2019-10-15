@@ -5045,3 +5045,51 @@ func TestParseSwapStatement(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestParseDestructor(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        resource Test {
+            destroy() {}
+        }
+	`)
+
+	assert.Nil(t, err)
+
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindResource,
+		Identifier: Identifier{
+			Identifier: "Test",
+			Pos:        Position{Offset: 18, Line: 2, Column: 17},
+		},
+		Conformances: []*NominalType{},
+		Members: &Members{
+			SpecialFunctions: []*SpecialFunctionDeclaration{
+				{
+					DeclarationKind: common.DeclarationKindDestructor,
+					FunctionDeclaration: &FunctionDeclaration{
+						Identifier: Identifier{
+							Identifier: "destroy",
+							Pos:        Position{Offset: 37, Line: 3, Column: 12},
+						},
+						FunctionBlock: &FunctionBlock{
+							Block: &Block{
+								StartPos: Position{Offset: 47, Line: 3, Column: 22},
+								EndPos:   Position{Offset: 48, Line: 3, Column: 23},
+							},
+						},
+						StartPos: Position{Offset: 37, Line: 3, Column: 12},
+					},
+				},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 58, Line: 4, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}

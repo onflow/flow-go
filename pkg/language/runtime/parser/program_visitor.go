@@ -323,8 +323,16 @@ func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDec
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
+	declarationKind := common.DeclarationKindUnknown
+	switch identifier.Identifier {
+	case common.DeclarationKindInitializer.Keywords():
+		declarationKind = common.DeclarationKindInitializer
+	case common.DeclarationKindDestructor.Keywords():
+		declarationKind = common.DeclarationKindDestructor
+	}
+
 	return &ast.SpecialFunctionDeclaration{
-		DeclarationKind: common.DeclarationKindInitializer,
+		DeclarationKind: declarationKind,
 		FunctionDeclaration: &ast.FunctionDeclaration{
 			Identifier:    identifier,
 			Parameters:    parameters,
