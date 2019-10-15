@@ -16,12 +16,30 @@ type Expression interface {
 	AcceptExp(ExpressionVisitor) Repr
 }
 
+// TargetExpression
+
+type TargetExpression interface {
+	isTargetExpression()
+}
+
 // BoolExpression
 
 type BoolExpression struct {
 	Value    bool
 	StartPos Position
 	EndPos   Position
+}
+
+func (*BoolExpression) isExpression() {}
+
+func (*BoolExpression) isIfStatementTest() {}
+
+func (e *BoolExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *BoolExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitBoolExpression(e)
 }
 
 func (e *BoolExpression) String() string {
@@ -40,22 +58,22 @@ func (e *BoolExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*BoolExpression) isIfStatementTest() {}
-
-func (*BoolExpression) isExpression() {}
-
-func (e *BoolExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *BoolExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitBoolExpression(e)
-}
-
 // NilExpression
 
 type NilExpression struct {
 	Pos Position
+}
+
+func (*NilExpression) isExpression() {}
+
+func (*NilExpression) isIfStatementTest() {}
+
+func (e *NilExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *NilExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitNilExpression(e)
 }
 
 func (e *NilExpression) String() string {
@@ -70,24 +88,24 @@ func (e *NilExpression) EndPosition() Position {
 	return e.Pos.Shifted(len(NilConstant) - 1)
 }
 
-func (*NilExpression) isIfStatementTest() {}
-
-func (*NilExpression) isExpression() {}
-
-func (e *NilExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *NilExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitNilExpression(e)
-}
-
 // StringExpression
 
 type StringExpression struct {
 	Value    string
 	StartPos Position
 	EndPos   Position
+}
+
+func (*StringExpression) isExpression() {}
+
+func (*StringExpression) isIfStatementTest() {}
+
+func (e *StringExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *StringExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitStringExpression(e)
 }
 
 func (e *StringExpression) String() string {
@@ -103,24 +121,24 @@ func (e *StringExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*StringExpression) isIfStatementTest() {}
-
-func (*StringExpression) isExpression() {}
-
-func (e *StringExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *StringExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitStringExpression(e)
-}
-
 // IntExpression
 
 type IntExpression struct {
 	Value    *big.Int
 	StartPos Position
 	EndPos   Position
+}
+
+func (*IntExpression) isExpression() {}
+
+func (*IntExpression) isIfStatementTest() {}
+
+func (e *IntExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *IntExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitIntExpression(e)
 }
 
 func (e *IntExpression) String() string {
@@ -135,24 +153,24 @@ func (e *IntExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*IntExpression) isIfStatementTest() {}
-
-func (*IntExpression) isExpression() {}
-
-func (e *IntExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *IntExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitIntExpression(e)
-}
-
 // ArrayExpression
 
 type ArrayExpression struct {
 	Values   []Expression
 	StartPos Position
 	EndPos   Position
+}
+
+func (*ArrayExpression) isExpression() {}
+
+func (*ArrayExpression) isIfStatementTest() {}
+
+func (e *ArrayExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *ArrayExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitArrayExpression(e)
 }
 
 func (e *ArrayExpression) String() string {
@@ -176,24 +194,24 @@ func (e *ArrayExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*ArrayExpression) isIfStatementTest() {}
-
-func (*ArrayExpression) isExpression() {}
-
-func (e *ArrayExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *ArrayExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitArrayExpression(e)
-}
-
 // DictionaryExpression
 
 type DictionaryExpression struct {
 	Entries  []Entry
 	StartPos Position
 	EndPos   Position
+}
+
+func (*DictionaryExpression) isExpression() {}
+
+func (*DictionaryExpression) isIfStatementTest() {}
+
+func (e *DictionaryExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *DictionaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitDictionaryExpression(e)
 }
 
 func (e *DictionaryExpression) String() string {
@@ -219,18 +237,6 @@ func (e *DictionaryExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*DictionaryExpression) isIfStatementTest() {}
-
-func (*DictionaryExpression) isExpression() {}
-
-func (e *DictionaryExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *DictionaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitDictionaryExpression(e)
-}
-
 type Entry struct {
 	Key   Expression
 	Value Expression
@@ -242,13 +248,11 @@ type IdentifierExpression struct {
 	Identifier
 }
 
-func (e *IdentifierExpression) String() string {
-	return e.Identifier.Identifier
-}
+func (*IdentifierExpression) isExpression() {}
+
+func (*IdentifierExpression) isTargetExpression() {}
 
 func (*IdentifierExpression) isIfStatementTest() {}
-
-func (*IdentifierExpression) isExpression() {}
 
 func (e *IdentifierExpression) Accept(visitor Visitor) Repr {
 	return e.AcceptExp(visitor)
@@ -256,6 +260,10 @@ func (e *IdentifierExpression) Accept(visitor Visitor) Repr {
 
 func (e *IdentifierExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 	return visitor.VisitIdentifierExpression(e)
+}
+
+func (e *IdentifierExpression) String() string {
+	return e.Identifier.Identifier
 }
 
 // Arguments
@@ -283,6 +291,18 @@ type InvocationExpression struct {
 	EndPos            Position
 }
 
+func (*InvocationExpression) isExpression() {}
+
+func (*InvocationExpression) isIfStatementTest() {}
+
+func (e *InvocationExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *InvocationExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitInvocationExpression(e)
+}
+
 func (e *InvocationExpression) String() string {
 	var builder strings.Builder
 	builder.WriteString(e.InvokedExpression.String())
@@ -298,18 +318,6 @@ func (e *InvocationExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*InvocationExpression) isIfStatementTest() {}
-
-func (*InvocationExpression) isExpression() {}
-
-func (e *InvocationExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *InvocationExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitInvocationExpression(e)
-}
-
 // AccessExpression
 
 type AccessExpression interface {
@@ -321,6 +329,22 @@ type AccessExpression interface {
 type MemberExpression struct {
 	Expression Expression
 	Identifier Identifier
+}
+
+func (*MemberExpression) isExpression() {}
+
+func (*MemberExpression) isAccessExpression() {}
+
+func (*MemberExpression) isTargetExpression() {}
+
+func (*MemberExpression) isIfStatementTest() {}
+
+func (e *MemberExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitMemberExpression(e)
 }
 
 func (e *MemberExpression) String() string {
@@ -338,21 +362,7 @@ func (e *MemberExpression) EndPosition() Position {
 	return e.Identifier.EndPosition()
 }
 
-func (*MemberExpression) isIfStatementTest() {}
-
-func (*MemberExpression) isExpression() {}
-
-func (*MemberExpression) isAccessExpression() {}
-
-func (e *MemberExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitMemberExpression(e)
-}
-
-// IndexExpression
+// IndexingExpression
 
 type IndexExpression struct {
 	TargetExpression Expression
@@ -363,6 +373,21 @@ type IndexExpression struct {
 	EndPos             Position
 }
 
+func (*IndexExpression) isExpression() {}
+
+func (*IndexExpression) isAccessExpression() {}
+
+func (*IndexExpression) isTargetExpression() {}
+
+func (*IndexExpression) isIfStatementTest() {}
+
+func (e *IndexExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *IndexExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitIndexExpression(e)
+}
 func (e *IndexExpression) String() string {
 	var indexString string
 	if e.IndexingExpression != nil {
@@ -385,20 +410,6 @@ func (e *IndexExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*IndexExpression) isIfStatementTest() {}
-
-func (*IndexExpression) isExpression() {}
-
-func (*IndexExpression) isAccessExpression() {}
-
-func (e *IndexExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *IndexExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitIndexExpression(e)
-}
-
 // ConditionalExpression
 
 type ConditionalExpression struct {
@@ -407,6 +418,17 @@ type ConditionalExpression struct {
 	Else Expression
 }
 
+func (*ConditionalExpression) isExpression() {}
+
+func (*ConditionalExpression) isIfStatementTest() {}
+
+func (e *ConditionalExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *ConditionalExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitConditionalExpression(e)
+}
 func (e *ConditionalExpression) String() string {
 	return fmt.Sprintf(
 		"(%s ? %s : %s)",
@@ -422,18 +444,6 @@ func (e *ConditionalExpression) EndPosition() Position {
 	return e.Else.EndPosition()
 }
 
-func (*ConditionalExpression) isIfStatementTest() {}
-
-func (*ConditionalExpression) isExpression() {}
-
-func (e *ConditionalExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *ConditionalExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitConditionalExpression(e)
-}
-
 // UnaryExpression
 
 type UnaryExpression struct {
@@ -441,6 +451,18 @@ type UnaryExpression struct {
 	Expression Expression
 	StartPos   Position
 	EndPos     Position
+}
+
+func (*UnaryExpression) isExpression() {}
+
+func (*UnaryExpression) isIfStatementTest() {}
+
+func (e *UnaryExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *UnaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitUnaryExpression(e)
 }
 
 func (e *UnaryExpression) String() string {
@@ -458,24 +480,24 @@ func (e *UnaryExpression) EndPosition() Position {
 	return e.EndPos
 }
 
-func (*UnaryExpression) isIfStatementTest() {}
-
-func (*UnaryExpression) isExpression() {}
-
-func (e *UnaryExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *UnaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitUnaryExpression(e)
-}
-
 // BinaryExpression
 
 type BinaryExpression struct {
 	Operation Operation
 	Left      Expression
 	Right     Expression
+}
+
+func (*BinaryExpression) isExpression() {}
+
+func (*BinaryExpression) isIfStatementTest() {}
+
+func (e *BinaryExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *BinaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitBinaryExpression(e)
 }
 
 func (e *BinaryExpression) String() string {
@@ -493,18 +515,6 @@ func (e *BinaryExpression) EndPosition() Position {
 	return e.Right.EndPosition()
 }
 
-func (*BinaryExpression) isIfStatementTest() {}
-
-func (*BinaryExpression) isExpression() {}
-
-func (e *BinaryExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *BinaryExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitBinaryExpression(e)
-}
-
 // FunctionExpression
 
 type FunctionExpression struct {
@@ -514,9 +524,21 @@ type FunctionExpression struct {
 	StartPos             Position
 }
 
+func (*FunctionExpression) isExpression() {}
+
+func (*FunctionExpression) isIfStatementTest() {}
+
+func (e *FunctionExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *FunctionExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitFunctionExpression(e)
+}
+
 func (e *FunctionExpression) String() string {
 	// TODO:
-	return "..."
+	return "func ..."
 }
 
 func (e *FunctionExpression) StartPosition() Position {
@@ -527,23 +549,23 @@ func (e *FunctionExpression) EndPosition() Position {
 	return e.FunctionBlock.EndPosition()
 }
 
-func (*FunctionExpression) isIfStatementTest() {}
-
-func (*FunctionExpression) isExpression() {}
-
-func (e *FunctionExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *FunctionExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitFunctionExpression(e)
-}
-
 // FailableDowncastExpression
 
 type FailableDowncastExpression struct {
 	Expression     Expression
 	TypeAnnotation *TypeAnnotation
+}
+
+func (*FailableDowncastExpression) isExpression() {}
+
+func (*FailableDowncastExpression) isIfStatementTest() {}
+
+func (e *FailableDowncastExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *FailableDowncastExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitFailableDowncastExpression(e)
 }
 
 func (e *FailableDowncastExpression) String() string {
@@ -561,23 +583,23 @@ func (e *FailableDowncastExpression) EndPosition() Position {
 	return e.TypeAnnotation.EndPosition()
 }
 
-func (*FailableDowncastExpression) isIfStatementTest() {}
-
-func (*FailableDowncastExpression) isExpression() {}
-
-func (e *FailableDowncastExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *FailableDowncastExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitFailableDowncastExpression(e)
-}
-
 // CreateExpression
 
 type CreateExpression struct {
 	InvocationExpression *InvocationExpression
 	StartPos             Position
+}
+
+func (*CreateExpression) isExpression() {}
+
+func (*CreateExpression) isIfStatementTest() {}
+
+func (e *CreateExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *CreateExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitCreateExpression(e)
 }
 
 func (e *CreateExpression) String() string {
@@ -595,23 +617,23 @@ func (e *CreateExpression) EndPosition() Position {
 	return e.InvocationExpression.EndPos
 }
 
-func (*CreateExpression) isIfStatementTest() {}
-
-func (*CreateExpression) isExpression() {}
-
-func (e *CreateExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *CreateExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitCreateExpression(e)
-}
-
 // DestroyExpression
 
 type DestroyExpression struct {
 	Expression Expression
 	StartPos   Position
+}
+
+func (*DestroyExpression) isExpression() {}
+
+func (*DestroyExpression) isIfStatementTest() {}
+
+func (e *DestroyExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *DestroyExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitDestroyExpression(e)
 }
 
 func (e *DestroyExpression) String() string {
@@ -627,16 +649,4 @@ func (e *DestroyExpression) StartPosition() Position {
 
 func (e *DestroyExpression) EndPosition() Position {
 	return e.Expression.EndPosition()
-}
-
-func (*DestroyExpression) isIfStatementTest() {}
-
-func (*DestroyExpression) isExpression() {}
-
-func (e *DestroyExpression) Accept(visitor Visitor) Repr {
-	return e.AcceptExp(visitor)
-}
-
-func (e *DestroyExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitDestroyExpression(e)
 }

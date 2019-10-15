@@ -130,3 +130,21 @@ func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.
 
 	return &account, nil
 }
+
+func (c *Client) GetEvents(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
+	res, err := c.rpcClient.GetEvents(
+		ctx,
+		proto.EventQueryToMessage(query),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Events are sent over the wire JSON-encoded.
+	var events []*types.Event
+	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}

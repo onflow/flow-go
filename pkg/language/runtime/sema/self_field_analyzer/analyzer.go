@@ -123,10 +123,25 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitBreakStatement(*ast.BreakState
 	return analyzer.assignments
 }
 
-func (analyzer *SelfFieldAssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitAssignmentStatement(node *ast.AssignmentStatement) ast.Repr {
 	node.Value.Accept(analyzer)
 
 	if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
+		if analyzer.isSelfExpression(memberExpression.Expression) {
+			return analyzer.assignments.Insert(memberExpression.Identifier)
+		}
+	}
+
+	return analyzer.assignments
+}
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitSwapStatement(node *ast.SwapStatement) ast.Repr {
+	if memberExpression, ok := node.Left.(*ast.MemberExpression); ok {
+		if analyzer.isSelfExpression(memberExpression.Expression) {
+			return analyzer.assignments.Insert(memberExpression.Identifier)
+		}
+	}
+
+	if memberExpression, ok := node.Right.(*ast.MemberExpression); ok {
 		if analyzer.isSelfExpression(memberExpression.Expression) {
 			return analyzer.assignments.Insert(memberExpression.Identifier)
 		}
@@ -186,6 +201,14 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitCondition(*ast.Condition) ast.
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitImportDeclaration(*ast.ImportDeclaration) ast.Repr {
+	return analyzer.assignments
+}
+
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	return analyzer.assignments
+}
+
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
 	return analyzer.assignments
 }
 

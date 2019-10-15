@@ -18,6 +18,7 @@ const (
 	DeclarationKindStructure
 	DeclarationKindResource
 	DeclarationKindContract
+	DeclarationKindEvent
 	DeclarationKindField
 	DeclarationKindInitializer
 	DeclarationKindStructureInterface
@@ -50,6 +51,8 @@ func (k DeclarationKind) Name() string {
 		return "resource"
 	case DeclarationKindContract:
 		return "contract"
+	case DeclarationKindEvent:
+		return "event"
 	case DeclarationKindField:
 		return "field"
 	case DeclarationKindInitializer:

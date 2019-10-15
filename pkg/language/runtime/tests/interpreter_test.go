@@ -4499,3 +4499,55 @@ func TestInterpretStorage(t *testing.T) {
 		value,
 	)
 }
+
+func TestInterpretSwapVariables(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       fun test(): [Int] {
+           var x = 2
+           var y = 3
+           x <-> y
+           return [x, y]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretSwapArrayAndField(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       struct Foo {
+           var bar: Int
+
+           init(bar: Int) {
+               self.bar = bar
+           }
+       }
+
+       fun test(): [Int] {
+           let foo = Foo(bar: 1)
+           let nums = [2]
+           foo.bar <-> nums[0]
+           return [foo.bar, nums[0]]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(1),
+		),
+		value,
+	)
+}
