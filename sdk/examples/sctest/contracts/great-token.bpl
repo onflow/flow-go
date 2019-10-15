@@ -3,7 +3,7 @@ struct interface NFT {
     post {
       result > 0
     }
-  }
+  } 
 }
 
 struct GreatNFT: NFT {
@@ -32,10 +32,6 @@ struct GreatNFTMinter {
     var nextNFT = GreatNFT(id: self._nextID)
     self._nextID = self._nextID + 1
     return nextNFT
-  }
-
-  fun test(): Int {
-    return 100
   }
 
   init() {
