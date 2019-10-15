@@ -27,7 +27,7 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 // Message models a single message that is supposed to get exchanged by the gossip network
 type GossipMessage struct {
 	Payload              []byte   `protobuf:"bytes,1,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	Method               string   `protobuf:"bytes,2,opt,name=Method,proto3" json:"Method,omitempty"`
+	MessageType          string   `protobuf:"bytes,2,opt,name=messageType,proto3" json:"messageType,omitempty"`
 	Recipients           []string `protobuf:"bytes,3,rep,name=Recipients,proto3" json:"Recipients,omitempty"`
 	Sender               string   `protobuf:"bytes,4,opt,name=Sender,proto3" json:"Sender,omitempty"`
 	Path                 []string `protobuf:"bytes,5,rep,name=Path,proto3" json:"Path,omitempty"`
@@ -70,9 +70,9 @@ func (m *GossipMessage) GetPayload() []byte {
 	return nil
 }
 
-func (m *GossipMessage) GetMethod() string {
+func (m *GossipMessage) GetMessageType() string {
 	if m != nil {
-		return m.Method
+		return m.MessageType
 	}
 	return ""
 }
@@ -159,25 +159,25 @@ func init() {
 func init() { proto.RegisterFile("shared/gossip.proto", fileDescriptor_b864370d9939db87) }
 
 var fileDescriptor_b864370d9939db87 = []byte{
-	// 273 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x51, 0xb1, 0x4e, 0xc3, 0x30,
-	0x10, 0xc5, 0x24, 0xa4, 0xe4, 0x28, 0x02, 0x1d, 0x12, 0xb2, 0x18, 0x20, 0x64, 0xca, 0x14, 0x04,
-	0x7c, 0x01, 0x5d, 0x58, 0xa8, 0xd4, 0xba, 0x9d, 0xd8, 0x42, 0x73, 0x34, 0x91, 0xa2, 0xd8, 0xb2,
-	0x1d, 0x50, 0xbe, 0x8b, 0x85, 0xcf, 0x43, 0xb1, 0x83, 0x44, 0x85, 0xd8, 0xd8, 0xde, 0xbb, 0x77,
-	0xcf, 0x7a, 0x7e, 0x07, 0x67, 0xa6, 0x2a, 0x34, 0x95, 0x37, 0x5b, 0x69, 0x4c, 0xad, 0x72, 0xa5,
-	0xa5, 0x95, 0x88, 0xaf, 0x8d, 0x7c, 0xcf, 0xbd, 0x92, 0x7b, 0x25, 0xfd, 0x60, 0x70, 0xfc, 0xe8,
-	0xe0, 0x9c, 0x8c, 0x29, 0xb6, 0x84, 0x1c, 0x26, 0x8b, 0xa2, 0x6f, 0x64, 0x51, 0x72, 0x96, 0xb0,
-	0x6c, 0x2a, 0xbe, 0x29, 0x9e, 0x43, 0x34, 0x27, 0x5b, 0xc9, 0x92, 0xef, 0x27, 0x2c, 0x8b, 0xc5,
-	0xc8, 0xf0, 0x12, 0x40, 0xd0, 0xa6, 0x56, 0x35, 0xb5, 0xd6, 0xf0, 0x20, 0x09, 0xb2, 0x58, 0xfc,
-	0x98, 0x0c, 0xbe, 0x15, 0xb5, 0x25, 0x69, 0x1e, 0x7a, 0x9f, 0x67, 0x88, 0x10, 0x2e, 0x0a, 0x5b,
-	0xf1, 0x03, 0xe7, 0x70, 0x18, 0x4f, 0x21, 0x58, 0xaf, 0x9f, 0x78, 0x94, 0xb0, 0x2c, 0x14, 0x03,
-	0x1c, 0xb6, 0xba, 0xae, 0x2e, 0xf9, 0xc4, 0x79, 0x1d, 0x4e, 0x6f, 0xe1, 0xc8, 0x87, 0x16, 0xa4,
-	0x9a, 0x1e, 0x53, 0x98, 0x6a, 0x32, 0x4a, 0xb6, 0x86, 0x66, 0xbd, 0xa5, 0x31, 0xf7, 0xce, 0xec,
-	0xee, 0x93, 0xc1, 0xc9, 0xf8, 0xc5, 0x21, 0x1a, 0xbd, 0x91, 0x46, 0x01, 0xf0, 0x60, 0xfa, 0x76,
-	0xb3, 0xec, 0xa8, 0x23, 0xbc, 0xce, 0x7f, 0xf7, 0x93, 0xef, 0x74, 0x73, 0x71, 0xf5, 0xf7, 0x8a,
-	0x4b, 0x92, 0xee, 0xe1, 0x12, 0xe2, 0xd5, 0xff, 0x3e, 0x39, 0x3b, 0x7c, 0x8e, 0xbc, 0xfc, 0x12,
-	0xb9, 0x43, 0xde, 0x7f, 0x05, 0x00, 0x00, 0xff, 0xff, 0x1a, 0x08, 0x87, 0x2b, 0xdf, 0x01, 0x00,
-	0x00,
+	// 276 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x51, 0xbd, 0x4e, 0xc3, 0x30,
+	0x10, 0xc6, 0x34, 0xa4, 0xe4, 0x5a, 0x04, 0x3a, 0x24, 0x64, 0x31, 0x40, 0xc8, 0x94, 0x29, 0x08,
+	0x78, 0x02, 0xba, 0xb0, 0x80, 0xd4, 0xba, 0x99, 0xd8, 0x42, 0x72, 0xb4, 0x91, 0x42, 0x6c, 0xd9,
+	0x09, 0xc8, 0x6f, 0xc6, 0xc2, 0xbb, 0xa1, 0xda, 0x41, 0x6a, 0x85, 0xd8, 0xd8, 0xbe, 0xfb, 0x7e,
+	0xac, 0xbb, 0xcf, 0x70, 0x6a, 0xd6, 0x85, 0xa6, 0xea, 0x7a, 0x25, 0x8d, 0xa9, 0x55, 0xa6, 0xb4,
+	0xec, 0x24, 0xe2, 0x6b, 0x23, 0x3f, 0x32, 0xaf, 0x64, 0x5e, 0x49, 0xbe, 0x18, 0x1c, 0x3d, 0x38,
+	0xf8, 0x44, 0xc6, 0x14, 0x2b, 0x42, 0x0e, 0xe3, 0x79, 0x61, 0x1b, 0x59, 0x54, 0x9c, 0xc5, 0x2c,
+	0x9d, 0x8a, 0x9f, 0x11, 0x63, 0x98, 0xbc, 0x79, 0x53, 0x6e, 0x15, 0xf1, 0xfd, 0x98, 0xa5, 0x91,
+	0xd8, 0xa6, 0xf0, 0x02, 0x40, 0x50, 0x59, 0xab, 0x9a, 0xda, 0xce, 0xf0, 0x51, 0x3c, 0x4a, 0x23,
+	0xb1, 0xc5, 0xe0, 0x19, 0x84, 0x4b, 0x6a, 0x2b, 0xd2, 0x3c, 0x70, 0xe1, 0x61, 0x42, 0x84, 0x60,
+	0x5e, 0x74, 0x6b, 0x7e, 0xe0, 0x12, 0x0e, 0xe3, 0x09, 0x8c, 0xf2, 0xfc, 0x91, 0x87, 0x31, 0x4b,
+	0x03, 0xb1, 0x81, 0x1b, 0x57, 0xdf, 0xd7, 0x15, 0x1f, 0xbb, 0xac, 0xc3, 0xc9, 0x0d, 0x4c, 0xfc,
+	0xfa, 0x82, 0x54, 0x63, 0x31, 0x81, 0xa9, 0x26, 0xa3, 0x64, 0x6b, 0x68, 0x66, 0x3b, 0x1a, 0x2e,
+	0xd8, 0xe1, 0x6e, 0x3f, 0x19, 0x1c, 0x0f, 0xc7, 0x0a, 0x2a, 0xa9, 0x7e, 0x27, 0x8d, 0x02, 0xe0,
+	0xde, 0xd8, 0xb6, 0x5c, 0xf4, 0xd4, 0x13, 0x5e, 0x65, 0xbf, 0x9b, 0xca, 0x76, 0x5a, 0x3a, 0xbf,
+	0xfc, 0xdb, 0xe2, 0x36, 0x49, 0xf6, 0x70, 0x01, 0xd1, 0xf2, 0x7f, 0x9f, 0x9c, 0x1d, 0x3e, 0x87,
+	0x5e, 0x7e, 0x09, 0xdd, 0x97, 0xde, 0x7d, 0x07, 0x00, 0x00, 0xff, 0xff, 0xea, 0xbc, 0x29, 0x67,
+	0xe9, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -188,108 +188,108 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// MessageRecieverClient is the client API for MessageReciever service.
+// MessageReceiverClient is the client API for MessageReceiver service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type MessageRecieverClient interface {
+type MessageReceiverClient interface {
 	AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
 	SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
 }
 
-type messageRecieverClient struct {
+type messageReceiverClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewMessageRecieverClient(cc *grpc.ClientConn) MessageRecieverClient {
-	return &messageRecieverClient{cc}
+func NewMessageReceiverClient(cc *grpc.ClientConn) MessageReceiverClient {
+	return &messageReceiverClient{cc}
 }
 
-func (c *messageRecieverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
+func (c *messageReceiverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
 	out := new(GossipReply)
-	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReciever/AsyncQueue", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReceiver/AsyncQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *messageRecieverClient) SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
+func (c *messageReceiverClient) SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
 	out := new(GossipReply)
-	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReciever/SyncQueue", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flow.shared.gossip.MessageReceiver/SyncQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// MessageRecieverServer is the server API for MessageReciever service.
-type MessageRecieverServer interface {
+// MessageReceiverServer is the server API for MessageReceiver service.
+type MessageReceiverServer interface {
 	AsyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
 	SyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
 }
 
-// UnimplementedMessageRecieverServer can be embedded to have forward compatible implementations.
-type UnimplementedMessageRecieverServer struct {
+// UnimplementedMessageReceiverServer can be embedded to have forward compatible implementations.
+type UnimplementedMessageReceiverServer struct {
 }
 
-func (*UnimplementedMessageRecieverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
+func (*UnimplementedMessageReceiverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AsyncQueue not implemented")
 }
-func (*UnimplementedMessageRecieverServer) SyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
+func (*UnimplementedMessageReceiverServer) SyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncQueue not implemented")
 }
 
-func RegisterMessageRecieverServer(s *grpc.Server, srv MessageRecieverServer) {
-	s.RegisterService(&_MessageReciever_serviceDesc, srv)
+func RegisterMessageReceiverServer(s *grpc.Server, srv MessageReceiverServer) {
+	s.RegisterService(&_MessageReceiver_serviceDesc, srv)
 }
 
-func _MessageReciever_AsyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MessageReceiver_AsyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GossipMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MessageRecieverServer).AsyncQueue(ctx, in)
+		return srv.(MessageReceiverServer).AsyncQueue(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/flow.shared.gossip.MessageReciever/AsyncQueue",
+		FullMethod: "/flow.shared.gossip.MessageReceiver/AsyncQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageRecieverServer).AsyncQueue(ctx, req.(*GossipMessage))
+		return srv.(MessageReceiverServer).AsyncQueue(ctx, req.(*GossipMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MessageReciever_SyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MessageReceiver_SyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GossipMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MessageRecieverServer).SyncQueue(ctx, in)
+		return srv.(MessageReceiverServer).SyncQueue(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/flow.shared.gossip.MessageReciever/SyncQueue",
+		FullMethod: "/flow.shared.gossip.MessageReceiver/SyncQueue",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageRecieverServer).SyncQueue(ctx, req.(*GossipMessage))
+		return srv.(MessageReceiverServer).SyncQueue(ctx, req.(*GossipMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _MessageReciever_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "flow.shared.gossip.MessageReciever",
-	HandlerType: (*MessageRecieverServer)(nil),
+var _MessageReceiver_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "flow.shared.gossip.MessageReceiver",
+	HandlerType: (*MessageReceiverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "AsyncQueue",
-			Handler:    _MessageReciever_AsyncQueue_Handler,
+			Handler:    _MessageReceiver_AsyncQueue_Handler,
 		},
 		{
 			MethodName: "SyncQueue",
-			Handler:    _MessageReciever_SyncQueue_Handler,
+			Handler:    _MessageReceiver_SyncQueue_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

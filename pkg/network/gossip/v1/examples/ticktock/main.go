@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"log"
 	"net"
 	"time"
@@ -11,27 +12,34 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
-// Demo of for the gossip async node implementation
+// Demo of for the gossip node implementation
 // How to run: just start three instances of this program. The nodes will
 // communicate with each other and place gossip messages.
 
 func main() {
 	portPool := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 
+	// step 1: establishing a tcp listener on an available port
 	listener, err := pickPort(portPool)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	servePort := listener.Addr().String()
 
 	fmt.Println(servePort)
 	if err != nil {
 		log.Fatal(err)
 	}
-	node := gnode.NewNode()
 
-	Time := func(payloadBytes []byte) ([]byte, error) {
+	// step 2: registering the grpc services if any
+	// Note: this example is not built upon any grpc service, hence we pass nil
+	node := gnode.NewNode(zerolog.Logger{}, nil)
+
+	// step 3: passing the listener to the instance of gnode
+	go node.Serve(listener)
+
+	// Defining and adding a time function to the registry of node
+	Time := func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
 		newMsg := &Message{}
 		if err := proto.Unmarshal(payloadBytes, newMsg); err != nil {
 			return nil, fmt.Errorf("could not unmarshal payload: %v", err)
@@ -43,9 +51,8 @@ func main() {
 		return []byte("Pong"), nil
 	}
 
+	// add the Time function to the node's registry
 	node.RegisterFunc("Time", Time)
-
-	go node.Serve(listener)
 
 	peers := make([]string, 0)
 	for _, port := range portPool {
@@ -68,13 +75,13 @@ func main() {
 				}
 				// You can try to change the line bellow to AsyncGossip(...), when you do
 				// so you will notice that the responses returned to you will be empty
-				// (that is because AyncGossip does not wait for the sent messages to be
+				// (that is because AsyncGossip does not wait for the sent messages to be
 				// processed)
-				resps, err := node.SyncGossip(context.Background(), bytes, peers, "Time")
+				rep, err := node.SyncGossip(context.Background(), bytes, peers, "Time")
 				if err != nil {
 					log.Println(err)
 				}
-				for _, resp := range resps {
+				for _, resp := range rep {
 					if resp == nil {
 						continue
 					}
@@ -85,6 +92,7 @@ func main() {
 	}
 }
 
+// pickPort chooses a port from the port pool which is available
 func pickPort(portPool []string) (net.Listener, error) {
 	for _, port := range portPool {
 		ln, err := net.Listen("tcp4", port)

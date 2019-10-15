@@ -52,6 +52,9 @@ type StrictusListener interface {
 	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
 
+	// EnterEventDeclaration is called when entering the eventDeclaration production.
+	EnterEventDeclaration(c *EventDeclarationContext)
+
 	// EnterParameterList is called when entering the parameterList production.
 	EnterParameterList(c *ParameterListContext)
 
@@ -120,6 +123,9 @@ type StrictusListener interface {
 
 	// EnterWhileStatement is called when entering the whileStatement production.
 	EnterWhileStatement(c *WhileStatementContext)
+
+	// EnterEmitStatement is called when entering the emitStatement production.
+	EnterEmitStatement(c *EmitStatementContext)
 
 	// EnterVariableDeclaration is called when entering the variableDeclaration production.
 	EnterVariableDeclaration(c *VariableDeclarationContext)
@@ -319,6 +325,9 @@ type StrictusListener interface {
 	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)
 
+	// ExitEventDeclaration is called when exiting the eventDeclaration production.
+	ExitEventDeclaration(c *EventDeclarationContext)
+
 	// ExitParameterList is called when exiting the parameterList production.
 	ExitParameterList(c *ParameterListContext)
 
@@ -387,6 +396,9 @@ type StrictusListener interface {
 
 	// ExitWhileStatement is called when exiting the whileStatement production.
 	ExitWhileStatement(c *WhileStatementContext)
+
+	// ExitEmitStatement is called when exiting the emitStatement production.
+	ExitEmitStatement(c *EmitStatementContext)
 
 	// ExitVariableDeclaration is called when exiting the variableDeclaration production.
 	ExitVariableDeclaration(c *VariableDeclarationContext)

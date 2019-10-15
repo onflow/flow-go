@@ -3,11 +3,32 @@ package proto
 import (
 	"errors"
 
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
+
+func MessageToBlockHeader(m *shared.BlockHeader) types.BlockHeader {
+	return types.BlockHeader{
+		Hash:              crypto.BytesToHash(m.GetHash()),
+		PreviousBlockHash: crypto.BytesToHash(m.GetPreviousBlockHash()),
+		Number:            m.GetNumber(),
+		TransactionCount:  m.GetTransactionCount(),
+	}
+}
+
+func BlockHeaderToMessage(b types.BlockHeader) *shared.BlockHeader {
+	return &shared.BlockHeader{
+		Hash:              b.Hash,
+		PreviousBlockHash: b.PreviousBlockHash,
+		Number:            b.Number,
+		TransactionCount:  b.TransactionCount,
+	}
+}
 
 func MessageToAccountSignature(m *shared.AccountSignature) types.AccountSignature {
 	return types.AccountSignature{
@@ -16,10 +37,10 @@ func MessageToAccountSignature(m *shared.AccountSignature) types.AccountSignatur
 	}
 }
 
-func AccountSignatureToMessage(t types.AccountSignature) *shared.AccountSignature {
+func AccountSignatureToMessage(a types.AccountSignature) *shared.AccountSignature {
 	return &shared.AccountSignature{
-		Account:   t.Account.Bytes(),
-		Signature: t.Signature,
+		Account:   a.Account.Bytes(),
+		Signature: a.Signature,
 	}
 }
 
@@ -115,7 +136,7 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
 
 	return types.AccountKey{
 		PublicKey: m.PublicKey,
-		Weight:    m.Weight,
+		Weight:    int(m.Weight),
 	}, nil
 }
 
@@ -123,5 +144,13 @@ func AccountKeyToMessage(a types.AccountKey) *shared.AccountKey {
 	return &shared.AccountKey{
 		PublicKey: a.PublicKey,
 		Weight:    uint32(a.Weight),
+	}
+}
+
+func EventQueryToMessage(q *types.EventQuery) *observe.GetEventsRequest {
+	return &observe.GetEventsRequest{
+		EventId:    q.ID,
+		StartBlock: q.StartBlock,
+		EndBlock:   q.EndBlock,
 	}
 }

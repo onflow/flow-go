@@ -6,10 +6,16 @@ package flow.shared.messages;
 
 option go_package = "shared";
 
+message BlockHeader {
+  bytes hash = 1;
+  bytes previousBlockHash = 2;
+  uint64 number = 3;
+  uint32 transactionCount = 4;
+}
 
 message Block {
   string chainID = 1;
-  uint64 height = 2;
+  uint64 number = 2;
   bytes previousBlockHash = 3;
   google.protobuf.Timestamp timestamp = 4;
   repeated SignedCollectionHash signedCollectionHashes = 5;
@@ -108,3 +114,4 @@ message AccountKey {
   bytes public_key = 1;
   uint32 weight = 2;
 }
+

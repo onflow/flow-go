@@ -65,6 +65,7 @@ declaration
     | functionDeclaration[true]
     | variableDeclaration
     | importDeclaration
+    | eventDeclaration
     ;
 
 importDeclaration
@@ -129,6 +130,10 @@ functionDeclaration[bool functionBlockRequired]
     : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+    ;
+
+eventDeclaration
+    : Event identifier parameterList
     ;
 
 parameterList
@@ -213,6 +218,7 @@ statement
     | continueStatement
     | ifStatement
     | whileStatement
+    | emitStatement
     // NOTE: allow all declarations, even structures, in parser,
     // then check identifier declaration is variable/constant or function
     // in semantic analysis to provide better error
@@ -248,6 +254,10 @@ ifStatement
 
 whileStatement
     : While expression block
+    ;
+
+emitStatement
+    : Emit identifier invocation
     ;
 
 variableDeclaration
@@ -512,6 +522,9 @@ Contract : 'contract' ;
 Interface : 'interface' ;
 
 Fun : 'fun' ;
+
+Event : 'event' ;
+Emit : 'emit' ;
 
 Pre : 'pre' ;
 Post : 'post' ;

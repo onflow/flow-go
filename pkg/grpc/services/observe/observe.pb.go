@@ -8,7 +8,6 @@ import (
 	fmt "fmt"
 	shared "github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	proto "github.com/golang/protobuf/proto"
-	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -25,31 +24,6 @@ var _ = math.Inf
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
-
-type Block_Status int32
-
-const (
-	Block_STATUS_PENDING Block_Status = 0
-	Block_STATUS_SEALED  Block_Status = 1
-)
-
-var Block_Status_name = map[int32]string{
-	0: "STATUS_PENDING",
-	1: "STATUS_SEALED",
-}
-
-var Block_Status_value = map[string]int32{
-	"STATUS_PENDING": 0,
-	"STATUS_SEALED":  1,
-}
-
-func (x Block_Status) String() string {
-	return proto.EnumName(Block_Status_name, int32(x))
-}
-
-func (Block_Status) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{4, 0}
-}
 
 type PingRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -199,241 +173,6 @@ func (m *SendTransactionResponse) GetHash() []byte {
 	return nil
 }
 
-type Block struct {
-	Hash                 []byte               `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
-	Number               uint64               `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
-	PrevBlockHash        []byte               `protobuf:"bytes,3,opt,name=prev_block_hash,json=prevBlockHash,proto3" json:"prev_block_hash,omitempty"`
-	Timestamp            *timestamp.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	TransactionHashes    [][]byte             `protobuf:"bytes,5,rep,name=transaction_hashes,json=transactionHashes,proto3" json:"transaction_hashes,omitempty"`
-	Status               Block_Status         `protobuf:"varint,6,opt,name=status,proto3,enum=flow.services.observe.Block_Status" json:"status,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
-}
-
-func (m *Block) Reset()         { *m = Block{} }
-func (m *Block) String() string { return proto.CompactTextString(m) }
-func (*Block) ProtoMessage()    {}
-func (*Block) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{4}
-}
-
-func (m *Block) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Block.Unmarshal(m, b)
-}
-func (m *Block) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Block.Marshal(b, m, deterministic)
-}
-func (m *Block) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Block.Merge(m, src)
-}
-func (m *Block) XXX_Size() int {
-	return xxx_messageInfo_Block.Size(m)
-}
-func (m *Block) XXX_DiscardUnknown() {
-	xxx_messageInfo_Block.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Block proto.InternalMessageInfo
-
-func (m *Block) GetHash() []byte {
-	if m != nil {
-		return m.Hash
-	}
-	return nil
-}
-
-func (m *Block) GetNumber() uint64 {
-	if m != nil {
-		return m.Number
-	}
-	return 0
-}
-
-func (m *Block) GetPrevBlockHash() []byte {
-	if m != nil {
-		return m.PrevBlockHash
-	}
-	return nil
-}
-
-func (m *Block) GetTimestamp() *timestamp.Timestamp {
-	if m != nil {
-		return m.Timestamp
-	}
-	return nil
-}
-
-func (m *Block) GetTransactionHashes() [][]byte {
-	if m != nil {
-		return m.TransactionHashes
-	}
-	return nil
-}
-
-func (m *Block) GetStatus() Block_Status {
-	if m != nil {
-		return m.Status
-	}
-	return Block_STATUS_PENDING
-}
-
-type GetBlockByHashRequest struct {
-	Hash                 []byte   `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockByHashRequest) Reset()         { *m = GetBlockByHashRequest{} }
-func (m *GetBlockByHashRequest) String() string { return proto.CompactTextString(m) }
-func (*GetBlockByHashRequest) ProtoMessage()    {}
-func (*GetBlockByHashRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{5}
-}
-
-func (m *GetBlockByHashRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockByHashRequest.Unmarshal(m, b)
-}
-func (m *GetBlockByHashRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockByHashRequest.Marshal(b, m, deterministic)
-}
-func (m *GetBlockByHashRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockByHashRequest.Merge(m, src)
-}
-func (m *GetBlockByHashRequest) XXX_Size() int {
-	return xxx_messageInfo_GetBlockByHashRequest.Size(m)
-}
-func (m *GetBlockByHashRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockByHashRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockByHashRequest proto.InternalMessageInfo
-
-func (m *GetBlockByHashRequest) GetHash() []byte {
-	if m != nil {
-		return m.Hash
-	}
-	return nil
-}
-
-type GetBlockByHashResponse struct {
-	Block                *Block   `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockByHashResponse) Reset()         { *m = GetBlockByHashResponse{} }
-func (m *GetBlockByHashResponse) String() string { return proto.CompactTextString(m) }
-func (*GetBlockByHashResponse) ProtoMessage()    {}
-func (*GetBlockByHashResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{6}
-}
-
-func (m *GetBlockByHashResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockByHashResponse.Unmarshal(m, b)
-}
-func (m *GetBlockByHashResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockByHashResponse.Marshal(b, m, deterministic)
-}
-func (m *GetBlockByHashResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockByHashResponse.Merge(m, src)
-}
-func (m *GetBlockByHashResponse) XXX_Size() int {
-	return xxx_messageInfo_GetBlockByHashResponse.Size(m)
-}
-func (m *GetBlockByHashResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockByHashResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockByHashResponse proto.InternalMessageInfo
-
-func (m *GetBlockByHashResponse) GetBlock() *Block {
-	if m != nil {
-		return m.Block
-	}
-	return nil
-}
-
-type GetBlockByNumberRequest struct {
-	Number               uint64   `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockByNumberRequest) Reset()         { *m = GetBlockByNumberRequest{} }
-func (m *GetBlockByNumberRequest) String() string { return proto.CompactTextString(m) }
-func (*GetBlockByNumberRequest) ProtoMessage()    {}
-func (*GetBlockByNumberRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{7}
-}
-
-func (m *GetBlockByNumberRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockByNumberRequest.Unmarshal(m, b)
-}
-func (m *GetBlockByNumberRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockByNumberRequest.Marshal(b, m, deterministic)
-}
-func (m *GetBlockByNumberRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockByNumberRequest.Merge(m, src)
-}
-func (m *GetBlockByNumberRequest) XXX_Size() int {
-	return xxx_messageInfo_GetBlockByNumberRequest.Size(m)
-}
-func (m *GetBlockByNumberRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockByNumberRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockByNumberRequest proto.InternalMessageInfo
-
-func (m *GetBlockByNumberRequest) GetNumber() uint64 {
-	if m != nil {
-		return m.Number
-	}
-	return 0
-}
-
-type GetBlockByNumberResponse struct {
-	Block                *Block   `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockByNumberResponse) Reset()         { *m = GetBlockByNumberResponse{} }
-func (m *GetBlockByNumberResponse) String() string { return proto.CompactTextString(m) }
-func (*GetBlockByNumberResponse) ProtoMessage()    {}
-func (*GetBlockByNumberResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{8}
-}
-
-func (m *GetBlockByNumberResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockByNumberResponse.Unmarshal(m, b)
-}
-func (m *GetBlockByNumberResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockByNumberResponse.Marshal(b, m, deterministic)
-}
-func (m *GetBlockByNumberResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockByNumberResponse.Merge(m, src)
-}
-func (m *GetBlockByNumberResponse) XXX_Size() int {
-	return xxx_messageInfo_GetBlockByNumberResponse.Size(m)
-}
-func (m *GetBlockByNumberResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockByNumberResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockByNumberResponse proto.InternalMessageInfo
-
-func (m *GetBlockByNumberResponse) GetBlock() *Block {
-	if m != nil {
-		return m.Block
-	}
-	return nil
-}
-
 type GetLatestBlockRequest struct {
 	IsSealed             bool     `protobuf:"varint,1,opt,name=is_sealed,json=isSealed,proto3" json:"is_sealed,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -445,7 +184,7 @@ func (m *GetLatestBlockRequest) Reset()         { *m = GetLatestBlockRequest{} }
 func (m *GetLatestBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*GetLatestBlockRequest) ProtoMessage()    {}
 func (*GetLatestBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{9}
+	return fileDescriptor_4d6a761c9ca594cc, []int{4}
 }
 
 func (m *GetLatestBlockRequest) XXX_Unmarshal(b []byte) error {
@@ -474,17 +213,17 @@ func (m *GetLatestBlockRequest) GetIsSealed() bool {
 }
 
 type GetLatestBlockResponse struct {
-	Block                *Block   `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Block                *shared.BlockHeader `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
 }
 
 func (m *GetLatestBlockResponse) Reset()         { *m = GetLatestBlockResponse{} }
 func (m *GetLatestBlockResponse) String() string { return proto.CompactTextString(m) }
 func (*GetLatestBlockResponse) ProtoMessage()    {}
 func (*GetLatestBlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{10}
+	return fileDescriptor_4d6a761c9ca594cc, []int{5}
 }
 
 func (m *GetLatestBlockResponse) XXX_Unmarshal(b []byte) error {
@@ -505,7 +244,7 @@ func (m *GetLatestBlockResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetLatestBlockResponse proto.InternalMessageInfo
 
-func (m *GetLatestBlockResponse) GetBlock() *Block {
+func (m *GetLatestBlockResponse) GetBlock() *shared.BlockHeader {
 	if m != nil {
 		return m.Block
 	}
@@ -523,7 +262,7 @@ func (m *GetTransactionRequest) Reset()         { *m = GetTransactionRequest{} }
 func (m *GetTransactionRequest) String() string { return proto.CompactTextString(m) }
 func (*GetTransactionRequest) ProtoMessage()    {}
 func (*GetTransactionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{11}
+	return fileDescriptor_4d6a761c9ca594cc, []int{6}
 }
 
 func (m *GetTransactionRequest) XXX_Unmarshal(b []byte) error {
@@ -562,7 +301,7 @@ func (m *GetTransactionResponse) Reset()         { *m = GetTransactionResponse{}
 func (m *GetTransactionResponse) String() string { return proto.CompactTextString(m) }
 func (*GetTransactionResponse) ProtoMessage()    {}
 func (*GetTransactionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{12}
+	return fileDescriptor_4d6a761c9ca594cc, []int{7}
 }
 
 func (m *GetTransactionResponse) XXX_Unmarshal(b []byte) error {
@@ -601,7 +340,7 @@ func (m *GetAccountRequest) Reset()         { *m = GetAccountRequest{} }
 func (m *GetAccountRequest) String() string { return proto.CompactTextString(m) }
 func (*GetAccountRequest) ProtoMessage()    {}
 func (*GetAccountRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{13}
+	return fileDescriptor_4d6a761c9ca594cc, []int{8}
 }
 
 func (m *GetAccountRequest) XXX_Unmarshal(b []byte) error {
@@ -640,7 +379,7 @@ func (m *GetAccountResponse) Reset()         { *m = GetAccountResponse{} }
 func (m *GetAccountResponse) String() string { return proto.CompactTextString(m) }
 func (*GetAccountResponse) ProtoMessage()    {}
 func (*GetAccountResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{14}
+	return fileDescriptor_4d6a761c9ca594cc, []int{9}
 }
 
 func (m *GetAccountResponse) XXX_Unmarshal(b []byte) error {
@@ -679,7 +418,7 @@ func (m *CallScriptRequest) Reset()         { *m = CallScriptRequest{} }
 func (m *CallScriptRequest) String() string { return proto.CompactTextString(m) }
 func (*CallScriptRequest) ProtoMessage()    {}
 func (*CallScriptRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{15}
+	return fileDescriptor_4d6a761c9ca594cc, []int{10}
 }
 
 func (m *CallScriptRequest) XXX_Unmarshal(b []byte) error {
@@ -719,7 +458,7 @@ func (m *CallScriptResponse) Reset()         { *m = CallScriptResponse{} }
 func (m *CallScriptResponse) String() string { return proto.CompactTextString(m) }
 func (*CallScriptResponse) ProtoMessage()    {}
 func (*CallScriptResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_4d6a761c9ca594cc, []int{16}
+	return fileDescriptor_4d6a761c9ca594cc, []int{11}
 }
 
 func (m *CallScriptResponse) XXX_Unmarshal(b []byte) error {
@@ -754,17 +493,106 @@ func (m *CallScriptResponse) GetValue() []byte {
 	return nil
 }
 
+type GetEventsRequest struct {
+	EventId              string   `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	StartBlock           uint64   `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
+	EndBlock             uint64   `protobuf:"varint,3,opt,name=end_block,json=endBlock,proto3" json:"end_block,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetEventsRequest) Reset()         { *m = GetEventsRequest{} }
+func (m *GetEventsRequest) String() string { return proto.CompactTextString(m) }
+func (*GetEventsRequest) ProtoMessage()    {}
+func (*GetEventsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4d6a761c9ca594cc, []int{12}
+}
+
+func (m *GetEventsRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetEventsRequest.Unmarshal(m, b)
+}
+func (m *GetEventsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetEventsRequest.Marshal(b, m, deterministic)
+}
+func (m *GetEventsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetEventsRequest.Merge(m, src)
+}
+func (m *GetEventsRequest) XXX_Size() int {
+	return xxx_messageInfo_GetEventsRequest.Size(m)
+}
+func (m *GetEventsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetEventsRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetEventsRequest proto.InternalMessageInfo
+
+func (m *GetEventsRequest) GetEventId() string {
+	if m != nil {
+		return m.EventId
+	}
+	return ""
+}
+
+func (m *GetEventsRequest) GetStartBlock() uint64 {
+	if m != nil {
+		return m.StartBlock
+	}
+	return 0
+}
+
+func (m *GetEventsRequest) GetEndBlock() uint64 {
+	if m != nil {
+		return m.EndBlock
+	}
+	return 0
+}
+
+type GetEventsResponse struct {
+	// Contains JSON-encoded array of event objects
+	EventsJson           []byte   `protobuf:"bytes,1,opt,name=events_json,json=eventsJson,proto3" json:"events_json,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetEventsResponse) Reset()         { *m = GetEventsResponse{} }
+func (m *GetEventsResponse) String() string { return proto.CompactTextString(m) }
+func (*GetEventsResponse) ProtoMessage()    {}
+func (*GetEventsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4d6a761c9ca594cc, []int{13}
+}
+
+func (m *GetEventsResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetEventsResponse.Unmarshal(m, b)
+}
+func (m *GetEventsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetEventsResponse.Marshal(b, m, deterministic)
+}
+func (m *GetEventsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetEventsResponse.Merge(m, src)
+}
+func (m *GetEventsResponse) XXX_Size() int {
+	return xxx_messageInfo_GetEventsResponse.Size(m)
+}
+func (m *GetEventsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetEventsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetEventsResponse proto.InternalMessageInfo
+
+func (m *GetEventsResponse) GetEventsJson() []byte {
+	if m != nil {
+		return m.EventsJson
+	}
+	return nil
+}
+
 func init() {
-	proto.RegisterEnum("flow.services.observe.Block_Status", Block_Status_name, Block_Status_value)
 	proto.RegisterType((*PingRequest)(nil), "flow.services.observe.PingRequest")
 	proto.RegisterType((*PingResponse)(nil), "flow.services.observe.PingResponse")
 	proto.RegisterType((*SendTransactionRequest)(nil), "flow.services.observe.SendTransactionRequest")
 	proto.RegisterType((*SendTransactionResponse)(nil), "flow.services.observe.SendTransactionResponse")
-	proto.RegisterType((*Block)(nil), "flow.services.observe.Block")
-	proto.RegisterType((*GetBlockByHashRequest)(nil), "flow.services.observe.GetBlockByHashRequest")
-	proto.RegisterType((*GetBlockByHashResponse)(nil), "flow.services.observe.GetBlockByHashResponse")
-	proto.RegisterType((*GetBlockByNumberRequest)(nil), "flow.services.observe.GetBlockByNumberRequest")
-	proto.RegisterType((*GetBlockByNumberResponse)(nil), "flow.services.observe.GetBlockByNumberResponse")
 	proto.RegisterType((*GetLatestBlockRequest)(nil), "flow.services.observe.GetLatestBlockRequest")
 	proto.RegisterType((*GetLatestBlockResponse)(nil), "flow.services.observe.GetLatestBlockResponse")
 	proto.RegisterType((*GetTransactionRequest)(nil), "flow.services.observe.GetTransactionRequest")
@@ -773,57 +601,50 @@ func init() {
 	proto.RegisterType((*GetAccountResponse)(nil), "flow.services.observe.GetAccountResponse")
 	proto.RegisterType((*CallScriptRequest)(nil), "flow.services.observe.CallScriptRequest")
 	proto.RegisterType((*CallScriptResponse)(nil), "flow.services.observe.CallScriptResponse")
+	proto.RegisterType((*GetEventsRequest)(nil), "flow.services.observe.GetEventsRequest")
+	proto.RegisterType((*GetEventsResponse)(nil), "flow.services.observe.GetEventsResponse")
 }
 
 func init() { proto.RegisterFile("services/observe/observe.proto", fileDescriptor_4d6a761c9ca594cc) }
 
 var fileDescriptor_4d6a761c9ca594cc = []byte{
-	// 713 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xed, 0x4e, 0xdb, 0x30,
-	0x14, 0x5d, 0xa1, 0x2d, 0xf4, 0x52, 0x0a, 0xb5, 0x06, 0x44, 0xd9, 0x57, 0x67, 0xa4, 0xa9, 0x13,
-	0xab, 0xab, 0x75, 0x93, 0x36, 0x69, 0xd2, 0x24, 0xbe, 0x04, 0x93, 0x58, 0x41, 0x49, 0xf7, 0x67,
-	0x12, 0xaa, 0xdc, 0xd6, 0x94, 0x68, 0x69, 0x92, 0xc5, 0x2e, 0x13, 0xaf, 0xb5, 0xd7, 0xd9, 0xcb,
-	0x4c, 0xb5, 0x1d, 0x92, 0xd2, 0xa4, 0xab, 0xc4, 0x7e, 0x11, 0x5f, 0x9f, 0x73, 0xef, 0xb1, 0x0f,
-	0xc7, 0x85, 0xe7, 0x9c, 0x85, 0x37, 0x4e, 0x9f, 0xf1, 0xa6, 0xdf, 0x9b, 0x7c, 0xb2, 0xe8, 0x2f,
-	0x09, 0x42, 0x5f, 0xf8, 0x68, 0xeb, 0xca, 0xf5, 0x7f, 0x91, 0x08, 0x44, 0xf4, 0xa6, 0xf9, 0x62,
-	0xe8, 0xfb, 0x43, 0x97, 0x35, 0x25, 0xa8, 0x37, 0xbe, 0x6a, 0x0a, 0x67, 0xc4, 0xb8, 0xa0, 0xa3,
-	0x40, 0xf1, 0xcc, 0x2d, 0x7e, 0x4d, 0x43, 0x36, 0x68, 0x8e, 0x18, 0xe7, 0x74, 0xc8, 0xb8, 0x2a,
-	0xe3, 0x75, 0x58, 0xbb, 0x70, 0xbc, 0xa1, 0xc5, 0x7e, 0x8e, 0x19, 0x17, 0xb8, 0x0e, 0x65, 0xb5,
-	0xe4, 0x81, 0xef, 0x71, 0x86, 0x0c, 0x58, 0xa1, 0x83, 0x41, 0xc8, 0x38, 0x37, 0x72, 0xb5, 0x5c,
-	0xbd, 0x6c, 0x45, 0x4b, 0x7c, 0x09, 0xdb, 0x36, 0xf3, 0x06, 0x9d, 0x90, 0x7a, 0x9c, 0xf6, 0x85,
-	0xe3, 0x7b, 0xba, 0x07, 0x3a, 0x84, 0x35, 0x11, 0x57, 0x25, 0x6f, 0xad, 0xf5, 0x92, 0x28, 0xdd,
-	0x52, 0x04, 0xb9, 0x13, 0x91, 0xa4, 0x27, 0x59, 0xb8, 0x01, 0x3b, 0x33, 0xed, 0xb5, 0x26, 0x04,
-	0xf9, 0x6b, 0xca, 0xaf, 0xb5, 0x20, 0xf9, 0x8d, 0x7f, 0x2f, 0x41, 0xe1, 0xc0, 0xf5, 0xfb, 0x3f,
-	0xd2, 0x76, 0xd1, 0x36, 0x14, 0xbd, 0xf1, 0xa8, 0xc7, 0x42, 0x63, 0xa9, 0x96, 0xab, 0xe7, 0x2d,
-	0xbd, 0x42, 0xaf, 0x60, 0x23, 0x08, 0xd9, 0x4d, 0xb7, 0x37, 0x61, 0x76, 0x25, 0x6d, 0x59, 0xd2,
-	0xd6, 0x27, 0x65, 0xd9, 0xef, 0x74, 0xc2, 0xff, 0x08, 0xa5, 0xbb, 0xeb, 0x34, 0xf2, 0xf2, 0x3c,
-	0x26, 0x51, 0x17, 0x4e, 0xa2, 0x0b, 0x27, 0x9d, 0x08, 0x61, 0xc5, 0x60, 0xd4, 0x00, 0x94, 0x38,
-	0x95, 0x1c, 0xc1, 0xb8, 0x51, 0xa8, 0x2d, 0xd7, 0xcb, 0x56, 0x35, 0xb1, 0x73, 0x2a, 0x37, 0xd0,
-	0x27, 0x28, 0x72, 0x41, 0xc5, 0x98, 0x1b, 0xc5, 0x5a, 0xae, 0x5e, 0x69, 0xed, 0x92, 0x54, 0xb7,
-	0x89, 0x94, 0x46, 0x6c, 0x09, 0xb5, 0x34, 0x05, 0x37, 0xa1, 0xa8, 0x2a, 0x08, 0x41, 0xc5, 0xee,
-	0xec, 0x77, 0xbe, 0xd9, 0xdd, 0x8b, 0xe3, 0xf6, 0xd1, 0x97, 0xf6, 0xc9, 0xe6, 0x23, 0x54, 0x85,
-	0x75, 0x5d, 0xb3, 0x8f, 0xf7, 0xcf, 0x8e, 0x8f, 0x36, 0x73, 0x78, 0x0f, 0xb6, 0x4e, 0x98, 0x90,
-	0xbd, 0x0e, 0x6e, 0x27, 0x0a, 0x22, 0x07, 0xd3, 0x6e, 0xf8, 0x0c, 0xb6, 0xef, 0x83, 0xb5, 0x1f,
-	0x2d, 0x28, 0xc8, 0x0b, 0xd4, 0x4e, 0x3f, 0x9d, 0xa7, 0xd9, 0x52, 0x50, 0xfc, 0x16, 0x76, 0xe2,
-	0x6e, 0x6d, 0xe9, 0x46, 0x34, 0x3c, 0x36, 0x2b, 0x97, 0x34, 0x0b, 0xb7, 0xc1, 0x98, 0xa5, 0x3c,
-	0x40, 0xc2, 0x7b, 0x79, 0xfa, 0x33, 0x2a, 0x18, 0x57, 0x5d, 0x23, 0x01, 0x4f, 0xa0, 0xe4, 0xf0,
-	0x2e, 0x67, 0xd4, 0x65, 0x03, 0xd9, 0x70, 0xd5, 0x5a, 0x75, 0xb8, 0x2d, 0xd7, 0xfa, 0x1a, 0xa6,
-	0x58, 0x0f, 0xd0, 0xa0, 0x1c, 0x48, 0xc9, 0x50, 0x9a, 0x03, 0x97, 0x72, 0x74, 0x5a, 0x22, 0xfe,
-	0x53, 0xe2, 0xaa, 0x27, 0x4c, 0xec, 0xf7, 0xfb, 0xfe, 0xd8, 0x13, 0x91, 0x8e, 0xec, 0xfc, 0x7f,
-	0x05, 0x94, 0x84, 0x6b, 0x25, 0x1f, 0x60, 0x85, 0xaa, 0x92, 0x56, 0xf1, 0x2c, 0x5d, 0x45, 0xc4,
-	0x8b, 0xd0, 0x78, 0x0f, 0xaa, 0x87, 0xd4, 0x75, 0xed, 0x7e, 0xe8, 0x04, 0x22, 0xf1, 0xaf, 0xc0,
-	0x65, 0x41, 0x0f, 0xd7, 0x2b, 0xfc, 0x19, 0x50, 0x12, 0x1c, 0xbf, 0x0b, 0xe2, 0x36, 0x60, 0x12,
-	0x5b, 0xb2, 0xe4, 0x37, 0x7a, 0x0c, 0x85, 0x1b, 0xea, 0x8e, 0x99, 0x0c, 0x7e, 0xd9, 0x52, 0x8b,
-	0xd6, 0x9f, 0x22, 0x54, 0xce, 0x95, 0x1f, 0xb6, 0xf2, 0x07, 0x9d, 0x43, 0x7e, 0xf2, 0xf0, 0x21,
-	0x9c, 0x61, 0x5b, 0xe2, 0x91, 0x34, 0x77, 0xe7, 0x62, 0xb4, 0x9a, 0x00, 0x36, 0xee, 0x3d, 0x60,
-	0xa8, 0x91, 0xc1, 0x4b, 0x7f, 0x47, 0x4d, 0xb2, 0x28, 0x5c, 0x4f, 0x1c, 0x41, 0x65, 0x3a, 0xa1,
-	0xe8, 0x4d, 0x46, 0x87, 0xd4, 0xd4, 0x9b, 0x8d, 0x05, 0xd1, 0x7a, 0x1c, 0x87, 0xcd, 0xfb, 0x79,
-	0x44, 0xe4, 0x9f, 0x2d, 0xa6, 0xb2, 0x6e, 0x36, 0x17, 0xc6, 0x4f, 0x9d, 0x31, 0x11, 0xbf, 0x79,
-	0x67, 0x9c, 0xcd, 0xf6, 0xbc, 0x33, 0xa6, 0x65, 0x5a, 0x8d, 0x4b, 0x7a, 0x38, 0x67, 0x5c, 0x8a,
-	0x85, 0x8d, 0x05, 0xd1, 0x7a, 0x1c, 0x05, 0x88, 0x33, 0x85, 0xea, 0xd9, 0xe4, 0xe9, 0x94, 0x9a,
-	0xaf, 0x17, 0x40, 0xc6, 0x23, 0xe2, 0xe8, 0x64, 0x8e, 0x98, 0x89, 0x62, 0xe6, 0x88, 0xd9, 0x1c,
-	0x1e, 0x94, 0xbe, 0xaf, 0xe8, 0xdd, 0x5e, 0x51, 0xfe, 0x3a, 0xbe, 0xfb, 0x1b, 0x00, 0x00, 0xff,
-	0xff, 0xec, 0x08, 0xd2, 0x7a, 0xd5, 0x08, 0x00, 0x00,
+	// 570 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0x41, 0x6f, 0xd3, 0x4c,
+	0x10, 0x55, 0xbf, 0x2f, 0x69, 0x92, 0x49, 0x28, 0x74, 0x45, 0x42, 0x30, 0x82, 0xc2, 0x72, 0x20,
+	0xa8, 0xc4, 0x95, 0x4a, 0x25, 0x6e, 0x48, 0xb4, 0x42, 0x01, 0x04, 0x2a, 0x38, 0x9c, 0x90, 0x4a,
+	0xb4, 0xb1, 0x87, 0xc6, 0xd4, 0x5d, 0x07, 0xcf, 0x26, 0x88, 0x5f, 0xca, 0xdf, 0x41, 0xde, 0x5d,
+	0x27, 0x4e, 0x6b, 0x87, 0x1c, 0x38, 0xc5, 0x33, 0xf3, 0x66, 0xde, 0xdb, 0x9d, 0x7d, 0x0a, 0x3c,
+	0x20, 0x4c, 0xe6, 0xa1, 0x8f, 0x74, 0x10, 0x8f, 0xd3, 0x4f, 0xcc, 0x7e, 0xdd, 0x69, 0x12, 0xab,
+	0x98, 0xb5, 0xbf, 0x45, 0xf1, 0x4f, 0x37, 0x03, 0xb9, 0xb6, 0xe8, 0xb4, 0x69, 0x22, 0x12, 0x0c,
+	0x0e, 0x2e, 0x91, 0x48, 0x9c, 0x23, 0x19, 0x34, 0xbf, 0x01, 0xcd, 0x8f, 0xa1, 0x3c, 0xf7, 0xf0,
+	0xc7, 0x0c, 0x49, 0xf1, 0x1e, 0xb4, 0x4c, 0x48, 0xd3, 0x58, 0x12, 0xb2, 0x2e, 0xd4, 0x44, 0x10,
+	0x24, 0x48, 0xd4, 0xdd, 0x7a, 0xb8, 0xd5, 0x6b, 0x79, 0x59, 0xc8, 0xcf, 0xa0, 0x33, 0x44, 0x19,
+	0x7c, 0x4e, 0x84, 0x24, 0xe1, 0xab, 0x30, 0x96, 0x76, 0x06, 0x3b, 0x81, 0xa6, 0x5a, 0x66, 0x75,
+	0x5f, 0xf3, 0xf0, 0x91, 0x6b, 0x64, 0x69, 0x11, 0xee, 0x42, 0x44, 0xbe, 0x3d, 0xdf, 0xc5, 0xfb,
+	0x70, 0xe7, 0xda, 0x78, 0xab, 0x89, 0x41, 0x65, 0x22, 0x68, 0x62, 0x05, 0xe9, 0x6f, 0x7e, 0x04,
+	0xed, 0x01, 0xaa, 0xf7, 0x42, 0x21, 0xa9, 0xe3, 0x28, 0xf6, 0x2f, 0x32, 0x31, 0xf7, 0xa0, 0x11,
+	0xd2, 0x88, 0x50, 0x44, 0x18, 0xe8, 0x8e, 0xba, 0x57, 0x0f, 0x69, 0xa8, 0x63, 0xfe, 0x09, 0x3a,
+	0x57, 0xbb, 0x2c, 0xc7, 0x0b, 0xa8, 0x8e, 0xd3, 0xc4, 0x7a, 0xf5, 0xba, 0xe7, 0x0d, 0x8a, 0x00,
+	0x13, 0xcf, 0xe0, 0xf9, 0xbe, 0x16, 0x52, 0x70, 0x2b, 0x45, 0xaa, 0xcf, 0x34, 0x7f, 0xd1, 0x19,
+	0xff, 0xd1, 0x1d, 0xee, 0x0e, 0x50, 0xbd, 0xf2, 0xfd, 0x78, 0x26, 0x55, 0xa6, 0xa3, 0x7c, 0xa3,
+	0x1f, 0x80, 0xe5, 0xe1, 0x8b, 0x9b, 0xa8, 0x09, 0x93, 0xb2, 0x2a, 0xee, 0x17, 0xab, 0xc8, 0xfa,
+	0x32, 0x34, 0xdf, 0x87, 0xdd, 0x13, 0x11, 0x45, 0x43, 0x3f, 0x09, 0xa7, 0x0b, 0xf6, 0x0e, 0x6c,
+	0x93, 0x4e, 0x58, 0x72, 0x1b, 0xf1, 0x97, 0xc0, 0xf2, 0xe0, 0xe5, 0xa6, 0xd5, 0xaf, 0x29, 0x6a,
+	0x6c, 0xc3, 0xd3, 0xdf, 0xec, 0x36, 0x54, 0xe7, 0x22, 0x9a, 0x61, 0xf7, 0x3f, 0x3d, 0xc0, 0x04,
+	0xfc, 0x02, 0x6e, 0x0d, 0x50, 0xbd, 0x9e, 0xa3, 0x54, 0x94, 0x71, 0xdd, 0x85, 0x3a, 0xa6, 0x89,
+	0x51, 0x18, 0xd8, 0x09, 0x35, 0x1d, 0xbf, 0x0d, 0xd8, 0x1e, 0x34, 0x49, 0x89, 0x44, 0x8d, 0xcc,
+	0x92, 0xd3, 0x51, 0x15, 0x0f, 0x74, 0x4a, 0xef, 0x34, 0x7d, 0x36, 0x28, 0x03, 0x5b, 0xfe, 0x5f,
+	0x97, 0xeb, 0x28, 0x03, 0x5d, 0xe4, 0x47, 0xfa, 0x5e, 0x33, 0x32, 0xab, 0x75, 0x0f, 0x9a, 0x7a,
+	0x3a, 0x8d, 0xbe, 0x93, 0xdd, 0x58, 0xcb, 0x03, 0x93, 0x7a, 0x47, 0xb1, 0x3c, 0xfc, 0x5d, 0x85,
+	0x9d, 0x53, 0x63, 0xc6, 0xa1, 0x31, 0x27, 0x3b, 0x85, 0x4a, 0xea, 0x36, 0xc6, 0xdd, 0x42, 0xcf,
+	0xba, 0x39, 0x67, 0x3a, 0x8f, 0xd7, 0x62, 0xac, 0x88, 0x29, 0xdc, 0xbc, 0xe2, 0x1a, 0xd6, 0x2f,
+	0xe9, 0x2b, 0x36, 0xaf, 0xe3, 0x6e, 0x0a, 0xb7, 0x8c, 0x97, 0xb0, 0xb3, 0x6a, 0x21, 0xf6, 0xac,
+	0x64, 0x42, 0xa1, 0x3f, 0x9d, 0xfe, 0x86, 0xe8, 0x15, 0xba, 0xfc, 0xf9, 0xd6, 0xd0, 0x15, 0x1c,
+	0xaf, 0xbf, 0x21, 0xda, 0xd2, 0x09, 0x80, 0xa5, 0x25, 0x58, 0xaf, 0xbc, 0x79, 0xd5, 0x64, 0xce,
+	0xd3, 0x0d, 0x90, 0x4b, 0x8a, 0xe5, 0xcb, 0x2f, 0xa5, 0xb8, 0xe6, 0xa4, 0x52, 0x8a, 0x02, 0x1b,
+	0x7d, 0x85, 0xc6, 0xe2, 0xbd, 0xb2, 0x27, 0xe5, 0xd2, 0x56, 0xec, 0xe3, 0xf4, 0xfe, 0x0e, 0x34,
+	0xf3, 0x8f, 0x1b, 0x5f, 0x6a, 0xb6, 0x38, 0xde, 0xd6, 0xff, 0x2a, 0xcf, 0xff, 0x04, 0x00, 0x00,
+	0xff, 0xff, 0x73, 0x6a, 0xe6, 0xa6, 0xa5, 0x06, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -841,10 +662,6 @@ type ObserveServiceClient interface {
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	// SendTransaction submits a transaction to the network.
 	SendTransaction(ctx context.Context, in *SendTransactionRequest, opts ...grpc.CallOption) (*SendTransactionResponse, error)
-	// GetBlockByHash gets a block by hash.
-	GetBlockByHash(ctx context.Context, in *GetBlockByHashRequest, opts ...grpc.CallOption) (*GetBlockByHashResponse, error)
-	// GetBlockByNumber gets a block by number.
-	GetBlockByNumber(ctx context.Context, in *GetBlockByNumberRequest, opts ...grpc.CallOption) (*GetBlockByNumberResponse, error)
 	// GetLatestBlock gets the latest sealed block.
 	GetLatestBlock(ctx context.Context, in *GetLatestBlockRequest, opts ...grpc.CallOption) (*GetLatestBlockResponse, error)
 	// GetTransactions gets a transaction by hash.
@@ -853,6 +670,8 @@ type ObserveServiceClient interface {
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 	// CallScript calls code deployed on the blockchain.
 	CallScript(ctx context.Context, in *CallScriptRequest, opts ...grpc.CallOption) (*CallScriptResponse, error)
+	// GetEvents retrieves events matching a given query.
+	GetEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (*GetEventsResponse, error)
 }
 
 type observeServiceClient struct {
@@ -875,24 +694,6 @@ func (c *observeServiceClient) Ping(ctx context.Context, in *PingRequest, opts .
 func (c *observeServiceClient) SendTransaction(ctx context.Context, in *SendTransactionRequest, opts ...grpc.CallOption) (*SendTransactionResponse, error) {
 	out := new(SendTransactionResponse)
 	err := c.cc.Invoke(ctx, "/flow.services.observe.ObserveService/SendTransaction", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *observeServiceClient) GetBlockByHash(ctx context.Context, in *GetBlockByHashRequest, opts ...grpc.CallOption) (*GetBlockByHashResponse, error) {
-	out := new(GetBlockByHashResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observe.ObserveService/GetBlockByHash", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *observeServiceClient) GetBlockByNumber(ctx context.Context, in *GetBlockByNumberRequest, opts ...grpc.CallOption) (*GetBlockByNumberResponse, error) {
-	out := new(GetBlockByNumberResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observe.ObserveService/GetBlockByNumber", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -935,15 +736,20 @@ func (c *observeServiceClient) CallScript(ctx context.Context, in *CallScriptReq
 	return out, nil
 }
 
+func (c *observeServiceClient) GetEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (*GetEventsResponse, error) {
+	out := new(GetEventsResponse)
+	err := c.cc.Invoke(ctx, "/flow.services.observe.ObserveService/GetEvents", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ObserveServiceServer is the server API for ObserveService service.
 type ObserveServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	// SendTransaction submits a transaction to the network.
 	SendTransaction(context.Context, *SendTransactionRequest) (*SendTransactionResponse, error)
-	// GetBlockByHash gets a block by hash.
-	GetBlockByHash(context.Context, *GetBlockByHashRequest) (*GetBlockByHashResponse, error)
-	// GetBlockByNumber gets a block by number.
-	GetBlockByNumber(context.Context, *GetBlockByNumberRequest) (*GetBlockByNumberResponse, error)
 	// GetLatestBlock gets the latest sealed block.
 	GetLatestBlock(context.Context, *GetLatestBlockRequest) (*GetLatestBlockResponse, error)
 	// GetTransactions gets a transaction by hash.
@@ -952,6 +758,8 @@ type ObserveServiceServer interface {
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	// CallScript calls code deployed on the blockchain.
 	CallScript(context.Context, *CallScriptRequest) (*CallScriptResponse, error)
+	// GetEvents retrieves events matching a given query.
+	GetEvents(context.Context, *GetEventsRequest) (*GetEventsResponse, error)
 }
 
 // UnimplementedObserveServiceServer can be embedded to have forward compatible implementations.
@@ -964,12 +772,6 @@ func (*UnimplementedObserveServiceServer) Ping(ctx context.Context, req *PingReq
 func (*UnimplementedObserveServiceServer) SendTransaction(ctx context.Context, req *SendTransactionRequest) (*SendTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTransaction not implemented")
 }
-func (*UnimplementedObserveServiceServer) GetBlockByHash(ctx context.Context, req *GetBlockByHashRequest) (*GetBlockByHashResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHash not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetBlockByNumber(ctx context.Context, req *GetBlockByNumberRequest) (*GetBlockByNumberResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByNumber not implemented")
-}
 func (*UnimplementedObserveServiceServer) GetLatestBlock(ctx context.Context, req *GetLatestBlockRequest) (*GetLatestBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlock not implemented")
 }
@@ -981,6 +783,9 @@ func (*UnimplementedObserveServiceServer) GetAccount(ctx context.Context, req *G
 }
 func (*UnimplementedObserveServiceServer) CallScript(ctx context.Context, req *CallScriptRequest) (*CallScriptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CallScript not implemented")
+}
+func (*UnimplementedObserveServiceServer) GetEvents(ctx context.Context, req *GetEventsRequest) (*GetEventsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetEvents not implemented")
 }
 
 func RegisterObserveServiceServer(s *grpc.Server, srv ObserveServiceServer) {
@@ -1019,42 +824,6 @@ func _ObserveService_SendTransaction_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ObserveServiceServer).SendTransaction(ctx, req.(*SendTransactionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ObserveService_GetBlockByHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockByHashRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetBlockByHash(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.services.observe.ObserveService/GetBlockByHash",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetBlockByHash(ctx, req.(*GetBlockByHashRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ObserveService_GetBlockByNumber_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockByNumberRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetBlockByNumber(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.services.observe.ObserveService/GetBlockByNumber",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetBlockByNumber(ctx, req.(*GetBlockByNumberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1131,6 +900,24 @@ func _ObserveService_CallScript_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ObserveService_GetEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ObserveServiceServer).GetEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/flow.services.observe.ObserveService/GetEvents",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ObserveServiceServer).GetEvents(ctx, req.(*GetEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _ObserveService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "flow.services.observe.ObserveService",
 	HandlerType: (*ObserveServiceServer)(nil),
@@ -1142,14 +929,6 @@ var _ObserveService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendTransaction",
 			Handler:    _ObserveService_SendTransaction_Handler,
-		},
-		{
-			MethodName: "GetBlockByHash",
-			Handler:    _ObserveService_GetBlockByHash_Handler,
-		},
-		{
-			MethodName: "GetBlockByNumber",
-			Handler:    _ObserveService_GetBlockByNumber_Handler,
 		},
 		{
 			MethodName: "GetLatestBlock",
@@ -1166,6 +945,10 @@ var _ObserveService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CallScript",
 			Handler:    _ObserveService_CallScript_Handler,
+		},
+		{
+			MethodName: "GetEvents",
+			Handler:    _ObserveService_GetEvents_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

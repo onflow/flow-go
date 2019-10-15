@@ -28,6 +28,7 @@ type StatementVisitor interface {
 	VisitContinueStatement(*ContinueStatement) Repr
 	VisitIfStatement(*IfStatement) Repr
 	VisitWhileStatement(*WhileStatement) Repr
+	VisitEmitStatement(*EmitStatement) Repr
 	VisitVariableDeclaration(*VariableDeclaration) Repr
 	VisitAssignmentStatement(*AssignmentStatement) Repr
 	VisitSwapStatement(*SwapStatement) Repr
@@ -67,4 +68,5 @@ type Visitor interface {
 	VisitInitializerDeclaration(*InitializerDeclaration) Repr
 	VisitCondition(*Condition) Repr
 	VisitImportDeclaration(*ImportDeclaration) Repr
+	VisitEventDeclaration(*EventDeclaration) Repr
 }

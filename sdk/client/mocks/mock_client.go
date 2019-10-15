@@ -75,44 +75,24 @@ func (mr *MockRPCClientMockRecorder) GetAccount(arg0, arg1 interface{}, arg2 ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockRPCClient)(nil).GetAccount), varargs...)
 }
 
-// GetBlockByHash mocks base method
-func (m *MockRPCClient) GetBlockByHash(arg0 context.Context, arg1 *observe.GetBlockByHashRequest, arg2 ...grpc.CallOption) (*observe.GetBlockByHashResponse, error) {
+// GetEvents mocks base method
+func (m *MockRPCClient) GetEvents(arg0 context.Context, arg1 *observe.GetEventsRequest, arg2 ...grpc.CallOption) (*observe.GetEventsResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "GetBlockByHash", varargs...)
-	ret0, _ := ret[0].(*observe.GetBlockByHashResponse)
+	ret := m.ctrl.Call(m, "GetEvents", varargs...)
+	ret0, _ := ret[0].(*observe.GetEventsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockByHash indicates an expected call of GetBlockByHash
-func (mr *MockRPCClientMockRecorder) GetBlockByHash(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// GetEvents indicates an expected call of GetEvents
+func (mr *MockRPCClientMockRecorder) GetEvents(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByHash", reflect.TypeOf((*MockRPCClient)(nil).GetBlockByHash), varargs...)
-}
-
-// GetBlockByNumber mocks base method
-func (m *MockRPCClient) GetBlockByNumber(arg0 context.Context, arg1 *observe.GetBlockByNumberRequest, arg2 ...grpc.CallOption) (*observe.GetBlockByNumberResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "GetBlockByNumber", varargs...)
-	ret0, _ := ret[0].(*observe.GetBlockByNumberResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBlockByNumber indicates an expected call of GetBlockByNumber
-func (mr *MockRPCClientMockRecorder) GetBlockByNumber(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByNumber", reflect.TypeOf((*MockRPCClient)(nil).GetBlockByNumber), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEvents", reflect.TypeOf((*MockRPCClient)(nil).GetEvents), varargs...)
 }
 
 // GetLatestBlock mocks base method
