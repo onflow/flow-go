@@ -28,7 +28,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	return nil
 }
 
-func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
+func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaration) {
 	identifier := declaration.Identifier
 
 	convertedParameterTypeAnnotations := checker.parameterTypeAnnotations(declaration.Parameters)
@@ -39,8 +39,21 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 		ArgumentLabels:           declaration.Parameters.ArgumentLabels(),
 	}
 
-	err := checker.typeActivations.Declare(identifier, eventType)
-	checker.report(err)
+	typeDeclaredErr := checker.typeActivations.Declare(identifier, eventType)
+	checker.report(typeDeclaredErr)
+
+	_, valueDeclaredErr := checker.valueActivations.DeclareFunction(
+		identifier,
+		&FunctionType{
+			ParameterTypeAnnotations: eventType.ParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(eventType),
+		},
+		declaration.Parameters.ArgumentLabels(),
+	)
+
+	if typeDeclaredErr == nil {
+		checker.report(valueDeclaredErr)
+	}
 
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
@@ -54,8 +67,6 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	)
 
 	checker.Elaboration.EventDeclarationTypes[declaration] = eventType
-
-	return eventType
 }
 
 // isValidEventParameterType returns true if the given type is a valid event parameters.
