@@ -21,14 +21,14 @@ func TestCheckEventDeclaration(t *testing.T) {
 	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
             struct Token {
-              let ID: String
+				let ID: String
 
-              init(ID: String) {
-                self.ID = ID
-              }
+	  			init(ID: String) {
+                	self.ID = ID
+              	}
             }
 
-            event Transfer(token: Token)
+			event Transfer(token: Token)
         `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
