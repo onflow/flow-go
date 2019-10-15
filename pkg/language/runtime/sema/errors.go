@@ -1635,7 +1635,7 @@ type InvalidEventUsageError struct {
 }
 
 func (e *InvalidEventUsageError) Error() string {
-	return "events can only be invoked in an emit statement"
+	return "events can only be invoked in an `emit` statement"
 }
 
 func (*InvalidEventUsageError) isSemanticError() {}
