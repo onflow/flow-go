@@ -4963,3 +4963,79 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestParseSwapStatement(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+          foo[0] <-> bar.baz
+      }
+	`)
+
+	assert.Nil(t, err)
+
+	test := &FunctionDeclaration{
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Parameters: nil,
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&SwapStatement{
+						Left: &IndexExpression{
+							TargetExpression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "foo",
+									Pos:        Position{Offset: 30, Line: 3, Column: 10},
+								},
+							},
+							IndexingExpression: &IntExpression{
+								Value:    big.NewInt(0),
+								StartPos: Position{Offset: 34, Line: 3, Column: 14},
+								EndPos:   Position{Offset: 34, Line: 3, Column: 14},
+							},
+							IndexingType: nil,
+							StartPos:     Position{Offset: 33, Line: 3, Column: 13},
+							EndPos:       Position{Offset: 35, Line: 3, Column: 15},
+						},
+						Right: &MemberExpression{
+							Expression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "bar",
+									Pos:        Position{Offset: 41, Line: 3, Column: 21},
+								},
+							},
+							Identifier: Identifier{
+								Identifier: "baz",
+								Pos:        Position{Offset: 45, Line: 3, Column: 25},
+							},
+						},
+					},
+				},
+				StartPos: Position{Offset: 18, Line: 2, Column: 17},
+				EndPos:   Position{Offset: 55, Line: 4, Column: 6},
+			},
+			PreConditions:  nil,
+			PostConditions: nil,
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}

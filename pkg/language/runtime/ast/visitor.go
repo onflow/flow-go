@@ -30,7 +30,8 @@ type StatementVisitor interface {
 	VisitWhileStatement(*WhileStatement) Repr
 	VisitEmitStatement(*EmitStatement) Repr
 	VisitVariableDeclaration(*VariableDeclaration) Repr
-	VisitAssignment(*AssignmentStatement) Repr
+	VisitAssignmentStatement(*AssignmentStatement) Repr
+	VisitSwapStatement(*SwapStatement) Repr
 	VisitExpressionStatement(*ExpressionStatement) Repr
 }
 
