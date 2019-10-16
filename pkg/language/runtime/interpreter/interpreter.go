@@ -1727,14 +1727,52 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		})
 }
 
-func (interpreter *Interpreter) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
-	// TODO: implement events
-	panic(errors.UnreachableError{})
+func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
+	interpreter.declareEventConstructor(declaration)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
 }
 
-func (interpreter *Interpreter) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
-	// TODO: implement events
-	panic(errors.UnreachableError{})
+func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
+	identifier := declaration.Identifier.Identifier
+	variable := interpreter.findOrDeclareVariable(identifier)
+
+	eventType := interpreter.Checker.Elaboration.EventDeclarationTypes[declaration]
+
+	variable.Value = NewHostFunctionValue(
+		func(arguments []Value, location Location) Trampoline {
+			fields := make([]EventFieldValue, len(eventType.Fields))
+			for i, field := range eventType.Fields {
+				fields[i] = EventFieldValue{
+					Identifier: field.Identifier,
+					Value:      arguments[i],
+				}
+			}
+
+			value := EventValue{Fields: fields}
+
+			return Done{Result: value}
+		},
+	)
+}
+
+func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
+	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			event := result.(EventValue)
+
+			arguments := []Value{event.Copy()}
+			location := Location{
+				Position:       statement.StartPosition(),
+				ImportLocation: interpreter.ImportLocation,
+			}
+
+			emitFunction := interpreter.PredefinedValues["emitEvent"].(HostFunctionValue)
+			emitFunction.invoke(arguments, location)
+
+			return functionReturn{VoidValue{}}
+		})
 }
 
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
