@@ -15,7 +15,8 @@ type StandardLibraryFunction struct {
 	Type           *sema.FunctionType
 	Function       interpreter.HostFunctionValue
 	ArgumentLabels []string
-	IsDeclared     bool
+	// IsDeclared specifies if this function should be made available to the user.
+	IsDeclared bool
 }
 
 func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
@@ -62,6 +63,7 @@ type StandardLibraryFunctions []StandardLibraryFunction
 func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
 	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
 	for _, function := range functions {
+		// skip non-declared functions
 		if function.IsDeclared {
 			valueDeclarations[function.Name] = function
 		}
