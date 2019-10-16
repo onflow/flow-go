@@ -67,7 +67,7 @@ func generateInspectNFTScript(nftCodeAddr types.Address, expectedID int, expecte
 		import GreatNFT from 0x%s
 
 		fun main(acct: Account) {
-			var nft = acct.storage[GreatNFT] ?? panic("missing nft")
+			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
 			if nft.id() != %d {
 				panic("incorrect id")
 			}
