@@ -8,33 +8,42 @@ struct interface NFT {
 
 struct GreatNFT: NFT {
   let _id: Int
+  let _special: Bool
 
   fun id(): Int {
     return self._id
   }
 
-  init(id: Int) {
+  fun isSpecial(): Bool {
+    return self._special
+  }
+
+  init(id: Int, isSpecial: Bool) { 
     pre {
       id > 0
     }
     self._id = id
+    self._special = isSpecial
   }
 }
 
 struct GreatNFTMinter {
   var _nextID: Int
+  let _specialMod: Int
 
-  fun maybeMint(): GreatNFT? {
-    if self._nextID % 2 == 0 {
-      self._nextID = self._nextID + 1
-      return nil
-    }
-    var nextNFT = GreatNFT(id: self._nextID)
+  fun mint(): GreatNFT {
+    var isSpecial = self._nextID % self._specialMod == 0
+    let nft = GreatNFT(id: self._nextID, isSpecial: isSpecial)
     self._nextID = self._nextID + 1
-    return nextNFT
+    return nft
   }
 
-  init() {
-    self._nextID = 1
+  init(firstID: Int, specialMod: Int) {
+    pre {
+      firstID > 0
+      specialMod > 1
+    }
+    self._nextID = firstID
+    self._specialMod = specialMod
   }
 }
