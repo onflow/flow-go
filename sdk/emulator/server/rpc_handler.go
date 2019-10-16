@@ -175,19 +175,15 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 
 // GetEvents supports querying events
 func (s *EmulatorServer) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
-	// TODO: Retrieve events matching query from an index in the EmulatorServer
-	mockEvent := types.Event{
-		ID: "Transfer",
-		Values: map[string]interface{}{
-			"to":   types.ZeroAddress(),
-			"from": types.ZeroAddress(),
-			"id":   1,
-		},
+	query := proto.MessageToEventQuery(req)
+
+	events, err := s.eventStore.Query(ctx, query)
+	if err != nil {
+		return nil, err
 	}
-	events := []*types.Event{&mockEvent}
 
 	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(events)
+	err = json.NewEncoder(&buf).Encode(events)
 	if err != nil {
 		return nil, err
 	}

@@ -11,13 +11,20 @@ type Store interface {
 	// Add adds one or events to the store.
 	Add(ctx context.Context, blockNumber int, events []*types.Event) error
 	// Query searches for events in the store matching the given query.
-	Query(ctx context.Context, query types.EventQuery) ([]*types.Event, error)
+	Query(ctx context.Context, query *types.EventQuery) ([]*types.Event, error)
 }
 
 // memStore implements an in-memory store for events. Events are indexed by
 // block number and by ID
 type memStore struct {
 	byBlock map[int][]*types.Event
+}
+
+// NewMemStore returns a new in-memory Store implementation.
+func NewMemStore() Store {
+	return &memStore{
+		byBlock: make(map[int][]*types.Event),
+	}
 }
 
 func (s *memStore) Add(ctx context.Context, blockNumber int, events []*types.Event) error {
