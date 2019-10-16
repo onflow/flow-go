@@ -3484,7 +3484,7 @@ func TestInterpretImport(t *testing.T) {
           return 42
       }
 	`)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -3504,13 +3504,13 @@ func TestInterpretImport(t *testing.T) {
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
@@ -3537,7 +3537,7 @@ func TestInterpretImportError(t *testing.T) {
 		nil,
 		nil,
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -3557,17 +3557,17 @@ func TestInterpretImportError(t *testing.T) {
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	values := stdlib.StandardLibraryFunctions{
 		stdlib.PanicFunction,
 	}.ToValues()
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, values)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("test")
 
@@ -4460,7 +4460,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
         }
       }
     `)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -4481,13 +4481,13 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("test")
 	assert.Nil(t, err)
