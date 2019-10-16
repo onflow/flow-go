@@ -304,3 +304,67 @@ func TestAssignmentUsages(t *testing.T) {
 		assert.Len(t, errors, 0)
 	})
 }
+
+func TestAssignmentWithReturn(t *testing.T) {
+
+	t.Run("Direct", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					return
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
+	})
+
+	t.Run("InsideIf", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					if false {
+						return
+					}
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
+	})
+
+	t.Run("InsideWhile", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					while false {
+						return
+					}
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
+	})
+}
