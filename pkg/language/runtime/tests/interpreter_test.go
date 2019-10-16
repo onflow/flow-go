@@ -4634,40 +4634,43 @@ func TestInterpretEmitEvent(t *testing.T) {
 		assert.Nil(t, err)
 
 		assert.Equal(t, []interpreter.EventValue{
-			{[]interpreter.EventFieldValue{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
-			}},
-			{[]interpreter.EventFieldValue{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(3),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(4),
-				},
-			}},
-			{[]interpreter.EventFieldValue{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
-				{
-					Identifier: "amount",
-					Value:      interpreter.NewIntValue(100),
-				},
-			}},
+			{"Transfer",
+				[]interpreter.EventFieldValue{
+					{
+						Identifier: "to",
+						Value:      interpreter.NewIntValue(1),
+					},
+					{
+						Identifier: "from",
+						Value:      interpreter.NewIntValue(2),
+					},
+				}},
+			{"Transfer",
+				[]interpreter.EventFieldValue{
+					{
+						Identifier: "to",
+						Value:      interpreter.NewIntValue(3),
+					},
+					{
+						Identifier: "from",
+						Value:      interpreter.NewIntValue(4),
+					},
+				}},
+			{"TransferAmount",
+				[]interpreter.EventFieldValue{
+					{
+						Identifier: "to",
+						Value:      interpreter.NewIntValue(1),
+					},
+					{
+						Identifier: "from",
+						Value:      interpreter.NewIntValue(2),
+					},
+					{
+						Identifier: "amount",
+						Value:      interpreter.NewIntValue(100),
+					},
+				}},
 		}, events)
 	})
 }

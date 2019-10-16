@@ -1202,6 +1202,7 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
+	ID     string
 	Fields []EventFieldValue
 }
 
@@ -1216,7 +1217,10 @@ func (v EventValue) Copy() Value {
 		}
 	}
 
-	return EventValue{fields}
+	return EventValue{
+		ID:     v.ID,
+		Fields: fields,
+	}
 }
 
 // EventFieldValue

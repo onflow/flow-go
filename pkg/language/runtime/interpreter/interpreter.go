@@ -1750,7 +1750,11 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 				}
 			}
 
-			value := EventValue{Fields: fields}
+			value := EventValue{
+				// TODO: use account as namespace for event ID
+				ID:     eventType.Identifier,
+				Fields: fields,
+			}
 
 			return Done{Result: value}
 		},
