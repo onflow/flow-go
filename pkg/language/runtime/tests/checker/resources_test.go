@@ -283,6 +283,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 }
 
 func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -731,10 +732,9 @@ func TestCheckUnaryMove(t *testing.T) {
           return <-x
       }
 
-      var x <- foo(x: <-create X())
-
       fun bar() {
-          x <- create X()
+          let x <- foo(x: <-create X())
+          destroy x
       }
 	`)
 
@@ -1137,7 +1137,7 @@ func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 }
 
-func TestCheckResourceAssignmentTransfer(t *testing.T) {
+func TestCheckInvalidResourceAssignmentTransfer(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource X {}
@@ -1150,11 +1150,10 @@ func TestCheckResourceAssignmentTransfer(t *testing.T) {
       }
 	`)
 
-	// TODO: this program is actually invalid as it reintroduces
-	//   the invalidated variable `x2`:
-	//   https://github.com/dapperlabs/flow-go/issues/820
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.Nil(t, err)
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
 func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
@@ -1170,13 +1169,11 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
       }
 	`)
 
-	// TODO: this program is actually invalid as it reintroduces
-	//   the invalidated variable `x2`:
-	//   https://github.com/dapperlabs/flow-go/issues/820
-
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 3)
 
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
@@ -1239,9 +1236,11 @@ func TestCheckInvalidResourceLossThroughAssignment(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 3)
 
-	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckResourceMoveThroughReturn(t *testing.T) {
@@ -2008,6 +2007,81 @@ func testResourceNesting(
 	}
 }
 
+// TestCheckResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {
+          fun test() {}
+      }
+	`)
+
+	assert.Nil(t, err)
+}
+
+// TestCheckInvalidResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckInvalidResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {}
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+// TestCheckResourceInterfaceUseAsType tests if a resource interface
+// can be used as a type, and if a resource is a subtype of the interface
+// if it conforms to it.
+//
+func TestCheckResourceInterfaceUseAsType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      let x: <-X <- create Y()
+	`)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckResourceArrayIndexing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): Int {
+        let foo <- create Foo(bar: 1)
+        let foos <- [<-[<-foo]]
+        let bar = foos[0][0].bar
+        destroy foos
+        return bar
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
 func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -2049,30 +2123,7 @@ func TestCheckInvalidResourceLossThroughArrayIndexing(t *testing.T) {
 	`)
 
 	errs := ExpectCheckerErrors(t, err, 1)
-
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-}
-
-func TestCheckResourceArrayIndexing(t *testing.T) {
-
-	_, err := ParseAndCheck(t, `
-      resource Foo {
-          var bar: Int
-          init(bar: Int) {
-              self.bar = bar
-          }
-      }
-
-      fun test(): Int {
-        let foo <- create Foo(bar: 1)
-        let foos <- [<-[<-foo]]
-        let bar = foos[0][0].bar
-        destroy foos
-        return bar
-      }
-    `)
-
-	assert.Nil(t, err)
 }
 
 func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
@@ -2097,4 +2148,27 @@ func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+// TestCheckResourceInterfaceDestruction tests if resources
+// can be passed to resource interface parameters,
+// and if resource interfaces can be destroyed.
+//
+func TestCheckResourceInterfaceDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      fun foo(x: <-X) {
+          destroy x
+      }
+
+      fun bar() {
+          foo(x: <-create Y())
+      }
+	`)
+
+	assert.Nil(t, err)
 }

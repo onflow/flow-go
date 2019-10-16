@@ -1604,3 +1604,24 @@ func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
 func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// InvalidResourceAssignmentError
+
+type InvalidResourceAssignmentError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidResourceAssignmentError) Error() string {
+	return "cannot assign to resource-typed target. consider swapping (<->)"
+}
+
+func (*InvalidResourceAssignmentError) isSemanticError() {}
+
+func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
+	return e.EndPos
+}

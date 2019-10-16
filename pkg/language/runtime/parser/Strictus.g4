@@ -268,6 +268,11 @@ variableDeclaration
     : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
+// NOTE: we allow any kind of transfer, i.e. moves, but ensure
+//   that move is not used in the semantic analysis (as assignment
+//   to resource type will cause a loss of the old value).
+//   Being unrestritive here allows us to provide better error messages
+//   in the semantic analysis.
 assignment
     : identifier expressionAccess* transfer expression
     ;
