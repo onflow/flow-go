@@ -60,6 +60,7 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 		}
 	}
 }
+
 func TestCheckInvalidResourceDestructorOverloading(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}

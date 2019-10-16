@@ -1289,18 +1289,6 @@ func (v SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// MetaTypeValue
-
-type MetaTypeValue struct {
-	Type sema.Type
-}
-
-func (MetaTypeValue) isValue() {}
-
-func (v MetaTypeValue) Copy() Value {
-	return v
-}
-
 // AnyValue
 
 type AnyValue struct {
@@ -1374,6 +1362,5 @@ func init() {
 	gob.Register(DictionaryValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
-	gob.Register(MetaTypeValue{})
 	gob.Register(AnyValue{})
 }

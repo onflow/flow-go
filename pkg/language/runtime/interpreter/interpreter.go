@@ -1656,22 +1656,11 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 }
 
 func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
-
-	interpreter.declareInterfaceMetaType(declaration)
-
 	return Done{}
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
 	interpreter.interfaces[declaration.Identifier.Identifier] = declaration
-}
-
-func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.InterfaceDeclaration) {
-
-	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
-
-	variable := interpreter.findOrDeclareVariable(declaration.Identifier.Identifier)
-	variable.Value = MetaTypeValue{Type: interfaceType}
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
