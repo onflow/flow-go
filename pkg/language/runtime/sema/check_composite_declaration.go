@@ -773,12 +773,15 @@ func (checker *Checker) checkDestructor(
 		)
 	}
 
+	parameterTypeAnnotations :=
+		checker.parameterTypeAnnotations(destructor.Parameters)
+
 	checker.checkSpecialFunction(
 		destructor,
 		containerType,
 		containerDeclarationKind,
 		containerTypeIdentifier,
-		nil,
+		parameterTypeAnnotations,
 		containerKind,
 	)
 

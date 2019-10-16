@@ -1871,3 +1871,37 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckInvalidDestructorParameters(t *testing.T) {
+
+	interfacePossibilities := []bool{true, false}
+
+	for _, isInterface := range interfacePossibilities {
+
+		interfaceKeyword := ""
+		if isInterface {
+			interfaceKeyword = "interface"
+		}
+
+		destructorBody := ""
+		if !isInterface {
+			destructorBody = "{}"
+		}
+
+		t.Run(interfaceKeyword, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource %[1]s Test {
+                      destroy(x: Int) %[2]s
+                  }
+	            `,
+				interfaceKeyword,
+				destructorBody,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidDestructorParametersError{}, errs[0])
+		})
+	}
+}
