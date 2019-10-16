@@ -2,12 +2,14 @@ package tests
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
@@ -4167,6 +4169,122 @@ func TestParseResource(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestParseEvent(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        event Transfer(to: Address, from: Address)
+	`)
+
+	require.Nil(t, err)
+
+	transfer := &EventDeclaration{
+		Identifier: Identifier{
+			Identifier: "Transfer",
+			Pos:        Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Parameters: Parameters{
+			{
+				Label: "",
+				Identifier: Identifier{
+					Identifier: "to",
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "Address",
+							Pos:        Position{Offset: 28, Line: 2, Column: 27},
+						},
+					},
+					StartPos: Position{Offset: 28, Line: 2, Column: 27},
+				},
+				StartPos: Position{Offset: 24, Line: 2, Column: 23},
+				EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+			},
+			{
+				Label: "",
+				Identifier: Identifier{
+					Identifier: "from",
+					Pos:        Position{Offset: 37, Line: 2, Column: 36},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "Address",
+							Pos:        Position{Offset: 43, Line: 2, Column: 42},
+						},
+					},
+					StartPos: Position{Offset: 43, Line: 2, Column: 42},
+				},
+				StartPos: Position{Offset: 37, Line: 2, Column: 36},
+				EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 50, Line: 2, Column: 49},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{transfer},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseEventEmitStatement(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+        emit Transfer(to: 1, from: 2)
+      }
+	`)
+
+	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
+
+	expectedStatements := []Statement{
+		&EmitStatement{
+			InvocationExpression: &InvocationExpression{
+				InvokedExpression: &IdentifierExpression{
+					Identifier: Identifier{
+						Identifier: "Transfer",
+						Pos:        Position{Offset: 33, Line: 3, Column: 13},
+					},
+				},
+				Arguments: Arguments{
+					{
+						Label:         "to",
+						LabelStartPos: &Position{Offset: 42, Line: 3, Column: 22},
+						LabelEndPos:   &Position{Offset: 43, Line: 3, Column: 23},
+						Expression: &IntExpression{
+							Value:    big.NewInt(1),
+							StartPos: Position{Offset: 46, Line: 3, Column: 26},
+							EndPos:   Position{Offset: 46, Line: 3, Column: 26},
+						},
+					},
+					{
+						Label:         "from",
+						LabelStartPos: &Position{Offset: 49, Line: 3, Column: 29},
+						LabelEndPos:   &Position{Offset: 52, Line: 3, Column: 32},
+						Expression: &IntExpression{
+							Value:    big.NewInt(2),
+							StartPos: Position{Offset: 55, Line: 3, Column: 35},
+							EndPos:   Position{Offset: 55, Line: 3, Column: 35},
+						},
+					},
+				},
+				EndPos: Position{Offset: 56, Line: 3, Column: 36},
+			},
+			StartPos: Position{Offset: 28, Line: 3, Column: 8},
+		},
+	}
+
+	require.Nil(t, err)
+
+	assert.Equal(t, expectedStatements, actualStatements)
+}
+
 func TestParseMoveReturnType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -4835,6 +4953,82 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 				StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				EndPos:   Position{Offset: 63, Line: 5, Column: 6},
 			},
+		},
+		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseSwapStatement(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+      fun test() {
+          foo[0] <-> bar.baz
+      }
+	`)
+
+	assert.Nil(t, err)
+
+	test := &FunctionDeclaration{
+		Identifier: Identifier{
+			Identifier: "test",
+			Pos:        Position{Offset: 11, Line: 2, Column: 10},
+		},
+		Parameters: nil,
+		ReturnTypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+			},
+			StartPos: Position{Offset: 16, Line: 2, Column: 15},
+		},
+		FunctionBlock: &FunctionBlock{
+			Block: &Block{
+				Statements: []Statement{
+					&SwapStatement{
+						Left: &IndexExpression{
+							TargetExpression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "foo",
+									Pos:        Position{Offset: 30, Line: 3, Column: 10},
+								},
+							},
+							IndexingExpression: &IntExpression{
+								Value:    big.NewInt(0),
+								StartPos: Position{Offset: 34, Line: 3, Column: 14},
+								EndPos:   Position{Offset: 34, Line: 3, Column: 14},
+							},
+							IndexingType: nil,
+							StartPos:     Position{Offset: 33, Line: 3, Column: 13},
+							EndPos:       Position{Offset: 35, Line: 3, Column: 15},
+						},
+						Right: &MemberExpression{
+							Expression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "bar",
+									Pos:        Position{Offset: 41, Line: 3, Column: 21},
+								},
+							},
+							Identifier: Identifier{
+								Identifier: "baz",
+								Pos:        Position{Offset: 45, Line: 3, Column: 25},
+							},
+						},
+					},
+				},
+				StartPos: Position{Offset: 18, Line: 2, Column: 17},
+				EndPos:   Position{Offset: 55, Line: 4, Column: 6},
+			},
+			PreConditions:  nil,
+			PostConditions: nil,
 		},
 		StartPos: Position{Offset: 7, Line: 2, Column: 6},
 	}

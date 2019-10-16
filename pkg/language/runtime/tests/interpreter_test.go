@@ -2715,6 +2715,44 @@ func TestInterpretNilReturnValue(t *testing.T) {
 	)
 }
 
+func TestInterpretSomeReturnValue(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     fun test(): Int? {
+         let x: Int? = 1
+         return x
+     }
+   `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		value,
+	)
+}
+
+func TestInterpretSomeReturnValueFromDictionary(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     fun test(): Int? {
+         let foo: {String: Int} = {"a": 1}
+         return foo["a"]
+     }
+   `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		value,
+	)
+}
+
 func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4456,4 +4494,100 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 
 	_, err = inter.Invoke("test")
 	assert.Nil(t, err)
+}
+
+var storageValueDeclaration = map[string]sema.ValueDeclaration{
+	"storage": stdlib.StandardLibraryValue{
+		Name:       "storage",
+		Type:       &sema.StorageType{},
+		Kind:       common.DeclarationKindConstant,
+		IsConstant: true,
+	},
+}
+
+func TestInterpretStorage(t *testing.T) {
+
+	storedValues := map[sema.Type]interpreter.Value{}
+
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
+          fun test(): Int? {
+              storage[Int] = 42
+              return storage[Int]
+          }
+	    `,
+		storageValueDeclaration,
+		map[string]interpreter.Value{
+			"storage": interpreter.StorageValue{
+				Getter: func(key sema.Type) interpreter.Value {
+					return storedValues[key]
+				},
+				Setter: func(key sema.Type, value interpreter.Value) {
+					storedValues[key] = value
+				},
+			},
+		},
+		nil,
+	)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+		value,
+	)
+}
+
+func TestInterpretSwapVariables(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       fun test(): [Int] {
+           var x = 2
+           var y = 3
+           x <-> y
+           return [x, y]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretSwapArrayAndField(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       struct Foo {
+           var bar: Int
+
+           init(bar: Int) {
+               self.bar = bar
+           }
+       }
+
+       fun test(): [Int] {
+           let foo = Foo(bar: 1)
+           let nums = [2]
+           foo.bar <-> nums[0]
+           return [foo.bar, nums[0]]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(1),
+		),
+		value,
+	)
 }

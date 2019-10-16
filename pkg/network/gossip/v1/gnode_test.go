@@ -3,16 +3,21 @@ package gnode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/rs/zerolog"
 )
 
-func TestAsyncQueue(t *testing.T) {
-	a := NewNode(nil)
-	go a.sweeper()
+var defaultLogger = zerolog.New(ioutil.Discard)
 
-	//To test the error returned when a context provided is expired
+func TestAsyncQueue(t *testing.T) {
+	//gn := NewNode(defaultLogger, nil)
+	gn := NewNode(zerolog.Logger{}, nil)
+	go gn.sweeper()
+
+	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
 	//expiring the context
 	cancel()
@@ -31,7 +36,7 @@ func TestAsyncQueue(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		_, gotErr := a.AsyncQueue(tc.ctx, nil)
+		_, gotErr := gn.AsyncQueue(tc.ctx, nil)
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
@@ -51,12 +56,12 @@ func TestAsyncQueue(t *testing.T) {
 }
 
 func TestSyncQueue(t *testing.T) {
-	a := NewNode(nil)
+	gn := NewNode(defaultLogger, nil)
 	//to handle the queue
-	go a.sweeper()
+	go gn.sweeper()
 
-	// registering a function
-	err := a.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
+	// registering gn function
+	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
 
@@ -69,7 +74,7 @@ func TestSyncQueue(t *testing.T) {
 		return msg
 	}
 
-	//To test the error returned when a context provided is expired
+	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
 	// cancelling the context
 	cancel()
@@ -96,7 +101,7 @@ func TestSyncQueue(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		_, gotErr := a.SyncQueue(tc.ctx, tc.msg)
+		_, gotErr := gn.SyncQueue(tc.ctx, tc.msg)
 
 		if tc.err == nil && gotErr == nil {
 			continue
@@ -117,10 +122,10 @@ func TestSyncQueue(t *testing.T) {
 }
 
 func TestMessageHandler(t *testing.T) {
-	a := NewNode(nil)
+	gn := NewNode(defaultLogger, nil)
 
-	//add a function for testing
-	err := a.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
+	//add gn function for testing
+	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
 
@@ -128,7 +133,7 @@ func TestMessageHandler(t *testing.T) {
 		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
 	}
 
-	go a.sweeper()
+	go gn.sweeper()
 
 	genMsg := func(payload []byte, recipients []string, msgType string) *shared.GossipMessage {
 		msg, _ := generateGossipMessage(payload, recipients, msgType)
@@ -159,7 +164,7 @@ func TestMessageHandler(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		gotErr := a.messageHandler(tc.e)
+		gotErr := gn.messageHandler(tc.e)
 		if tc.err == nil && gotErr == nil {
 			continue
 		}

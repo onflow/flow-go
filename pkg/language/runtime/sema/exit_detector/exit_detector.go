@@ -88,9 +88,7 @@ func (detector *ExitDetector) VisitIfStatement(node *ast.IfStatement) ast.Repr {
 
 func (detector *ExitDetector) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
 	outerBreakValue := detector.enclosingBlockContainsBreak
-
 	detector.enclosingBlockContainsBreak = false
-
 	defer func() {
 		detector.enclosingBlockContainsBreak = outerBreakValue
 	}()
@@ -119,8 +117,12 @@ func (detector *ExitDetector) VisitVariableDeclaration(node *ast.VariableDeclara
 	return detector.nodeExits(node.Value)
 }
 
-func (detector *ExitDetector) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
+func (detector *ExitDetector) VisitAssignmentStatement(node *ast.AssignmentStatement) ast.Repr {
 	return detector.nodeExits(node.Target) || detector.nodeExits(node.Value)
+}
+
+func (detector *ExitDetector) VisitSwapStatement(node *ast.SwapStatement) ast.Repr {
+	return detector.nodeExits(node.Left) || detector.nodeExits(node.Right)
 }
 
 func (detector *ExitDetector) VisitExpressionStatement(node *ast.ExpressionStatement) ast.Repr {
@@ -165,6 +167,14 @@ func (detector *ExitDetector) VisitCondition(node *ast.Condition) ast.Repr {
 }
 
 func (detector *ExitDetector) VisitImportDeclaration(*ast.ImportDeclaration) ast.Repr {
+	return false
+}
+
+func (detector *ExitDetector) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	return false
+}
+
+func (detector *ExitDetector) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
 	return false
 }
 

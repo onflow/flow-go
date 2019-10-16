@@ -2,37 +2,79 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
-// TODO: handle potential loss of target's current value if it is a resource
-
-func (checker *Checker) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
+func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
 	valueType := assignment.Value.Accept(checker).(Type)
 	checker.Elaboration.AssignmentStatementValueTypes[assignment] = valueType
 
-	targetType := checker.visitAssignmentValueType(assignment, valueType)
+	targetType := checker.visitAssignmentValueType(assignment.Target, assignment.Value, valueType)
 	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
 	checker.checkTransfer(assignment.Transfer, valueType)
-	checker.recordResourceInvalidation(
-		assignment.Value,
-		valueType,
-		ResourceInvalidationKindMove,
-	)
+
+	// Assignment of a resource or assignment to a resource is not valid,
+	// as it would result in a resource loss
+
+	if valueType.IsResourceType() || targetType.IsResourceType() {
+		// Assignment to self-field is allowed. This is necessary to initialize
+		// fields in the initializer
+
+		// TODO: improve exception
+
+		if checker.isSelfFieldAccess(assignment.Target) {
+			checker.recordResourceInvalidation(
+				assignment.Value,
+				valueType,
+				ResourceInvalidationKindMove,
+			)
+		} else {
+			checker.report(
+				&InvalidResourceAssignmentError{
+					StartPos: assignment.StartPosition(),
+					EndPos:   assignment.EndPosition(),
+				},
+			)
+		}
+	}
 
 	return nil
 }
 
-func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentStatement, valueType Type) (targetType Type) {
-	switch target := assignment.Target.(type) {
+func (checker *Checker) isSelfFieldAccess(expression ast.Expression) bool {
+	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
+	if !isMemberExpression {
+		return false
+	}
+
+	identifierExpression, isIdentifierExpression := memberExpression.Expression.(*ast.IdentifierExpression)
+	if !isIdentifierExpression {
+		return false
+	}
+
+	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
+	if variable == nil {
+		return false
+	}
+
+	return variable.Kind == common.DeclarationKindSelf
+}
+
+func (checker *Checker) visitAssignmentValueType(
+	targetExpression ast.Expression,
+	valueExpression ast.Expression,
+	valueType Type,
+) (targetType Type) {
+	switch target := targetExpression.(type) {
 	case *ast.IdentifierExpression:
-		return checker.visitIdentifierExpressionAssignment(assignment, target, valueType)
+		return checker.visitIdentifierExpressionAssignment(valueExpression, target, valueType)
 
 	case *ast.IndexExpression:
-		return checker.visitIndexExpressionAssignment(assignment, target, valueType)
+		return checker.visitIndexExpressionAssignment(valueExpression, target, valueType)
 
 	case *ast.MemberExpression:
-		return checker.visitMemberExpressionAssignment(assignment, target, valueType)
+		return checker.visitMemberExpressionAssignment(valueExpression, target, valueType)
 
 	default:
 		panic(&unsupportedAssignmentTargetExpression{
@@ -42,7 +84,7 @@ func (checker *Checker) visitAssignmentValueType(assignment *ast.AssignmentState
 }
 
 func (checker *Checker) visitIdentifierExpressionAssignment(
-	assignment *ast.AssignmentStatement,
+	valueExpression ast.Expression,
 	target *ast.IdentifierExpression,
 	valueType Type,
 ) (targetType Type) {
@@ -67,14 +109,14 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 	// check value type is subtype of variable type
 	if !IsInvalidType(valueType) &&
-		!checker.IsTypeCompatible(assignment.Value, valueType, variable.Type) {
+		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				StartPos:     assignment.Value.StartPosition(),
-				EndPos:       assignment.Value.EndPosition(),
+				StartPos:     valueExpression.StartPosition(),
+				EndPos:       valueExpression.EndPosition(),
 			},
 		)
 	}
@@ -83,7 +125,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 }
 
 func (checker *Checker) visitIndexExpressionAssignment(
-	assignment *ast.AssignmentStatement,
+	valueExpression ast.Expression,
 	target *ast.IndexExpression,
 	valueType Type,
 ) (elementType Type) {
@@ -95,14 +137,14 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	}
 
 	if !IsInvalidType(elementType) &&
-		!checker.IsTypeCompatible(assignment.Value, valueType, elementType) {
+		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				StartPos:     assignment.Value.StartPosition(),
-				EndPos:       assignment.Value.EndPosition(),
+				StartPos:     valueExpression.StartPosition(),
+				EndPos:       valueExpression.EndPosition(),
 			},
 		)
 	}
@@ -111,7 +153,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 }
 
 func (checker *Checker) visitMemberExpressionAssignment(
-	assignment *ast.AssignmentStatement,
+	valueExpression ast.Expression,
 	target *ast.MemberExpression,
 	valueType Type,
 ) (memberType Type) {
@@ -119,7 +161,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	member := checker.visitMember(target)
 
 	if member == nil {
-		return
+		return &InvalidType{}
 	}
 
 	// check member is not constant
@@ -129,8 +171,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			checker.report(
 				&AssignmentToConstantMemberError{
 					Name:     target.Identifier.Identifier,
-					StartPos: assignment.Value.StartPosition(),
-					EndPos:   assignment.Value.EndPosition(),
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
 				},
 			)
 		}
@@ -140,14 +182,14 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// if value type is valid, check value can be assigned to member
 	if !IsInvalidType(valueType) &&
-		!checker.IsTypeCompatible(assignment.Value, valueType, member.Type) {
+		!checker.IsTypeCompatible(valueExpression, valueType, member.Type) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				StartPos:     assignment.Value.StartPosition(),
-				EndPos:       assignment.Value.EndPosition(),
+				StartPos:     valueExpression.StartPosition(),
+				EndPos:       valueExpression.EndPosition(),
 			},
 		)
 	}

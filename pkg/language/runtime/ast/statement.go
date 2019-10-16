@@ -125,6 +125,27 @@ func (s *WhileStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitWhileStatement(s)
 }
 
+// EmitStatement
+
+type EmitStatement struct {
+	InvocationExpression *InvocationExpression
+	StartPos             Position
+}
+
+func (s *EmitStatement) StartPosition() Position {
+	return s.StartPos
+}
+
+func (s *EmitStatement) EndPosition() Position {
+	return s.InvocationExpression.EndPosition()
+}
+
+func (*EmitStatement) isStatement() {}
+
+func (s *EmitStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitEmitStatement(s)
+}
+
 // AssignmentStatement
 
 type AssignmentStatement struct {
@@ -144,7 +165,28 @@ func (s *AssignmentStatement) EndPosition() Position {
 func (*AssignmentStatement) isStatement() {}
 
 func (s *AssignmentStatement) Accept(visitor Visitor) Repr {
-	return visitor.VisitAssignment(s)
+	return visitor.VisitAssignmentStatement(s)
+}
+
+// SwapStatement
+
+type SwapStatement struct {
+	Left  Expression
+	Right Expression
+}
+
+func (s *SwapStatement) StartPosition() Position {
+	return s.Left.StartPosition()
+}
+
+func (s *SwapStatement) EndPosition() Position {
+	return s.Right.EndPosition()
+}
+
+func (*SwapStatement) isStatement() {}
+
+func (s *SwapStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitSwapStatement(s)
 }
 
 // ExpressionStatement

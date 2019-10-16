@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
-	"log"
 )
 
 var (

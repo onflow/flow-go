@@ -4,23 +4,22 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
-// CheckSelfFieldInitializations performs a definite assignment analysis on the provided function block.
+// CheckSelfFieldInitializations performs a definite assignment analysis
+// on the provided function block.
 //
-// This function checks that the provided fields are definitely assigned in the function block. It returns
-// a list of all fields that are not definitely assigned, as well as a list of errors that occurred
-// due to unassigned usages in the function block itself.
+// This function checks that the provided fields are definitely assigned
+// in the function block.
+//
+// It returns a list of all fields that are not definitely assigned,
+// as well as a list of errors that occurred due to unassigned field uses
+// in the function block itself.
+//
 func CheckSelfFieldInitializations(
 	fields []*ast.FieldDeclaration,
 	block *ast.FunctionBlock,
 ) ([]*ast.FieldDeclaration, []error) {
-	assignments := NewAssignmentSet()
-	errors := make([]error, 0)
-
-	a := &SelfFieldAssignmentAnalyzer{
-		assignments: assignments,
-		errors:      &errors,
-	}
-	assigned := a.visitNode(block)
+	analyzer := NewSelfFieldAssignmentAnalyzer()
+	assigned := analyzer.VisitNode(block)
 
 	unassigned := make([]*ast.FieldDeclaration, 0)
 
@@ -30,7 +29,14 @@ func CheckSelfFieldInitializations(
 		}
 	}
 
-	return unassigned, errors
+	return unassigned, *analyzer.Errors
+}
+
+func NewSelfFieldAssignmentAnalyzer() *SelfFieldAssignmentAnalyzer {
+	return &SelfFieldAssignmentAnalyzer{
+		assignments: NewAssignmentSet(),
+		Errors:      &[]error{},
+	}
 }
 
 // SelfFieldAssignmentAnalyzer is a visitor that traverses an AST to perform definite assignment analysis.
@@ -38,13 +44,17 @@ func CheckSelfFieldInitializations(
 // This analyzer accumulates field assignments as it traverses, meaning that each node is aware of all
 // definitely-assigned fields in its logical path.
 type SelfFieldAssignmentAnalyzer struct {
-	assignments AssignmentSet
-	errors      *[]error
+	assignments   AssignmentSet
+	maybeReturned bool
+	Errors        *[]error
 }
 
 // branch spawns a new analyzer to inspect a branch of the AST.
 func (analyzer *SelfFieldAssignmentAnalyzer) branch() *SelfFieldAssignmentAnalyzer {
-	return &SelfFieldAssignmentAnalyzer{analyzer.assignments, analyzer.errors}
+	return &SelfFieldAssignmentAnalyzer{
+		assignments: analyzer.assignments,
+		Errors:      analyzer.Errors,
+	}
 }
 
 // isSelfExpression returns true if the given expression is the `self` identifier referring
@@ -61,18 +71,18 @@ func (analyzer *SelfFieldAssignmentAnalyzer) isSelfExpression(expr ast.Expressio
 
 // report reports an error that has occurred during the analysis.
 func (analyzer *SelfFieldAssignmentAnalyzer) report(err error) {
-	*analyzer.errors = append(*analyzer.errors, err)
+	*analyzer.Errors = append(*analyzer.Errors, err)
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) visitStatements(statements []ast.Statement) AssignmentSet {
 	for _, statement := range statements {
-		analyzer.assignments = analyzer.visitNode(statement)
+		analyzer.assignments = analyzer.VisitNode(statement)
 	}
 
 	return analyzer.assignments
 }
 
-func (analyzer *SelfFieldAssignmentAnalyzer) visitNode(node ast.Element) AssignmentSet {
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitNode(node ast.Element) AssignmentSet {
 	if node == nil {
 		return analyzer.assignments
 	}
@@ -89,33 +99,49 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitBlock(node *ast.Block) ast.Rep
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitFunctionBlock(node *ast.FunctionBlock) ast.Repr {
-	return analyzer.visitNode(node.Block)
+	return analyzer.VisitNode(node.Block)
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitIfStatement(node *ast.IfStatement) ast.Repr {
 	test := node.Test.(ast.Element)
-	analyzer.visitNode(test)
+	analyzer.VisitNode(test)
 
-	thenAssignments := analyzer.branch().visitNode(node.Then)
-	elseAssignments := analyzer.branch().visitNode(node.Else)
+	thenAnalyzer := analyzer.branch()
+	thenAssignments := thenAnalyzer.VisitNode(node.Then)
+
+	elseAnalyzer := analyzer.branch()
+	elseAssignments := elseAnalyzer.VisitNode(node.Else)
+
+	analyzer.maybeReturned = analyzer.maybeReturned ||
+		thenAnalyzer.maybeReturned || elseAnalyzer.maybeReturned
 
 	return thenAssignments.Intersection(elseAssignments)
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
-	analyzer.branch().visitNode(node.Test)
-	analyzer.branch().visitNode(node.Block)
+	testAnalyzer := analyzer.branch()
+	testAnalyzer.VisitNode(node.Test)
+
+	analyzer.maybeReturned = analyzer.maybeReturned ||
+		testAnalyzer.maybeReturned
+
+	blockAnalyzer := analyzer.branch()
+	blockAnalyzer.VisitNode(node.Block)
+
+	analyzer.maybeReturned = analyzer.maybeReturned ||
+		blockAnalyzer.maybeReturned
 
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitVariableDeclaration(node *ast.VariableDeclaration) ast.Repr {
-	analyzer.visitNode(node.Value)
+	analyzer.VisitNode(node.Value)
 
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitReturnStatement(*ast.ReturnStatement) ast.Repr {
+	analyzer.maybeReturned = true
 	return analyzer.assignments
 }
 
@@ -123,10 +149,27 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitBreakStatement(*ast.BreakState
 	return analyzer.assignments
 }
 
-func (analyzer *SelfFieldAssignmentAnalyzer) VisitAssignment(node *ast.AssignmentStatement) ast.Repr {
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitAssignmentStatement(node *ast.AssignmentStatement) ast.Repr {
 	node.Value.Accept(analyzer)
 
-	if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
+	if !analyzer.maybeReturned {
+		if memberExpression, ok := node.Target.(*ast.MemberExpression); ok {
+			if analyzer.isSelfExpression(memberExpression.Expression) {
+				return analyzer.assignments.Insert(memberExpression.Identifier)
+			}
+		}
+	}
+
+	return analyzer.assignments
+}
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitSwapStatement(node *ast.SwapStatement) ast.Repr {
+	if memberExpression, ok := node.Left.(*ast.MemberExpression); ok {
+		if analyzer.isSelfExpression(memberExpression.Expression) {
+			return analyzer.assignments.Insert(memberExpression.Identifier)
+		}
+	}
+
+	if memberExpression, ok := node.Right.(*ast.MemberExpression); ok {
 		if analyzer.isSelfExpression(memberExpression.Expression) {
 			return analyzer.assignments.Insert(memberExpression.Identifier)
 		}
@@ -136,23 +179,28 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitAssignment(node *ast.Assignmen
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitExpressionStatement(node *ast.ExpressionStatement) ast.Repr {
-	analyzer.visitNode(node.Expression)
+	analyzer.VisitNode(node.Expression)
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitInvocationExpression(node *ast.InvocationExpression) ast.Repr {
 	for _, arg := range node.Arguments {
-		analyzer.visitNode(arg.Expression)
+		analyzer.VisitNode(arg.Expression)
 	}
 
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitConditionalExpression(node *ast.ConditionalExpression) ast.Repr {
-	analyzer.visitNode(node.Test)
+	analyzer.VisitNode(node.Test)
 
-	thenAssignments := analyzer.branch().visitNode(node.Then)
-	elseAssignments := analyzer.branch().visitNode(node.Else)
+	thenAnalyzer := analyzer.branch()
+	thenAssignments := thenAnalyzer.VisitNode(node.Then)
+
+	elseAnalyzer := analyzer.branch()
+	elseAssignments := elseAnalyzer.VisitNode(node.Else)
+
+	analyzer.maybeReturned = thenAnalyzer.maybeReturned || elseAnalyzer.maybeReturned
 
 	return thenAssignments.Intersection(elseAssignments)
 }
@@ -189,6 +237,14 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitImportDeclaration(*ast.ImportD
 	return analyzer.assignments
 }
 
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	return analyzer.assignments
+}
+
+func (analyzer *SelfFieldAssignmentAnalyzer) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	return analyzer.assignments
+}
+
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitContinueStatement(*ast.ContinueStatement) ast.Repr {
 	return analyzer.assignments
 }
@@ -207,7 +263,7 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitIntExpression(*ast.IntExpressi
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitArrayExpression(node *ast.ArrayExpression) ast.Repr {
 	for _, value := range node.Values {
-		analyzer.visitNode(value)
+		analyzer.VisitNode(value)
 	}
 
 	return analyzer.assignments
@@ -215,8 +271,8 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitArrayExpression(node *ast.Arra
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitDictionaryExpression(node *ast.DictionaryExpression) ast.Repr {
 	for _, entry := range node.Entries {
-		analyzer.visitNode(entry.Key)
-		analyzer.visitNode(entry.Value)
+		analyzer.VisitNode(entry.Key)
+		analyzer.VisitNode(entry.Value)
 	}
 
 	return analyzer.assignments
@@ -242,22 +298,22 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitMemberExpression(node *ast.Mem
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitIndexExpression(node *ast.IndexExpression) ast.Repr {
-	analyzer.visitNode(node.TargetExpression)
+	analyzer.VisitNode(node.TargetExpression)
 	if node.IndexingExpression != nil {
-		analyzer.visitNode(node.IndexingExpression)
+		analyzer.VisitNode(node.IndexingExpression)
 	}
 
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitUnaryExpression(node *ast.UnaryExpression) ast.Repr {
-	analyzer.visitNode(node.Expression)
+	analyzer.VisitNode(node.Expression)
 	return analyzer.assignments
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitBinaryExpression(node *ast.BinaryExpression) ast.Repr {
-	analyzer.visitNode(node.Left)
-	analyzer.visitNode(node.Right)
+	analyzer.VisitNode(node.Left)
+	analyzer.VisitNode(node.Right)
 
 	return analyzer.assignments
 }
@@ -273,7 +329,7 @@ func (analyzer *SelfFieldAssignmentAnalyzer) VisitStringExpression(*ast.StringEx
 }
 
 func (analyzer *SelfFieldAssignmentAnalyzer) VisitFailableDowncastExpression(node *ast.FailableDowncastExpression) ast.Repr {
-	analyzer.visitNode(node.Expression)
+	analyzer.VisitNode(node.Expression)
 	return analyzer.assignments
 }
 

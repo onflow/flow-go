@@ -171,6 +171,41 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+
+	var parameters ast.Parameters
+	parameterList := ctx.ParameterList()
+	if parameterList != nil {
+		parameters = parameterList.Accept(v).(ast.Parameters)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.EventDeclaration{
+		Identifier: identifier,
+		Parameters: parameters,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface{} {
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	invocation.InvokedExpression =
+		&ast.IdentifierExpression{
+			Identifier: identifier,
+		}
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.EmitStatement{
+		InvocationExpression: invocation,
+		StartPos:             startPosition,
+	}
+}
+
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
@@ -761,20 +796,8 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 }
 
 func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-
-	var target ast.Expression = &ast.IdentifierExpression{
-		Identifier: identifier,
-	}
-
-	for _, accessExpressionContext := range ctx.AllExpressionAccess() {
-		expression := accessExpressionContext.Accept(v)
-		accessExpression := expression.(ast.AccessExpression)
-		target = v.wrapPartialAccessExpression(target, accessExpression)
-	}
-
+	target := v.targetExpression(ctx.Identifier(), ctx.AllExpressionAccess())
 	transfer := ctx.Transfer().Accept(v).(*ast.Transfer)
-
 	value := ctx.Expression().Accept(v).(ast.Expression)
 
 	return &ast.AssignmentStatement{
@@ -782,6 +805,24 @@ func (v *ProgramVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
 		Transfer: transfer,
 		Value:    value,
 	}
+}
+
+func (v *ProgramVisitor) targetExpression(
+	identifierContext IIdentifierContext,
+	expressionAccessContexts []IExpressionAccessContext,
+) ast.Expression {
+	identifier := identifierContext.Accept(v).(ast.Identifier)
+	var target ast.Expression = &ast.IdentifierExpression{
+		Identifier: identifier,
+	}
+
+	for _, accessExpressionContext := range expressionAccessContexts {
+		expression := accessExpressionContext.Accept(v)
+		accessExpression := expression.(ast.AccessExpression)
+		target = v.wrapPartialAccessExpression(target, accessExpression)
+	}
+
+	return target
 }
 
 func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
@@ -795,6 +836,16 @@ func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 	return &ast.Transfer{
 		Operation: operation,
 		Pos:       position,
+	}
+}
+
+func (v *ProgramVisitor) VisitSwap(ctx *SwapContext) interface{} {
+	left := ctx.left.Accept(v).(ast.Expression)
+	right := ctx.right.Accept(v).(ast.Expression)
+
+	return &ast.SwapStatement{
+		Left:  left,
+		Right: right,
 	}
 }
 

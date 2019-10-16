@@ -67,6 +67,10 @@ func (v *BaseStrictusVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationC
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -159,11 +163,19 @@ func (v *BaseStrictusVisitor) VisitWhileStatement(ctx *WhileStatementContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseStrictusVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitSwap(ctx *SwapContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

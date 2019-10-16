@@ -702,8 +702,50 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 
 func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	type testCase struct {
+		compositeKind common.CompositeKind
+		check         func(error)
+	}
+
+	// TODO: add support for non-structure declarations
+
+	testCases := []testCase{
+		{
+			compositeKind: common.CompositeKindStructure,
+			check: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+			},
+		},
+		{
+			compositeKind: common.CompositeKindResource,
+			check: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 5)
+
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+				assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[4])
+			},
+		},
+		{
+			compositeKind: common.CompositeKindContract,
+			check: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+
+		t.Run(testCase.compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s Test {
@@ -716,26 +758,12 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
                   }
               }
 	        `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
+				testCase.compositeKind.Keyword(),
+				testCase.compositeKind.TransferOperator(),
+				testCase.compositeKind.ConstructionKeyword(),
 			))
 
-			// TODO: add support for non-structure declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure {
-				expectedErrorCount += 1
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
-			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-
-			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
-
-			if kind != common.CompositeKindStructure {
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
+			testCase.check(err)
 		})
 	}
 }

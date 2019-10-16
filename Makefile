@@ -26,7 +26,7 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip > pkg/network/gossip/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip/v1 > pkg/network/gossip/v1/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
-	godoc2md github.com/dapperlabs/flow-go/sdk/accounts > sdk/accounts/README.md
+	godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
 
 .PHONY: generate-proto
 generate-proto:
@@ -35,7 +35,6 @@ generate-proto:
 .PHONY: generate-wire
 generate-wire:
 	GO111MODULE=on wire ./internal/roles/collect/
-	GO111MODULE=on wire ./internal/roles/consensus/
 	GO111MODULE=on wire ./internal/roles/execute/
 	GO111MODULE=on wire ./internal/roles/verify/
 
@@ -45,7 +44,7 @@ generate-mocks:
 
 .PHONY: generate-registries
 generate-registries:
-	go build -o /tmp/registry-generator ./pkg/network/gossip/v1/scripts/
+	GO111MODULE=on go build -o /tmp/registry-generator ./pkg/network/gossip/v1/scripts/
 	find ./pkg/grpc/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
 	rm /tmp/registry-generator
 

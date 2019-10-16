@@ -65,6 +65,7 @@ declaration
     | functionDeclaration[true]
     | variableDeclaration
     | importDeclaration
+    | eventDeclaration
     ;
 
 importDeclaration
@@ -129,6 +130,10 @@ functionDeclaration[bool functionBlockRequired]
     : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+    ;
+
+eventDeclaration
+    : Event identifier parameterList
     ;
 
 parameterList
@@ -213,11 +218,13 @@ statement
     | continueStatement
     | ifStatement
     | whileStatement
+    | emitStatement
     // NOTE: allow all declarations, even structures, in parser,
     // then check identifier declaration is variable/constant or function
     // in semantic analysis to provide better error
     | declaration
     | assignment
+    | swap
     | expression
     ;
 
@@ -249,12 +256,29 @@ whileStatement
     : While expression block
     ;
 
+emitStatement
+    : Emit identifier invocation
+    ;
+
 variableDeclaration
     : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
+// NOTE: we allow any kind of transfer, i.e. moves, but ensure
+//   that move is not used in the semantic analysis (as assignment
+//   to resource type will cause a loss of the old value).
+//   Being unrestritive here allows us to provide better error messages
+//   in the semantic analysis.
 assignment
     : identifier expressionAccess* transfer expression
+    ;
+
+
+// NOTE: we allow expressions on both sides when parsing, but ensure
+//   that both sides are targets (identifier, member access, or index access)
+//   in the semantic analysis. This allows us to provide better error messages
+swap
+    : left=expression '<->' right=expression
     ;
 
 transfer
@@ -503,6 +527,9 @@ Contract : 'contract' ;
 Interface : 'interface' ;
 
 Fun : 'fun' ;
+
+Event : 'event' ;
+Emit : 'emit' ;
 
 Pre : 'pre' ;
 Post : 'post' ;
