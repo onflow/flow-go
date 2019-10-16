@@ -138,7 +138,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		sema.ArgumentLabelNotRequired,
 		"message",
 	},
-	false,
+	true,
 )
 
 // PanicError
