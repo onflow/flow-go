@@ -60,3 +60,35 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 		}
 	}
 }
+func TestCheckInvalidResourceDestructorOverloading(t *testing.T) {
+
+	interfacePossibilities := []bool{true, false}
+
+	for _, isInterface := range interfacePossibilities {
+
+		interfaceKeyword := ""
+		body := ""
+		if isInterface {
+			interfaceKeyword = "interface"
+		} else {
+			body = "{}"
+		}
+
+		t.Run(interfaceKeyword, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource %[1]s X {
+                      destroy() %[2]s
+                      destroy(y: Int) %[2]s
+                  }
+	            `,
+				interfaceKeyword,
+				body,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
+		})
+	}
+}
