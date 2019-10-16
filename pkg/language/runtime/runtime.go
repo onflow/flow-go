@@ -246,13 +246,10 @@ func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (p
 	return
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
-	program, err := r.parse(script, runtimeInterface)
-	if err != nil {
-		return nil, err
-	}
+type ImportResolver = func(astLocation ast.ImportLocation) (program *ast.Program, e error)
 
-	err = program.ResolveImports(func(astLocation ast.ImportLocation) (program *ast.Program, e error) {
+func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
+	return func(astLocation ast.ImportLocation) (program *ast.Program, e error) {
 		var location ImportLocation
 		switch astLocation := astLocation.(type) {
 		case ast.StringImportLocation:
@@ -267,64 +264,22 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 			return nil, err
 		}
 		return r.parse(script, runtimeInterface)
-	})
+	}
+}
+
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
+	program, err := r.parse(script, runtimeInterface)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: maybe consider adding argument labels
+	importResolver := r.importResolver(runtimeInterface)
+	err = program.ResolveImports(importResolver)
+	if err != nil {
+		return nil, err
+	}
 
-	functions := append(
-		stdlib.BuiltinFunctions,
-		stdlib.NewStandardLibraryFunction(
-			"getValue",
-			&getValueFunctionType,
-			r.newGetValueFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"setValue",
-			&setValueFunctionType,
-			r.newSetValueFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"createAccount",
-			&createAccountFunctionType,
-			r.newCreateAccountFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"addAccountKey",
-			&addAccountKeyFunctionType,
-			r.addAccountKeyFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"removeAccountKey",
-			&removeAccountKeyFunctionType,
-			r.removeAccountKeyFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"updateAccountCode",
-			&updateAccountCodeFunctionType,
-			r.newUpdateAccountCodeFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"getAccount",
-			&getAccountFunctionType,
-			r.newGetAccountFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"log",
-			&logFunctionType,
-			r.newLogFunction(runtimeInterface),
-			nil,
-		),
-	)
+	functions := r.standardLibraryFunctions(runtimeInterface)
 
 	valueDeclarations := functions.ToValueDeclarations()
 
@@ -389,7 +344,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	}
 
 	signingAccounts := make([]interface{}, signingAccountsCount)
-	storedValues := make([]interpreter.DictionaryValue, signingAccountsCount)
+	storedValues := make([]map[string]interpreter.Value, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
 		signingAccount, storedValue, err := loadAccount(runtimeInterface, address)
@@ -426,23 +381,77 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	return value.ToGoValue(), nil
 }
 
+func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
+	return append(
+		stdlib.BuiltinFunctions,
+		stdlib.NewStandardLibraryFunction(
+			"getValue",
+			&getValueFunctionType,
+			r.newGetValueFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"setValue",
+			&setValueFunctionType,
+			r.newSetValueFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"createAccount",
+			&createAccountFunctionType,
+			r.newCreateAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"addAccountKey",
+			&addAccountKeyFunctionType,
+			r.addAccountKeyFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"removeAccountKey",
+			&removeAccountKeyFunctionType,
+			r.removeAccountKeyFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"updateAccountCode",
+			&updateAccountCodeFunctionType,
+			r.newUpdateAccountCodeFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"getAccount",
+			&getAccountFunctionType,
+			r.newGetAccountFunction(runtimeInterface),
+			nil,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"log",
+			&logFunctionType,
+			r.newLogFunction(runtimeInterface),
+			nil,
+		),
+	)
+}
+
 func loadAccount(runtimeInterface Interface, address types.Address) (
 	interface{},
-	interpreter.DictionaryValue,
+	map[string]interpreter.Value,
 	error,
 ) {
 	// TODO: fix controller and key
 	storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte("storage"))
 	if err != nil {
-		return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+		return nil, nil, Error{[]error{err}}
 	}
 
-	storedValue := interpreter.DictionaryValue{}
+	storedValue := map[string]interpreter.Value{}
 	if len(storedData) > 0 {
 		decoder := gob.NewDecoder(bytes.NewReader(storedData))
 		err = decoder.Decode(&storedValue)
 		if err != nil {
-			return nil, interpreter.DictionaryValue{}, Error{[]error{err}}
+			return nil, nil, Error{[]error{err}}
 		}
 	}
 
@@ -450,11 +459,22 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(address.String()),
-			"storage": storedValue,
+			"storage": storageValue(storedValue),
 		},
 	}
 
 	return account, storedValue, nil
+}
+
+func storageValue(storedValue map[string]interpreter.Value) interpreter.StorageValue {
+	return interpreter.StorageValue{
+		Getter: func(key sema.Type) interpreter.Value {
+			return storedValue[key.String()]
+		},
+		Setter: func(key sema.Type, value interpreter.Value) {
+			storedValue[key.String()] = value
+		},
+	}
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {

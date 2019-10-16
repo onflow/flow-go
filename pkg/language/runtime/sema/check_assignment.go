@@ -2,9 +2,8 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
-
-// TODO: handle potential loss of target's current value if it is a resource
 
 func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
 	valueType := assignment.Value.Accept(checker).(Type)
@@ -14,13 +13,52 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
 	checker.checkTransfer(assignment.Transfer, valueType)
-	checker.recordResourceInvalidation(
-		assignment.Value,
-		valueType,
-		ResourceInvalidationKindMove,
-	)
+
+	// Assignment of a resource or assignment to a resource is not valid,
+	// as it would result in a resource loss
+
+	if valueType.IsResourceType() || targetType.IsResourceType() {
+		// Assignment to self-field is allowed. This is necessary to initialize
+		// fields in the initializer
+
+		// TODO: improve exception
+
+		if checker.isSelfFieldAccess(assignment.Target) {
+			checker.recordResourceInvalidation(
+				assignment.Value,
+				valueType,
+				ResourceInvalidationKindMove,
+			)
+		} else {
+			checker.report(
+				&InvalidResourceAssignmentError{
+					StartPos: assignment.StartPosition(),
+					EndPos:   assignment.EndPosition(),
+				},
+			)
+		}
+	}
 
 	return nil
+}
+
+func (checker *Checker) isSelfFieldAccess(expression ast.Expression) bool {
+	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
+	if !isMemberExpression {
+		return false
+	}
+
+	identifierExpression, isIdentifierExpression := memberExpression.Expression.(*ast.IdentifierExpression)
+	if !isIdentifierExpression {
+		return false
+	}
+
+	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
+	if variable == nil {
+		return false
+	}
+
+	return variable.Kind == common.DeclarationKindSelf
 }
 
 func (checker *Checker) visitAssignmentValueType(
@@ -123,7 +161,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	member := checker.visitMember(target)
 
 	if member == nil {
-		return
+		return &InvalidType{}
 	}
 
 	// check member is not constant

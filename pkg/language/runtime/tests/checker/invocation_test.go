@@ -201,3 +201,47 @@ func TestCheckInvalidFunctionCallWithWrongTypeAndMissingArgumentLabel(t *testing
 
 	assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[1])
 }
+
+func TestCheckInvocationOfFunctionFromStructFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun f(x: Int) {}
+
+      struct Y {
+        fun x() {
+          f(x: 1)
+        }
+      }
+    `)
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidStructFunctionInvocation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      struct Y {
+        fun x() {
+          x()
+        }
+      }
+    `)
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckInvocationOfFunctionFromStructFunctionWithSameName(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun x(y: Int) {}
+
+      struct Y {
+        // struct function and global function have same name
+        fun x() {
+          x(y: 1)
+        }
+      }
+    `)
+	assert.Nil(t, err)
+}
