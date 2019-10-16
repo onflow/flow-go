@@ -14,18 +14,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	checker.checkParameters(declaration.Parameters, eventType.ParameterTypeAnnotations)
 
 	// check that parameters are primitive types
-	for i, parameter := range declaration.Parameters {
-		parameterTypeAnnotation := eventType.ParameterTypeAnnotations[i]
-
-		// only allow primitive parameters
-		if !isValidEventParameterType(parameterTypeAnnotation.Type) {
-			checker.report(&InvalidEventParameterTypeError{
-				Type:     parameterTypeAnnotation.Type,
-				StartPos: parameter.StartPos,
-				EndPos:   parameter.TypeAnnotation.EndPosition(),
-			})
-		}
-	}
+	checker.checkEventParameters(declaration.Parameters, eventType.ParameterTypeAnnotations)
 
 	return nil
 }
@@ -68,6 +57,22 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	)
 
 	checker.Elaboration.EventDeclarationTypes[declaration] = eventType
+}
+
+func (checker *Checker) checkEventParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
+	for i, parameter := range parameters {
+		parameterTypeAnnotation := parameterTypeAnnotations[i]
+
+		// only allow primitive parameters
+		if !isValidEventParameterType(parameterTypeAnnotation.Type) {
+			checker.report(&InvalidEventParameterTypeError{
+				Type:     parameterTypeAnnotation.Type,
+				StartPos: parameter.StartPos,
+				EndPos:   parameter.TypeAnnotation.EndPosition(),
+			})
+		}
+	}
+
 }
 
 // isValidEventParameterType returns true if the given type is a valid event parameters.
