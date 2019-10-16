@@ -48,10 +48,7 @@ var AccountType = StandardLibraryType{
 				Type: &sema.StringType{},
 			},
 			"storage": {
-				Type: &sema.DictionaryType{
-					KeyType:   &sema.AnyType{},
-					ValueType: &sema.AnyType{},
-				},
+				Type: &sema.StorageType{},
 			},
 		},
 	},

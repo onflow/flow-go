@@ -176,7 +176,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
-		checker.declareFunctionDeclaration(declaration)
+		checker.declareGlobalFunctionDeclaration(declaration)
 	}
 
 	for _, declaration := range program.EventDeclarations() {
@@ -191,6 +191,12 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	return nil
+}
+
+func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
+	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
+	checker.declareFunctionDeclaration(declaration, functionType)
 }
 
 func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {

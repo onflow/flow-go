@@ -83,9 +83,9 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
-	var parameterTypes []Type
-	for _, parameterTypeAnnotation := range parameterTypeAnnotations {
-		parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
+	parameterTypes := make([]Type, len(parameterTypeAnnotations))
+	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
+		parameterTypes[i] = parameterTypeAnnotation.Type
 	}
 	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
@@ -246,6 +246,8 @@ func (checker *Checker) checkInvocationArguments(
 		minCount = parameterCount
 	}
 
+	argumentTypes = make([]Type, minCount)
+
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
 
@@ -254,7 +256,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentType := argument.Expression.Accept(checker).(Type)
 
-		argumentTypes = append(argumentTypes, argumentType)
+		argumentTypes[i] = argumentType
 
 		if !IsInvalidType(parameterType) &&
 			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {

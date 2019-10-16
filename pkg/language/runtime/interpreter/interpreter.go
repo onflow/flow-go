@@ -58,6 +58,7 @@ type Interpreter struct {
 	interfaces         map[string]*ast.InterfaceDeclaration
 	ImportLocation     ast.ImportLocation
 	CompositeFunctions map[string]map[string]FunctionValue
+	SubInterpreters    map[ast.ImportLocation]*Interpreter
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -68,6 +69,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		Globals:            map[string]*Variable{},
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions: map[string]map[string]FunctionValue{},
+		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
 	}
 
 	for name, value := range predefinedValues {
@@ -1415,9 +1417,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location Location) Trampoline {
 
 			value := CompositeValue{
-				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				ImportLocation: interpreter.ImportLocation,
+				Identifier:     identifier,
+				Fields:         &map[string]Value{},
+				Functions:      &functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1682,8 +1685,15 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter.ImportLocation = declaration.Location
 
+	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
+
+			for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
+				interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
+			}
+
 			// determine which identifiers are imported /
 			// which variables need to be declared
 
