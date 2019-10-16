@@ -7,11 +7,15 @@ import (
 func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	eventType := checker.Elaboration.EventDeclarationTypes[declaration]
 
-	// check argument labels
-	checker.checkArgumentLabels(declaration.Parameters)
+	constructorFunctionType := eventType.ConstructorFunctionType()
 
-	// check parameters
-	checker.checkParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
+	checker.checkFunction(
+		declaration.Parameters,
+		ast.Position{},
+		constructorFunctionType,
+		nil,
+		false,
+	)
 
 	// check that parameters are primitive types
 	checker.checkEventParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
