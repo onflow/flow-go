@@ -239,6 +239,15 @@ var logFunctionType = sema.FunctionType{
 	),
 }
 
+var emitEventFunctionType = sema.FunctionType{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		&sema.EventType{},
+	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
+}
+
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
@@ -439,6 +448,13 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 			r.newLogFunction(runtimeInterface),
 			nil,
 			true,
+		),
+		stdlib.NewStandardLibraryFunction(
+			"emit",
+			&emitEventFunctionType,
+			r.newEmitEventFunction(runtimeInterface),
+			nil,
+			false,
 		),
 	)
 }
@@ -673,6 +689,21 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		runtimeInterface.Log(fmt.Sprint(arguments[0]))
+		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	}
+}
+
+func (r *interpreterRuntime) newEmitEventFunction(runtimeInterface Interface) interpreter.HostFunction {
+	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		if len(arguments) != 1 {
+			panic("emitEvent requires 1 parameter")
+		}
+
+		eventValue := arguments[0].(interpreter.EventValue)
+
+		// TODO: pass event to host environment through runtime context
+		fmt.Printf("Event emitted: %s\n", eventValue)
+
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
 }
