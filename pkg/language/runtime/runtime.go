@@ -239,15 +239,6 @@ var logFunctionType = sema.FunctionType{
 	),
 }
 
-var emitEventFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.EventType{},
-	),
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
@@ -449,9 +440,10 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 			nil,
 			true,
 		),
+		// override built-in emitEvent function
 		stdlib.NewStandardLibraryFunction(
-			"emit",
-			&emitEventFunctionType,
+			"emitEvent",
+			stdlib.EmitEventFunction.Type,
 			r.newEmitEventFunction(runtimeInterface),
 			nil,
 			false,
