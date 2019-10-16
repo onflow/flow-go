@@ -1199,6 +1199,33 @@ type DictionaryEntryValues struct {
 	Value Value
 }
 
+// EventValue
+
+type EventValue struct {
+	Fields []EventFieldValue
+}
+
+func (EventValue) isValue() {}
+
+func (v EventValue) Copy() Value {
+	fields := make([]EventFieldValue, len(v.Fields))
+	for i, field := range v.Fields {
+		fields[i] = EventFieldValue{
+			Identifier: field.Identifier,
+			Value:      field.Value.Copy(),
+		}
+	}
+
+	return EventValue{fields}
+}
+
+// EventFieldValue
+
+type EventFieldValue struct {
+	Identifier string
+	Value      Value
+}
+
 // ToValue
 
 // ToValue converts a Go value into an interpreter value
