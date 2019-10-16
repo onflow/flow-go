@@ -4588,3 +4588,105 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 		value,
 	)
 }
+
+func TestInterpretResourceDestroyExpressionNoDestructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       resource R {}
+
+       fun test() {
+           let r <- create R()
+           destroy r
+       }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+}
+
+func TestInterpretResourceDestroyExpressionDestructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       var ranDestructor = false
+
+       resource R {
+           destroy() {
+               ranDestructor = true
+           }
+       }
+
+       fun test() {
+           let r <- create R()
+           destroy r
+       }
+	`)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructor"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructor"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var ranDestructorA = false
+      var ranDestructorB = false
+
+      resource B {
+          destroy() {
+              ranDestructorB = true
+          }
+      }
+
+      resource A {
+          let b: <-B
+
+          init(b: <-B) {
+              self.b <- b
+          }
+
+          destroy() {
+              ranDestructorA = true
+              destroy self.b
+          }
+      }
+
+      fun test() {
+          let b <- create B()
+          let a <- create A(b: <-b)
+          destroy a
+      }
+	`)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructorA"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructorB"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructorA"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructorB"].Value,
+	)
+}

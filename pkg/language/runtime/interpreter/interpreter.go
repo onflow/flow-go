@@ -51,25 +51,27 @@ func (m StatementTrampoline) Continue() Trampoline {
 // are treated like they are returning a value.
 
 type Interpreter struct {
-	Checker            *sema.Checker
-	PredefinedValues   map[string]Value
-	activations        *activations.Activations
-	Globals            map[string]*Variable
-	interfaces         map[string]*ast.InterfaceDeclaration
-	ImportLocation     ast.ImportLocation
-	CompositeFunctions map[string]map[string]FunctionValue
-	SubInterpreters    map[ast.ImportLocation]*Interpreter
+	Checker             *sema.Checker
+	PredefinedValues    map[string]Value
+	activations         *activations.Activations
+	Globals             map[string]*Variable
+	interfaces          map[string]*ast.InterfaceDeclaration
+	ImportLocation      ast.ImportLocation
+	CompositeFunctions  map[string]map[string]FunctionValue
+	DestructorFunctions map[string]*InterpretedFunctionValue
+	SubInterpreters     map[ast.ImportLocation]*Interpreter
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:            checker,
-		PredefinedValues:   predefinedValues,
-		activations:        &activations.Activations{},
-		Globals:            map[string]*Variable{},
-		interfaces:         map[string]*ast.InterfaceDeclaration{},
-		CompositeFunctions: map[string]map[string]FunctionValue{},
-		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
+		Checker:             checker,
+		PredefinedValues:    predefinedValues,
+		activations:         &activations.Activations{},
+		Globals:             map[string]*Variable{},
+		interfaces:          map[string]*ast.InterfaceDeclaration{},
+		CompositeFunctions:  map[string]map[string]FunctionValue{},
+		DestructorFunctions: map[string]*InterpretedFunctionValue{},
+		SubInterpreters:     map[ast.ImportLocation]*Interpreter{},
 	}
 
 	for name, value := range predefinedValues {
@@ -1410,8 +1412,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		initializerFunction = &f
 	}
 
-	functions := interpreter.compositeFunctions(declaration, lexicalScope)
+	destructorFunction := interpreter.destructorFunction(declaration, lexicalScope)
+	interpreter.DestructorFunctions[identifier] = destructorFunction
 
+	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
 	variable.Value = NewHostFunctionValue(
@@ -1422,6 +1426,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 				Identifier:     identifier,
 				Fields:         &map[string]Value{},
 				Functions:      &functions,
+				Destructor:     &destructorFunction,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1507,6 +1512,54 @@ func (interpreter *Interpreter) initializerFunction(
 	)
 }
 
+func (interpreter *Interpreter) destructorFunction(
+	compositeDeclaration *ast.CompositeDeclaration,
+	lexicalScope hamt.Map,
+) *InterpretedFunctionValue {
+
+	destructor := compositeDeclaration.Members.Destructor()
+	if destructor == nil {
+		return nil
+	}
+	function := destructor.ToExpression()
+
+	// copy function block, append interfaces' pre-conditions and post-condition
+	functionBlockCopy := *function.FunctionBlock
+	function.FunctionBlock = &functionBlockCopy
+
+	for _, conformance := range compositeDeclaration.Conformances {
+		conformanceIdentifier := conformance.Identifier.Identifier
+		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
+		interfaceDestructor := interfaceDeclaration.Members.Destructor()
+		if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
+			continue
+		}
+
+		functionBlockCopy.PreConditions = append(
+			functionBlockCopy.PreConditions,
+			interfaceDestructor.FunctionBlock.PreConditions...,
+		)
+
+		functionBlockCopy.PostConditions = append(
+			functionBlockCopy.PostConditions,
+			interfaceDestructor.FunctionBlock.PostConditions...,
+		)
+	}
+
+	result := newInterpretedFunction(
+		interpreter,
+		function,
+		// TODO: refactor into constant
+		&sema.FunctionType{
+			ReturnTypeAnnotation: &sema.TypeAnnotation{
+				Type: &sema.VoidType{},
+			},
+		},
+		lexicalScope,
+	)
+	return &result
+}
+
 func (interpreter *Interpreter) compositeFunctions(
 	compositeDeclaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
@@ -1517,7 +1570,7 @@ func (interpreter *Interpreter) compositeFunctions(
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.compositeFunction(compositeDeclaration, functionDeclaration)
+		function := interpreter.compositeFunction(functionDeclaration, compositeDeclaration.Conformances)
 
 		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(
@@ -1532,8 +1585,8 @@ func (interpreter *Interpreter) compositeFunctions(
 }
 
 func (interpreter *Interpreter) compositeFunction(
-	compositeDeclaration *ast.CompositeDeclaration,
 	functionDeclaration *ast.FunctionDeclaration,
+	conformances []*ast.NominalType,
 ) *ast.FunctionExpression {
 
 	functionIdentifier := functionDeclaration.Identifier.Identifier
@@ -1544,7 +1597,7 @@ func (interpreter *Interpreter) compositeFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range compositeDeclaration.Conformances {
+	for _, conformance := range conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
 		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
 		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
@@ -1706,10 +1759,15 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 				interpreter.setVariable(name, variable)
 
-				// if the imported name refers to a structure,
-				// also take the structure functions from the sub-interpreter
-				if structureFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
-					interpreter.CompositeFunctions[name] = structureFunctions
+				// if the imported name refers to a composite, also take the composite functions
+				// and the destructor function from the sub-interpreter
+
+				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
+					interpreter.CompositeFunctions[name] = compositeFunctions
+				}
+
+				if destructorFunction, ok := subInterpreter.DestructorFunctions[name]; ok {
+					interpreter.DestructorFunctions[name] = destructorFunction
 				}
 			}
 		})
@@ -1746,5 +1804,27 @@ func (interpreter *Interpreter) VisitCreateExpression(expression *ast.CreateExpr
 }
 
 func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyExpression) ast.Repr {
-	return expression.Expression.Accept(interpreter)
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			value := result.(Value)
+
+			destructionResult := VoidValue{}
+
+			// TODO: generalize, e.g. arrays
+
+			compositeValue := value.(CompositeValue)
+			destructor := compositeValue.Destructor
+			if *destructor == nil {
+				return Done{Result: destructionResult}
+			}
+
+			// TODO: optimize: only potentially used by host-functions
+			location := Location{
+				Position:       expression.StartPosition(),
+				ImportLocation: interpreter.ImportLocation,
+			}
+
+			return interpreter.bindSelf(**destructor, compositeValue).
+				invoke(nil, location)
+		})
 }

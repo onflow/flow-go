@@ -1007,6 +1007,7 @@ type CompositeValue struct {
 	Identifier     string
 	Fields         *map[string]Value
 	Functions      *map[string]FunctionValue
+	Destructor     **InterpretedFunctionValue
 }
 
 func (CompositeValue) isValue() {}
@@ -1017,13 +1018,14 @@ func (v CompositeValue) Copy() Value {
 		newFields[field] = value.Copy()
 	}
 
-	// NOTE: not copying functions – linked in
+	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
 		ImportLocation: v.ImportLocation,
 		Identifier:     v.Identifier,
 		Fields:         &newFields,
 		Functions:      v.Functions,
+		Destructor:     v.Destructor,
 	}
 }
 
@@ -1046,10 +1048,16 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 		}
 	}
 
-	// if structure was deserialized, dynamically link in the functions
+	// if composite was deserialized, dynamically link in the functions
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = &functions
+	}
+
+	// if composite was deserialized, dynamically link in the destructor
+	if v.Destructor == nil {
+		destructor := interpreter.DestructorFunctions[v.Identifier]
+		v.Destructor = &destructor
 	}
 
 	function, ok := (*v.Functions)[name]
