@@ -10,7 +10,7 @@ struct GreatNFT: NFT {
   let _id: Int
   let _special: Bool
 
-  fun id(): Int {
+  fun id(): Int { 
     return self._id
   }
 
@@ -28,13 +28,13 @@ struct GreatNFT: NFT {
 }
 
 struct GreatNFTMinter {
-  var _nextID: Int
-  let _specialMod: Int
+  var nextID: Int
+  let specialMod: Int
 
   fun mint(): GreatNFT {
-    var isSpecial = self._nextID % self._specialMod == 0
-    let nft = GreatNFT(id: self._nextID, isSpecial: isSpecial)
-    self._nextID = self._nextID + 1
+    var isSpecial = self.nextID % self.specialMod == 0
+    let nft = GreatNFT(id: self.nextID, isSpecial: isSpecial)
+    self.nextID = self.nextID + 1
     return nft
   }
 
@@ -43,7 +43,7 @@ struct GreatNFTMinter {
       firstID > 0
       specialMod > 1
     }
-    self._nextID = firstID
-    self._specialMod = specialMod
+    self.nextID = firstID
+    self.specialMod = specialMod
   }
 }
