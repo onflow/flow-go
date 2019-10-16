@@ -129,13 +129,16 @@ func (checker *Checker) checkInterfaceFunctions(
 
 func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDeclaration) {
 
+	identifier := declaration.Identifier
+
 	// NOTE: fields and functions might already refer to interface itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	interfaceType := &InterfaceType{}
-
-	identifier := declaration.Identifier
+	interfaceType := &InterfaceType{
+		CompositeKind: declaration.CompositeKind,
+		Identifier:    identifier.Identifier,
+	}
 
 	err := checker.typeActivations.Declare(identifier, interfaceType)
 	checker.report(err)
@@ -152,10 +155,6 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 	// NOTE: members are added in `VisitInterfaceDeclaration` –
 	//   left out for now, as field and function requirements could refer to e.g. composites
-	*interfaceType = InterfaceType{
-		CompositeKind: declaration.CompositeKind,
-		Identifier:    identifier.Identifier,
-	}
 
 	interfaceType.InitializerParameterTypeAnnotations =
 		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())

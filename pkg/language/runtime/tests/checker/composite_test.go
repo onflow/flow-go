@@ -762,23 +762,54 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 
 func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-	   resource Test {
-           let test: Test
+	interfacePossibilities := []bool{true, false}
 
-           init(test: <-Test) {
-               self.test <- test
-           }
+	for _, isInterface := range interfacePossibilities {
 
-           destroy() {
-               destroy self.test
-           }
-	   }
-	`)
+		interfaceKeyword := ""
+		if isInterface {
+			interfaceKeyword = "interface"
+		}
 
-	errs := ExpectCheckerErrors(t, err, 1)
+		t.Run(interfaceKeyword, func(t *testing.T) {
 
-	assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+			initializerBody := ""
+			if !isInterface {
+				initializerBody = `
+                  {
+                    self.test <- test
+                  }
+                `
+			}
+
+			destructorBody := ""
+			if !isInterface {
+				destructorBody = `
+                  {
+                      destroy self.test
+                  }
+                `
+			}
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+	               resource %[1]s Test {
+                       let test: Test
+
+                       init(test: <-Test) %[2]s
+
+                       destroy() %[3]s
+	               }
+	            `,
+				interfaceKeyword,
+				initializerBody,
+				destructorBody,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+		})
+	}
 }
 
 func TestCheckCompositeFieldAccess(t *testing.T) {
