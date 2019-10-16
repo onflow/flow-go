@@ -527,7 +527,7 @@ func (e *BinaryExpression) EndPosition() Position {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters           Parameters
+	ParameterList        *ParameterList
 	ReturnTypeAnnotation *TypeAnnotation
 	FunctionBlock        *FunctionBlock
 	StartPos             Position

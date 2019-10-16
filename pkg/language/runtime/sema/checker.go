@@ -189,7 +189,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+	functionType := checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 	checker.declareFunctionDeclaration(declaration, functionType)
 }
@@ -429,11 +429,11 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 }
 
 func (checker *Checker) functionType(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
 	convertedParameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(parameters)
+		checker.parameterTypeAnnotations(parameterList)
 
 	convertedReturnTypeAnnotation :=
 		checker.ConvertTypeAnnotation(returnTypeAnnotation)
@@ -444,11 +444,11 @@ func (checker *Checker) functionType(
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameters ast.Parameters) []*TypeAnnotation {
+func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterList) []*TypeAnnotation {
 
-	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameters))
+	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameterList.Parameters))
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,

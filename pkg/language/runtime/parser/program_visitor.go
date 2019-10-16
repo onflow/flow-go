@@ -55,10 +55,10 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
-	var parameters ast.Parameters
-	parameterList := ctx.ParameterList()
-	if parameterList != nil {
-		parameters = parameterList.Accept(v).(ast.Parameters)
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
 	}
 
 	// NOTE: in e.g interface declarations, function blocks are optional
@@ -74,7 +74,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 	return &ast.FunctionDeclaration{
 		Access:               access,
 		Identifier:           identifier,
-		Parameters:           parameters,
+		ParameterList:        parameterList,
 		ReturnTypeAnnotation: returnTypeAnnotation,
 		FunctionBlock:        functionBlock,
 		StartPos:             startPosition,
@@ -174,19 +174,19 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	var parameters ast.Parameters
-	parameterList := ctx.ParameterList()
-	if parameterList != nil {
-		parameters = parameterList.Accept(v).(ast.Parameters)
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.EventDeclaration{
-		Identifier: identifier,
-		Parameters: parameters,
-		StartPos:   startPosition,
-		EndPos:     endPosition,
+		Identifier:    identifier,
+		ParameterList: parameterList,
+		StartPos:      startPosition,
+		EndPos:        endPosition,
 	}
 }
 
@@ -307,10 +307,10 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	var parameters ast.Parameters
-	parameterList := ctx.ParameterList()
-	if parameterList != nil {
-		parameters = parameterList.Accept(v).(ast.Parameters)
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
 	}
 
 	// NOTE: in e.g interface declarations, function blocks are optional
@@ -335,7 +335,7 @@ func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDec
 		DeclarationKind: declarationKind,
 		FunctionDeclaration: &ast.FunctionDeclaration{
 			Identifier:    identifier,
-			Parameters:    parameters,
+			ParameterList: parameterList,
 			FunctionBlock: functionBlock,
 			StartPos:      startPosition,
 		},
@@ -377,10 +377,10 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 	parameterListEnd := ctx.ParameterList().GetStop()
 	returnTypeAnnotation := v.visitReturnTypeAnnotation(ctx.returnType, parameterListEnd)
 
-	var parameters ast.Parameters
-	parameterList := ctx.ParameterList()
-	if parameterList != nil {
-		parameters = parameterList.Accept(v).(ast.Parameters)
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
 	}
 
 	functionBlock := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
@@ -388,7 +388,7 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
-		Parameters:           parameters,
+		ParameterList:        parameterList,
 		ReturnTypeAnnotation: returnTypeAnnotation,
 		FunctionBlock:        functionBlock,
 		StartPos:             startPosition,
@@ -396,7 +396,7 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 }
 
 func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface{} {
-	var parameters ast.Parameters
+	var parameters []*ast.Parameter
 
 	for _, parameter := range ctx.AllParameter() {
 		parameters = append(
@@ -405,7 +405,13 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 		)
 	}
 
-	return parameters
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.ParameterList{
+		Parameters: parameters,
+		StartPos:   startPosition,
+		EndPos:     endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
