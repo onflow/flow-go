@@ -1759,7 +1759,7 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
-		Map(func(result interface{}) interface{} {
+		FlatMap(func(result interface{}) Trampoline {
 			event := result.(EventValue)
 
 			arguments := []Value{event.Copy()}
@@ -1771,7 +1771,8 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 			emitFunction := interpreter.PredefinedValues["emitEvent"].(HostFunctionValue)
 			emitFunction.invoke(arguments, location)
 
-			return functionReturn{VoidValue{}}
+			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
 		})
 }
 
