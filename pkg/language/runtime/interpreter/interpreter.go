@@ -1734,12 +1734,17 @@ func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDecl
 	return Done{}
 }
 
+// declareEventConstructor declares the constructor function for an event type.
+//
+// The constructor is assigned to a variable with the same identifier as the event type itself.
+// For example, this allows an event instance for event type MyEvent(x: Int) to be created
+// by calling MyEvent(2).
 func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
 	identifier := declaration.Identifier.Identifier
-	variable := interpreter.findOrDeclareVariable(identifier)
 
 	eventType := interpreter.Checker.Elaboration.EventDeclarationTypes[declaration]
 
+	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location Location) Trampoline {
 			fields := make([]EventFieldValue, len(eventType.Fields))
