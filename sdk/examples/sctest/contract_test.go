@@ -5,6 +5,7 @@ package sctest
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -18,7 +19,10 @@ const (
 )
 
 func readFile(path string) []byte {
-	contents, _ := ioutil.ReadFile(path)
+	contents, err := ioutil.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
 	return contents
 }
 
@@ -31,25 +35,64 @@ func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
+// Creates a script that instantiates a new GreatNFTMinter instance
+// and stores it in memory.
+// Initial ID and special mod are arguments to the GreatNFTMinter constructor.
+// The GreatNFTMinter must have been deployed already.
+func generateCreateMinterScript(nftAddr types.Address, initialID, specialMod int) []byte {
+	template := `
+		import GreatNFTMinter from 0x%s
+
+		fun main(acct: Account) {
+			var minter = GreatNFTMinter(firstID: %d, specialMod: %d)
+			acct.storage[GreatNFTMinter] = minter
+		}`
+	return []byte(fmt.Sprintf(template, nftAddr, initialID, specialMod))
+}
+
 // Creates a script that mints an NFT and put it into storage.
+// The minter must have been instantiated already.
 func generateMintScript(nftCodeAddr types.Address) []byte {
+	r := rand.Int()
 	template := `
 		import GreatNFTMinter, GreatNFT from 0x%s
 
 		fun main(acct: Account) {
-			var minter = GreatNFTMinter()
-			var nft = minter.maybeMint()
+			var minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
+			var nft = minter.mint()
 
-			acct.storage["my_nft"] = nft
+			acct.storage[GreatNFT] = nft
+			acct.storage[GreatNFTMinter] = minter
+			// Random comment to prevent dupe tx error %d
 		}`
 
-	filledTemplate := fmt.Sprintf(template, nftCodeAddr.String())
-	return []byte(filledTemplate)
+	return []byte(fmt.Sprintf(template, nftCodeAddr.String(), r))
+}
+
+// Creates a script that retrieves an NFT from storage and makes assertions
+// about its properties. If these assertions fail, the script panics.
+func generateInspectNFTScript(nftCodeAddr types.Address, expectedID int, expectedIsSpecial bool) []byte {
+	r := rand.Int()
+	template := `
+		import GreatNFT from 0x%s
+
+		fun main(acct: Account) {
+			var nft = acct.storage[GreatNFT] ?? panic("missing nft")
+			if nft.id() != %d {
+				panic("incorrect id")
+			}
+			if nft.isSpecial() != %t {
+				panic("incorrect specialness")
+			}
+			// Random comment to prevent dupe tx error %d
+		}`
+
+	return []byte(fmt.Sprintf(template, nftCodeAddr, expectedID, expectedIsSpecial, r))
 }
 
 func newEmulator() *emulator.EmulatedBlockchain {
 	return emulator.NewEmulatedBlockchain(&emulator.EmulatedBlockchainOptions{
-		RuntimeLogger: func(msg string) { fmt.Println(msg) },
+		RuntimeLogger: func(msg string) { },
 	})
 }
 
@@ -58,10 +101,66 @@ func TestDeployment(t *testing.T) {
 
 	// Should be able to deploy a contract as a new account with no keys.
 	nftCode := readFile(greatTokenContractFile)
-	_ = nftCode
-	_, err := b.CreateAccount(nil, nil)
+	_, err := b.CreateAccount(nil, nftCode)
 	assert.Nil(t, err)
 	b.CommitBlock()
+}
+
+func TestCreateMinter(t *testing.T) {
+	b := newEmulator()
+
+	// First, deploy the contract
+	nftCode := readFile(greatTokenContractFile)
+	contractAddr, err := b.CreateAccount(nil, nftCode)
+	assert.Nil(t, err)
+
+	// GreatNFTMinter must be instantiated with initialID > 0 and
+	// specialMod > 1
+	t.Run("Cannot create minter with negative initial ID", func(t *testing.T) {
+		tx := types.Transaction{
+			Script:         generateCreateMinterScript(contractAddr, -1, 2),
+			ComputeLimit:   10,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		}
+
+		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		assert.Nil(t, err)
+		err = b.SubmitTransaction(&tx)
+		if assert.Error(t, err) {
+			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+		}
+	})
+
+	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
+		tx := types.Transaction{
+			Script:         generateCreateMinterScript(contractAddr, 1, 1),
+			ComputeLimit:   10,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		}
+
+		_ = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		err = b.SubmitTransaction(&tx)
+		if assert.Error(t, err) {
+			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+		}
+	})
+
+	t.Run("Should be able to create minter", func(t *testing.T) {
+		tx := types.Transaction{
+			Script:         generateCreateMinterScript(contractAddr, 1, 2),
+			ComputeLimit:   10,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		}
+
+		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		assert.Nil(t, err)
+		err = b.SubmitTransaction(&tx)
+		assert.Nil(t, err)
+		b.CommitBlock()
+	})
 }
 
 func TestMinting(t *testing.T) {
@@ -72,19 +171,68 @@ func TestMinting(t *testing.T) {
 	contractAddr, err := b.CreateAccount(nil, nftCode)
 	assert.Nil(t, err)
 
-	// Create a transaction that mints a GreatToken by calling the minter.
-	mintScript := generateMintScript(contractAddr)
-	fmt.Println(string(mintScript))
-
-	tx := types.Transaction{
-		Script:         mintScript,
+	// Next, instantiate the minter
+	createMinterTx := types.Transaction{
+		Script:         generateCreateMinterScript(contractAddr, 1, 2),
 		ComputeLimit:   10,
 		PayerAccount:   b.RootAccountAddress(),
 		ScriptAccounts: []types.Address{b.RootAccountAddress()},
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-	err = b.SubmitTransaction(&tx)
+	err = createMinterTx.AddSignature(b.RootAccountAddress(), b.RootKey())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	err = b.SubmitTransaction(&createMinterTx)
+	assert.Nil(t, err)
+
+	// Mint the first NFT
+	mintTx := types.Transaction{
+		Script:         generateMintScript(contractAddr),
+		ComputeLimit:   10,
+		PayerAccount:   b.RootAccountAddress(),
+		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+	}
+
+	err = mintTx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	assert.Nil(t, err)
+	err = b.SubmitTransaction(&mintTx)
+	assert.Nil(t, err)
+
+	// Create a tx that will assert ID and specialness
+	inspectTx := types.Transaction{
+		Script:         generateInspectNFTScript(contractAddr, 1, false),
+		ComputeLimit:   10,
+		PayerAccount:   b.RootAccountAddress(),
+		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+	}
+
+	err = inspectTx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	assert.Nil(t, err)
+	err = b.SubmitTransaction(&inspectTx)
+	assert.Nil(t, err)
+
+	// Mint a second NFT
+	mintTx2 := types.Transaction{
+		Script:         generateMintScript(contractAddr),
+		ComputeLimit:   10,
+		PayerAccount:   b.RootAccountAddress(),
+		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+	}
+
+	err = mintTx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	assert.Nil(t, err)
+	err = b.SubmitTransaction(&mintTx2)
+	assert.Nil(t, err)
+
+	// Create a tx that will assert ID and specialness
+	inspectTx2 := types.Transaction{
+		Script:         generateInspectNFTScript(contractAddr, 2, true),
+		ComputeLimit:   10,
+		PayerAccount:   b.RootAccountAddress(),
+		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+	}
+
+	err = inspectTx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	assert.Nil(t, err)
+	err = b.SubmitTransaction(&inspectTx2)
+	assert.Nil(t, err)
 }
