@@ -246,9 +246,9 @@ func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (p
 	return
 }
 
-type Resolver = func(astLocation ast.ImportLocation) (program *ast.Program, e error)
+type ImportResolver = func(astLocation ast.ImportLocation) (program *ast.Program, e error)
 
-func (r *interpreterRuntime) importResolver(runtimeInterface Interface) Resolver {
+func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
 	return func(astLocation ast.ImportLocation) (program *ast.Program, e error) {
 		var location ImportLocation
 		switch astLocation := astLocation.(type) {

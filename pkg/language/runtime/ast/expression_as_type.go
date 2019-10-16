@@ -1,6 +1,6 @@
 package ast
 
-// ExpressionAsType attempt to convert an expression to a type.
+// ExpressionAsType attempts to convert an expression to a type.
 // Some expressions can be considered both an expression and a type
 //
 func ExpressionAsType(expression Expression) Type {

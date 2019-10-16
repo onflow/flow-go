@@ -101,7 +101,13 @@ func (checker *Checker) checkInterfaceFunctions(
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
-			checker.visitFunctionDeclaration(function, false)
+			checker.visitFunctionDeclaration(
+				function,
+				functionDeclarationOptions{
+					mustExit:        false,
+					declareFunction: false,
+				},
+			)
 
 			if function.FunctionBlock != nil {
 				checker.checkInterfaceFunctionBlock(
