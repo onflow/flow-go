@@ -48,7 +48,7 @@ func generateMintScript(nftCodeAddr types.Address) []byte {
 		import GreatNFTMinter, GreatNFT from 0x%s
 
 		fun main(acct: Account) {
-			var minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
+			let minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
 			var nft = minter.mint()
 
 			acct.storage[GreatNFT] = nft
