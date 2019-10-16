@@ -1395,8 +1395,9 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if len(declaration.Members.SpecialFunctions) > 0 {
-		firstInitializer := declaration.Members.SpecialFunctions[0]
+	initializers := declaration.Members.Initializers()
+	if len(initializers) > 0 {
+		firstInitializer := initializers[0]
 
 		functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer]
 
@@ -1477,11 +1478,12 @@ func (interpreter *Interpreter) initializerFunction(
 
 		// TODO: support multiple overloaded initializers
 
-		if len(interfaceDeclaration.Members.SpecialFunctions) == 0 {
+		initializers := interfaceDeclaration.Members.Initializers()
+		if len(initializers) == 0 {
 			continue
 		}
 
-		firstInitializer := interfaceDeclaration.Members.SpecialFunctions[0]
+		firstInitializer := initializers[0]
 		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}

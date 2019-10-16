@@ -112,12 +112,12 @@ func TestCheckInvalidInitializerName(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidInitializerNameError{}, errs[0])
+				assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.InvalidInitializerNameError{}, errs[0])
+				assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 			}
 		})

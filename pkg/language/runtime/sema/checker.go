@@ -6,7 +6,6 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
-const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
@@ -664,5 +663,24 @@ func (checker *Checker) checkResourceFieldNesting(
 				Pos:  field.Identifier.Pos,
 			},
 		)
+	}
+}
+
+// checkUnknownSpecialFunctions checks that the special function declarations
+// are supported, i.e., they are either initializers or destructors
+//
+func (checker *Checker) checkUnknownSpecialFunctions(functions []*ast.SpecialFunctionDeclaration) {
+	for _, function := range functions {
+		switch function.DeclarationKind {
+		case common.DeclarationKindInitializer, common.DeclarationKindDestructor:
+			continue
+
+		default:
+			checker.report(
+				&UnknownSpecialFunctionError{
+					Pos: function.Identifier.Pos,
+				},
+			)
+		}
 	}
 }

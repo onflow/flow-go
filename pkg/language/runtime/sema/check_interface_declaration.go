@@ -34,7 +34,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	)
 
 	checker.checkInitializers(
-		declaration.Members.SpecialFunctions,
+		declaration.Members.Initializers(),
 		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
@@ -150,28 +150,8 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		Identifier:    identifier.Identifier,
 	}
 
-	// TODO: support multiple overloaded initializers
-
-	var parameterTypeAnnotations []*TypeAnnotation
-	initializerCount := len(declaration.Members.SpecialFunctions)
-	if initializerCount > 0 {
-		firstInitializer := declaration.Members.SpecialFunctions[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
-
-		if initializerCount > 1 {
-			secondInitializer := declaration.Members.SpecialFunctions[1]
-
-			checker.report(
-				&UnsupportedOverloadingError{
-					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
-				},
-			)
-		}
-	}
-
-	interfaceType.InitializerParameterTypeAnnotations = parameterTypeAnnotations
+	interfaceType.InitializerParameterTypeAnnotations =
+		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
 	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
 }

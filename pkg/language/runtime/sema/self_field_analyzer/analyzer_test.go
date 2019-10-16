@@ -8,6 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
+// TODO: test multiple initializers once overloading is supported
+
 // testAssignment parses a composite declaration and performs definite assignment
 // analysis on the first initializer defined.
 //
@@ -22,7 +24,7 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 	structDeclaration := program.CompositeDeclarations()[0]
 
 	fields := structDeclaration.Members.Fields
-	initializer := structDeclaration.Members.SpecialFunctions[0]
+	initializer := structDeclaration.Members.Initializers()[0]
 
 	return CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
 }
