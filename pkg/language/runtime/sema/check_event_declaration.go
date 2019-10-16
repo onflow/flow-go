@@ -49,7 +49,7 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 
 	constructorDeclarationErr := checker.declareEventConstructor(declaration, eventType)
 
-	// only report declaration error for constructor if type declaration error does not exist
+	// only report declaration error for constructor if declaration error for type does not occur
 	if typeDeclarationErr == nil {
 		checker.report(constructorDeclarationErr)
 	}
