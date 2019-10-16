@@ -34,16 +34,22 @@ func parseCheckAndInterpretWithExtra(
 	if handleCheckerError != nil {
 		handleCheckerError(err)
 	} else {
-		assert.Nil(t, err)
+		if !assert.Nil(t, err) {
+			t.FailNow()
+		}
 	}
 
 	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
-	assert.Nil(t, err)
+	if !assert.Nil(t, err) {
+		t.FailNow()
+	}
 
 	err = inter.Interpret()
 
-	assert.Nil(t, err)
+	if !assert.Nil(t, err) {
+		t.FailNow()
+	}
 
 	return inter
 }
@@ -4440,6 +4446,56 @@ func TestInterpretClosure(t *testing.T) {
 	)
 }
 
+// TestInterpretCompositeFunctionInvocationFromImportingProgram checks
+// that member functions of imported composites can be invoked from an importing program.
+// See https://github.com/dapperlabs/flow-go/issues/838
+//
+func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
+
+	checkerImported, err := ParseAndCheck(t, `
+      // function must have arguments
+      fun x(x: Int) {}
+
+      // invocation must be in composite
+      struct Y {
+        fun x() {
+          x(x: 1)
+        }
+      }
+    `)
+	assert.Nil(t, err)
+
+	checkerImporting, err := ParseAndCheckWithExtra(t,
+		`
+          import Y from "imported"
+
+          fun test() {
+              // get member must bind using imported interpreter
+              Y().x()
+          }
+        `,
+		nil,
+		nil,
+		func(location ast.ImportLocation) (program *ast.Program, e error) {
+			assert.Equal(t,
+				ast.StringImportLocation("imported"),
+				location,
+			)
+			return checkerImported.Program, nil
+		},
+	)
+	assert.Nil(t, err)
+
+	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+	assert.Nil(t, err)
+
+	err = inter.Interpret()
+	assert.Nil(t, err)
+
+	_, err = inter.Invoke("test")
+	assert.Nil(t, err)
+}
+
 var storageValueDeclaration = map[string]sema.ValueDeclaration{
 	"storage": stdlib.StandardLibraryValue{
 		Name:       "storage",
@@ -4480,6 +4536,58 @@ func TestInterpretStorage(t *testing.T) {
 		interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
+		value,
+	)
+}
+
+func TestInterpretSwapVariables(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       fun test(): [Int] {
+           var x = 2
+           var y = 3
+           x <-> y
+           return [x, y]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(3),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretSwapArrayAndField(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       struct Foo {
+           var bar: Int
+
+           init(bar: Int) {
+               self.bar = bar
+           }
+       }
+
+       fun test(): [Int] {
+           let foo = Foo(bar: 1)
+           let nums = [2]
+           foo.bar <-> nums[0]
+           return [foo.bar, nums[0]]
+       }
+	`)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(1),
+		),
 		value,
 	)
 }

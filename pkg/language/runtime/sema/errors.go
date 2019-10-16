@@ -1579,3 +1579,49 @@ func (e *InvalidIndexingError) StartPosition() ast.Position {
 func (e *InvalidIndexingError) EndPosition() ast.Position {
 	return e.EndPos
 }
+
+// InvalidSwapExpressionError
+
+type InvalidSwapExpressionError struct {
+	Side     common.OperandSide
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidSwapExpressionError) Error() string {
+	return fmt.Sprintf(
+		"invalid %s-hand side of swap: expected target expression",
+		e.Side.Name(),
+	)
+}
+
+func (*InvalidSwapExpressionError) isSemanticError() {}
+
+func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidResourceAssignmentError
+
+type InvalidResourceAssignmentError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidResourceAssignmentError) Error() string {
+	return "cannot assign to resource-typed target. consider swapping (<->)"
+}
+
+func (*InvalidResourceAssignmentError) isSemanticError() {}
+
+func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
+	return e.EndPos
+}

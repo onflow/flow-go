@@ -6,9 +6,16 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
+type BlockHeader struct {
+	Hash              crypto.Hash
+	PreviousBlockHash crypto.Hash
+	Number            uint64
+	TransactionCount  uint32
+}
+
 type Block struct {
 	ChainID                string
-	Height                 uint64
+	Number                 uint64
 	PreviousBlockHash      crypto.Hash
 	Timestamp              time.Time
 	SignedCollectionHashes []SignedCollectionHash

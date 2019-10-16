@@ -11,15 +11,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/accounts"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 type Config struct {
-	Signer string `default:"root" flag:"signer,s"`
-	Key    string `flag:"key,k"`
-	Code   string `flag:"code,c"`
+	Signer string   `default:"root" flag:"signer,s"`
+	Keys   []string `flag:"key,k"`
+	Code   string   `flag:"code,c"`
 }
 
 var conf Config
@@ -37,29 +38,35 @@ var Cmd = &cobra.Command{
 			utils.Exit("Failed to load signer key", 1)
 		}
 
-		var publicKey []byte
-		var code []byte
+		accountKeys := make([]types.AccountKey, len(conf.Keys))
 
-		if conf.Key != "" {
-			accountKey, err := utils.DecodePrivateKey(conf.Key)
+		for i, privateKeyBytes := range conf.Keys {
+			privateKey, err := utils.DecodePrivateKey(privateKeyBytes)
 			if err != nil {
 				utils.Exit("Failed to decode private key", 1)
 			}
 
-			publicKey, err = utils.EncodePublicKey(accountKey.Publickey())
+			publicKey, err := utils.EncodePublicKey(privateKey.Publickey())
 			if err != nil {
 				utils.Exit("Failed to encode public key", 1)
 			}
+
+			accountKeys[i] = types.AccountKey{
+				PublicKey: publicKey,
+				Weight:    constants.AccountKeyWeightThreshold,
+			}
 		}
+
+		var code []byte
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
-				utils.Exit(fmt.Sprintf("Failed to load BPL code from %s", conf.Code), 1)
+				utils.Exit(fmt.Sprintf("Failed to parse Cadence code from %s", conf.Code), 1)
 			}
 		}
 
-		script := accounts.CreateAccount(publicKey, code)
+		script := templates.CreateAccount(accountKeys, code)
 
 		tx := types.Transaction{
 			Script:       script,

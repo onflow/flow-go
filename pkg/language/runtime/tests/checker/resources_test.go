@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
-	"sort"
 	"testing"
 )
 
@@ -325,6 +324,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 }
 
 func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -350,7 +350,6 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 
 			case common.CompositeKindContract:
@@ -362,11 +361,8 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				// NOTE: one invalid move annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[2])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
 
 			case common.CompositeKindStructure:
@@ -376,7 +372,6 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 				// NOTE: one invalid move annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
 			}
 		})
@@ -846,10 +841,9 @@ func TestCheckUnaryMove(t *testing.T) {
           return <-x
       }
 
-      var x <- foo(x: <-create X())
-
       fun bar() {
-          x <- create X()
+          let x <- foo(x: <-create X())
+          destroy x
       }
 	`)
 
@@ -858,7 +852,6 @@ func TestCheckUnaryMove(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 }
 
 func TestCheckImmediateDestroy(t *testing.T) {
@@ -1341,7 +1334,7 @@ func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 }
 
-func TestCheckResourceAssignmentTransfer(t *testing.T) {
+func TestCheckInvalidResourceAssignmentTransfer(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource X {}
@@ -1360,9 +1353,11 @@ func TestCheckResourceAssignmentTransfer(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 3)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
@@ -1384,11 +1379,13 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 4)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[1])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[2])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[3])
+
 }
 
 func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
@@ -1461,11 +1458,12 @@ func TestCheckInvalidResourceLossThroughAssignment(t *testing.T) {
 
 	// TODO: add support for resources
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 4)
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[3])
 }
 
 func TestCheckResourceMoveThroughReturn(t *testing.T) {
@@ -2254,120 +2252,213 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 
 func TestCheckResourceNesting(t *testing.T) {
 
+	compositeKindPossibilities := []common.CompositeKind{
+		common.CompositeKindResource,
+		common.CompositeKindStructure,
+	}
 	interfacePossibilities := []bool{true, false}
 
-	for _, firstCompositeKind := range common.CompositeKinds {
-		for _, firstIsInterface := range interfacePossibilities {
-
-			firstInterfaceKeyword := ""
-			if firstIsInterface {
-				firstInterfaceKeyword = "interface"
-			}
-
-			for _, secondCompositeKind := range common.CompositeKinds {
-				for _, secondIsInterface := range interfacePossibilities {
-
-					secondInterfaceKeyword := ""
-					if secondIsInterface {
-						secondInterfaceKeyword = "interface"
-					}
+	for _, innerCompositeKind := range compositeKindPossibilities {
+		for _, innerIsInterface := range interfacePossibilities {
+			for _, outerCompositeKind := range compositeKindPossibilities {
+				for _, outerIsInterface := range interfacePossibilities {
 
 					testName := fmt.Sprintf(
-						"%s %s/%s %s",
-						firstCompositeKind.Keyword(),
-						firstInterfaceKeyword,
-						secondCompositeKind.Keyword(),
-						secondInterfaceKeyword,
+						"%s %v/%s %v",
+						innerCompositeKind.Keyword(),
+						innerIsInterface,
+						outerCompositeKind.Keyword(),
+						outerIsInterface,
 					)
 
 					t.Run(testName, func(t *testing.T) {
-
-						// `secondCompositeKind` is the container composite kind.
-						// If it is concrete, i.e. not an interface, it needs an initializer.
-
-						initializer := ""
-						if !secondIsInterface {
-							initializer = fmt.Sprintf(
-								`
-                                  init(t: %[1]sT) {
-                                      self.t %[2]s t
-                                  }
-                                `,
-								firstCompositeKind.Annotation(),
-								firstCompositeKind.TransferOperator(),
-							)
-						}
-
-						_, err := ParseAndCheck(t, fmt.Sprintf(`
-                              %[1]s %[2]s T {}
-
-                              %[3]s %[4]s U {
-                                  let t: %[5]sT
-                                  %[6]s
-                              }
-	                        `,
-							firstCompositeKind.Keyword(),
-							firstInterfaceKeyword,
-							secondCompositeKind.Keyword(),
-							secondInterfaceKeyword,
-							firstCompositeKind.Annotation(),
-							initializer,
-						))
-
-						// TODO: add support for non-structure declarations
-
-						expectedErrorCount := 0
-						if firstCompositeKind != common.CompositeKindStructure {
-							expectedErrorCount += 1
-						}
-						if secondCompositeKind != common.CompositeKindStructure {
-							expectedErrorCount += 1
-						}
-
-						// `firstCompositeKind` is the nested composite kind.
-						// `secondCompositeKind` is the container composite kind.
-						// Resource composites can only be nested in resource composite kinds.
-
-						expectInvalidResourceNestingErrorCount := 0
-
-						if firstCompositeKind == common.CompositeKindResource &&
-							secondCompositeKind != common.CompositeKindResource {
-
-							expectInvalidResourceNestingErrorCount = 1
-						}
-
-						if expectedErrorCount == 0 {
-							assert.Nil(t, err)
-						} else {
-
-							errs := ExpectCheckerErrors(t,
-								err,
-								expectedErrorCount+expectInvalidResourceNestingErrorCount,
-							)
-
-							sort.Slice(errs, func(i, j int) bool {
-								_, firstIsInvalidResourceFieldError :=
-									errs[i].(*sema.InvalidResourceFieldError)
-
-								_, secondIsUnsupportedDeclarationError :=
-									errs[j].(*sema.UnsupportedDeclarationError)
-
-								return !(firstIsInvalidResourceFieldError &&
-									secondIsUnsupportedDeclarationError)
-							})
-
-							i := 0
-							for ; i < expectedErrorCount; i += 1 {
-								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[i])
-							}
-
-							for ; i < expectInvalidResourceNestingErrorCount; i += 1 {
-								assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[i])
-							}
-						}
+						testResourceNesting(
+							t,
+							innerCompositeKind,
+							innerIsInterface,
+							outerCompositeKind,
+							outerIsInterface,
+						)
 					})
 				}
 			}
 		}
 	}
+}
+
+func testResourceNesting(
+	t *testing.T,
+	innerCompositeKind common.CompositeKind,
+	innerIsInterface bool,
+	outerCompositeKind common.CompositeKind,
+	outerIsInterface bool,
+) {
+	innerInterfaceKeyword := ""
+	if innerIsInterface {
+		innerInterfaceKeyword = "interface"
+	}
+
+	outerInterfaceKeyword := ""
+	if outerIsInterface {
+		outerInterfaceKeyword = "interface"
+	}
+
+	// Prepare the initializer, if needed.
+	// `outerCompositeKind` is the container composite kind.
+	// If it is concrete, i.e. not an interface, it needs an initializer.
+
+	initializer := ""
+	if !outerIsInterface {
+		initializer = fmt.Sprintf(
+			`
+              init(t: %[1]sT) {
+                  self.t %[2]s t
+              }
+            `,
+			innerCompositeKind.Annotation(),
+			innerCompositeKind.TransferOperator(),
+		)
+	}
+
+	// Prepare the full program defining an empty composite,
+	// and a second composite which contains the first
+
+	program := fmt.Sprintf(
+		`
+          %[1]s %[2]s T {}
+
+          %[3]s %[4]s U {
+              let t: %[5]sT
+              %[6]s
+          }
+        `,
+		innerCompositeKind.Keyword(),
+		innerInterfaceKeyword,
+		outerCompositeKind.Keyword(),
+		outerInterfaceKeyword,
+		innerCompositeKind.Annotation(),
+		initializer,
+	)
+
+	_, err := ParseAndCheck(t, program)
+
+	// TODO: add support for non-structure declarations
+
+	switch outerCompositeKind {
+	case common.CompositeKindStructure:
+		switch innerCompositeKind {
+		case common.CompositeKindStructure:
+			assert.Nil(t, err)
+		case common.CompositeKindResource:
+			errs := ExpectCheckerErrors(t, err, 2)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[1])
+		}
+
+	case common.CompositeKindResource:
+		switch innerCompositeKind {
+		case common.CompositeKindStructure:
+			errs := ExpectCheckerErrors(t, err, 1)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+		case common.CompositeKindResource:
+			errs := ExpectCheckerErrors(t, err, 2)
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+		}
+	}
+}
+
+// TestCheckResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {
+          fun test() {}
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+}
+
+// TestCheckInvalidResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckInvalidResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 3)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.ConformanceError{}, errs[1])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+}
+
+// TestCheckResourceInterfaceUseAsType tests if a resource interface
+// can be used as a type, and if a resource is a subtype of the interface
+// if it conforms to it.
+//
+func TestCheckResourceInterfaceUseAsType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      let x: <-X <- create Y()
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+}
+
+// TestCheckResourceInterfaceDestruction tests if resources
+// can be passed to resource interface parameters,
+// and if resource interfaces can be destroyed.
+//
+func TestCheckResourceInterfaceDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      fun foo(x: <-X) {
+          destroy x
+      }
+
+      fun bar() {
+          foo(x: <-create Y())
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 }

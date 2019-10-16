@@ -6,16 +6,17 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 )
 
-func generateGossipMessage(payloadBytes []byte, recipients []string, method string) (*shared.GossipMessage, error) {
+// generateGossipMessage initializes a new gossip message made from the given inputs
+func generateGossipMessage(payloadBytes []byte, recipients []string, msgType string) (*shared.GossipMessage, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return nil, err
 	}
 
 	return &shared.GossipMessage{
-		Uuid:       id.String(),
-		Payload:    payloadBytes,
-		Method:     method,
-		Recipients: recipients,
+		Uuid:        id.String(),
+		Payload:     payloadBytes,
+		MessageType: msgType,
+		Recipients:  recipients,
 	}, nil
 }

@@ -27,14 +27,6 @@ func (c *Controller) SendTransaction(context.Context, *observeSvc.SendTransactio
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (c *Controller) GetBlockByHash(context.Context, *observeSvc.GetBlockByHashRequest) (*observeSvc.GetBlockByHashResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (c *Controller) GetBlockByNumber(context.Context, *observeSvc.GetBlockByNumberRequest) (*observeSvc.GetBlockByNumberResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
 func (c *Controller) GetLatestBlock(context.Context, *observeSvc.GetLatestBlockRequest) (*observeSvc.GetLatestBlockResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
@@ -48,5 +40,9 @@ func (c *Controller) GetAccount(context.Context, *observeSvc.GetAccountRequest) 
 }
 
 func (c *Controller) CallScript(context.Context, *observeSvc.CallScriptRequest) (*observeSvc.CallScriptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (c *Controller) GetEvents(context.Context, *observeSvc.GetEventsRequest) (*observeSvc.GetEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }

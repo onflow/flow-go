@@ -2,9 +2,10 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -13,8 +14,10 @@ type testRuntimeInterface struct {
 	resolveImport      func(ImportLocation) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKey, code []byte) (accountID []byte, err error)
-	updateAccountCode  func(accountID, code []byte) (err error)
+	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
+	removeAccountKey   func(address types.Address, index int) error
+	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
 }
@@ -31,12 +34,20 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKey, code []byte) (accountID []byte, err error) {
-	return i.createAccount(publicKey, code)
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
+	return i.createAccount(publicKeys, keyWeights, code)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(accountID, code []byte) (err error) {
-	return i.updateAccountCode(accountID, code)
+func (i *testRuntimeInterface) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+	return i.addAccountKey(address, publicKey, keyWeight)
+}
+
+func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) error {
+	return i.removeAccountKey(address, index)
+}
+
+func (i *testRuntimeInterface) UpdateAccountCode(address types.Address, code []byte) (err error) {
+	return i.updateAccountCode(address, code)
 }
 
 func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
@@ -75,10 +86,10 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 			state.SetBytes(value)
 			return nil
 		},
-		createAccount: func(key, code []byte) (accountID []byte, err error) {
+		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
 			return nil, nil
 		},
-		updateAccountCode: func(accountID, code []byte) (err error) {
+		updateAccountCode: func(address types.Address, code []byte) (err error) {
 			return nil
 		},
 	}
@@ -221,7 +232,7 @@ func TestRuntimeStorage(t *testing.T) {
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface)
 	if !assert.Nil(t, err) {
-		println(err.Error())
+		t.Error(err)
 	}
 	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
@@ -377,5 +388,72 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 
 	result, err := runtime.ExecuteScript(script2, runtimeInterface)
 	assert.Equal(t, big.NewInt(42), result)
+	assert.Nil(t, err)
+}
+
+// TestRuntimeCompositeFunctionInvocationFromImportingProgram checks
+// that member functions of imported composites can be invoked from an importing program.
+// See https://github.com/dapperlabs/flow-go/issues/838
+//
+func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	imported := []byte(`
+      // function must have arguments
+      fun x(x: Int) {}
+
+      // invocation must be in composite
+      struct Y {
+        fun x() {
+          x(x: 1)
+        }
+      }
+    `)
+
+	script1 := []byte(`
+      import Y from "imported"
+
+      fun main(account: Account) {
+	      account.storage[Y] = Y()
+	  }
+    `)
+
+	script2 := []byte(`
+      import Y from "imported"
+
+      fun main(account: Account) {
+          let y = account.storage[Y] ?? panic("stored value is nil")
+          y.x()
+      }
+    `)
+
+	var storedValue []byte
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValue, nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValue = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	assert.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface)
 	assert.Nil(t, err)
 }

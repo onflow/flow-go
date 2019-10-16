@@ -58,6 +58,7 @@ type Interpreter struct {
 	interfaces         map[string]*ast.InterfaceDeclaration
 	ImportLocation     ast.ImportLocation
 	CompositeFunctions map[string]map[string]FunctionValue
+	SubInterpreters    map[ast.ImportLocation]*Interpreter
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -68,6 +69,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		Globals:            map[string]*Variable{},
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions: map[string]map[string]FunctionValue{},
+		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
 	}
 
 	for name, value := range predefinedValues {
@@ -715,7 +717,7 @@ func (interpreter *Interpreter) declareVariable(identifier string, value Value) 
 	return variable
 }
 
-func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatement) ast.Repr {
+func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
 	return assignment.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
@@ -724,16 +726,36 @@ func (interpreter *Interpreter) VisitAssignment(assignment *ast.AssignmentStatem
 
 			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
-			return interpreter.visitAssignmentValue(assignment, valueCopy)
+			return interpreter.visitAssignmentValue(assignment.Target, valueCopy)
 		})
 }
 
-func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentStatement, value Value) Trampoline {
-	switch target := assignment.Target.(type) {
+func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
+	// Evaluate the left expression
+	return swap.Left.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			leftValue := result.(Value)
+
+			// Evaluate the right expression
+			return swap.Right.Accept(interpreter).(Trampoline).
+				FlatMap(func(result interface{}) Trampoline {
+					rightValue := result.(Value)
+
+					// Assign the right-hand side value to the left-hand side
+					return interpreter.visitAssignmentValue(swap.Left, rightValue).
+						FlatMap(func(_ interface{}) Trampoline {
+
+							// Assign the left-hand side value to the right-hand side
+							return interpreter.visitAssignmentValue(swap.Right, leftValue)
+						})
+				})
+		})
+}
+
+func (interpreter *Interpreter) visitAssignmentValue(target ast.Expression, value Value) Trampoline {
+	switch target := target.(type) {
 	case *ast.IdentifierExpression:
-		interpreter.visitIdentifierExpressionAssignment(target, value)
-		// NOTE: no result, so it does *not* act like a return-statement
-		return Done{}
+		return interpreter.visitIdentifierExpressionAssignment(target, value)
 
 	case *ast.IndexExpression:
 		return interpreter.visitIndexExpressionAssignment(target, value)
@@ -745,9 +767,11 @@ func (interpreter *Interpreter) visitAssignmentValue(assignment *ast.AssignmentS
 	panic(&errors.UnreachableError{})
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) {
+func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) Trampoline {
 	variable := interpreter.findVariable(target.Identifier.Identifier)
 	variable.Value = value
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
 }
 
 func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
@@ -1094,7 +1118,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
 			}
 
-			return Done{Result: ArrayValue{Values: &copies}}
+			return Done{Result: NewArrayValue(copies...)}
 		})
 }
 
@@ -1265,7 +1289,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 }
 
 func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: ArrayValue{Values: &[]Value{}}}
+	var trampoline Trampoline = Done{Result: NewArrayValue()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1281,7 +1305,7 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 					value := result.(Value)
 
 					newValues := append(*array.Values, value)
-					return Done{Result: ArrayValue{Values: &newValues}}
+					return Done{Result: NewArrayValue(newValues...)}
 				})
 		})
 	}
@@ -1294,33 +1318,33 @@ func (interpreter *Interpreter) visitEntries(entries []ast.Entry) Trampoline {
 
 	for _, entry := range entries {
 		// NOTE: important: rebind entry, because it is captured in the closure below
-		entry := entry
+		func(entry ast.Entry) {
+			// append the evaluation of this entry
+			trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
+				resultEntries := result.([]DictionaryEntryValues)
 
-		// append the evaluation of this entry
-		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
-			resultEntries := result.([]DictionaryEntryValues)
+				// evaluate the key expression
+				return entry.Key.Accept(interpreter).(Trampoline).
+					FlatMap(func(result interface{}) Trampoline {
+						key := result.(Value)
 
-			// evaluate the key expression
-			return entry.Key.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					key := result.(Value)
+						// evaluate the value expression
+						return entry.Value.Accept(interpreter).(Trampoline).
+							FlatMap(func(result interface{}) Trampoline {
+								value := result.(Value)
 
-					// evaluate the value expression
-					return entry.Value.Accept(interpreter).(Trampoline).
-						FlatMap(func(result interface{}) Trampoline {
-							value := result.(Value)
-
-							newResultEntries := append(
-								resultEntries,
-								DictionaryEntryValues{
-									Key:   key,
-									Value: value,
-								},
-							)
-							return Done{Result: newResultEntries}
-						})
-				})
-		})
+								newResultEntries := append(
+									resultEntries,
+									DictionaryEntryValues{
+										Key:   key,
+										Value: value,
+									},
+								)
+								return Done{Result: newResultEntries}
+							})
+					})
+			})
+		}(entry)
 	}
 
 	return trampoline
@@ -1393,9 +1417,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location Location) Trampoline {
 
 			value := CompositeValue{
-				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				ImportLocation: interpreter.ImportLocation,
+				Identifier:     identifier,
+				Fields:         &map[string]Value{},
+				Functions:      &functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1660,8 +1685,15 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter.ImportLocation = declaration.Location
 
+	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
+
+			for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
+				interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
+			}
+
 			// determine which identifiers are imported /
 			// which variables need to be declared
 
@@ -1693,6 +1725,16 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				}
 			}
 		})
+}
+
+func (interpreter *Interpreter) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
+	// TODO: implement events
+	panic(errors.UnreachableError{})
+}
+
+func (interpreter *Interpreter) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
+	// TODO: implement events
+	panic(errors.UnreachableError{})
 }
 
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
