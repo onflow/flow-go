@@ -34,7 +34,7 @@ func generateCreateMinterScript(nftAddr types.Address, initialID, specialMod int
 		import GreatNFTMinter from 0x%s
 
 		fun main(acct: Account) {
-			var minter = GreatNFTMinter(firstID: %d, specialMod: %d)
+			let minter = GreatNFTMinter(firstID: %d, specialMod: %d)
 			acct.storage[GreatNFTMinter] = minter
 		}`
 	return []byte(fmt.Sprintf(template, nftAddr, initialID, specialMod))
@@ -48,8 +48,8 @@ func generateMintScript(nftCodeAddr types.Address) []byte {
 		import GreatNFTMinter, GreatNFT from 0x%s
 
 		fun main(acct: Account) {
-			var minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
-			var nft = minter.mint()
+			let minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
+			let nft = minter.mint()
 
 			acct.storage[GreatNFT] = nft
 			acct.storage[GreatNFTMinter] = minter
@@ -67,7 +67,7 @@ func generateInspectNFTScript(nftCodeAddr types.Address, expectedID int, expecte
 		import GreatNFT from 0x%s
 
 		fun main(acct: Account) {
-			var nft = acct.storage[GreatNFT] ?? panic("missing nft")
+			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
 			if nft.id() != %d {
 				panic("incorrect id")
 			}
