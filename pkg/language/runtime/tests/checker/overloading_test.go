@@ -11,30 +11,52 @@ import (
 
 func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 
+	interfacePossibilities := []bool{true, false}
+
 	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+		for _, isInterface := range interfacePossibilities {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s X {
-                  init() {}
-                  init(y: Int) {}
-              }
-	        `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			interfaceKeyword := ""
+			body := ""
+			if isInterface {
+				interfaceKeyword = "interface"
+			} else {
+				body = "{}"
 			}
-		})
+
+			testName := fmt.Sprintf("%s_%s",
+				kind.Keyword(),
+				interfaceKeyword,
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s %[2]s X {
+                          init() %[3]s
+                          init(y: Int) %[3]s
+                      }
+	                `,
+					kind.Keyword(),
+					interfaceKeyword,
+					body,
+				))
+
+				// TODO: add support for non-structure / non-resource declarations
+
+				switch kind {
+				case common.CompositeKindStructure, common.CompositeKindResource:
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
+
+				default:
+					errs := ExpectCheckerErrors(t, err, 2)
+
+					assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
+					assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+				}
+			})
+		}
 	}
 }
