@@ -7,14 +7,18 @@ import (
 func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	eventType := checker.Elaboration.EventDeclarationTypes[declaration]
 
-	// check argument labels
-	checker.checkArgumentLabels(declaration.Parameters)
+	constructorFunctionType := eventType.ConstructorFunctionType()
 
-	// check parameters
-	checker.checkParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
+	checker.checkFunction(
+		declaration.Parameters,
+		ast.Position{},
+		constructorFunctionType,
+		nil,
+		false,
+	)
 
 	// check that parameters are primitive types
-	checker.checkEventParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
+	checker.checkEventParameters(declaration.Parameters, constructorFunctionType.ParameterTypeAnnotations)
 
 	return nil
 }
@@ -40,20 +44,14 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 		ConstructorParameterTypeAnnotations: convertedParameterTypeAnnotations,
 	}
 
-	typeDeclaredErr := checker.typeActivations.Declare(identifier, eventType)
-	checker.report(typeDeclaredErr)
+	typeDeclarationErr := checker.typeActivations.Declare(identifier, eventType)
+	checker.report(typeDeclarationErr)
 
-	_, valueDeclaredErr := checker.valueActivations.DeclareFunction(
-		identifier,
-		&FunctionType{
-			ParameterTypeAnnotations: convertedParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(eventType),
-		},
-		declaration.Parameters.ArgumentLabels(),
-	)
+	constructorDeclarationErr := checker.declareEventConstructor(declaration, eventType)
 
-	if typeDeclaredErr == nil {
-		checker.report(valueDeclaredErr)
+	// only report declaration error for constructor if declaration error for type does not occur
+	if typeDeclarationErr == nil {
+		checker.report(constructorDeclarationErr)
 	}
 
 	checker.recordVariableDeclarationOccurrence(
@@ -68,6 +66,16 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	)
 
 	checker.Elaboration.EventDeclarationTypes[declaration] = eventType
+}
+
+func (checker *Checker) declareEventConstructor(declaration *ast.EventDeclaration, eventType *EventType) error {
+	_, err := checker.valueActivations.DeclareFunction(
+		declaration.Identifier,
+		eventType.ConstructorFunctionType(),
+		declaration.Parameters.ArgumentLabels(),
+	)
+
+	return err
 }
 
 func (checker *Checker) checkEventParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
