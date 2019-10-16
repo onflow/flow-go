@@ -1072,22 +1072,23 @@ func (h StorageType) IsResourceType() bool {
 // EventType
 
 type EventType struct {
-	Identifier               string
-	ParameterTypeAnnotations []*TypeAnnotation
+	Identifier                          string
+	Fields                              []EventFieldType
+	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
 
 func (*EventType) isType() {}
 
 func (t *EventType) String() string {
-	var parameters strings.Builder
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+	var fields strings.Builder
+	for i, field := range t.Fields {
 		if i > 0 {
-			parameters.WriteString(", ")
+			fields.WriteString(", ")
 		}
-		parameters.WriteString(parameterTypeAnnotation.String())
+		fields.WriteString(field.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", t.Identifier, parameters.String())
+	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
 }
 
 func (t *EventType) Equal(other Type) bool {
@@ -1100,13 +1101,13 @@ func (t *EventType) Equal(other Type) bool {
 		return false
 	}
 
-	if len(t.ParameterTypeAnnotations) != len(otherEvent.ParameterTypeAnnotations) {
+	if len(t.Fields) != len(otherEvent.Fields) {
 		return false
 	}
 
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-		otherParameterType := otherEvent.ParameterTypeAnnotations[i]
-		if !parameterTypeAnnotation.Equal(otherParameterType) {
+	for i, field := range t.Fields {
+		otherField := otherEvent.Fields[i]
+		if !field.Equal(otherField) {
 			return false
 		}
 	}
@@ -1116,6 +1117,20 @@ func (t *EventType) Equal(other Type) bool {
 
 func (*EventType) IsResourceType() bool {
 	return false
+}
+
+type EventFieldType struct {
+	Identifier string
+	Type       Type
+}
+
+func (t EventFieldType) String() string {
+	return fmt.Sprint("%s: %s", t.Identifier, t.Type)
+}
+
+func (t EventFieldType) Equal(other EventFieldType) bool {
+	return t.Identifier == other.Identifier &&
+		t.Type.Equal(other.Type)
 }
 
 ////

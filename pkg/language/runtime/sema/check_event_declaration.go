@@ -11,10 +11,10 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	checker.checkArgumentLabels(declaration.Parameters)
 
 	// check parameters
-	checker.checkParameters(declaration.Parameters, eventType.ParameterTypeAnnotations)
+	checker.checkParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
 
 	// check that parameters are primitive types
-	checker.checkEventParameters(declaration.Parameters, eventType.ParameterTypeAnnotations)
+	checker.checkEventParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
 
 	return nil
 }
@@ -24,9 +24,20 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 
 	convertedParameterTypeAnnotations := checker.parameterTypeAnnotations(declaration.Parameters)
 
+	fields := make([]EventFieldType, len(declaration.Parameters))
+	for i, parameter := range declaration.Parameters {
+		parameterTypeAnnotation := convertedParameterTypeAnnotations[i]
+
+		fields[i] = EventFieldType{
+			Identifier: parameter.Identifier.Identifier,
+			Type:       parameterTypeAnnotation.Type,
+		}
+	}
+
 	eventType := &EventType{
-		Identifier:               identifier.Identifier,
-		ParameterTypeAnnotations: convertedParameterTypeAnnotations,
+		Identifier:                          identifier.Identifier,
+		Fields:                              fields,
+		ConstructorParameterTypeAnnotations: convertedParameterTypeAnnotations,
 	}
 
 	typeDeclaredErr := checker.typeActivations.Declare(identifier, eventType)
@@ -35,7 +46,7 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	_, valueDeclaredErr := checker.valueActivations.DeclareFunction(
 		identifier,
 		&FunctionType{
-			ParameterTypeAnnotations: eventType.ParameterTypeAnnotations,
+			ParameterTypeAnnotations: convertedParameterTypeAnnotations,
 			ReturnTypeAnnotation:     NewTypeAnnotation(eventType),
 		},
 		declaration.Parameters.ArgumentLabels(),
