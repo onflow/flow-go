@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"strings"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -24,15 +23,6 @@ func readFile(path string) []byte {
 		panic(err)
 	}
 	return contents
-}
-
-// Taken from sdk/emulator/emulator_test.go
-// TODO make this more reusable
-func bytesToString(b []byte) string {
-	if b == nil {
-		return "nil"
-	}
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
 // Creates a script that instantiates a new GreatNFTMinter instance
