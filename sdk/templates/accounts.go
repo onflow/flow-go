@@ -17,9 +17,9 @@ func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
 		keyWeights[i] = accountKey.Weight
 	}
 
-	publicKeysStr := bytesArrayToString(publicKeys)
-	keyWeightsStr := intArrayToString(keyWeights)
-	codeStr := bytesToString(code)
+	publicKeysStr := cadenceEncodeBytesArray(publicKeys)
+	keyWeightsStr := cadenceEncodeIntArray(keyWeights)
+	codeStr := cadenceEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main() {
@@ -35,7 +35,7 @@ func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
 
 // UpdateAccountCode generates a script that updates the code associated with an account.
 func UpdateAccountCode(code []byte) []byte {
-	codeStr := bytesToString(code)
+	codeStr := cadenceEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
@@ -49,7 +49,7 @@ func UpdateAccountCode(code []byte) []byte {
 
 // AddAccountKey generates a script that adds a key to an account.
 func AddAccountKey(accountKey types.AccountKey) []byte {
-	publicKeyStr := bytesToString(accountKey.PublicKey)
+	publicKeyStr := cadenceEncodeBytes(accountKey.PublicKey)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
@@ -74,8 +74,8 @@ func RemoveAccountKey(index int) []byte {
 	return []byte(script)
 }
 
-// bytesToString converts a byte slice to a comma-separated list of uint8 integers.
-func bytesToString(b []byte) string {
+// cadenceEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
+func cadenceEncodeBytes(b []byte) string {
 	if b == nil || len(b) == 0 {
 		return "[]"
 	}
@@ -83,10 +83,10 @@ func bytesToString(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-// bytesArrayToString converts a slice of byte slices to a comma-separated list of uint8 integers.
+// cadenceEncodeBytesArray converts a slice of byte slices to a comma-separated list of uint8 integers.
 //
 // Example: [][]byte{[]byte{1}, []byte{2,3}} -> "[[1],[2,3]]"
-func bytesArrayToString(b [][]byte) string {
+func cadenceEncodeBytesArray(b [][]byte) string {
 	if b == nil || len(b) == 0 {
 		return "[]"
 	}
@@ -94,8 +94,8 @@ func bytesArrayToString(b [][]byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-// intArrayToString converts a slice of integers to a comma-separated list.
-func intArrayToString(i []int) string {
+// cadenceEncodeIntArray converts a slice of integers to a comma-separated list.
+func cadenceEncodeIntArray(i []int) string {
 	if i == nil || len(i) == 0 {
 		return "[]"
 	}
