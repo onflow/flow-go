@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"math/big"
 	"strconv"
 	"strings"
@@ -1002,9 +1003,10 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 // CompositeValue
 
 type CompositeValue struct {
-	Identifier string
-	Fields     *map[string]Value
-	Functions  *map[string]FunctionValue
+	ImportLocation ast.ImportLocation
+	Identifier     string
+	Fields         *map[string]Value
+	Functions      *map[string]FunctionValue
 }
 
 func (CompositeValue) isValue() {}
@@ -1018,9 +1020,10 @@ func (v CompositeValue) Copy() Value {
 	// NOTE: not copying functions – linked in
 
 	return CompositeValue{
-		Identifier: v.Identifier,
-		Fields:     &newFields,
-		Functions:  v.Functions,
+		ImportLocation: v.ImportLocation,
+		Identifier:     v.Identifier,
+		Fields:         &newFields,
+		Functions:      v.Functions,
 	}
 }
 
@@ -1033,6 +1036,14 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 	value, ok := (*v.Fields)[name]
 	if ok {
 		return value
+	}
+
+	// get correct interpreter
+	if v.ImportLocation != nil {
+		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation]
+		if ok {
+			interpreter = subInterpreter
+		}
 	}
 
 	// if structure was deserialized, dynamically link in the functions
@@ -1059,7 +1070,13 @@ func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value V
 func (v CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
-	err := encoder.Encode(v.Identifier)
+	// NOTE: important: decode as pointer, so gob sees
+	// the interface, not the concrete type
+	err := encoder.Encode(&v.ImportLocation)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1074,7 +1091,11 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.Identifier)
+	err := decoder.Decode(&v.ImportLocation)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Identifier)
 	if err != nil {
 		return err
 	}
