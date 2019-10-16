@@ -2367,3 +2367,98 @@ func testResourceNesting(
 		}
 	}
 }
+
+// TestCheckResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {
+          fun test() {}
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+}
+
+// TestCheckInvalidResourceInterfaceConformance tests the check
+// of conformance of resources to resource interfaces.
+//
+func TestCheckInvalidResourceInterfaceConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {
+          fun test()
+      }
+
+      resource Y: X {}
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 3)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.ConformanceError{}, errs[1])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+}
+
+// TestCheckResourceInterfaceUseAsType tests if a resource interface
+// can be used as a type, and if a resource is a subtype of the interface
+// if it conforms to it.
+//
+func TestCheckResourceInterfaceUseAsType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      let x: <-X <- create Y()
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+}
+
+// TestCheckResourceInterfaceDestruction tests if resources
+// can be passed to resource interface parameters,
+// and if resource interfaces can be destroyed.
+//
+func TestCheckResourceInterfaceDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface X {}
+
+      resource Y: X {}
+
+      fun foo(x: <-X) {
+          destroy x
+      }
+
+      fun bar() {
+          foo(x: <-create Y())
+      }
+	`)
+
+	// TODO: add support for resources
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+}

@@ -8,36 +8,61 @@ import (
 )
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
-	return checker.visitFunctionDeclaration(declaration, true)
+	return checker.visitFunctionDeclaration(
+		declaration,
+		functionDeclarationOptions{
+			mustExit:        true,
+			declareFunction: true,
+		},
+	)
 }
 
-func (checker *Checker) visitFunctionDeclaration(declaration *ast.FunctionDeclaration, mustExit bool) ast.Repr {
+type functionDeclarationOptions struct {
+	// mustExit specifies if the function declaration's function block
+	// should be checked for containing proper return statements.
+	// This check may be omitted in e.g. function declarations of interfaces
+	mustExit bool
+	// declareFunction specifies if the function should also be declared in
+	// the current scope. This might be e.g. true for global function
+	// declarations, but false for function declarations of composites
+	declareFunction bool
+}
+
+func (checker *Checker) visitFunctionDeclaration(
+	declaration *ast.FunctionDeclaration,
+	options functionDeclarationOptions,
+) ast.Repr {
 	checker.checkFunctionAccessModifier(declaration)
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
 
 	functionType := checker.Elaboration.FunctionDeclarationFunctionTypes[declaration]
 	if functionType == nil {
-		functionType = checker.declareFunctionDeclaration(declaration)
+		functionType = checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+
+		if options.declareFunction {
+			checker.declareFunctionDeclaration(declaration, functionType)
+		}
 	}
+
+	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	checker.checkFunction(
 		declaration.Parameters,
 		declaration.ReturnTypeAnnotation.StartPos,
 		functionType,
 		declaration.FunctionBlock,
-		mustExit,
+		options.mustExit,
 	)
 
 	return nil
 }
 
-func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDeclaration) *FunctionType {
-
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+func (checker *Checker) declareFunctionDeclaration(
+	declaration *ast.FunctionDeclaration,
+	functionType *FunctionType,
+) {
 	argumentLabels := declaration.Parameters.ArgumentLabels()
-
-	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	variable, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
@@ -47,8 +72,6 @@ func (checker *Checker) declareFunctionDeclaration(declaration *ast.FunctionDecl
 	checker.report(err)
 
 	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
-
-	return functionType
 }
 
 func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDeclaration) {
