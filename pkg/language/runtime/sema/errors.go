@@ -1604,14 +1604,79 @@ func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
 func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+  
+// InvalidEventParameterTypeError
 
-// InvalidResourceAssignmentError
-
-type InvalidResourceAssignmentError struct {
+type InvalidEventParameterTypeError struct {
+	Type     Type
 	StartPos ast.Position
 	EndPos   ast.Position
 }
 
+func (e *InvalidEventParameterTypeError) Error() string {
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+}
+
+func (*InvalidEventParameterTypeError) isSemanticError() {}
+
+func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidEventUsageError
+
+type InvalidEventUsageError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventUsageError) Error() string {
+	return "events can only be invoked in an `emit` statement"
+}
+
+func (*InvalidEventUsageError) isSemanticError() {}
+
+func (e *InvalidEventUsageError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventUsageError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// EmitNonEventError
+
+type EmitNonEventError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *EmitNonEventError) Error() string {
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+}
+
+func (*EmitNonEventError) isSemanticError() {}
+
+func (e *EmitNonEventError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *EmitNonEventError) EndPosition() ast.Position {
+	return e.EndPos
+}
+  
+// InvalidResourceAssignmentError
+
+type InvalidResourceAssignmentError struct {
+ 	StartPos ast.Position
+	EndPos   ast.Position
+}
+  
 func (e *InvalidResourceAssignmentError) Error() string {
 	return "cannot assign to resource-typed target. consider swapping (<->)"
 }
