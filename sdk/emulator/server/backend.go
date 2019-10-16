@@ -26,6 +26,15 @@ type Backend struct {
 	logger *log.Logger
 }
 
+// NewBackend returns a new backend.
+func NewBackend(blockchain *emulator.EmulatedBlockchain, eventStore events.Store, logger *log.Logger) *Backend {
+	return &Backend{
+		blockchain: blockchain,
+		eventStore: eventStore,
+		logger: logger,
+	}
+}
+
 // Ping the Observation API server for a response.
 func (b *Backend) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
 	response := &observe.PingResponse{

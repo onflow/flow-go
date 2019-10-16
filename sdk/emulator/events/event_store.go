@@ -9,7 +9,7 @@ import (
 // Store stores an indexed representation of events to support querying.
 type Store interface {
 	// Add adds one or events to the store.
-	Add(ctx context.Context, blockNumber int, events []*types.Event) error
+	Add(ctx context.Context, blockNumber int, events ...*types.Event) error
 	// Query searches for events in the store matching the given query.
 	Query(ctx context.Context, query *types.EventQuery) ([]*types.Event, error)
 }
@@ -27,7 +27,7 @@ func NewMemStore() Store {
 	}
 }
 
-func (s *memStore) Add(ctx context.Context, blockNumber int, events []*types.Event) error {
+func (s *memStore) Add(ctx context.Context, blockNumber int, events ...*types.Event) error {
 	if s.byBlock[blockNumber] == nil {
 		s.byBlock[blockNumber] = events
 	} else {
