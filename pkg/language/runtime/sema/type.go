@@ -1132,7 +1132,7 @@ type EventFieldType struct {
 }
 
 func (t EventFieldType) String() string {
-	return fmt.Sprint("%s: %s", t.Identifier, t.Type)
+	return fmt.Sprintf("%s: %s", t.Identifier, t.Type)
 }
 
 func (t EventFieldType) Equal(other EventFieldType) bool {
