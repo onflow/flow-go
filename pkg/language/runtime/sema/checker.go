@@ -665,22 +665,3 @@ func (checker *Checker) checkResourceFieldNesting(
 		)
 	}
 }
-
-// checkUnknownSpecialFunctions checks that the special function declarations
-// are supported, i.e., they are either initializers or destructors
-//
-func (checker *Checker) checkUnknownSpecialFunctions(functions []*ast.SpecialFunctionDeclaration) {
-	for _, function := range functions {
-		switch function.DeclarationKind {
-		case common.DeclarationKindInitializer, common.DeclarationKindDestructor:
-			continue
-
-		default:
-			checker.report(
-				&UnknownSpecialFunctionError{
-					Pos: function.Identifier.Pos,
-				},
-			)
-		}
-	}
-}

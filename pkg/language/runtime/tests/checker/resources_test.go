@@ -287,6 +287,15 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
+			destructor := ""
+			if kind == common.CompositeKindResource {
+				destructor = `
+                  destroy() {
+                      destroy self.t
+                  }
+                `
+			}
+
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s T {}
 
@@ -295,10 +304,13 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
                   init(t: <-T) {
                       self.t %[2]s t
                   }
+
+                  %[3]s
               }
 	        `,
 				kind.Keyword(),
 				kind.TransferOperator(),
+				destructor,
 			))
 
 			switch kind {
@@ -333,6 +345,15 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
+			destructor := ""
+			if kind == common.CompositeKindResource {
+				destructor = `
+                  destroy() {
+                      destroy self.t
+                  }
+                `
+			}
+
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s T {}
 
@@ -341,10 +362,13 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
                   init(t: T) {
                       self.t %[2]s t
                   }
+
+                  %[3]s
               }
 	        `,
 				kind.Keyword(),
 				kind.TransferOperator(),
+				destructor,
 			))
 
 			switch kind {
@@ -1968,6 +1992,18 @@ func testResourceNesting(
 		)
 	}
 
+	destructor := ""
+	if !outerIsInterface &&
+		outerCompositeKind == common.CompositeKindResource &&
+		innerCompositeKind == common.CompositeKindResource {
+
+		destructor = `
+          destroy() {
+              destroy self.t
+          }
+        `
+	}
+
 	// Prepare the full program defining an empty composite,
 	// and a second composite which contains the first
 
@@ -1978,6 +2014,7 @@ func testResourceNesting(
           %[3]s %[4]s U {
               let t: %[5]sT
               %[6]s
+              %[7]s
           }
         `,
 		innerCompositeKind.Keyword(),
@@ -1986,6 +2023,7 @@ func testResourceNesting(
 		outerInterfaceKeyword,
 		innerCompositeKind.Annotation(),
 		initializer,
+		destructor,
 	)
 
 	_, err := ParseAndCheck(t, program)
