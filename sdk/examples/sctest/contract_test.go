@@ -34,7 +34,7 @@ func generateCreateMinterScript(nftAddr types.Address, initialID, specialMod int
 		import GreatNFTMinter from 0x%s
 
 		fun main(acct: Account) {
-			var minter = GreatNFTMinter(firstID: %d, specialMod: %d)
+			let minter = GreatNFTMinter(firstID: %d, specialMod: %d)
 			acct.storage[GreatNFTMinter] = minter
 		}`
 	return []byte(fmt.Sprintf(template, nftAddr, initialID, specialMod))
