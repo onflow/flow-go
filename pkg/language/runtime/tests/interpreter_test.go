@@ -4594,28 +4594,26 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 }
 
 func TestInterpretEmitEvent(t *testing.T) {
+	var actualEvents []interpreter.EventValue
 
-	t.Run("ValidEvent", func(t *testing.T) {
-		var events []interpreter.EventValue
+	values := stdlib.StandardLibraryFunctions{
+		stdlib.NewStandardLibraryFunction(
+			stdlib.EmitEventFunction.Name,
+			stdlib.EmitEventFunction.Type,
+			func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
+				eventValue := arguments[0].(interpreter.EventValue)
 
-		values := stdlib.StandardLibraryFunctions{
-			stdlib.NewStandardLibraryFunction(
-				stdlib.EmitEventFunction.Name,
-				stdlib.EmitEventFunction.Type,
-				func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
-					eventValue := arguments[0].(interpreter.EventValue)
+				actualEvents = append(actualEvents, eventValue)
 
-					events = append(events, eventValue)
+				return trampoline.Done{}
+			},
+			nil,
+			false,
+		),
+	}.ToValues()
 
-					return trampoline.Done{}
-				},
-				nil,
-				false,
-			),
-		}.ToValues()
-
-		inter := parseCheckAndInterpretWithExtra(t,
-			`
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
 			event Transfer(to: Int, from: Int)
 			event TransferAmount(to: Int, from: Int, amount: Int)
 
@@ -4625,52 +4623,53 @@ func TestInterpretEmitEvent(t *testing.T) {
 			  emit TransferAmount(to: 1, from: 2, amount: 100)
 			}
             `,
-			nil,
-			values,
-			nil,
-		)
+		nil,
+		values,
+		nil,
+	)
 
-		_, err := inter.Invoke("test")
-		assert.Nil(t, err)
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
 
-		assert.Equal(t, []interpreter.EventValue{
-			{"Transfer",
-				[]interpreter.EventFieldValue{
-					{
-						Identifier: "to",
-						Value:      interpreter.NewIntValue(1),
-					},
-					{
-						Identifier: "from",
-						Value:      interpreter.NewIntValue(2),
-					},
-				}},
-			{"Transfer",
-				[]interpreter.EventFieldValue{
-					{
-						Identifier: "to",
-						Value:      interpreter.NewIntValue(3),
-					},
-					{
-						Identifier: "from",
-						Value:      interpreter.NewIntValue(4),
-					},
-				}},
-			{"TransferAmount",
-				[]interpreter.EventFieldValue{
-					{
-						Identifier: "to",
-						Value:      interpreter.NewIntValue(1),
-					},
-					{
-						Identifier: "from",
-						Value:      interpreter.NewIntValue(2),
-					},
-					{
-						Identifier: "amount",
-						Value:      interpreter.NewIntValue(100),
-					},
-				}},
-		}, events)
-	})
+	expectedEvents := []interpreter.EventValue{
+		{"Transfer",
+			[]interpreter.EventFieldValue{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+			}},
+		{"Transfer",
+			[]interpreter.EventFieldValue{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(3),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(4),
+				},
+			}},
+		{"TransferAmount",
+			[]interpreter.EventFieldValue{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+				{
+					Identifier: "amount",
+					Value:      interpreter.NewIntValue(100),
+				},
+			}},
+	}
+
+	assert.Equal(t, expectedEvents, actualEvents)
 }
