@@ -442,7 +442,7 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 		),
 		// override built-in emitEvent function
 		stdlib.NewStandardLibraryFunction(
-			"emitEvent",
+			stdlib.EmitEventFunction.Name,
 			stdlib.EmitEventFunction.Type,
 			r.newEmitEventFunction(runtimeInterface),
 			nil,
