@@ -1223,11 +1223,27 @@ func (v EventValue) Copy() Value {
 	}
 }
 
+func (v EventValue) String() string {
+	var fields strings.Builder
+	for i, field := range v.Fields {
+		if i > 0 {
+			fields.WriteString(", ")
+		}
+		fields.WriteString(field.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
+}
+
 // EventFieldValue
 
 type EventFieldValue struct {
 	Identifier string
 	Value      Value
+}
+
+func (f EventFieldValue) String() string {
+	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
 
 // ToValue
