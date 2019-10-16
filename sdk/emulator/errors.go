@@ -75,6 +75,18 @@ func (e *ErrInvalidSignatureAccount) Error() string {
 	return fmt.Sprintf("Account with address %s does not exist", e.Account)
 }
 
+// ErrInvalidTransaction indicates that a submitted transaction is invalid (missing required fields).
+type ErrInvalidTransaction struct {
+	TxHash crypto.Hash
+}
+
+func (e *ErrInvalidTransaction) Error() string {
+	return fmt.Sprintf(
+		"Transaction with hash %s is invalid (missing required fields)",
+		e.TxHash,
+	)
+}
+
 // ErrTransactionReverted indicates that a transaction reverted.
 type ErrTransactionReverted struct {
 	TxHash crypto.Hash
