@@ -1597,6 +1597,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			return trampoline.Done{Result: result}
 		},
 		nil,
+		true,
 	)
 
 	checker, err := sema.NewChecker(
