@@ -321,7 +321,7 @@ func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
 	b.lastCreatedAccount = account
 }
 
-// lastCreatedAccount returns the last account that was created in the blockchain.
+// LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 	return b.lastCreatedAccount
 }
