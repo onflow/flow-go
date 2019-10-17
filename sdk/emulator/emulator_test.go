@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
@@ -1003,4 +1004,39 @@ func TestRuntimeLogger(t *testing.T) {
 	_, err := b.CallScript(script)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{`"elephant ears"`}, loggedMessages)
+}
+
+func TestEventEmitted(t *testing.T) {
+	events := make([]types.Event, 0)
+
+	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+		OnEventEmitted: func(event types.Event) {
+			events = append(events, event)
+		},
+	})
+
+	script := []byte(`
+		event MyEvent(x: Int, y: Int)
+
+		fun main() {
+		  emit MyEvent(x: 1, y: 2)
+		}
+	`)
+
+	tx := &types.Transaction{
+		Script:             script,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err := b.SubmitTransaction(tx)
+	assert.Nil(t, err)
+
+	require.Len(t, events, 1)
+	assert.Equal(t, "MyEvent", events[0].ID)
+	assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+	assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 }
