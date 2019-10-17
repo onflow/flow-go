@@ -4424,6 +4424,45 @@ func TestInterpretResourceMoveInArrayAndDestroy(t *testing.T) {
 	)
 }
 
+func TestInterpretResourceMoveInDictionaryAndDestroy(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destroys = 0
+
+      resource Foo {
+          var bar: Int
+
+          init(bar: Int) {
+              self.bar = bar
+          }
+
+          destroy() {
+              destroys = destroys + 1
+          }
+      }
+
+      fun test() {
+          let foo1 <- create Foo(bar: 1)
+          let foo2 <- create Foo(bar: 2)
+          let foos <- {"foo1": <-foo1, "foo2": <-foo2}
+          destroy foos
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destroys"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destroys"].Value,
+	)
+}
+
 func TestInterpretClosure(t *testing.T) {
 	// Create a closure that increments and returns
 	// a variable each time it is invoked.

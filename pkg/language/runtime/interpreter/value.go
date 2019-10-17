@@ -1157,6 +1157,28 @@ func (v DictionaryValue) Copy() Value {
 	return newDictionary
 }
 
+func (v DictionaryValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+
+	maybeDestroy := func(value interface{}) {
+		destroyableValue, ok := value.(DestroyableValue)
+		if !ok {
+			return
+		}
+
+		result = result.
+			FlatMap(func(_ interface{}) trampoline.Trampoline {
+				return destroyableValue.Destroy(interpreter, location)
+			})
+	}
+
+	for key, value := range v {
+		maybeDestroy(key)
+		maybeDestroy(value)
+	}
+	return result
+}
+
 func (v DictionaryValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
 	return v
