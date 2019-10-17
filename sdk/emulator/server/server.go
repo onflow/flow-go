@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"net"
 	"net/http"
@@ -45,8 +46,12 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		options.RootAccountKey = conf.RootAccountKey
 	}
 
-	options.RuntimeLogger = func(msg string) {
+	options.OnLogMessage = func(msg string) {
 		logger.Debug(msg)
+	}
+
+	options.OnEventEmitted = func(event types.Event) {
+		// TODO: store events for indexing
 	}
 
 	server := &EmulatorServer{

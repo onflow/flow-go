@@ -43,12 +43,14 @@ type EmulatedBlockchain struct {
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
 	RootAccountKey crypto.PrivateKey
-	RuntimeLogger  func(string)
+	OnLogMessage   func(string)
+	OnEventEmitted func(types.Event)
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
 var DefaultOptions = &EmulatedBlockchainOptions{
-	RuntimeLogger: func(string) {},
+	OnLogMessage:   func(string) {},
+	OnEventEmitted: func(types.Event) {},
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -70,8 +72,9 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	runtime := runtime.NewInterpreterRuntime()
 	computer := execution.NewComputer(
 		runtime,
-		opt.RuntimeLogger,
+		opt.OnLogMessage,
 		b.onAccountCreated,
+		opt.OnEventEmitted,
 	)
 
 	b.computer = computer

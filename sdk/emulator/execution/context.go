@@ -19,16 +19,18 @@ import (
 type RuntimeContext struct {
 	registers        *types.RegistersView
 	signingAccounts  []types.Address
-	onLog            func(string)
-	onAccountCreated func(account types.Account)
+	onLogMessage     func(string)
+	onAccountCreated func(types.Account)
+	onEventEmitted   func(types.Event)
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
 		registers:        registers,
-		onLog:            func(string) {},
+		onLogMessage:     func(string) {},
 		onAccountCreated: func(types.Account) {},
+		onEventEmitted:   func(types.Event) {},
 	}
 }
 
@@ -48,15 +50,21 @@ func (r *RuntimeContext) GetSigningAccounts() []types.Address {
 	return r.signingAccounts
 }
 
-// SetLogger sets the logging function for this context.
-func (r *RuntimeContext) SetLogger(callback func(string)) {
-	r.onLog = callback
+// SetOnLogMessage sets the logging function for this context.
+func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
+	r.onLogMessage = callback
 }
 
 // SetOnAccountCreated registers a callback that is triggered when a new
 // account is created.
-func (r *RuntimeContext) SetOnAccountCreated(callback func(account types.Account)) {
+func (r *RuntimeContext) SetOnAccountCreated(callback func(types.Account)) {
 	r.onAccountCreated = callback
+}
+
+// SetOnEventEmitted registers a callback that is trigger when an event is
+// emitted by the runtime.
+func (r *RuntimeContext) SetOnEventEmitted(callback func(types.Event)) {
+	r.onEventEmitted = callback
 }
 
 // GetValue gets a register value from the world state.
@@ -315,12 +323,12 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 //
 // This functions calls the onLog callback registered with this context.
 func (r *RuntimeContext) Log(message string) {
-	r.onLog(message)
+	r.onLogMessage(message)
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *RuntimeContext) EmitEvent(event types.Event) {
-	r.onLog(fmt.Sprintf("Event emitted: %s", event))
+	r.onEventEmitted(event)
 }
 
 func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {
