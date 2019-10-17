@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
@@ -220,4 +221,69 @@ func TestCheckSwapResourceFields(t *testing.T) {
 	`)
 
 	assert.Nil(t, err)
+}
+
+// TestCheckInvalidSwapConstantResourceFields tests that it is invalid
+// to swap fields which are constant (`let`)
+//
+func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
+
+	for i := 0; i < 2; i += 1 {
+
+		first := "var"
+		second := "let"
+
+		if i == 1 {
+			first = "let"
+			second = "var"
+		}
+
+		testName := fmt.Sprintf("%s_%s", first, second)
+
+		t.Run(testName, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource X {}
+
+                  resource Y {
+                      %[1]s x: <-X
+
+                      init(x: <-X) {
+                          self.x <- x
+                      }
+
+                      destroy() {
+                          destroy self.x
+                      }
+                  }
+
+                  resource Z {
+                      %[2]s x: <-X
+
+                      init(x: <-X) {
+                          self.x <- x
+                      }
+
+                      destroy() {
+                          destroy self.x
+                      }
+                  }
+
+                  fun test() {
+                      let y <- create Y(x: <-create X())
+                      let z <- create Z(x: <-create X())
+                      y.x <-> z.x
+                      destroy y
+                      destroy z
+                  }
+	            `,
+				first,
+				second,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+		})
+	}
 }
