@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -10,7 +9,7 @@ import (
 // Store stores an indexed representation of events to support querying.
 type Store interface {
 	// Add adds one or events to the store.
-	Add(ctx context.Context, blockNumber int, events []*types.Event) error
+	Add(ctx context.Context, blockNumber int, events ...*types.Event) error
 	// Query searches for events in the store matching the given query.
 	Query(ctx context.Context, query *types.EventQuery) ([]*types.Event, error)
 }
@@ -28,7 +27,7 @@ func NewMemStore() Store {
 	}
 }
 
-func (s *memStore) Add(ctx context.Context, blockNumber int, events []*types.Event) error {
+func (s *memStore) Add(ctx context.Context, blockNumber int, events ...*types.Event) error {
 	if s.byBlock[blockNumber] == nil {
 		s.byBlock[blockNumber] = events
 	} else {
@@ -39,11 +38,6 @@ func (s *memStore) Add(ctx context.Context, blockNumber int, events []*types.Eve
 }
 
 func (s *memStore) Query(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
-	// Check for invalid queries
-	if query.StartBlock > query.EndBlock {
-		return nil, &ErrInvalidQuery{query}
-	}
-
 	var events []*types.Event
 	// Filter by block number first
 	for i := query.StartBlock; i <= query.EndBlock; i++ {
@@ -63,12 +57,4 @@ func (s *memStore) Query(ctx context.Context, query *types.EventQuery) ([]*types
 		}
 	}
 	return events, nil
-}
-
-type ErrInvalidQuery struct {
-	q *types.EventQuery
-}
-
-func (e *ErrInvalidQuery) Error() string {
-	return fmt.Sprintf("eventstore: invalid query %v", e.q)
 }

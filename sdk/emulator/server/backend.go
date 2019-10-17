@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
+
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,8 +19,25 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
+// Backend wraps an emulated blockchain and implements the RPC handlers
+// required by the Observation GRPC API.
+type Backend struct {
+	blockchain *emulator.EmulatedBlockchain
+	eventStore events.Store
+	logger     *log.Logger
+}
+
+// NewBackend returns a new backend.
+func NewBackend(blockchain *emulator.EmulatedBlockchain, eventStore events.Store, logger *log.Logger) *Backend {
+	return &Backend{
+		blockchain: blockchain,
+		eventStore: eventStore,
+		logger:     logger,
+	}
+}
+
 // Ping the Observation API server for a response.
-func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
+func (b *Backend) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
 	response := &observe.PingResponse{
 		Address: []byte("pong!"),
 	}
@@ -27,7 +46,7 @@ func (s *EmulatorServer) Ping(ctx context.Context, req *observe.PingRequest) (*o
 }
 
 // SendTransaction submits a transaction to the network.
-func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
+func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
 	tx, err := proto.MessageToTransaction(txMsg)
@@ -35,14 +54,14 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = s.blockchain.SubmitTransaction(&tx)
+	err = b.blockchain.SubmitTransaction(&tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
-			s.logger.
+			b.logger.
 				WithField("txHash", tx.Hash().Hex()).
 				Infof("💸  Transaction #%d mined", tx.Nonce)
-			s.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
+			b.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *emulator.ErrDuplicateTransaction:
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		case *emulator.ErrInvalidSignaturePublicKey:
@@ -53,14 +72,14 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		s.logger.
+		b.logger.
 			WithField("txHash", tx.Hash().Hex()).
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
-	block := s.blockchain.CommitBlock()
+	block := b.blockchain.CommitBlock()
 
-	s.logger.WithFields(log.Fields{
+	b.logger.WithFields(log.Fields{
 		"blockNum":  block.Number,
 		"blockHash": block.Hash().Hex(),
 		"blockSize": len(block.TransactionHashes),
@@ -74,8 +93,8 @@ func (s *EmulatorServer) SendTransaction(ctx context.Context, req *observe.SendT
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
-	block := s.blockchain.GetLatestBlock()
+func (b *Backend) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
+	block := b.blockchain.GetLatestBlock()
 
 	// create block header for block
 	blockHeader := types.BlockHeader{
@@ -85,7 +104,7 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 		TransactionCount:  uint32(len(block.TransactionHashes)),
 	}
 
-	s.logger.WithFields(log.Fields{
+	b.logger.WithFields(log.Fields{
 		"blockNum":  blockHeader.Number,
 		"blockHash": blockHeader.Hash.Hex(),
 		"blockSize": blockHeader.TransactionCount,
@@ -99,10 +118,10 @@ func (s *EmulatorServer) GetLatestBlock(ctx context.Context, req *observe.GetLat
 }
 
 // GetTransaction gets a transaction by hash.
-func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
+func (b *Backend) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
-	tx, err := s.blockchain.GetTransaction(hash)
+	tx, err := b.blockchain.GetTransaction(hash)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionNotFound:
@@ -112,7 +131,7 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 		}
 	}
 
-	s.logger.
+	b.logger.
 		WithField("txHash", hash.Hex()).
 		Debugf("💵  GetTransaction called")
 
@@ -124,9 +143,9 @@ func (s *EmulatorServer) GetTransaction(ctx context.Context, req *observe.GetTra
 }
 
 // GetAccount returns the info associated with an address.
-func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
+func (b *Backend) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
 	address := types.BytesToAddress(req.GetAddress())
-	account, err := s.blockchain.GetAccount(address)
+	account, err := b.blockchain.GetAccount(address)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrAccountNotFound:
@@ -136,7 +155,7 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 		}
 	}
 
-	s.logger.
+	b.logger.
 		WithField("address", address).
 		Debugf("👤  GetAccount called")
 
@@ -148,9 +167,9 @@ func (s *EmulatorServer) GetAccount(ctx context.Context, req *observe.GetAccount
 }
 
 // CallScript performs a call.
-func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScriptRequest) (*observe.CallScriptResponse, error) {
+func (b *Backend) CallScript(ctx context.Context, req *observe.CallScriptRequest) (*observe.CallScriptResponse, error) {
 	script := req.GetScript()
-	value, err := s.blockchain.CallScript(script)
+	value, err := b.blockchain.CallScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -159,7 +178,7 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 		return nil, status.Error(codes.InvalidArgument, "invalid script")
 	}
 
-	s.logger.Debugf("📞  Contract script called")
+	b.logger.Debugf("📞  Contract script called")
 
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueBytes, _ := json.Marshal(value)
@@ -173,11 +192,16 @@ func (s *EmulatorServer) CallScript(ctx context.Context, req *observe.CallScript
 	return response, nil
 }
 
-// GetEvents supports querying events
-func (s *EmulatorServer) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
+// GetEvents returns events matching a query.
+func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
 	query := proto.MessageToEventQuery(req)
 
-	events, err := s.eventStore.Query(ctx, query)
+	// Check for invalid queries
+	if query.StartBlock > query.EndBlock {
+		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
+	}
+
+	events, err := b.eventStore.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
