@@ -4634,7 +4634,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 	expectedEvents := []interpreter.EventValue{
 		{
 			"Transfer",
-			[]interpreter.EventFieldValue{
+			[]interpreter.EventField{
 				{
 					Identifier: "to",
 					Value:      interpreter.NewIntValue(1),
@@ -4646,7 +4646,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 			}},
 		{
 			"Transfer",
-			[]interpreter.EventFieldValue{
+			[]interpreter.EventField{
 				{
 					Identifier: "to",
 					Value:      interpreter.NewIntValue(3),
@@ -4658,7 +4658,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 			}},
 		{
 			"TransferAmount",
-			[]interpreter.EventFieldValue{
+			[]interpreter.EventField{
 				{
 					Identifier: "to",
 					Value:      interpreter.NewIntValue(1),

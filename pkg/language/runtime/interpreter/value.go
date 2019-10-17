@@ -1203,15 +1203,15 @@ type DictionaryEntryValues struct {
 
 type EventValue struct {
 	ID     string
-	Fields []EventFieldValue
+	Fields []EventField
 }
 
 func (EventValue) isValue() {}
 
 func (v EventValue) Copy() Value {
-	fields := make([]EventFieldValue, len(v.Fields))
+	fields := make([]EventField, len(v.Fields))
 	for i, field := range v.Fields {
-		fields[i] = EventFieldValue{
+		fields[i] = EventField{
 			Identifier: field.Identifier,
 			Value:      field.Value.Copy(),
 		}
@@ -1235,14 +1235,14 @@ func (v EventValue) String() string {
 	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
 }
 
-// EventFieldValue
+// EventField
 
-type EventFieldValue struct {
+type EventField struct {
 	Identifier string
 	Value      Value
 }
 
-func (f EventFieldValue) String() string {
+func (f EventField) String() string {
 	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
 

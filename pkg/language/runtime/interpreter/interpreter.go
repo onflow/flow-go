@@ -1747,9 +1747,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location Location) Trampoline {
-			fields := make([]EventFieldValue, len(eventType.Fields))
+			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
-				fields[i] = EventFieldValue{
+				fields[i] = EventField{
 					Identifier: field.Identifier,
 					Value:      arguments[i],
 				}
