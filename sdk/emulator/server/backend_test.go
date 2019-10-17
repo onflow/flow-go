@@ -6,9 +6,9 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	log "github.com/sirupsen/logrus"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -31,12 +31,12 @@ func TestGetEvents(t *testing.T) {
 
 	// Add some events
 	var (
-		mintID = "Mint()"
+		mintID     = "Mint()"
 		transferID = "Transfer(to: Address)"
-		toAddress = types.HexToAddress("1234567890123456789012345678901234567890")
+		toAddress  = types.HexToAddress("1234567890123456789012345678901234567890")
 
 		ev1 = types.Event{
-			ID: mintID,
+			ID:     mintID,
 			Values: map[string]interface{}{},
 		}
 		ev2 = types.Event{
@@ -53,17 +53,15 @@ func TestGetEvents(t *testing.T) {
 	t.Run("should return error for invalid query", func(t *testing.T) {
 		// End block cannot be less than start block
 		_, err := server.GetEvents(ctx, &observe.GetEventsRequest{
-			StartBlock:           2,
-			EndBlock:             1,
+			StartBlock: 2,
+			EndBlock:   1,
 		})
-		if assert.Error(t, err) {
-			assert.IsType(t, &events.InvalidQueryError{}, err)
-		}
+		assert.Error(t, err)
 	})
 	t.Run("should return empty list when there are no results", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
-			StartBlock:           2,
-			EndBlock:             2,
+			StartBlock: 2,
+			EndBlock:   2,
 		})
 		assert.Nil(t, err)
 		var events []*types.Event
@@ -73,9 +71,9 @@ func TestGetEvents(t *testing.T) {
 	})
 	t.Run("should filter by ID", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
-			EventId:              transferID,
-			StartBlock:           1,
-			EndBlock:             3,
+			EventId:    transferID,
+			StartBlock: 1,
+			EndBlock:   3,
 		})
 		assert.Nil(t, err)
 		var resEvents []*types.Event
@@ -87,8 +85,8 @@ func TestGetEvents(t *testing.T) {
 	})
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
-			StartBlock:           1,
-			EndBlock:             3,
+			StartBlock: 1,
+			EndBlock:   3,
 		})
 		assert.Nil(t, err)
 		var resEvents []*types.Event
@@ -99,8 +97,8 @@ func TestGetEvents(t *testing.T) {
 	})
 	t.Run("should preserve event ordering", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
-			StartBlock:           1,
-			EndBlock:             3,
+			StartBlock: 1,
+			EndBlock:   3,
 		})
 		assert.Nil(t, err)
 		var resEvents []*types.Event
