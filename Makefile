@@ -10,6 +10,7 @@ install-tools: build-relic
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@7df3b957ffe3d09dc57fe4e1eb96694614db8c7a; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1
+	GO111MODULE=on go get golang.org/x/lint/golint@master
 
 .PHONY: test
 test:
@@ -62,5 +63,9 @@ build-cli:
 install-cli: build-relic
 	go install ./cmd/flow
 
+.PHONY: lint
+lint:
+	GO111MODULE=on golint ./sdk/...
+
 .PHONY: ci
-ci: install-tools generate check-generated-code test
+ci: install-tools generate check-generated-code lint test
