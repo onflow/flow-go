@@ -389,7 +389,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		loggedMessages := make([]string, 0)
 
 		b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
-			RuntimeLogger: func(msg string) {
+			OnLogMessage: func(msg string) {
 				loggedMessages = append(loggedMessages, msg)
 			},
 		})
@@ -989,7 +989,7 @@ func TestRuntimeLogger(t *testing.T) {
 	loggedMessages := make([]string, 0)
 
 	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
-		RuntimeLogger: func(msg string) {
+		OnLogMessage: func(msg string) {
 			loggedMessages = append(loggedMessages, msg)
 		},
 	})
