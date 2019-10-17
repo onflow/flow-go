@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"net"
 	"net/http"
 	"time"
@@ -25,6 +26,7 @@ type EmulatorServer struct {
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
+	eventStore events.Store
 }
 
 // Config is the configuration for an emulator server.
@@ -52,6 +54,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		grpcServer: grpc.NewServer(),
 		config:     conf,
 		logger:     logger,
+		eventStore: events.NewMemStore(),
 	}
 
 	address := server.blockchain.RootAccountAddress()
