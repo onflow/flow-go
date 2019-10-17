@@ -6,7 +6,6 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
-const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
@@ -603,12 +602,42 @@ func (checker *Checker) checkWithResources(
 	return check()
 }
 
-func (checker *Checker) checkNonIdentifierResourceLoss(expressionType Type, expression ast.Expression) {
+// checkAccessResourceLoss checks for a resource loss caused by an expression which is accessed
+// (indexed or member). This is basically any expression that does not have an identifier
+// as its "base" expression.
+//
+// For example, function invocations, array literals, or dictionary literals will cause a resource loss
+// if the expression is accessed immediately: e.g.
+//   - `returnResource()[0]`
+//   - `[<-create R(), <-create R()][0]`,
+//   - `{"resource": <-create R()}.length`
+//
+// Safe expressions are identifier expressions, an indexing expression into a safe expression,
+// or a member access on a safe expression.
+//
+func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression ast.Expression) {
 	if !expressionType.IsResourceType() {
 		return
 	}
 
-	if _, isIdentifier := expression.(*ast.IdentifierExpression); isIdentifier {
+	// Get the base expression of the given expression, i.e. get the accessed expression
+	// as long as there is one.
+	//
+	// For example, in the expression `foo[0].bar`, both the wrapping member access
+	// expression `bar` and the wrapping indexing expression `[0]` are removed,
+	// leaving the base expression `foo`
+
+	baseExpression := expression
+
+	for {
+		accessExpression, isAccess := baseExpression.(ast.AccessExpression)
+		if !isAccess {
+			break
+		}
+		baseExpression = accessExpression.AccessedExpression()
+	}
+
+	if _, isIdentifier := baseExpression.(*ast.IdentifierExpression); isIdentifier {
 		return
 	}
 
@@ -645,5 +674,24 @@ func (checker *Checker) checkResourceFieldNesting(
 				Pos:  field.Identifier.Pos,
 			},
 		)
+	}
+}
+
+// checkUnknownSpecialFunctions checks that the special function declarations
+// are supported, i.e., they are either initializers or destructors
+//
+func (checker *Checker) checkUnknownSpecialFunctions(functions []*ast.SpecialFunctionDeclaration) {
+	for _, function := range functions {
+		switch function.DeclarationKind {
+		case common.DeclarationKindInitializer, common.DeclarationKindDestructor:
+			continue
+
+		default:
+			checker.report(
+				&UnknownSpecialFunctionError{
+					Pos: function.Identifier.Pos,
+				},
+			)
+		}
 	}
 }

@@ -123,7 +123,7 @@ func (checker *Checker) visitIndexingExpression(
 	}
 
 	defer func() {
-		checker.checkNonIdentifierResourceLoss(result, targetExpression)
+		checker.checkAccessResourceLoss(result, targetExpression)
 	}()
 
 	_, isStorage := indexedType.(*StorageType)

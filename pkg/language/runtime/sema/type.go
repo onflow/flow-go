@@ -816,9 +816,10 @@ func (*FunctionType) IsResourceType() bool {
 	return false
 }
 
-// ConstructorFunctionType
+// SpecialFunctionType is the the type representing a special function,
+// i.e., a constructor or destructor
 
-type ConstructorFunctionType struct {
+type SpecialFunctionType struct {
 	*FunctionType
 }
 

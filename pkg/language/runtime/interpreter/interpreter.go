@@ -1395,10 +1395,11 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if len(declaration.Members.Initializers) > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
+	initializers := declaration.Members.Initializers()
+	if len(initializers) > 0 {
+		firstInitializer := initializers[0]
 
-		functionType := interpreter.Checker.Elaboration.InitializerFunctionTypes[firstInitializer]
+		functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
 			declaration,
@@ -1461,12 +1462,12 @@ func (interpreter *Interpreter) bindSelf(
 
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
-	initializer *ast.InitializerDeclaration,
-	constructorFunctionType *sema.ConstructorFunctionType,
+	initializer *ast.SpecialFunctionDeclaration,
+	constructorFunctionType *sema.SpecialFunctionType,
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
-	function := initializer.ToFunctionExpression()
+	function := initializer.ToExpression()
 
 	// copy function block, append interfaces' pre-conditions and post-condition
 	functionBlockCopy := *function.FunctionBlock
@@ -1477,11 +1478,12 @@ func (interpreter *Interpreter) initializerFunction(
 
 		// TODO: support multiple overloaded initializers
 
-		if len(interfaceDeclaration.Members.Initializers) == 0 {
+		initializers := interfaceDeclaration.Members.Initializers()
+		if len(initializers) == 0 {
 			continue
 		}
 
-		firstInitializer := interfaceDeclaration.Members.Initializers[0]
+		firstInitializer := initializers[0]
 		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}
@@ -1565,10 +1567,7 @@ func (interpreter *Interpreter) compositeFunction(
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	panic(&errors.UnreachableError{})
-}
-
-func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
+	// fields can't be interpreted
 	panic(&errors.UnreachableError{})
 }
 

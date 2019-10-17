@@ -23,7 +23,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	expressionType := accessedExpression.Accept(checker).(Type)
 
-	checker.checkNonIdentifierResourceLoss(expressionType, accessedExpression)
+	checker.checkAccessResourceLoss(expressionType, accessedExpression)
 
 	origins := checker.memberOrigins[expressionType]
 

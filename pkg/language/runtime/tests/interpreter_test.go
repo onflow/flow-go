@@ -4378,45 +4378,32 @@ func TestInterpretUnaryMove(t *testing.T) {
 	)
 }
 
-// TODO: requires https://github.com/dapperlabs/flow-go/issues/816
-//
-//func TestInterpretResourceMoveInArray(t *testing.T) {
-//
-//	inter := parseCheckAndInterpretWithExtra(t,
-//		`
-//        resource Foo {
-//            var bar: Int
-//            init(bar: Int) {
-//                self.bar = bar
-//            }
-//        }
-//
-//        fun test(): Int {
-//          let foo <- create Foo(bar: 1)
-//          let foos <- [<-foo]
-//          let bar = foos[0].bar
-//          destroy foos
-//          return bar
-//        }
-//      `,
-//		nil,
-//		nil,
-//		func(checkerError error) {
-//			// TODO: add support for resources
-//
-//			errs := ExpectCheckerErrors(t, checkerError, 1)
-//
-//			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-//		},
-//	)
-//
-//	value, err := inter.Invoke("test")
-//	assert.Nil(t, err)
-//	assert.Equal(t,
-//		interpreter.NewIntValue(1),
-//		value,
-//	)
-//}
+func TestInterpretResourceMoveInArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): Int {
+        let foo <- create Foo(bar: 1)
+        let foos <- [<-foo]
+        let bar = foos[0].bar
+        destroy foos
+        return bar
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		value,
+	)
+}
 
 func TestInterpretClosure(t *testing.T) {
 	// Create a closure that increments and returns

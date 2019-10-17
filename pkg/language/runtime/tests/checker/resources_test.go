@@ -2060,6 +2060,96 @@ func TestCheckResourceInterfaceUseAsType(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckResourceArrayIndexing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): Int {
+        let foo <- create Foo(bar: 1)
+        let foos <- [<-[<-foo]]
+        let bar = foos[0][0].bar
+        destroy foos
+        return bar
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test(): Int {
+          return createX().id
+      }
+
+      fun createX(): <-X {
+          return <-create X(id: 1)
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckInvalidResourceLossThroughArrayIndexing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- [<-create X()]
+          foo(x: <-xs[0])
+      }
+
+      fun foo(x: <-X) {
+          destroy x
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun createFoo(): <-Foo {
+          return <- create Foo(bar: 1)
+      }
+
+      fun test(): Int {
+          return createFoo().bar
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
 // TestCheckResourceInterfaceDestruction tests if resources
 // can be passed to resource interface parameters,
 // and if resource interfaces can be destroyed.

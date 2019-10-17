@@ -521,30 +521,24 @@ func (e *InvalidNameError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidInitializerNameError
+// UnknownSpecialFunctionError
 
-type InvalidInitializerNameError struct {
-	Name string
-	Pos  ast.Position
+type UnknownSpecialFunctionError struct {
+	Pos ast.Position
 }
 
-func (e *InvalidInitializerNameError) Error() string {
-	return fmt.Sprintf("invalid initializer name: `%s`", e.Name)
+func (e *UnknownSpecialFunctionError) Error() string {
+	return "unknown special function. did you mean `init`, `destroy`, or forgot the `fun` keyword?"
 }
 
-func (*InvalidInitializerNameError) isSemanticError() {}
+func (*UnknownSpecialFunctionError) isSemanticError() {}
 
-func (e *InvalidInitializerNameError) SecondaryError() string {
-	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
-}
-
-func (e *InvalidInitializerNameError) StartPosition() ast.Position {
+func (e *UnknownSpecialFunctionError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidInitializerNameError) EndPosition() ast.Position {
-	length := len(e.Name)
-	return e.Pos.Shifted(length - 1)
+func (e *UnknownSpecialFunctionError) EndPosition() ast.Position {
+	return e.Pos
 }
 
 // InvalidVariableKindError
@@ -682,7 +676,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
-	Initializer   *ast.InitializerDeclaration
+	Initializer   *ast.SpecialFunctionDeclaration
 	Pos           ast.Position
 }
 
