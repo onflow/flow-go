@@ -34,8 +34,7 @@ func TestGetEvents(t *testing.T) {
 		mintID = "Mint()"
 		transferID = "Transfer(to: Address)"
 		toAddress = types.HexToAddress("1234567890123456789012345678901234567890")
-	)
-	var (
+
 		ev1 = types.Event{
 			ID: mintID,
 			Values: map[string]interface{}{},
