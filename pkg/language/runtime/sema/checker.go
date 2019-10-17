@@ -290,9 +290,15 @@ func (checker *Checker) declareGlobalType(name string) {
 }
 
 func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expression, valueType Type) {
+	// The check is only necessary for resources.
+	// Bail out early if the value is not a resource
+
 	if !valueType.IsResourceType() {
 		return
 	}
+
+	// Check the moved expression is wrapped in a unary expression with the move operation (<-).
+	// Report an error if not and bail out if it is missing or another unary operator is used
 
 	unaryExpression, ok := valueExpression.(*ast.UnaryExpression)
 	if !ok || unaryExpression.Operation != ast.OperationMove {
@@ -309,24 +315,6 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 		valueType,
 		ResourceInvalidationKindMove,
 	)
-}
-
-func (checker *Checker) resourceVariable(exp ast.Expression, valueType Type) (variable *Variable, pos ast.Position) {
-	if !valueType.IsResourceType() {
-		return
-	}
-
-	identifierExpression, ok := exp.(*ast.IdentifierExpression)
-	if !ok {
-		return
-	}
-
-	variable = checker.findAndCheckVariable(identifierExpression.Identifier, false)
-	if variable == nil {
-		return
-	}
-
-	return variable, identifierExpression.Pos
 }
 
 func (checker *Checker) inLoop() bool {
@@ -576,15 +564,54 @@ func (checker *Checker) withValueScope(f func()) {
 	f()
 }
 
-func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType Type, kind ResourceInvalidationKind) {
-	variable, pos := checker.resourceVariable(exp, valueType)
+// TODO: create mapping between composite declaration member -> variable
+//   then look up in `resourceVariable`
+
+func (checker *Checker) recordResourceInvalidation(
+	expression ast.Expression,
+	valueType Type,
+	kind ResourceInvalidationKind,
+) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	reportInvalidNestedMove := func() {
+		checker.report(
+			&InvalidNestedMoveError{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: improve handling of `self`: only allow invalidation once
+
+	switch expression.(type) {
+	case *ast.MemberExpression:
+		if !checker.isSelfFieldAccess(expression) {
+			reportInvalidNestedMove()
+			return
+		}
+	case *ast.IndexExpression:
+		reportInvalidNestedMove()
+		return
+	}
+
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
+	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
 	}
+
 	checker.resources.AddInvalidation(variable,
 		ResourceInvalidation{
 			Kind: kind,
-			Pos:  pos,
+			Pos:  identifierExpression.Pos,
 		},
 	)
 }
