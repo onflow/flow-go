@@ -50,7 +50,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger.Debug(msg)
 	}
 
-	options.OnEventEmitted = func(event types.Event) {
+	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
 		// TODO: store events for indexing
 	}
 

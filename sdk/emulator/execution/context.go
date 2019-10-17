@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -19,9 +20,16 @@ import (
 type RuntimeContext struct {
 	registers        *types.RegistersView
 	signingAccounts  []types.Address
+	txMeta           *transactionMetadata
 	onLogMessage     func(string)
 	onAccountCreated func(types.Account)
-	onEventEmitted   func(types.Event)
+	onEventEmitted   func(event types.Event, blockNumber uint64, txhash crypto.Hash)
+}
+
+// transactionMetadata holds information about the transaction linked to this context.
+type transactionMetadata struct {
+	transaction types.Transaction
+	blockNumber uint64
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
@@ -30,7 +38,7 @@ func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 		registers:        registers,
 		onLogMessage:     func(string) {},
 		onAccountCreated: func(types.Account) {},
-		onEventEmitted:   func(types.Event) {},
+		onEventEmitted:   func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
 	}
 }
 
@@ -63,8 +71,16 @@ func (r *RuntimeContext) SetOnAccountCreated(callback func(types.Account)) {
 
 // SetOnEventEmitted registers a callback that is trigger when an event is
 // emitted by the runtime.
-func (r *RuntimeContext) SetOnEventEmitted(callback func(types.Event)) {
+func (r *RuntimeContext) SetOnEventEmitted(callback func(event types.Event, blockNumber uint64, txhash crypto.Hash)) {
 	r.onEventEmitted = callback
+}
+
+// SetTransactionMetadata injects the metadata for the transaction being executed in this context.
+func (r *RuntimeContext) SetTransactionMetadata(tx types.Transaction, blockNumber uint64) {
+	r.txMeta = &transactionMetadata{
+		transaction: tx,
+		blockNumber: blockNumber,
+	}
 }
 
 // GetValue gets a register value from the world state.
@@ -328,7 +344,14 @@ func (r *RuntimeContext) Log(message string) {
 
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *RuntimeContext) EmitEvent(event types.Event) {
-	r.onEventEmitted(event)
+	if r.txMeta != nil {
+		r.onEventEmitted(
+			event,
+			r.txMeta.blockNumber,
+			r.txMeta.transaction.Hash(),
+		)
+
+	}
 }
 
 func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {

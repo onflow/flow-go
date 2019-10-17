@@ -1010,7 +1010,7 @@ func TestEventEmitted(t *testing.T) {
 	events := make([]types.Event, 0)
 
 	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
-		OnEventEmitted: func(event types.Event) {
+		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
 			events = append(events, event)
 		},
 	})

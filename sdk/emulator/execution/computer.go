@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -10,7 +11,7 @@ type Computer struct {
 	runtime          runtime.Runtime
 	onLogMessage     func(string)
 	onAccountCreated func(types.Account)
-	onEventEmitted   func(types.Event)
+	onEventEmitted   func(event types.Event, blockNumber uint64, txhash crypto.Hash)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
@@ -18,7 +19,7 @@ func NewComputer(
 	runtime runtime.Runtime,
 	onLogMessage func(string),
 	onAccountCreated func(types.Account),
-	onEventEmitted func(types.Event),
+	onEventEmitted func(event types.Event, blockNumber uint64, txhash crypto.Hash),
 ) *Computer {
 	return &Computer{
 		runtime:          runtime,
@@ -34,13 +35,14 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) error {
+func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction, blockNumber uint64) error {
 	runtimeContext := NewRuntimeContext(registers)
 
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
 	runtimeContext.SetOnAccountCreated(c.onAccountCreated)
 	runtimeContext.SetOnEventEmitted(c.onEventEmitted)
+	runtimeContext.SetTransactionMetadata(*tx, blockNumber)
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
 	return err
@@ -52,7 +54,6 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, error) {
 	runtimeContext := NewRuntimeContext(registers)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
-	runtimeContext.SetOnEventEmitted(c.onEventEmitted)
 
 	return c.runtime.ExecuteScript(script, runtimeContext)
 }
