@@ -47,6 +47,12 @@ type EquatableValue interface {
 	Equal(other Value) BoolValue
 }
 
+// DestroyableValue
+
+type DestroyableValue interface {
+	Destroy(*Interpreter, Location) trampoline.Trampoline
+}
+
 // VoidValue
 
 type VoidValue struct{}
@@ -240,6 +246,16 @@ func (v ArrayValue) Copy() Value {
 		copies[i] = value.Copy()
 	}
 	return NewArrayValue(copies...)
+}
+
+func (v ArrayValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+	for _, value := range *v.Values {
+		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
+			return value.(DestroyableValue).Destroy(interpreter, location)
+		})
+	}
+	return result
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -1007,7 +1023,25 @@ type CompositeValue struct {
 	Identifier     string
 	Fields         *map[string]Value
 	Functions      *map[string]FunctionValue
-	Destructor     **InterpretedFunctionValue
+	// double pointer: first pointer for linking after deserialization,
+	// second pointer to indicate there is no destructor (through nil)
+	Destructor **InterpretedFunctionValue
+}
+
+func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	// if composite was deserialized, dynamically link in the destructor
+	if v.Destructor == nil {
+		destructor := interpreter.DestructorFunctions[v.Identifier]
+		v.Destructor = &destructor
+	}
+
+	destructor := v.Destructor
+	if *destructor == nil {
+		return trampoline.Done{Result: VoidValue{}}
+	}
+
+	return interpreter.bindSelf(**destructor, v).
+		invoke(nil, location)
 }
 
 func (CompositeValue) isValue() {}
@@ -1054,12 +1088,6 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 		v.Functions = &functions
 	}
 
-	// if composite was deserialized, dynamically link in the destructor
-	if v.Destructor == nil {
-		destructor := interpreter.DestructorFunctions[v.Identifier]
-		v.Destructor = &destructor
-	}
-
 	function, ok := (*v.Functions)[name]
 	if ok {
 		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
@@ -1092,7 +1120,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: *not* encoding functions – linked in on-demand
+	// NOTE: *not* encoding functions and destructor – linked in on-demand
 	return w.Bytes(), nil
 }
 

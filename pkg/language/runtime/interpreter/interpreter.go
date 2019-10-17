@@ -1869,23 +1869,12 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 		FlatMap(func(result interface{}) Trampoline {
 			value := result.(Value)
 
-			destructionResult := VoidValue{}
-
-			// TODO: generalize, e.g. arrays
-
-			compositeValue := value.(CompositeValue)
-			destructor := compositeValue.Destructor
-			if *destructor == nil {
-				return Done{Result: destructionResult}
-			}
-
 			// TODO: optimize: only potentially used by host-functions
 			location := Location{
 				Position:       expression.StartPosition(),
 				ImportLocation: interpreter.ImportLocation,
 			}
 
-			return interpreter.bindSelf(**destructor, compositeValue).
-				invoke(nil, location)
+			return value.(DestroyableValue).Destroy(interpreter, location)
 		})
 }

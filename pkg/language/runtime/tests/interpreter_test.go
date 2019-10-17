@@ -4378,30 +4378,49 @@ func TestInterpretUnaryMove(t *testing.T) {
 	)
 }
 
-func TestInterpretResourceMoveInArray(t *testing.T) {
+func TestInterpretResourceMoveInArrayAndDestroy(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var destroys = 0
+
       resource Foo {
           var bar: Int
+
           init(bar: Int) {
               self.bar = bar
+          }
+
+          destroy() {
+              destroys = destroys + 1
           }
       }
 
       fun test(): Int {
-        let foo <- create Foo(bar: 1)
-        let foos <- [<-foo]
-        let bar = foos[0].bar
-        destroy foos
-        return bar
+          let foo1 <- create Foo(bar: 1)
+          let foo2 <- create Foo(bar: 2)
+          let foos <- [<-foo1, <-foo2]
+          let bar = foos[1].bar
+          destroy foos
+          return bar
       }
     `)
 
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destroys"].Value,
+	)
+
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.NewIntValue(2),
 		value,
+	)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destroys"].Value,
 	)
 }
 
