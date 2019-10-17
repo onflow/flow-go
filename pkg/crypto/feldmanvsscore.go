@@ -54,7 +54,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	// prepare the DKGToSend to be broadcasted
 	toBroadcast := &(out.action[s.size-1])
 	toBroadcast.broadcast = true
-	vectorSize := (PubKeyLengthBLS_BLS12381 + 1) * (s.threshold + 1)
+	vectorSize := (PubKeyLengthBLS_BLS12381) * (s.threshold + 1)
 	data := make([]byte, vectorSize+1)
 	data[0] = byte(FeldmanVSSVerifVec)
 	writeVerifVector(data[1:], s.A)
@@ -93,12 +93,13 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult
 	if s.AReceived {
 		return invalid, nil
 	}
-	if (PubKeyLengthBLS_BLS12381+1)*(s.threshold+1) != len(data) {
+	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
 		return invalid, nil
 	}
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
 	readVerifVector(s.A, data)
+
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
 
@@ -124,7 +125,7 @@ func ZrPolynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
 // writeVerifVector exports A vector into a slice of bytes
 // assuming the slice length matches the vector length
 func writeVerifVector(dest []byte, A []pointG2) {
-	C.write_ep2st_vector((*C.uchar)((unsafe.Pointer)(&dest[0])),
+	C.ep2_vector_write_bin((*C.uchar)((unsafe.Pointer)(&dest[0])),
 		(*C.ep2_st)(&A[0]),
 		(C.int)(len(A)),
 	)
@@ -133,7 +134,7 @@ func writeVerifVector(dest []byte, A []pointG2) {
 // readVerifVector imports A vector from a slice of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) {
-	C.read_ep2st_vector((*C.ep2_st)(&A[0]),
+	C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)((unsafe.Pointer)(&src[0])),
 		(C.int)(len(A)),
 	)

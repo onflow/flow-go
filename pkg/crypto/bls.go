@@ -117,6 +117,7 @@ func (pk *PubKeyBLS_BLS12381) KeySize() int {
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
-	// TODO: implement EncodePubKey
-	return nil, nil
+	dest := make([]byte, pubKeyLengthBLS_BLS12381)
+	writePointG2(dest, &a.point)
+	return dest, nil
 }

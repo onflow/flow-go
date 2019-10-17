@@ -33,7 +33,7 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSinger,
 			if err != nil {
 				log.Errorf("End dkg failed: %s\n", err.Error())
 			}
-			//pkChan <- groupPK
+			pkChan <- groupPK
 			ts[current], err = NewThresholdSigner(n, SHA3_384)
 			assert.Nil(t, err)
 			ts[current].SetKeys(sk, groupPK, nodesPK)
@@ -112,13 +112,14 @@ func TestThresholdSignature(t *testing.T) {
 	out.processDkgOutput(lead, dkg, chans, t)
 
 	// this loop synchronizes the main thread to end DKG
-	//var pkTemp PublicKey
-	//groupPK := <-pkChan
+	var pkTemp, groupPK []byte
 	for i := 0; i < n; i++ {
-		/*pkTemp = <-pkChan
-		if !equalPublicKey(groupPK, pkTemp) {
-			log.Error("Group Public key mismatch!")
-		}*/
+		if i == 0 {
+			groupPK, _ = (<-pkChan).Encode()
+		} else {
+			pkTemp, _ = (<-pkChan).Encode()
+			assert.Equal(t, groupPK, pkTemp)
+		}
 		<-dkgSync
 	}
 
@@ -130,8 +131,4 @@ func TestThresholdSignature(t *testing.T) {
 	for i := 1; i < n; i++ {
 		<-tsSync
 	}
-}
-
-func equalPublicKey(a, b PublicKey) bool {
-	return true
 }

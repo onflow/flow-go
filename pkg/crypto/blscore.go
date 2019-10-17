@@ -91,6 +91,14 @@ func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
+// writeVerifVector exports A vector into a slice of bytes
+// assuming the slice length matches the vector length
+func writePointG2(dest []byte, a *pointG2) {
+	C._ep2_write_bin_compact((*C.uchar)((unsafe.Pointer)(&dest[0])),
+		(*C.ep2_st)(a),
+	)
+}
+
 // computes a bls signature
 func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 	s := make([]byte, a.signatureLength)

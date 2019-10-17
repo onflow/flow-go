@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -41,16 +42,8 @@ func NewHasher(name AlgoName) (Hasher, error) {
 // Hash is the hash algorithms output types
 type Hash []byte
 
-func (h Hash) IsEqual(input Hash) bool {
-	if len(h) != len(input) {
-		return false
-	}
-	for i := 0; i < len(h); i++ {
-		if h[i] != input[i] {
-			return false
-		}
-	}
-	return true
+func (h Hash) Equal(input Hash) bool {
+	return bytes.Compare(h, input) == 0
 }
 
 // Hex returns the hex string representation of the hash.

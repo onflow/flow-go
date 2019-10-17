@@ -112,25 +112,24 @@ void G2_polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A) {
 }
 
 // export an array of ep2_st into an array of bytes
-// the length matching is supposed to be done
-void write_ep2st_vector(byte* out, ep2_st* A, const int len) {
-    const int size = 2*Fp_BYTES+1;
+// the length matching is supposed to be checked
+void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
+    const int size = 2*Fp_BYTES;
     byte* p = out;
     for (int i=0; i<len; i++){
-        ep2_write_bin(p, size, &A[i], 1);
-        p+= size;
+        _ep2_write_bin_compact(p, &A[i]);
+        p += size;
     }
 }
 
 // imports an array of ep2_st from an array of bytes
-// the length matching is supposed to be done
-void read_ep2st_vector(ep2_st* A, byte* src, const int len){
-    const int size = 2*Fp_BYTES+1;
-    byte* p = src;
+// the length matching is supposed to be already done
+void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
+    const int size = 2*Fp_BYTES;
+    byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        if (!*p) ep2_read_bin(&A[i], p, 1);
-        else ep2_read_bin(&A[i], p, size);
-        p+= size;
+        _ep2_read_bin_compact(&A[i], p);
+        p += size;
     }
 }
 

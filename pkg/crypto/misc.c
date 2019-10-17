@@ -49,10 +49,10 @@ void _bn_randZr(bn_t x) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
-    bn_set_dig(x, 5);
+    bn_set_dig(x, 0);
 }
 
-// ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.
+// ep_write_bin_compact exports a point in E(Fp) to a buffer in a compressed or uncompressed form.
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
@@ -93,12 +93,13 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a) {
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
 void _ep_read_bin_compact(ep_st* a, byte *bin) {
+    // TODO: add length parameter and check
     if (bin[0] & 0x40) {
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
             return;
         }
-        for (int i=1; i<SIGNATURE_LEN; i++) {
+        for (int i=1; i<SIGNATURE_LEN-1; i++) {
             if (bin[i]) {
                 THROW(ERR_NO_VALID);
                 return;
@@ -130,6 +131,87 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
         fp_zero(a->y);
         fp_set_bit(a->y, 0, y_is_odd);
         ep_upk(a, a);
+    }
+}
+
+// _ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
+// The code is a modified version of Relic ep2_write_bin
+// The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
+// Otherwise, the point is in uncompressed form.
+// The second-most significant bit indicates that the point is at infinity. 
+// If this bit is set, the remaining bits of the group element's encoding should be set to zero.
+// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+void _ep2_write_bin_compact(byte *bin, const ep2_st *a) {
+    ep2_t t;
+    ep2_null(t);
+ 
+    if (ep2_is_infty((ep2_st *)a)) {
+            bin[0] = (SERIALIZATION << 7) | 0x40;
+            memset(bin+1, 0, PK_LEN-1);
+            return;
+    }
+
+    TRY {
+        ep2_new(t);
+        ep2_norm(t, (ep2_st *)a);
+        fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
+
+        if (SERIALIZATION == COMPRESSED) {
+            bin[0] |= (fp_get_bit(t->y[0], 0) << 5);
+        } else {
+            fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
+        }
+    } CATCH_ANY {
+        THROW(ERR_CAUGHT);
+    }
+
+    bin[0] |= (SERIALIZATION << 7);
+    ep_free(t);
+ }
+
+ // _ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// The code is a modified version of Relic ep_write_bin
+void _ep2_read_bin_compact(ep2_st* a, byte *bin) {
+    // TODO: add length parameter and check
+    if (bin[0] & 0x40) {
+        if (bin[0] & 0x3F) {
+            THROW(ERR_NO_VALID);
+            return;
+        }
+        for (int i=1; i<PK_LEN-1; i++) {
+            if (bin[i]) {
+                THROW(ERR_NO_VALID);
+                return;
+            } 
+        }
+		ep2_set_infty(a);
+		return;
+	} 
+
+    byte temp = bin[0];
+    int compressed = temp >> 7;
+    int y_is_odd = (temp >> 5) & 1;
+
+    if (y_is_odd && (!compressed)) {
+        THROW(ERR_NO_VALID);
+        return;
+    } 
+
+	a->norm = 1;
+	fp_set_dig(a->z[0], 1);
+	fp_zero(a->z[1]);
+    bin[0] &= 0x1F;
+    fp2_read_bin(a->x, bin, 2 * Fp_BYTES);
+    bin[0] = temp;
+
+    if (SERIALIZATION == UNCOMPRESSED) {
+        fp2_read_bin(a->y, bin + 2 * Fp_BYTES, 2 * Fp_BYTES);
+    }
+    else {
+        fp2_zero(a->y);
+        fp_set_bit(a->y[0], 0, y_is_odd);
+		fp_zero(a->y[1]);
+        ep2_upk(a, a);
     }
 }
 

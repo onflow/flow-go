@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) 
 // This is a testing function
 // It simulates processing incoming messages by a node
 func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
-	quit chan int, t *testing.T) {
+	quit chan PublicKey, t *testing.T) {
 	for {
 		select {
 		case newMsg := <-chans[current]:
@@ -63,8 +64,8 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
 			log.Infof("%d quit \n", current)
-			dkg[current].EndDKG()
-			quit <- 1
+			_, pk, _, _ := dkg[current].EndDKG()
+			quit <- pk
 			return
 		}
 	}
@@ -98,7 +99,7 @@ func TestFeldmanVSS(t *testing.T) {
 	n := 5
 	lead := 0
 	dkg := make([]DKGstate, n)
-	quit := make(chan int)
+	quit := make(chan PublicKey)
 	chans := make([]chan *toProcess, n)
 
 	// create DKG in all nodes
@@ -128,11 +129,17 @@ func TestFeldmanVSS(t *testing.T) {
 	out := dkg[lead].StartDKG(seed)
 	out.processDkgOutput(lead, dkg, chans, t)
 
-	// TODO: check all public keys are consistent
 	// TODO: check the reconstructed key is equal to a_0
 
 	// this loop synchronizes the main thread to end all DKGs
+	var pkTemp, groupPK []byte
 	for i := 0; i < n; i++ {
-		<-quit
+		if i == 0 {
+			groupPK, _ = (<-quit).Encode()
+			fmt.Println(groupPK)
+		} else {
+			pkTemp, _ = (<-quit).Encode()
+			assert.Equal(t, groupPK, pkTemp, "2 group public keys are mismatching")
+		}
 	}
 }

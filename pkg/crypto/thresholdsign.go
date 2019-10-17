@@ -22,11 +22,12 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 	signers := make([]int, 0, size)
 
 	return &ThresholdSinger{
-		size:      size,
-		threshold: threshold,
-		hashAlgo:  hasher,
-		shares:    shares,
-		signers:   signers,
+		size:               size,
+		threshold:          threshold,
+		hashAlgo:           hasher,
+		shares:             shares,
+		signers:            signers,
+		thresholdSignature: nil,
 	}, nil
 }
 
@@ -88,9 +89,6 @@ func (s *ThresholdSinger) verifyShare(share Signature, signerIndex int) (bool, e
 	if len(s.nodePublicKeys)-1 < signerIndex {
 		return false, cryptoError{"The node public keys are not set"}
 	}
-	if s.nodePublicKeys[signerIndex] == nil {
-		return false, cryptoError{fmt.Sprintf("The node public key at index %d is not set", signerIndex)}
-	}
 
 	return s.nodePublicKeys[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)
 }
@@ -123,6 +121,11 @@ func (s *ThresholdSinger) ClearShares() {
 
 // ReceiveThresholdSignatureMsg processes a new TS message received by the current node
 func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature) (bool, Signature, error) {
+	// if origin is disqualified, ignore the message
+	if s.nodePublicKeys[orig] == nil {
+		return false, nil, nil
+	}
+
 	verif, err := s.verifyShare(Signature(share), orig)
 	if err != nil {
 		return false, nil, err
