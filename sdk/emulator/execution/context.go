@@ -344,13 +344,15 @@ func (r *RuntimeContext) Log(message string) {
 
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *RuntimeContext) EmitEvent(event types.Event) {
+	// transaction metadata is included if this context is attached to a transaction
 	if r.txMeta != nil {
 		r.onEventEmitted(
 			event,
 			r.txMeta.blockNumber,
 			r.txMeta.transaction.Hash(),
 		)
-
+	} else {
+		r.onEventEmitted(event, 0, nil)
 	}
 }
 

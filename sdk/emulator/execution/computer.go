@@ -54,6 +54,7 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, error) {
 	runtimeContext := NewRuntimeContext(registers)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
+	runtimeContext.SetOnEventEmitted(c.onEventEmitted)
 
 	return c.runtime.ExecuteScript(script, runtimeContext)
 }
