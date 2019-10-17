@@ -157,22 +157,29 @@ func TestCheckImportTypes(t *testing.T) {
 	           %s Test {}
 	        `, kind.Keyword()))
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 			}
 
 			_, err = ParseAndCheckWithExtra(t,
-				`
-                 import "imported"
+				fmt.Sprintf(
+					`
+                      import "imported"
 
-                 let x: Test = Test()
-              `,
+                      let x: %[1]sTest %[2]s %[3]s Test()
+                    `,
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
 				nil,
 				nil,
 				func(location ast.ImportLocation) (program *ast.Program, e error) {
@@ -180,11 +187,13 @@ func TestCheckImportTypes(t *testing.T) {
 				},
 			)
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 3)
 
 				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])

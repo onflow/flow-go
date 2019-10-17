@@ -55,9 +55,11 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
-	// TODO: support non-structure interfaces, such as contracts and resources
+	// TODO: support non-structure / non-resource interfaces, such as contract interfaces
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
+
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
