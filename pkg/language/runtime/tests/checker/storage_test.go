@@ -22,8 +22,10 @@ func TestCheckStorageIndexing(t *testing.T) {
 
 	checker, err := ParseAndCheckWithExtra(t,
 		`
-		  let x = storage[Int]
-          let y = storage[Bool]
+          let a = storage[Int]
+          let b = storage[Bool]
+          let c = storage[[Int]]
+          let d = storage[{String: Int}]
 	    `,
 		storageValueDeclaration,
 		nil,
@@ -36,14 +38,33 @@ func TestCheckStorageIndexing(t *testing.T) {
 		&sema.OptionalType{
 			Type: &sema.IntType{},
 		},
-		checker.GlobalValues["x"].Type,
+		checker.GlobalValues["a"].Type,
 	)
 
 	assert.Equal(t,
 		&sema.OptionalType{
 			Type: &sema.BoolType{},
 		},
-		checker.GlobalValues["y"].Type,
+		checker.GlobalValues["b"].Type,
+	)
+
+	assert.Equal(t,
+		&sema.OptionalType{
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+		checker.GlobalValues["c"].Type,
+	)
+
+	assert.Equal(t,
+		&sema.OptionalType{
+			Type: &sema.DictionaryType{
+				KeyType:   &sema.StringType{},
+				ValueType: &sema.IntType{},
+			},
+		},
+		checker.GlobalValues["d"].Type,
 	)
 }
 

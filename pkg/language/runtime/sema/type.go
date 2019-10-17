@@ -816,9 +816,10 @@ func (*FunctionType) IsResourceType() bool {
 	return false
 }
 
-// ConstructorFunctionType
+// SpecialFunctionType is the the type representing a special function,
+// i.e., a constructor or destructor
 
-type ConstructorFunctionType struct {
+type SpecialFunctionType struct {
 	*FunctionType
 }
 
@@ -1067,6 +1068,77 @@ func (h StorageType) IsResourceType() bool {
 	// NOTE: even though storage may contain resources,
 	//   we define it to not behave like a resource
 	return false
+}
+
+// EventType
+
+type EventType struct {
+	Identifier                          string
+	Fields                              []EventFieldType
+	ConstructorParameterTypeAnnotations []*TypeAnnotation
+}
+
+func (*EventType) isType() {}
+
+func (t *EventType) String() string {
+	var fields strings.Builder
+	for i, field := range t.Fields {
+		if i > 0 {
+			fields.WriteString(", ")
+		}
+		fields.WriteString(field.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
+}
+
+func (t *EventType) Equal(other Type) bool {
+	otherEvent, ok := other.(*EventType)
+	if !ok {
+		return false
+	}
+
+	if t.Identifier != otherEvent.Identifier {
+		return false
+	}
+
+	if len(t.Fields) != len(otherEvent.Fields) {
+		return false
+	}
+
+	for i, field := range t.Fields {
+		otherField := otherEvent.Fields[i]
+		if !field.Equal(otherField) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (t *EventType) ConstructorFunctionType() *FunctionType {
+	return &FunctionType{
+		ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+		ReturnTypeAnnotation:     NewTypeAnnotation(t),
+	}
+}
+
+func (*EventType) IsResourceType() bool {
+	return false
+}
+
+type EventFieldType struct {
+	Identifier string
+	Type       Type
+}
+
+func (t EventFieldType) String() string {
+	return fmt.Sprintf("%s: %s", t.Identifier, t.Type)
+}
+
+func (t EventFieldType) Equal(other EventFieldType) bool {
+	return t.Identifier == other.Identifier &&
+		t.Type.Equal(other.Type)
 }
 
 ////

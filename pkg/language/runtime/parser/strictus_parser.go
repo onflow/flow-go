@@ -379,9 +379,9 @@ var symbolicNames = []string{
 var ruleNames = []string{
 	"program", "replInput", "declaration", "importDeclaration", "access", "compositeDeclaration",
 	"conformances", "variableKind", "field", "interfaceDeclaration", "members",
-	"member", "compositeKind", "initializer", "functionDeclaration", "eventDeclaration",
-	"parameterList", "parameter", "typeAnnotation", "fullType", "baseType",
-	"nominalType", "functionType", "variableSizedType", "constantSizedType",
+	"member", "compositeKind", "specialFunctionDeclaration", "functionDeclaration",
+	"eventDeclaration", "parameterList", "parameter", "typeAnnotation", "fullType",
+	"baseType", "nominalType", "functionType", "variableSizedType", "constantSizedType",
 	"dictionaryType", "block", "functionBlock", "preConditions", "postConditions",
 	"conditions", "condition", "statements", "statement", "returnStatement",
 	"breakStatement", "continueStatement", "ifStatement", "whileStatement",
@@ -552,7 +552,7 @@ const (
 	StrictusParserRULE_members                       = 10
 	StrictusParserRULE_member                        = 11
 	StrictusParserRULE_compositeKind                 = 12
-	StrictusParserRULE_initializer                   = 13
+	StrictusParserRULE_specialFunctionDeclaration    = 13
 	StrictusParserRULE_functionDeclaration           = 14
 	StrictusParserRULE_eventDeclaration              = 15
 	StrictusParserRULE_parameterList                 = 16
@@ -2390,14 +2390,14 @@ func (s *MemberContext) Field() IFieldContext {
 	return t.(IFieldContext)
 }
 
-func (s *MemberContext) Initializer() IInitializerContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IInitializerContext)(nil)).Elem(), 0)
+func (s *MemberContext) SpecialFunctionDeclaration() ISpecialFunctionDeclarationContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*ISpecialFunctionDeclarationContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IInitializerContext)
+	return t.(ISpecialFunctionDeclarationContext)
 }
 
 func (s *MemberContext) FunctionDeclaration() IFunctionDeclarationContext {
@@ -2494,7 +2494,7 @@ func (p *StrictusParser) Member(functionBlockRequired bool) (localctx IMemberCon
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(263)
-			p.Initializer(functionBlockRequired)
+			p.SpecialFunctionDeclaration(functionBlockRequired)
 		}
 
 	case 3:
@@ -2640,8 +2640,8 @@ func (p *StrictusParser) CompositeKind() (localctx ICompositeKindContext) {
 	return localctx
 }
 
-// IInitializerContext is an interface to support dynamic dispatch.
-type IInitializerContext interface {
+// ISpecialFunctionDeclarationContext is an interface to support dynamic dispatch.
+type ISpecialFunctionDeclarationContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
@@ -2659,50 +2659,54 @@ type IInitializerContext interface {
 	// SetFunctionBlockRequired sets the functionBlockRequired attribute.
 	SetFunctionBlockRequired(bool)
 
-	// IsInitializerContext differentiates from other interfaces.
-	IsInitializerContext()
+	// IsSpecialFunctionDeclarationContext differentiates from other interfaces.
+	IsSpecialFunctionDeclarationContext()
 }
 
-type InitializerContext struct {
+type SpecialFunctionDeclarationContext struct {
 	*antlr.BaseParserRuleContext
 	parser                antlr.Parser
 	functionBlockRequired bool
 	b                     IFunctionBlockContext
 }
 
-func NewEmptyInitializerContext() *InitializerContext {
-	var p = new(InitializerContext)
+func NewEmptySpecialFunctionDeclarationContext() *SpecialFunctionDeclarationContext {
+	var p = new(SpecialFunctionDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_initializer
+	p.RuleIndex = StrictusParserRULE_specialFunctionDeclaration
 	return p
 }
 
-func (*InitializerContext) IsInitializerContext() {}
+func (*SpecialFunctionDeclarationContext) IsSpecialFunctionDeclarationContext() {}
 
-func NewInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int, functionBlockRequired bool) *InitializerContext {
-	var p = new(InitializerContext)
+func NewSpecialFunctionDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int, functionBlockRequired bool) *SpecialFunctionDeclarationContext {
+	var p = new(SpecialFunctionDeclarationContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_initializer
+	p.RuleIndex = StrictusParserRULE_specialFunctionDeclaration
 
 	p.functionBlockRequired = functionBlockRequired
 
 	return p
 }
 
-func (s *InitializerContext) GetParser() antlr.Parser { return s.parser }
+func (s *SpecialFunctionDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *InitializerContext) GetB() IFunctionBlockContext { return s.b }
+func (s *SpecialFunctionDeclarationContext) GetB() IFunctionBlockContext { return s.b }
 
-func (s *InitializerContext) SetB(v IFunctionBlockContext) { s.b = v }
+func (s *SpecialFunctionDeclarationContext) SetB(v IFunctionBlockContext) { s.b = v }
 
-func (s *InitializerContext) GetFunctionBlockRequired() bool { return s.functionBlockRequired }
+func (s *SpecialFunctionDeclarationContext) GetFunctionBlockRequired() bool {
+	return s.functionBlockRequired
+}
 
-func (s *InitializerContext) SetFunctionBlockRequired(v bool) { s.functionBlockRequired = v }
+func (s *SpecialFunctionDeclarationContext) SetFunctionBlockRequired(v bool) {
+	s.functionBlockRequired = v
+}
 
-func (s *InitializerContext) Identifier() IIdentifierContext {
+func (s *SpecialFunctionDeclarationContext) Identifier() IIdentifierContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IIdentifierContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -2712,7 +2716,7 @@ func (s *InitializerContext) Identifier() IIdentifierContext {
 	return t.(IIdentifierContext)
 }
 
-func (s *InitializerContext) ParameterList() IParameterListContext {
+func (s *SpecialFunctionDeclarationContext) ParameterList() IParameterListContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IParameterListContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -2722,7 +2726,7 @@ func (s *InitializerContext) ParameterList() IParameterListContext {
 	return t.(IParameterListContext)
 }
 
-func (s *InitializerContext) FunctionBlock() IFunctionBlockContext {
+func (s *SpecialFunctionDeclarationContext) FunctionBlock() IFunctionBlockContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFunctionBlockContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -2732,39 +2736,39 @@ func (s *InitializerContext) FunctionBlock() IFunctionBlockContext {
 	return t.(IFunctionBlockContext)
 }
 
-func (s *InitializerContext) GetRuleContext() antlr.RuleContext {
+func (s *SpecialFunctionDeclarationContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *InitializerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *SpecialFunctionDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *InitializerContext) EnterRule(listener antlr.ParseTreeListener) {
+func (s *SpecialFunctionDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(StrictusListener); ok {
-		listenerT.EnterInitializer(s)
+		listenerT.EnterSpecialFunctionDeclaration(s)
 	}
 }
 
-func (s *InitializerContext) ExitRule(listener antlr.ParseTreeListener) {
+func (s *SpecialFunctionDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(StrictusListener); ok {
-		listenerT.ExitInitializer(s)
+		listenerT.ExitSpecialFunctionDeclaration(s)
 	}
 }
 
-func (s *InitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *SpecialFunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case StrictusVisitor:
-		return t.VisitInitializer(s)
+		return t.VisitSpecialFunctionDeclaration(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *StrictusParser) Initializer(functionBlockRequired bool) (localctx IInitializerContext) {
-	localctx = NewInitializerContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
-	p.EnterRule(localctx, 26, StrictusParserRULE_initializer)
+func (p *StrictusParser) SpecialFunctionDeclaration(functionBlockRequired bool) (localctx ISpecialFunctionDeclarationContext) {
+	localctx = NewSpecialFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
+	p.EnterRule(localctx, 26, StrictusParserRULE_specialFunctionDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -2800,13 +2804,13 @@ func (p *StrictusParser) Initializer(functionBlockRequired bool) (localctx IInit
 
 			var _x = p.FunctionBlock()
 
-			localctx.(*InitializerContext).b = _x
+			localctx.(*SpecialFunctionDeclarationContext).b = _x
 		}
 
 	}
 	p.SetState(276)
 
-	if !(!localctx.(*InitializerContext).functionBlockRequired || localctx.(*InitializerContext).b != nil) {
+	if !(!localctx.(*SpecialFunctionDeclarationContext).functionBlockRequired || localctx.(*SpecialFunctionDeclarationContext).b != nil) {
 		panic(antlr.NewFailedPredicateException(p, " !$functionBlockRequired || $ctx.b != nil ", ""))
 	}
 
@@ -13712,11 +13716,11 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 func (p *StrictusParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
 	switch ruleIndex {
 	case 13:
-		var t *InitializerContext = nil
+		var t *SpecialFunctionDeclarationContext = nil
 		if localctx != nil {
-			t = localctx.(*InitializerContext)
+			t = localctx.(*SpecialFunctionDeclarationContext)
 		}
-		return p.Initializer_Sempred(t, predIndex)
+		return p.SpecialFunctionDeclaration_Sempred(t, predIndex)
 
 	case 14:
 		var t *FunctionDeclarationContext = nil
@@ -13807,10 +13811,10 @@ func (p *StrictusParser) Sempred(localctx antlr.RuleContext, ruleIndex, predInde
 	}
 }
 
-func (p *StrictusParser) Initializer_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *StrictusParser) SpecialFunctionDeclaration_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 0:
-		return !localctx.(*InitializerContext).functionBlockRequired || localctx.(*InitializerContext).b != nil
+		return !localctx.(*SpecialFunctionDeclarationContext).functionBlockRequired || localctx.(*SpecialFunctionDeclarationContext).b != nil
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

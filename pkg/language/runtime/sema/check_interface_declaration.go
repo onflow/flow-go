@@ -34,7 +34,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	)
 
 	checker.checkInitializers(
-		declaration.Members.Initializers,
+		declaration.Members.Initializers(),
 		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
@@ -55,9 +55,11 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
-	// TODO: support non-structure interfaces, such as contracts and resources
+	// TODO: support non-structure / non-resource interfaces, such as contract interfaces
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
+
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
@@ -99,7 +101,13 @@ func (checker *Checker) checkInterfaceFunctions(
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
-			checker.visitFunctionDeclaration(function, false)
+			checker.visitFunctionDeclaration(
+				function,
+				functionDeclarationOptions{
+					mustExit:        false,
+					declareFunction: false,
+				},
+			)
 
 			if function.FunctionBlock != nil {
 				checker.checkInterfaceFunctionBlock(
@@ -142,28 +150,8 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		Identifier:    identifier.Identifier,
 	}
 
-	// TODO: support multiple overloaded initializers
-
-	var parameterTypeAnnotations []*TypeAnnotation
-	initializerCount := len(declaration.Members.Initializers)
-	if initializerCount > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
-
-		if initializerCount > 1 {
-			secondInitializer := declaration.Members.Initializers[1]
-
-			checker.report(
-				&UnsupportedOverloadingError{
-					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
-				},
-			)
-		}
-	}
-
-	interfaceType.InitializerParameterTypeAnnotations = parameterTypeAnnotations
+	interfaceType.InitializerParameterTypeAnnotations =
+		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
 	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
 }

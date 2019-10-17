@@ -58,6 +58,8 @@ type Interpreter struct {
 	interfaces         map[string]*ast.InterfaceDeclaration
 	ImportLocation     ast.ImportLocation
 	CompositeFunctions map[string]map[string]FunctionValue
+	SubInterpreters    map[ast.ImportLocation]*Interpreter
+	onEventEmitted     func(EventValue)
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -68,6 +70,8 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		Globals:            map[string]*Variable{},
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions: map[string]map[string]FunctionValue{},
+		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
+		onEventEmitted:     func(EventValue) {},
 	}
 
 	for name, value := range predefinedValues {
@@ -78,6 +82,11 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 	}
 
 	return interpreter, nil
+}
+
+// SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
+	interpreter.onEventEmitted = callback
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -1393,10 +1402,11 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	// TODO: support multiple overloaded initializers
 
 	var initializerFunction *InterpretedFunctionValue
-	if len(declaration.Members.Initializers) > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
+	initializers := declaration.Members.Initializers()
+	if len(initializers) > 0 {
+		firstInitializer := initializers[0]
 
-		functionType := interpreter.Checker.Elaboration.InitializerFunctionTypes[firstInitializer]
+		functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer]
 
 		f := interpreter.initializerFunction(
 			declaration,
@@ -1415,9 +1425,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location Location) Trampoline {
 
 			value := CompositeValue{
-				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				ImportLocation: interpreter.ImportLocation,
+				Identifier:     identifier,
+				Fields:         &map[string]Value{},
+				Functions:      &functions,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1458,12 +1469,12 @@ func (interpreter *Interpreter) bindSelf(
 
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
-	initializer *ast.InitializerDeclaration,
-	constructorFunctionType *sema.ConstructorFunctionType,
+	initializer *ast.SpecialFunctionDeclaration,
+	constructorFunctionType *sema.SpecialFunctionType,
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
-	function := initializer.ToFunctionExpression()
+	function := initializer.ToExpression()
 
 	// copy function block, append interfaces' pre-conditions and post-condition
 	functionBlockCopy := *function.FunctionBlock
@@ -1474,11 +1485,12 @@ func (interpreter *Interpreter) initializerFunction(
 
 		// TODO: support multiple overloaded initializers
 
-		if len(interfaceDeclaration.Members.Initializers) == 0 {
+		initializers := interfaceDeclaration.Members.Initializers()
+		if len(initializers) == 0 {
 			continue
 		}
 
-		firstInitializer := interfaceDeclaration.Members.Initializers[0]
+		firstInitializer := initializers[0]
 		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
 			continue
 		}
@@ -1562,10 +1574,7 @@ func (interpreter *Interpreter) compositeFunction(
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-	panic(&errors.UnreachableError{})
-}
-
-func (interpreter *Interpreter) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
+	// fields can't be interpreted
 	panic(&errors.UnreachableError{})
 }
 
@@ -1682,8 +1691,15 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter.ImportLocation = declaration.Location
 
+	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
+
+			for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
+				interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
+			}
+
 			// determine which identifiers are imported /
 			// which variables need to be declared
 
@@ -1717,14 +1733,55 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		})
 }
 
-func (interpreter *Interpreter) VisitEventDeclaration(*ast.EventDeclaration) ast.Repr {
-	// TODO: implement events
-	panic(errors.UnreachableError{})
+func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
+	interpreter.declareEventConstructor(declaration)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
 }
 
-func (interpreter *Interpreter) VisitEmitStatement(*ast.EmitStatement) ast.Repr {
-	// TODO: implement events
-	panic(errors.UnreachableError{})
+// declareEventConstructor declares the constructor function for an event type.
+//
+// The constructor is assigned to a variable with the same identifier as the event type itself.
+// For example, this allows an event instance for event type MyEvent(x: Int) to be created
+// by calling MyEvent(x: 2).
+func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
+	identifier := declaration.Identifier.Identifier
+
+	eventType := interpreter.Checker.Elaboration.EventDeclarationTypes[declaration]
+
+	variable := interpreter.findOrDeclareVariable(identifier)
+	variable.Value = NewHostFunctionValue(
+		func(arguments []Value, location Location) Trampoline {
+			fields := make([]EventField, len(eventType.Fields))
+			for i, field := range eventType.Fields {
+				fields[i] = EventField{
+					Identifier: field.Identifier,
+					Value:      arguments[i],
+				}
+			}
+
+			value := EventValue{
+				// TODO: use account as namespace for event ID
+				ID:     eventType.Identifier,
+				Fields: fields,
+			}
+
+			return Done{Result: value}
+		},
+	)
+}
+
+func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
+	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			event := result.(EventValue)
+
+			interpreter.onEventEmitted(event)
+
+			// NOTE: no result, so it does *not* act like a return-statement
+			return Done{}
+		})
 }
 
 func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {

@@ -521,30 +521,24 @@ func (e *InvalidNameError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidInitializerNameError
+// UnknownSpecialFunctionError
 
-type InvalidInitializerNameError struct {
-	Name string
-	Pos  ast.Position
+type UnknownSpecialFunctionError struct {
+	Pos ast.Position
 }
 
-func (e *InvalidInitializerNameError) Error() string {
-	return fmt.Sprintf("invalid initializer name: `%s`", e.Name)
+func (e *UnknownSpecialFunctionError) Error() string {
+	return "unknown special function. did you mean `init`, `destroy`, or forgot the `fun` keyword?"
 }
 
-func (*InvalidInitializerNameError) isSemanticError() {}
+func (*UnknownSpecialFunctionError) isSemanticError() {}
 
-func (e *InvalidInitializerNameError) SecondaryError() string {
-	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
-}
-
-func (e *InvalidInitializerNameError) StartPosition() ast.Position {
+func (e *UnknownSpecialFunctionError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidInitializerNameError) EndPosition() ast.Position {
-	length := len(e.Name)
-	return e.Pos.Shifted(length - 1)
+func (e *UnknownSpecialFunctionError) EndPosition() ast.Position {
+	return e.Pos
 }
 
 // InvalidVariableKindError
@@ -682,7 +676,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
-	Initializer   *ast.InitializerDeclaration
+	Initializer   *ast.SpecialFunctionDeclaration
 	Pos           ast.Position
 }
 
@@ -1602,5 +1596,91 @@ func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
 }
 
 func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
+	return e.EndPos
+}
+  
+// InvalidEventParameterTypeError
+
+type InvalidEventParameterTypeError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventParameterTypeError) Error() string {
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+}
+
+func (*InvalidEventParameterTypeError) isSemanticError() {}
+
+func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidEventUsageError
+
+type InvalidEventUsageError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventUsageError) Error() string {
+	return "events can only be invoked in an `emit` statement"
+}
+
+func (*InvalidEventUsageError) isSemanticError() {}
+
+func (e *InvalidEventUsageError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventUsageError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// EmitNonEventError
+
+type EmitNonEventError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *EmitNonEventError) Error() string {
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+}
+
+func (*EmitNonEventError) isSemanticError() {}
+
+func (e *EmitNonEventError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *EmitNonEventError) EndPosition() ast.Position {
+	return e.EndPos
+}
+  
+// InvalidResourceAssignmentError
+
+type InvalidResourceAssignmentError struct {
+ 	StartPos ast.Position
+	EndPos   ast.Position
+}
+  
+func (e *InvalidResourceAssignmentError) Error() string {
+	return "cannot assign to resource-typed target. consider swapping (<->)"
+}
+
+func (*InvalidResourceAssignmentError) isSemanticError() {}
+
+func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
 	return e.EndPos
 }

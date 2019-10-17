@@ -2686,10 +2686,8 @@ some.e = 5
 
 ## Interfaces
 
-> 🚧 Status: Interfaces are implemented, but have the syntax `struct S: Interface1, ... {}`
-
 An interface is an abstract type that specifies the behavior of types that *implement* the interface.
-Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
+Interfaces declare the required functions and fields, the access control for those declarations, and preconditions and postconditions that implementing types need to provide.
 
 There are two kinds of interfaces:
 
@@ -2700,6 +2698,7 @@ Structure and resource types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for.
 Interface requirements, and therefore also their implementations, must always be at least public.
+
 Variable field requirements may be annotated to require them to be publicly settable.
 
 Function requirements consist of the name of the function, parameter types, an optional return type,
@@ -2748,6 +2747,12 @@ resource interface FungibleToken {
     // it can be either variable or constant in the implementation
     //
     pub balance: Int {
+        set(newBalance) {
+            pre {
+                newBalance >= 0:
+                    "Balances are always non-negative"
+            }
+        }
         get {
             post {
                 result >= 0:
@@ -2826,15 +2831,17 @@ Interfaces can only be declared globally, i.e. not inside of functions.
 
 ### Interface Implementation
 
-Implementations for interfaces are declared using the `impl` keyword,
-followed by the name of interface, the `for` keyword,
-and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
+Declaring implementations for an interface is done in the type declaration of the composite data type (e.g., structure, resource).
+The kind and the name are followed by a colon (`:`)
+and the name of one or more interfaces to implement.
+
+This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.
 
 ```bamboo,file=interface-implementation.bpl
-// Declare a resource named `ExampleToken` with a variable field named `balance`,
-// that can be written by functions of the type, but outer scopes can only read it
+// Declare a resource named `ExampleToken` that has to implement the `FungibleToken` interface.
+// It has a variable field named `balance`, that can be written by functions of the type, but outer scopes can only read it
 //
-resource ExampleToken {
+resource ExampleToken: FungibleToken {
 
     // Implement the required field `balance` for the `FungibleToken` interface.
     // The interface does not specify if the field must be variable, constant,
@@ -2855,13 +2862,6 @@ resource ExampleToken {
     init(balance: Int) {
         self.balance = balance
     }
-}
-
-
-// Declare the implementation of the interface `FungibleToken`
-// for the resource `ExampleToken`
-//
-impl FungibleToken for ExampleToken {
 
     // Implement the required function named `withdraw` of the interface
     // `FungibleToken`, that withdraws an amount from the token's balance.
@@ -2938,7 +2938,7 @@ struct interface AnInterface {
     pub a: Int
 }
 
-struct AnImplementation {
+struct AnImplementation: AnInterface {
     // Declare a publicly settable variable field named `a`that has type `Int`.
     // This implementation satisfies the requirement for interface `AnInterface`:
     // The field is at least publicly readable, but this implementation also
@@ -2951,12 +2951,6 @@ struct AnImplementation {
     }
 }
 
-impl AnInterface for AnImplementation {
-    // This implementation is empty, as the declaration
-    // of the structure `AnImplementation` already fully satisfies
-    // the requirements of the interface `AnInterface`,
-    // i.e. a field named `a` that has type `Int` must be provided
-}
 ```
 
 ### Interface Type
@@ -2974,11 +2968,15 @@ struct interface Shape {
     pub fun scale(factor: Int)
 }
 
-// Declare a structure named `Square`
+// Declare a structure named `Square` the implements the `Shape` interface
 //
-struct Square {
+struct Square: Shape {
+    // In addition to the required fields from the interface, 
+    // the type can also declare additional fields
     pub var length: Int
 
+    // Since `area` was not declared as a constant, variable,
+    // field in the interface, it can be declared 
     pub synthetic area: Int {
         get {
             return self.length * self.length
@@ -2988,20 +2986,16 @@ struct Square {
     pub init(length: Int) {
         self.length = length
     }
-}
 
-// Implement the interface `Shape` for the structure `Square`
-//
-impl Shape for Square {
-
+    // here we have provided the implementation of the required `scale` function
     pub fun scale(factor: Int) {
         self.length = self.length * factor
     }
 }
 
-// Declare a structure named `Rectangle`
+// Declare a structure named `Rectangle` that also implements the `Shape` interface
 //
-struct Rectangle {
+struct Rectangle: Shape {
     pub var width: Int
     pub var height: Int
 
@@ -3015,17 +3009,16 @@ struct Rectangle {
         self.width = width
         self.height = height
     }
-}
 
-// Implement the interface `Rectangle` for the structure `Square`
-//
-impl Shape for Rectangle {
-
+    // As long as the function names and parameters match those 
+    // of the required functions, the implementations can differ
     pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
     }
 }
+
+
 
 // Declare a constant that has type `Shape`, which has a value that has type `Rectangle`
 //
@@ -3060,6 +3053,8 @@ shape.area // is 6
 // Call the function `scale` declared in the interface `Shape`
 //
 shape.scale(factor: 3)
+
+shape.area // is 54
 ```
 
 ### Interface Implementation Requirements
@@ -3079,22 +3074,11 @@ struct interface Shape {}
 //
 struct interface Polygon: Shape {}
 
-// Declare a structure named `Hexagon`
+// Declare a structure named `Hexagon` that implements the `Polygon` interface.
+// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it
 //
-struct Hexagon {}
+struct Hexagon: Polygon {}
 
-// Implement the structure interface `Polygon`
-// for the structure `Hexagon`
-//
-impl Polygon for Hexagon {}
-
-// Implement the structure interface `Shape`
-// for the structure `Hexagon`.
-//
-// This is required, as the interface `Polygon`
-// specified this implementation requirement.
-//
-impl Shape for Hexagon {}
 ```
 
 ### Interface Nesting
@@ -3116,25 +3100,17 @@ resource interface OuterInterface {
     struct interface InnerInterface {}
 }
 
-// Declare a resource named `SomeOuter`
-//
-resource SomeOuter {}
-
-// Implement the interface `OuterInterface` for the resource  `SomeOuter`.
+// Declare a resource named `SomeOuter` that implements the interface `OuterInterface`
 //
 // The resource is not required to implement `OuterInterface.InnerInterface`
 //
-impl OuterInterface for SomeOuter {}
+resource SomeOuter: OuterInterface {}
 
-
-// Declare a structure named `SomeInner`
+// Declare a structure named `SomeInner` that implements `InnerInterface`
+// which is nested in interface `OuterInterface`
 //
-struct SomeInner {}
+struct SomeInner: OuterInterface.InnerInterface {}
 
-// Implement the interface `InnerInterface` which is nested in
-// interface `OuterInterface` for the structure `SomeInner`.
-//
-impl OuterInterface.InnerInterface for SomeInner {}
 ```
 
 ### Nested Type Requirements
@@ -3155,17 +3131,12 @@ resource interface FungibleToken {
     }
 }
 
-// Declare a resource named `ExampleToken`
-//
-resource ExampleToken {}
-
-// Implement the resource interface `FungibleToken`
-// for resource type `ExampleToken`.
+// Declare a resource named `ExampleToken` that implements the `FungibleToken` interface
 //
 // The nested type `Vault` must be provided
 // to conform to the interface.
 //
-impl FungibleToken for ExampleToken {
+resource ExampleToken: FungibleToken {
 
     pub resource Vault {
         pub var balance: Int
@@ -3175,6 +3146,7 @@ impl FungibleToken for ExampleToken {
         }
     }
 }
+
 ```
 
 ### `Equatable` Interface
@@ -3199,18 +3171,15 @@ struct interface Equatable {
 // Declare a struct named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
-struct Cat {
+// `Cat` also will implement the interface `Equatable`
+// to allow cats to be compared for equality.
+//
+struct Cat: Equatable {
     pub let id: Int
 
     init(id: Int) {
         self.id = id
     }
-}
-
-// Implement the interface `Equatable` for the type `Cat`,
-// to allow cats to be compared for equality.
-//
-impl Equatable for Cat {
 
     pub fun equals(_ other: Self): Bool {
         // Cats are equal if their identifier matches.
@@ -3251,7 +3220,10 @@ struct interface Hashable: Equatable {
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
-struct Point {
+// `Point` is declared to implement the `Hashable` interface,
+// which also means it needs to implement the `Equatable` interface
+//
+struct Point: Hashable {
 
     pub(set) var x: Int
     pub(set) var y: Int
@@ -3260,13 +3232,9 @@ struct Point {
         self.x = x
         self.y = y
     }
-}
 
-// Implement the interface `Equatable` for the type `Point`,
-// to allow points to be compared for equality.
-//
-impl Equatable for Point {
-
+    // Implementing the function `equals` will allow points to be compared 
+    // for equality and satisfies the `Equatable` interface
     pub fun equals(_ other: Self): Bool {
         // Points are equal if their coordinates match.
         //
@@ -3277,12 +3245,9 @@ impl Equatable for Point {
         return other.x == self.x
             && other.y == self.y
     }
-}
 
-// Implement the interface `Equatable` for the type `Point`.
-//
-impl Hashable for Point {
-
+    // Providing an implementation for the hash value field 
+    // satisfies the `Hashable` interface
     pub synthetic hashValue: Int {
         get {
             var hash = 7

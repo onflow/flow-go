@@ -267,13 +267,6 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 			OriginEndPos:    &sema.Position{Line: 10, Column: 15},
 			DeclarationKind: common.DeclarationKindFunction,
 		},
-		{
-			StartPos:        sema.Position{Line: 10, Column: 12},
-			EndPos:          sema.Position{Line: 10, Column: 15},
-			OriginStartPos:  &sema.Position{Line: 10, Column: 12},
-			OriginEndPos:    &sema.Position{Line: 10, Column: 12},
-			DeclarationKind: common.DeclarationKindFunction,
-		},
 		// TODO: why the duplicate?
 		{
 			StartPos:        sema.Position{Line: 10, Column: 12},

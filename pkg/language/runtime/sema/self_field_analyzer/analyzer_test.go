@@ -8,6 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 )
 
+// TODO: test multiple initializers once overloading is supported
+
 // testAssignment parses a composite declaration and performs definite assignment
 // analysis on the first initializer defined.
 //
@@ -22,7 +24,7 @@ func testAssignment(body string) ([]*ast.FieldDeclaration, []error) {
 	structDeclaration := program.CompositeDeclarations()[0]
 
 	fields := structDeclaration.Members.Fields
-	initializer := structDeclaration.Members.Initializers[0]
+	initializer := structDeclaration.Members.Initializers()[0]
 
 	return CheckSelfFieldInitializations(fields, initializer.FunctionBlock)
 }
@@ -301,6 +303,70 @@ func TestAssignmentUsages(t *testing.T) {
 		unassigned, errors := testAssignment(body)
 
 		assert.Len(t, unassigned, 0)
+		assert.Len(t, errors, 0)
+	})
+}
+
+func TestAssignmentWithReturn(t *testing.T) {
+
+	t.Run("Direct", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					return
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
+	})
+
+	t.Run("InsideIf", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					if false {
+						return
+					}
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
+		assert.Len(t, errors, 0)
+	})
+
+	t.Run("InsideWhile", func(t *testing.T) {
+
+		body := `
+			struct Test {
+				var foo: Int
+
+				init(foo: Int) {
+					while false {
+						return
+					}
+					self.foo = foo
+				}
+			}
+		`
+
+		unassigned, errors := testAssignment(body)
+
+		assert.Len(t, unassigned, 1)
 		assert.Len(t, errors, 0)
 	})
 }

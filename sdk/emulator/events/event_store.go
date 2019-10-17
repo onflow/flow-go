@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -40,7 +41,7 @@ func (s *memStore) Add(ctx context.Context, blockNumber int, events ...*types.Ev
 func (s *memStore) Query(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
 	// Check for invalid queries
 	if query.StartBlock > query.EndBlock {
-		return nil, &InvalidQueryError{query}
+		return nil, &ErrInvalidQuery{query}
 	}
 
 	var events []*types.Event
@@ -64,10 +65,10 @@ func (s *memStore) Query(ctx context.Context, query *types.EventQuery) ([]*types
 	return events, nil
 }
 
-type InvalidQueryError struct {
+type ErrInvalidQuery struct {
 	q *types.EventQuery
 }
 
-func (e *InvalidQueryError) Error() string {
+func (e *ErrInvalidQuery) Error() string {
 	return fmt.Sprintf("eventstore: invalid query %v", e.q)
 }

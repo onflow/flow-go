@@ -6,6 +6,23 @@ import (
 )
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+	typ := checker.checkInvocationExpression(invocationExpression)
+
+	// events cannot be invoked without an emit statement
+	if _, isEventType := typ.(*EventType); isEventType {
+		checker.report(
+			&InvalidEventUsageError{
+				StartPos: invocationExpression.StartPosition(),
+				EndPos:   invocationExpression.EndPosition(),
+			},
+		)
+		return &InvalidType{}
+	}
+
+	return typ
+}
+
+func (checker *Checker) checkInvocationExpression(invocationExpression *ast.InvocationExpression) Type {
 	inCreate := checker.inCreate
 	checker.inCreate = false
 	defer func() {
@@ -66,9 +83,9 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
-	var parameterTypes []Type
-	for _, parameterTypeAnnotation := range parameterTypeAnnotations {
-		parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
+	parameterTypes := make([]Type, len(parameterTypeAnnotations))
+	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
+		parameterTypes[i] = parameterTypeAnnotation.Type
 	}
 	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
@@ -88,7 +105,7 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 	returnType Type,
 	inCreate bool,
 ) {
-	if _, ok := invokableType.(*ConstructorFunctionType); !ok {
+	if _, ok := invokableType.(*SpecialFunctionType); !ok {
 		return
 	}
 
@@ -229,6 +246,8 @@ func (checker *Checker) checkInvocationArguments(
 		minCount = parameterCount
 	}
 
+	argumentTypes = make([]Type, minCount)
+
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
 
@@ -237,7 +256,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentType := argument.Expression.Accept(checker).(Type)
 
-		argumentTypes = append(argumentTypes, argumentType)
+		argumentTypes[i] = argumentType
 
 		if !IsInvalidType(parameterType) &&
 			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {

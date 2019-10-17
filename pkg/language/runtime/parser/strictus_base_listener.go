@@ -98,11 +98,13 @@ func (s *BaseStrictusListener) EnterCompositeKind(ctx *CompositeKindContext) {}
 // ExitCompositeKind is called when production compositeKind is exited.
 func (s *BaseStrictusListener) ExitCompositeKind(ctx *CompositeKindContext) {}
 
-// EnterInitializer is called when production initializer is entered.
-func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}
+// EnterSpecialFunctionDeclaration is called when production specialFunctionDeclaration is entered.
+func (s *BaseStrictusListener) EnterSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {
+}
 
-// ExitInitializer is called when production initializer is exited.
-func (s *BaseStrictusListener) ExitInitializer(ctx *InitializerContext) {}
+// ExitSpecialFunctionDeclaration is called when production specialFunctionDeclaration is exited.
+func (s *BaseStrictusListener) ExitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {
+}
 
 // EnterFunctionDeclaration is called when production functionDeclaration is entered.
 func (s *BaseStrictusListener) EnterFunctionDeclaration(ctx *FunctionDeclarationContext) {}

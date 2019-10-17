@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"encoding/gob"
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
@@ -71,6 +72,10 @@ type StringImportLocation string
 
 func (StringImportLocation) isImportLocation() {}
 
+func init() {
+	gob.Register(StringImportLocation(""))
+}
+
 // AddressImportLocation
 
 type AddressImportLocation string
@@ -79,6 +84,10 @@ func (AddressImportLocation) isImportLocation() {}
 
 func (l AddressImportLocation) String() string {
 	return fmt.Sprintf("%#x", []byte(l))
+}
+
+func init() {
+	gob.Register(AddressImportLocation(""))
 }
 
 // HasImportLocation

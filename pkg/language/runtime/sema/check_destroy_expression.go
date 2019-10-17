@@ -2,7 +2,6 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) (resultType ast.Repr) {
@@ -10,10 +9,16 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 
 	valueType := expression.Expression.Accept(checker).(Type)
 
-	// NOTE: not using `isResourceType`,
-	// as only direct resource types can be destructed
-	if compositeType, ok := valueType.(*CompositeType); !ok ||
-		compositeType.Kind != common.CompositeKindResource {
+	checker.recordResourceInvalidation(
+		expression.Expression,
+		valueType,
+		ResourceInvalidationKindDestroy,
+	)
+
+	// destruction of any resource type (even compound resource types) is allowed:
+	// the destructor of the resource type will be invoked
+
+	if !valueType.IsResourceType() {
 
 		checker.report(
 			&InvalidDestructionError{
@@ -24,12 +29,6 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 
 		return
 	}
-
-	checker.recordResourceInvalidation(
-		expression.Expression,
-		valueType,
-		ResourceInvalidationKindDestroy,
-	)
 
 	return
 }
