@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"reflect"
+
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -23,7 +24,7 @@ import (
 type Backend struct {
 	blockchain *emulator.EmulatedBlockchain
 	eventStore events.Store
-	logger *log.Logger
+	logger     *log.Logger
 }
 
 // NewBackend returns a new backend.
@@ -31,7 +32,7 @@ func NewBackend(blockchain *emulator.EmulatedBlockchain, eventStore events.Store
 	return &Backend{
 		blockchain: blockchain,
 		eventStore: eventStore,
-		logger: logger,
+		logger:     logger,
 	}
 }
 
@@ -191,9 +192,14 @@ func (b *Backend) CallScript(ctx context.Context, req *observe.CallScriptRequest
 	return response, nil
 }
 
-// GetEvents supports querying events
+// GetEvents returns events matching a query.
 func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
 	query := proto.MessageToEventQuery(req)
+
+	// Check for invalid queries
+	if query.StartBlock > query.EndBlock {
+		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
+	}
 
 	events, err := b.eventStore.Query(ctx, query)
 	if err != nil {
