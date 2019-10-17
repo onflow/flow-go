@@ -99,3 +99,31 @@ func (tx *Transaction) AddSignature(account Address, prKey crypto.PrivateKey) er
 
 	return nil
 }
+
+// MissingFields checks if a transaction is missing any required fields and returns those that are missing.
+func (tx *Transaction) MissingFields() []string {
+	// Required fields are Script, ReferenceBlockHash, Nonce, ComputeLimit, PayerAccount
+	requiredFields := make([]string, 0)
+
+	if len(tx.Script) == 0 {
+		requiredFields = append(requiredFields, "Script")
+	}
+
+	if len(tx.ReferenceBlockHash) == 0 {
+		requiredFields = append(requiredFields, "ReferenceBlockHash")
+	}
+
+	if tx.Nonce == 0 {
+		requiredFields = append(requiredFields, "Nonce")
+	}
+
+	if tx.ComputeLimit == 0 {
+		requiredFields = append(requiredFields, "ComputeLimit")
+	}
+
+	if tx.PayerAccount == ZeroAddress() {
+		requiredFields = append(requiredFields, "PayerAccount")
+	}
+
+	return requiredFields
+}
