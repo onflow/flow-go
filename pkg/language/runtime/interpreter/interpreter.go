@@ -20,6 +20,12 @@ type functionReturn struct {
 	Value
 }
 
+var emptyFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: &sema.TypeAnnotation{
+		Type: &sema.VoidType{},
+	},
+}
+
 // StatementTrampoline
 
 type StatementTrampoline struct {
@@ -1284,6 +1290,10 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) {
+	if function.Expression.ParameterList == nil {
+		return
+	}
+
 	for parameterIndex, parameter := range function.Expression.ParameterList.Parameters {
 		argument := arguments[parameterIndex]
 		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
@@ -1394,23 +1404,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
 
-	// TODO: support multiple overloaded initializers
-
-	var initializerFunction *InterpretedFunctionValue
-	initializers := declaration.Members.Initializers()
-	if len(initializers) > 0 {
-		firstInitializer := initializers[0]
-
-		functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer]
-
-		f := interpreter.initializerFunction(
-			declaration,
-			firstInitializer,
-			functionType,
-			lexicalScope,
-		)
-		initializerFunction = &f
-	}
+	initializerFunction := interpreter.initializerFunction(declaration, lexicalScope)
 
 	destructorFunction := interpreter.destructorFunction(declaration, lexicalScope)
 	interpreter.DestructorFunctions[identifier] = destructorFunction
@@ -1467,16 +1461,14 @@ func (interpreter *Interpreter) bindSelf(
 
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
-	initializer *ast.SpecialFunctionDeclaration,
-	constructorFunctionType *sema.SpecialFunctionType,
 	lexicalScope hamt.Map,
-) InterpretedFunctionValue {
+) *InterpretedFunctionValue {
 
-	function := initializer.ToExpression()
+	// NOTE: gather all conformances' preconditions and postconditions,
+	// even if the composite declaration does not have an initializer
 
-	// copy function block, append interfaces' pre-conditions and post-condition
-	functionBlockCopy := *function.FunctionBlock
-	function.FunctionBlock = &functionBlockCopy
+	var preConditions []*ast.Condition
+	var postConditions []*ast.Condition
 
 	for _, conformance := range compositeDeclaration.Conformances {
 		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
@@ -1493,23 +1485,66 @@ func (interpreter *Interpreter) initializerFunction(
 			continue
 		}
 
-		functionBlockCopy.PreConditions = append(
-			functionBlockCopy.PreConditions,
+		preConditions = append(
+			preConditions,
 			firstInitializer.FunctionBlock.PreConditions...,
 		)
 
-		functionBlockCopy.PostConditions = append(
-			functionBlockCopy.PostConditions,
+		postConditions = append(
+			postConditions,
 			firstInitializer.FunctionBlock.PostConditions...,
 		)
 	}
 
-	return newInterpretedFunction(
+	var function *ast.FunctionExpression
+	var functionType *sema.FunctionType
+
+	initializers := compositeDeclaration.Members.Initializers()
+	if len(initializers) > 0 {
+		// TODO: support multiple overloaded initializers
+
+		firstInitializer := initializers[0]
+
+		function = firstInitializer.ToExpression()
+
+		// copy function block – this makes rewriting the conditions safe
+		functionBlockCopy := *function.FunctionBlock
+		function.FunctionBlock = &functionBlockCopy
+
+		functionType = interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer].FunctionType
+	} else if len(preConditions) > 0 || len(postConditions) > 0 {
+
+		// no initializer, but preconditions or postconditions from conformances,
+		// prepare a function expression just for those
+
+		// NOTE: the preconditions and postconditions are added below
+
+		function = &ast.FunctionExpression{
+			FunctionBlock: &ast.FunctionBlock{},
+		}
+
+		functionType = emptyFunctionType
+	}
+
+	// no initializer in the composite declaration and also
+	// no preconditions or postconditions in the conformances: no need for initializer
+
+	if function == nil {
+		return nil
+	}
+
+	// prepend the conformances' preconditions and postconditions, if any
+
+	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
+	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+
+	result := newInterpretedFunction(
 		interpreter,
 		function,
-		constructorFunctionType.FunctionType,
+		functionType,
 		lexicalScope,
 	)
+	return &result
 }
 
 func (interpreter *Interpreter) destructorFunction(
@@ -1517,15 +1552,11 @@ func (interpreter *Interpreter) destructorFunction(
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	destructor := compositeDeclaration.Members.Destructor()
-	if destructor == nil {
-		return nil
-	}
-	function := destructor.ToExpression()
+	// NOTE: gather all conformances' preconditions and postconditions,
+	// even if the composite declaration does not have a destructor
 
-	// copy function block, append interfaces' pre-conditions and post-condition
-	functionBlockCopy := *function.FunctionBlock
-	function.FunctionBlock = &functionBlockCopy
+	var preConditions []*ast.Condition
+	var postConditions []*ast.Condition
 
 	for _, conformance := range compositeDeclaration.Conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
@@ -1535,26 +1566,56 @@ func (interpreter *Interpreter) destructorFunction(
 			continue
 		}
 
-		functionBlockCopy.PreConditions = append(
-			functionBlockCopy.PreConditions,
+		preConditions = append(
+			preConditions,
 			interfaceDestructor.FunctionBlock.PreConditions...,
 		)
 
-		functionBlockCopy.PostConditions = append(
-			functionBlockCopy.PostConditions,
+		postConditions = append(
+			postConditions,
 			interfaceDestructor.FunctionBlock.PostConditions...,
 		)
 	}
 
+	var function *ast.FunctionExpression
+
+	destructor := compositeDeclaration.Members.Destructor()
+	if destructor != nil {
+
+		function = destructor.ToExpression()
+
+		// copy function block – this makes rewriting the conditions safe
+		functionBlockCopy := *function.FunctionBlock
+		function.FunctionBlock = &functionBlockCopy
+
+	} else if len(preConditions) > 0 || len(postConditions) > 0 {
+
+		// no destructor, but preconditions or postconditions from conformances,
+		// prepare a function expression just for those
+
+		// NOTE: the preconditions and postconditions are added below
+
+		function = &ast.FunctionExpression{
+			FunctionBlock: &ast.FunctionBlock{},
+		}
+	}
+
+	// no destructor in the resource declaration and also
+	// no preconditions or postconditions in the conformances: no need for destructor
+
+	if function == nil {
+		return nil
+	}
+
+	// prepend the conformances' preconditions and postconditions, if any
+
+	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
+	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+
 	result := newInterpretedFunction(
 		interpreter,
 		function,
-		// TODO: refactor into constant
-		&sema.FunctionType{
-			ReturnTypeAnnotation: &sema.TypeAnnotation{
-				Type: &sema.VoidType{},
-			},
-		},
+		emptyFunctionType,
 		lexicalScope,
 	)
 	return &result

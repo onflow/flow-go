@@ -4690,3 +4690,51 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 		inter.Globals["ranDestructorB"].Value,
 	)
 }
+
+// TestInterpretResourceDestroyExpressionResourceInterfaceCondition tests that
+// the resource interface's initializer is called, even if the conforming resource
+// does not have an initializer
+//
+func TestInterpretResourceDestroyExpressionResourceInterfaceCondition(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource interface I {
+          destroy() {
+              pre { false }
+          }
+      }
+
+      resource R: I {}
+
+      fun test() {
+          let r <- create R()
+          destroy r
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+// TestInterpretInterfaceInitializer tests that the interface's initializer
+// is called, even if the conforming composite does not have an initializer
+//
+func TestInterpretInterfaceInitializer(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface I {
+          init() {
+              pre { false }
+          }
+      }
+
+      struct S: I {}
+
+      fun test() {
+          S()
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
