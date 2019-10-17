@@ -620,6 +620,13 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 		return
 	}
 
+	// Get the base expression of the given expression, i.e. get the accessed expression
+	// as long as there is one.
+	//
+	// For example, in the expression `foo[0].bar`, both the wrapping member access
+	// expression `bar` and the wrapping indexing expression `[0]` are removed,
+	// leaving the base expression `foo`
+
 	baseExpression := expression
 
 	for {
