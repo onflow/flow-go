@@ -15,8 +15,6 @@ type StandardLibraryFunction struct {
 	Type           *sema.FunctionType
 	Function       interpreter.HostFunctionValue
 	ArgumentLabels []string
-	// IsDeclared specifies if this function should be made available to the user.
-	IsDeclared bool
 }
 
 func (f StandardLibraryFunction) ValueDeclarationType() sema.Type {
@@ -44,7 +42,6 @@ func NewStandardLibraryFunction(
 	functionType *sema.FunctionType,
 	function interpreter.HostFunction,
 	argumentLabels []string,
-	isDeclared bool,
 ) StandardLibraryFunction {
 	functionValue := interpreter.NewHostFunctionValue(function)
 	return StandardLibraryFunction{
@@ -52,7 +49,6 @@ func NewStandardLibraryFunction(
 		Type:           functionType,
 		Function:       functionValue,
 		ArgumentLabels: argumentLabels,
-		IsDeclared:     isDeclared,
 	}
 }
 
@@ -63,10 +59,7 @@ type StandardLibraryFunctions []StandardLibraryFunction
 func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
 	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
 	for _, function := range functions {
-		// skip undeclared functions
-		if function.IsDeclared {
-			valueDeclarations[function.Name] = function
-		}
+		valueDeclarations[function.Name] = function
 	}
 	return valueDeclarations
 }
@@ -140,7 +133,6 @@ var AssertFunction = NewStandardLibraryFunction(
 		sema.ArgumentLabelNotRequired,
 		"message",
 	},
-	true,
 )
 
 // PanicError
@@ -187,30 +179,6 @@ var PanicFunction = NewStandardLibraryFunction(
 		return trampoline.Done{}
 	},
 	nil,
-	true,
-)
-
-// EmitEventFunction
-
-var EmitEventFunction = NewStandardLibraryFunction(
-	"emitEvent",
-	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.EventType{},
-		),
-		ReturnTypeAnnotation: sema.NewTypeAnnotation(
-			&sema.VoidType{},
-		),
-	},
-	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
-		eventValue := arguments[0].(interpreter.EventValue)
-
-		fmt.Printf("Event emitted: %s\n", eventValue)
-
-		return trampoline.Done{}
-	},
-	nil,
-	false,
 )
 
 // BuiltinFunctions
@@ -218,7 +186,6 @@ var EmitEventFunction = NewStandardLibraryFunction(
 var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
-	EmitEventFunction,
 }
 
 // LogFunction
@@ -238,7 +205,6 @@ var LogFunction = NewStandardLibraryFunction(
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},
 	nil,
-	true,
 )
 
 // HelperFunctions

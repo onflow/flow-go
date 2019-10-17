@@ -59,6 +59,7 @@ type Interpreter struct {
 	ImportLocation     ast.ImportLocation
 	CompositeFunctions map[string]map[string]FunctionValue
 	SubInterpreters    map[ast.ImportLocation]*Interpreter
+	onEventEmitted     func(EventValue)
 }
 
 func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
@@ -70,6 +71,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions: map[string]map[string]FunctionValue{},
 		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
+		onEventEmitted:     func(EventValue) {},
 	}
 
 	for name, value := range predefinedValues {
@@ -80,6 +82,11 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 	}
 
 	return interpreter, nil
+}
+
+// SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
+	interpreter.onEventEmitted = callback
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -1771,14 +1778,7 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 		FlatMap(func(result interface{}) Trampoline {
 			event := result.(EventValue)
 
-			arguments := []Value{event.Copy()}
-			location := Location{
-				Position:       statement.StartPosition(),
-				ImportLocation: interpreter.ImportLocation,
-			}
-
-			emitFunction := interpreter.PredefinedValues["emitEvent"].(HostFunctionValue)
-			emitFunction.invoke(arguments, location)
+			interpreter.onEventEmitted(event)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}

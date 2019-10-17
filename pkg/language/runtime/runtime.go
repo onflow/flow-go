@@ -389,64 +389,48 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 			&getValueFunctionType,
 			r.newGetValueFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"setValue",
 			&setValueFunctionType,
 			r.newSetValueFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"createAccount",
 			&createAccountFunctionType,
 			r.newCreateAccountFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"addAccountKey",
 			&addAccountKeyFunctionType,
 			r.addAccountKeyFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"removeAccountKey",
 			&removeAccountKeyFunctionType,
 			r.removeAccountKeyFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"updateAccountCode",
 			&updateAccountCodeFunctionType,
 			r.newUpdateAccountCodeFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"getAccount",
 			&getAccountFunctionType,
 			r.newGetAccountFunction(runtimeInterface),
 			nil,
-			true,
 		),
 		stdlib.NewStandardLibraryFunction(
 			"log",
 			&logFunctionType,
 			r.newLogFunction(runtimeInterface),
 			nil,
-			true,
-		),
-		// override built-in emitEvent function
-		stdlib.NewStandardLibraryFunction(
-			stdlib.EmitEventFunction.Name,
-			stdlib.EmitEventFunction.Type,
-			r.newEmitEventFunction(runtimeInterface),
-			nil,
-			false,
 		),
 	)
 }
@@ -681,21 +665,6 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
 		runtimeInterface.Log(fmt.Sprint(arguments[0]))
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
-	}
-}
-
-func (r *interpreterRuntime) newEmitEventFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 1 {
-			panic("emitEvent requires 1 parameter")
-		}
-
-		eventValue := arguments[0].(interpreter.EventValue)
-
-		// TODO: pass event to host environment through runtime context
-		fmt.Printf("Event emitted: %s\n", eventValue)
-
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
 }
