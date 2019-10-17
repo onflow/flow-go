@@ -1745,7 +1745,7 @@ func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDecl
 //
 // The constructor is assigned to a variable with the same identifier as the event type itself.
 // For example, this allows an event instance for event type MyEvent(x: Int) to be created
-// by calling MyEvent(2).
+// by calling MyEvent(x: 2).
 func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
 	identifier := declaration.Identifier.Identifier
 
