@@ -73,7 +73,7 @@ export PATH="$PATH:$GOPATH/bin"
 - Clone this repository to `$GOPATH/src/github.com/dapperlabs/flow-go/`
 - Clone this repository submodules:
 ```bash
-git submodule update --recursive
+git submodule update --init --recursive
 ```
 
 _Note: since we are using go modules and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo anywhere you want._
