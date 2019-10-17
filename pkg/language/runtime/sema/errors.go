@@ -1171,6 +1171,27 @@ func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
+// InvalidNestedMoveError
+
+type InvalidNestedMoveError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidNestedMoveError) Error() string {
+	return "cannot move nested resource"
+}
+
+func (*InvalidNestedMoveError) isSemanticError() {}
+
+func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidMoveAnnotationError
 
 type InvalidMoveAnnotationError struct {

@@ -192,3 +192,32 @@ func TestCheckSwapResourceArrayElements(t *testing.T) {
 
 	assert.Nil(t, err)
 }
+
+func TestCheckSwapResourceFields(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      resource Y {
+          var x: <-X
+
+          init(x: <-X) {
+              self.x <- x
+          }
+
+          destroy() {
+              destroy self.x
+          }
+      }
+
+      fun test() {
+          let y1 <- create Y(x: <-create X())
+          let y2 <- create Y(x: <-create X())
+          y1.x <-> y2.x
+          destroy y1
+          destroy y2
+      }
+	`)
+
+	assert.Nil(t, err)
+}
