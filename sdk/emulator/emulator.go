@@ -359,16 +359,16 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte) (types.Address, error) {
 	createAccountScript := templates.CreateAccount(accountKeys, code)
 
-	tx1 := &types.Transaction{
+	tx := &types.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx1)
+	err := b.SubmitTransaction(tx)
 	if err != nil {
 		return types.Address{}, err
 	}
