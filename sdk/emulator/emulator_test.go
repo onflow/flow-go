@@ -37,6 +37,7 @@ func createAccount(b *EmulatedBlockchain, accountKeys []types.AccountKey, code [
 	tx1 := &types.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 	}
@@ -61,6 +62,7 @@ func TestWorldStates(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -71,7 +73,7 @@ func TestWorldStates(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -185,6 +187,7 @@ func TestSubmitTransaction(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -225,6 +228,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -270,6 +274,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
@@ -292,6 +297,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressA},
@@ -315,6 +321,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       addressA,
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -337,6 +344,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -360,6 +368,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -399,6 +408,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -413,6 +423,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		tx2 := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
+			Nonce:              2,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressA},
@@ -450,6 +461,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
+			Nonce:              1,
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []types.Address{addressA},
@@ -497,6 +509,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		tx2 := &types.Transaction{
 			Script:             multipleAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              2,
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
@@ -521,6 +534,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -546,6 +560,7 @@ func TestCommitBlock(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -562,6 +577,7 @@ func TestCommitBlock(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -611,6 +627,7 @@ func TestCreateAccount(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             createAccountScriptA,
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 	}
@@ -640,7 +657,7 @@ func TestCreateAccount(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             createAccountScriptC,
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 	}
@@ -690,7 +707,7 @@ func TestAddAccountKey(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -737,7 +754,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -756,7 +773,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx3 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              3,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -775,7 +792,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx4 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              2,
+		Nonce:              4,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -955,6 +972,7 @@ func TestImportAccountCode(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -974,6 +992,7 @@ func TestCallScript(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -1004,6 +1023,7 @@ func TestQueryByVersion(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -1014,7 +1034,7 @@ func TestQueryByVersion(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
