@@ -18,7 +18,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	)
 
 	// check that parameters are primitive types
-	checker.checkEventParameters(declaration.Parameters, eventType.ConstructorParameterTypeAnnotations)
+	checker.checkEventParameters(declaration.Parameters, constructorFunctionType.ParameterTypeAnnotations)
 
 	return nil
 }
