@@ -21,6 +21,7 @@ type testRuntimeInterface struct {
 	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
+	emitEvent          func(types.Event)
 }
 
 func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
@@ -60,6 +61,10 @@ func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
 
 func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
+}
+
+func (i *testRuntimeInterface) EmitEvent(event types.Event) {
+	i.emitEvent(event)
 }
 
 func TestRuntimeGetAndSetValue(t *testing.T) {

@@ -318,6 +318,11 @@ func (r *RuntimeContext) Log(message string) {
 	r.onLog(message)
 }
 
+// EmitEvent is called when an event is emitted by the runtime.
+func (r *RuntimeContext) EmitEvent(event types.Event) {
+	r.onLog(fmt.Sprintf("Event emitted: %s", event))
+}
+
 func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
 		if accountAddress == address {
