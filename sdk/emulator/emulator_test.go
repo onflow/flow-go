@@ -202,6 +202,21 @@ func TestSubmitTransaction(t *testing.T) {
 	Expect(tx.Status).To(Equal(types.TransactionFinalized))
 }
 
+func TestSubmitInvalidTransaction(t *testing.T) {
+	RegisterTestingT(t)
+
+	b := NewEmulatedBlockchain(DefaultOptions)
+
+	// Create empty transaction
+	tx1 := &types.Transaction{}
+
+	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	// Submit tx1
+	err := b.SubmitTransaction(tx1)
+	Expect(err).To(MatchError(&ErrInvalidTransaction{TxHash: tx1.Hash(), MissingFields: tx1.MissingFields()}))
+}
+
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	RegisterTestingT(t)
 
