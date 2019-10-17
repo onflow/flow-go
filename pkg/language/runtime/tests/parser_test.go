@@ -3163,66 +3163,69 @@ func TestParseStructure(t *testing.T) {
 					EndPos:   Position{Offset: 55, Line: 3, Column: 32},
 				},
 			},
-			Initializers: []*InitializerDeclaration{
+			SpecialFunctions: []*SpecialFunctionDeclaration{
 				{
-					Identifier: Identifier{
-						Identifier: "init",
-						Pos:        Position{Offset: 70, Line: 5, Column: 12},
-					},
-					Parameters: Parameters{
-						{
-							Label: "",
-							Identifier: Identifier{
-								Identifier: "foo",
-								Pos:        Position{Offset: 75, Line: 5, Column: 17},
-							},
-							TypeAnnotation: &TypeAnnotation{
-								Move: false,
-								Type: &NominalType{
-									Identifier: Identifier{
-										Identifier: "Int",
-										Pos:        Position{Offset: 80, Line: 5, Column: 22},
-									},
-								},
-								StartPos: Position{Offset: 80, Line: 5, Column: 22},
-							},
-							StartPos: Position{Offset: 75, Line: 5, Column: 17},
-							EndPos:   Position{Offset: 80, Line: 5, Column: 22},
+					DeclarationKind: common.DeclarationKindInitializer,
+					FunctionDeclaration: &FunctionDeclaration{
+						Identifier: Identifier{
+							Identifier: "init",
+							Pos:        Position{Offset: 70, Line: 5, Column: 12},
 						},
-					},
-					FunctionBlock: &FunctionBlock{
-						Block: &Block{
-							Statements: []Statement{
-								&AssignmentStatement{
-									Target: &MemberExpression{
-										Expression: &IdentifierExpression{
+						Parameters: Parameters{
+							{
+								Label: "",
+								Identifier: Identifier{
+									Identifier: "foo",
+									Pos:        Position{Offset: 75, Line: 5, Column: 17},
+								},
+								TypeAnnotation: &TypeAnnotation{
+									Move: false,
+									Type: &NominalType{
+										Identifier: Identifier{
+											Identifier: "Int",
+											Pos:        Position{Offset: 80, Line: 5, Column: 22},
+										},
+									},
+									StartPos: Position{Offset: 80, Line: 5, Column: 22},
+								},
+								StartPos: Position{Offset: 75, Line: 5, Column: 17},
+								EndPos:   Position{Offset: 80, Line: 5, Column: 22},
+							},
+						},
+						FunctionBlock: &FunctionBlock{
+							Block: &Block{
+								Statements: []Statement{
+									&AssignmentStatement{
+										Target: &MemberExpression{
+											Expression: &IdentifierExpression{
+												Identifier: Identifier{
+													Identifier: "self",
+													Pos:        Position{Offset: 103, Line: 6, Column: 16},
+												},
+											},
 											Identifier: Identifier{
-												Identifier: "self",
-												Pos:        Position{Offset: 103, Line: 6, Column: 16},
+												Identifier: "foo",
+												Pos:        Position{Offset: 108, Line: 6, Column: 21},
 											},
 										},
-										Identifier: Identifier{
-											Identifier: "foo",
-											Pos:        Position{Offset: 108, Line: 6, Column: 21},
+										Transfer: &Transfer{
+											Operation: TransferOperationCopy,
+											Pos:       Position{Offset: 112, Line: 6, Column: 25},
 										},
-									},
-									Transfer: &Transfer{
-										Operation: TransferOperationCopy,
-										Pos:       Position{Offset: 112, Line: 6, Column: 25},
-									},
-									Value: &IdentifierExpression{
-										Identifier: Identifier{
-											Identifier: "foo",
-											Pos:        Position{Offset: 114, Line: 6, Column: 27},
+										Value: &IdentifierExpression{
+											Identifier: Identifier{
+												Identifier: "foo",
+												Pos:        Position{Offset: 114, Line: 6, Column: 27},
+											},
 										},
 									},
 								},
+								StartPos: Position{Offset: 85, Line: 5, Column: 27},
+								EndPos:   Position{Offset: 130, Line: 7, Column: 12},
 							},
-							StartPos: Position{Offset: 85, Line: 5, Column: 27},
-							EndPos:   Position{Offset: 130, Line: 7, Column: 12},
 						},
+						StartPos: Position{Offset: 70, Line: 5, Column: 12},
 					},
-					StartPos: Position{Offset: 70, Line: 5, Column: 12},
 				},
 			},
 			Functions: []*FunctionDeclaration{
@@ -3905,35 +3908,38 @@ func TestParseInterface(t *testing.T) {
 						EndPos:   Position{Offset: 60, Line: 3, Column: 23},
 					},
 				},
-				Initializers: []*InitializerDeclaration{
+				SpecialFunctions: []*SpecialFunctionDeclaration{
 					{
-						Identifier: Identifier{
-							Identifier: "init",
-							Pos:        Position{Offset: 79, Line: 5, Column: 16},
-						},
-						Parameters: Parameters{
-							{
-								Label: "",
-								Identifier: Identifier{
-									Identifier: "foo",
-									Pos:        Position{Offset: 84, Line: 5, Column: 21},
-								},
-								TypeAnnotation: &TypeAnnotation{
-									Move: false,
-									Type: &NominalType{
-										Identifier: Identifier{
-											Identifier: "Int",
-											Pos:        Position{Offset: 89, Line: 5, Column: 26},
-										},
-									},
-									StartPos: Position{Offset: 89, Line: 5, Column: 26},
-								},
-								StartPos: Position{Offset: 84, Line: 5, Column: 21},
-								EndPos:   Position{Offset: 89, Line: 5, Column: 26},
+						DeclarationKind: common.DeclarationKindInitializer,
+						FunctionDeclaration: &FunctionDeclaration{
+							Identifier: Identifier{
+								Identifier: "init",
+								Pos:        Position{Offset: 79, Line: 5, Column: 16},
 							},
+							Parameters: Parameters{
+								{
+									Label: "",
+									Identifier: Identifier{
+										Identifier: "foo",
+										Pos:        Position{Offset: 84, Line: 5, Column: 21},
+									},
+									TypeAnnotation: &TypeAnnotation{
+										Move: false,
+										Type: &NominalType{
+											Identifier: Identifier{
+												Identifier: "Int",
+												Pos:        Position{Offset: 89, Line: 5, Column: 26},
+											},
+										},
+										StartPos: Position{Offset: 89, Line: 5, Column: 26},
+									},
+									StartPos: Position{Offset: 84, Line: 5, Column: 21},
+									EndPos:   Position{Offset: 89, Line: 5, Column: 26},
+								},
+							},
+							FunctionBlock: nil,
+							StartPos:      Position{Offset: 79, Line: 5, Column: 16},
 						},
-						FunctionBlock: nil,
-						StartPos:      Position{Offset: 79, Line: 5, Column: 16},
 					},
 				},
 				Functions: []*FunctionDeclaration{
@@ -5031,6 +5037,54 @@ func TestParseSwapStatement(t *testing.T) {
 			PostConditions: nil,
 		},
 		StartPos: Position{Offset: 7, Line: 2, Column: 6},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseDestructor(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        resource Test {
+            destroy() {}
+        }
+	`)
+
+	assert.Nil(t, err)
+
+	test := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindResource,
+		Identifier: Identifier{
+			Identifier: "Test",
+			Pos:        Position{Offset: 18, Line: 2, Column: 17},
+		},
+		Conformances: []*NominalType{},
+		Members: &Members{
+			SpecialFunctions: []*SpecialFunctionDeclaration{
+				{
+					DeclarationKind: common.DeclarationKindDestructor,
+					FunctionDeclaration: &FunctionDeclaration{
+						Identifier: Identifier{
+							Identifier: "destroy",
+							Pos:        Position{Offset: 37, Line: 3, Column: 12},
+						},
+						FunctionBlock: &FunctionBlock{
+							Block: &Block{
+								StartPos: Position{Offset: 47, Line: 3, Column: 22},
+								EndPos:   Position{Offset: 48, Line: 3, Column: 23},
+							},
+						},
+						StartPos: Position{Offset: 37, Line: 3, Column: 12},
+					},
+				},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+		EndPos:   Position{Offset: 58, Line: 4, Column: 8},
 	}
 
 	expected := &Program{

@@ -214,13 +214,9 @@ func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
       let test = makeKittyCloner()
 	`)
 
-	// TODO: add support for resources
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	errs := ExpectCheckerErrors(t, err, 2)
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
 
 func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
@@ -237,13 +233,9 @@ func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
       let test = makeKittyCloner(kitty: <-create Kitty())
 	`)
 
-	// TODO: add support for resources
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	errs := ExpectCheckerErrors(t, err, 2)
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
 
 func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
@@ -261,11 +253,37 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
       let test = kitty.makeCloner()
 	`)
 
-	// TODO: add support for resources
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
+
+func TestCheckInvalidResourceCapturingJustMemberAccess(t *testing.T) {
+	// Resource capturing even just for read access (e.g. reading a member) is invalid
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun makeKittyIdGetter(): ((): Int) {
+          let kitty <- create Kitty(id: 1)
+          let getId = fun (): Int {
+              return kitty.id
+          }
+          destroy kitty
+          return getId
+      }
+
+      let test = makeKittyIdGetter()
+	`)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }

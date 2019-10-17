@@ -88,9 +88,7 @@ func (detector *ExitDetector) VisitIfStatement(node *ast.IfStatement) ast.Repr {
 
 func (detector *ExitDetector) VisitWhileStatement(node *ast.WhileStatement) ast.Repr {
 	outerBreakValue := detector.enclosingBlockContainsBreak
-
 	detector.enclosingBlockContainsBreak = false
-
 	defer func() {
 		detector.enclosingBlockContainsBreak = outerBreakValue
 	}()
@@ -157,10 +155,6 @@ func (detector *ExitDetector) VisitInterfaceDeclaration(*ast.InterfaceDeclaratio
 }
 
 func (detector *ExitDetector) VisitFieldDeclaration(*ast.FieldDeclaration) ast.Repr {
-	return false
-}
-
-func (detector *ExitDetector) VisitInitializerDeclaration(node *ast.InitializerDeclaration) ast.Repr {
 	return false
 }
 

@@ -21,18 +21,18 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
               }
 	        `, kind.Keyword()))
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure {
-				expectedErrorCount += 1
-			}
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
 
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+				assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
 
-			assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
+			default:
+				errs := ExpectCheckerErrors(t, err, 2)
 
-			if kind != common.CompositeKindStructure {
+				assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 			}
 		})

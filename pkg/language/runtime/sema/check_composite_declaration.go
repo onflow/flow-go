@@ -23,7 +23,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	)
 
 	checker.checkInitializers(
-		declaration.Members.Initializers,
+		declaration.Members.Initializers(),
 		declaration.Members.Fields,
 		compositeType,
 		declaration.DeclarationKind(),
@@ -31,6 +31,8 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		compositeType.ConstructorParameterTypeAnnotations,
 		initializerKindComposite,
 	)
+
+	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
 
 	checker.checkFieldsInitialized(declaration, compositeType)
 
@@ -56,9 +58,11 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 	}
 
-	// TODO: support non-structure composites, such as contracts and resources
+	// TODO: support non-structure / non-resources composites, such as contracts
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
+
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
@@ -126,16 +130,26 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	checker.memberOrigins[compositeType] = origins
 
-	// TODO: support multiple overloaded initializers
+	constructorParameterTypeAnnotations := checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
+	compositeType.ConstructorParameterTypeAnnotations = constructorParameterTypeAnnotations
+
+	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
+
+	checker.declareCompositeConstructor(declaration, compositeType, constructorParameterTypeAnnotations)
+}
+
+func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.SpecialFunctionDeclaration) []*TypeAnnotation {
+	// TODO: support multiple overloaded initializers
 	var parameterTypeAnnotations []*TypeAnnotation
-	initializerCount := len(declaration.Members.Initializers)
+
+	initializerCount := len(initializers)
 	if initializerCount > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
+		firstInitializer := initializers[0]
 		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
-			secondInitializer := declaration.Members.Initializers[1]
+			secondInitializer := initializers[1]
 
 			checker.report(
 				&UnsupportedOverloadingError{
@@ -146,12 +160,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			)
 		}
 	}
-
-	compositeType.ConstructorParameterTypeAnnotations = parameterTypeAnnotations
-
-	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
-
-	checker.declareCompositeConstructor(declaration, compositeType, parameterTypeAnnotations)
+	return parameterTypeAnnotations
 }
 
 func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*InterfaceType {
@@ -290,7 +299,7 @@ func (checker *Checker) checkFieldsInitialized(
 	declaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 ) {
-	for _, initializer := range declaration.Members.Initializers {
+	for _, initializer := range declaration.Members.Initializers() {
 		unassigned, errs := self_field_analyzer.CheckSelfFieldInitializations(
 			declaration.Members.Fields,
 			initializer.FunctionBlock,
@@ -316,7 +325,7 @@ func (checker *Checker) declareCompositeConstructor(
 	compositeType *CompositeType,
 	parameterTypeAnnotations []*TypeAnnotation,
 ) {
-	functionType := &ConstructorFunctionType{
+	functionType := &SpecialFunctionType{
 		&FunctionType{
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				compositeType,
@@ -328,19 +337,20 @@ func (checker *Checker) declareCompositeConstructor(
 
 	// TODO: support multiple overloaded initializers
 
-	if len(compositeDeclaration.Members.Initializers) > 0 {
-		firstInitializer := compositeDeclaration.Members.Initializers[0]
+	initializers := compositeDeclaration.Members.Initializers
+	if len(initializers()) > 0 {
+		firstInitializer := initializers()[0]
 
 		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
 
-		functionType = &ConstructorFunctionType{
+		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
 				ParameterTypeAnnotations: parameterTypeAnnotations,
 				ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
 			},
 		}
 
-		checker.Elaboration.InitializerFunctionTypes[firstInitializer] = functionType
+		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
 
 	_, err := checker.valueActivations.DeclareFunction(
@@ -418,7 +428,7 @@ func (checker *Checker) membersAndOrigins(
 }
 
 func (checker *Checker) checkInitializers(
-	initializers []*ast.InitializerDeclaration,
+	initializers []*ast.SpecialFunctionDeclaration,
 	fields []*ast.FieldDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
@@ -474,7 +484,7 @@ func (checker *Checker) checkNoInitializerNoFields(
 }
 
 func (checker *Checker) checkInitializer(
-	initializer *ast.InitializerDeclaration,
+	initializer *ast.SpecialFunctionDeclaration,
 	fields []*ast.FieldDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
@@ -489,17 +499,6 @@ func (checker *Checker) checkInitializer(
 	defer checker.leaveValueScope()
 
 	checker.declareSelfValue(containerType)
-
-	// check the initializer is named properly
-	identifier := initializer.Identifier.Identifier
-	if identifier != InitializerIdentifier {
-		checker.report(
-			&InvalidInitializerNameError{
-				Name: identifier,
-				Pos:  initializer.StartPos,
-			},
-		)
-	}
 
 	functionType := &FunctionType{
 		ParameterTypeAnnotations: initializerParameterTypeAnnotations,
@@ -538,7 +537,13 @@ func (checker *Checker) checkCompositeFunctions(
 
 			checker.declareSelfValue(selfType)
 
-			function.Accept(checker)
+			checker.visitFunctionDeclaration(
+				function,
+				functionDeclarationOptions{
+					mustExit:        true,
+					declareFunction: false,
+				},
+			)
 		})
 	}
 }
@@ -596,7 +601,12 @@ func (checker *Checker) checkMemberIdentifier(
 	name := identifier.Identifier
 	pos := identifier.Pos
 
-	if name == InitializerIdentifier {
+	// TODO: provide a more helpful error
+
+	switch name {
+	case common.DeclarationKindInitializer.Keywords(),
+		common.DeclarationKindDestructor.Keywords():
+
 		checker.report(
 			&InvalidNameError{
 				Name: name,
@@ -620,15 +630,7 @@ func (checker *Checker) checkMemberIdentifier(
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-
 	// NOTE: field type is already checked when determining composite function in `compositeType`
-
-	panic(&errors.UnreachableError{})
-}
-
-func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
-
-	// NOTE: already checked in `checkInitializer`
 
 	panic(&errors.UnreachableError{})
 }

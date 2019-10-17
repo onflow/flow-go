@@ -105,7 +105,7 @@ members[bool functionBlockRequired]
 
 member[bool functionBlockRequired]
     : field
-    | initializer[functionBlockRequired]
+    | specialFunctionDeclaration[functionBlockRequired]
     | functionDeclaration[functionBlockRequired]
     | interfaceDeclaration
     | compositeDeclaration
@@ -117,10 +117,14 @@ compositeKind
     | Contract
     ;
 
-// NOTE: allow any identifier in parser, then check identifier
-// is `init` in semantic analysis to provide better error
+// specialFunctionDeclaration is the rule for special function declarations,
+// i.e., those that don't require a `fun` keyword and don't have a return type,
+// e.g. initializers (`init`) and destructors (`destroy`).
 //
-initializer[bool functionBlockRequired]
+// NOTE: allow any identifier in parser, then check identifier is one of
+// the valid identifiers in the semantic analysis to provide better error
+//
+specialFunctionDeclaration[bool functionBlockRequired]
     : identifier parameterList
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
@@ -264,6 +268,11 @@ variableDeclaration
     : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
+// NOTE: we allow any kind of transfer, i.e. moves, but ensure
+//   that move is not used in the semantic analysis (as assignment
+//   to resource type will cause a loss of the old value).
+//   Being unrestritive here allows us to provide better error messages
+//   in the semantic analysis.
 assignment
     : identifier expressionAccess* transfer expression
     ;

@@ -59,7 +59,7 @@ func (v *BaseStrictusVisitor) VisitCompositeKind(ctx *CompositeKindContext) inte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+func (v *BaseStrictusVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

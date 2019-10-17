@@ -22,17 +22,18 @@ func _() {
 	_ = x[DeclarationKindEvent-11]
 	_ = x[DeclarationKindField-12]
 	_ = x[DeclarationKindInitializer-13]
-	_ = x[DeclarationKindStructureInterface-14]
-	_ = x[DeclarationKindResourceInterface-15]
-	_ = x[DeclarationKindContractInterface-16]
-	_ = x[DeclarationKindImport-17]
-	_ = x[DeclarationKindSelf-18]
-	_ = x[DeclarationKindResult-19]
+	_ = x[DeclarationKindDestructor-14]
+	_ = x[DeclarationKindStructureInterface-15]
+	_ = x[DeclarationKindResourceInterface-16]
+	_ = x[DeclarationKindContractInterface-17]
+	_ = x[DeclarationKindImport-18]
+	_ = x[DeclarationKindSelf-19]
+	_ = x[DeclarationKindResult-20]
 }
 
-const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindResourceDeclarationKindContractDeclarationKindEventDeclarationKindFieldDeclarationKindInitializerDeclarationKindStructureInterfaceDeclarationKindResourceInterfaceDeclarationKindContractInterfaceDeclarationKindImportDeclarationKindSelfDeclarationKindResult"
+const _DeclarationKind_name = "DeclarationKindUnknownDeclarationKindValueDeclarationKindFunctionDeclarationKindVariableDeclarationKindConstantDeclarationKindTypeDeclarationKindParameterDeclarationKindArgumentLabelDeclarationKindStructureDeclarationKindResourceDeclarationKindContractDeclarationKindEventDeclarationKindFieldDeclarationKindInitializerDeclarationKindDestructorDeclarationKindStructureInterfaceDeclarationKindResourceInterfaceDeclarationKindContractInterfaceDeclarationKindImportDeclarationKindSelfDeclarationKindResult"
 
-var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 229, 252, 272, 292, 318, 351, 383, 415, 436, 455, 476}
+var _DeclarationKind_index = [...]uint16{0, 22, 42, 65, 88, 111, 130, 154, 182, 206, 229, 252, 272, 292, 318, 343, 376, 408, 440, 461, 480, 501}
 
 func (i DeclarationKind) String() string {
 	if i < 0 || i >= DeclarationKind(len(_DeclarationKind_index)-1) {

@@ -123,7 +123,7 @@ func (checker *Checker) visitIndexingExpression(
 	}
 
 	defer func() {
-		checker.checkNonIdentifierResourceLoss(result, targetExpression)
+		checker.checkAccessResourceLoss(result, targetExpression)
 	}()
 
 	_, isStorage := indexedType.(*StorageType)
@@ -134,16 +134,13 @@ func (checker *Checker) visitIndexingExpression(
 		// indexing into storage using expression?
 		if indexExpression.IndexingExpression != nil {
 
-			// Identifier expressions are valid, as the parser can't differentiate
-			// between identifier expressions and nominal types.
+			// The parser may have parsed a type as an expression,
+			// because some type forms are also valid expression forms,
+			// and the parser can't disambiguate them.
+			// Attempt to convert the expression to a type
 
-			identifierExpression, isIdentifier := indexExpression.IndexingExpression.(*ast.IdentifierExpression)
-
-			if isIdentifier {
-				indexingType = &ast.NominalType{
-					Identifier: identifierExpression.Identifier,
-				}
-			} else {
+			indexingType = ast.ExpressionAsType(indexExpression.IndexingExpression)
+			if indexingType == nil {
 				checker.report(
 					&InvalidStorageIndexingError{
 						StartPos: indexExpression.IndexingExpression.StartPosition(),

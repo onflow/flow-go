@@ -30,27 +30,6 @@ const sampleCall = `
 	}
 `
 
-// createAccount is a test utility to add a new account to the emulated blockchain.
-func createAccount(b *EmulatedBlockchain, accountKeys []types.AccountKey, code []byte) (types.Address, error) {
-	createAccountScript := templates.CreateAccount(accountKeys, code)
-
-	tx1 := &types.Transaction{
-		Script:             createAccountScript,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-	}
-
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
-
-	err := b.SubmitTransaction(tx1)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return b.LastCreatedAccount().Address, nil
-}
-
 func TestWorldStates(t *testing.T) {
 	RegisterTestingT(t)
 
@@ -242,7 +221,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	}
 
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, nil)
+	accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -377,25 +356,11 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
-		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
-
-		accountAddressA := types.HexToAddress("0000000000000000000000000000000000000002")
-
-		tx1 := &types.Transaction{
-			Script:             createAccountScript,
-			ReferenceBlockHash: nil,
-			ComputeLimit:       10,
-			PayerAccount:       b.RootAccountAddress(),
-		}
-
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
-
-		err := b.SubmitTransaction(tx1)
-		Expect(err).ToNot(HaveOccurred())
+		accountAddressA, err := b.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
 
 		script := []byte("fun main(account: Account) {}")
 
-		tx2 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
@@ -406,19 +371,19 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		t.Run("InsufficientKeyWeight", func(t *testing.T) {
 			RegisterTestingT(t)
 
-			tx2.AddSignature(accountAddressA, privateKeyB)
+			tx.AddSignature(accountAddressA, privateKeyB)
 
-			err = b.SubmitTransaction(tx2)
+			err = b.SubmitTransaction(tx)
 			Expect(err).To(MatchError(&ErrMissingSignature{Account: accountAddressA}))
 		})
 
 		t.Run("SufficientKeyWeight", func(t *testing.T) {
 			RegisterTestingT(t)
 
-			tx2.AddSignature(accountAddressA, privateKeyA)
-			tx2.AddSignature(accountAddressA, privateKeyB)
+			tx.AddSignature(accountAddressA, privateKeyA)
+			tx.AddSignature(accountAddressA, privateKeyB)
 
-			err = b.SubmitTransaction(tx2)
+			err = b.SubmitTransaction(tx)
 			Expect(err).To(Not(HaveOccurred()))
 		})
 	})
@@ -469,7 +434,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		}
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, nil)
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		multipleAccountScript := []byte(`
@@ -794,7 +759,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -831,7 +796,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -868,7 +833,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := createAccount(b, []types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
 		Expect(err).ToNot(HaveOccurred())
 
 		account, err := b.GetAccount(accountAddressB)
@@ -923,7 +888,7 @@ func TestImportAccountCode(t *testing.T) {
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
-	_, err := createAccount(b, []types.AccountKey{accountKeyA}, accountScript)
+	_, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript)
 	Expect(err).ToNot(HaveOccurred())
 
 	script := []byte(`

@@ -50,8 +50,8 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#compositeKind.
 	VisitCompositeKind(ctx *CompositeKindContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#initializer.
-	VisitInitializer(ctx *InitializerContext) interface{}
+	// Visit a parse tree produced by StrictusParser#specialFunctionDeclaration.
+	VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
