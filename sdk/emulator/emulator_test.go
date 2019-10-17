@@ -82,7 +82,7 @@ func TestWorldStates(t *testing.T) {
 	// tx1 included in tx pool
 	assert.Len(t, b.txPool, 1)
 	// World state updates
-	assert.NotEqual(t, ws2, ws1)
+	assert.NotEqual(t, ws1, ws2)
 
 	// Submit tx1 again
 	err = b.SubmitTransaction(tx1)
@@ -94,7 +94,7 @@ func TestWorldStates(t *testing.T) {
 	// tx1 not included in tx pool
 	assert.Len(t, b.txPool, 1)
 	// World state does not update
-	assert.Equal(t, ws3, ws2)
+	assert.Equal(t, ws2, ws3)
 
 	// Submit tx2
 	err = b.SubmitTransaction(tx2)
@@ -106,7 +106,7 @@ func TestWorldStates(t *testing.T) {
 	// tx2 included in tx pool
 	assert.Len(t, b.txPool, 2)
 	// World state updates
-	assert.NotEqual(t, ws4, ws3)
+	assert.NotEqual(t, ws3, ws4)
 
 	// Commit new block
 	b.CommitBlock()
@@ -116,7 +116,7 @@ func TestWorldStates(t *testing.T) {
 	// Tx pool cleared
 	assert.Len(t, b.txPool, 0)
 	// World state updates
-	assert.NotEqual(t, ws5, ws4)
+	assert.NotEqual(t, ws4, ws5)
 	// World state is indexed
 	assert.Contains(t, b.worldStates, string(ws5))
 
@@ -130,7 +130,7 @@ func TestWorldStates(t *testing.T) {
 	// tx3 included in tx pool
 	assert.Len(t, b.txPool, 1)
 	// World state updates
-	assert.NotEqual(t, ws6, ws5)
+	assert.NotEqual(t, ws5, ws6)
 
 	// Seek to committed block/world state
 	b.SeekToState(ws5)
@@ -140,7 +140,7 @@ func TestWorldStates(t *testing.T) {
 	// Tx pool cleared
 	assert.Len(t, b.txPool, 0)
 	// World state rollback to ws5 (before tx3)
-	assert.Equal(t, ws7, ws5)
+	assert.Equal(t, ws5, ws7)
 	// World state does not include tx3
 	assert.False(t, b.pendingWorldState.ContainsTransaction(tx3.Hash()))
 
@@ -150,7 +150,7 @@ func TestWorldStates(t *testing.T) {
 	t.Logf("world state after failed seek: %x\n", ws8)
 
 	// World state does not rollback to ws4 (before commit block)
-	assert.NotEqual(t, ws8, ws4)
+	assert.NotEqual(t, ws4, ws8)
 }
 
 func TestSubmitTransaction(t *testing.T) {
@@ -173,7 +173,7 @@ func TestSubmitTransaction(t *testing.T) {
 	// tx1 status becomes TransactionFinalized
 	tx, err := b.GetTransaction(tx1.Hash())
 	assert.Nil(t, err)
-	assert.Equal(t, tx.Status, types.TransactionFinalized)
+	assert.Equal(t, types.TransactionFinalized, tx.Status)
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
@@ -454,7 +454,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	// tx1 status becomes TransactionReverted
 	tx, err := b.GetTransaction(tx1.Hash())
 	assert.Nil(t, err)
-	assert.Equal(t, tx.Status, types.TransactionReverted)
+	assert.Equal(t, types.TransactionReverted, tx.Status)
 }
 
 func TestCommitBlock(t *testing.T) {
@@ -474,7 +474,7 @@ func TestCommitBlock(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	tx, _ := b.GetTransaction(tx1.Hash())
 	assert.Nil(t, err)
-	assert.Equal(t, tx.Status, types.TransactionFinalized)
+	assert.Equal(t, types.TransactionFinalized, tx.Status)
 
 	tx2 := &types.Transaction{
 		Script:             []byte("invalid script"),
@@ -493,17 +493,17 @@ func TestCommitBlock(t *testing.T) {
 	tx, err = b.GetTransaction(tx2.Hash())
 	assert.Nil(t, err)
 
-	assert.Equal(t, tx.Status, types.TransactionReverted)
+	assert.Equal(t, types.TransactionReverted, tx.Status)
 
 	// Commit tx1 and tx2 into new block
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
 	tx, _ = b.GetTransaction(tx1.Hash())
-	assert.Equal(t, tx.Status, types.TransactionSealed)
+	assert.Equal(t, types.TransactionSealed, tx.Status)
 	// tx2 status stays TransactionReverted
 	tx, _ = b.GetTransaction(tx2.Hash())
-	assert.Equal(t, tx.Status, types.TransactionReverted)
+	assert.Equal(t, types.TransactionReverted, tx.Status)
 }
 
 func TestCreateAccount(t *testing.T) {
@@ -538,10 +538,10 @@ func TestCreateAccount(t *testing.T) {
 	account, err := b.GetAccount(b.LastCreatedAccount().Address)
 	assert.Nil(t, err)
 
-	assert.Equal(t, account.Balance, uint64(0))
-	assert.Equal(t, account.Keys[0], accountKeyA)
-	assert.Equal(t, account.Keys[1], accountKeyB)
-	assert.Equal(t, account.Code, codeA)
+	assert.Equal(t, uint64(0), account.Balance)
+	assert.Equal(t, accountKeyA, account.Keys[0])
+	assert.Equal(t, accountKeyB, account.Keys[1])
+	assert.Equal(t, codeA, account.Code)
 
 	accountKeyC := types.AccountKey{
 		PublicKey: []byte{7, 8, 9},
@@ -568,9 +568,9 @@ func TestCreateAccount(t *testing.T) {
 	account, err = b.GetAccount(b.LastCreatedAccount().Address)
 
 	assert.Nil(t, err)
-	assert.Equal(t, account.Balance, uint64(0))
-	assert.Equal(t, account.Keys[0], accountKeyC)
-	assert.Equal(t, account.Code, codeB)
+	assert.Equal(t, uint64(0), account.Balance)
+	assert.Equal(t, accountKeyC, account.Keys[0])
+	assert.Equal(t, codeB, account.Code)
 }
 
 func TestAddAccountKey(t *testing.T) {
@@ -724,7 +724,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err := b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{4, 5, 6})
+		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 
 		tx := &types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
@@ -744,7 +744,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err = b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{7, 8, 9})
+		assert.Equal(t, []byte{7, 8, 9}, account.Code)
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
@@ -759,7 +759,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err := b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{4, 5, 6})
+		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 
 		tx := &types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
@@ -779,7 +779,7 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		// code should not be updated
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{4, 5, 6})
+		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 	})
 
 	t.Run("UnauthorizedAccount", func(t *testing.T) {
@@ -794,7 +794,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err := b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{4, 5, 6})
+		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
 			fun main(account: Account) {
@@ -821,7 +821,7 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		// code should not be updated
 		assert.Nil(t, err)
-		assert.Equal(t, account.Code, []byte{4, 5, 6})
+		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 	})
 }
 
@@ -885,7 +885,7 @@ func TestCallScript(t *testing.T) {
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
 	assert.Nil(t, err)
-	assert.Equal(t, value, big.NewInt(0))
+	assert.Equal(t, big.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx1)
@@ -894,7 +894,7 @@ func TestCallScript(t *testing.T) {
 	// Sample call (value is 2)
 	value, err = b.CallScript([]byte(sampleCall))
 	assert.Nil(t, err)
-	assert.Equal(t, value, big.NewInt(2))
+	assert.Equal(t, big.NewInt(2), value)
 }
 
 func TestQueryByVersion(t *testing.T) {
@@ -969,20 +969,20 @@ func TestQueryByVersion(t *testing.T) {
 	// Value at ws1 is 0
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
 	assert.Nil(t, err)
-	assert.Equal(t, value, big.NewInt(0))
+	assert.Equal(t, big.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
 	assert.Nil(t, err)
-	assert.Equal(t, value, big.NewInt(2))
+	assert.Equal(t, big.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
 	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
 	assert.Nil(t, err)
-	assert.Equal(t, value, big.NewInt(4))
+	assert.Equal(t, big.NewInt(4), value)
 
 	// Pending state does not change after call scripts/get transactions
-	assert.Equal(t, b.pendingWorldState.Hash(), ws3)
+	assert.Equal(t, ws3, b.pendingWorldState.Hash())
 }
 
 func TestRuntimeLogger(t *testing.T) {
@@ -1002,5 +1002,5 @@ func TestRuntimeLogger(t *testing.T) {
 
 	_, err := b.CallScript(script)
 	assert.Nil(t, err)
-	assert.Equal(t, loggedMessages, []string{`"elephant ears"`})
+	assert.Equal(t, []string{`"elephant ears"`}, loggedMessages)
 }
