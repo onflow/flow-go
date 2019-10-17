@@ -63,7 +63,7 @@ type StandardLibraryFunctions []StandardLibraryFunction
 func (functions StandardLibraryFunctions) ToValueDeclarations() map[string]sema.ValueDeclaration {
 	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
 	for _, function := range functions {
-		// skip non-declared functions
+		// skip undeclared functions
 		if function.IsDeclared {
 			valueDeclarations[function.Name] = function
 		}
