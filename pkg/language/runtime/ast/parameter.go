@@ -16,12 +16,16 @@ func (p *Parameter) EndPosition() Position {
 	return p.EndPos
 }
 
-type Parameters []*Parameter
+type ParameterList struct {
+	Parameters []*Parameter
+	StartPos   Position
+	EndPos     Position
+}
 
-func (parameters Parameters) ArgumentLabels() []string {
-	argumentLabels := make([]string, len(parameters))
+func (l *ParameterList) ArgumentLabels() []string {
+	argumentLabels := make([]string, len(l.Parameters))
 
-	for i, parameter := range parameters {
+	for i, parameter := range l.Parameters {
 		argumentLabel := parameter.Label
 		// if no argument label is given, the parameter name
 		// is used as the argument labels and is required
@@ -34,19 +38,19 @@ func (parameters Parameters) ArgumentLabels() []string {
 	return argumentLabels
 }
 
-func (parameters Parameters) StartPosition() Position {
-	if len(parameters) == 0 {
+func (l *ParameterList) StartPosition() Position {
+	if len(l.Parameters) == 0 {
 		return Position{}
 	}
-	firstParameter := parameters[0]
+	firstParameter := l.Parameters[0]
 	return firstParameter.StartPos
 }
 
-func (parameters Parameters) EndPosition() Position {
-	count := len(parameters)
+func (l *ParameterList) EndPosition() Position {
+	count := len(l.Parameters)
 	if count == 0 {
 		return Position{}
 	}
-	lastParameter := parameters[count-1]
+	lastParameter := l.Parameters[count-1]
 	return lastParameter.EndPos
 }

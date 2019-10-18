@@ -7,10 +7,10 @@ import (
 // EventDeclaration
 
 type EventDeclaration struct {
-	Identifier Identifier
-	Parameters Parameters
-	StartPos   Position
-	EndPos     Position
+	Identifier    Identifier
+	ParameterList *ParameterList
+	StartPos      Position
+	EndPos        Position
 }
 
 func (e *EventDeclaration) StartPosition() Position {

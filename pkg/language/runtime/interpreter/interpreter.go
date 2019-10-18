@@ -1289,7 +1289,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) {
-	for parameterIndex, parameter := range function.Expression.Parameters {
+	for parameterIndex, parameter := range function.Expression.ParameterList.Parameters {
 		argument := arguments[parameterIndex]
 		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}

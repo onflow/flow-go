@@ -158,7 +158,7 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 	initializerCount := len(initializers)
 	if initializerCount > 0 {
 		firstInitializer := initializers[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
+		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.ParameterList)
 
 		if initializerCount > 1 {
 			secondInitializer := initializers[1]
@@ -355,7 +355,7 @@ func (checker *Checker) declareCompositeConstructor(
 	if len(initializers()) > 0 {
 		firstInitializer := initializers()[0]
 
-		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
+		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
 
 		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
@@ -421,9 +421,9 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
+		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
-		argumentLabels := function.Parameters.ArgumentLabels()
+		argumentLabels := function.ParameterList.ArgumentLabels()
 
 		identifier := function.Identifier.Identifier
 
@@ -518,7 +518,7 @@ func (checker *Checker) checkSpecialFunction(
 	}
 
 	checker.checkFunction(
-		specialFunction.Parameters,
+		specialFunction.ParameterList,
 		ast.Position{},
 		functionType,
 		specialFunction.FunctionBlock,
@@ -764,17 +764,17 @@ func (checker *Checker) checkDestructor(
 	containerKind ContainerKind,
 ) {
 
-	if len(destructor.Parameters) != 0 {
+	if len(destructor.ParameterList.Parameters) != 0 {
 		checker.report(
 			&InvalidDestructorParametersError{
-				StartPos: destructor.Parameters.StartPosition(),
-				EndPos:   destructor.Parameters.EndPosition(),
+				StartPos: destructor.ParameterList.StartPosition(),
+				EndPos:   destructor.ParameterList.EndPosition(),
 			},
 		)
 	}
 
 	parameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(destructor.Parameters)
+		checker.parameterTypeAnnotations(destructor.ParameterList)
 
 	checker.checkSpecialFunction(
 		destructor,
