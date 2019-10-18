@@ -1039,7 +1039,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("atx.%s.MyEvent", tx.Hash().Hex())
+		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -1068,7 +1068,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("ascript.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedID := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -1120,7 +1120,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("aaccount.%s.MyEvent", addressA.Hex())
+		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
