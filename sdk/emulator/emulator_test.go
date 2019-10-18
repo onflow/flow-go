@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"math/big"
 	"testing"
 
@@ -1007,15 +1008,16 @@ func TestRuntimeLogger(t *testing.T) {
 }
 
 func TestEventEmitted(t *testing.T) {
-	events := make([]types.Event, 0)
+	t.Run("EmittedFromTransaction", func(t *testing.T) {
+		events := make([]types.Event, 0)
 
-	b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
-		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-			events = append(events, event)
-		},
-	})
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
 
-	script := []byte(`
+		script := []byte(`
 		event MyEvent(x: Int, y: Int)
 
 		fun main() {
@@ -1023,51 +1025,80 @@ func TestEventEmitted(t *testing.T) {
 		}
 	`)
 
-	tx := &types.Transaction{
-		Script:             script,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-	}
+		tx := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+		err := b.SubmitTransaction(tx)
+		assert.Nil(t, err)
 
-	require.Len(t, events, 1)
+		require.Len(t, events, 1)
 
-	expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
-	assert.Equal(t, expectedID, events[0].ID)
+		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
 
-	assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-	assert.Equal(t, big.NewInt(2), events[0].Values["y"])
-}
-
-func TestEventEmittedFromAccount(t *testing.T) {
-	events := make([]types.Event, 0)
-
-	b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
-		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-			events = append(events, event)
-		},
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 	})
 
-	accountScript := []byte(`
+	t.Run("EmittedFromScript", func(t *testing.T) {
+		events := make([]types.Event, 0)
+
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
+
+		script := []byte(`
+		event MyEvent(x: Int, y: Int)
+
+		fun main() {
+		  emit MyEvent(x: 1, y: 2)
+		}
+	`)
+
+		_, err := b.CallScript(script)
+		assert.Nil(t, err)
+
+		require.Len(t, events, 1)
+
+		expectedID := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+	})
+
+	t.Run("EmittedFromAccount", func(t *testing.T) {
+		events := make([]types.Event, 0)
+
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
+
+		accountScript := []byte(`
 		event MyEvent(x: Int, y: Int)
 	`)
 
-	publicKeyA, _ := b.RootKey().Publickey().Encode()
+		publicKeyA, _ := b.RootKey().Publickey().Encode()
 
-	accountKeyA := types.AccountKey{
-		PublicKey: publicKeyA,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
+		accountKeyA := types.AccountKey{
+			PublicKey: publicKeyA,
+			Weight:    constants.AccountKeyWeightThreshold,
+		}
 
-	addressA, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript)
-	assert.Nil(t, err)
+		addressA, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript)
+		assert.Nil(t, err)
 
-	script := []byte(fmt.Sprintf(`
+		script := []byte(fmt.Sprintf(`
 		import 0x%s
 	
 		fun main() {
@@ -1075,23 +1106,24 @@ func TestEventEmittedFromAccount(t *testing.T) {
 		}
 	`, addressA.Hex()))
 
-	tx := &types.Transaction{
-		Script:             script,
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-	}
+		tx := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+		err = b.SubmitTransaction(tx)
+		assert.Nil(t, err)
 
-	require.Len(t, events, 1)
+		require.Len(t, events, 1)
 
-	expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
-	assert.Equal(t, expectedID, events[0].ID)
+		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
 
-	assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-	assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+	})
 }
