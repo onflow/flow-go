@@ -509,7 +509,13 @@ func TestCommitBlock(t *testing.T) {
 }
 
 func TestCreateAccount(t *testing.T) {
-	b := NewEmulatedBlockchain(DefaultOptions)
+	var lastEvent types.Event
+
+	b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+			lastEvent = event
+		},
+	})
 
 	accountKeyA := types.AccountKey{
 		PublicKey: []byte{1, 2, 3},
@@ -537,7 +543,11 @@ func TestCreateAccount(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
-	account, err := b.GetAccount(b.LastCreatedAccount().Address)
+	assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
+	assert.IsType(t, types.Address{}, lastEvent.Values["address"])
+
+	accountAddress := lastEvent.Values["address"].(types.Address)
+	account, err := b.GetAccount(accountAddress)
 	assert.Nil(t, err)
 
 	assert.Equal(t, uint64(0), account.Balance)
@@ -567,9 +577,13 @@ func TestCreateAccount(t *testing.T) {
 	err = b.SubmitTransaction(tx2)
 	assert.Nil(t, err)
 
-	account, err = b.GetAccount(b.LastCreatedAccount().Address)
+	assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
+	assert.IsType(t, types.Address{}, lastEvent.Values["address"])
 
+	accountAddress = lastEvent.Values["address"].(types.Address)
+	account, err = b.GetAccount(accountAddress)
 	assert.Nil(t, err)
+
 	assert.Equal(t, uint64(0), account.Balance)
 	assert.Equal(t, accountKeyC, account.Keys[0])
 	assert.Equal(t, codeB, account.Code)
