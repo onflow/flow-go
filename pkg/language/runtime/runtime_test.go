@@ -100,7 +100,7 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
 
@@ -140,7 +140,7 @@ func TestRuntimeImport(t *testing.T) {
 		},
 	}
 
-	value, err := runtime.ExecuteScript(script, runtimeInterface)
+	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), value)
 }
@@ -161,7 +161,7 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Error(t, err)
 }
 
@@ -193,7 +193,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 		},
 	}
 
-	value, err := runtime.ExecuteScript(script, runtimeInterface)
+	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), value)
@@ -236,7 +236,7 @@ func TestRuntimeStorage(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	require.Nil(t, err)
 
@@ -273,10 +273,10 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script, runtimeInterface)
+	_, err = runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 
 	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
@@ -346,10 +346,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	answer, err := runtime.ExecuteScript(script2, runtimeInterface)
+	answer, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), answer)
 }
@@ -389,10 +389,10 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	result, err := runtime.ExecuteScript(script2, runtimeInterface)
+	result, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Equal(t, big.NewInt(42), result)
 	assert.Nil(t, err)
 }
@@ -457,9 +457,9 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface)
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
 }

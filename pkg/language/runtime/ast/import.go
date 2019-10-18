@@ -2,6 +2,7 @@ package ast
 
 import (
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
@@ -84,6 +85,26 @@ func (AddressImportLocation) isImportLocation() {}
 
 func (l AddressImportLocation) String() string {
 	return fmt.Sprintf("%#x", []byte(l))
+}
+
+// TransactionImportLocation
+
+type TransactionImportLocation []byte
+
+func (TransactionImportLocation) isImportLocation() {}
+
+func (l TransactionImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+// ScriptImportLocation
+
+type ScriptImportLocation []byte
+
+func (ScriptImportLocation) isImportLocation() {}
+
+func (l ScriptImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
 }
 
 func init() {

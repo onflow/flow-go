@@ -1762,9 +1762,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				// TODO: use account as namespace for event ID
-				ID:     eventType.Identifier,
-				Fields: fields,
+				ID:             eventType.Identifier,
+				Fields:         fields,
+				ImportLocation: interpreter.ImportLocation,
 			}
 
 			return Done{Result: value}

@@ -1202,8 +1202,9 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID     string
-	Fields []EventField
+	ID             string
+	Fields         []EventField
+	ImportLocation ast.ImportLocation
 }
 
 func (EventValue) isValue() {}

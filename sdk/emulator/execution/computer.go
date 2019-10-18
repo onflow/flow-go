@@ -44,8 +44,7 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 	runtimeContext.SetOnEventEmitted(c.onEventEmitted)
 	runtimeContext.SetTransactionMetadata(*tx, blockNumber)
 
-	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext)
-	return err
+	return c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash())
 }
 
 // ExecuteScript executes a plain script in the runtime.
@@ -56,5 +55,7 @@ func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) 
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
 	runtimeContext.SetOnEventEmitted(c.onEventEmitted)
 
-	return c.runtime.ExecuteScript(script, runtimeContext)
+	scriptHash := ScriptHash(script)
+
+	return c.runtime.ExecuteScript(script, runtimeContext, scriptHash)
 }

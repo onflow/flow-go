@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"github.com/dapperlabs/flow-go/sdk/templates"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 // EmulatedBlockchain simulates a blockchain for testing purposes.
@@ -48,13 +48,13 @@ type EmulatedBlockchainOptions struct {
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
-var DefaultOptions = &EmulatedBlockchainOptions{
+var DefaultOptions = EmulatedBlockchainOptions{
 	OnLogMessage:   func(string) {},
 	OnEventEmitted: func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
+func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[string][]byte)
 	intermediateWorldStates := make(map[string][]byte)
 	txPool := make(map[string]*types.Transaction)
@@ -68,6 +68,9 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 		pendingWorldState:       ws,
 		txPool:                  txPool,
 	}
+
+	// merge user-provided options with default options
+	opt = mergeOptions(DefaultOptions, opt)
 
 	runtime := runtime.NewInterpreterRuntime()
 	computer := execution.NewComputer(
@@ -448,4 +451,16 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	account := runtimeContext.GetAccount(accountAddress)
 
 	return *account, prKey
+}
+
+func mergeOptions(optA, optB EmulatedBlockchainOptions) EmulatedBlockchainOptions {
+	if optB.OnLogMessage == nil {
+		optB.OnLogMessage = optA.OnLogMessage
+	}
+
+	if optB.OnEventEmitted == nil {
+		optB.OnEventEmitted = optA.OnEventEmitted
+	}
+
+	return optB
 }
