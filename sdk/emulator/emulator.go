@@ -43,12 +43,14 @@ type EmulatedBlockchain struct {
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
 	RootAccountKey crypto.PrivateKey
-	RuntimeLogger  func(string)
+	OnLogMessage   func(string)
+	OnEventEmitted func(event types.Event, blockNumber uint64, txhash crypto.Hash)
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
 var DefaultOptions = &EmulatedBlockchainOptions{
-	RuntimeLogger: func(string) {},
+	OnLogMessage:   func(string) {},
+	OnEventEmitted: func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -70,8 +72,9 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	runtime := runtime.NewInterpreterRuntime()
 	computer := execution.NewComputer(
 		runtime,
-		opt.RuntimeLogger,
+		opt.OnLogMessage,
 		b.onAccountCreated,
+		opt.OnEventEmitted,
 	)
 
 	b.computer = computer
@@ -205,9 +208,13 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.txPool[string(tx.Hash())] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
+	// TODO: improve the pending block, provide all block information
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+	blockNumber := prevBlock.Number + 1
+
 	registers := b.pendingWorldState.Registers.NewView()
 
-	err := b.computer.ExecuteTransaction(registers, tx)
+	err := b.computer.ExecuteTransaction(registers, tx, blockNumber)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
 
