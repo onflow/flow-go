@@ -137,8 +137,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		true,
 	)
 
-	(*compositeType).Members = members
-	(*compositeType).Conformances = conformances
+	compositeType.Members = members
+	compositeType.Conformances = conformances
 
 	checker.memberOrigins[compositeType] = origins
 

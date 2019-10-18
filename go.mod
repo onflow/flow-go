@@ -37,6 +37,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/twinj/uuid v1.0.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/text v0.3.2
 	google.golang.org/grpc v1.21.1
