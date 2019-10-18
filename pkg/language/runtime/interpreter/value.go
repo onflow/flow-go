@@ -1040,7 +1040,7 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 
 	// get correct interpreter
 	if v.ImportLocation != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation]
+		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
 		if ok {
 			interpreter = subInterpreter
 		}

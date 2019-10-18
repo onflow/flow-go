@@ -30,7 +30,7 @@ type Checker struct {
 	Program             *ast.Program
 	PredeclaredValues   map[string]ValueDeclaration
 	PredeclaredTypes    map[string]TypeDeclaration
-	ImportCheckers      map[ast.ImportLocation]*Checker
+	ImportCheckers      map[ast.LocationID]*Checker
 	errors              []error
 	valueActivations    *ValueActivations
 	resources           *Resources
@@ -42,7 +42,7 @@ type Checker struct {
 	Occurrences         *Occurrences
 	variableOrigins     map[*Variable]*Origin
 	memberOrigins       map[Type]map[string]*Origin
-	seenImports         map[ast.ImportLocation]bool
+	seenImports         map[ast.LocationID]bool
 	isChecked           bool
 	inCreate            bool
 	Elaboration         *Elaboration
@@ -58,7 +58,7 @@ func NewChecker(
 		Program:             program,
 		PredeclaredValues:   predeclaredValues,
 		PredeclaredTypes:    predeclaredTypes,
-		ImportCheckers:      map[ast.ImportLocation]*Checker{},
+		ImportCheckers:      map[ast.LocationID]*Checker{},
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
@@ -68,7 +68,7 @@ func NewChecker(
 		Occurrences:         NewOccurrences(),
 		variableOrigins:     map[*Variable]*Origin{},
 		memberOrigins:       map[Type]map[string]*Origin{},
-		seenImports:         map[ast.ImportLocation]bool{},
+		seenImports:         map[ast.LocationID]bool{},
 		Elaboration:         NewElaboration(),
 	}
 

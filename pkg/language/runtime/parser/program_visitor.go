@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
@@ -143,6 +144,8 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 			bytes = append([]byte{'0'}, bytes...)
 			length += 1
 		}
+
+		fmt.Println("ADDR", bytes)
 
 		address := make([]byte, hex.DecodedLen(length))
 		_, err := hex.Decode(address, bytes)

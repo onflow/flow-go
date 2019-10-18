@@ -58,7 +58,7 @@ type Interpreter struct {
 	interfaces         map[string]*ast.InterfaceDeclaration
 	ImportLocation     ast.ImportLocation
 	CompositeFunctions map[string]map[string]FunctionValue
-	SubInterpreters    map[ast.ImportLocation]*Interpreter
+	SubInterpreters    map[ast.LocationID]*Interpreter
 	onEventEmitted     func(EventValue)
 }
 
@@ -70,7 +70,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		Globals:            map[string]*Variable{},
 		interfaces:         map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions: map[string]map[string]FunctionValue{},
-		SubInterpreters:    map[ast.ImportLocation]*Interpreter{},
+		SubInterpreters:    map[ast.LocationID]*Interpreter{},
 		onEventEmitted:     func(EventValue) {},
 	}
 
@@ -1682,7 +1682,7 @@ func (interpreter *Interpreter) declareInterfaceMetaType(declaration *ast.Interf
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
 	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
 	if err != nil {
@@ -1691,7 +1691,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter.ImportLocation = declaration.Location
 
-	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
 
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
