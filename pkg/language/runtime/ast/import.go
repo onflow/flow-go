@@ -78,7 +78,9 @@ type StringImportLocation string
 
 func (StringImportLocation) isImportLocation() {}
 
-func (l StringImportLocation) ID() LocationID { return LocationID(l) }
+func (l StringImportLocation) ID() LocationID {
+	return LocationID(l)
+}
 
 func init() {
 	gob.Register(StringImportLocation(""))
@@ -90,7 +92,9 @@ type AddressImportLocation []byte
 
 func (AddressImportLocation) isImportLocation() {}
 
-func (l AddressImportLocation) ID() LocationID { return LocationID(l.String()) }
+func (l AddressImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
 
 func (l AddressImportLocation) String() string {
 	return hex.EncodeToString([]byte(l))
@@ -102,7 +106,9 @@ type TransactionImportLocation []byte
 
 func (TransactionImportLocation) isImportLocation() {}
 
-func (l TransactionImportLocation) ID() LocationID { return LocationID(l.String()) }
+func (l TransactionImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
 
 func (l TransactionImportLocation) String() string {
 	return hex.EncodeToString([]byte(l))
@@ -114,7 +120,9 @@ type ScriptImportLocation []byte
 
 func (ScriptImportLocation) isImportLocation() {}
 
-func (l ScriptImportLocation) ID() LocationID { return LocationID(l.String()) }
+func (l ScriptImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
 
 func (l ScriptImportLocation) String() string {
 	return hex.EncodeToString([]byte(l))
