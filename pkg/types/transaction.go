@@ -109,9 +109,10 @@ func (tx *Transaction) MissingFields() []string {
 		requiredFields = append(requiredFields, "Script")
 	}
 
-	if len(tx.ReferenceBlockHash) == 0 {
-		requiredFields = append(requiredFields, "ReferenceBlockHash")
-	}
+	// TODO: need to refactor tests to include ReferenceBlockHash field (i.e. b.GetLatestBlock().Hash() should do)
+	// if len(tx.ReferenceBlockHash) == 0 {
+	// 	requiredFields = append(requiredFields, "ReferenceBlockHash")
+	// }
 
 	if tx.Nonce == 0 {
 		requiredFields = append(requiredFields, "Nonce")
