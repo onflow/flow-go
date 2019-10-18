@@ -1023,24 +1023,21 @@ type CompositeValue struct {
 	Identifier     string
 	Fields         *map[string]Value
 	Functions      *map[string]FunctionValue
-	// double pointer: first pointer for linking after deserialization,
-	// second pointer to indicate there is no destructor (through nil)
-	Destructor **InterpretedFunctionValue
+	Destructor     *InterpretedFunctionValue
 }
 
 func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
-		destructor := interpreter.DestructorFunctions[v.Identifier]
-		v.Destructor = &destructor
+		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
 	}
 
 	destructor := v.Destructor
-	if *destructor == nil {
+	if destructor == nil {
 		return trampoline.Done{Result: VoidValue{}}
 	}
 
-	return interpreter.bindSelf(**destructor, v).
+	return interpreter.bindSelf(*destructor, v).
 		invoke(nil, location)
 }
 

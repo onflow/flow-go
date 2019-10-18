@@ -1420,7 +1420,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 				Identifier:     identifier,
 				Fields:         &map[string]Value{},
 				Functions:      &functions,
-				Destructor:     &destructorFunction,
+				Destructor:     destructorFunction,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
