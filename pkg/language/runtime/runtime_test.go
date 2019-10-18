@@ -15,7 +15,7 @@ type testRuntimeInterface struct {
 	resolveImport      func(ImportLocation) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
 	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
 	removeAccountKey   func(address types.Address, index int) error
 	updateAccountCode  func(address types.Address, code []byte) (err error)
@@ -36,7 +36,7 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
 	return i.createAccount(publicKeys, keyWeights, code)
 }
 
@@ -92,8 +92,8 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 			state.SetBytes(value)
 			return nil
 		},
-		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
-			return nil, nil
+		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
+			return types.Address{}, nil
 		},
 		updateAccountCode: func(address types.Address, code []byte) (err error) {
 			return nil

@@ -8,7 +8,5 @@ const (
 
 const (
 	EventAccountCreated string = "flow.AccountCreated"
-	// TODO: implement remaining account events
-	EventAccountUpdated = "flow.AccountUpdated"
-	EventAccountDeleted = "flow.AccountDeleted"
+	EventAccountUpdated        = "flow.AccountUpdated"
 )

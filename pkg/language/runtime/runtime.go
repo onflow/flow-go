@@ -38,7 +38,7 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
 	// AddAccountKey appends a key to an account.
 	AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
@@ -180,22 +180,6 @@ var createAccountFunctionType = sema.FunctionType{
 	),
 }
 
-var accountCreatedEventType = sema.EventType{
-	Identifier: "AccountCreated",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			Move: false,
-			Type: &sema.StringType{},
-		},
-	},
-}
-
 // TODO: improve types
 var addAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
@@ -266,6 +250,40 @@ var logFunctionType = sema.FunctionType{
 	),
 }
 
+// built-in event types
+
+var accountCreatedEventType = sema.EventType{
+	Identifier: "AccountCreated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
+var accountUpdatedEventType = sema.EventType{
+	Identifier: "AccountUpdated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
@@ -324,15 +342,13 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) emitAccountCreatedEvent(accountID []byte, runtimeInterface Interface) {
-	eventID := fmt.Sprintf("flow.%s", accountCreatedEventType.Identifier)
-
-	address := types.BytesToAddress(accountID)
+func (r *interpreterRuntime) emitAccountEvent(address types.Address, eventType sema.EventType, runtimeInterface Interface) {
+	eventID := fmt.Sprintf("flow.%s", eventType.Identifier)
 
 	event := types.Event{
 		ID: eventID,
 		Values: map[string]interface{}{
-			accountCreatedEventType.Fields[0].Identifier: address,
+			eventType.Fields[0].Identifier: address,
 		},
 	}
 
@@ -631,12 +647,14 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
 
-		accountID, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
+		accountAddress, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
 		if err != nil {
 			panic(err)
 		}
 
-		r.emitAccountCreatedEvent(accountID, runtimeInterface)
+		r.emitAccountEvent(accountAddress, accountCreatedEventType, runtimeInterface)
+
+		accountID := accountAddress.Bytes()
 
 		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(accountID)}
 		return trampoline.Done{Result: result}
@@ -671,6 +689,8 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(err)
 		}
 
+		r.emitAccountEvent(accountAddress, accountUpdatedEventType, runtimeInterface)
+
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
@@ -700,6 +720,8 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(err)
 		}
 
+		r.emitAccountEvent(accountAddress, accountUpdatedEventType, runtimeInterface)
+
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
@@ -727,6 +749,8 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 		if err != nil {
 			panic(err)
 		}
+
+		r.emitAccountEvent(accountAddress, accountUpdatedEventType, runtimeInterface)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}

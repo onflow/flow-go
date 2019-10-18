@@ -482,7 +482,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
-	accountID, _ := runtimeContext.CreateAccount(
+	accountAddress, _ := runtimeContext.CreateAccount(
 		[][]byte{pubKeyBytes},
 		[]int{constants.AccountKeyWeightThreshold},
 		[]byte{},
@@ -490,7 +490,6 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	accountAddress := types.BytesToAddress(accountID)
 	account := runtimeContext.GetAccount(accountAddress)
 
 	return *account, prKey

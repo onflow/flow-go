@@ -76,9 +76,9 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) ([]byte, error) {
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (types.Address, error) {
 	if len(publicKeys) != len(keyWeights) {
-		return nil, fmt.Errorf(
+		return types.Address{}, fmt.Errorf(
 			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
 			len(publicKeys),
 			len(keyWeights),
@@ -105,7 +105,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
-	return accountID, nil
+	return accountAddress, nil
 }
 
 // AddAccountKey adds a public key to an existing account.
