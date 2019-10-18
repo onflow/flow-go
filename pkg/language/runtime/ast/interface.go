@@ -11,16 +11,7 @@ type InterfaceDeclaration struct {
 	CompositeKind common.CompositeKind
 	Identifier    Identifier
 	Members       *Members
-	StartPos      Position
-	EndPos        Position
-}
-
-func (d *InterfaceDeclaration) StartPosition() Position {
-	return d.StartPos
-}
-
-func (d *InterfaceDeclaration) EndPosition() Position {
-	return d.EndPos
+	Range
 }
 
 func (d *InterfaceDeclaration) Accept(visitor Visitor) Repr {

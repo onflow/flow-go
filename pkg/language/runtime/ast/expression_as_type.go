@@ -21,9 +21,11 @@ func ExpressionAsType(expression Expression) Type {
 		}
 
 		return &VariableSizedType{
-			Type:     elementType,
-			StartPos: expression.StartPos,
-			EndPos:   expression.EndPos,
+			Type: elementType,
+			Range: Range{
+				StartPos: expression.StartPos,
+				EndPos:   expression.EndPos,
+			},
 		}
 
 	case *DictionaryExpression:
@@ -46,8 +48,10 @@ func ExpressionAsType(expression Expression) Type {
 		return &DictionaryType{
 			KeyType:   keyType,
 			ValueType: valueType,
-			StartPos:  expression.StartPos,
-			EndPos:    expression.EndPos,
+			Range: Range{
+				StartPos: expression.StartPos,
+				EndPos:   expression.EndPos,
+			},
 		}
 
 	default:

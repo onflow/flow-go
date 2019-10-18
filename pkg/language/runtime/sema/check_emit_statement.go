@@ -11,9 +11,11 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 		// check that emitted expression is an event
 		if _, isEventType := typ.(*EventType); !isEventType {
 			checker.report(&EmitNonEventError{
-				Type:     typ,
-				StartPos: statement.StartPosition(),
-				EndPos:   statement.EndPosition(),
+				Type: typ,
+				Range: ast.Range{
+					StartPos: statement.StartPosition(),
+					EndPos:   statement.EndPosition(),
+				},
 			})
 		}
 	}

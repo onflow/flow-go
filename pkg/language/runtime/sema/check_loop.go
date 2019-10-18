@@ -15,8 +15,10 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
 				ActualType:   testType,
-				StartPos:     testExpression.StartPosition(),
-				EndPos:       testExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: testExpression.StartPosition(),
+					EndPos:   testExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -88,8 +90,10 @@ func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.R
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementBreak,
-				StartPos:         statement.StartPos,
-				EndPos:           statement.EndPos,
+				Range: ast.Range{
+					StartPos: statement.StartPos,
+					EndPos:   statement.EndPos,
+				},
 			},
 		)
 	}
@@ -105,8 +109,10 @@ func (checker *Checker) VisitContinueStatement(statement *ast.ContinueStatement)
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementContinue,
-				StartPos:         statement.StartPos,
-				EndPos:           statement.EndPos,
+				Range: ast.Range{
+					StartPos: statement.StartPos,
+					EndPos:   statement.EndPos,
+				},
 			},
 		)
 	}

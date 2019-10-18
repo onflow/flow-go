@@ -23,9 +23,11 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	if _, leftIsTarget := swap.Left.(ast.TargetExpression); !leftIsTarget {
 		checker.report(
 			&InvalidSwapExpressionError{
-				Side:     common.OperandSideLeft,
-				StartPos: swap.Left.StartPosition(),
-				EndPos:   swap.Left.EndPosition(),
+				Side: common.OperandSideLeft,
+				Range: ast.Range{
+					StartPos: swap.Left.StartPosition(),
+					EndPos:   swap.Left.EndPosition(),
+				},
 			},
 		)
 	} else if !IsInvalidType(leftType) {
@@ -46,9 +48,11 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	if _, rightIsTarget := swap.Right.(ast.TargetExpression); !rightIsTarget {
 		checker.report(
 			&InvalidSwapExpressionError{
-				Side:     common.OperandSideRight,
-				StartPos: swap.Right.StartPosition(),
-				EndPos:   swap.Right.EndPosition(),
+				Side: common.OperandSideRight,
+				Range: ast.Range{
+					StartPos: swap.Right.StartPosition(),
+					EndPos:   swap.Right.EndPosition(),
+				},
 			},
 		)
 	} else if !IsInvalidType(rightType) {

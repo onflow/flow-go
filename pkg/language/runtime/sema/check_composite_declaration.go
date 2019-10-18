@@ -76,8 +76,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				StartPos:        declaration.Identifier.StartPosition(),
-				EndPos:          declaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: declaration.Identifier.StartPosition(),
+					EndPos:   declaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -91,8 +93,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
-				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
+					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -166,8 +170,10 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
+					Range: ast.Range{
+						StartPos: secondInitializer.StartPosition(),
+						EndPos:   secondInitializer.EndPosition(),
+					},
 				},
 			)
 		}
@@ -231,8 +237,10 @@ func (checker *Checker) checkCompositeConformance(
 			&CompositeKindMismatchError{
 				ExpectedKind: compositeType.Kind,
 				ActualKind:   interfaceType.CompositeKind,
-				StartPos:     interfaceIdentifier.StartPosition(),
-				EndPos:       interfaceIdentifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: interfaceIdentifier.StartPosition(),
+					EndPos:   interfaceIdentifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -411,9 +419,11 @@ func (checker *Checker) membersAndOrigins(
 
 			checker.report(
 				&InvalidVariableKindError{
-					Kind:     field.VariableKind,
-					StartPos: field.Identifier.Pos,
-					EndPos:   field.Identifier.Pos,
+					Kind: field.VariableKind,
+					Range: ast.Range{
+						StartPos: field.Identifier.Pos,
+						EndPos:   field.Identifier.Pos,
+					},
 				},
 			)
 		}
@@ -686,8 +696,10 @@ func (checker *Checker) checkDestructors(
 
 			checker.report(
 				&InvalidDestructorError{
-					StartPos: firstDestructor.Identifier.StartPosition(),
-					EndPos:   firstDestructor.Identifier.EndPosition(),
+					Range: ast.Range{
+						StartPos: firstDestructor.Identifier.StartPosition(),
+						EndPos:   firstDestructor.Identifier.EndPosition(),
+					},
 				},
 			)
 		}
@@ -717,8 +729,10 @@ func (checker *Checker) checkDestructors(
 		checker.report(
 			&UnsupportedOverloadingError{
 				DeclarationKind: common.DeclarationKindDestructor,
-				StartPos:        secondDestructor.StartPosition(),
-				EndPos:          secondDestructor.EndPosition(),
+				Range: ast.Range{
+					StartPos: secondDestructor.StartPosition(),
+					EndPos:   secondDestructor.EndPosition(),
+				},
 			},
 		)
 	}
@@ -767,8 +781,10 @@ func (checker *Checker) checkDestructor(
 	if len(destructor.ParameterList.Parameters) != 0 {
 		checker.report(
 			&InvalidDestructorParametersError{
-				StartPos: destructor.ParameterList.StartPosition(),
-				EndPos:   destructor.ParameterList.EndPosition(),
+				Range: ast.Range{
+					StartPos: destructor.ParameterList.StartPosition(),
+					EndPos:   destructor.ParameterList.EndPosition(),
+				},
 			},
 		)
 	}

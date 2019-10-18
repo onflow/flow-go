@@ -85,9 +85,11 @@ func (checker *Checker) checkEventParameters(parameterList *ast.ParameterList, p
 		// only allow primitive parameters
 		if !isValidEventParameterType(parameterTypeAnnotation.Type) {
 			checker.report(&InvalidEventParameterTypeError{
-				Type:     parameterTypeAnnotation.Type,
-				StartPos: parameter.StartPos,
-				EndPos:   parameter.TypeAnnotation.EndPosition(),
+				Type: parameterTypeAnnotation.Type,
+				Range: ast.Range{
+					StartPos: parameter.StartPos,
+					EndPos:   parameter.TypeAnnotation.EndPosition(),
+				},
 			})
 		}
 	}
