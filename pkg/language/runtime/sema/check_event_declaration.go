@@ -10,7 +10,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	constructorFunctionType := eventType.ConstructorFunctionType()
 
 	checker.checkFunction(
-		declaration.Parameters,
+		declaration.ParameterList,
 		ast.Position{},
 		constructorFunctionType,
 		nil,
@@ -18,7 +18,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	)
 
 	// check that parameters are primitive types
-	checker.checkEventParameters(declaration.Parameters, constructorFunctionType.ParameterTypeAnnotations)
+	checker.checkEventParameters(declaration.ParameterList, constructorFunctionType.ParameterTypeAnnotations)
 
 	return nil
 }
@@ -26,10 +26,10 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaration) {
 	identifier := declaration.Identifier
 
-	convertedParameterTypeAnnotations := checker.parameterTypeAnnotations(declaration.Parameters)
+	convertedParameterTypeAnnotations := checker.parameterTypeAnnotations(declaration.ParameterList)
 
-	fields := make([]EventFieldType, len(declaration.Parameters))
-	for i, parameter := range declaration.Parameters {
+	fields := make([]EventFieldType, len(declaration.ParameterList.Parameters))
+	for i, parameter := range declaration.ParameterList.Parameters {
 		parameterTypeAnnotation := convertedParameterTypeAnnotations[i]
 
 		fields[i] = EventFieldType{
@@ -72,14 +72,14 @@ func (checker *Checker) declareEventConstructor(declaration *ast.EventDeclaratio
 	_, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
 		eventType.ConstructorFunctionType(),
-		declaration.Parameters.ArgumentLabels(),
+		declaration.ParameterList.ArgumentLabels(),
 	)
 
 	return err
 }
 
-func (checker *Checker) checkEventParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
-	for i, parameter := range parameters {
+func (checker *Checker) checkEventParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
+	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 
 		// only allow primitive parameters
