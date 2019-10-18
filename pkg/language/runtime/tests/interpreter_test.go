@@ -4796,3 +4796,72 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 	_, err := inter.Invoke("test")
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 }
+
+func TestInterpretEmitEvent(t *testing.T) {
+	var actualEvents []interpreter.EventValue
+
+	inter := parseCheckAndInterpret(t,
+		`
+			event Transfer(to: Int, from: Int)
+			event TransferAmount(to: Int, from: Int, amount: Int)
+
+			fun test() {
+			  emit Transfer(to: 1, from: 2)
+			  emit Transfer(to: 3, from: 4)
+			  emit TransferAmount(to: 1, from: 2, amount: 100)
+			}
+            `,
+	)
+
+	inter.SetOnEventEmitted(func(event interpreter.EventValue) {
+		actualEvents = append(actualEvents, event)
+	})
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	expectedEvents := []interpreter.EventValue{
+		{
+			"Transfer",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+			}},
+		{
+			"Transfer",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(3),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(4),
+				},
+			}},
+		{
+			"TransferAmount",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+				{
+					Identifier: "amount",
+					Value:      interpreter.NewIntValue(100),
+				},
+			}},
+	}
+
+	assert.Equal(t, expectedEvents, actualEvents)
+}

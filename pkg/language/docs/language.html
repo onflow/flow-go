@@ -2691,12 +2691,9 @@
       </section>
       <section>
         <h2 id="interfaces"><a href="#interfaces" aria-hidden="true"><span class="icon icon-link"></span></a>Interfaces</h2>
-        <blockquote>
-          <p>🚧 Status: Interfaces are implemented, but have the syntax <code>struct S: Interface1, ... {}</code></p>
-        </blockquote>
         <p>
           An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface.
-          Interfaces declare the required functions and fields, as well as the access for those declarations, that implementing types need to provide.
+          Interfaces declare the required functions and fields, the access control for those declarations, and preconditions and postconditions that implementing types need to provide.
         </p>
         <p>There are two kinds of interfaces:</p>
         <ul>
@@ -2707,8 +2704,8 @@
         <p>
           Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for.
           Interface requirements, and therefore also their implementations, must always be at least public.
-          Variable field requirements may be annotated to require them to be publicly settable.
         </p>
+        <p>Variable field requirements may be annotated to require them to be publicly settable.</p>
         <p>
           Function requirements consist of the name of the function, parameter types, an optional return type,
           and optional preconditions and postconditions.
@@ -2759,6 +2756,12 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// it can be either variable or constant in the implementation</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
@@ -2836,14 +2839,15 @@
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
           <p>
-            Implementations for interfaces are declared using the <code>impl</code> keyword,
-            followed by the name of interface, the <code>for</code> keyword,
-            and the name of the composite data type (structure or resource) that provides the functionality required in the interface.
+            Declaring implementations for an interface is done in the type declaration of the composite data type (e.g., structure, resource).
+            The kind and the name are followed by a colon (<code>:</code>)
+            and the name of one or more interfaces to implement.
           </p>
-          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a resource named `ExampleToken` with a variable field named `balance`,</span><span>
-</span><span style="color: #008000">// that can be written by functions of the type, but outer scopes can only read it</span><span>
+          <p>This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.</p>
+          <pre><code class="language-bamboo,file=interface-implementation.bpl"><span style="color: #008000">// Declare a resource named `ExampleToken` that has to implement the `FungibleToken` interface.</span><span>
+</span><span style="color: #008000">// It has a variable field named `balance`, that can be written by functions of the type, but outer scopes can only read it</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken {</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `FungibleToken` interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The interface does not specify if the field must be variable, constant,</span><span>
@@ -2864,13 +2868,6 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare the implementation of the interface `FungibleToken`</span><span>
-</span><span style="color: #008000">// for the resource `ExampleToken`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl FungibleToken for ExampleToken {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `withdraw` of the interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// `FungibleToken`, that withdraws an amount from the token's balance.</span><span>
@@ -2944,7 +2941,7 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> a: Int</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> AnImplementation {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> AnImplementation: AnInterface {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a publicly settable variable field named `a`that has type `Int`.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the requirement for interface `AnInterface`:</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The field is at least publicly readable, but this implementation also</span><span>
@@ -2957,12 +2954,6 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #000000">impl AnInterface for AnImplementation {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// This implementation is empty, as the declaration</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// of the structure `AnImplementation` already fully satisfies</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the requirements of the interface `AnInterface`,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// i.e. a field named `a` that has type `Int` must be provided</span><span>
-</span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -2978,11 +2969,15 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a structure named `Square`</span><span>
+</span><span style="color: #008000">// Declare a structure named `Square` the implements the `Shape` interface</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Square {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Square: Shape {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// In addition to the required fields from the interface, </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the type can also declare additional fields</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> length: Int</span><span>
 </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Since `area` was not declared as a constant, variable,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// field in the interface, it can be declared </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * </span><span style="color: #0000FF">self</span><span style="color: #000000">.length</span><span>
@@ -2992,20 +2987,16 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(length: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = length</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the interface `Shape` for the structure `Square`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Shape for Square {</span><span>
-</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// here we have provided the implementation of the required `scale` function</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a structure named `Rectangle`</span><span>
+</span><span style="color: #008000">// Declare a structure named `Rectangle` that also implements the `Shape` interface</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle: Shape {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
 </span><span>
@@ -3019,17 +3010,16 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the interface `Rectangle` for the structure `Square`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Shape for Rectangle {</span><span>
-</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// As long as the function names and parameters match those </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of the required functions, the implementations can differ</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3058,6 +3048,8 @@
 </span><span style="color: #008000">// Call the function `scale` declared in the interface `Shape`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">shape.scale(factor: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">shape.area </span><span style="color: #008000">// is 54</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -3077,22 +3069,11 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Polygon: Shape {}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a structure named `Hexagon`</span><span>
+</span><span style="color: #008000">// Declare a structure named `Hexagon` that implements the `Polygon` interface.</span><span>
+</span><span style="color: #008000">// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hexagon {}</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hexagon: Polygon {}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the structure interface `Polygon`</span><span>
-</span><span style="color: #008000">// for the structure `Hexagon`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Polygon for Hexagon {}</span><span>
-</span><span>
-</span><span style="color: #008000">// Implement the structure interface `Shape`</span><span>
-</span><span style="color: #008000">// for the structure `Hexagon`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// This is required, as the interface `Polygon`</span><span>
-</span><span style="color: #008000">// specified this implementation requirement.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Shape for Hexagon {}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -3114,25 +3095,17 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> InnerInterface {}</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a resource named `SomeOuter`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeOuter {}</span><span>
-</span><span>
-</span><span style="color: #008000">// Implement the interface `OuterInterface` for the resource  `SomeOuter`.</span><span>
+</span><span style="color: #008000">// Declare a resource named `SomeOuter` that implements the interface `OuterInterface`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The resource is not required to implement `OuterInterface.InnerInterface`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl OuterInterface for SomeOuter {}</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeOuter: OuterInterface {}</span><span>
 </span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a structure named `SomeInner`</span><span>
+</span><span style="color: #008000">// Declare a structure named `SomeInner` that implements `InnerInterface`</span><span>
+</span><span style="color: #008000">// which is nested in interface `OuterInterface`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeInner {}</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeInner: OuterInterface.InnerInterface {}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the interface `InnerInterface` which is nested in</span><span>
-</span><span style="color: #008000">// interface `OuterInterface` for the structure `SomeInner`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl OuterInterface.InnerInterface for SomeInner {}</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -3153,17 +3126,12 @@
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a resource named `ExampleToken`</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken {}</span><span>
-</span><span>
-</span><span style="color: #008000">// Implement the resource interface `FungibleToken`</span><span>
-</span><span style="color: #008000">// for resource type `ExampleToken`.</span><span>
+</span><span style="color: #008000">// Declare a resource named `ExampleToken` that implements the `FungibleToken` interface</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The nested type `Vault` must be provided</span><span>
 </span><span style="color: #008000">// to conform to the interface.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl FungibleToken for ExampleToken {</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
@@ -3173,6 +3141,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
+</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -3191,18 +3160,15 @@
           <pre><code class="language-bamboo,file=equatable-impl.bpl"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
 </span><span style="color: #008000">// that has type `Int`, i.e., the identifier of the cat.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat {</span><span>
+</span><span style="color: #008000">// `Cat` also will implement the interface `Equatable`</span><span>
+</span><span style="color: #008000">// to allow cats to be compared for equality.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat: Equatable {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #008000">// Implement the interface `Equatable` for the type `Cat`,</span><span>
-</span><span style="color: #008000">// to allow cats to be compared for equality.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Equatable for Cat {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Cats are equal if their identifier matches.</span><span>
@@ -3234,7 +3200,10 @@
           <pre><code class="language-bamboo,file=hashable-impl.bpl"><span style="color: #008000">// Declare a structure named `Point` with two fields</span><span>
 </span><span style="color: #008000">// named `x` and `y` that have type `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Point {</span><span>
+</span><span style="color: #008000">// `Point` is declared to implement the `Hashable` interface,</span><span>
+</span><span style="color: #008000">// which also means it needs to implement the `Equatable` interface</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Point: Hashable {</span><span>
 </span><span>
 </span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> x: Int</span><span>
 </span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> y: Int</span><span>
@@ -3243,13 +3212,9 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.x = x</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.y = y</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the interface `Equatable` for the type `Point`,</span><span>
-</span><span style="color: #008000">// to allow points to be compared for equality.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Equatable for Point {</span><span>
-</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementing the function `equals` will allow points to be compared </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// for equality and satisfies the `Equatable` interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Points are equal if their coordinates match.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -3260,12 +3225,9 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.x == </span><span style="color: #0000FF">self</span><span style="color: #000000">.x</span><span>
 </span><span style="color: #000000">            &#x26;&#x26; other.y == </span><span style="color: #0000FF">self</span><span style="color: #000000">.y</span><span>
 </span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Implement the interface `Equatable` for the type `Point`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">impl Hashable for Point {</span><span>
-</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Providing an implementation for the hash value field </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// satisfies the `Hashable` interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic hashValue: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">var</span><span style="color: #000000"> hash = </span><span style="color: #09885A">7</span><span>

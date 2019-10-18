@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"github.com/dapperlabs/flow-go/sdk/templates"
 	"sync"
 	"time"
 
@@ -320,7 +321,7 @@ func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
 	b.lastCreatedAccount = account
 }
 
-// lastCreatedAccount returns the last account that was created in the blockchain.
+// LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 	return b.lastCreatedAccount
 }
@@ -351,6 +352,28 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	}
 
 	return nil
+}
+
+// CreateAccount submits a transaction to create a new account with the given
+// account keys and code. The transaction is paid by the root account.
+func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte) (types.Address, error) {
+	createAccountScript := templates.CreateAccount(accountKeys, code)
+
+	tx := &types.Transaction{
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err := b.SubmitTransaction(tx)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return b.LastCreatedAccount().Address, nil
 }
 
 // verifyAccountSignature verifies that an account signature is valid for the account and given message.
