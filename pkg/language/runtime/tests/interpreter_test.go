@@ -4750,8 +4750,8 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 }
 
 // TestInterpretResourceDestroyExpressionResourceInterfaceCondition tests that
-// the resource interface's initializer is called, even if the conforming resource
-// does not have an initializer
+// the resource interface's destructor is called, even if the conforming resource
+// does not have an destructor
 //
 func TestInterpretResourceDestroyExpressionResourceInterfaceCondition(t *testing.T) {
 
