@@ -65,6 +65,7 @@ func (s *memStore) Query(ctx context.Context, query *types.EventQuery) ([]*types
 	return events, nil
 }
 
+// ErrInvalidQuery indicates that an event query is invalid.
 type ErrInvalidQuery struct {
 	q *types.EventQuery
 }
