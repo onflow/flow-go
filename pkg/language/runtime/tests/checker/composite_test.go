@@ -1925,6 +1925,29 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
 }
 
+func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               if false {
+                   destroy self.test
+               }
+           }
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
+}
+
 func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -1944,3 +1967,28 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckResourceDestructorMoveInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               absorb(<-self.test)
+               absorb(<-self.test)
+           }
+	   }
+
+       fun absorb(_ test: <-Test) {
+           destroy test
+       }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}

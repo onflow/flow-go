@@ -831,3 +831,21 @@ func (checker *Checker) checkResourceFieldInvalidation(containerType Type, conta
 		}
 	}
 }
+
+// checkResourceUseAfterInvalidation checks if a resource (variable or composite member)
+// is used after it was previously invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceUseAfterInvalidation(resource interface{}, useIdentifier ast.Identifier) {
+	resourceInfo := checker.resources.Get(resource)
+	if resourceInfo.Invalidations.Size() == 0 {
+		return
+	}
+
+	checker.report(
+		&ResourceUseAfterInvalidationError{
+			StartPos:      useIdentifier.StartPosition(),
+			EndPos:        useIdentifier.EndPosition(),
+			Invalidations: resourceInfo.Invalidations.All(),
+		},
+	)
+}
