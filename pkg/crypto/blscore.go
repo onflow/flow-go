@@ -91,11 +91,17 @@ func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
-// writeVerifVector exports A vector into a slice of bytes
-// assuming the slice length matches the vector length
+// writeVerifVector writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)((unsafe.Pointer)(&dest[0])),
 		(*C.ep2_st)(a),
+	)
+}
+
+// readVerifVector reads a G2 point from a slice of bytes
+func readPointG2(a *pointG2, data []byte) {
+	C._ep2_read_bin_compact((*C.ep2_st)(a),
+		(*C.uchar)((unsafe.Pointer)(&data[0])),
 	)
 }
 

@@ -116,9 +116,9 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult
 // x being a small integer
 func ZrPolynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
 	C.Zr_polynomialImage((*C.uchar)((unsafe.Pointer)(&dest[0])),
+		(*C.ep2_st)(y),
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.int)(x),
-		(*C.ep2_st)(y),
 	)
 }
 
@@ -139,6 +139,7 @@ func readVerifVector(A []pointG2, src []byte) {
 		(C.int)(len(A)),
 	)
 }
+
 
 func (s *feldmanVSSstate) verifyShare() DKGresult {
 	// check y[current] == x.G2

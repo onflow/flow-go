@@ -52,7 +52,7 @@ void    _blsSign(byte*, bn_st*, byte*, int);
 int     _blsVerify(ep2_st *, byte*, byte*, int);
 void    _ep_read_bin_compact(ep_st*, byte *);
 void    _ep_write_bin_compact(byte *, const ep_st *);
-void    _ep2_read_bin_compact(ep2_st* , byte *);
+void    _ep2_read_bin_compact(ep2_st* , const byte *);
 void    _ep2_write_bin_compact(byte *, const ep2_st *);
 void    mapToG1_swu(ep_t, const uint8_t *, int);
 

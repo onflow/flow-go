@@ -49,7 +49,7 @@ void _bn_randZr(bn_t x) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
-    bn_set_dig(x, 0);
+    //bn_set_dig(x, 0);
 }
 
 // ep_write_bin_compact exports a point in E(Fp) to a buffer in a compressed or uncompressed form.
@@ -167,11 +167,11 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a) {
 
     bin[0] |= (SERIALIZATION << 7);
     ep_free(t);
- }
+}
 
- // _ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// _ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The code is a modified version of Relic ep_write_bin
-void _ep2_read_bin_compact(ep2_st* a, byte *bin) {
+void _ep2_read_bin_compact(ep2_st* a, const byte *bin) {
     // TODO: add length parameter and check
     if (bin[0] & 0x40) {
         if (bin[0] & 0x3F) {
@@ -187,22 +187,21 @@ void _ep2_read_bin_compact(ep2_st* a, byte *bin) {
 		ep2_set_infty(a);
 		return;
 	} 
-
-    byte temp = bin[0];
-    int compressed = temp >> 7;
-    int y_is_odd = (temp >> 5) & 1;
-
+    byte compressed = bin[0] >> 7;
+    byte y_is_odd = (bin[0] >> 5) & 1;
     if (y_is_odd && (!compressed)) {
         THROW(ERR_NO_VALID);
         return;
     } 
-
 	a->norm = 1;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
-    bin[0] &= 0x1F;
-    fp2_read_bin(a->x, bin, 2 * Fp_BYTES);
-    bin[0] = temp;
+    byte* temp = (byte*)malloc(2 * Fp_BYTES);
+    memcpy(temp, bin, 2 * Fp_BYTES);
+    temp[0] &= 0x1F;
+    fp2_read_bin(a->x, temp, 2 * Fp_BYTES);
+    free(temp);
+
 
     if (SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2 * Fp_BYTES, 2 * Fp_BYTES);

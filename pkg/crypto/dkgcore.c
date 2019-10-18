@@ -11,7 +11,7 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y
 // x being a small integer
-void Zr_polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_st* y){
+void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const int x){
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -139,3 +139,5 @@ int verifyshare(bn_st* x, ep2_st* y) {
     g2_mul_gen(&res, x);
     return (ep2_cmp(&res, y) == RLC_EQ);
 }
+
+

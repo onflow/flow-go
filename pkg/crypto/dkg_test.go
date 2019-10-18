@@ -54,7 +54,7 @@ func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) 
 // This is a testing function
 // It simulates processing incoming messages by a node
 func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
-	quit chan PublicKey, t *testing.T) {
+	pkChan chan PublicKey, quit chan int, t *testing.T) {
 	for {
 		select {
 		case newMsg := <-chans[current]:
@@ -65,7 +65,8 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 		case <-time.After(time.Second):
 			log.Infof("%d quit \n", current)
 			_, pk, _, _ := dkg[current].EndDKG()
-			quit <- pk
+			pkChan <- pk
+			quit <- 0
 			return
 		}
 	}
@@ -80,7 +81,7 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 		log.Error("DKG output error: " + out.err.Error())
 	}
 
-	assert.Equal(t, out.result, valid, "they should be equal")
+	assert.Equal(t, out.result, valid, fmt.Sprintf("Result computed by %d is not correct", current))
 
 	for _, msg := range out.action {
 		if msg.broadcast {
@@ -93,14 +94,15 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
 func TestFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
+	log.SetLevel(log.InfoLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 5
 	lead := 0
 	dkg := make([]DKGstate, n)
-	quit := make(chan PublicKey)
+	pkChan := make(chan PublicKey)
 	chans := make([]chan *toProcess, n)
+	quit := make(chan int)
 
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
@@ -115,7 +117,7 @@ func TestFeldmanVSS(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, quit, t)
+		go dkgProcessChan(i, dkg, chans, pkChan, quit, t)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
@@ -135,11 +137,11 @@ func TestFeldmanVSS(t *testing.T) {
 	var pkTemp, groupPK []byte
 	for i := 0; i < n; i++ {
 		if i == 0 {
-			groupPK, _ = (<-quit).Encode()
-			fmt.Println(groupPK)
+			groupPK, _ = (<-pkChan).Encode()
 		} else {
-			pkTemp, _ = (<-quit).Encode()
+			pkTemp, _ = (<-pkChan).Encode()
 			assert.Equal(t, groupPK, pkTemp, "2 group public keys are mismatching")
 		}
+		<-quit
 	}
 }
