@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -85,7 +86,7 @@ func (e *ErrInvalidTransaction) Error() string {
 	return fmt.Sprintf(
 		"Transaction with hash %s is invalid (missing required fields): %s",
 		e.TxHash,
-		e.MissingFields,
+		strings.Join(e.MissingFields, ", "),
 	)
 }
 

@@ -210,7 +210,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	// Create empty transaction
+	// Create empty transaction (no required fields)
 	tx1 := &types.Transaction{}
 
 	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
