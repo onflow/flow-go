@@ -2922,7 +2922,7 @@ resource ExampleToken: FungibleToken {
     // in the interface have to be repeated here in the implementation
     //
     pub fun deposit(_ token: <-ExampleToken) {
-        self.balance = self.balance + amount
+        self.balance = self.balance + token.balance
         destroy token
     }
 }
@@ -2936,6 +2936,7 @@ let token <- create ExampleToken(balance: 100)
 //
 // The amount satisfies the precondition of the `withdraw` function
 // in the `FungibleToken` interface
+// invoking a member of a resource does not destroy it, so the `token` resource is still valid
 //
 let withdrawn <- token.withdraw(amount: 10)
 
@@ -2954,6 +2955,10 @@ receiver.deposit(<-withdrawn)
 // is larger than the field `balance` (100 > 90)
 //
 token.withdraw(amount: 100)
+
+// Withdrawing tokens so that the balance is zero does not destroy the resource.
+// the resource has to be destroy explicitly.
+token.withdraw(amount: 90)
 ```
 
 The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
@@ -2971,7 +2976,7 @@ struct AnImplementation: AnInterface {
     // Declare a publicly settable variable field named `a`that has type `Int`.
     // This implementation satisfies the requirement for interface `AnInterface`:
     // The field is at least publicly readable, but this implementation also
-    // allows the field to be written to in all scopes
+    // allows the field to be written to in all scopes.
     //
     pub(set) var a: Int
 
@@ -3001,11 +3006,11 @@ struct interface Shape {
 //
 struct Square: Shape {
     // In addition to the required fields from the interface, 
-    // the type can also declare additional fields
+    // the type can also declare additional fields.
     pub var length: Int
 
     // Since `area` was not declared as a constant, variable,
-    // field in the interface, it can be declared 
+    // field in the interface, it can be declared.
     pub synthetic area: Int {
         get {
             return self.length * self.length
@@ -3016,13 +3021,13 @@ struct Square: Shape {
         self.length = length
     }
 
-    // here we have provided the implementation of the required `scale` function
+    // here we have provided the implementation of the required `scale` function.
     pub fun scale(factor: Int) {
         self.length = self.length * factor
     }
 }
 
-// Declare a structure named `Rectangle` that also implements the `Shape` interface
+// Declare a structure named `Rectangle` that also implements the `Shape` interface.
 //
 struct Rectangle: Shape {
     pub var width: Int
@@ -3040,7 +3045,7 @@ struct Rectangle: Shape {
     }
 
     // As long as the function names and parameters match those 
-    // of the required functions, the implementations can differ
+    // of the required functions, the implementations can differ.
     pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -3049,7 +3054,7 @@ struct Rectangle: Shape {
 
 
 
-// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`
+// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`.
 //
 var shape: Shape = Rectangle(width: 10, height: 20)
 ```
@@ -3057,12 +3062,12 @@ var shape: Shape = Rectangle(width: 10, height: 20)
 Values implementing an interface are assignable to variables that have the interface as their type.
 
 ```bamboo,file=interface-type-assignment.bpl
-// Assign a value of type `Square` to the variable `shape` that has type `Shape`
+// Assign a value of type `Square` to the variable `shape` that has type `Shape`.
 //
 shape = Square(length: 30)
 
-// Invalid: cannot initialize a constant that has type `Rectangle`
-// with a value that has type `Square`
+// Invalid: cannot initialize a constant that has type `Rectangle`.
+// with a value that has type `Square`.
 //
 let rectangle: Rectangle = Square(length: 10)
 ```
@@ -3070,16 +3075,16 @@ let rectangle: Rectangle = Square(length: 10)
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
 ```bamboo,file=interface-type-fields-and-functions.bpl
-// Declare a constant which has the type `Shape`
-// and is initialized with a value that has type `Rectangle`
+// Declare a constant which has the type `Shape`.
+// and is initialized with a value that has type `Rectangle`.
 //
 let shape: Shape = Rectangle(width: 2, height: 3)
 
-// Access the field `area` declared in the interface `Shape`
+// Access the field `area` declared in the interface `Shape`.
 //
 shape.area // is 6
 
-// Call the function `scale` declared in the interface `Shape`
+// Call the function `scale` declared in the interface `Shape`.
 //
 shape.scale(factor: 3)
 
@@ -3093,18 +3098,18 @@ Interface implementation requirements can be declared by following the interface
 and one or more names of interfaces of the same kind, separated by commas.
 
 ```bamboo,file=interface-implementation-requirement.bpl
-// Declare a structure interface named `Shape`
+// Declare a structure interface named `Shape`.
 //
 struct interface Shape {}
 
 // Declare a structure interface named `Polygon`.
 // Require implementing types to also implement
-// the structure interface `Shape`
+// the structure interface `Shape`.
 //
 struct interface Polygon: Shape {}
 
 // Declare a structure named `Hexagon` that implements the `Polygon` interface.
-// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it
+// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it.
 //
 struct Hexagon: Polygon {}
 
@@ -3122,7 +3127,7 @@ Declaring an interface inside another does not require implementing types of the
 // Resources implementing `OuterInterface` do not need to provide
 // an implementation of `InnerInterface`.
 //
-// Structures may just implement `InnerInterface`
+// Structures may just implement `InnerInterface`.
 //
 resource interface OuterInterface {
 
@@ -3131,12 +3136,12 @@ resource interface OuterInterface {
 
 // Declare a resource named `SomeOuter` that implements the interface `OuterInterface`
 //
-// The resource is not required to implement `OuterInterface.InnerInterface`
+// The resource is not required to implement `OuterInterface.InnerInterface`.
 //
 resource SomeOuter: OuterInterface {}
 
-// Declare a structure named `SomeInner` that implements `InnerInterface`
-// which is nested in interface `OuterInterface`
+// Declare a structure named `SomeInner` that implements `InnerInterface`.
+// which is nested in interface `OuterInterface`.
 //
 struct SomeInner: OuterInterface.InnerInterface {}
 
@@ -3151,7 +3156,7 @@ For example, a resource interface may require an implementing type to provide a 
 // Declare a resource interface named `FungibleToken`.
 //
 // Require implementing types to provide a resource type named `Vault`
-// which must have a field named `balance`
+// which must have a field named `balance`.
 //
 resource interface FungibleToken {
 
@@ -3333,6 +3338,8 @@ Like resources, attestations are associated with an [account](#accounts).
 ```bamboo
 struct interface Account {
     address: Address
+    storage: (WHAT TYPE IS THIS?)
+    types: (WHAT TYPE IS THIS?)
 }
 ```
 
@@ -3379,7 +3386,9 @@ Transactions are objects that are signed by one or more [accounts](#accounts) an
 
 Transactions are structured as such:
 
-Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, you must include that account's `Address`.
+Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's type definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, you must include that account's `Address`.
+
+Importing an external resource does not move it from the account that holds it.  It simply imports the type definition so that it can be used within a transaction.
 
 ```bamboo
     // type import from a local file
