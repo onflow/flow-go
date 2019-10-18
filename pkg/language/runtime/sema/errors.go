@@ -1015,8 +1015,8 @@ func (*ResourceLossError) isSemanticError() {}
 // ResourceUseAfterInvalidationError
 
 type ResourceUseAfterInvalidationError struct {
-	Name          string
-	Pos           ast.Position
+	StartPos      ast.Position
+	EndPos        ast.Position
 	Invalidations []ResourceInvalidation
 	InLoop        bool
 	// NOTE: cached values, use `Cause()`
@@ -1049,20 +1049,17 @@ func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool
 }
 
 func (e *ResourceUseAfterInvalidationError) Error() string {
-	message := ""
 	wasMoved, wasDestroyed := e.Cause()
 	switch {
 	case wasMoved && wasDestroyed:
-		message = "use of moved or destroyed resource"
+		return "use of moved or destroyed resource"
 	case wasMoved:
-		message = "use of moved resource"
+		return "use of moved resource"
 	case wasDestroyed:
-		message = "use of destroyed resource"
+		return "use of destroyed resource"
 	default:
 		panic(&errors.UnreachableError{})
 	}
-
-	return fmt.Sprintf("%s: `%s`", message, e.Name)
 }
 
 func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
@@ -1103,7 +1100,7 @@ func (e *ResourceUseAfterInvalidationError) HasInvalidationInPreviousLoopIterati
 	// if all invalidations occur after the use
 
 	for _, invalidation := range e.Invalidations {
-		if invalidation.Pos.Compare(e.Pos) < 0 {
+		if invalidation.StartPos.Compare(e.StartPos) < 0 {
 			return false
 		}
 	}
@@ -1116,8 +1113,8 @@ func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNo
 		notes = append(notes, ResourceInvalidationNote{
 			ResourceInvalidation: invalidation,
 			Range: ast.Range{
-				StartPos: invalidation.Pos,
-				EndPos:   invalidation.Pos.Shifted(len(e.Name) - 1),
+				StartPos: invalidation.StartPos,
+				EndPos:   invalidation.EndPos,
 			},
 		})
 	}
@@ -1127,11 +1124,11 @@ func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNo
 func (*ResourceUseAfterInvalidationError) isSemanticError() {}
 
 func (e *ResourceUseAfterInvalidationError) StartPosition() ast.Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
-	return e.Pos.Shifted(len(e.Name) - 1)
+	return e.EndPos
 }
 
 // ResourceInvalidationNote
@@ -1383,3 +1380,34 @@ func (e *InvalidDestructorParametersError) SecondaryError() string {
 }
 
 func (*InvalidDestructorParametersError) isSemanticError() {}
+
+// ResourceFieldNotInvalidatedError
+
+type ResourceFieldNotInvalidatedError struct {
+	FieldName string
+	TypeName  string
+	Pos       ast.Position
+}
+
+func (e *ResourceFieldNotInvalidatedError) Error() string {
+	return fmt.Sprintf(
+		"field `%s` of resource type `%s` is not invalidated (moved or destroyed)",
+		e.FieldName,
+		e.TypeName,
+	)
+}
+
+func (e *ResourceFieldNotInvalidatedError) SecondaryError() string {
+	return "not invalidated"
+}
+
+func (*ResourceFieldNotInvalidatedError) isSemanticError() {}
+
+func (e *ResourceFieldNotInvalidatedError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceFieldNotInvalidatedError) EndPosition() ast.Position {
+	length := len(e.FieldName)
+	return e.Pos.Shifted(length - 1)
+}

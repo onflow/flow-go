@@ -1905,3 +1905,115 @@ func TestCheckInvalidDestructorParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {}
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
+}
+
+func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               if false {
+                   destroy self.test
+               }
+           }
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
+}
+
+func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       struct S {}
+
+	   resource Test {
+           let s: S
+
+           init(s: S) {
+               self.s = s
+           }
+
+           destroy() {}
+	   }
+	`)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               absorb(<-self.test)
+               absorb(<-self.test)
+           }
+	   }
+
+       fun absorb(_ test: <-Test) {
+           destroy test
+       }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       var duplicate: ((): <-Test)? = nil
+
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               duplicate = fun (): <-Test {
+                   return <-self.test
+               }
+           }
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
