@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
+// Block is a naive data structure used to represent blocks in the emulator.
 type Block struct {
 	Number            uint64
 	Timestamp         time.Time
@@ -15,6 +16,7 @@ type Block struct {
 	TransactionHashes []crypto.Hash
 }
 
+// Hash returns the hash of this block.
 func (b *Block) Hash() crypto.Hash {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
@@ -26,6 +28,7 @@ func (b *Block) Hash() crypto.Hash {
 	return hasher.ComputeHash(d)
 }
 
+// GenesisBlock returns the genesis block for an emulated blockchain.
 func GenesisBlock() *Block {
 	return &Block{
 		Number:            0,

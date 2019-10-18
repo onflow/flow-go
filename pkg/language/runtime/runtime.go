@@ -40,11 +40,11 @@ type Interface interface {
 	// CreateAccount creates a new account with the given public keys and code.
 	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(adddress types.Address, publicKey []byte, keyWeight int) error
+	AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(adddress types.Address, index int) error
+	RemoveAccountKey(address types.Address, index int) error
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(adddress types.Address, code []byte) (err error)
+	UpdateAccountCode(address types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
 	GetSigningAccounts() []types.Address
 	// Log logs a string.

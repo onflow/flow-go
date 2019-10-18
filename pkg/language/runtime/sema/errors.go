@@ -521,30 +521,24 @@ func (e *InvalidNameError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidInitializerNameError
+// UnknownSpecialFunctionError
 
-type InvalidInitializerNameError struct {
-	Name string
-	Pos  ast.Position
+type UnknownSpecialFunctionError struct {
+	Pos ast.Position
 }
 
-func (e *InvalidInitializerNameError) Error() string {
-	return fmt.Sprintf("invalid initializer name: `%s`", e.Name)
+func (e *UnknownSpecialFunctionError) Error() string {
+	return "unknown special function. did you mean `init`, `destroy`, or forgot the `fun` keyword?"
 }
 
-func (*InvalidInitializerNameError) isSemanticError() {}
+func (*UnknownSpecialFunctionError) isSemanticError() {}
 
-func (e *InvalidInitializerNameError) SecondaryError() string {
-	return fmt.Sprintf("initializer must be named `%s`", InitializerIdentifier)
-}
-
-func (e *InvalidInitializerNameError) StartPosition() ast.Position {
+func (e *UnknownSpecialFunctionError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidInitializerNameError) EndPosition() ast.Position {
-	length := len(e.Name)
-	return e.Pos.Shifted(length - 1)
+func (e *UnknownSpecialFunctionError) EndPosition() ast.Position {
+	return e.Pos
 }
 
 // InvalidVariableKindError
@@ -597,16 +591,16 @@ func (e *InvalidDeclarationError) EndPosition() ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	TypeIdentifier string
-	FirstFieldName string
-	FirstFieldPos  ast.Position
+	ContainerTypeIdentifier string
+	FirstFieldName          string
+	FirstFieldPos           ast.Position
 }
 
 func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
-		"missing initializer for field `%s` of type `%s`",
+		"missing initializer for field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.TypeIdentifier,
+		e.ContainerTypeIdentifier,
 	)
 }
 
@@ -682,7 +676,7 @@ func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
 type FieldUninitializedError struct {
 	Name          string
 	CompositeType *CompositeType
-	Initializer   *ast.InitializerDeclaration
+	Initializer   *ast.SpecialFunctionDeclaration
 	Pos           ast.Position
 }
 
@@ -1177,6 +1171,27 @@ func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
+// InvalidNestedMoveError
+
+type InvalidNestedMoveError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidNestedMoveError) Error() string {
+	return "cannot move nested resource"
+}
+
+func (*InvalidNestedMoveError) isSemanticError() {}
+
+func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidMoveAnnotationError
 
 type InvalidMoveAnnotationError struct {
@@ -1604,14 +1619,79 @@ func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
 func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
 	return e.EndPos
 }
+  
+// InvalidEventParameterTypeError
 
-// InvalidResourceAssignmentError
-
-type InvalidResourceAssignmentError struct {
+type InvalidEventParameterTypeError struct {
+	Type     Type
 	StartPos ast.Position
 	EndPos   ast.Position
 }
 
+func (e *InvalidEventParameterTypeError) Error() string {
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+}
+
+func (*InvalidEventParameterTypeError) isSemanticError() {}
+
+func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidEventUsageError
+
+type InvalidEventUsageError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidEventUsageError) Error() string {
+	return "events can only be invoked in an `emit` statement"
+}
+
+func (*InvalidEventUsageError) isSemanticError() {}
+
+func (e *InvalidEventUsageError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidEventUsageError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// EmitNonEventError
+
+type EmitNonEventError struct {
+	Type     Type
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *EmitNonEventError) Error() string {
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+}
+
+func (*EmitNonEventError) isSemanticError() {}
+
+func (e *EmitNonEventError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *EmitNonEventError) EndPosition() ast.Position {
+	return e.EndPos
+}
+  
+// InvalidResourceAssignmentError
+
+type InvalidResourceAssignmentError struct {
+ 	StartPos ast.Position
+	EndPos   ast.Position
+}
+  
 func (e *InvalidResourceAssignmentError) Error() string {
 	return "cannot assign to resource-typed target. consider swapping (<->)"
 }
@@ -1623,5 +1703,77 @@ func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
 }
 
 func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidDestructorError
+
+type InvalidDestructorError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructorError) Error() string {
+	return "cannot declare destructor for non-resource"
+}
+
+func (*InvalidDestructorError) isSemanticError() {}
+
+func (e *InvalidDestructorError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructorError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingDestructorError
+
+type MissingDestructorError struct {
+	ContainerTypeIdentifier string
+	FirstFieldName          string
+	FirstFieldPos           ast.Position
+}
+
+func (e *MissingDestructorError) Error() string {
+	return fmt.Sprintf(
+		"missing destructor for resource field `%s` in type `%s`",
+		e.FirstFieldName,
+		e.ContainerTypeIdentifier,
+	)
+}
+
+func (*MissingDestructorError) isSemanticError() {}
+
+func (e *MissingDestructorError) StartPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+func (e *MissingDestructorError) EndPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+// InvalidDestructorParametersError
+
+type InvalidDestructorParametersError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructorParametersError) Error() string {
+	return "invalid parameters for destructor"
+}
+
+func (e *InvalidDestructorParametersError) SecondaryError() string {
+	return "consider removing these parameters"
+}
+
+func (*InvalidDestructorParametersError) isSemanticError() {}
+
+func (e *InvalidDestructorParametersError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructorParametersError) EndPosition() ast.Position {
 	return e.EndPos
 }

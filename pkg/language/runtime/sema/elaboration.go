@@ -9,7 +9,7 @@ type Elaboration struct {
 	AssignmentStatementValueTypes      map[*ast.AssignmentStatement]Type
 	AssignmentStatementTargetTypes     map[*ast.AssignmentStatement]Type
 	CompositeDeclarationTypes          map[*ast.CompositeDeclaration]*CompositeType
-	InitializerFunctionTypes           map[*ast.InitializerDeclaration]*ConstructorFunctionType
+	SpecialFunctionTypes               map[*ast.SpecialFunctionDeclaration]*SpecialFunctionType
 	FunctionExpressionFunctionType     map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes  map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes map[*ast.InvocationExpression][]Type
@@ -24,6 +24,7 @@ type Elaboration struct {
 	ArrayExpressionElementType         map[*ast.ArrayExpression]Type
 	DictionaryExpressionType           map[*ast.DictionaryExpression]*DictionaryType
 	DictionaryExpressionEntryTypes     map[*ast.DictionaryExpression][]DictionaryEntryType
+	EventDeclarationTypes              map[*ast.EventDeclaration]*EventType
 	// NOTE: not indexed by `ast.Type`, as IndexExpression might index
 	//   with "type" which is an expression, i.e., an IdentifierExpression.
 	//   See `Checker.visitStorageIndexingExpression`
@@ -38,7 +39,7 @@ func NewElaboration() *Elaboration {
 		AssignmentStatementValueTypes:      map[*ast.AssignmentStatement]Type{},
 		AssignmentStatementTargetTypes:     map[*ast.AssignmentStatement]Type{},
 		CompositeDeclarationTypes:          map[*ast.CompositeDeclaration]*CompositeType{},
-		InitializerFunctionTypes:           map[*ast.InitializerDeclaration]*ConstructorFunctionType{},
+		SpecialFunctionTypes:               map[*ast.SpecialFunctionDeclaration]*SpecialFunctionType{},
 		FunctionExpressionFunctionType:     map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:  map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes: map[*ast.InvocationExpression][]Type{},
@@ -53,6 +54,7 @@ func NewElaboration() *Elaboration {
 		ArrayExpressionElementType:         map[*ast.ArrayExpression]Type{},
 		DictionaryExpressionType:           map[*ast.DictionaryExpression]*DictionaryType{},
 		DictionaryExpressionEntryTypes:     map[*ast.DictionaryExpression][]DictionaryEntryType{},
+		EventDeclarationTypes:              map[*ast.EventDeclaration]*EventType{},
 		IndexExpressionIndexingTypes:       map[*ast.IndexExpression]Type{},
 	}
 }

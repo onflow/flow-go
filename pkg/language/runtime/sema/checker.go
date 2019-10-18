@@ -6,7 +6,6 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
-const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
@@ -179,6 +178,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		checker.declareGlobalFunctionDeclaration(declaration)
 	}
 
+	for _, declaration := range program.EventDeclarations() {
+		checker.declareEventDeclaration(declaration)
+	}
+
 	// check all declarations
 
 	for _, declaration := range program.Declarations {
@@ -287,9 +290,15 @@ func (checker *Checker) declareGlobalType(name string) {
 }
 
 func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expression, valueType Type) {
+	// The check is only necessary for resources.
+	// Bail out early if the value is not a resource
+
 	if !valueType.IsResourceType() {
 		return
 	}
+
+	// Check the moved expression is wrapped in a unary expression with the move operation (<-).
+	// Report an error if not and bail out if it is missing or another unary operator is used
 
 	unaryExpression, ok := valueExpression.(*ast.UnaryExpression)
 	if !ok || unaryExpression.Operation != ast.OperationMove {
@@ -306,24 +315,6 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 		valueType,
 		ResourceInvalidationKindMove,
 	)
-}
-
-func (checker *Checker) resourceVariable(exp ast.Expression, valueType Type) (variable *Variable, pos ast.Position) {
-	if !valueType.IsResourceType() {
-		return
-	}
-
-	identifierExpression, ok := exp.(*ast.IdentifierExpression)
-	if !ok {
-		return
-	}
-
-	variable = checker.findAndCheckVariable(identifierExpression.Identifier, false)
-	if variable == nil {
-		return
-	}
-
-	return variable, identifierExpression.Pos
 }
 
 func (checker *Checker) inLoop() bool {
@@ -573,15 +564,54 @@ func (checker *Checker) withValueScope(f func()) {
 	f()
 }
 
-func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType Type, kind ResourceInvalidationKind) {
-	variable, pos := checker.resourceVariable(exp, valueType)
+// TODO: create mapping between composite declaration member -> variable
+//   then look up in `resourceVariable`
+
+func (checker *Checker) recordResourceInvalidation(
+	expression ast.Expression,
+	valueType Type,
+	kind ResourceInvalidationKind,
+) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	reportInvalidNestedMove := func() {
+		checker.report(
+			&InvalidNestedMoveError{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: improve handling of `self`: only allow invalidation once
+
+	switch expression.(type) {
+	case *ast.MemberExpression:
+		if !checker.isSelfFieldAccess(expression) {
+			reportInvalidNestedMove()
+			return
+		}
+	case *ast.IndexExpression:
+		reportInvalidNestedMove()
+		return
+	}
+
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
+	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
 	}
+
 	checker.resources.AddInvalidation(variable,
 		ResourceInvalidation{
 			Kind: kind,
-			Pos:  pos,
+			Pos:  identifierExpression.Pos,
 		},
 	)
 }
@@ -599,12 +629,42 @@ func (checker *Checker) checkWithResources(
 	return check()
 }
 
-func (checker *Checker) checkNonIdentifierResourceLoss(expressionType Type, expression ast.Expression) {
+// checkAccessResourceLoss checks for a resource loss caused by an expression which is accessed
+// (indexed or member). This is basically any expression that does not have an identifier
+// as its "base" expression.
+//
+// For example, function invocations, array literals, or dictionary literals will cause a resource loss
+// if the expression is accessed immediately: e.g.
+//   - `returnResource()[0]`
+//   - `[<-create R(), <-create R()][0]`,
+//   - `{"resource": <-create R()}.length`
+//
+// Safe expressions are identifier expressions, an indexing expression into a safe expression,
+// or a member access on a safe expression.
+//
+func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression ast.Expression) {
 	if !expressionType.IsResourceType() {
 		return
 	}
 
-	if _, isIdentifier := expression.(*ast.IdentifierExpression); isIdentifier {
+	// Get the base expression of the given expression, i.e. get the accessed expression
+	// as long as there is one.
+	//
+	// For example, in the expression `foo[0].bar`, both the wrapping member access
+	// expression `bar` and the wrapping indexing expression `[0]` are removed,
+	// leaving the base expression `foo`
+
+	baseExpression := expression
+
+	for {
+		accessExpression, isAccess := baseExpression.(ast.AccessExpression)
+		if !isAccess {
+			break
+		}
+		baseExpression = accessExpression.AccessedExpression()
+	}
+
+	if _, isIdentifier := baseExpression.(*ast.IdentifierExpression); isIdentifier {
 		return
 	}
 

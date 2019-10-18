@@ -2,7 +2,6 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression) (resultType ast.Repr) {
@@ -16,22 +15,10 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 		ResourceInvalidationKindDestroy,
 	)
 
-	// TODO: allow destruction of any resource type (even compound resource types):
-	//  Simply check `isResourceType`.
-	//  See https://github.com/dapperlabs/flow-go/issues/816
+	// destruction of any resource type (even compound resource types) is allowed:
+	// the destructor of the resource type will be invoked
 
-	// NOTE: not using `isResourceType`,
-	// as only direct resources and resource interfaces can be destructed (for now)
-
-	compositeType, isCompositeType := valueType.(*CompositeType)
-	isResource := isCompositeType &&
-		compositeType.Kind == common.CompositeKindResource
-
-	interfaceType, isInterfaceType := valueType.(*InterfaceType)
-	isResourceInterface := isInterfaceType &&
-		interfaceType.CompositeKind == common.CompositeKindResource
-
-	if !isResource && !isResourceInterface {
+	if !valueType.IsResourceType() {
 
 		checker.report(
 			&InvalidDestructionError{

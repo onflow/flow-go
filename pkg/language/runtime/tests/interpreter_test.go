@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 
@@ -34,22 +35,16 @@ func parseCheckAndInterpretWithExtra(
 	if handleCheckerError != nil {
 		handleCheckerError(err)
 	} else {
-		if !assert.Nil(t, err) {
-			t.FailNow()
-		}
+		require.Nil(t, err)
 	}
 
 	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
 
-	if !assert.Nil(t, err) {
-		t.FailNow()
-	}
+	require.Nil(t, err)
 
 	err = inter.Interpret()
 
-	if !assert.Nil(t, err) {
-		t.FailNow()
-	}
+	require.Nil(t, err)
 
 	return inter
 }
@@ -3239,21 +3234,28 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure composites: resources and contracts
+		// TODO: add support for non-structure / non-resource composites
 
-		if kind != common.CompositeKindStructure {
+		if kind != common.CompositeKindStructure &&
+			kind != common.CompositeKindResource {
+
 			continue
 		}
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %s interface Test {}
+              %[1]s interface Test {}
 
-              %s TestImpl: Test {}
+              %[1]s TestImpl: Test {}
 
-              let test: Test = TestImpl()
-	        `, kind.Keyword(), kind.Keyword()))
+              let test: %[2]sTest %[3]s %[4]s TestImpl()
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			))
 
 			assert.IsType(t,
 				interpreter.CompositeValue{},
@@ -3266,20 +3268,22 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure composites: resources and contracts
+		// TODO: add support for non-structure / non-resource composites
 
-		if kind != common.CompositeKindStructure {
+		if kind != common.CompositeKindStructure &&
+			kind != common.CompositeKindResource {
+
 			continue
 		}
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %s interface Test {
+              %[1]s interface Test {
                   x: Int
               }
 
-              %s TestImpl: Test {
+              %[1]s TestImpl: Test {
                   var x: Int
 
                   init(x: Int) {
@@ -3287,10 +3291,15 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
                   }
               }
 
-              let test: Test = TestImpl(x: 1)
+              let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
 
               let x = test.x
-	        `, kind.Keyword(), kind.Keyword()))
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			))
 
 			assert.Equal(t,
 				interpreter.NewIntValue(1),
@@ -3303,29 +3312,37 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure composites: resources and contracts
+		// TODO: add support for non-structure / non-resource composites
 
-		if kind != common.CompositeKindStructure {
+		if kind != common.CompositeKindStructure &&
+			kind != common.CompositeKindResource {
+
 			continue
 		}
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-            %s interface Test {
-                fun test(): Int
-            }
+			inter := parseCheckAndInterpret(t, fmt.Sprintf(
+				`
+                    %[1]s interface Test {
+                        fun test(): Int
+                    }
 
-            %s TestImpl: Test {
-                fun test(): Int {
-                    return 2
-                }
-            }
+                    %[1]s TestImpl: Test {
+                        fun test(): Int {
+                            return 2
+                        }
+                    }
 
-            let test: Test = TestImpl()
+                    let test: %[2]s Test %[3]s %[4]s TestImpl()
 
-            let val = test.test()
-	      `, kind.Keyword(), kind.Keyword()))
+                    let val = test.test()
+	            `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			))
 
 			assert.Equal(t,
 				interpreter.NewIntValue(2),
@@ -3338,16 +3355,18 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure composites: resources and contracts
+		// TODO: add support for non-structure / non-resource composites
 
-		if kind != common.CompositeKindStructure {
+		if kind != common.CompositeKindStructure &&
+			kind != common.CompositeKindResource {
+
 			continue
 		}
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %s interface Test {
+              %[1]s interface Test {
                   fun test(x: Int): Int {
                       pre {
                           x > 0: "x must be positive"
@@ -3355,7 +3374,7 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
                   }
               }
 
-              %s TestImpl: Test {
+              %[1]s TestImpl: Test {
                   fun test(x: Int): Int {
                       pre {
                           x < 2: "x must be smaller than 2"
@@ -3364,12 +3383,19 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
                   }
               }
 
-              let test: Test = TestImpl()
-
               fun callTest(x: Int): Int {
-                  return test.test(x: x)
+                  let test: %[2]s Test %[3]s %[4]s TestImpl()
+                  let res = test.test(x: x)
+                  %[5]s test
+                  return res
               }
-	        `, kind.Keyword(), kind.Keyword()))
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+				kind.DestructionKeyword(),
+			))
 
 			_, err := inter.Invoke("callTest", big.NewInt(0))
 			assert.IsType(t, &interpreter.ConditionError{}, err)
@@ -3393,16 +3419,18 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure composites: resources and contracts
+		// TODO: add support for non-structure / non-resource composites
 
-		if kind != common.CompositeKindStructure {
+		if kind != common.CompositeKindStructure &&
+			kind != common.CompositeKindResource {
+
 			continue
 		}
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %s interface Test {
+              %[1]s interface Test {
                   init(x: Int) {
                       pre {
                           x > 0: "x must be positive"
@@ -3410,7 +3438,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
                   }
               }
 
-              %s TestImpl: Test {
+              %[1]s TestImpl: Test {
                   init(x: Int) {
                       pre {
                           x < 2: "x must be smaller than 2"
@@ -3418,10 +3446,14 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
                   }
               }
 
-              fun test(x: Int): Test {
-                  return TestImpl(x: x)
+              fun test(x: Int): %[2]sTest {
+                  return %[2]s %[3]s TestImpl(x: x)
               }
-	        `, kind.Keyword(), kind.Keyword()))
+	        `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.ConstructionKeyword(),
+			))
 
 			_, err := inter.Invoke("test", big.NewInt(0))
 			assert.IsType(t,
@@ -4306,25 +4338,14 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 
 func TestInterpretIndirectDestroy(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
-		`
-          resource X {}
+	inter := parseCheckAndInterpret(t, `
+      resource X {}
 
-          fun test() {
-              let x <- create X()
-              destroy x
-          }
-	    `,
-		nil,
-		nil,
-		func(checkerError error) {
-			// TODO: add support for resources
-
-			errs := ExpectCheckerErrors(t, checkerError, 1)
-
-			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-		},
-	)
+      fun test() {
+          let x <- create X()
+          destroy x
+      }
+    `)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
@@ -4336,29 +4357,18 @@ func TestInterpretIndirectDestroy(t *testing.T) {
 
 func TestInterpretUnaryMove(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
-		`
-          resource X {}
+	inter := parseCheckAndInterpret(t, `
+      resource X {}
 
-          fun foo(x: <-X): <-X {
-              return <-x
-          }
+      fun foo(x: <-X): <-X {
+          return <-x
+      }
 
-          fun bar() {
-              let x <- foo(x: <-create X())
-              destroy x
-          }
-	    `,
-		nil,
-		nil,
-		func(checkerError error) {
-			// TODO: add support for resources
-
-			errs := ExpectCheckerErrors(t, checkerError, 1)
-
-			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-		},
-	)
+      fun bar() {
+          let x <- foo(x: <-create X())
+          destroy x
+      }
+    `)
 
 	value, err := inter.Invoke("bar")
 	assert.Nil(t, err)
@@ -4368,45 +4378,32 @@ func TestInterpretUnaryMove(t *testing.T) {
 	)
 }
 
-// TODO: requires https://github.com/dapperlabs/flow-go/issues/816
-//
-//func TestInterpretResourceMoveInArray(t *testing.T) {
-//
-//	inter := parseCheckAndInterpretWithExtra(t,
-//		`
-//        resource Foo {
-//            var bar: Int
-//            init(bar: Int) {
-//                self.bar = bar
-//            }
-//        }
-//
-//        fun test(): Int {
-//          let foo <- create Foo(bar: 1)
-//          let foos <- [<-foo]
-//          let bar = foos[0].bar
-//          destroy foos
-//          return bar
-//        }
-//      `,
-//		nil,
-//		nil,
-//		func(checkerError error) {
-//			// TODO: add support for resources
-//
-//			errs := ExpectCheckerErrors(t, checkerError, 1)
-//
-//			assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-//		},
-//	)
-//
-//	value, err := inter.Invoke("test")
-//	assert.Nil(t, err)
-//	assert.Equal(t,
-//		interpreter.NewIntValue(1),
-//		value,
-//	)
-//}
+func TestInterpretResourceMoveInArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource Foo {
+          var bar: Int
+          init(bar: Int) {
+              self.bar = bar
+          }
+      }
+
+      fun test(): Int {
+        let foo <- create Foo(bar: 1)
+        let foos <- [<-foo]
+        let bar = foos[0].bar
+        destroy foos
+        return bar
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		value,
+	)
+}
 
 func TestInterpretClosure(t *testing.T) {
 	// Create a closure that increments and returns
@@ -4590,4 +4587,73 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 		),
 		value,
 	)
+}
+
+func TestInterpretEmitEvent(t *testing.T) {
+	var actualEvents []interpreter.EventValue
+
+	inter := parseCheckAndInterpret(t,
+		`
+			event Transfer(to: Int, from: Int)
+			event TransferAmount(to: Int, from: Int, amount: Int)
+
+			fun test() {
+			  emit Transfer(to: 1, from: 2)
+			  emit Transfer(to: 3, from: 4)
+			  emit TransferAmount(to: 1, from: 2, amount: 100)
+			}
+            `,
+	)
+
+	inter.SetOnEventEmitted(func(event interpreter.EventValue) {
+		actualEvents = append(actualEvents, event)
+	})
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	expectedEvents := []interpreter.EventValue{
+		{
+			"Transfer",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+			}},
+		{
+			"Transfer",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(3),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(4),
+				},
+			}},
+		{
+			"TransferAmount",
+			[]interpreter.EventField{
+				{
+					Identifier: "to",
+					Value:      interpreter.NewIntValue(1),
+				},
+				{
+					Identifier: "from",
+					Value:      interpreter.NewIntValue(2),
+				},
+				{
+					Identifier: "amount",
+					Value:      interpreter.NewIntValue(100),
+				},
+			}},
+	}
+
+	assert.Equal(t, expectedEvents, actualEvents)
 }

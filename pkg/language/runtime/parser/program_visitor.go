@@ -243,7 +243,7 @@ func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
 func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 
 	var fields []*ast.FieldDeclaration
-	var initializers []*ast.InitializerDeclaration
+	var specialFunctions []*ast.SpecialFunctionDeclaration
 	var functions []*ast.FunctionDeclaration
 	var compositeDeclarations []*ast.CompositeDeclaration
 	var interfaceDeclarations []*ast.InterfaceDeclaration
@@ -255,8 +255,8 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 		case *ast.FieldDeclaration:
 			fields = append(fields, member)
 
-		case *ast.InitializerDeclaration:
-			initializers = append(initializers, member)
+		case *ast.SpecialFunctionDeclaration:
+			specialFunctions = append(specialFunctions, member)
 
 		case *ast.FunctionDeclaration:
 			functions = append(functions, member)
@@ -271,7 +271,7 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 
 	return &ast.Members{
 		Fields:                fields,
-		Initializers:          initializers,
+		SpecialFunctions:      specialFunctions,
 		Functions:             functions,
 		CompositeDeclarations: compositeDeclarations,
 	}
@@ -304,7 +304,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 	}
 }
 
-func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var parameters ast.Parameters
@@ -323,11 +323,22 @@ func (v *ProgramVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	return &ast.InitializerDeclaration{
-		Identifier:    identifier,
-		Parameters:    parameters,
-		FunctionBlock: functionBlock,
-		StartPos:      startPosition,
+	declarationKind := common.DeclarationKindUnknown
+	switch identifier.Identifier {
+	case common.DeclarationKindInitializer.Keywords():
+		declarationKind = common.DeclarationKindInitializer
+	case common.DeclarationKindDestructor.Keywords():
+		declarationKind = common.DeclarationKindDestructor
+	}
+
+	return &ast.SpecialFunctionDeclaration{
+		DeclarationKind: declarationKind,
+		FunctionDeclaration: &ast.FunctionDeclaration{
+			Identifier:    identifier,
+			Parameters:    parameters,
+			FunctionBlock: functionBlock,
+			StartPos:      startPosition,
+		},
 	}
 }
 

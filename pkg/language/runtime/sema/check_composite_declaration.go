@@ -23,14 +23,26 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	)
 
 	checker.checkInitializers(
-		declaration.Members.Initializers,
+		declaration.Members.Initializers(),
 		declaration.Members.Fields,
 		compositeType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		compositeType.ConstructorParameterTypeAnnotations,
-		initializerKindComposite,
+		ContainerKindComposite,
 	)
+
+	checker.checkDestructors(
+		declaration.Members.Destructors(),
+		declaration.Members.FieldsByIdentifier(),
+		compositeType.Members,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		ContainerKindComposite,
+	)
+
+	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
 
 	checker.checkFieldsInitialized(declaration, compositeType)
 
@@ -56,9 +68,11 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 	}
 
-	// TODO: support non-structure composites, such as contracts and resources
+	// TODO: support non-structure / non-resources composites, such as contracts
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
+
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
@@ -88,13 +102,19 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 
 func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) {
 
+	identifier := declaration.Identifier
+
 	// NOTE: fields and functions might already refer to declaration itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	compositeType := &CompositeType{}
+	// NOTE: it is important to already specify the kind, as fields may refer
+	// to the type and check the annotation of the field
 
-	identifier := declaration.Identifier
+	compositeType := &CompositeType{
+		Kind:       declaration.CompositeKind,
+		Identifier: identifier.Identifier,
+	}
 
 	err := checker.typeActivations.Declare(identifier, compositeType)
 	checker.report(err)
@@ -117,25 +137,31 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		true,
 	)
 
-	*compositeType = CompositeType{
-		Kind:         declaration.CompositeKind,
-		Identifier:   identifier.Identifier,
-		Members:      members,
-		Conformances: conformances,
-	}
+	compositeType.Members = members
+	compositeType.Conformances = conformances
 
 	checker.memberOrigins[compositeType] = origins
 
-	// TODO: support multiple overloaded initializers
+	constructorParameterTypeAnnotations := checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
+	compositeType.ConstructorParameterTypeAnnotations = constructorParameterTypeAnnotations
+
+	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
+
+	checker.declareCompositeConstructor(declaration, compositeType, constructorParameterTypeAnnotations)
+}
+
+func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.SpecialFunctionDeclaration) []*TypeAnnotation {
+	// TODO: support multiple overloaded initializers
 	var parameterTypeAnnotations []*TypeAnnotation
-	initializerCount := len(declaration.Members.Initializers)
+
+	initializerCount := len(initializers)
 	if initializerCount > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
+		firstInitializer := initializers[0]
 		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
 
 		if initializerCount > 1 {
-			secondInitializer := declaration.Members.Initializers[1]
+			secondInitializer := initializers[1]
 
 			checker.report(
 				&UnsupportedOverloadingError{
@@ -146,12 +172,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			)
 		}
 	}
-
-	compositeType.ConstructorParameterTypeAnnotations = parameterTypeAnnotations
-
-	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
-
-	checker.declareCompositeConstructor(declaration, compositeType, parameterTypeAnnotations)
+	return parameterTypeAnnotations
 }
 
 func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*InterfaceType {
@@ -215,6 +236,8 @@ func (checker *Checker) checkCompositeConformance(
 			},
 		)
 	}
+
+	// TODO: add support for overloaded initializers
 
 	if interfaceType.InitializerParameterTypeAnnotations != nil {
 
@@ -290,7 +313,7 @@ func (checker *Checker) checkFieldsInitialized(
 	declaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 ) {
-	for _, initializer := range declaration.Members.Initializers {
+	for _, initializer := range declaration.Members.Initializers() {
 		unassigned, errs := self_field_analyzer.CheckSelfFieldInitializations(
 			declaration.Members.Fields,
 			initializer.FunctionBlock,
@@ -316,7 +339,7 @@ func (checker *Checker) declareCompositeConstructor(
 	compositeType *CompositeType,
 	parameterTypeAnnotations []*TypeAnnotation,
 ) {
-	functionType := &ConstructorFunctionType{
+	functionType := &SpecialFunctionType{
 		&FunctionType{
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				compositeType,
@@ -328,19 +351,20 @@ func (checker *Checker) declareCompositeConstructor(
 
 	// TODO: support multiple overloaded initializers
 
-	if len(compositeDeclaration.Members.Initializers) > 0 {
-		firstInitializer := compositeDeclaration.Members.Initializers[0]
+	initializers := compositeDeclaration.Members.Initializers
+	if len(initializers()) > 0 {
+		firstInitializer := initializers()[0]
 
 		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
 
-		functionType = &ConstructorFunctionType{
+		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
 				ParameterTypeAnnotations: parameterTypeAnnotations,
 				ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
 			},
 		}
 
-		checker.Elaboration.InitializerFunctionTypes[firstInitializer] = functionType
+		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
 
 	_, err := checker.valueActivations.DeclareFunction(
@@ -418,18 +442,18 @@ func (checker *Checker) membersAndOrigins(
 }
 
 func (checker *Checker) checkInitializers(
-	initializers []*ast.InitializerDeclaration,
+	initializers []*ast.SpecialFunctionDeclaration,
 	fields []*ast.FieldDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
-	typeIdentifier string,
+	containerTypeIdentifier string,
 	initializerParameterTypeAnnotations []*TypeAnnotation,
-	initializerKind initializerKind,
+	containerKind ContainerKind,
 ) {
 	count := len(initializers)
 
 	if count == 0 {
-		checker.checkNoInitializerNoFields(fields, initializerKind, typeIdentifier)
+		checker.checkNoInitializerNoFields(fields, containerKind, containerTypeIdentifier)
 		return
 	}
 
@@ -437,14 +461,13 @@ func (checker *Checker) checkInitializers(
 	//  parameter initializerParameterTypeAnnotations needs to be a slice
 
 	initializer := initializers[0]
-	checker.checkInitializer(
+	checker.checkSpecialFunction(
 		initializer,
-		fields,
 		containerType,
 		containerDeclarationKind,
-		typeIdentifier,
+		containerTypeIdentifier,
 		initializerParameterTypeAnnotations,
-		initializerKind,
+		containerKind,
 	)
 }
 
@@ -454,10 +477,10 @@ func (checker *Checker) checkInitializers(
 //
 func (checker *Checker) checkNoInitializerNoFields(
 	fields []*ast.FieldDeclaration,
-	initializerKind initializerKind,
+	containerKind ContainerKind,
 	typeIdentifier string,
 ) {
-	if len(fields) == 0 || initializerKind == initializerKindInterface {
+	if len(fields) == 0 || containerKind == ContainerKindInterface {
 		return
 	}
 
@@ -466,61 +489,49 @@ func (checker *Checker) checkNoInitializerNoFields(
 
 	checker.report(
 		&MissingInitializerError{
-			TypeIdentifier: typeIdentifier,
-			FirstFieldName: firstField.Identifier.Identifier,
-			FirstFieldPos:  firstField.Identifier.Pos,
+			ContainerTypeIdentifier: typeIdentifier,
+			FirstFieldName:          firstField.Identifier.Identifier,
+			FirstFieldPos:           firstField.Identifier.Pos,
 		},
 	)
 }
 
-func (checker *Checker) checkInitializer(
-	initializer *ast.InitializerDeclaration,
-	fields []*ast.FieldDeclaration,
+func (checker *Checker) checkSpecialFunction(
+	specialFunction *ast.SpecialFunctionDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
 	typeIdentifier string,
-	initializerParameterTypeAnnotations []*TypeAnnotation,
-	initializerKind initializerKind,
+	parameterTypeAnnotations []*TypeAnnotation,
+	containerKind ContainerKind,
 ) {
 	// NOTE: new activation, so `self`
-	// is only visible inside initializer
+	// is only visible inside the special function
 
 	checker.enterValueScope()
 	defer checker.leaveValueScope()
 
 	checker.declareSelfValue(containerType)
 
-	// check the initializer is named properly
-	identifier := initializer.Identifier.Identifier
-	if identifier != InitializerIdentifier {
-		checker.report(
-			&InvalidInitializerNameError{
-				Name: identifier,
-				Pos:  initializer.StartPos,
-			},
-		)
-	}
-
 	functionType := &FunctionType{
-		ParameterTypeAnnotations: initializerParameterTypeAnnotations,
+		ParameterTypeAnnotations: parameterTypeAnnotations,
 		ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
 	}
 
 	checker.checkFunction(
-		initializer.Parameters,
+		specialFunction.Parameters,
 		ast.Position{},
 		functionType,
-		initializer.FunctionBlock,
+		specialFunction.FunctionBlock,
 		true,
 	)
 
-	if initializerKind == initializerKindInterface &&
-		initializer.FunctionBlock != nil {
+	if containerKind == ContainerKindInterface &&
+		specialFunction.FunctionBlock != nil {
 
-		checker.checkInterfaceFunctionBlock(
-			initializer.FunctionBlock,
+		checker.checkInterfaceSpecialFunctionBlock(
+			specialFunction.FunctionBlock,
 			containerDeclarationKind,
-			common.DeclarationKindInitializer,
+			specialFunction.DeclarationKind,
 		)
 	}
 }
@@ -602,7 +613,12 @@ func (checker *Checker) checkMemberIdentifier(
 	name := identifier.Identifier
 	pos := identifier.Pos
 
-	if name == InitializerIdentifier {
+	// TODO: provide a more helpful error
+
+	switch name {
+	case common.DeclarationKindInitializer.Keywords(),
+		common.DeclarationKindDestructor.Keywords():
+
 		checker.report(
 			&InvalidNameError{
 				Name: name,
@@ -626,15 +642,149 @@ func (checker *Checker) checkMemberIdentifier(
 }
 
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
-
 	// NOTE: field type is already checked when determining composite function in `compositeType`
 
 	panic(&errors.UnreachableError{})
 }
 
-func (checker *Checker) VisitInitializerDeclaration(initializer *ast.InitializerDeclaration) ast.Repr {
+// checkUnknownSpecialFunctions checks that the special function declarations
+// are supported, i.e., they are either initializers or destructors
+//
+func (checker *Checker) checkUnknownSpecialFunctions(functions []*ast.SpecialFunctionDeclaration) {
+	for _, function := range functions {
+		switch function.DeclarationKind {
+		case common.DeclarationKindInitializer, common.DeclarationKindDestructor:
+			continue
 
-	// NOTE: already checked in `checkInitializer`
+		default:
+			checker.report(
+				&UnknownSpecialFunctionError{
+					Pos: function.Identifier.Pos,
+				},
+			)
+		}
+	}
+}
 
-	panic(&errors.UnreachableError{})
+func (checker *Checker) checkDestructors(
+	destructors []*ast.SpecialFunctionDeclaration,
+	fields map[string]*ast.FieldDeclaration,
+	members map[string]*Member,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
+	containerTypeIdentifier string,
+	containerKind ContainerKind,
+) {
+	count := len(destructors)
+
+	// only resource and resource interface declarations may
+	// declare a destructor
+
+	if !containerType.IsResourceType() {
+		if count > 0 {
+			firstDestructor := destructors[0]
+
+			checker.report(
+				&InvalidDestructorError{
+					StartPos: firstDestructor.Identifier.StartPosition(),
+					EndPos:   firstDestructor.Identifier.EndPosition(),
+				},
+			)
+		}
+
+		return
+	}
+
+	if count == 0 {
+		checker.checkNoDestructorNoResourceFields(members, fields, containerTypeIdentifier, containerKind)
+		return
+	}
+
+	firstDestructor := destructors[0]
+	checker.checkDestructor(
+		firstDestructor,
+		containerType,
+		containerDeclarationKind,
+		containerTypeIdentifier,
+		containerKind,
+	)
+
+	// destructor overloading is not supported
+
+	if count > 1 {
+		secondDestructor := destructors[1]
+
+		checker.report(
+			&UnsupportedOverloadingError{
+				DeclarationKind: common.DeclarationKindDestructor,
+				StartPos:        secondDestructor.StartPosition(),
+				EndPos:          secondDestructor.EndPosition(),
+			},
+		)
+	}
+}
+
+// checkNoDestructorNoResourceFields checks that if there is no destructor there are
+// also no fields which have a resource type – otherwise those fields will be lost.
+// In interfaces this is allowed.
+//
+func (checker *Checker) checkNoDestructorNoResourceFields(
+	members map[string]*Member,
+	fields map[string]*ast.FieldDeclaration,
+	containerTypeIdentifier string,
+	containerKind ContainerKind,
+) {
+	if containerKind == ContainerKindInterface {
+		return
+	}
+
+	for memberName, member := range members {
+		if !member.Type.IsResourceType() {
+			continue
+		}
+
+		checker.report(
+			&MissingDestructorError{
+				ContainerTypeIdentifier: containerTypeIdentifier,
+				FirstFieldName:          memberName,
+				FirstFieldPos:           fields[memberName].StartPos,
+			},
+		)
+
+		// only report for first member
+		return
+	}
+}
+
+func (checker *Checker) checkDestructor(
+	destructor *ast.SpecialFunctionDeclaration,
+	containerType Type,
+	containerDeclarationKind common.DeclarationKind,
+	containerTypeIdentifier string,
+	containerKind ContainerKind,
+) {
+
+	if len(destructor.Parameters) != 0 {
+		checker.report(
+			&InvalidDestructorParametersError{
+				StartPos: destructor.Parameters.StartPosition(),
+				EndPos:   destructor.Parameters.EndPosition(),
+			},
+		)
+	}
+
+	parameterTypeAnnotations :=
+		checker.parameterTypeAnnotations(destructor.Parameters)
+
+	checker.checkSpecialFunction(
+		destructor,
+		containerType,
+		containerDeclarationKind,
+		containerTypeIdentifier,
+		parameterTypeAnnotations,
+		containerKind,
+	)
+
+	// TODO: check all resources fields are invalidated
+
 }

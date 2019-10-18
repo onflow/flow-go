@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 	"github.com/stretchr/testify/assert"
@@ -159,4 +160,130 @@ func TestCheckSwapOptional(t *testing.T) {
 	`)
 
 	assert.Nil(t, err)
+}
+
+func TestCheckSwapResourceArrayElementAndVariable(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- [<-create X()]
+          var x <- create X()
+          x <-> xs[0]
+          destroy x
+          destroy xs
+      }
+	`)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckSwapResourceArrayElements(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- [<-create X(), <-create X()]
+          xs[0] <-> xs[1]
+          destroy xs
+      }
+	`)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckSwapResourceFields(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      resource Y {
+          var x: <-X
+
+          init(x: <-X) {
+              self.x <- x
+          }
+
+          destroy() {
+              destroy self.x
+          }
+      }
+
+      fun test() {
+          let y1 <- create Y(x: <-create X())
+          let y2 <- create Y(x: <-create X())
+          y1.x <-> y2.x
+          destroy y1
+          destroy y2
+      }
+	`)
+
+	assert.Nil(t, err)
+}
+
+// TestCheckInvalidSwapConstantResourceFields tests that it is invalid
+// to swap fields which are constant (`let`)
+//
+func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
+
+	for i := 0; i < 2; i += 1 {
+
+		first := "var"
+		second := "let"
+
+		if i == 1 {
+			first = "let"
+			second = "var"
+		}
+
+		testName := fmt.Sprintf("%s_%s", first, second)
+
+		t.Run(testName, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource X {}
+
+                  resource Y {
+                      %[1]s x: <-X
+
+                      init(x: <-X) {
+                          self.x <- x
+                      }
+
+                      destroy() {
+                          destroy self.x
+                      }
+                  }
+
+                  resource Z {
+                      %[2]s x: <-X
+
+                      init(x: <-X) {
+                          self.x <- x
+                      }
+
+                      destroy() {
+                          destroy self.x
+                      }
+                  }
+
+                  fun test() {
+                      let y <- create Y(x: <-create X())
+                      let z <- create Z(x: <-create X())
+                      y.x <-> z.x
+                      destroy y
+                      destroy z
+                  }
+	            `,
+				first,
+				second,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+		})
+	}
 }
