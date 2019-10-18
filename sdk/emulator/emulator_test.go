@@ -1018,11 +1018,11 @@ func TestEventEmitted(t *testing.T) {
 		})
 
 		script := []byte(`
-            event MyEvent(x: Int, y: Int)
-    
-            fun main() {
-              emit MyEvent(x: 1, y: 2)
-            }
+			event MyEvent(x: Int, y: Int)
+			
+			fun main() {
+			  emit MyEvent(x: 1, y: 2)
+			}
 		`)
 
 		tx := &types.Transaction{
@@ -1056,11 +1056,11 @@ func TestEventEmitted(t *testing.T) {
 		})
 
 		script := []byte(`
-            event MyEvent(x: Int, y: Int)
-    
-            fun main() {
-              emit MyEvent(x: 1, y: 2)
-            }
+			event MyEvent(x: Int, y: Int)
+			
+			fun main() {
+			  emit MyEvent(x: 1, y: 2)
+			}
 		`)
 
 		_, err := b.CallScript(script)
@@ -1085,8 +1085,8 @@ func TestEventEmitted(t *testing.T) {
 		})
 
 		accountScript := []byte(`
-		event MyEvent(x: Int, y: Int)
-	`)
+			event MyEvent(x: Int, y: Int)
+		`)
 
 		publicKeyA, _ := b.RootKey().Publickey().Encode()
 
@@ -1099,11 +1099,11 @@ func TestEventEmitted(t *testing.T) {
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`
-            import 0x%s
-        
-            fun main() {
-                emit MyEvent(x: 1, y: 2)
-            }
+			import 0x%s
+			
+			fun main() {
+				emit MyEvent(x: 1, y: 2)
+			}
 		`, addressA.Hex()))
 
 		tx := &types.Transaction{
