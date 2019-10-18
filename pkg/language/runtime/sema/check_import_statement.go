@@ -69,7 +69,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 	checker.importValues(declaration, importChecker, missing)
 	checker.importTypes(declaration, importChecker, missing)
 
-	for identifier, _ := range missing {
+	for identifier := range missing {
 		checker.report(
 			&NotExportedError{
 				Name:           identifier.Identifier,

@@ -126,10 +126,11 @@ func TestResourceResources_FirstRest(t *testing.T) {
 
 	result := map[*Variable][]ResourceInvalidation{}
 
-	var variable *Variable
+	var resource interface{}
 	var resourceInfo ResourceInfo
 	for resources.Size() != 0 {
-		variable, resourceInfo, resources = resources.FirstRest()
+		resource, resourceInfo, resources = resources.FirstRest()
+		variable := resource.(*Variable)
 		result[variable] = resourceInfo.Invalidations.All()
 	}
 

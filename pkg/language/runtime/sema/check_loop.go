@@ -40,12 +40,13 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 }
 
 func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) {
-	var variable *Variable
+	var resource interface{}
 	var info ResourceInfo
 
 	resources := checker.resources
 	for resources.Size() != 0 {
-		variable, info, resources = resources.FirstRest()
+		resource, info, resources = resources.FirstRest()
+		variable := resource.(*Variable)
 
 		// only report if the variable was invalidated
 		if info.Invalidations.IsEmpty() {
