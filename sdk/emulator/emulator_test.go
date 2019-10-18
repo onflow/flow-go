@@ -1018,12 +1018,12 @@ func TestEventEmitted(t *testing.T) {
 		})
 
 		script := []byte(`
-		event MyEvent(x: Int, y: Int)
-
-		fun main() {
-		  emit MyEvent(x: 1, y: 2)
-		}
-	`)
+            event MyEvent(x: Int, y: Int)
+    
+            fun main() {
+              emit MyEvent(x: 1, y: 2)
+            }
+		`)
 
 		tx := &types.Transaction{
 			Script:             script,
@@ -1039,7 +1039,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		expectedID := fmt.Sprintf("atx.%s.MyEvent", tx.Hash().Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -1056,19 +1056,19 @@ func TestEventEmitted(t *testing.T) {
 		})
 
 		script := []byte(`
-		event MyEvent(x: Int, y: Int)
-
-		fun main() {
-		  emit MyEvent(x: 1, y: 2)
-		}
-	`)
+            event MyEvent(x: Int, y: Int)
+    
+            fun main() {
+              emit MyEvent(x: 1, y: 2)
+            }
+		`)
 
 		_, err := b.CallScript(script)
 		assert.Nil(t, err)
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedID := fmt.Sprintf("ascript.%s.MyEvent", execution.ScriptHash(script).Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -1099,12 +1099,12 @@ func TestEventEmitted(t *testing.T) {
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`
-		import 0x%s
-	
-		fun main() {
-			emit MyEvent(x: 1, y: 2)
-		}
-	`, addressA.Hex()))
+            import 0x%s
+        
+            fun main() {
+                emit MyEvent(x: 1, y: 2)
+            }
+		`, addressA.Hex()))
 
 		tx := &types.Transaction{
 			Script:             script,
@@ -1120,7 +1120,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
+		expectedID := fmt.Sprintf("aaccount.%s.MyEvent", addressA.Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
