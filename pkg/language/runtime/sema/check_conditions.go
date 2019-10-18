@@ -33,8 +33,10 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
 				ActualType:   testType,
-				StartPos:     condition.Test.StartPosition(),
-				EndPos:       condition.Test.EndPosition(),
+				Range: ast.Range{
+					StartPos: condition.Test.StartPosition(),
+					EndPos:   condition.Test.EndPosition(),
+				},
 			},
 		)
 	}
@@ -52,8 +54,10 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 				&TypeMismatchError{
 					ExpectedType: &StringType{},
 					ActualType:   testType,
-					StartPos:     condition.Message.StartPosition(),
-					EndPos:       condition.Message.EndPosition(),
+					Range: ast.Range{
+						StartPos: condition.Message.StartPosition(),
+						EndPos:   condition.Message.EndPosition(),
+					},
 				},
 			)
 		}

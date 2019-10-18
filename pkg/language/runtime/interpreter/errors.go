@@ -12,8 +12,7 @@ import (
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	startPos  ast.Position
-	endPos    ast.Position
+	ast.Range
 }
 
 func (e *unsupportedOperation) Error() string {
@@ -22,14 +21,6 @@ func (e *unsupportedOperation) Error() string {
 		e.kind.Name(),
 		e.operation.Symbol(),
 	)
-}
-
-func (e *unsupportedOperation) StartPosition() ast.Position {
-	return e.startPos
-}
-
-func (e *unsupportedOperation) EndPosition() ast.Position {
-	return e.endPos
 }
 
 // NotDeclaredError

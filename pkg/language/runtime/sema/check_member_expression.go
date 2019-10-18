@@ -5,12 +5,11 @@ import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	member := checker.visitMember(expression)
 
-	var memberType Type = &InvalidType{}
-	if member != nil {
-		memberType = member.Type
+	if member == nil {
+		return &InvalidType{}
 	}
 
-	return memberType
+	return member.Type
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
@@ -24,6 +23,13 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	expressionType := accessedExpression.Accept(checker).(Type)
 
 	checker.checkAccessResourceLoss(expressionType, accessedExpression)
+
+	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
+	if selfFieldAccessMember != nil {
+		// NOTE: capturing is already handled by access to self
+		checker.checkResourceUseAfterInvalidation(selfFieldAccessMember, expression.Identifier)
+		checker.resources.AddUse(selfFieldAccessMember, expression.Identifier.Pos)
+	}
 
 	origins := checker.memberOrigins[expressionType]
 
@@ -43,9 +49,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 			if !IsEquatableType(functionType.ParameterTypeAnnotations[0].Type) {
 				checker.report(
 					&NotEquatableTypeError{
-						Type:     expressionType,
-						StartPos: identifierStartPosition,
-						EndPos:   identifierEndPosition,
+						Type: expressionType,
+						Range: ast.Range{
+							StartPos: identifierStartPosition,
+							EndPos:   identifierEndPosition,
+						},
 					},
 				)
 
@@ -58,10 +66,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		if !IsInvalidType(expressionType) {
 			checker.report(
 				&NotDeclaredMemberError{
-					Type:     expressionType,
-					Name:     identifier,
-					StartPos: identifierStartPosition,
-					EndPos:   identifierEndPosition,
+					Type: expressionType,
+					Name: identifier,
+					Range: ast.Range{
+						StartPos: identifierStartPosition,
+						EndPos:   identifierEndPosition,
+					},
 				},
 			)
 		}

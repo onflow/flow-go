@@ -5,7 +5,7 @@ import "github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 type FunctionDeclaration struct {
 	Access               Access
 	Identifier           Identifier
-	Parameters           Parameters
+	ParameterList        *ParameterList
 	ReturnTypeAnnotation *TypeAnnotation
 	FunctionBlock        *FunctionBlock
 	StartPos             Position
@@ -16,7 +16,13 @@ func (f *FunctionDeclaration) StartPosition() Position {
 }
 
 func (f *FunctionDeclaration) EndPosition() Position {
-	return f.FunctionBlock.EndPosition()
+	if f.FunctionBlock != nil {
+		return f.FunctionBlock.EndPosition()
+	}
+	if f.ReturnTypeAnnotation != nil {
+		return f.ReturnTypeAnnotation.EndPosition()
+	}
+	return f.ParameterList.EndPosition()
 }
 
 func (f *FunctionDeclaration) Accept(visitor Visitor) Repr {
@@ -36,7 +42,7 @@ func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
 
 func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
 	return &FunctionExpression{
-		Parameters:           f.Parameters,
+		ParameterList:        f.ParameterList,
 		ReturnTypeAnnotation: f.ReturnTypeAnnotation,
 		FunctionBlock:        f.FunctionBlock,
 		StartPos:             f.StartPos,

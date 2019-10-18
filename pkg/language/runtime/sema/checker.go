@@ -193,7 +193,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+	functionType := checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 	checker.declareFunctionDeclaration(declaration, functionType)
 }
@@ -257,8 +257,10 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 				ExpectedType:     integerType,
 				ExpectedRangeMin: rangeMin,
 				ExpectedRangeMax: rangeMax,
-				StartPos:         expression.StartPosition(),
-				EndPos:           expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: expression.StartPosition(),
+					EndPos:   expression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -421,11 +423,11 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 }
 
 func (checker *Checker) functionType(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
 	convertedParameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(parameters)
+		checker.parameterTypeAnnotations(parameterList)
 
 	convertedReturnTypeAnnotation :=
 		checker.ConvertTypeAnnotation(returnTypeAnnotation)
@@ -436,11 +438,11 @@ func (checker *Checker) functionType(
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameters ast.Parameters) []*TypeAnnotation {
+func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterList) []*TypeAnnotation {
 
-	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameters))
+	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameterList.Parameters))
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,
@@ -549,8 +551,10 @@ func (checker *Checker) checkResourceLoss(depth int) {
 
 			checker.report(
 				&ResourceLossError{
-					StartPos: *variable.Pos,
-					EndPos:   variable.Pos.Shifted(len(name) - 1),
+					Range: ast.Range{
+						StartPos: *variable.Pos,
+						EndPos:   variable.Pos.Shifted(len(name) - 1),
+					},
 				},
 			)
 
@@ -587,14 +591,27 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
+	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
+
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if !checker.isSelfFieldAccess(expression) {
+		if selfFieldAccessMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
 	case *ast.IndexExpression:
 		reportInvalidNestedMove()
+		return
+	}
+
+	invalidation := ResourceInvalidation{
+		Kind:     kind,
+		StartPos: expression.StartPosition(),
+		EndPos:   expression.EndPosition(),
+	}
+
+	if selfFieldAccessMember != nil {
+		checker.resources.AddInvalidation(selfFieldAccessMember, invalidation)
 		return
 	}
 
@@ -608,12 +625,7 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	checker.resources.AddInvalidation(variable,
-		ResourceInvalidation{
-			Kind: kind,
-			Pos:  identifierExpression.Pos,
-		},
-	)
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(
@@ -670,8 +682,10 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 
 	checker.report(
 		&ResourceLossError{
-			StartPos: expression.StartPosition(),
-			EndPos:   expression.EndPosition(),
+			Range: ast.Range{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
 		},
 	)
 }

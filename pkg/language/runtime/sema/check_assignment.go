@@ -21,9 +21,10 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		// Assignment to self-field is allowed. This is necessary to initialize
 		// fields in the initializer
 
-		// TODO: improve exception
+		// TODO: improve exception: this is only allowed once, in the initializer
+		//    https://github.com/dapperlabs/flow-go/issues/947
 
-		if checker.isSelfFieldAccess(assignment.Target) {
+		if checker.selfFieldAccessMember(assignment.Target) != nil {
 			checker.recordResourceInvalidation(
 				assignment.Value,
 				valueType,
@@ -32,8 +33,10 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		} else {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					StartPos: assignment.StartPosition(),
-					EndPos:   assignment.EndPosition(),
+					Range: ast.Range{
+						StartPos: assignment.StartPosition(),
+						EndPos:   assignment.EndPosition(),
+					},
 				},
 			)
 		}
@@ -42,23 +45,26 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 	return nil
 }
 
-func (checker *Checker) isSelfFieldAccess(expression ast.Expression) bool {
+func (checker *Checker) selfFieldAccessMember(expression ast.Expression) *Member {
 	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
 	if !isMemberExpression {
-		return false
+		return nil
 	}
 
 	identifierExpression, isIdentifierExpression := memberExpression.Expression.(*ast.IdentifierExpression)
 	if !isIdentifierExpression {
-		return false
+		return nil
 	}
 
 	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
-	if variable == nil {
-		return false
+	if variable == nil ||
+		variable.Kind != common.DeclarationKindSelf {
+
+		return nil
 	}
 
-	return variable.Kind == common.DeclarationKindSelf
+	fieldName := memberExpression.Identifier.Identifier
+	return variable.Type.(*CompositeType).Members[fieldName]
 }
 
 func (checker *Checker) visitAssignmentValueType(
@@ -100,9 +106,11 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	if variable.IsConstant {
 		checker.report(
 			&AssignmentToConstantError{
-				Name:     identifier,
-				StartPos: target.StartPosition(),
-				EndPos:   target.EndPosition(),
+				Name: identifier,
+				Range: ast.Range{
+					StartPos: target.StartPosition(),
+					EndPos:   target.EndPosition(),
+				},
 			},
 		)
 	}
@@ -115,8 +123,10 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -143,8 +153,10 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -170,9 +182,11 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
-					Name:     target.Identifier.Identifier,
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
+					Name: target.Identifier.Identifier,
+					Range: ast.Range{
+						StartPos: valueExpression.StartPosition(),
+						EndPos:   valueExpression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -188,8 +202,10 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}

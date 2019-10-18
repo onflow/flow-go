@@ -13,7 +13,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 
 	if variable.Type.IsResourceType() {
 		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
-		checker.checkResourceVariableUseAfterInvalidation(variable, expression.Identifier)
+		checker.checkResourceUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
@@ -43,24 +43,6 @@ func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Varia
 	)
 }
 
-// checkResourceVariableUseAfterInvalidation checks if a resource variable
-// is used after it was previously invalidated (moved or destroyed)
-//
-func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Variable, useIdentifier ast.Identifier) {
-	resourceInfo := checker.resources.Get(variable)
-	if resourceInfo.Invalidations.Size() == 0 {
-		return
-	}
-
-	checker.report(
-		&ResourceUseAfterInvalidationError{
-			Name:          useIdentifier.Identifier,
-			Pos:           useIdentifier.Pos,
-			Invalidations: resourceInfo.Invalidations.All(),
-		},
-	)
-}
-
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
 	result := statement.Expression.Accept(checker)
 
@@ -69,8 +51,10 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 
 		checker.report(
 			&ResourceLossError{
-				StartPos: statement.Expression.StartPosition(),
-				EndPos:   statement.Expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: statement.Expression.StartPosition(),
+					EndPos:   statement.Expression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -143,8 +127,10 @@ func (checker *Checker) visitIndexingExpression(
 			if indexingType == nil {
 				checker.report(
 					&InvalidStorageIndexingError{
-						StartPos: indexExpression.IndexingExpression.StartPosition(),
-						EndPos:   indexExpression.IndexingExpression.EndPosition(),
+						Range: ast.Range{
+							StartPos: indexExpression.IndexingExpression.StartPosition(),
+							EndPos:   indexExpression.IndexingExpression.EndPosition(),
+						},
 					},
 				)
 
@@ -162,8 +148,10 @@ func (checker *Checker) visitIndexingExpression(
 		if indexExpression.IndexingType != nil {
 			checker.report(
 				&InvalidIndexingError{
-					StartPos: indexExpression.IndexingType.StartPosition(),
-					EndPos:   indexExpression.IndexingType.EndPosition(),
+					Range: ast.Range{
+						StartPos: indexExpression.IndexingType.StartPosition(),
+						EndPos:   indexExpression.IndexingType.EndPosition(),
+					},
 				},
 			)
 
@@ -191,9 +179,11 @@ func (checker *Checker) visitNormalIndexingExpression(
 	if !isIndexableType {
 		checker.report(
 			&NotIndexableTypeError{
-				Type:     indexedType,
-				StartPos: indexedExpression.StartPosition(),
-				EndPos:   indexedExpression.EndPosition(),
+				Type: indexedType,
+				Range: ast.Range{
+					StartPos: indexedExpression.StartPosition(),
+					EndPos:   indexedExpression.EndPosition(),
+				},
 			},
 		)
 
@@ -210,9 +200,11 @@ func (checker *Checker) visitNormalIndexingExpression(
 
 		checker.report(
 			&NotIndexingTypeError{
-				Type:     indexingType,
-				StartPos: indexingExpression.StartPosition(),
-				EndPos:   indexingExpression.EndPosition(),
+				Type: indexingType,
+				Range: ast.Range{
+					StartPos: indexingExpression.StartPosition(),
+					EndPos:   indexingExpression.EndPosition(),
+				},
 			},
 		)
 	}

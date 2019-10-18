@@ -47,6 +47,12 @@ type EquatableValue interface {
 	Equal(other Value) BoolValue
 }
 
+// DestroyableValue
+
+type DestroyableValue interface {
+	Destroy(*Interpreter, Location) trampoline.Trampoline
+}
+
 // VoidValue
 
 type VoidValue struct{}
@@ -240,6 +246,16 @@ func (v ArrayValue) Copy() Value {
 		copies[i] = value.Copy()
 	}
 	return NewArrayValue(copies...)
+}
+
+func (v ArrayValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+	for _, value := range *v.Values {
+		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
+			return value.(DestroyableValue).Destroy(interpreter, location)
+		})
+	}
+	return result
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -1007,6 +1023,22 @@ type CompositeValue struct {
 	Identifier     string
 	Fields         *map[string]Value
 	Functions      *map[string]FunctionValue
+	Destructor     *InterpretedFunctionValue
+}
+
+func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	// if composite was deserialized, dynamically link in the destructor
+	if v.Destructor == nil {
+		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
+	}
+
+	destructor := v.Destructor
+	if destructor == nil {
+		return trampoline.Done{Result: VoidValue{}}
+	}
+
+	return interpreter.bindSelf(*destructor, v).
+		invoke(nil, location)
 }
 
 func (CompositeValue) isValue() {}
@@ -1017,13 +1049,14 @@ func (v CompositeValue) Copy() Value {
 		newFields[field] = value.Copy()
 	}
 
-	// NOTE: not copying functions – linked in
+	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
 		ImportLocation: v.ImportLocation,
 		Identifier:     v.Identifier,
 		Fields:         &newFields,
 		Functions:      v.Functions,
+		Destructor:     v.Destructor,
 	}
 }
 
@@ -1046,7 +1079,7 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 		}
 	}
 
-	// if structure was deserialized, dynamically link in the functions
+	// if composite was deserialized, dynamically link in the functions
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = &functions
@@ -1084,7 +1117,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: *not* encoding functions – linked in on-demand
+	// NOTE: *not* encoding functions and destructor – linked in on-demand
 	return w.Bytes(), nil
 }
 
@@ -1119,6 +1152,28 @@ func (v DictionaryValue) Copy() Value {
 		newDictionary[field] = value.Copy()
 	}
 	return newDictionary
+}
+
+func (v DictionaryValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+
+	maybeDestroy := func(value interface{}) {
+		destroyableValue, ok := value.(DestroyableValue)
+		if !ok {
+			return
+		}
+
+		result = result.
+			FlatMap(func(_ interface{}) trampoline.Trampoline {
+				return destroyableValue.Destroy(interpreter, location)
+			})
+	}
+
+	for key, value := range v {
+		maybeDestroy(key)
+		maybeDestroy(value)
+	}
+	return result
 }
 
 func (v DictionaryValue) ToGoValue() interface{} {
@@ -1337,18 +1392,6 @@ func (v SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// MetaTypeValue
-
-type MetaTypeValue struct {
-	Type sema.Type
-}
-
-func (MetaTypeValue) isValue() {}
-
-func (v MetaTypeValue) Copy() Value {
-	return v
-}
-
 // AnyValue
 
 type AnyValue struct {
@@ -1422,6 +1465,5 @@ func init() {
 	gob.Register(DictionaryValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
-	gob.Register(MetaTypeValue{})
 	gob.Register(AnyValue{})
 }
