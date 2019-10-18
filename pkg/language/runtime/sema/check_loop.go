@@ -48,7 +48,6 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 	resources := checker.resources
 	for resources.Size() != 0 {
 		resource, info, resources = resources.FirstRest()
-		variable := resource.(*Variable)
 
 		// only report if the variable was invalidated
 		if info.Invalidations.IsEmpty() {
@@ -65,16 +64,17 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 				continue
 			}
 
-			if checker.resources.IsUseAfterInvalidationReported(variable, usePosition) {
+			if checker.resources.IsUseAfterInvalidationReported(resource, usePosition) {
 				continue
 			}
 
-			checker.resources.MarkUseAfterInvalidationReported(variable, usePosition)
+			checker.resources.MarkUseAfterInvalidationReported(resource, usePosition)
 
 			checker.report(
 				&ResourceUseAfterInvalidationError{
-					Name:          variable.Identifier,
-					Pos:           usePosition,
+					// TODO: improve position information
+					StartPos:      usePosition,
+					EndPos:        usePosition,
 					Invalidations: invalidations,
 					InLoop:        true,
 				},

@@ -54,8 +54,8 @@ func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Vari
 
 	checker.report(
 		&ResourceUseAfterInvalidationError{
-			Name:          useIdentifier.Identifier,
-			Pos:           useIdentifier.Pos,
+			StartPos:      useIdentifier.StartPosition(),
+			EndPos:        useIdentifier.EndPosition(),
 			Invalidations: resourceInfo.Invalidations.All(),
 		},
 	)

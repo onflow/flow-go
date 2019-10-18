@@ -1905,3 +1905,42 @@ func TestCheckInvalidDestructorParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {}
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
+}
+
+func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       struct S {}
+
+	   resource Test {
+           let s: S
+
+           init(s: S) {
+               self.s = s
+           }
+
+           destroy() {}
+	   }
+	`)
+
+	assert.Nil(t, err)
+}
+
