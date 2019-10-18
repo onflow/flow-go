@@ -961,9 +961,10 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 			}
 		`)
 
-		errs := ExpectCheckerErrors(t, err, 1)
+		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
 	})
 
 	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
@@ -984,9 +985,10 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
             }
 		`)
 
-		errs := ExpectCheckerErrors(t, err, 1)
+		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
 	})
 }
 
@@ -2145,7 +2147,7 @@ func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 }
 
-func TestCheckInvalidResourceLossThroughArrayIndexing(t *testing.T) {
+func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource X {}
@@ -2160,8 +2162,9 @@ func TestCheckInvalidResourceLossThroughArrayIndexing(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
-	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	errs := ExpectCheckerErrors(t, err, 2)
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
@@ -2209,4 +2212,83 @@ func TestCheckResourceInterfaceDestruction(t *testing.T) {
 	`)
 
 	assert.Nil(t, err)
+}
+
+// TestCheckInvalidResourceFieldMoveThroughVariableDeclaration tests if resources nested
+// as a field in another resource cannot be moved out of the containing resource through
+// a variable declaration. This would partially invalidate the containing resource
+//
+func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {}
+
+      resource Bar {
+          let foo: <-Foo
+
+          init(foo: <-Foo) {
+              self.foo <- foo
+          }
+
+          destroy() {
+              destroy self.foo
+          }
+      }
+
+      fun test(): <-[Foo] {
+          let foo <- create Foo()
+          let bar <- create Bar(foo: <-foo)
+          let foo2 <- bar.foo
+          let foo3 <- bar.foo
+          destroy bar
+          return <-[<-foo2, <-foo3]
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+}
+
+// TestCheckInvalidResourceFieldMoveThroughParameter tests if resources nested
+// as a field in another resource cannot be moved out of the containing resource
+// by passing the field as an argument to a function. This would partially invalidate
+// the containing resource
+//
+func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {}
+
+      resource Bar {
+          let foo: <-Foo
+
+          init(foo: <-Foo) {
+              self.foo <- foo
+          }
+
+          destroy() {
+              destroy self.foo
+          }
+      }
+
+      fun identity(_ foo: <-Foo): <-Foo {
+          return <-foo
+      }
+
+      fun test(): <-[Foo] {
+          let foo <- create Foo()
+          let bar <- create Bar(foo: <-foo)
+          let foo2 <- identity(<-bar.foo)
+          let foo3 <- identity(<-bar.foo)
+          destroy bar
+          return <-[<-foo2, <-foo3]
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
 }

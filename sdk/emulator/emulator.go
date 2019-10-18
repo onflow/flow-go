@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"github.com/dapperlabs/flow-go/sdk/templates"
 	"sync"
 	"time"
 
@@ -42,12 +43,14 @@ type EmulatedBlockchain struct {
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
 	RootAccountKey crypto.PrivateKey
-	RuntimeLogger  func(string)
+	OnLogMessage   func(string)
+	OnEventEmitted func(event types.Event, blockNumber uint64, txhash crypto.Hash)
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
 var DefaultOptions = &EmulatedBlockchainOptions{
-	RuntimeLogger: func(string) {},
+	OnLogMessage:   func(string) {},
+	OnEventEmitted: func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
@@ -69,8 +72,9 @@ func NewEmulatedBlockchain(opt *EmulatedBlockchainOptions) *EmulatedBlockchain {
 	runtime := runtime.NewInterpreterRuntime()
 	computer := execution.NewComputer(
 		runtime,
-		opt.RuntimeLogger,
+		opt.OnLogMessage,
 		b.onAccountCreated,
+		opt.OnEventEmitted,
 	)
 
 	b.computer = computer
@@ -204,9 +208,13 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.txPool[string(tx.Hash())] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
+	// TODO: improve the pending block, provide all block information
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+	blockNumber := prevBlock.Number + 1
+
 	registers := b.pendingWorldState.Registers.NewView()
 
-	err := b.computer.ExecuteTransaction(registers, tx)
+	err := b.computer.ExecuteTransaction(registers, tx, blockNumber)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
 
@@ -320,7 +328,7 @@ func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
 	b.lastCreatedAccount = account
 }
 
-// lastCreatedAccount returns the last account that was created in the blockchain.
+// LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 	return b.lastCreatedAccount
 }
@@ -351,6 +359,28 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	}
 
 	return nil
+}
+
+// CreateAccount submits a transaction to create a new account with the given
+// account keys and code. The transaction is paid by the root account.
+func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte) (types.Address, error) {
+	createAccountScript := templates.CreateAccount(accountKeys, code)
+
+	tx := &types.Transaction{
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	err := b.SubmitTransaction(tx)
+	if err != nil {
+		return types.Address{}, err
+	}
+
+	return b.LastCreatedAccount().Address, nil
 }
 
 // verifyAccountSignature verifies that an account signature is valid for the account and given message.

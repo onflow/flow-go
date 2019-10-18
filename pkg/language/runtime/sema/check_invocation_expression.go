@@ -6,6 +6,25 @@ import (
 )
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+	typ := checker.checkInvocationExpression(invocationExpression)
+
+	// events cannot be invoked without an emit statement
+	if _, isEventType := typ.(*EventType); isEventType {
+		checker.report(
+			&InvalidEventUsageError{
+				Range: ast.Range{
+					StartPos: invocationExpression.StartPosition(),
+					EndPos:   invocationExpression.EndPosition(),
+				},
+			},
+		)
+		return &InvalidType{}
+	}
+
+	return typ
+}
+
+func (checker *Checker) checkInvocationExpression(invocationExpression *ast.InvocationExpression) Type {
 	inCreate := checker.inCreate
 	checker.inCreate = false
 	defer func() {

@@ -910,6 +910,27 @@ func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
+// InvalidNestedMoveError
+
+type InvalidNestedMoveError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidNestedMoveError) Error() string {
+	return "cannot move nested resource"
+}
+
+func (*InvalidNestedMoveError) isSemanticError() {}
+
+func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidMoveAnnotationError
 
 type InvalidMoveAnnotationError struct {
@@ -1258,6 +1279,44 @@ func (e *InvalidSwapExpressionError) Error() string {
 }
 
 func (*InvalidSwapExpressionError) isSemanticError() {}
+
+// InvalidEventParameterTypeError
+
+type InvalidEventParameterTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidEventParameterTypeError) Error() string {
+	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+}
+
+func (*InvalidEventParameterTypeError) isSemanticError() {}
+
+// InvalidEventUsageError
+
+type InvalidEventUsageError struct {
+	ast.Range
+}
+
+func (e *InvalidEventUsageError) Error() string {
+	return "events can only be invoked in an `emit` statement"
+}
+
+func (*InvalidEventUsageError) isSemanticError() {}
+
+// EmitNonEventError
+
+type EmitNonEventError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *EmitNonEventError) Error() string {
+	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+}
+
+func (*EmitNonEventError) isSemanticError() {}
 
 // InvalidResourceAssignmentError
 

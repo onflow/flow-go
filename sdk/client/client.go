@@ -131,6 +131,7 @@ func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.
 	return &account, nil
 }
 
+// GetEvents queries the Observation API for events and returns the results.
 func (c *Client) GetEvents(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
 	res, err := c.rpcClient.GetEvents(
 		ctx,

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"net"
 	"net/http"
 	"time"
@@ -21,7 +23,7 @@ import (
 //
 // The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
-	blockchain *emulator.EmulatedBlockchain
+	backend *Backend
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
@@ -43,26 +45,34 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		options.RootAccountKey = conf.RootAccountKey
 	}
 
-	options.RuntimeLogger = func(msg string) {
+	options.OnLogMessage = func(msg string) {
 		logger.Debug(msg)
 	}
 
+	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+		// TODO: store events for indexing
+	}
+
 	server := &EmulatorServer{
-		blockchain: emulator.NewEmulatedBlockchain(options),
+		backend: &Backend{
+			blockchain: emulator.NewEmulatedBlockchain(options),
+			logger: logger,
+			eventStore: events.NewMemStore(),
+		},
 		grpcServer: grpc.NewServer(),
 		config:     conf,
 		logger:     logger,
 	}
 
-	address := server.blockchain.RootAccountAddress()
-	prKey, _ := utils.EncodePrivateKey(server.blockchain.RootKey())
+	address := server.backend.blockchain.RootAccountAddress()
+	prKey, _ := utils.EncodePrivateKey(server.backend.blockchain.RootKey())
 
 	logger.WithFields(log.Fields{
 		"address": address.Hex(),
 		"prKey":   prKey,
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
-	observe.RegisterObserveServiceServer(server.grpcServer, server)
+	observe.RegisterObserveServiceServer(server.grpcServer, server.backend)
 	return server
 }
 
@@ -70,21 +80,21 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 //
 // This function starts a gRPC server to listen for requests and process incoming transactions.
 // By default, the Flow Emulator server automatically mines a block every BlockInterval.
-func (s *EmulatorServer) Start(ctx context.Context) {
-	s.logger.WithFields(log.Fields{
-		"port": s.config.Port,
-	}).Infof("🌱  Starting Emulator Server on port %d...", s.config.Port)
+func (b *EmulatorServer) Start(ctx context.Context) {
+	b.logger.WithFields(log.Fields{
+		"port": b.config.Port,
+	}).Infof("🌱  Starting Emulator Server on port %d...", b.config.Port)
 
 	// Start gRPC server in a separate goroutine to continually listen for requests
-	go s.startGrpcServer()
+	go b.startGrpcServer()
 
-	tick := time.Tick(s.config.BlockInterval)
+	tick := time.Tick(b.config.BlockInterval)
 	for {
 		select {
 		case <-tick:
-			block := s.blockchain.CommitBlock()
+			block := b.backend.blockchain.CommitBlock()
 
-			s.logger.WithFields(log.Fields{
+			b.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,
 				"blockHash": block.Hash(),
 				"blockSize": len(block.TransactionHashes),
@@ -96,13 +106,13 @@ func (s *EmulatorServer) Start(ctx context.Context) {
 	}
 }
 
-func (s *EmulatorServer) startGrpcServer() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
+func (b *EmulatorServer) startGrpcServer() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", b.config.Port))
 	if err != nil {
-		s.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
+		b.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
-	s.grpcServer.Serve(lis)
+	b.grpcServer.Serve(lis)
 }
 
 // StartServer sets up a wrapped instance of the Flow Emulator server and starts it.
