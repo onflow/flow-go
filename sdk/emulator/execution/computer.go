@@ -8,22 +8,19 @@ import (
 
 // Computer uses a runtime instance to execute transactions and scripts.
 type Computer struct {
-	runtime          runtime.Runtime
-	onLogMessage     func(string)
-	onAccountCreated func(types.Account)
-	onEventEmitted   func(event types.Event, blockNumber uint64, txHash crypto.Hash)
+	runtime        runtime.Runtime
+	onLogMessage   func(string)
+	onEventEmitted func(event types.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
 func NewComputer(
 	runtime runtime.Runtime,
 	onLogMessage func(string),
-	onAccountCreated func(types.Account),
 ) *Computer {
 	return &Computer{
-		runtime:          runtime,
-		onLogMessage:     onLogMessage,
-		onAccountCreated: onAccountCreated,
+		runtime:      runtime,
+		onLogMessage: onLogMessage,
 	}
 }
 
@@ -38,7 +35,6 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
-	runtimeContext.SetOnAccountCreated(c.onAccountCreated)
 
 	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash())
 	if err != nil {

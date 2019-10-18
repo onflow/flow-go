@@ -17,20 +17,18 @@ import (
 // The logic in this runtime context is specific to the emulator and is designed to be
 // used with an EmulatedBlockchain instance.
 type RuntimeContext struct {
-	registers        *types.RegistersView
-	signingAccounts  []types.Address
-	onLogMessage     func(string)
-	onAccountCreated func(types.Account)
-	events           []types.Event
+	registers       *types.RegistersView
+	signingAccounts []types.Address
+	onLogMessage    func(string)
+	events          []types.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers:        registers,
-		onLogMessage:     func(string) {},
-		onAccountCreated: func(types.Account) {},
-		events:           make([]types.Event, 0),
+		registers:    registers,
+		onLogMessage: func(string) {},
+		events:       make([]types.Event, 0),
 	}
 }
 
@@ -53,12 +51,6 @@ func (r *RuntimeContext) GetSigningAccounts() []types.Address {
 // SetOnLogMessage sets the logging function for this context.
 func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
 	r.onLogMessage = callback
-}
-
-// SetOnAccountCreated registers a callback that is triggered when a new
-// account is created.
-func (r *RuntimeContext) SetOnAccountCreated(callback func(types.Account)) {
-	r.onAccountCreated = callback
 }
 
 // Events returns all events emitted by the runtime to this context.
@@ -112,9 +104,6 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
-
-	account := r.GetAccount(accountAddress)
-	r.onAccountCreated(*account)
 
 	return accountID, nil
 }

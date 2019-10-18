@@ -76,11 +76,7 @@ func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
 	}
 
 	runtime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(
-		runtime,
-		opt.OnLogMessage,
-		b.onAccountCreated,
-	)
+	computer := execution.NewComputer(runtime, opt.OnLogMessage)
 
 	b.computer = computer
 	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
