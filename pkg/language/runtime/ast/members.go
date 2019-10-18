@@ -72,3 +72,12 @@ func (m *Members) Destructors() []*SpecialFunctionDeclaration {
 	}
 	return m._destructors
 }
+
+// Destructor returns the first destructor, if any
+func (m *Members) Destructor() *SpecialFunctionDeclaration {
+	destructors := m.Destructors()
+	if len(destructors) == 0 {
+		return nil
+	}
+	return destructors[0]
+}
