@@ -33,3 +33,20 @@ func (parameters Parameters) ArgumentLabels() []string {
 
 	return argumentLabels
 }
+
+func (parameters Parameters) StartPosition() Position {
+	if len(parameters) == 0 {
+		return Position{}
+	}
+	firstParameter := parameters[0]
+	return firstParameter.StartPos
+}
+
+func (parameters Parameters) EndPosition() Position {
+	count := len(parameters)
+	if count == 0 {
+		return Position{}
+	}
+	lastParameter := parameters[count-1]
+	return lastParameter.EndPos
+}

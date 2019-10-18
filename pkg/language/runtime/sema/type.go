@@ -942,9 +942,10 @@ type HasMembers interface {
 // InterfaceType
 
 type InterfaceType struct {
-	CompositeKind                       common.CompositeKind
-	Identifier                          string
-	Members                             map[string]*Member
+	CompositeKind common.CompositeKind
+	Identifier    string
+	Members       map[string]*Member
+	// TODO: add support for overloaded initializers
 	InitializerParameterTypeAnnotations []*TypeAnnotation
 }
 

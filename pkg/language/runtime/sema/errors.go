@@ -591,16 +591,16 @@ func (e *InvalidDeclarationError) EndPosition() ast.Position {
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	TypeIdentifier string
-	FirstFieldName string
-	FirstFieldPos  ast.Position
+	ContainerTypeIdentifier string
+	FirstFieldName          string
+	FirstFieldPos           ast.Position
 }
 
 func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
-		"missing initializer for field `%s` of type `%s`",
+		"missing initializer for field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.TypeIdentifier,
+		e.ContainerTypeIdentifier,
 	)
 }
 
@@ -1171,6 +1171,27 @@ func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
+// InvalidNestedMoveError
+
+type InvalidNestedMoveError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidNestedMoveError) Error() string {
+	return "cannot move nested resource"
+}
+
+func (*InvalidNestedMoveError) isSemanticError() {}
+
+func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
 // InvalidMoveAnnotationError
 
 type InvalidMoveAnnotationError struct {
@@ -1682,5 +1703,77 @@ func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
 }
 
 func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidDestructorError
+
+type InvalidDestructorError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructorError) Error() string {
+	return "cannot declare destructor for non-resource"
+}
+
+func (*InvalidDestructorError) isSemanticError() {}
+
+func (e *InvalidDestructorError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructorError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// MissingDestructorError
+
+type MissingDestructorError struct {
+	ContainerTypeIdentifier string
+	FirstFieldName          string
+	FirstFieldPos           ast.Position
+}
+
+func (e *MissingDestructorError) Error() string {
+	return fmt.Sprintf(
+		"missing destructor for resource field `%s` in type `%s`",
+		e.FirstFieldName,
+		e.ContainerTypeIdentifier,
+	)
+}
+
+func (*MissingDestructorError) isSemanticError() {}
+
+func (e *MissingDestructorError) StartPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+func (e *MissingDestructorError) EndPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+// InvalidDestructorParametersError
+
+type InvalidDestructorParametersError struct {
+	StartPos ast.Position
+	EndPos   ast.Position
+}
+
+func (e *InvalidDestructorParametersError) Error() string {
+	return "invalid parameters for destructor"
+}
+
+func (e *InvalidDestructorParametersError) SecondaryError() string {
+	return "consider removing these parameters"
+}
+
+func (*InvalidDestructorParametersError) isSemanticError() {}
+
+func (e *InvalidDestructorParametersError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidDestructorParametersError) EndPosition() ast.Position {
 	return e.EndPos
 }
