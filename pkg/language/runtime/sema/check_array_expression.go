@@ -26,8 +26,10 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 				&TypeMismatchError{
 					ExpectedType: elementType,
 					ActualType:   valueType,
-					StartPos:     value.StartPosition(),
-					EndPos:       value.EndPosition(),
+					Range: ast.Range{
+						StartPos: value.StartPosition(),
+						EndPos:   value.EndPosition(),
+					},
 				},
 			)
 		}

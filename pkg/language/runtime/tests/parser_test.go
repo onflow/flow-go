@@ -114,9 +114,11 @@ func TestParseBoolExpression(t *testing.T) {
 			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &BoolExpression{
-			Value:    true,
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			Value: true,
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -182,18 +184,24 @@ func TestParseArrayExpression(t *testing.T) {
 		Value: &ArrayExpression{
 			Values: []Expression{
 				&IntExpression{
-					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 15, Line: 2, Column: 14},
-					EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+						EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+					},
 				},
 				&IntExpression{
-					Value:    big.NewInt(2),
-					StartPos: Position{Offset: 18, Line: 2, Column: 17},
-					EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					Value: big.NewInt(2),
+					Range: Range{
+						StartPos: Position{Offset: 18, Line: 2, Column: 17},
+						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					},
 				},
 			},
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -226,31 +234,41 @@ func TestParseDictionaryExpression(t *testing.T) {
 			Entries: []Entry{
 				{
 					Key: &StringExpression{
-						Value:    "a",
-						StartPos: Position{Offset: 15, Line: 2, Column: 14},
-						EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+						Value: "a",
+						Range: Range{
+							StartPos: Position{Offset: 15, Line: 2, Column: 14},
+							EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+						},
 					},
 					Value: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 20, Line: 2, Column: 19},
-						EndPos:   Position{Offset: 20, Line: 2, Column: 19},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 20, Line: 2, Column: 19},
+							EndPos:   Position{Offset: 20, Line: 2, Column: 19},
+						},
 					},
 				},
 				{
 					Key: &StringExpression{
-						Value:    "b",
-						StartPos: Position{Offset: 23, Line: 2, Column: 22},
-						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						Value: "b",
+						Range: Range{
+							StartPos: Position{Offset: 23, Line: 2, Column: 22},
+							EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						},
 					},
 					Value: &IntExpression{
-						Value:    big.NewInt(2),
-						StartPos: Position{Offset: 28, Line: 2, Column: 27},
-						EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+						Value: big.NewInt(2),
+						Range: Range{
+							StartPos: Position{Offset: 28, Line: 2, Column: 27},
+							EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+						},
 					},
 				},
 			},
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -291,17 +309,21 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 				{
 					Label: "",
 					Expression: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 16, Line: 2, Column: 15},
-						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 16, Line: 2, Column: 15},
+							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						},
 					},
 				},
 				{
 					Label: "",
 					Expression: &IntExpression{
-						Value:    big.NewInt(2),
-						StartPos: Position{Offset: 19, Line: 2, Column: 18},
-						EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+						Value: big.NewInt(2),
+						Range: Range{
+							StartPos: Position{Offset: 19, Line: 2, Column: 18},
+							EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+						},
 					},
 				},
 			},
@@ -348,9 +370,11 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 					LabelStartPos: &Position{Offset: 16, Line: 2, Column: 15},
 					LabelEndPos:   &Position{Offset: 16, Line: 2, Column: 15},
 					Expression: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 19, Line: 2, Column: 18},
-						EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 19, Line: 2, Column: 18},
+							EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+						},
 					},
 				},
 				{
@@ -358,9 +382,11 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 					LabelStartPos: &Position{Offset: 22, Line: 2, Column: 21},
 					LabelEndPos:   &Position{Offset: 22, Line: 2, Column: 21},
 					Expression: &IntExpression{
-						Value:    big.NewInt(2),
-						StartPos: Position{Offset: 25, Line: 2, Column: 24},
-						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						Value: big.NewInt(2),
+						Range: Range{
+							StartPos: Position{Offset: 25, Line: 2, Column: 24},
+							EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						},
 					},
 				},
 			},
@@ -442,12 +468,16 @@ func TestParseIndexExpression(t *testing.T) {
 				},
 			},
 			IndexingExpression: &IntExpression{
-				Value:    big.NewInt(1),
-				StartPos: Position{Offset: 16, Line: 2, Column: 15},
-				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+				Value: big.NewInt(1),
+				Range: Range{
+					StartPos: Position{Offset: 16, Line: 2, Column: 15},
+					EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+				},
 			},
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -485,8 +515,10 @@ func TestParseUnaryExpression(t *testing.T) {
 					Pos:        Position{Offset: 17, Line: 2, Column: 16},
 				},
 			},
-			StartPos: Position{Offset: 16, Line: 2, Column: 15},
-			EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+			Range: Range{
+				StartPos: Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -519,14 +551,18 @@ func TestParseOrExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationOr,
 			Left: &BoolExpression{
-				Value:    false,
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: false,
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 			Right: &BoolExpression{
-				Value:    true,
-				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				Value: true,
+				Range: Range{
+					StartPos: Position{Offset: 26, Line: 2, Column: 25},
+					EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -560,14 +596,18 @@ func TestParseAndExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationAnd,
 			Left: &BoolExpression{
-				Value:    false,
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: false,
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 			Right: &BoolExpression{
-				Value:    true,
-				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				Value: true,
+				Range: Range{
+					StartPos: Position{Offset: 26, Line: 2, Column: 25},
+					EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -601,14 +641,18 @@ func TestParseEqualityExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationEqual,
 			Left: &BoolExpression{
-				Value:    false,
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: false,
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 			Right: &BoolExpression{
-				Value:    true,
-				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				Value: true,
+				Range: Range{
+					StartPos: Position{Offset: 26, Line: 2, Column: 25},
+					EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -642,14 +686,18 @@ func TestParseRelationalExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationLess,
 			Left: &IntExpression{
-				Value:    big.NewInt(1),
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				Value: big.NewInt(1),
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				},
 			},
 			Right: &IntExpression{
-				Value:    big.NewInt(2),
-				StartPos: Position{Offset: 21, Line: 2, Column: 20},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: big.NewInt(2),
+				Range: Range{
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -683,14 +731,18 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationPlus,
 			Left: &IntExpression{
-				Value:    big.NewInt(1),
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				Value: big.NewInt(1),
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				},
 			},
 			Right: &IntExpression{
-				Value:    big.NewInt(2),
-				StartPos: Position{Offset: 21, Line: 2, Column: 20},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: big.NewInt(2),
+				Range: Range{
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -724,14 +776,18 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Value: &BinaryExpression{
 			Operation: OperationMul,
 			Left: &IntExpression{
-				Value:    big.NewInt(1),
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				Value: big.NewInt(1),
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+				},
 			},
 			Right: &IntExpression{
-				Value:    big.NewInt(2),
-				StartPos: Position{Offset: 21, Line: 2, Column: 20},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Value: big.NewInt(2),
+				Range: Range{
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -767,34 +823,46 @@ func TestParseConcatenatingExpression(t *testing.T) {
 			Left: &ArrayExpression{
 				Values: []Expression{
 					&IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 18, Line: 2, Column: 17},
-						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 18, Line: 2, Column: 17},
+							EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+						},
 					},
 					&IntExpression{
-						Value:    big.NewInt(2),
-						StartPos: Position{Offset: 21, Line: 2, Column: 20},
-						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+						Value: big.NewInt(2),
+						Range: Range{
+							StartPos: Position{Offset: 21, Line: 2, Column: 20},
+							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+						},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				},
 			},
 			Right: &ArrayExpression{
 				Values: []Expression{
 					&IntExpression{
-						Value:    big.NewInt(3),
-						StartPos: Position{Offset: 27, Line: 2, Column: 26},
-						EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+						Value: big.NewInt(3),
+						Range: Range{
+							StartPos: Position{Offset: 27, Line: 2, Column: 26},
+							EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+						},
 					},
 					&IntExpression{
-						Value:    big.NewInt(4),
-						StartPos: Position{Offset: 30, Line: 2, Column: 29},
-						EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+						Value: big.NewInt(4),
+						Range: Range{
+							StartPos: Position{Offset: 30, Line: 2, Column: 29},
+							EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+						},
 					},
 				},
-				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+				Range: Range{
+					StartPos: Position{Offset: 26, Line: 2, Column: 25},
+					EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -827,8 +895,10 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		},
 		Value: &FunctionExpression{
 			ParameterList: &ParameterList{
-				StartPos: Position{Offset: 21, Line: 2, Column: 20},
-				EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				Range: Range{
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
+					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
 				Move: false,
@@ -845,16 +915,22 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 					Statements: []Statement{
 						&ReturnStatement{
 							Expression: &IntExpression{
-								Value:    big.NewInt(1),
-								StartPos: Position{Offset: 38, Line: 2, Column: 37},
+								Value: big.NewInt(1),
+								Range: Range{
+									StartPos: Position{Offset: 38, Line: 2, Column: 37},
+									EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+								},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 31, Line: 2, Column: 30},
 								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 							},
-							StartPos: Position{Offset: 31, Line: 2, Column: 30},
-							EndPos:   Position{Offset: 38, Line: 2, Column: 37},
 						},
 					},
-					StartPos: Position{Offset: 29, Line: 2, Column: 28},
-					EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+					Range: Range{
+						StartPos: Position{Offset: 29, Line: 2, Column: 28},
+						EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+					},
 				},
 			},
 			StartPos: Position{Offset: 17, Line: 2, Column: 16},
@@ -884,8 +960,10 @@ func TestParseFunctionAndBlock(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -900,12 +978,16 @@ func TestParseFunctionAndBlock(t *testing.T) {
 			Block: &Block{
 				Statements: []Statement{
 					&ReturnStatement{
-						StartPos: Position{Offset: 19, Line: 2, Column: 18},
-						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+						Range: Range{
+							StartPos: Position{Offset: 19, Line: 2, Column: 18},
+							EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+						},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -950,12 +1032,16 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 						},
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
 					},
-					StartPos: Position{Offset: 15, Line: 2, Column: 14},
-					EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					Range: Range{
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					},
 				},
 			},
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -968,8 +1054,10 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 23, Line: 2, Column: 22},
-				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				Range: Range{
+					StartPos: Position{Offset: 23, Line: 2, Column: 22},
+					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1014,12 +1102,16 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 						},
 						StartPos: Position{Offset: 20, Line: 2, Column: 19},
 					},
-					StartPos: Position{Offset: 15, Line: 2, Column: 14},
-					EndPos:   Position{Offset: 20, Line: 2, Column: 19},
+					Range: Range{
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+						EndPos:   Position{Offset: 20, Line: 2, Column: 19},
+					},
 				},
 			},
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1032,8 +1124,10 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 25, Line: 2, Column: 24},
-				EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+				Range: Range{
+					StartPos: Position{Offset: 25, Line: 2, Column: 24},
+					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1070,8 +1164,10 @@ func TestParseIfStatement(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1087,73 +1183,95 @@ func TestParseIfStatement(t *testing.T) {
 				Statements: []Statement{
 					&IfStatement{
 						Test: &BoolExpression{
-							Value:    true,
-							StartPos: Position{Offset: 34, Line: 3, Column: 15},
-							EndPos:   Position{Offset: 37, Line: 3, Column: 18},
+							Value: true,
+							Range: Range{
+								StartPos: Position{Offset: 34, Line: 3, Column: 15},
+								EndPos:   Position{Offset: 37, Line: 3, Column: 18},
+							},
 						},
 						Then: &Block{
 							Statements: []Statement{
 								&ReturnStatement{
 									Expression: nil,
-									StartPos:   Position{Offset: 57, Line: 4, Column: 16},
-									EndPos:     Position{Offset: 62, Line: 4, Column: 21},
+									Range: Range{
+										StartPos: Position{Offset: 57, Line: 4, Column: 16},
+										EndPos:   Position{Offset: 62, Line: 4, Column: 21},
+									},
 								},
 							},
-							StartPos: Position{Offset: 39, Line: 3, Column: 20},
-							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 39, Line: 3, Column: 20},
+								EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							},
 						},
 						Else: &Block{
 							Statements: []Statement{
 								&IfStatement{
 									Test: &BoolExpression{
-										Value:    false,
-										StartPos: Position{Offset: 86, Line: 5, Column: 22},
-										EndPos:   Position{Offset: 90, Line: 5, Column: 26},
+										Value: false,
+										Range: Range{
+											StartPos: Position{Offset: 86, Line: 5, Column: 22},
+											EndPos:   Position{Offset: 90, Line: 5, Column: 26},
+										},
 									},
 									Then: &Block{
 										Statements: []Statement{
 											&ExpressionStatement{
 												Expression: &BoolExpression{
-													Value:    false,
-													StartPos: Position{Offset: 110, Line: 6, Column: 16},
-													EndPos:   Position{Offset: 114, Line: 6, Column: 20},
+													Value: false,
+													Range: Range{
+														StartPos: Position{Offset: 110, Line: 6, Column: 16},
+														EndPos:   Position{Offset: 114, Line: 6, Column: 20},
+													},
 												},
 											},
 											&ExpressionStatement{
 												Expression: &IntExpression{
-													Value:    big.NewInt(1),
-													StartPos: Position{Offset: 132, Line: 7, Column: 16},
-													EndPos:   Position{Offset: 132, Line: 7, Column: 16},
+													Value: big.NewInt(1),
+													Range: Range{
+														StartPos: Position{Offset: 132, Line: 7, Column: 16},
+														EndPos:   Position{Offset: 132, Line: 7, Column: 16},
+													},
 												},
 											},
 										},
-										StartPos: Position{Offset: 92, Line: 5, Column: 28},
-										EndPos:   Position{Offset: 146, Line: 8, Column: 12},
+										Range: Range{
+											StartPos: Position{Offset: 92, Line: 5, Column: 28},
+											EndPos:   Position{Offset: 146, Line: 8, Column: 12},
+										},
 									},
 									Else: &Block{
 										Statements: []Statement{
 											&ExpressionStatement{
 												Expression: &IntExpression{
-													Value:    big.NewInt(2),
-													StartPos: Position{Offset: 171, Line: 9, Column: 16},
-													EndPos:   Position{Offset: 171, Line: 9, Column: 16},
+													Value: big.NewInt(2),
+													Range: Range{
+														StartPos: Position{Offset: 171, Line: 9, Column: 16},
+														EndPos:   Position{Offset: 171, Line: 9, Column: 16},
+													},
 												},
 											},
 										},
-										StartPos: Position{Offset: 153, Line: 8, Column: 19},
-										EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+										Range: Range{
+											StartPos: Position{Offset: 153, Line: 8, Column: 19},
+											EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+										},
 									},
 									StartPos: Position{Offset: 83, Line: 5, Column: 19},
 								},
 							},
-							StartPos: Position{Offset: 83, Line: 5, Column: 19},
-							EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 83, Line: 5, Column: 19},
+								EndPos:   Position{Offset: 185, Line: 10, Column: 12},
+							},
 						},
 						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 195, Line: 11, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 195, Line: 11, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1187,8 +1305,10 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1225,33 +1345,43 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 							Statements: []Statement{
 								&ExpressionStatement{
 									Expression: &IntExpression{
-										Value:    big.NewInt(1),
-										StartPos: Position{Offset: 62, Line: 4, Column: 16},
-										EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+										Value: big.NewInt(1),
+										Range: Range{
+											StartPos: Position{Offset: 62, Line: 4, Column: 16},
+											EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+										},
 									},
 								},
 							},
-							StartPos: Position{Offset: 44, Line: 3, Column: 25},
-							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 44, Line: 3, Column: 25},
+								EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							},
 						},
 						Else: &Block{
 							Statements: []Statement{
 								&ExpressionStatement{
 									Expression: &IntExpression{
-										Value:    big.NewInt(2),
-										StartPos: Position{Offset: 101, Line: 6, Column: 16},
-										EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+										Value: big.NewInt(2),
+										Range: Range{
+											StartPos: Position{Offset: 101, Line: 6, Column: 16},
+											EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+										},
 									},
 								},
 							},
-							StartPos: Position{Offset: 83, Line: 5, Column: 19},
-							EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 83, Line: 5, Column: 19},
+								EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+							},
 						},
 						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 125, Line: 8, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 125, Line: 8, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1283,8 +1413,10 @@ func TestParseIfStatementNoElse(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1300,26 +1432,34 @@ func TestParseIfStatementNoElse(t *testing.T) {
 				Statements: []Statement{
 					&IfStatement{
 						Test: &BoolExpression{
-							Value:    true,
-							StartPos: Position{Offset: 34, Line: 3, Column: 15},
-							EndPos:   Position{Offset: 37, Line: 3, Column: 18},
+							Value: true,
+							Range: Range{
+								StartPos: Position{Offset: 34, Line: 3, Column: 15},
+								EndPos:   Position{Offset: 37, Line: 3, Column: 18},
+							},
 						},
 						Then: &Block{
 							Statements: []Statement{
 								&ReturnStatement{
 									Expression: nil,
-									StartPos:   Position{Offset: 57, Line: 4, Column: 16},
-									EndPos:     Position{Offset: 62, Line: 4, Column: 21},
+									Range: Range{
+										StartPos: Position{Offset: 57, Line: 4, Column: 16},
+										EndPos:   Position{Offset: 62, Line: 4, Column: 21},
+									},
 								},
 							},
-							StartPos: Position{Offset: 39, Line: 3, Column: 20},
-							EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 39, Line: 3, Column: 20},
+								EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+							},
 						},
 						StartPos: Position{Offset: 31, Line: 3, Column: 12},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 86, Line: 6, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 86, Line: 6, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1353,8 +1493,10 @@ func TestParseWhileStatement(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1370,35 +1512,49 @@ func TestParseWhileStatement(t *testing.T) {
 				Statements: []Statement{
 					&WhileStatement{
 						Test: &BoolExpression{
-							Value:    true,
-							StartPos: Position{Offset: 37, Line: 3, Column: 18},
-							EndPos:   Position{Offset: 40, Line: 3, Column: 21},
+							Value: true,
+							Range: Range{
+								StartPos: Position{Offset: 37, Line: 3, Column: 18},
+								EndPos:   Position{Offset: 40, Line: 3, Column: 21},
+							},
 						},
 						Block: &Block{
 							Statements: []Statement{
 								&ReturnStatement{
 									Expression: nil,
-									StartPos:   Position{Offset: 58, Line: 4, Column: 14},
-									EndPos:     Position{Offset: 63, Line: 4, Column: 19},
+									Range: Range{
+										StartPos: Position{Offset: 58, Line: 4, Column: 14},
+										EndPos:   Position{Offset: 63, Line: 4, Column: 19},
+									},
 								},
 								&BreakStatement{
-									StartPos: Position{Offset: 79, Line: 5, Column: 14},
-									EndPos:   Position{Offset: 83, Line: 5, Column: 18},
+									Range: Range{
+										StartPos: Position{Offset: 79, Line: 5, Column: 14},
+										EndPos:   Position{Offset: 83, Line: 5, Column: 18},
+									},
 								},
 								&ContinueStatement{
-									StartPos: Position{Offset: 99, Line: 6, Column: 14},
-									EndPos:   Position{Offset: 106, Line: 6, Column: 21},
+									Range: Range{
+										StartPos: Position{Offset: 99, Line: 6, Column: 14},
+										EndPos:   Position{Offset: 106, Line: 6, Column: 21},
+									},
 								},
 							},
-							StartPos: Position{Offset: 42, Line: 3, Column: 23},
+							Range: Range{
+								StartPos: Position{Offset: 42, Line: 3, Column: 23},
+								EndPos:   Position{Offset: 120, Line: 7, Column: 12},
+							},
+						},
+						Range: Range{
+							StartPos: Position{Offset: 31, Line: 3, Column: 12},
 							EndPos:   Position{Offset: 120, Line: 7, Column: 12},
 						},
-						StartPos: Position{Offset: 31, Line: 3, Column: 12},
-						EndPos:   Position{Offset: 120, Line: 7, Column: 12},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 130, Line: 8, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 130, Line: 8, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1428,8 +1584,10 @@ func TestParseAssignment(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1455,14 +1613,18 @@ func TestParseAssignment(t *testing.T) {
 							Pos:       Position{Offset: 33, Line: 3, Column: 14},
 						},
 						Value: &IntExpression{
-							Value:    big.NewInt(1),
-							StartPos: Position{Offset: 35, Line: 3, Column: 16},
-							EndPos:   Position{Offset: 35, Line: 3, Column: 16},
+							Value: big.NewInt(1),
+							Range: Range{
+								StartPos: Position{Offset: 35, Line: 3, Column: 16},
+								EndPos:   Position{Offset: 35, Line: 3, Column: 16},
+							},
 						},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 45, Line: 4, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 45, Line: 4, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1492,8 +1654,10 @@ func TestParseAccessAssignment(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1530,20 +1694,28 @@ func TestParseAccessAssignment(t *testing.T) {
 										},
 									},
 									IndexingExpression: &IntExpression{
-										Value:    big.NewInt(0),
-										StartPos: Position{Offset: 41, Line: 3, Column: 22},
-										EndPos:   Position{Offset: 41, Line: 3, Column: 22},
+										Value: big.NewInt(0),
+										Range: Range{
+											StartPos: Position{Offset: 41, Line: 3, Column: 22},
+											EndPos:   Position{Offset: 41, Line: 3, Column: 22},
+										},
 									},
-									StartPos: Position{Offset: 40, Line: 3, Column: 21},
-									EndPos:   Position{Offset: 42, Line: 3, Column: 23},
+									Range: Range{
+										StartPos: Position{Offset: 40, Line: 3, Column: 21},
+										EndPos:   Position{Offset: 42, Line: 3, Column: 23},
+									},
 								},
 								IndexingExpression: &IntExpression{
-									Value:    big.NewInt(1),
-									StartPos: Position{Offset: 44, Line: 3, Column: 25},
-									EndPos:   Position{Offset: 44, Line: 3, Column: 25},
+									Value: big.NewInt(1),
+									Range: Range{
+										StartPos: Position{Offset: 44, Line: 3, Column: 25},
+										EndPos:   Position{Offset: 44, Line: 3, Column: 25},
+									},
 								},
-								StartPos: Position{Offset: 43, Line: 3, Column: 24},
-								EndPos:   Position{Offset: 45, Line: 3, Column: 26},
+								Range: Range{
+									StartPos: Position{Offset: 43, Line: 3, Column: 24},
+									EndPos:   Position{Offset: 45, Line: 3, Column: 26},
+								},
 							},
 							Identifier: Identifier{
 								Identifier: "baz",
@@ -1555,14 +1727,18 @@ func TestParseAccessAssignment(t *testing.T) {
 							Pos:       Position{Offset: 51, Line: 3, Column: 32},
 						},
 						Value: &IntExpression{
-							Value:    big.NewInt(1),
-							StartPos: Position{Offset: 53, Line: 3, Column: 34},
-							EndPos:   Position{Offset: 53, Line: 3, Column: 34},
+							Value: big.NewInt(1),
+							Range: Range{
+								StartPos: Position{Offset: 53, Line: 3, Column: 34},
+								EndPos:   Position{Offset: 53, Line: 3, Column: 34},
+							},
 						},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 63, Line: 4, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 63, Line: 4, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1590,8 +1766,10 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 			Pos:        Position{Offset: 10, Line: 2, Column: 9},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 14, Line: 2, Column: 13},
-			EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			Range: Range{
+				StartPos: Position{Offset: 14, Line: 2, Column: 13},
+				EndPos:   Position{Offset: 15, Line: 2, Column: 14},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1628,20 +1806,28 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 										},
 									},
 									IndexingExpression: &IntExpression{
-										Value:    big.NewInt(0),
-										StartPos: Position{Offset: 29, Line: 2, Column: 28},
-										EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+										Value: big.NewInt(0),
+										Range: Range{
+											StartPos: Position{Offset: 29, Line: 2, Column: 28},
+											EndPos:   Position{Offset: 29, Line: 2, Column: 28},
+										},
 									},
-									StartPos: Position{Offset: 28, Line: 2, Column: 27},
-									EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+									Range: Range{
+										StartPos: Position{Offset: 28, Line: 2, Column: 27},
+										EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+									},
 								},
 								IndexingExpression: &IntExpression{
-									Value:    big.NewInt(1),
-									StartPos: Position{Offset: 32, Line: 2, Column: 31},
-									EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+									Value: big.NewInt(1),
+									Range: Range{
+										StartPos: Position{Offset: 32, Line: 2, Column: 31},
+										EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+									},
 								},
-								StartPos: Position{Offset: 31, Line: 2, Column: 30},
-								EndPos:   Position{Offset: 33, Line: 2, Column: 32},
+								Range: Range{
+									StartPos: Position{Offset: 31, Line: 2, Column: 30},
+									EndPos:   Position{Offset: 33, Line: 2, Column: 32},
+								},
 							},
 							Identifier: Identifier{
 								Identifier: "baz",
@@ -1650,8 +1836,10 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 						},
 					},
 				},
-				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 39, Line: 2, Column: 38},
+				Range: Range{
+					StartPos: Position{Offset: 17, Line: 2, Column: 16},
+					EndPos:   Position{Offset: 39, Line: 2, Column: 38},
+				},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1695,8 +1883,10 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						},
 						StartPos: Position{Offset: 19, Line: 2, Column: 18},
 					},
-					StartPos: Position{Offset: 16, Line: 2, Column: 15},
-					EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+					Range: Range{
+						StartPos: Position{Offset: 16, Line: 2, Column: 15},
+						EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+					},
 				},
 				{
 					Identifier: Identifier{
@@ -1712,14 +1902,18 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 									Pos:        Position{Offset: 30, Line: 2, Column: 29},
 								},
 							},
-							Size:     2,
-							StartPos: Position{Offset: 29, Line: 2, Column: 28},
-							EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+							Size: 2,
+							Range: Range{
+								StartPos: Position{Offset: 29, Line: 2, Column: 28},
+								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+							},
 						},
 						StartPos: Position{Offset: 29, Line: 2, Column: 28},
 					},
-					StartPos: Position{Offset: 26, Line: 2, Column: 25},
-					EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+					Range: Range{
+						StartPos: Position{Offset: 26, Line: 2, Column: 25},
+						EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+					},
 				},
 				{
 					Identifier: Identifier{
@@ -1736,21 +1930,29 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 										Pos:        Position{Offset: 46, Line: 2, Column: 45},
 									},
 								},
-								Size:     3,
-								StartPos: Position{Offset: 45, Line: 2, Column: 44},
-								EndPos:   Position{Offset: 54, Line: 2, Column: 53},
+								Size: 3,
+								Range: Range{
+									StartPos: Position{Offset: 45, Line: 2, Column: 44},
+									EndPos:   Position{Offset: 54, Line: 2, Column: 53},
+								},
 							},
-							StartPos: Position{Offset: 44, Line: 2, Column: 43},
-							EndPos:   Position{Offset: 55, Line: 2, Column: 54},
+							Range: Range{
+								StartPos: Position{Offset: 44, Line: 2, Column: 43},
+								EndPos:   Position{Offset: 55, Line: 2, Column: 54},
+							},
 						},
 						StartPos: Position{Offset: 44, Line: 2, Column: 43},
 					},
-					StartPos: Position{Offset: 41, Line: 2, Column: 40},
-					EndPos:   Position{Offset: 55, Line: 2, Column: 54},
+					Range: Range{
+						StartPos: Position{Offset: 41, Line: 2, Column: 40},
+						EndPos:   Position{Offset: 55, Line: 2, Column: 54},
+					},
 				},
 			},
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 56, Line: 2, Column: 55},
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 56, Line: 2, Column: 55},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -1761,18 +1963,24 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 							Pos: Position{Offset: 61, Line: 2, Column: 60},
 						},
 					},
-					StartPos: Position{Offset: 60, Line: 2, Column: 59},
-					EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+					Range: Range{
+						StartPos: Position{Offset: 60, Line: 2, Column: 59},
+						EndPos:   Position{Offset: 66, Line: 2, Column: 65},
+					},
 				},
-				StartPos: Position{Offset: 59, Line: 2, Column: 58},
-				EndPos:   Position{Offset: 67, Line: 2, Column: 66},
+				Range: Range{
+					StartPos: Position{Offset: 59, Line: 2, Column: 58},
+					EndPos:   Position{Offset: 67, Line: 2, Column: 66},
+				},
 			},
 			StartPos: Position{Offset: 59, Line: 2, Column: 58},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 69, Line: 2, Column: 68},
-				EndPos:   Position{Offset: 70, Line: 2, Column: 69},
+				Range: Range{
+					StartPos: Position{Offset: 69, Line: 2, Column: 68},
+					EndPos:   Position{Offset: 70, Line: 2, Column: 69},
+				},
 			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
@@ -1813,8 +2021,10 @@ func TestParseDictionaryType(t *testing.T) {
 						Pos:        Position{Offset: 22, Line: 2, Column: 21},
 					},
 				},
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -1823,8 +2033,10 @@ func TestParseDictionaryType(t *testing.T) {
 			Pos:       Position{Offset: 27, Line: 2, Column: 26},
 		},
 		Value: &DictionaryExpression{
-			StartPos: Position{Offset: 29, Line: 2, Column: 28},
-			EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+			Range: Range{
+				StartPos: Position{Offset: 29, Line: 2, Column: 28},
+				EndPos:   Position{Offset: 30, Line: 2, Column: 29},
+			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
 	}
@@ -1858,9 +2070,11 @@ func TestParseIntegerLiterals(t *testing.T) {
 			Pos:       Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(26),
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			Value: big.NewInt(26),
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -1876,9 +2090,11 @@ func TestParseIntegerLiterals(t *testing.T) {
 			Pos:       Position{Offset: 36, Line: 3, Column: 16},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(242),
-			StartPos: Position{Offset: 38, Line: 3, Column: 18},
-			EndPos:   Position{Offset: 41, Line: 3, Column: 21},
+			Value: big.NewInt(242),
+			Range: Range{
+				StartPos: Position{Offset: 38, Line: 3, Column: 18},
+				EndPos:   Position{Offset: 41, Line: 3, Column: 21},
+			},
 		},
 		StartPos: Position{Offset: 28, Line: 3, Column: 8},
 	}
@@ -1894,9 +2110,11 @@ func TestParseIntegerLiterals(t *testing.T) {
 			Pos:       Position{Offset: 62, Line: 4, Column: 19},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(42),
-			StartPos: Position{Offset: 64, Line: 4, Column: 21},
-			EndPos:   Position{Offset: 71, Line: 4, Column: 28},
+			Value: big.NewInt(42),
+			Range: Range{
+				StartPos: Position{Offset: 64, Line: 4, Column: 21},
+				EndPos:   Position{Offset: 71, Line: 4, Column: 28},
+			},
 		},
 		StartPos: Position{Offset: 51, Line: 4, Column: 8},
 	}
@@ -1912,9 +2130,11 @@ func TestParseIntegerLiterals(t *testing.T) {
 			Pos:       Position{Offset: 93, Line: 5, Column: 20},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(1234567890),
-			StartPos: Position{Offset: 95, Line: 5, Column: 22},
-			EndPos:   Position{Offset: 104, Line: 5, Column: 31},
+			Value: big.NewInt(1234567890),
+			Range: Range{
+				StartPos: Position{Offset: 95, Line: 5, Column: 22},
+				EndPos:   Position{Offset: 104, Line: 5, Column: 31},
+			},
 		},
 		StartPos: Position{Offset: 81, Line: 5, Column: 8},
 	}
@@ -1948,9 +2168,11 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 			Pos:       Position{Offset: 13, Line: 2, Column: 12},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(1701),
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+			Value: big.NewInt(1701),
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -1966,9 +2188,11 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 			Pos:       Position{Offset: 39, Line: 3, Column: 16},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(61961),
-			StartPos: Position{Offset: 41, Line: 3, Column: 18},
-			EndPos:   Position{Offset: 47, Line: 3, Column: 24},
+			Value: big.NewInt(61961),
+			Range: Range{
+				StartPos: Position{Offset: 41, Line: 3, Column: 18},
+				EndPos:   Position{Offset: 47, Line: 3, Column: 24},
+			},
 		},
 		StartPos: Position{Offset: 31, Line: 3, Column: 8},
 	}
@@ -1984,9 +2208,11 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 			Pos:       Position{Offset: 68, Line: 4, Column: 19},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(2730),
-			StartPos: Position{Offset: 70, Line: 4, Column: 21},
-			EndPos:   Position{Offset: 84, Line: 4, Column: 35},
+			Value: big.NewInt(2730),
+			Range: Range{
+				StartPos: Position{Offset: 70, Line: 4, Column: 21},
+				EndPos:   Position{Offset: 84, Line: 4, Column: 35},
+			},
 		},
 		StartPos: Position{Offset: 57, Line: 4, Column: 8},
 	}
@@ -2002,9 +2228,11 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 			Pos:       Position{Offset: 106, Line: 5, Column: 20},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(1234567890),
-			StartPos: Position{Offset: 108, Line: 5, Column: 22},
-			EndPos:   Position{Offset: 120, Line: 5, Column: 34},
+			Value: big.NewInt(1234567890),
+			Range: Range{
+				StartPos: Position{Offset: 108, Line: 5, Column: 22},
+				EndPos:   Position{Offset: 120, Line: 5, Column: 34},
+			},
 		},
 		StartPos: Position{Offset: 94, Line: 5, Column: 8},
 	}
@@ -2342,9 +2570,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(1),
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			Value: big.NewInt(1),
+			Range: Range{
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -2369,9 +2599,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 34, Line: 3, Column: 15},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(2),
-			StartPos: Position{Offset: 36, Line: 3, Column: 17},
-			EndPos:   Position{Offset: 36, Line: 3, Column: 17},
+			Value: big.NewInt(2),
+			Range: Range{
+				StartPos: Position{Offset: 36, Line: 3, Column: 17},
+				EndPos:   Position{Offset: 36, Line: 3, Column: 17},
+			},
 		},
 		StartPos: Position{Offset: 21, Line: 3, Column: 2},
 	}
@@ -2396,9 +2628,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 53, Line: 4, Column: 15},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(3),
-			StartPos: Position{Offset: 55, Line: 4, Column: 17},
-			EndPos:   Position{Offset: 55, Line: 4, Column: 17},
+			Value: big.NewInt(3),
+			Range: Range{
+				StartPos: Position{Offset: 55, Line: 4, Column: 17},
+				EndPos:   Position{Offset: 55, Line: 4, Column: 17},
+			},
 		},
 		StartPos: Position{Offset: 40, Line: 4, Column: 2},
 	}
@@ -2423,9 +2657,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 72, Line: 5, Column: 15},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(4),
-			StartPos: Position{Offset: 74, Line: 5, Column: 17},
-			EndPos:   Position{Offset: 74, Line: 5, Column: 17},
+			Value: big.NewInt(4),
+			Range: Range{
+				StartPos: Position{Offset: 74, Line: 5, Column: 17},
+				EndPos:   Position{Offset: 74, Line: 5, Column: 17},
+			},
 		},
 		StartPos: Position{Offset: 59, Line: 5, Column: 2},
 	}
@@ -2450,9 +2686,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 91, Line: 6, Column: 15},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(5),
-			StartPos: Position{Offset: 93, Line: 6, Column: 17},
-			EndPos:   Position{Offset: 93, Line: 6, Column: 17},
+			Value: big.NewInt(5),
+			Range: Range{
+				StartPos: Position{Offset: 93, Line: 6, Column: 17},
+				EndPos:   Position{Offset: 93, Line: 6, Column: 17},
+			},
 		},
 		StartPos: Position{Offset: 78, Line: 6, Column: 2},
 	}
@@ -2477,9 +2715,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 111, Line: 7, Column: 16},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(6),
-			StartPos: Position{Offset: 113, Line: 7, Column: 18},
-			EndPos:   Position{Offset: 113, Line: 7, Column: 18},
+			Value: big.NewInt(6),
+			Range: Range{
+				StartPos: Position{Offset: 113, Line: 7, Column: 18},
+				EndPos:   Position{Offset: 113, Line: 7, Column: 18},
+			},
 		},
 		StartPos: Position{Offset: 97, Line: 7, Column: 2},
 	}
@@ -2504,9 +2744,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 131, Line: 8, Column: 16},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(7),
-			StartPos: Position{Offset: 133, Line: 8, Column: 18},
-			EndPos:   Position{Offset: 133, Line: 8, Column: 18},
+			Value: big.NewInt(7),
+			Range: Range{
+				StartPos: Position{Offset: 133, Line: 8, Column: 18},
+				EndPos:   Position{Offset: 133, Line: 8, Column: 18},
+			},
 		},
 		StartPos: Position{Offset: 117, Line: 8, Column: 2},
 	}
@@ -2531,9 +2773,11 @@ func TestParseIntegerTypes(t *testing.T) {
 			Pos:       Position{Offset: 151, Line: 9, Column: 16},
 		},
 		Value: &IntExpression{
-			Value:    big.NewInt(8),
-			StartPos: Position{Offset: 153, Line: 9, Column: 18},
-			EndPos:   Position{Offset: 153, Line: 9, Column: 18},
+			Value: big.NewInt(8),
+			Range: Range{
+				StartPos: Position{Offset: 153, Line: 9, Column: 18},
+				EndPos:   Position{Offset: 153, Line: 9, Column: 18},
+			},
 		},
 		StartPos: Position{Offset: 137, Line: 9, Column: 2},
 	}
@@ -2594,8 +2838,10 @@ func TestParseFunctionType(t *testing.T) {
 					},
 					StartPos: Position{Offset: 28, Line: 2, Column: 27},
 				},
-				StartPos: Position{Offset: 12, Line: 2, Column: 11},
-				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+				Range: Range{
+					StartPos: Position{Offset: 12, Line: 2, Column: 11},
+					EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+				},
 			},
 			StartPos: Position{Offset: 12, Line: 2, Column: 11},
 		},
@@ -2660,12 +2906,16 @@ func TestParseFunctionArrayType(t *testing.T) {
 						},
 						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
-					StartPos: Position{Offset: 14, Line: 2, Column: 13},
-					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+					Range: Range{
+						StartPos: Position{Offset: 14, Line: 2, Column: 13},
+						EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+					},
 				},
-				Size:     2,
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+				Size: 2,
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -2674,8 +2924,10 @@ func TestParseFunctionArrayType(t *testing.T) {
 			Pos:       Position{Offset: 34, Line: 2, Column: 33},
 		},
 		Value: &ArrayExpression{
-			StartPos: Position{Offset: 36, Line: 2, Column: 35},
-			EndPos:   Position{Offset: 37, Line: 2, Column: 36},
+			Range: Range{
+				StartPos: Position{Offset: 36, Line: 2, Column: 35},
+				EndPos:   Position{Offset: 37, Line: 2, Column: 36},
+			},
 		},
 		StartPos: Position{Offset: 3, Line: 2, Column: 2},
 	}
@@ -2726,14 +2978,18 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 								Pos:        Position{Offset: 23, Line: 2, Column: 22},
 							},
 						},
-						Size:     2,
-						StartPos: Position{Offset: 22, Line: 2, Column: 21},
-						EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+						Size: 2,
+						Range: Range{
+							StartPos: Position{Offset: 22, Line: 2, Column: 21},
+							EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+						},
 					},
 					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 31, Line: 2, Column: 30},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -2811,13 +3067,17 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 							},
 							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
-						StartPos: Position{Offset: 22, Line: 2, Column: 21},
-						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						Range: Range{
+							StartPos: Position{Offset: 22, Line: 2, Column: 21},
+							EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						},
 					},
 					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -2896,13 +3156,17 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 							},
 							StartPos: Position{Offset: 32, Line: 2, Column: 31},
 						},
-						StartPos: Position{Offset: 22, Line: 2, Column: 21},
-						EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						Range: Range{
+							StartPos: Position{Offset: 22, Line: 2, Column: 21},
+							EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+						},
 					},
 					StartPos: Position{Offset: 22, Line: 2, Column: 21},
 				},
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 36, Line: 2, Column: 35},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -2955,8 +3219,10 @@ func TestParseMissingReturnType(t *testing.T) {
 					},
 					StartPos: Position{Offset: 18, Line: 2, Column: 17},
 				},
-				StartPos: Position{Offset: 13, Line: 2, Column: 12},
-				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				Range: Range{
+					StartPos: Position{Offset: 13, Line: 2, Column: 12},
+					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+				},
 			},
 			StartPos: Position{Offset: 13, Line: 2, Column: 12},
 		},
@@ -2966,8 +3232,10 @@ func TestParseMissingReturnType(t *testing.T) {
 		},
 		Value: &FunctionExpression{
 			ParameterList: &ParameterList{
-				StartPos: Position{Offset: 42, Line: 3, Column: 16},
-				EndPos:   Position{Offset: 43, Line: 3, Column: 17},
+				Range: Range{
+					StartPos: Position{Offset: 42, Line: 3, Column: 16},
+					EndPos:   Position{Offset: 43, Line: 3, Column: 17},
+				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
 				Move: false,
@@ -2982,12 +3250,16 @@ func TestParseMissingReturnType(t *testing.T) {
 				Block: &Block{
 					Statements: []Statement{
 						&ReturnStatement{
-							StartPos: Position{Offset: 47, Line: 3, Column: 21},
-							EndPos:   Position{Offset: 52, Line: 3, Column: 26},
+							Range: Range{
+								StartPos: Position{Offset: 47, Line: 3, Column: 21},
+								EndPos:   Position{Offset: 52, Line: 3, Column: 26},
+							},
 						},
 					},
-					StartPos: Position{Offset: 45, Line: 3, Column: 19},
-					EndPos:   Position{Offset: 54, Line: 3, Column: 28},
+					Range: Range{
+						StartPos: Position{Offset: 45, Line: 3, Column: 19},
+						EndPos:   Position{Offset: 54, Line: 3, Column: 28},
+					},
 				},
 			},
 			StartPos: Position{Offset: 38, Line: 3, Column: 12},
@@ -3025,20 +3297,26 @@ func TestParseLeftAssociativity(t *testing.T) {
 			Left: &BinaryExpression{
 				Operation: OperationPlus,
 				Left: &IntExpression{
-					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 17, Line: 2, Column: 16},
-					EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 17, Line: 2, Column: 16},
+						EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+					},
 				},
 				Right: &IntExpression{
-					Value:    big.NewInt(2),
-					StartPos: Position{Offset: 21, Line: 2, Column: 20},
-					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					Value: big.NewInt(2),
+					Range: Range{
+						StartPos: Position{Offset: 21, Line: 2, Column: 20},
+						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					},
 				},
 			},
 			Right: &IntExpression{
-				Value:    big.NewInt(3),
-				StartPos: Position{Offset: 25, Line: 2, Column: 24},
-				EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				Value: big.NewInt(3),
+				Range: Range{
+					StartPos: Position{Offset: 25, Line: 2, Column: 24},
+					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -3116,44 +3394,58 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 			Test: &BinaryExpression{
 				Operation: OperationGreater,
 				Left: &IntExpression{
-					Value:    big.NewInt(2),
-					StartPos: Position{Offset: 17, Line: 2, Column: 16},
-					EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+					Value: big.NewInt(2),
+					Range: Range{
+						StartPos: Position{Offset: 17, Line: 2, Column: 16},
+						EndPos:   Position{Offset: 17, Line: 2, Column: 16},
+					},
 				},
 				Right: &IntExpression{
-					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 21, Line: 2, Column: 20},
-					EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 21, Line: 2, Column: 20},
+						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					},
 				},
 			},
 			Then: &IntExpression{
-				Value:    big.NewInt(0),
-				StartPos: Position{Offset: 35, Line: 3, Column: 12},
-				EndPos:   Position{Offset: 35, Line: 3, Column: 12},
+				Value: big.NewInt(0),
+				Range: Range{
+					StartPos: Position{Offset: 35, Line: 3, Column: 12},
+					EndPos:   Position{Offset: 35, Line: 3, Column: 12},
+				},
 			},
 			Else: &ConditionalExpression{
 				Test: &BinaryExpression{
 					Operation: OperationGreater,
 					Left: &IntExpression{
-						Value:    big.NewInt(3),
-						StartPos: Position{Offset: 49, Line: 4, Column: 12},
-						EndPos:   Position{Offset: 49, Line: 4, Column: 12},
+						Value: big.NewInt(3),
+						Range: Range{
+							StartPos: Position{Offset: 49, Line: 4, Column: 12},
+							EndPos:   Position{Offset: 49, Line: 4, Column: 12},
+						},
 					},
 					Right: &IntExpression{
-						Value:    big.NewInt(2),
-						StartPos: Position{Offset: 53, Line: 4, Column: 16},
-						EndPos:   Position{Offset: 53, Line: 4, Column: 16},
+						Value: big.NewInt(2),
+						Range: Range{
+							StartPos: Position{Offset: 53, Line: 4, Column: 16},
+							EndPos:   Position{Offset: 53, Line: 4, Column: 16},
+						},
 					},
 				},
 				Then: &IntExpression{
-					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 57, Line: 4, Column: 20},
-					EndPos:   Position{Offset: 57, Line: 4, Column: 20},
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 57, Line: 4, Column: 20},
+						EndPos:   Position{Offset: 57, Line: 4, Column: 20},
+					},
 				},
 				Else: &IntExpression{
-					Value:    big.NewInt(2),
-					StartPos: Position{Offset: 61, Line: 4, Column: 24},
-					EndPos:   Position{Offset: 61, Line: 4, Column: 24},
+					Value: big.NewInt(2),
+					Range: Range{
+						StartPos: Position{Offset: 61, Line: 4, Column: 24},
+						EndPos:   Position{Offset: 61, Line: 4, Column: 24},
+					},
 				},
 			},
 		},
@@ -3211,8 +3503,10 @@ func TestParseStructure(t *testing.T) {
 						},
 						StartPos: Position{Offset: 53, Line: 3, Column: 30},
 					},
-					StartPos: Position{Offset: 35, Line: 3, Column: 12},
-					EndPos:   Position{Offset: 55, Line: 3, Column: 32},
+					Range: Range{
+						StartPos: Position{Offset: 35, Line: 3, Column: 12},
+						EndPos:   Position{Offset: 55, Line: 3, Column: 32},
+					},
 				},
 			},
 			SpecialFunctions: []*SpecialFunctionDeclaration{
@@ -3241,12 +3535,16 @@ func TestParseStructure(t *testing.T) {
 										},
 										StartPos: Position{Offset: 80, Line: 5, Column: 22},
 									},
-									StartPos: Position{Offset: 75, Line: 5, Column: 17},
-									EndPos:   Position{Offset: 80, Line: 5, Column: 22},
+									Range: Range{
+										StartPos: Position{Offset: 75, Line: 5, Column: 17},
+										EndPos:   Position{Offset: 80, Line: 5, Column: 22},
+									},
 								},
 							},
-							StartPos: Position{Offset: 74, Line: 5, Column: 16},
-							EndPos:   Position{Offset: 83, Line: 5, Column: 25},
+							Range: Range{
+								StartPos: Position{Offset: 74, Line: 5, Column: 16},
+								EndPos:   Position{Offset: 83, Line: 5, Column: 25},
+							},
 						},
 						FunctionBlock: &FunctionBlock{
 							Block: &Block{
@@ -3276,8 +3574,10 @@ func TestParseStructure(t *testing.T) {
 										},
 									},
 								},
-								StartPos: Position{Offset: 85, Line: 5, Column: 27},
-								EndPos:   Position{Offset: 130, Line: 7, Column: 12},
+								Range: Range{
+									StartPos: Position{Offset: 85, Line: 5, Column: 27},
+									EndPos:   Position{Offset: 130, Line: 7, Column: 12},
+								},
 							},
 						},
 						StartPos: Position{Offset: 70, Line: 5, Column: 12},
@@ -3292,8 +3592,10 @@ func TestParseStructure(t *testing.T) {
 						Pos:        Position{Offset: 153, Line: 9, Column: 20},
 					},
 					ParameterList: &ParameterList{
-						StartPos: Position{Offset: 159, Line: 9, Column: 26},
-						EndPos:   Position{Offset: 160, Line: 9, Column: 27},
+						Range: Range{
+							StartPos: Position{Offset: 159, Line: 9, Column: 26},
+							EndPos:   Position{Offset: 160, Line: 9, Column: 27},
+						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
 						Move: false,
@@ -3321,20 +3623,26 @@ func TestParseStructure(t *testing.T) {
 											Pos:        Position{Offset: 197, Line: 10, Column: 28},
 										},
 									},
-									StartPos: Position{Offset: 185, Line: 10, Column: 16},
-									EndPos:   Position{Offset: 199, Line: 10, Column: 30},
+									Range: Range{
+										StartPos: Position{Offset: 185, Line: 10, Column: 16},
+										EndPos:   Position{Offset: 199, Line: 10, Column: 30},
+									},
 								},
 							},
-							StartPos: Position{Offset: 167, Line: 9, Column: 34},
-							EndPos:   Position{Offset: 213, Line: 11, Column: 12},
+							Range: Range{
+								StartPos: Position{Offset: 167, Line: 9, Column: 34},
+								EndPos:   Position{Offset: 213, Line: 11, Column: 12},
+							},
 						},
 					},
 					StartPos: Position{Offset: 145, Line: 9, Column: 12},
 				},
 			},
 		},
-		StartPos: Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:   Position{Offset: 223, Line: 12, Column: 8},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 223, Line: 12, Column: 8},
+		},
 	}
 
 	expected := &Program{
@@ -3372,9 +3680,11 @@ func TestParseStructureWithConformances(t *testing.T) {
 				},
 			},
 		},
-		Members:  &Members{},
-		StartPos: Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+		Members: &Members{},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+		},
 	}
 
 	expected := &Program{
@@ -3438,12 +3748,16 @@ func TestParsePreAndPostConditions(t *testing.T) {
 								},
 								StartPos: Position{Offset: 21, Line: 2, Column: 20},
 							},
-							StartPos: Position{Offset: 18, Line: 2, Column: 17},
-							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							Range: Range{
+								StartPos: Position{Offset: 18, Line: 2, Column: 17},
+								EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							},
 						},
 					},
-					StartPos: Position{Offset: 17, Line: 2, Column: 16},
-					EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					Range: Range{
+						StartPos: Position{Offset: 17, Line: 2, Column: 16},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
 					Move: false,
@@ -3460,16 +3774,22 @@ func TestParsePreAndPostConditions(t *testing.T) {
 						Statements: []Statement{
 							&ReturnStatement{
 								Expression: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 185, Line: 10, Column: 19},
+									Value: big.NewInt(0),
+									Range: Range{
+										StartPos: Position{Offset: 185, Line: 10, Column: 19},
+										EndPos:   Position{Offset: 185, Line: 10, Column: 19},
+									},
+								},
+								Range: Range{
+									StartPos: Position{Offset: 178, Line: 10, Column: 12},
 									EndPos:   Position{Offset: 185, Line: 10, Column: 19},
 								},
-								StartPos: Position{Offset: 178, Line: 10, Column: 12},
-								EndPos:   Position{Offset: 185, Line: 10, Column: 19},
 							},
 						},
-						StartPos: Position{Offset: 26, Line: 2, Column: 25},
-						EndPos:   Position{Offset: 195, Line: 11, Column: 8},
+						Range: Range{
+							StartPos: Position{Offset: 26, Line: 2, Column: 25},
+							EndPos:   Position{Offset: 195, Line: 11, Column: 8},
+						},
 					},
 					PreConditions: []*Condition{
 						{
@@ -3483,9 +3803,11 @@ func TestParsePreAndPostConditions(t *testing.T) {
 									},
 								},
 								Right: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 67, Line: 4, Column: 21},
-									EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+									Value: big.NewInt(0),
+									Range: Range{
+										StartPos: Position{Offset: 67, Line: 4, Column: 21},
+										EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+									},
 								},
 							},
 						},
@@ -3500,9 +3822,11 @@ func TestParsePreAndPostConditions(t *testing.T) {
 									},
 								},
 								Right: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 89, Line: 5, Column: 20},
-									EndPos:   Position{Offset: 89, Line: 5, Column: 20},
+									Value: big.NewInt(0),
+									Range: Range{
+										StartPos: Position{Offset: 89, Line: 5, Column: 20},
+										EndPos:   Position{Offset: 89, Line: 5, Column: 20},
+									},
 								},
 							},
 						},
@@ -3519,9 +3843,11 @@ func TestParsePreAndPostConditions(t *testing.T) {
 									},
 								},
 								Right: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 150, Line: 8, Column: 26},
-									EndPos:   Position{Offset: 150, Line: 8, Column: 26},
+									Value: big.NewInt(0),
+									Range: Range{
+										StartPos: Position{Offset: 150, Line: 8, Column: 26},
+										EndPos:   Position{Offset: 150, Line: 8, Column: 26},
+									},
 								},
 							},
 						},
@@ -3612,9 +3938,11 @@ func TestParseString(t *testing.T) {
 	assert.Nil(t, err)
 
 	expected := &StringExpression{
-		Value:    "test \x00\n\r\t\"'\\ xyz",
-		StartPos: Position{Offset: 8, Line: 2, Column: 7},
-		EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+		Value: "test \x00\n\r\t\"'\\ xyz",
+		Range: Range{
+			StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			EndPos:   Position{Offset: 32, Line: 2, Column: 31},
+		},
 	}
 
 	assert.Equal(t, expected, actual)
@@ -3629,9 +3957,11 @@ func TestParseStringWithUnicode(t *testing.T) {
 	assert.Nil(t, err)
 
 	expected := &StringExpression{
-		Value:    "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
-		StartPos: Position{Offset: 7, Line: 2, Column: 6},
-		EndPos:   Position{Offset: 68, Line: 2, Column: 67},
+		Value: "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
+		Range: Range{
+			StartPos: Position{Offset: 7, Line: 2, Column: 6},
+			EndPos:   Position{Offset: 68, Line: 2, Column: 67},
+		},
 	}
 
 	assert.Equal(t, expected, actual)
@@ -3675,12 +4005,16 @@ func TestParseConditionMessage(t *testing.T) {
 								},
 								StartPos: Position{Offset: 21, Line: 2, Column: 20},
 							},
-							StartPos: Position{Offset: 18, Line: 2, Column: 17},
-							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							Range: Range{
+								StartPos: Position{Offset: 18, Line: 2, Column: 17},
+								EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							},
 						},
 					},
-					StartPos: Position{Offset: 17, Line: 2, Column: 16},
-					EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					Range: Range{
+						StartPos: Position{Offset: 17, Line: 2, Column: 16},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
 					Move: false,
@@ -3702,12 +4036,16 @@ func TestParseConditionMessage(t *testing.T) {
 										Pos:        Position{Offset: 124, Line: 6, Column: 19},
 									},
 								},
-								StartPos: Position{Offset: 117, Line: 6, Column: 12},
-								EndPos:   Position{Offset: 124, Line: 6, Column: 19},
+								Range: Range{
+									StartPos: Position{Offset: 117, Line: 6, Column: 12},
+									EndPos:   Position{Offset: 124, Line: 6, Column: 19},
+								},
 							},
 						},
-						StartPos: Position{Offset: 26, Line: 2, Column: 25},
-						EndPos:   Position{Offset: 134, Line: 7, Column: 8},
+						Range: Range{
+							StartPos: Position{Offset: 26, Line: 2, Column: 25},
+							EndPos:   Position{Offset: 134, Line: 7, Column: 8},
+						},
 					},
 					PreConditions: []*Condition{
 						{
@@ -3721,15 +4059,19 @@ func TestParseConditionMessage(t *testing.T) {
 									},
 								},
 								Right: &IntExpression{
-									Value:    big.NewInt(0),
-									StartPos: Position{Offset: 67, Line: 4, Column: 21},
-									EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+									Value: big.NewInt(0),
+									Range: Range{
+										StartPos: Position{Offset: 67, Line: 4, Column: 21},
+										EndPos:   Position{Offset: 67, Line: 4, Column: 21},
+									},
 								},
 							},
 							Message: &StringExpression{
-								Value:    "n must be positive",
-								StartPos: Position{Offset: 70, Line: 4, Column: 24},
-								EndPos:   Position{Offset: 89, Line: 4, Column: 43},
+								Value: "n must be positive",
+								Range: Range{
+									StartPos: Position{Offset: 70, Line: 4, Column: 24},
+									EndPos:   Position{Offset: 89, Line: 4, Column: 43},
+								},
 							},
 						},
 					},
@@ -3780,9 +4122,11 @@ func TestParseOptionalType(t *testing.T) {
 					Pos:       Position{Offset: 21, Line: 2, Column: 20},
 				},
 				Value: &IntExpression{
-					Value:    big.NewInt(1),
-					StartPos: Position{Offset: 23, Line: 2, Column: 22},
-					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
 				},
 				StartPos: Position{Offset: 8, Line: 2, Column: 7},
 			},
@@ -3818,9 +4162,11 @@ func TestParseNilCoalescing(t *testing.T) {
 						Pos: Position{Offset: 16, Line: 2, Column: 15},
 					},
 					Right: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 23, Line: 2, Column: 22},
-						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 23, Line: 2, Column: 22},
+							EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+						},
 					},
 				},
 				StartPos: Position{Offset: 8, Line: 2, Column: 7},
@@ -3855,21 +4201,27 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 				Value: &BinaryExpression{
 					Operation: OperationNilCoalesce,
 					Left: &IntExpression{
-						Value:    big.NewInt(1),
-						StartPos: Position{Offset: 16, Line: 2, Column: 15},
-						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						Value: big.NewInt(1),
+						Range: Range{
+							StartPos: Position{Offset: 16, Line: 2, Column: 15},
+							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						},
 					},
 					Right: &BinaryExpression{
 						Operation: OperationNilCoalesce,
 						Left: &IntExpression{
-							Value:    big.NewInt(2),
-							StartPos: Position{Offset: 21, Line: 2, Column: 20},
-							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							Value: big.NewInt(2),
+							Range: Range{
+								StartPos: Position{Offset: 21, Line: 2, Column: 20},
+								EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+							},
 						},
 						Right: &IntExpression{
-							Value:    big.NewInt(3),
-							StartPos: Position{Offset: 26, Line: 2, Column: 25},
-							EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+							Value: big.NewInt(3),
+							Range: Range{
+								StartPos: Position{Offset: 26, Line: 2, Column: 25},
+								EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+							},
 						},
 					},
 				},
@@ -3903,9 +4255,11 @@ func TestParseFailableDowncasting(t *testing.T) {
 				},
 				Value: &FailableDowncastExpression{
 					Expression: &IntExpression{
-						Value:    big.NewInt(0),
-						StartPos: Position{Offset: 16, Line: 2, Column: 15},
-						EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						Value: big.NewInt(0),
+						Range: Range{
+							StartPos: Position{Offset: 16, Line: 2, Column: 15},
+							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+						},
 					},
 					TypeAnnotation: &TypeAnnotation{
 						Move: false,
@@ -3972,8 +4326,10 @@ func TestParseInterface(t *testing.T) {
 							},
 							StartPos: Position{Offset: 58, Line: 3, Column: 21},
 						},
-						StartPos: Position{Offset: 53, Line: 3, Column: 16},
-						EndPos:   Position{Offset: 60, Line: 3, Column: 23},
+						Range: Range{
+							StartPos: Position{Offset: 53, Line: 3, Column: 16},
+							EndPos:   Position{Offset: 60, Line: 3, Column: 23},
+						},
 					},
 				},
 				SpecialFunctions: []*SpecialFunctionDeclaration{
@@ -4002,12 +4358,16 @@ func TestParseInterface(t *testing.T) {
 											},
 											StartPos: Position{Offset: 89, Line: 5, Column: 26},
 										},
-										StartPos: Position{Offset: 84, Line: 5, Column: 21},
-										EndPos:   Position{Offset: 89, Line: 5, Column: 26},
+										Range: Range{
+											StartPos: Position{Offset: 84, Line: 5, Column: 21},
+											EndPos:   Position{Offset: 89, Line: 5, Column: 26},
+										},
 									},
 								},
-								StartPos: Position{Offset: 83, Line: 5, Column: 20},
-								EndPos:   Position{Offset: 92, Line: 5, Column: 29},
+								Range: Range{
+									StartPos: Position{Offset: 83, Line: 5, Column: 20},
+									EndPos:   Position{Offset: 92, Line: 5, Column: 29},
+								},
 							},
 							FunctionBlock: nil,
 							StartPos:      Position{Offset: 79, Line: 5, Column: 16},
@@ -4022,8 +4382,10 @@ func TestParseInterface(t *testing.T) {
 							Pos:        Position{Offset: 115, Line: 7, Column: 20},
 						},
 						ParameterList: &ParameterList{
-							StartPos: Position{Offset: 121, Line: 7, Column: 26},
-							EndPos:   Position{Offset: 122, Line: 7, Column: 27},
+							Range: Range{
+								StartPos: Position{Offset: 121, Line: 7, Column: 26},
+								EndPos:   Position{Offset: 122, Line: 7, Column: 27},
+							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
 							Move: false,
@@ -4040,8 +4402,10 @@ func TestParseInterface(t *testing.T) {
 					},
 				},
 			},
-			StartPos: Position{Offset: 13, Line: 2, Column: 12},
-			EndPos:   Position{Offset: 141, Line: 8, Column: 12},
+			Range: Range{
+				StartPos: Position{Offset: 13, Line: 2, Column: 12},
+				EndPos:   Position{Offset: 141, Line: 8, Column: 12},
+			},
 		}
 
 		expected := &Program{
@@ -4063,8 +4427,10 @@ func TestParseImportWithString(t *testing.T) {
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
 		Location:    StringImportLocation("test.bpl"),
-		StartPos:    Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:      Position{Offset: 25, Line: 2, Column: 24},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+		},
 		LocationPos: Position{Offset: 16, Line: 2, Column: 15},
 	}
 
@@ -4102,8 +4468,10 @@ func TestParseImportWithAddress(t *testing.T) {
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
 		Location:    AddressImportLocation([]byte{18, 52}),
-		StartPos:    Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:      Position{Offset: 21, Line: 2, Column: 20},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+		},
 		LocationPos: Position{Offset: 16, Line: 2, Column: 15},
 	}
 
@@ -4149,9 +4517,11 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 				Pos:        Position{Offset: 19, Line: 2, Column: 18},
 			},
 		},
-		Location:    AddressImportLocation([]byte{0}),
-		StartPos:    Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:      Position{Offset: 28, Line: 2, Column: 27},
+		Location: AddressImportLocation([]byte{0}),
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+		},
 		LocationPos: Position{Offset: 26, Line: 2, Column: 25},
 	}
 
@@ -4240,8 +4610,10 @@ func TestParseResource(t *testing.T) {
 		},
 		Conformances: []*NominalType{},
 		Members:      &Members{},
-		StartPos:     Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:       Position{Offset: 24, Line: 2, Column: 23},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+		},
 	}
 
 	expected := &Program{
@@ -4282,8 +4654,10 @@ func TestParseEvent(t *testing.T) {
 						},
 						StartPos: Position{Offset: 28, Line: 2, Column: 27},
 					},
-					StartPos: Position{Offset: 24, Line: 2, Column: 23},
-					EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+					Range: Range{
+						StartPos: Position{Offset: 24, Line: 2, Column: 23},
+						EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+					},
 				},
 				{
 					Label: "",
@@ -4301,15 +4675,21 @@ func TestParseEvent(t *testing.T) {
 						},
 						StartPos: Position{Offset: 43, Line: 2, Column: 42},
 					},
-					StartPos: Position{Offset: 37, Line: 2, Column: 36},
-					EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+					Range: Range{
+						StartPos: Position{Offset: 37, Line: 2, Column: 36},
+						EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+					},
 				},
 			},
-			StartPos: Position{Offset: 23, Line: 2, Column: 22},
+			Range: Range{
+				StartPos: Position{Offset: 23, Line: 2, Column: 22},
+				EndPos:   Position{Offset: 50, Line: 2, Column: 49},
+			},
+		},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
 			EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 		},
-		StartPos: Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 	}
 
 	expected := &Program{
@@ -4344,9 +4724,11 @@ func TestParseEventEmitStatement(t *testing.T) {
 						LabelStartPos: &Position{Offset: 42, Line: 3, Column: 22},
 						LabelEndPos:   &Position{Offset: 43, Line: 3, Column: 23},
 						Expression: &IntExpression{
-							Value:    big.NewInt(1),
-							StartPos: Position{Offset: 46, Line: 3, Column: 26},
-							EndPos:   Position{Offset: 46, Line: 3, Column: 26},
+							Value: big.NewInt(1),
+							Range: Range{
+								StartPos: Position{Offset: 46, Line: 3, Column: 26},
+								EndPos:   Position{Offset: 46, Line: 3, Column: 26},
+							},
 						},
 					},
 					{
@@ -4354,9 +4736,11 @@ func TestParseEventEmitStatement(t *testing.T) {
 						LabelStartPos: &Position{Offset: 49, Line: 3, Column: 29},
 						LabelEndPos:   &Position{Offset: 52, Line: 3, Column: 32},
 						Expression: &IntExpression{
-							Value:    big.NewInt(2),
-							StartPos: Position{Offset: 55, Line: 3, Column: 35},
-							EndPos:   Position{Offset: 55, Line: 3, Column: 35},
+							Value: big.NewInt(2),
+							Range: Range{
+								StartPos: Position{Offset: 55, Line: 3, Column: 35},
+								EndPos:   Position{Offset: 55, Line: 3, Column: 35},
+							},
 						},
 					},
 				},
@@ -4385,8 +4769,10 @@ func TestParseMoveReturnType(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			Range: Range{
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: true,
@@ -4400,8 +4786,10 @@ func TestParseMoveReturnType(t *testing.T) {
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 25, Line: 2, Column: 24},
-				EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+				Range: Range{
+					StartPos: Position{Offset: 25, Line: 2, Column: 24},
+					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -4464,8 +4852,10 @@ func TestParseMoveStatement(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			Range: Range{
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -4499,8 +4889,10 @@ func TestParseMoveStatement(t *testing.T) {
 						},
 					},
 				},
-				StartPos: Position{Offset: 20, Line: 2, Column: 19},
-				EndPos:   Position{Offset: 49, Line: 4, Column: 8},
+				Range: Range{
+					StartPos: Position{Offset: 20, Line: 2, Column: 19},
+					EndPos:   Position{Offset: 49, Line: 4, Column: 8},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -4551,8 +4943,10 @@ func TestParseMoveOperator(t *testing.T) {
 								Pos:        Position{Offset: 21, Line: 2, Column: 20},
 							},
 						},
-						StartPos: Position{Offset: 19, Line: 2, Column: 18},
-						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+						Range: Range{
+							StartPos: Position{Offset: 19, Line: 2, Column: 18},
+							EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+						},
 					},
 				},
 			},
@@ -4609,17 +5003,23 @@ func TestParseMoveParameterType(t *testing.T) {
 						},
 						StartPos: Position{Offset: 21, Line: 2, Column: 20},
 					},
-					StartPos: Position{Offset: 18, Line: 2, Column: 17},
-					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					Range: Range{
+						StartPos: Position{Offset: 18, Line: 2, Column: 17},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
 				},
 			},
-			StartPos: Position{Offset: 17, Line: 2, Column: 16},
-			EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+			Range: Range{
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+			},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
-				StartPos: Position{Offset: 26, Line: 2, Column: 25},
-				EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+				Range: Range{
+					StartPos: Position{Offset: 26, Line: 2, Column: 25},
+					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+				},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -4710,13 +5110,17 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 						},
 						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
-					StartPos: Position{Offset: 20, Line: 2, Column: 19},
-					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+					Range: Range{
+						StartPos: Position{Offset: 20, Line: 2, Column: 19},
+						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+					},
 				},
 			},
 		},
-		StartPos: Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+		},
 	}
 
 	expected := &Program{
@@ -4754,8 +5158,10 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 					},
 					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
-				StartPos: Position{Offset: 16, Line: 2, Column: 15},
-				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+				Range: Range{
+					StartPos: Position{Offset: 16, Line: 2, Column: 15},
+					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+				},
 			},
 			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
@@ -4799,8 +5205,10 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 		},
 		Value: &FunctionExpression{
 			ParameterList: &ParameterList{
-				StartPos: Position{Offset: 21, Line: 2, Column: 20},
-				EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				Range: Range{
+					StartPos: Position{Offset: 21, Line: 2, Column: 20},
+					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
 				Move: true,
@@ -4822,12 +5230,16 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 									Pos:        Position{Offset: 38, Line: 2, Column: 37},
 								},
 							},
-							StartPos: Position{Offset: 31, Line: 2, Column: 30},
-							EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+							Range: Range{
+								StartPos: Position{Offset: 31, Line: 2, Column: 30},
+								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+							},
 						},
 					},
-					StartPos: Position{Offset: 29, Line: 2, Column: 28},
-					EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+					Range: Range{
+						StartPos: Position{Offset: 29, Line: 2, Column: 28},
+						EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+					},
 				},
 			},
 			StartPos: Position{Offset: 17, Line: 2, Column: 16},
@@ -4906,8 +5318,10 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 			Pos:        Position{Offset: 11, Line: 2, Column: 10},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -4952,8 +5366,10 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 						Expression: &InvocationExpression{
 							InvokedExpression: &FunctionExpression{
 								ParameterList: &ParameterList{
-									StartPos: Position{Offset: 65, Line: 4, Column: 15},
-									EndPos:   Position{Offset: 66, Line: 4, Column: 16},
+									Range: Range{
+										StartPos: Position{Offset: 65, Line: 4, Column: 15},
+										EndPos:   Position{Offset: 66, Line: 4, Column: 16},
+									},
 								},
 								ReturnTypeAnnotation: &TypeAnnotation{
 									Move: false,
@@ -4968,8 +5384,10 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 								FunctionBlock: &FunctionBlock{
 									Block: &Block{
 										Statements: nil,
-										StartPos:   Position{Offset: 68, Line: 4, Column: 18},
-										EndPos:     Position{Offset: 69, Line: 4, Column: 19},
+										Range: Range{
+											StartPos: Position{Offset: 68, Line: 4, Column: 18},
+											EndPos:   Position{Offset: 69, Line: 4, Column: 19},
+										},
 									},
 									PreConditions:  nil,
 									PostConditions: nil,
@@ -4981,8 +5399,10 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 						},
 					},
 				},
-				StartPos: Position{Offset: 18, Line: 2, Column: 17},
-				EndPos:   Position{Offset: 80, Line: 5, Column: 6},
+				Range: Range{
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
+					EndPos:   Position{Offset: 80, Line: 5, Column: 6},
+				},
 			},
 			PreConditions:  nil,
 			PostConditions: nil,
@@ -5029,8 +5449,10 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 			Pos:        Position{Offset: 11, Line: 2, Column: 10},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -5047,8 +5469,10 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 				Statements: []Statement{
 					&ReturnStatement{
 						Expression: nil,
-						StartPos:   Position{Offset: 30, Line: 3, Column: 10},
-						EndPos:     Position{Offset: 35, Line: 3, Column: 15},
+						Range: Range{
+							StartPos: Position{Offset: 30, Line: 3, Column: 10},
+							EndPos:   Position{Offset: 35, Line: 3, Column: 15},
+						},
 					},
 					&ExpressionStatement{
 						Expression: &DestroyExpression{
@@ -5062,8 +5486,10 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 						},
 					},
 				},
-				StartPos: Position{Offset: 18, Line: 2, Column: 17},
-				EndPos:   Position{Offset: 63, Line: 5, Column: 6},
+				Range: Range{
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
+					EndPos:   Position{Offset: 63, Line: 5, Column: 6},
+				},
 			},
 		},
 		StartPos: Position{Offset: 7, Line: 2, Column: 6},
@@ -5092,8 +5518,10 @@ func TestParseSwapStatement(t *testing.T) {
 			Pos:        Position{Offset: 11, Line: 2, Column: 10},
 		},
 		ParameterList: &ParameterList{
-			StartPos: Position{Offset: 15, Line: 2, Column: 14},
-			EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
 			Move: false,
@@ -5117,13 +5545,17 @@ func TestParseSwapStatement(t *testing.T) {
 								},
 							},
 							IndexingExpression: &IntExpression{
-								Value:    big.NewInt(0),
-								StartPos: Position{Offset: 34, Line: 3, Column: 14},
-								EndPos:   Position{Offset: 34, Line: 3, Column: 14},
+								Value: big.NewInt(0),
+								Range: Range{
+									StartPos: Position{Offset: 34, Line: 3, Column: 14},
+									EndPos:   Position{Offset: 34, Line: 3, Column: 14},
+								},
 							},
 							IndexingType: nil,
-							StartPos:     Position{Offset: 33, Line: 3, Column: 13},
-							EndPos:       Position{Offset: 35, Line: 3, Column: 15},
+							Range: Range{
+								StartPos: Position{Offset: 33, Line: 3, Column: 13},
+								EndPos:   Position{Offset: 35, Line: 3, Column: 15},
+							},
 						},
 						Right: &MemberExpression{
 							Expression: &IdentifierExpression{
@@ -5139,8 +5571,10 @@ func TestParseSwapStatement(t *testing.T) {
 						},
 					},
 				},
-				StartPos: Position{Offset: 18, Line: 2, Column: 17},
-				EndPos:   Position{Offset: 55, Line: 4, Column: 6},
+				Range: Range{
+					StartPos: Position{Offset: 18, Line: 2, Column: 17},
+					EndPos:   Position{Offset: 55, Line: 4, Column: 6},
+				},
 			},
 			PreConditions:  nil,
 			PostConditions: nil,
@@ -5182,13 +5616,17 @@ func TestParseDestructor(t *testing.T) {
 							Pos:        Position{Offset: 37, Line: 3, Column: 12},
 						},
 						ParameterList: &ParameterList{
-							StartPos: Position{Offset: 44, Line: 3, Column: 19},
-							EndPos:   Position{Offset: 45, Line: 3, Column: 20},
+							Range: Range{
+								StartPos: Position{Offset: 44, Line: 3, Column: 19},
+								EndPos:   Position{Offset: 45, Line: 3, Column: 20},
+							},
 						},
 						FunctionBlock: &FunctionBlock{
 							Block: &Block{
-								StartPos: Position{Offset: 47, Line: 3, Column: 22},
-								EndPos:   Position{Offset: 48, Line: 3, Column: 23},
+								Range: Range{
+									StartPos: Position{Offset: 47, Line: 3, Column: 22},
+									EndPos:   Position{Offset: 48, Line: 3, Column: 23},
+								},
 							},
 						},
 						StartPos: Position{Offset: 37, Line: 3, Column: 12},
@@ -5196,8 +5634,10 @@ func TestParseDestructor(t *testing.T) {
 				},
 			},
 		},
-		StartPos: Position{Offset: 9, Line: 2, Column: 8},
-		EndPos:   Position{Offset: 58, Line: 4, Column: 8},
+		Range: Range{
+			StartPos: Position{Offset: 9, Line: 2, Column: 8},
+			EndPos:   Position{Offset: 58, Line: 4, Column: 8},
+		},
 	}
 
 	expected := &Program{

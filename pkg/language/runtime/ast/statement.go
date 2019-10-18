@@ -9,16 +9,7 @@ type Statement interface {
 
 type ReturnStatement struct {
 	Expression Expression
-	StartPos   Position
-	EndPos     Position
-}
-
-func (s *ReturnStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *ReturnStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*ReturnStatement) isStatement() {}
@@ -30,16 +21,7 @@ func (s *ReturnStatement) Accept(visitor Visitor) Repr {
 // BreakStatement
 
 type BreakStatement struct {
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *BreakStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *BreakStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*BreakStatement) isStatement() {}
@@ -51,16 +33,7 @@ func (s *BreakStatement) Accept(visitor Visitor) Repr {
 // ContinueStatement
 
 type ContinueStatement struct {
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *ContinueStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *ContinueStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*ContinueStatement) isStatement() {}
@@ -105,18 +78,9 @@ func (s *IfStatement) Accept(visitor Visitor) Repr {
 // WhileStatement
 
 type WhileStatement struct {
-	Test     Expression
-	Block    *Block
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *WhileStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *WhileStatement) EndPosition() Position {
-	return s.EndPos
+	Test  Expression
+	Block *Block
+	Range
 }
 
 func (*WhileStatement) isStatement() {}

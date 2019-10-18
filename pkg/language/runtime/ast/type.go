@@ -69,9 +69,8 @@ func (t *OptionalType) EndPosition() Position {
 // VariableSizedType is a variable sized array type
 
 type VariableSizedType struct {
-	Type
-	StartPos Position
-	EndPos   Position
+	Type Type
+	Range
 }
 
 func (*VariableSizedType) isType() {}
@@ -80,21 +79,12 @@ func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
 
-func (t *VariableSizedType) StartPosition() Position {
-	return t.StartPos
-}
-
-func (t *VariableSizedType) EndPosition() Position {
-	return t.EndPos
-}
-
 // ConstantSizedType is a constant sized array type
 
 type ConstantSizedType struct {
-	Type
-	Size     int
-	StartPos Position
-	EndPos   Position
+	Type Type
+	Size int
+	Range
 }
 
 func (*ConstantSizedType) isType() {}
@@ -103,21 +93,12 @@ func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
 }
 
-func (t *ConstantSizedType) StartPosition() Position {
-	return t.StartPos
-}
-
-func (t *ConstantSizedType) EndPosition() Position {
-	return t.EndPos
-}
-
 // DictionaryType
 
 type DictionaryType struct {
 	KeyType   Type
 	ValueType Type
-	StartPos  Position
-	EndPos    Position
+	Range
 }
 
 func (*DictionaryType) isType() {}
@@ -126,21 +107,12 @@ func (t *DictionaryType) String() string {
 	return fmt.Sprintf("{%s: %s}", t.KeyType, t.ValueType)
 }
 
-func (t *DictionaryType) StartPosition() Position {
-	return t.StartPos
-}
-
-func (t *DictionaryType) EndPosition() Position {
-	return t.EndPos
-}
-
 // FunctionType
 
 type FunctionType struct {
 	ParameterTypeAnnotations []*TypeAnnotation
 	ReturnTypeAnnotation     *TypeAnnotation
-	StartPos                 Position
-	EndPos                   Position
+	Range
 }
 
 func (*FunctionType) isType() {}
@@ -155,12 +127,4 @@ func (t *FunctionType) String() string {
 	}
 
 	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnTypeAnnotation.String())
-}
-
-func (t *FunctionType) StartPosition() Position {
-	return t.StartPos
-}
-
-func (t *FunctionType) EndPosition() Position {
-	return t.EndPos
 }

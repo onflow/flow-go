@@ -31,17 +31,8 @@ func (i Identifier) EndPosition() Position {
 type ImportDeclaration struct {
 	Identifiers []Identifier
 	Location    ImportLocation
-	StartPos    Position
-	EndPos      Position
 	LocationPos Position
-}
-
-func (v *ImportDeclaration) StartPosition() Position {
-	return v.StartPos
-}
-
-func (v *ImportDeclaration) EndPosition() Position {
-	return v.EndPos
+	Range
 }
 
 func (*ImportDeclaration) isDeclaration() {}
