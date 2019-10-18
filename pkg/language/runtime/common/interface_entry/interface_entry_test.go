@@ -3,8 +3,8 @@ package interface_entry
 import (
 	"testing"
 
-	"github.com/magiconair/properties/assert"
 	"github.com/raviqqe/hamt"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInterfaceEntry(t *testing.T) {

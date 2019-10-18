@@ -20,7 +20,6 @@ require (
 	github.com/kr/pty v1.1.3 // indirect
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
-	github.com/magiconair/properties v1.8.0
 	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
