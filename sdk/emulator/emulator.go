@@ -453,6 +453,8 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	return *account, prKey
 }
 
+// mergeOptions merges the values of two EmulatedBlockchainOptions structs.
+// TODO: this will be removed after improvements are made to the way EmulatedBlockchain is configured
 func mergeOptions(optA, optB EmulatedBlockchainOptions) EmulatedBlockchainOptions {
 	if optB.OnLogMessage == nil {
 		optB.OnLogMessage = optA.OnLogMessage
