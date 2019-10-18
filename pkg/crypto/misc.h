@@ -17,7 +17,7 @@ void    _ep_print(char*, ep_st*);
 void    _ep2_print(char*, ep2_st*);
 void    _seed_relic(byte*, int);
 void    _bn_randZr(bn_t);
-void    _G1scalarGenMult(ep_st*, bn_st*);
-ep_st*  _hashToG1(byte* data, int len);
+void    _G1scalarGenMult(ep_st*, const bn_st*);
+ep_st*  _hashToG1(const byte* data, const int len);
 
 #endif

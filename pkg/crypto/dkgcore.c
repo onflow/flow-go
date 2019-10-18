@@ -59,8 +59,8 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 // and stores the point in y
 // r is the order of G2, u is the barett constant associated to r
-static void G2_polynomialImage(ep2_st* y, ep2_st* A, int len_A,
-         int x, bn_st* r, bn_st* u){
+static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
+         const int x, const bn_st* r, const bn_st* u){
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
     ep_new(&bn_x);
@@ -74,7 +74,7 @@ static void G2_polynomialImage(ep2_st* y, ep2_st* A, int len_A,
     ep2_set_infty(&acc);
 
     for (int i=0; i < len_A; i++) {
-        ep2_mul_lwnaf(&mult, &A[i], &bn_x);
+        ep2_mul_lwnaf(&mult, (ep2_st*)&A[i], &bn_x);
         ep2_add_projc(&acc, &acc, &mult);
         // TODO: hardcode x^i mod r ?
         bn_mul_dig(&bn_x, &bn_x, x);
@@ -93,7 +93,7 @@ static void G2_polynomialImage(ep2_st* y, ep2_st* A, int len_A,
 // y[i] = Q(i+1) for all nodes i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 // for small x
-void G2_polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A) {
+void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A) {
     // order r
     bn_st r;
     bn_new(&r); 
@@ -114,10 +114,10 @@ void G2_polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A) {
 // export an array of ep2_st into an array of bytes
 // the length matching is supposed to be checked
 void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
-    const int size = 2*Fp_BYTES;
+    const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = out;
     for (int i=0; i<len; i++){
-        _ep2_write_bin_compact(p, &A[i]);
+        _ep2_write_bin_compact(p, &A[i], size);
         p += size;
     }
 }
@@ -125,19 +125,19 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
 // imports an array of ep2_st from an array of bytes
 // the length matching is supposed to be already done
 void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
-    const int size = 2*Fp_BYTES;
+    const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        _ep2_read_bin_compact(&A[i], p);
+        _ep2_read_bin_compact(&A[i], p, size);
         p += size;
     }
 }
 
-int verifyshare(bn_st* x, ep2_st* y) {
+int verifyshare(const bn_st* x, const ep2_st* y) {
     ep2_st res;
     ep2_new(res);
-    g2_mul_gen(&res, x);
-    return (ep2_cmp(&res, y) == RLC_EQ);
+    g2_mul_gen(&res, (bn_st*)x);
+    return (ep2_cmp(&res, (ep2_st*)y) == RLC_EQ);
 }
 
 

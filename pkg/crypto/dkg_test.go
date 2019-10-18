@@ -94,7 +94,7 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
 func TestFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 5

@@ -91,10 +91,11 @@ func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
-// writeVerifVector writes a G2 point in a slice of bytes
+// writePointG2 writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)((unsafe.Pointer)(&dest[0])),
 		(*C.ep2_st)(a),
+		(C.int)(pubKeyLengthBLS_BLS12381),
 	)
 }
 
@@ -102,6 +103,7 @@ func writePointG2(dest []byte, a *pointG2) {
 func readPointG2(a *pointG2, data []byte) {
 	C._ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(C.int)(len(data)),
 	)
 }
 
