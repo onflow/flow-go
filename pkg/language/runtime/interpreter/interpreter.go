@@ -571,8 +571,10 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							Message:       message,
 							LocationRange: LocationRange{
 								ImportLocation: interpreter.ImportLocation,
-								StartPos:       condition.Test.StartPosition(),
-								EndPos:         condition.Test.EndPosition(),
+								Range: ast.Range{
+									StartPos: condition.Test.StartPosition(),
+									EndPos:   condition.Test.EndPosition(),
+								},
 							},
 						})
 					})
@@ -1017,8 +1019,10 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
-		startPos:  expression.StartPosition(),
-		endPos:    expression.EndPosition(),
+		Range: ast.Range{
+			StartPos: expression.StartPosition(),
+			EndPos:   expression.EndPosition(),
+		},
 	})
 }
 
@@ -1075,8 +1079,10 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 			panic(&unsupportedOperation{
 				kind:      common.OperationKindUnary,
 				operation: expression.Operation,
-				startPos:  expression.StartPos,
-				endPos:    expression.EndPos,
+				Range: ast.Range{
+					StartPos: expression.StartPos,
+					EndPos:   expression.EndPos,
+				},
 			})
 		})
 }

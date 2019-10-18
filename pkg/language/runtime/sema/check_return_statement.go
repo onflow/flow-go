@@ -29,8 +29,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 		if _, ok := returnType.(*VoidType); ok {
 			checker.report(
 				&InvalidReturnValueError{
-					StartPos: statement.Expression.StartPosition(),
-					EndPos:   statement.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: statement.Expression.StartPosition(),
+						EndPos:   statement.Expression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -43,8 +45,10 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 				&TypeMismatchError{
 					ExpectedType: returnType,
 					ActualType:   valueType,
-					StartPos:     statement.Expression.StartPosition(),
-					EndPos:       statement.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: statement.Expression.StartPosition(),
+						EndPos:   statement.Expression.EndPosition(),
+					},
 				},
 			)
 		}

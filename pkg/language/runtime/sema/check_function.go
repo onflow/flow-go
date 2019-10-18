@@ -128,8 +128,10 @@ func (checker *Checker) checkFunction(
 			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
 				checker.report(
 					&MissingReturnStatementError{
-						StartPos: functionBlock.StartPosition(),
-						EndPos:   functionBlock.EndPosition(),
+						Range: ast.Range{
+							StartPos: functionBlock.StartPosition(),
+							EndPos:   functionBlock.EndPosition(),
+						},
 					},
 				)
 			}
@@ -319,8 +321,10 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if checker.inCondition {
 		checker.report(
 			&FunctionExpressionInConditionError{
-				StartPos: expression.StartPosition(),
-				EndPos:   expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: expression.StartPosition(),
+					EndPos:   expression.EndPosition(),
+				},
 			},
 		)
 	}

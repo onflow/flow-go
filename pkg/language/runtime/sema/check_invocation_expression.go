@@ -22,9 +22,11 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		if !IsInvalidType(expressionType) {
 			checker.report(
 				&NotCallableError{
-					Type:     expressionType,
-					StartPos: invokedExpression.StartPosition(),
-					EndPos:   invokedExpression.EndPosition(),
+					Type: expressionType,
+					Range: ast.Range{
+						StartPos: invokedExpression.StartPosition(),
+						EndPos:   invokedExpression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -107,8 +109,10 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 
 	checker.report(
 		&MissingCreateError{
-			StartPos: invocationExpression.StartPosition(),
-			EndPos:   invocationExpression.EndPosition(),
+			Range: ast.Range{
+				StartPos: invocationExpression.StartPosition(),
+				EndPos:   invocationExpression.EndPosition(),
+			},
 		},
 	)
 }
@@ -167,8 +171,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: "",
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -179,8 +185,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 				checker.report(
 					&MissingArgumentLabelError{
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              argument.Expression.StartPosition(),
-						EndPos:                argument.Expression.EndPosition(),
+						Range: ast.Range{
+							StartPos: argument.Expression.StartPosition(),
+							EndPos:   argument.Expression.EndPosition(),
+						},
 					},
 				)
 			} else if providedLabel != argumentLabel {
@@ -188,8 +196,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -217,8 +227,10 @@ func (checker *Checker) checkInvocationArguments(
 				&ArgumentCountError{
 					ParameterCount: parameterCount,
 					ArgumentCount:  argumentCount,
-					StartPos:       invocationExpression.StartPosition(),
-					EndPos:         invocationExpression.EndPosition(),
+					Range: ast.Range{
+						StartPos: invocationExpression.StartPosition(),
+						EndPos:   invocationExpression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -248,8 +260,10 @@ func (checker *Checker) checkInvocationArguments(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
 					ActualType:   argumentType,
-					StartPos:     argument.Expression.StartPosition(),
-					EndPos:       argument.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: argument.Expression.StartPosition(),
+						EndPos:   argument.Expression.EndPosition(),
+					},
 				},
 			)
 		}

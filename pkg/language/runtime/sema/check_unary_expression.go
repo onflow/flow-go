@@ -17,8 +17,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 					Operation:    expression.Operation,
 					ExpectedType: &BoolType{},
 					ActualType:   valueType,
-					StartPos:     expression.Expression.StartPosition(),
-					EndPos:       expression.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: expression.Expression.StartPosition(),
+						EndPos:   expression.Expression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -31,8 +33,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 					Operation:    expression.Operation,
 					ExpectedType: &IntegerType{},
 					ActualType:   valueType,
-					StartPos:     expression.Expression.StartPosition(),
-					EndPos:       expression.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: expression.Expression.StartPosition(),
+						EndPos:   expression.Expression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -42,8 +46,10 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		if !valueType.IsResourceType() {
 			checker.report(
 				&InvalidMoveOperationError{
-					StartPos: expression.StartPos,
-					EndPos:   expression.Expression.StartPosition(),
+					Range: ast.Range{
+						StartPos: expression.StartPos,
+						EndPos:   expression.Expression.StartPosition(),
+					},
 				},
 			)
 		}
@@ -54,7 +60,9 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindUnary,
 		operation: expression.Operation,
-		startPos:  expression.StartPos,
-		endPos:    expression.EndPos,
+		Range: ast.Range{
+			StartPos: expression.StartPos,
+			EndPos:   expression.EndPos,
+		},
 	})
 }

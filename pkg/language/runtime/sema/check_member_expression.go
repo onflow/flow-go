@@ -43,9 +43,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 			if !IsEquatableType(functionType.ParameterTypeAnnotations[0].Type) {
 				checker.report(
 					&NotEquatableTypeError{
-						Type:     expressionType,
-						StartPos: identifierStartPosition,
-						EndPos:   identifierEndPosition,
+						Type: expressionType,
+						Range: ast.Range{
+							StartPos: identifierStartPosition,
+							EndPos:   identifierEndPosition,
+						},
 					},
 				)
 
@@ -58,10 +60,12 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		if !IsInvalidType(expressionType) {
 			checker.report(
 				&NotDeclaredMemberError{
-					Type:     expressionType,
-					Name:     identifier,
-					StartPos: identifierStartPosition,
-					EndPos:   identifierEndPosition,
+					Type: expressionType,
+					Name: identifier,
+					Range: ast.Range{
+						StartPos: identifierStartPosition,
+						EndPos:   identifierEndPosition,
+					},
 				},
 			)
 		}

@@ -32,8 +32,10 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		} else {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					StartPos: assignment.StartPosition(),
-					EndPos:   assignment.EndPosition(),
+					Range: ast.Range{
+						StartPos: assignment.StartPosition(),
+						EndPos:   assignment.EndPosition(),
+					},
 				},
 			)
 		}
@@ -100,9 +102,11 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	if variable.IsConstant {
 		checker.report(
 			&AssignmentToConstantError{
-				Name:     identifier,
-				StartPos: target.StartPosition(),
-				EndPos:   target.EndPosition(),
+				Name: identifier,
+				Range: ast.Range{
+					StartPos: target.StartPosition(),
+					EndPos:   target.EndPosition(),
+				},
 			},
 		)
 	}
@@ -115,8 +119,10 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -143,8 +149,10 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -170,9 +178,11 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		if member.IsInitialized {
 			checker.report(
 				&AssignmentToConstantMemberError{
-					Name:     target.Identifier.Identifier,
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
+					Name: target.Identifier.Identifier,
+					Range: ast.Range{
+						StartPos: valueExpression.StartPosition(),
+						EndPos:   valueExpression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -188,8 +198,10 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
