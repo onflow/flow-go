@@ -180,6 +180,22 @@ var createAccountFunctionType = sema.FunctionType{
 	),
 }
 
+var accountCreatedEventType = sema.EventType{
+	Identifier: "AccountCreated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
 // TODO: improve types
 var addAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
@@ -303,6 +319,21 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 	event := types.Event{
 		ID:     eventID,
 		Values: values,
+	}
+
+	runtimeInterface.EmitEvent(event)
+}
+
+func (r *interpreterRuntime) emitAccountCreatedEvent(accountID []byte, runtimeInterface Interface) {
+	eventID := fmt.Sprintf("flow.%s", accountCreatedEventType.Identifier)
+
+	address := types.BytesToAddress(accountID)
+
+	event := types.Event{
+		ID: eventID,
+		Values: map[string]interface{}{
+			accountCreatedEventType.Fields[0].Identifier: address,
+		},
 	}
 
 	runtimeInterface.EmitEvent(event)
@@ -600,12 +631,14 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
 
-		value, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
+		accountID, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
 		if err != nil {
 			panic(err)
 		}
 
-		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
+		r.emitAccountCreatedEvent(accountID, runtimeInterface)
+
+		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(accountID)}
 		return trampoline.Done{Result: result}
 	}
 }

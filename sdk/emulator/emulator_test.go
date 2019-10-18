@@ -1118,12 +1118,15 @@ func TestEventEmitted(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		require.Len(t, events, 1)
+		require.Len(t, events, 2)
+
+		// first event is AccountCreated event
+		expectedEvent := events[1]
 
 		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
 
-		assert.Equal(t, expectedID, events[0].ID)
-		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, expectedID, expectedEvent.ID)
+		assert.Equal(t, big.NewInt(1), expectedEvent.Values["x"])
+		assert.Equal(t, big.NewInt(2), expectedEvent.Values["y"])
 	})
 }
