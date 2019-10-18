@@ -21,7 +21,8 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		// Assignment to self-field is allowed. This is necessary to initialize
 		// fields in the initializer
 
-		// TODO: improve exception
+		// TODO: improve exception: this is only allowed once, in the initializer
+		//    https://github.com/dapperlabs/flow-go/issues/947
 
 		if checker.selfFieldAccessMember(assignment.Target) != nil {
 			checker.recordResourceInvalidation(
