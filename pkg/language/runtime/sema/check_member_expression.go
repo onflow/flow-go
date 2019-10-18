@@ -26,6 +26,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
 	if selfFieldAccessMember != nil {
+		// NOTE: capturing is already handled by access to self
 		checker.checkResourceUseAfterInvalidation(selfFieldAccessMember, expression.Identifier)
 		checker.resources.AddUse(selfFieldAccessMember, expression.Identifier.Pos)
 	}

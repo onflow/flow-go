@@ -1967,7 +1967,7 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestCheckResourceDestructorMoveInvalidation(t *testing.T) {
+func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
 	   resource Test {
@@ -1991,4 +1991,29 @@ func TestCheckResourceDestructorMoveInvalidation(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       var duplicate: ((): <-Test)? = nil
+
+	   resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               duplicate = fun (): <-Test {
+                   return <-self.test
+               }
+           }
+	   }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
