@@ -16,7 +16,7 @@ In this document, various terminology is used to describe syntax or behavior tha
 
 `Invalid` means that the error is checked statically by the type checker.
 
-`Error` refers to bad behavior that will result in a runtime error.x
+`Error` refers to bad behavior that will result in a runtime error.
 
 ## Syntax and Behavior
 
@@ -2030,7 +2030,7 @@ and when the value is returned from a function:
     Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-    Structs are not an ideal way to represent this ownership because they can be copied.  This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
+    Structs are not an ideal way to represent this ownership because they can be copied.  If resources could be copied, this would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2957,7 +2957,7 @@ receiver.deposit(<-withdrawn)
 token.withdraw(amount: 100)
 
 // Withdrawing tokens so that the balance is zero does not destroy the resource.
-// the resource has to be destroy explicitly.
+// the resource has to be destroyed explicitly.
 token.withdraw(amount: 90)
 ```
 
@@ -3351,11 +3351,11 @@ There is only one account type in Flow. All accounts have a `storage` object whi
 
 Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually store a mixture of contracts, resources, and structs within their storage.
 
-The stored value must be a subtype of the type it is keyed by.  This means that if you are storing a `Vault` type as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
+The stored value must be a subtype of the type it is keyed by.  This means that if a `Vault` type is being stored as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
 
-Initializing values in account storage can only happen within the body of a transaction.  You cannot, for example, initialize a storage value within a member function of a struct or resource that is already in your account storage.
+Initializing values in account storage can only happen within the body of a transaction. Initialize a storage value within a member function of a struct or resource that is already in your account storage is not permitted.
 
-When you store a value in account's `account.storage[]`, the type of the data you just stored is also recorded in the `account.types[]` record.  You use `account.types[]` to publish type definitions that you want other accounts to have access to, which will be covered later.  You never need to write to `account.types[]`
+When a value is stored in an account's `account.storage[]`, or when a type is deployed to an account using the `deploy` function, the type of the data you just stored is also recorded in the `account.types[]` record.  `account.types[]` is used to publish type definitions that other accounts can have access to, which will be covered later.  `account.types[]` will never need to be writted to.
 
 ```bamboo
 // Declare a resource named `Counter`
@@ -3386,7 +3386,7 @@ Transactions are objects that are signed by one or more [accounts](#accounts) an
 
 Transactions are structured as such:
 
-Before the transaction declaration, you can import any necessary local or external types and interfaces that you would like to use, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's type definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, you must include that account's `Address`.
+Before the transaction declaration, there can be imports of any necessary local or external types and interfaces that are needed, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's type definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, that account's `Address` must be included
 
 Importing an external resource does not move it from the account that holds it.  It simply imports the type definition so that it can be used within a transaction.
 
@@ -3402,9 +3402,9 @@ Importing an external resource does not move it from the account that holds it. 
 > 🚧 Status: The usage of external types is not implemented yet.
 
 
-Next is where you can define any new types you would like to use or deploy within your transaction.  These are kind of like global constants or variables.
+Next is definitions of any new types that will be used or deployed within the transaction.  These are kind of like global constants or variables.
 
-Then, you have the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of bpl code that executes sequentially.
+Next is the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of bpl code that executes sequentially.
 
 The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
 The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
@@ -3446,7 +3446,7 @@ transaction {
 
 ### Deployment
 
-Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that we would like to deploy to our account.  Imagine it is in a file called `FungibleToken.bpl`.
+Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that will be   deployed to an account.  Imagine it is in a file called `FungibleToken.bpl`.
 
 ```bamboo,file=fungible-token-interface.bpl
 // Declare a resource interface for a fungible token.
@@ -3455,70 +3455,70 @@ Transactions can deploy resources and resource interfaces to the storage of any 
 // which needs to implement the interfaces `Provider` and `Receiver`
 //
 
-    pub resource interface Provider {
+pub resource interface Provider {
 
-        pub fun withdraw(amount: Int): <-Vault {
-            pre {
-                amount > 0:
-                    "withdrawal amount must be positive"
-            }
+    pub fun withdraw(amount: Int): <-Vault {
+        pre {
+            amount > 0:
+                "withdrawal amount must be positive"
+        }
+        post {
+            result.balance == amount:
+                "incorrect amount returned"
+        }
+    }
+}
+
+pub resource interface Receiver {
+    pub fun deposit(vault: <-Vault)
+}
+
+// Vault is an interface that implements both Provider and Receiver
+pub resource interface Vault: Provider, Receiver {
+
+    pub balance: Int {
+        set(newBalance) {
             post {
-                result.balance == amount:
-                    "incorrect amount returned"
+                newBalance >= 0:
+                    "Balances are always non-negative"
+            }
+        }
+        get {
+            post {
+                result >= 0:
+                    "Balances are always non-negative"
             }
         }
     }
 
-    pub resource interface Receiver {
-        pub fun deposit(vault: <-Vault)
-    }
-
-    // Vault is an interface that implements both Provider and Receiver
-    pub resource interface Vault: Provider, Receiver {
-
-        pub balance: Int {
-            set {
-                post {
-                    self.balance >= 0:
-                        "Balances are always non-negative"
-                }
-            }
-            get {
-                post {
-                    result >= 0:
-                        "Balances are always non-negative"
-                }
-            }
-        }
-
-        init(balance: Int) {
-            post {
-                self.balance == balance:
-                    "the balance must be initialized to the initial balance"
-            }
-        }
-
-        pub fun withdraw(amount: Int): <-Self {
-            pre {
-                amount <= self.balance:
-                    "insufficient funds: the amount must be smaller or equal to the balance"
-            }
-            post {
-                self.balance == before(self.balance) - amount:
-                    "Incorrect amount removed"
-            }
-        }
-
-        pub fun deposit(vault: <-Self) {
-            post {
-                self.balance == before(self.balance) + vault.balance:
-                    "the amount must be added to the balance"
-            }
+    init(balance: Int) {
+        post {
+            self.balance == balance:
+                "the balance must be initialized to the initial balance"
         }
     }
+
+    pub fun withdraw(amount: Int): <-Self {
+        pre {
+            amount <= self.balance:
+                "insufficient funds: the amount must be smaller or equal to the balance"
+        }
+        post {
+            self.balance == before(self.balance) - amount:
+                "Incorrect amount removed"
+        }
+    }
+
+    pub fun deposit(vault: <-Self) {
+        post {
+            self.balance == before(self.balance) + vault.balance:
+                "the amount must be added to the balance"
+        }
+    }
+}
 ```
 
-In our transaction code, we will import the above file to use it in our code.  
+The transaction will import the above file to use it in the code.  
 Transactions can refer to local code with the `import` keyword, 
 followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
@@ -3529,9 +3529,9 @@ and the string literal for the path of the file which contains the code of the t
 -->
 
 The preparer can use the signing account's `deploy` function to deploy
-the resource interface.  This essentially stores the resource interface in the account storage so it can be used again.
+the resource interface.  This essentially stores the resource interface in the account's `types` object so it can be used again.
 
-Once deployed, the resource interface is available in the account's `storage` object, which is how we access storage.
+Once deployed, the resource interface is available in the account's `types` object, which is how the deployed types are accessed.
 
 When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public. 
 
@@ -3561,9 +3561,9 @@ transaction {
     }
 }
 ```
-Now, anybody can import the vault interface from your account storage if they want to use it for their resources.
+Now, anybody can import the vault interface from the account storage if they want to use it for their resources.
 
-Just like resource interfaces it is possible to deploy resources.  Imagine this resource definition below is also in the local file `FungibleToken.bpl` that we used above.
+Just like resource interfaces it is possible to deploy resources.  Imagine this resource definition below is also in the local file `FungibleToken.bpl` that was used above.
 
 ```bamboo,file=example-token.bpl
 // Declare a resource named `FungibleToken` which implements
@@ -3589,7 +3589,7 @@ resource FungibleToken: Vault {
 }
 ```
 
-Now, in the same transaction that we used to deploy and publish our interface, we can also deploy and publish our resource.
+Now, in the same transaction that was used to deploy and publish the interface, the resource can also be stored and published.
 
 ```bamboo,file=deploy-resource.bpl
 import FungibleToken from "FungibleToken.bpl"
@@ -3605,16 +3605,17 @@ transaction {
         publish signer.types[Vault]
 
         signer.deploy(FungibleToken)
+        signer.storage[FungibleToken] <- create FungibleToken(balance: 100)
         publish signer.types[FungibleToken]
     }
 }
 ```
 
-Now, our Vault interface and our FungibleToken resource are deployed to our account and published so that anyone who wants to use them or interact with them can easily do so by importing the types into their bpl code! 
+Now, the Vault interface and the FungibleToken resource are deployed to the account and published so that anyone who wants to use them or interact with them can easily do so by importing the types into their bpl code! 
 
-In many scenarios, publishing the entire interface for your resource may be necessary because you want everyone to be able to access all functionality of your type.  In most situations though, including this one, you will want to expose only a subset of the functionality of your resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface, you would only publish the receiver interface.  
+In many scenarios, publishing the entire interface for the resource may be necessary because everyone might want to be able to access all functionality of the type.  In most situations though, including this one, it is important to expose only a subset of the functionality of the resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface,  the receiver interface is the only one that should be published.
 
-The next section will show how a account can deploy its own instance of `FungibleToken` based on a published external type and publish the correct interface.
+The next section will show how an account can deploy its own instance of `FungibleToken` based on a published external type and publish the correct interface.
 
 ### Interacting with Deployed Resources
 
