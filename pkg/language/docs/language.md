@@ -12,6 +12,12 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
+In this document, various terminology is used to describe syntax or behavior that is not allowed in the language:
+
+`Invalid` means that the error is checked statically by the type checker.
+
+`Error` refers to bad behavior that will result in a runtime error.x
+
 ## Syntax and Behavior
 
 The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
@@ -20,11 +26,13 @@ The programming language's syntax and behavior is inspired by Kotlin, Swift, Rus
 
 Comments can be used to document code. A comment is text that is not executed.
 
-*Single-line comments* start with two slashes (`//`):
+*Single-line comments* start with two slashes (`//`).  These comments can go on a line by themselves or they can go directly after a line of BPL code.
 
 ```bamboo,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
+
+let x = 1  // Here is another comment after a line of BPL code.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
@@ -74,7 +82,7 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).  They also cannot be redeclared with the same name in a subscope. 
 
 ```bamboo
 // Declare a constant named `a`
@@ -102,6 +110,12 @@ var b = 4
 // and it is declared as a constant
 //
 var a = 5
+
+// Invalid: cannot declare a variable with the name 'b',
+// in a subscope because b is already in scope
+{
+    var b = 5
+}
 ```
 
 ## Type Annotations
@@ -1076,7 +1090,7 @@ Logical operators work with the boolean values `true` and `false`.
     // is false
     ```
 
-    If the left-hand side is true, the right-hand side is not evaluated.
+    If the left-hand side is false, the right-hand side is not evaluated.
 
 - Logical OR: `a || b`
 
@@ -1094,7 +1108,7 @@ Logical operators work with the boolean values `true` and `false`.
     // is false
     ```
 
-    If the left-hand side is false, the right-hand side is not evaluated.
+    If the left-hand side is true, the right-hand side is not evaluated.
 
 ### Comparison operators
 
@@ -1132,14 +1146,14 @@ Comparison operators work with boolean and integer values.
 
     ```bamboo,file=operator-equal-int-nil.bpl
     let x: Int? = 2
-    let y: Int?? = nil
+    let y: Int? = nil
     x == y
     // is false
     ```
 
     ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
     let x: Int? = 2
-    let y: Int?? = 2
+    let y: Int? = 2
     x == y
     // is true
     ```
@@ -1176,14 +1190,14 @@ Comparison operators work with boolean and integer values.
 
     ```bamboo,file=operator-not-equal-int-nil.bpl
     let x: Int? = 2
-    let y: Int?? = nil
+    let y: Int? = nil
     x != y
     // is true
     ```
 
     ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
     let x: Int? = 2
-    let y: Int?? = 2
+    let y: Int? = 2
     x != y
     // is false
     ```
@@ -1281,9 +1295,9 @@ The parameters need to be enclosed in parentheses.
 The return type, if any, is separated from the parameters by a colon (`:`).
 The function code needs to be enclosed in opening and closing braces.
 
-Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter.
+Each parameter needs to have a label, the name that a function call needs to use to provide an argument value for the parameter.
 Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label.
-If no argument label is provided, the function call must use the parameter name.
+If no `_` argument label is provided, the function call must use the parameter name.
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
@@ -1467,12 +1481,14 @@ fun assert(_ test: Bool) {
 
 ### Function Expressions
 
-Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
+Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., anonymous.
 
 ```bamboo,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called
+//
+// This function's type is `((Int): Int)`
 //
 let double =
     fun (_ x: Int): Int {
@@ -1658,6 +1674,7 @@ If-statements allow a certain piece of code to be executed only when a given con
 
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
 The condition must be boolean and the braces are required.
+Parentheses around the condition are optional.
 
 ```bamboo,file=control-flow-if.bpl
 let a = 0
@@ -1667,15 +1684,15 @@ if a == 0 {
    b = 1
 }
 
-if a != 0 {
+if (a != 0) {
    b = 2
 }
 
 // `b` is 1
 ```
 
-An additional else-clause can be added to execute another piece of code when the condition is false.
-The else-clause is introduced by the `else` keyword.
+An additional, optional else-clause can be added to execute another piece of code when the condition is false.
+The else-clause is introduced by the `else` keyword followed by braces that contain the code that should be executed.
 
 ```bamboo,file=control-flow-if-else.bpl
 let a = 0
@@ -1763,13 +1780,13 @@ var i = 0
 var x = 0
 while i < 10 {
     i = i + 1
-    if i < 5 {
+    if i < 3 {
         continue
     }
     x = x + 1
 }
 
-// `x` is 6
+// `x` is 8
 ```
 
 The `break` statement can be used to stop the loop.
@@ -1904,7 +1921,7 @@ nand(false, false) // returns true
 nand(0, 0)
 ```
 
-Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
+Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`, or vice-versa.
 
 ```bamboo,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8): Int {
@@ -1977,7 +1994,7 @@ let add = (a: Int8, b: Int8): Int {
 // `add` has type `((Int8, Int8): Int)`
 ```
 
-Type inference is performed for eacg expression / statement, and not across statements.
+Type inference is performed for each expression / statement, and not across statements.
 
 There are cases where types cannot be inferred.
 In these cases explicit type annotations are required.
@@ -2014,8 +2031,6 @@ and when the value is returned from a function:
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
     Structs are not an ideal way to represent this ownership because they can be copied.  This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
-
-    We think resources are a great way to represent all types of assets.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2059,7 +2074,7 @@ Fields are declared like variables and constants, however, they have no initial 
 
 There are three kinds of fields.
 
-Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
+Constant fields are also stored in the composite value, but after the first value, they **cannot** have new values assigned to them. They are declared using the `let` keyword.
 
 Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
@@ -2078,8 +2093,8 @@ Synthetic fields are **not** stored in the composite value, i.e. they are derive
 // Both fields are initialized through the initializer
 //
 struct Token {
-    let id: Int
-    var balance: Int
+    pub let id: Int
+    pub var balance: Int
 
     init(id: Int, balance: Int) {
         self.id = id
@@ -2135,7 +2150,7 @@ struct Token {
 
 ### Composite Data Type Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  Assignments are not allowed at all in getters and setters.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
@@ -2145,9 +2160,9 @@ Getters are declared using the `get` keyword. Getters have no parameters and the
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
-    // which ensures the read value is always positive
+    // which ensures the read value is always non-negative
     //
-    var balance: Int {
+    pub var balance: Int {
         get {
            post {
                result >= 0
@@ -2184,7 +2199,7 @@ struct SetterExample {
     // Declare a variable field named `balance` with a setter
     // which requires written values to be positive
     //
-    var balance: Int {
+    pub var balance: Int {
         set(newBalance) {
             pre {
                 newBalance >= 0
@@ -2216,18 +2231,20 @@ Synthetic fields are read-only when only a getter is provided.
 
 ```bamboo,file=composite-type-synthetic-field-getter-only.bpl
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     // Declare a synthetic field named `area`,
     // which computes the area based on the width and height
     //
-    synthetic area: Int {
+    pub synthetic area: Int {
         get {
             return width * height
         }
     }
 
+    // in this case, since a getter is provided for `area`, 
+    // it cannot be assigned a value
     init(width: Int, height: Int) {
         self.width = width
         self.height = height
@@ -2247,8 +2264,8 @@ Synthetic fields are readable and writable when both a getter and a setter is de
 //
 struct GoalTracker {
 
-    var goal: Int
-    var completed: Int
+    pub var goal: Int
+    pub var completed: Int
 
     // Declare a synthetic field which is both readable
     // and writable.
@@ -2263,7 +2280,7 @@ struct GoalTracker {
     // based on the number of target goals
     // and the new remaining number of goals
     //
-    synthetic left: Double {
+    pub synthetic left: Double {
         get {
             return self.goal - self.completed
         }
@@ -2303,8 +2320,8 @@ Just like in the initializer, the special constant `self` refers to the composit
 // and has variable fields for the width and height
 //
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     init(width: Int, height: Int) {
         self.width = width
@@ -2314,7 +2331,7 @@ struct Rectangle {
     // Declare a function named "scale", which scales
     // the rectangle by the given factor
     //
-    fun scale(factor: Int) {
+    pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
     }
@@ -2333,8 +2350,8 @@ Functions support overloading.
 // and has variable fields for the width and height
 //
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     init(width: Int, height: Int) {
         self.width = width
@@ -2344,7 +2361,7 @@ struct Rectangle {
     // Declare a function named "scale", which independently scales
     // the width by a given factor and the height by a given factor
     //
-    fun scale(widthFactor: Int, heightFactor: Int) {
+    pub fun scale(widthFactor: Int, heightFactor: Int) {
         self.width = self.width * widthFactor
         self.height = self.height * heightFactor
     }
@@ -2353,7 +2370,7 @@ struct Rectangle {
     // both width and height by a given factor.
     // The function calls the `scale` function declared above
     //
-    fun scale(factor: Int) {
+    pub fun scale(factor: Int) {
         self.scale(
             widthFactor: factor,
             heightFactor: factor
@@ -2375,7 +2392,7 @@ and when returned from a function:
 // Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
-    var value: Int
+    pub var value: Int
 
     init(value: Int) {
         self.value = value
@@ -2397,20 +2414,22 @@ a.value // is *0*
 
 #### Resources
 
-Resources are **moved** when used as an initial value for a constant or variable,
+Resources are linear data types that can only be stored in one location at a time.  They are **moved** when used as an initial value for a constant or variable,
 when assigned to a different variable,
 when passed as an argument to a function,
 and when returned from a function.
 
 When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
-To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
+To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, or when it is moved to a function.
+
+A reference to a resource can be created and used, but only for reading fields and calling public functions, not for modifying the resource.
 
 ```bamboo,file=resource-behavior.bpl
 // Declare a resource named `SomeResource`, with a variable integer field
 //
 resource SomeResource {
-    var value: Int
+    pub var value: Int
 
     init(value: Int) {
         self.value = value
@@ -2457,7 +2476,7 @@ Resources **must** be used **exactly once**. To destroy a resource, the `destroy
 ```bamboo,file=resource-loss.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-let c = SomeResource(value: 10)
+let c <- create SomeResource(value: 10)
 
 // Invalid: `c` is not used, but must be! `c` cannot be lost
 ```
@@ -2465,7 +2484,7 @@ let c = SomeResource(value: 10)
 ```bamboo,file=resource-destruction.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-let d = SomeResource(value: 20)
+let d <- create SomeResource(value: 20)
 
 // Destroy the resource referred to by constant `d`
 //
@@ -2484,7 +2503,7 @@ To make it explicit that the type is moved, it must be prefixed with `<-` in typ
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`
 //
-let someResource: <-SomeResource <- create SomeResource()
+let someResource: <-SomeResource <- create SomeResource(value: 5)
 
 // Declare a function which consumes a resource.
 //
@@ -2544,7 +2563,7 @@ resource[1]
 
 ### Unbound References / Nulls
 
-There is **no** support for `null`s.
+There is **no** support for `null`.
 
 ### Inheritance and Abstract Types
 
@@ -2564,9 +2583,9 @@ Access control allows making certain parts of the program accessible/visible and
 
 **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and all other outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
+**Public** (using the `pub` keyword) means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
 
-**By default, everything is private.** The `pub` keyword is used to make declarations publicly readable.
+**By default, everything is private.** 
 
 The `(set)` suffix can be used to make variables also publicly writable.
 
@@ -2771,6 +2790,10 @@ resource interface FungibleToken {
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
+        pre {
+            balance >= 0:
+                "Balances are always non-negative"
+        }
         post {
             self.balance == balance:
                 "the balance must be initialized to the initial balance"
@@ -2820,7 +2843,7 @@ resource interface FungibleToken {
     // NOTE: the first parameter has the type `<-Self`,
     // i.e. the resource type implementing this interface
     //
-    pub fun deposit(_ token: <-Self) {
+    pub fun deposit(_ token: <-Self): Void {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -3315,11 +3338,11 @@ struct interface Account {
 
 ## Account Storage
 
-All accounts in flow are the same and have a `storage` object which contains the stored values of the account.  
+There is only one account type in Flow. All accounts have a `storage` object which contains the stored values of the account.  
 
 `account.storage[]`
 
-Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually be storing a mixture of contracts, resources, and structs within their storage.
+Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually store a mixture of contracts, resources, and structs within their storage.
 
 The stored value must be a subtype of the type it is keyed by.  This means that if you are storing a `Vault` type as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
 
@@ -3382,6 +3405,9 @@ The **execute phase** is where all interaction with external contracts happens. 
 The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
+
+Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
+
 The preparer is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
@@ -3498,9 +3524,9 @@ the resource interface.  This essentially stores the resource interface in the a
 
 Once deployed, the resource interface is available in the account's `storage` object, which is how we access storage.
 
-When you deploy a resource or interface to your account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds on to ensure that certain interfaces and resources are not available to anyone. You can use the `publish` action to make certain subsets of your resources public. 
+When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public. 
 
-The `publish` operator is used to make the resource interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to call the functions defined in the interface on the resource that implements that interface.
+The `publish` operator is used to make the resource or interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to import the type, call the functions defined in the resource at the owners address, or call the functions in an published interface in a resource that implements it.
 
 ```bamboo,file=deploy-resource-interface.bpl
 
@@ -3579,7 +3605,7 @@ Now, our Vault interface and our FungibleToken resource are deployed to our acco
 
 In many scenarios, publishing the entire interface for your resource may be necessary because you want everyone to be able to access all functionality of your type.  In most situations though, including this one, you will want to expose only a subset of the functionality of your resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface, you would only publish the receiver interface.  
 
-In the next section, we will see how to deploy your own instance of `FungibleToken` based on an external type and publish the correct interface.
+The next section will show how a account can deploy its own instance of `FungibleToken` based on a published external type and publish the correct interface.
 
 ### Interacting with Deployed Resources
 
