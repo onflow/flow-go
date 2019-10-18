@@ -9,6 +9,5 @@ type Location struct {
 
 type LocationRange struct {
 	ImportLocation ast.ImportLocation
-	StartPos       ast.Position
-	EndPos         ast.Position
+	ast.Range
 }

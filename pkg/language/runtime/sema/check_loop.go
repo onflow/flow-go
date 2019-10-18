@@ -15,8 +15,10 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
 				ActualType:   testType,
-				StartPos:     testExpression.StartPosition(),
-				EndPos:       testExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: testExpression.StartPosition(),
+					EndPos:   testExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -40,12 +42,12 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 }
 
 func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) {
-	var variable *Variable
+	var resource interface{}
 	var info ResourceInfo
 
 	resources := checker.resources
 	for resources.Size() != 0 {
-		variable, info, resources = resources.FirstRest()
+		resource, info, resources = resources.FirstRest()
 
 		// only report if the variable was invalidated
 		if info.Invalidations.IsEmpty() {
@@ -62,16 +64,17 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 				continue
 			}
 
-			if checker.resources.IsUseAfterInvalidationReported(variable, usePosition) {
+			if checker.resources.IsUseAfterInvalidationReported(resource, usePosition) {
 				continue
 			}
 
-			checker.resources.MarkUseAfterInvalidationReported(variable, usePosition)
+			checker.resources.MarkUseAfterInvalidationReported(resource, usePosition)
 
 			checker.report(
 				&ResourceUseAfterInvalidationError{
-					Name:          variable.Identifier,
-					Pos:           usePosition,
+					// TODO: improve position information
+					StartPos:      usePosition,
+					EndPos:        usePosition,
 					Invalidations: invalidations,
 					InLoop:        true,
 				},
@@ -88,8 +91,10 @@ func (checker *Checker) VisitBreakStatement(statement *ast.BreakStatement) ast.R
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementBreak,
-				StartPos:         statement.StartPos,
-				EndPos:           statement.EndPos,
+				Range: ast.Range{
+					StartPos: statement.StartPos,
+					EndPos:   statement.EndPos,
+				},
 			},
 		)
 	}
@@ -105,8 +110,10 @@ func (checker *Checker) VisitContinueStatement(statement *ast.ContinueStatement)
 		checker.report(
 			&ControlStatementError{
 				ControlStatement: common.ControlStatementContinue,
-				StartPos:         statement.StartPos,
-				EndPos:           statement.EndPos,
+				Range: ast.Range{
+					StartPos: statement.StartPos,
+					EndPos:   statement.EndPos,
+				},
 			},
 		)
 	}

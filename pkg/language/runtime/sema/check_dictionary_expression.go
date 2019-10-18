@@ -35,8 +35,10 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 				&TypeMismatchError{
 					ExpectedType: keyType,
 					ActualType:   entryKeyType,
-					StartPos:     entry.Key.StartPosition(),
-					EndPos:       entry.Key.EndPosition(),
+					Range: ast.Range{
+						StartPos: entry.Key.StartPosition(),
+						EndPos:   entry.Key.EndPosition(),
+					},
 				},
 			)
 		}
@@ -50,8 +52,10 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 				&TypeMismatchError{
 					ExpectedType: valueType,
 					ActualType:   entryValueType,
-					StartPos:     entry.Value.StartPosition(),
-					EndPos:       entry.Value.EndPosition(),
+					Range: ast.Range{
+						StartPos: entry.Value.StartPosition(),
+						EndPos:   entry.Value.EndPosition(),
+					},
 				},
 			)
 		}

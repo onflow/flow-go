@@ -13,8 +13,10 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		checker.report(
 			&UnresolvedImportError{
 				ImportLocation: declaration.Location,
-				StartPos:       declaration.LocationPos,
-				EndPos:         declaration.LocationPos,
+				Range: ast.Range{
+					StartPos: declaration.LocationPos,
+					EndPos:   declaration.LocationPos,
+				},
 			},
 		)
 		return nil
@@ -24,8 +26,10 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
-				StartPos:       declaration.LocationPos,
-				EndPos:         declaration.LocationPos,
+				Range: ast.Range{
+					StartPos: declaration.LocationPos,
+					EndPos:   declaration.LocationPos,
+				},
 			},
 		)
 		return nil
@@ -69,7 +73,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 	checker.importValues(declaration, importChecker, missing)
 	checker.importTypes(declaration, importChecker, missing)
 
-	for identifier, _ := range missing {
+	for identifier := range missing {
 		checker.report(
 			&NotExportedError{
 				Name:           identifier.Identifier,

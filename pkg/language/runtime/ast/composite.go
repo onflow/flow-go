@@ -12,16 +12,7 @@ type CompositeDeclaration struct {
 	Identifier    Identifier
 	Conformances  []*NominalType
 	Members       *Members
-	StartPos      Position
-	EndPos        Position
-}
-
-func (d *CompositeDeclaration) StartPosition() Position {
-	return d.StartPos
-}
-
-func (d *CompositeDeclaration) EndPosition() Position {
-	return d.EndPos
+	Range
 }
 
 func (d *CompositeDeclaration) Accept(visitor Visitor) Repr {
@@ -59,20 +50,11 @@ type FieldDeclaration struct {
 	VariableKind   VariableKind
 	Identifier     Identifier
 	TypeAnnotation *TypeAnnotation
-	StartPos       Position
-	EndPos         Position
+	Range
 }
 
 func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitFieldDeclaration(f)
-}
-
-func (f *FieldDeclaration) StartPosition() Position {
-	return f.StartPos
-}
-
-func (f *FieldDeclaration) EndPosition() Position {
-	return f.EndPos
 }
 
 func (*FieldDeclaration) isDeclaration() {}

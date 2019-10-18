@@ -3484,7 +3484,7 @@ func TestInterpretImport(t *testing.T) {
           return 42
       }
 	`)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -3504,13 +3504,13 @@ func TestInterpretImport(t *testing.T) {
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
@@ -3537,7 +3537,7 @@ func TestInterpretImportError(t *testing.T) {
 		nil,
 		nil,
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -3557,17 +3557,17 @@ func TestInterpretImportError(t *testing.T) {
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	values := stdlib.StandardLibraryFunctions{
 		stdlib.PanicFunction,
 	}.ToValues()
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, values)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("test")
 
@@ -4378,30 +4378,88 @@ func TestInterpretUnaryMove(t *testing.T) {
 	)
 }
 
-func TestInterpretResourceMoveInArray(t *testing.T) {
+func TestInterpretResourceMoveInArrayAndDestroy(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var destroys = 0
+
       resource Foo {
           var bar: Int
+
           init(bar: Int) {
               self.bar = bar
+          }
+
+          destroy() {
+              destroys = destroys + 1
           }
       }
 
       fun test(): Int {
-        let foo <- create Foo(bar: 1)
-        let foos <- [<-foo]
-        let bar = foos[0].bar
-        destroy foos
-        return bar
+          let foo1 <- create Foo(bar: 1)
+          let foo2 <- create Foo(bar: 2)
+          let foos <- [<-foo1, <-foo2]
+          let bar = foos[1].bar
+          destroy foos
+          return bar
       }
     `)
 
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destroys"].Value,
+	)
+
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.NewIntValue(2),
 		value,
+	)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destroys"].Value,
+	)
+}
+
+func TestInterpretResourceMoveInDictionaryAndDestroy(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destroys = 0
+
+      resource Foo {
+          var bar: Int
+
+          init(bar: Int) {
+              self.bar = bar
+          }
+
+          destroy() {
+              destroys = destroys + 1
+          }
+      }
+
+      fun test() {
+          let foo1 <- create Foo(bar: 1)
+          let foo2 <- create Foo(bar: 2)
+          let foos <- {"foo1": <-foo1, "foo2": <-foo2}
+          destroy foos
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destroys"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destroys"].Value,
 	)
 }
 
@@ -4460,7 +4518,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
         }
       }
     `)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	checkerImporting, err := ParseAndCheckWithExtra(t,
 		`
@@ -4481,13 +4539,13 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 			return checkerImported.Program, nil
 		},
 	)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	err = inter.Interpret()
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("test")
 	assert.Nil(t, err)
@@ -4587,6 +4645,156 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 		),
 		value,
 	)
+}
+
+func TestInterpretResourceDestroyExpressionNoDestructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       resource R {}
+
+       fun test() {
+           let r <- create R()
+           destroy r
+       }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+}
+
+func TestInterpretResourceDestroyExpressionDestructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+       var ranDestructor = false
+
+       resource R {
+           destroy() {
+               ranDestructor = true
+           }
+       }
+
+       fun test() {
+           let r <- create R()
+           destroy r
+       }
+	`)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructor"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructor"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var ranDestructorA = false
+      var ranDestructorB = false
+
+      resource B {
+          destroy() {
+              ranDestructorB = true
+          }
+      }
+
+      resource A {
+          let b: <-B
+
+          init(b: <-B) {
+              self.b <- b
+          }
+
+          destroy() {
+              ranDestructorA = true
+              destroy self.b
+          }
+      }
+
+      fun test() {
+          let b <- create B()
+          let a <- create A(b: <-b)
+          destroy a
+      }
+	`)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructorA"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["ranDestructorB"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructorA"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["ranDestructorB"].Value,
+	)
+}
+
+// TestInterpretResourceDestroyExpressionResourceInterfaceCondition tests that
+// the resource interface's destructor is called, even if the conforming resource
+// does not have an destructor
+//
+func TestInterpretResourceDestroyExpressionResourceInterfaceCondition(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource interface I {
+          destroy() {
+              pre { false }
+          }
+      }
+
+      resource R: I {}
+
+      fun test() {
+          let r <- create R()
+          destroy r
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+// TestInterpretInterfaceInitializer tests that the interface's initializer
+// is called, even if the conforming composite does not have an initializer
+//
+func TestInterpretInterfaceInitializer(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface I {
+          init() {
+              pre { false }
+          }
+      }
+
+      struct S: I {}
+
+      fun test() {
+          S()
+      }
+	`)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
 }
 
 func TestInterpretEmitEvent(t *testing.T) {

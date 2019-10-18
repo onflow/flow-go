@@ -38,7 +38,7 @@ func (checker *Checker) visitFunctionDeclaration(
 
 	functionType := checker.Elaboration.FunctionDeclarationFunctionTypes[declaration]
 	if functionType == nil {
-		functionType = checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+		functionType = checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
 
 		if options.declareFunction {
 			checker.declareFunctionDeclaration(declaration, functionType)
@@ -48,7 +48,7 @@ func (checker *Checker) visitFunctionDeclaration(
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	checker.checkFunction(
-		declaration.Parameters,
+		declaration.ParameterList,
 		declaration.ReturnTypeAnnotation.StartPos,
 		functionType,
 		declaration.FunctionBlock,
@@ -62,7 +62,7 @@ func (checker *Checker) declareFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	functionType *FunctionType,
 ) {
-	argumentLabels := declaration.Parameters.ArgumentLabels()
+	argumentLabels := declaration.ParameterList.ArgumentLabels()
 
 	variable, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
@@ -90,16 +90,16 @@ func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDec
 }
 
 func (checker *Checker) checkFunction(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypePosition ast.Position,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 ) {
 	// check argument labels
-	checker.checkArgumentLabels(parameters)
+	checker.checkArgumentLabels(parameterList)
 
-	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
+	checker.checkParameters(parameterList, functionType.ParameterTypeAnnotations)
 	if functionType.ReturnTypeAnnotation != nil {
 		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
@@ -115,7 +115,7 @@ func (checker *Checker) checkFunction(
 				checker.enterValueScope()
 				defer checker.leaveValueScope()
 
-				checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
+				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
 
 				checker.visitFunctionBlock(
 					functionBlock,
@@ -128,8 +128,10 @@ func (checker *Checker) checkFunction(
 			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
 				checker.report(
 					&MissingReturnStatementError{
-						StartPos: functionBlock.StartPosition(),
-						EndPos:   functionBlock.EndPosition(),
+						Range: ast.Range{
+							StartPos: functionBlock.StartPosition(),
+							EndPos:   functionBlock.EndPosition(),
+						},
 					},
 				)
 			}
@@ -137,8 +139,8 @@ func (checker *Checker) checkFunction(
 	}
 }
 
-func (checker *Checker) checkParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
-	for i, parameter := range parameters {
+func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
+	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
 	}
@@ -174,11 +176,11 @@ func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position
 
 // checkArgumentLabels checks that all argument labels (if any) are unique
 //
-func (checker *Checker) checkArgumentLabels(parameters ast.Parameters) {
+func (checker *Checker) checkArgumentLabels(parameterList *ast.ParameterList) {
 
 	argumentLabelPositions := map[string]ast.Position{}
 
-	for _, parameter := range parameters {
+	for _, parameter := range parameterList.Parameters {
 		label := parameter.Label
 		if label == "" || label == ArgumentLabelNotRequired {
 			continue
@@ -204,11 +206,13 @@ func (checker *Checker) checkArgumentLabels(parameters ast.Parameters) {
 // declareParameters declares a constant for each parameter,
 // ensuring names are unique and constants don't already exist
 //
-func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
-
+func (checker *Checker) declareParameters(
+	parameterList *ast.ParameterList,
+	parameterTypeAnnotations []*TypeAnnotation,
+) {
 	depth := checker.valueActivations.Depth()
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		identifier := parameter.Identifier
 
 		// check if variable with this identifier is already declared in the current scope
@@ -300,12 +304,12 @@ func (checker *Checker) declareBefore() {
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
+	functionType := checker.functionType(expression.ParameterList, expression.ReturnTypeAnnotation)
 
 	checker.Elaboration.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
-		expression.Parameters,
+		expression.ParameterList,
 		expression.ReturnTypeAnnotation.StartPos,
 		functionType,
 		expression.FunctionBlock,
@@ -317,8 +321,10 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if checker.inCondition {
 		checker.report(
 			&FunctionExpressionInConditionError{
-				StartPos: expression.StartPosition(),
-				EndPos:   expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: expression.StartPosition(),
+					EndPos:   expression.EndPosition(),
+				},
 			},
 		)
 	}

@@ -76,8 +76,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				StartPos:        declaration.Identifier.StartPosition(),
-				EndPos:          declaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: declaration.Identifier.StartPosition(),
+					EndPos:   declaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -91,8 +93,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
-				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
+					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -158,7 +162,7 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 	initializerCount := len(initializers)
 	if initializerCount > 0 {
 		firstInitializer := initializers[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
+		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.ParameterList)
 
 		if initializerCount > 1 {
 			secondInitializer := initializers[1]
@@ -166,8 +170,10 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
+					Range: ast.Range{
+						StartPos: secondInitializer.StartPosition(),
+						EndPos:   secondInitializer.EndPosition(),
+					},
 				},
 			)
 		}
@@ -231,8 +237,10 @@ func (checker *Checker) checkCompositeConformance(
 			&CompositeKindMismatchError{
 				ExpectedKind: compositeType.Kind,
 				ActualKind:   interfaceType.CompositeKind,
-				StartPos:     interfaceIdentifier.StartPosition(),
-				EndPos:       interfaceIdentifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: interfaceIdentifier.StartPosition(),
+					EndPos:   interfaceIdentifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -355,7 +363,7 @@ func (checker *Checker) declareCompositeConstructor(
 	if len(initializers()) > 0 {
 		firstInitializer := initializers()[0]
 
-		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
+		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
 
 		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
@@ -411,9 +419,11 @@ func (checker *Checker) membersAndOrigins(
 
 			checker.report(
 				&InvalidVariableKindError{
-					Kind:     field.VariableKind,
-					StartPos: field.Identifier.Pos,
-					EndPos:   field.Identifier.Pos,
+					Kind: field.VariableKind,
+					Range: ast.Range{
+						StartPos: field.Identifier.Pos,
+						EndPos:   field.Identifier.Pos,
+					},
 				},
 			)
 		}
@@ -421,9 +431,9 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
+		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
-		argumentLabels := function.Parameters.ArgumentLabels()
+		argumentLabels := function.ParameterList.ArgumentLabels()
 
 		identifier := function.Identifier.Identifier
 
@@ -518,7 +528,7 @@ func (checker *Checker) checkSpecialFunction(
 	}
 
 	checker.checkFunction(
-		specialFunction.Parameters,
+		specialFunction.ParameterList,
 		ast.Position{},
 		functionType,
 		specialFunction.FunctionBlock,
@@ -686,8 +696,10 @@ func (checker *Checker) checkDestructors(
 
 			checker.report(
 				&InvalidDestructorError{
-					StartPos: firstDestructor.Identifier.StartPosition(),
-					EndPos:   firstDestructor.Identifier.EndPosition(),
+					Range: ast.Range{
+						StartPos: firstDestructor.Identifier.StartPosition(),
+						EndPos:   firstDestructor.Identifier.EndPosition(),
+					},
 				},
 			)
 		}
@@ -717,8 +729,10 @@ func (checker *Checker) checkDestructors(
 		checker.report(
 			&UnsupportedOverloadingError{
 				DeclarationKind: common.DeclarationKindDestructor,
-				StartPos:        secondDestructor.StartPosition(),
-				EndPos:          secondDestructor.EndPosition(),
+				Range: ast.Range{
+					StartPos: secondDestructor.StartPosition(),
+					EndPos:   secondDestructor.EndPosition(),
+				},
 			},
 		)
 	}
@@ -764,17 +778,19 @@ func (checker *Checker) checkDestructor(
 	containerKind ContainerKind,
 ) {
 
-	if len(destructor.Parameters) != 0 {
+	if len(destructor.ParameterList.Parameters) != 0 {
 		checker.report(
 			&InvalidDestructorParametersError{
-				StartPos: destructor.Parameters.StartPosition(),
-				EndPos:   destructor.Parameters.EndPosition(),
+				Range: ast.Range{
+					StartPos: destructor.ParameterList.StartPosition(),
+					EndPos:   destructor.ParameterList.EndPosition(),
+				},
 			},
 		)
 	}
 
 	parameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(destructor.Parameters)
+		checker.parameterTypeAnnotations(destructor.ParameterList)
 
 	checker.checkSpecialFunction(
 		destructor,
@@ -785,6 +801,51 @@ func (checker *Checker) checkDestructor(
 		containerKind,
 	)
 
-	// TODO: check all resources fields are invalidated
+	checker.checkResourceFieldInvalidation(containerType, containerTypeIdentifier)
+}
 
+// checkResourceFieldInvalidation checks that if the container is a resource,
+// that all resource fields are invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceFieldInvalidation(containerType Type, containerTypeIdentifier string) {
+	compositeType, isComposite := containerType.(*CompositeType)
+	if !isComposite || compositeType.Kind != common.CompositeKindResource {
+		return
+	}
+
+	for name, member := range compositeType.Members {
+		if !member.Type.IsResourceType() {
+			return
+		}
+
+		info := checker.resources.Get(member)
+		if !info.DefinitivelyInvalidated {
+			checker.report(
+				&ResourceFieldNotInvalidatedError{
+					FieldName: name,
+					TypeName:  containerTypeIdentifier,
+					// TODO:
+					Pos: ast.Position{},
+				},
+			)
+		}
+	}
+}
+
+// checkResourceUseAfterInvalidation checks if a resource (variable or composite member)
+// is used after it was previously invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceUseAfterInvalidation(resource interface{}, useIdentifier ast.Identifier) {
+	resourceInfo := checker.resources.Get(resource)
+	if resourceInfo.Invalidations.Size() == 0 {
+		return
+	}
+
+	checker.report(
+		&ResourceUseAfterInvalidationError{
+			StartPos:      useIdentifier.StartPosition(),
+			EndPos:        useIdentifier.EndPosition(),
+			Invalidations: resourceInfo.Invalidations.All(),
+		},
+	)
 }
