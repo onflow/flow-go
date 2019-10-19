@@ -7,6 +7,7 @@ const (
 	// Supported Hashing algorithms
 	SHA3_256 AlgoName = "SHA3_256"
 	SHA3_384 AlgoName = "SHA3_384"
+	SHA2_256 AlgoName = "SHA2_256"
 
 	// Supported Signing algorithms
 	BLS_BLS12381    = "BLS_BLS12381"

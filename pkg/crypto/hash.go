@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"hash"
 
+	"crypto/sha256"
+
 	"golang.org/x/crypto/sha3"
 )
 
@@ -33,6 +35,19 @@ func NewHasher(name AlgoName) (Hasher, error) {
 		// Output length sanity check, size() is provided by Hash.hash
 		if algo.outputSize != algo.Size() {
 			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_384, algo.Size())}
+		}
+		return algo, nil
+	}
+	if name == SHA2_256 {
+		algo := &sha2_256Algo{
+			commonHasher: &commonHasher{
+				name:       name,
+				outputSize: HashLengthSha2_256,
+				Hash:       sha256.New()}}
+
+		// Output length sanity check, size() is provided by Hash.hash
+		if algo.outputSize != algo.Size() {
+			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA2_256, algo.Size())}
 		}
 		return algo, nil
 	}

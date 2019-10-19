@@ -22,7 +22,7 @@ func (s *sha3_256Algo) SumHash() Hash {
 	return digest
 }
 
-// sha3_256Algo, embeds HashAlgo
+// sha3_384Algo, embeds HashAlgo
 type sha3_384Algo struct {
 	*commonHasher
 }
