@@ -15,7 +15,7 @@ func TestCheckInvalidUnknownDeclarationSwap(t *testing.T) {
           var x = 1
           x <-> y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -30,7 +30,7 @@ func TestCheckInvalidLeftConstantSwap(t *testing.T) {
           var y = 1
           x <-> y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -45,7 +45,7 @@ func TestCheckInvalidRightConstantSwap(t *testing.T) {
           let y = 1
           x <-> y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -60,7 +60,7 @@ func TestCheckSwap(t *testing.T) {
           var y = 3
           x <-> y
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -73,7 +73,7 @@ func TestCheckInvalidTypesSwap(t *testing.T) {
           var y = "1"
           x <-> y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -88,7 +88,7 @@ func TestCheckInvalidTypesSwap2(t *testing.T) {
           var y = 1
           x <-> y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -106,7 +106,7 @@ func TestCheckInvalidSwapTargetExpressionLeft(t *testing.T) {
       fun f(): Int {
           return 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -124,7 +124,7 @@ func TestCheckInvalidSwapTargetExpressionRight(t *testing.T) {
       fun f(): Int {
           return 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -141,7 +141,7 @@ func TestCheckInvalidSwapTargetExpressions(t *testing.T) {
       fun f(): Int {
           return 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -157,7 +157,7 @@ func TestCheckSwapOptional(t *testing.T) {
           var y: Int? = nil
           x <-> y
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -174,7 +174,7 @@ func TestCheckSwapResourceArrayElementAndVariable(t *testing.T) {
           destroy x
           destroy xs
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -189,7 +189,7 @@ func TestCheckSwapResourceArrayElements(t *testing.T) {
           xs[0] <-> xs[1]
           destroy xs
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -218,7 +218,7 @@ func TestCheckSwapResourceFields(t *testing.T) {
           destroy y1
           destroy y2
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -276,7 +276,7 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
                       destroy y
                       destroy z
                   }
-	            `,
+                `,
 				first,
 				second,
 			))

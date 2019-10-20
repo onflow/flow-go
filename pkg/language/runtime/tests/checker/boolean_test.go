@@ -11,7 +11,7 @@ func TestCheckBoolean(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
         let x = true
-	`)
+    `)
 
 	assert.Nil(t, err)
 

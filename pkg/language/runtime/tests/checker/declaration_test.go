@@ -13,7 +13,7 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	checker, err := ParseAndCheck(t, `
         let x = 1
         var y = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
@@ -35,7 +35,7 @@ func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
 
         let y = true
         let y = false
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -49,7 +49,7 @@ func TestCheckInvalidGlobalFunctionRedeclaration(t *testing.T) {
 
         fun y() {}
         fun y() {}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -63,7 +63,7 @@ func TestCheckInvalidLocalRedeclaration(t *testing.T) {
             let x = true
             let x = false
         }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -79,7 +79,7 @@ func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
             fun y() {}
             fun y() {}
         }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -92,7 +92,7 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
        fun test() {
            return x
        }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -105,7 +105,7 @@ func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x = y
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -116,7 +116,7 @@ func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x: X = y
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -145,7 +145,7 @@ func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x = y()
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -159,7 +159,7 @@ func TestCheckInvalidRedeclarations(t *testing.T) {
         let x = 1
         let x = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -172,7 +172,7 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: Bool = 1
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -185,7 +185,7 @@ func TestCheckInvalidReference(t *testing.T) {
       fun test() {
           testX
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
