@@ -4,6 +4,9 @@ type FunctionActivation struct {
 	ReturnType           Type
 	Loops                int
 	ValueActivationDepth int
+	ReturnInfo           *ReturnInfo
+	ReportedDeadCode     bool
+	InitializationInfo   *InitializationInfo
 }
 
 func (a FunctionActivation) InLoop() bool {
@@ -19,6 +22,7 @@ func (a *FunctionActivations) EnterFunction(functionType *FunctionType, valueAct
 		&FunctionActivation{
 			ReturnType:           functionType.ReturnTypeAnnotation.Type,
 			ValueActivationDepth: valueActivationDepth,
+			ReturnInfo:           &ReturnInfo{},
 		},
 	)
 }

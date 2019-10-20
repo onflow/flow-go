@@ -11,8 +11,28 @@ func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
 
 func (checker *Checker) visitStatements(statements []ast.Statement) {
 
+	functionActivation := checker.functionActivations.Current()
+
 	// check all statements
 	for _, statement := range statements {
+
+		// Is this statement unreachable? Report it once for this statement,
+		// but avoid noise and don't report it for all remaining unreachable statements
+
+		if functionActivation.ReturnInfo.DefinitelyReturned &&
+			!functionActivation.ReportedDeadCode {
+
+			checker.report(
+				&UnreachableStatementError{
+					Range: ast.Range{
+						StartPos: statement.StartPosition(),
+						EndPos:   statement.EndPosition(),
+					},
+				},
+			)
+
+			functionActivation.ReportedDeadCode = true
+		}
 
 		// check statement is not a local composite or interface declaration
 

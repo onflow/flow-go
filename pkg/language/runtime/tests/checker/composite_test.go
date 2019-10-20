@@ -2,12 +2,13 @@ package checker
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/self_field_analyzer"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
@@ -865,7 +866,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 
 			// TODO: add support for non-structure / non-resource declarations
 
-			expectedErrorCount := 3
+			expectedErrorCount := 2
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
@@ -879,19 +880,16 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 				"foo",
 				errs[0].(*sema.NotDeclaredMemberError).Name,
 			)
-
-			assert.IsType(t, &self_field_analyzer.UninitializedFieldAccessError{}, errs[1])
-
-			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[2])
+			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[1])
 			assert.Equal(t,
 				"bar",
-				errs[2].(*sema.NotDeclaredMemberError).Name,
+				errs[1].(*sema.NotDeclaredMemberError).Name,
 			)
 
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
 			}
 		})
 	}
@@ -1240,13 +1238,13 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 
-			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+
+			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[1])
 			assert.Equal(t,
 				"foo",
-				errs[0].(*sema.AssignmentToConstantMemberError).Name,
+				errs[1].(*sema.AssignmentToConstantMemberError).Name,
 			)
-
-			assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
@@ -1987,6 +1985,28 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
            destroy test
        }
 	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       resource Test {
+           let test: <-Test
+
+           init(test: <-Test) {
+               self.test <- test
+           }
+
+           destroy() {
+               destroy self.test
+               destroy self.test
+           }
+       }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

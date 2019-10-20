@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -17,7 +18,68 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
+	checker.checkSelfVariableUseInInitializer(variable, expression.Pos)
+
 	return variable.Type
+}
+
+// checkSelfVariableUseInInitializer checks uses of `self` in the initializer
+// and ensures it is properly initialized
+//
+func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, position ast.Position) {
+
+	// Is this a use of `self`?
+
+	if variable.DeclarationKind != common.DeclarationKindSelf {
+		return
+	}
+
+	// Is this use of `self` in an initializer?
+
+	initializationInfo := checker.functionActivations.Current().InitializationInfo
+	if initializationInfo == nil {
+		return
+	}
+
+	// The use of `self` is inside the initializer
+
+	checkInitializationComplete := func() {
+		if initializationInfo.InitializationComplete() {
+			return
+		}
+
+		checker.report(
+			&UninitializedUseError{
+				Name: variable.Identifier,
+				Pos:  position,
+			},
+		)
+	}
+
+	if checker.currentMemberExpression != nil {
+
+		// The use of `self` is inside a member access
+
+		// If the member expression refers to a field that must be initialized,
+		// it must be initialized. This check is handled in `VisitMemberExpression`
+
+		// Otherwise, the member access is to a non-field, e.g. a function,
+		// in which case *all* fields must have been initialized
+
+		selfFieldMember := checker.selfFieldAccessMember(checker.currentMemberExpression)
+		field := initializationInfo.FieldMembers[selfFieldMember]
+
+		if field == nil {
+			checkInitializationComplete()
+		}
+
+	} else {
+		// The use of `self` is *not* inside a member access, i.e. `self` is used
+		// as a standalone expression, e.g. to pass it as an argument to a function.
+		// Ensure that *all* fields were initialized
+
+		checkInitializationComplete()
+	}
 }
 
 // checkResourceVariableCapturingInFunction checks if a resource variable is captured in a function

@@ -1831,9 +1831,10 @@ func TestCheckInvalidResourceLossThroughReturn(t *testing.T) {
       }
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossThroughReturnInIfStatementThrenBranch(t *testing.T) {
@@ -1876,9 +1877,10 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T
       }
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
 }
 
 func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *testing.T) {
