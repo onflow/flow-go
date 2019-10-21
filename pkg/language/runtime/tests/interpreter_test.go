@@ -4770,6 +4770,67 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 	)
 }
 
+func TestInterpretResourceDestroyArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let rs <- [<-create R(), <-create R()]
+          destroy rs
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyDictionary(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let rs <- {"r1": <-create R(), "r2": <-create R()}
+          destroy rs
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destructionCount"].Value,
+	)
+}
 
 func TestInterpretResourceDestroyOptionalSome(t *testing.T) {
 
