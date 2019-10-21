@@ -23,18 +23,15 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 		)
 	}
 
-	originalResources := checker.resources
-	temporaryResources := originalResources.Clone()
+	// The body of the loop will maybe be evaluated. That means that
+	// resource invalidation and returns are not definite, but only potential
 
-	checkLoop := func() Type {
+	checker.checkPotentiallyUnevaluated(func() Type {
 		checker.functionActivations.WithLoop(func() {
 			statement.Block.Accept(checker)
 		})
 		return &VoidType{}
-	}
-	checker.checkWithResources(checkLoop, temporaryResources)
-
-	checker.resources.MergeBranches(temporaryResources, nil)
+	})
 
 	checker.reportResourceUsesInLoop(statement.StartPos, statement.EndPos)
 

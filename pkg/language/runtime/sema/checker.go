@@ -27,25 +27,26 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program             *ast.Program
-	PredeclaredValues   map[string]ValueDeclaration
-	PredeclaredTypes    map[string]TypeDeclaration
-	ImportCheckers      map[ast.ImportLocation]*Checker
-	errors              []error
-	valueActivations    *ValueActivations
-	resources           *Resources
-	typeActivations     *TypeActivations
-	functionActivations *FunctionActivations
-	GlobalValues        map[string]*Variable
-	GlobalTypes         map[string]Type
-	inCondition         bool
-	Occurrences         *Occurrences
-	variableOrigins     map[*Variable]*Origin
-	memberOrigins       map[Type]map[string]*Origin
-	seenImports         map[ast.ImportLocation]bool
-	isChecked           bool
-	inCreate            bool
-	Elaboration         *Elaboration
+	Program                 *ast.Program
+	PredeclaredValues       map[string]ValueDeclaration
+	PredeclaredTypes        map[string]TypeDeclaration
+	ImportCheckers          map[ast.ImportLocation]*Checker
+	errors                  []error
+	valueActivations        *ValueActivations
+	resources               *Resources
+	typeActivations         *TypeActivations
+	functionActivations     *FunctionActivations
+	GlobalValues            map[string]*Variable
+	GlobalTypes             map[string]Type
+	inCondition             bool
+	Occurrences             *Occurrences
+	variableOrigins         map[*Variable]*Origin
+	memberOrigins           map[Type]map[string]*Origin
+	seenImports             map[ast.ImportLocation]bool
+	isChecked               bool
+	inCreate                bool
+	Elaboration             *Elaboration
+	currentMemberExpression *ast.MemberExpression
 }
 
 func NewChecker(
@@ -53,6 +54,12 @@ func NewChecker(
 	predeclaredValues map[string]ValueDeclaration,
 	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
+
+	functionActivations := &FunctionActivations{}
+	functionActivations.EnterFunction(&FunctionType{
+		ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{})},
+		0,
+	)
 
 	checker := &Checker{
 		Program:             program,
@@ -62,7 +69,7 @@ func NewChecker(
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
-		functionActivations: &FunctionActivations{},
+		functionActivations: functionActivations,
 		GlobalValues:        map[string]*Variable{},
 		GlobalTypes:         map[string]Type{},
 		Occurrences:         NewOccurrences(),
@@ -114,11 +121,11 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.TypeDeclarationKind(),
-			IsConstant: true,
-			Type:       ty,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.TypeDeclarationKind(),
+			IsConstant:      true,
+			Type:            ty,
+			Pos:             &identifier.Pos,
 		},
 	)
 }
@@ -458,7 +465,7 @@ func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.P
 	if !ok {
 		origin = &Origin{
 			Type:            variable.Type,
-			DeclarationKind: variable.Kind,
+			DeclarationKind: variable.DeclarationKind,
 			StartPos:        variable.Pos,
 			// TODO:
 			EndPos: variable.Pos,
@@ -545,8 +552,8 @@ func (checker *Checker) checkResourceLoss(depth int) {
 		// TODO: handle `self` and `result` properly
 
 		if variable.Type.IsResourceType() &&
-			variable.Kind != common.DeclarationKindSelf &&
-			variable.Kind != common.DeclarationKindResult &&
+			variable.DeclarationKind != common.DeclarationKindSelf &&
+			variable.DeclarationKind != common.DeclarationKindResult &&
 			!checker.resources.Get(variable).DefinitivelyInvalidated {
 
 			checker.report(
@@ -568,9 +575,6 @@ func (checker *Checker) withValueScope(f func()) {
 	f()
 }
 
-// TODO: create mapping between composite declaration member -> variable
-//   then look up in `resourceVariable`
-
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
@@ -591,14 +595,15 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
-	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
+	selfFieldMember := checker.selfFieldAccessMember(expression)
 
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if selfFieldAccessMember == nil {
+		if selfFieldMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
+
 	case *ast.IndexExpression:
 		reportInvalidNestedMove()
 		return
@@ -610,8 +615,8 @@ func (checker *Checker) recordResourceInvalidation(
 		EndPos:   expression.EndPosition(),
 	}
 
-	if selfFieldAccessMember != nil {
-		checker.resources.AddInvalidation(selfFieldAccessMember, invalidation)
+	if selfFieldMember != nil {
+		checker.resources.AddInvalidation(selfFieldMember, invalidation)
 		return
 	}
 
@@ -629,7 +634,7 @@ func (checker *Checker) recordResourceInvalidation(
 }
 
 func (checker *Checker) checkWithResources(
-	check func() Type,
+	check TypeCheckFunc,
 	temporaryResources *Resources,
 ) Type {
 	originalResources := checker.resources
@@ -637,6 +642,37 @@ func (checker *Checker) checkWithResources(
 	defer func() {
 		checker.resources = originalResources
 	}()
+
+	return check()
+}
+
+func (checker *Checker) checkWithReturnInfo(
+	check TypeCheckFunc,
+	temporaryReturnInfo *ReturnInfo,
+) Type {
+	functionActivation := checker.functionActivations.Current()
+	initialReturnInfo := functionActivation.ReturnInfo
+	functionActivation.ReturnInfo = temporaryReturnInfo
+	defer func() {
+		functionActivation.ReturnInfo = initialReturnInfo
+	}()
+
+	return check()
+}
+
+func (checker *Checker) checkWithInitializedMembers(
+	check TypeCheckFunc,
+	temporaryInitializedMembers *MemberSet,
+) Type {
+	if temporaryInitializedMembers != nil {
+		functionActivation := checker.functionActivations.Current()
+		initializationInfo := functionActivation.InitializationInfo
+		initialInitializedMembers := initializationInfo.InitializedFieldMembers
+		initializationInfo.InitializedFieldMembers = temporaryInitializedMembers
+		defer func() {
+			initializationInfo.InitializedFieldMembers = initialInitializedMembers
+		}()
+	}
 
 	return check()
 }
@@ -716,4 +752,42 @@ func (checker *Checker) checkResourceFieldNesting(
 			},
 		)
 	}
+}
+
+// checkPotentiallyUnevaluated runs the given type checking function
+// under the assumption that the checked expression might not be evaluated.
+// That means that resource invalidation and returns are not definite,
+// but only potential
+//
+func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
+	functionActivation := checker.functionActivations.Current()
+
+	initialReturnInfo := functionActivation.ReturnInfo
+	temporaryReturnInfo := initialReturnInfo.Clone()
+
+	var temporaryInitializedMembers *MemberSet
+	if functionActivation.InitializationInfo != nil {
+		initialInitializedMembers := functionActivation.InitializationInfo.InitializedFieldMembers
+		temporaryInitializedMembers = initialInitializedMembers.Clone()
+	}
+
+	initialResources := checker.resources
+	temporaryResources := initialResources.Clone()
+
+	result := checker.checkBranch(
+		check,
+		temporaryReturnInfo,
+		temporaryInitializedMembers,
+		temporaryResources,
+	)
+
+	functionActivation.ReturnInfo.MaybeReturned =
+		functionActivation.ReturnInfo.MaybeReturned ||
+			temporaryReturnInfo.MaybeReturned
+
+	// NOTE: the definitive return state does not change
+
+	checker.resources.MergeBranches(temporaryResources, nil)
+
+	return result
 }

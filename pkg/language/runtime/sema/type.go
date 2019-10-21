@@ -223,9 +223,8 @@ func (t *StringType) GetMember(field string) *Member {
 	switch field {
 	case "length":
 		return NewMemberForType(t, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
 	case "concat":
 		return NewMemberForType(t, "concat", Member{
@@ -579,7 +578,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&VoidType{},
 				),
 			},
-			IsInitialized: true,
 		})
 	case "concat":
 		typeAnnotation := NewTypeAnnotation(ty)
@@ -591,7 +589,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				},
 				ReturnTypeAnnotation: typeAnnotation,
 			},
-			IsInitialized: true,
 		})
 	case "insert":
 		elementType := ty.ElementType(false)
@@ -606,7 +603,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&VoidType{},
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 	case "remove":
@@ -621,7 +617,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					elementType,
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"at"},
 		})
 	case "removeFirst":
@@ -633,7 +628,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					elementType,
 				),
 			},
-			IsInitialized: true,
 		})
 	case "removeLast":
 		elementType := ty.ElementType(false)
@@ -644,7 +638,6 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					elementType,
 				),
 			},
-			IsInitialized: true,
 		})
 	case "contains":
 		elementType := ty.ElementType(false)
@@ -665,13 +658,11 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&BoolType{},
 				),
 			},
-			IsInitialized: true,
 		})
 	case "length":
 		return NewMemberForType(ty, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
 	default:
 		return nil
@@ -903,7 +894,6 @@ func (t *CompositeType) IsResourceType() bool {
 type Member struct {
 	Type           Type
 	VariableKind   ast.VariableKind
-	IsInitialized  bool
 	ArgumentLabels []string
 }
 
@@ -1005,9 +995,8 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 	switch identifer {
 	case "length":
 		return NewMemberForType(t, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
 	case "remove":
 		return NewMemberForType(t, "remove", Member{
@@ -1022,7 +1011,6 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 					},
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"key"},
 		})
 	default:

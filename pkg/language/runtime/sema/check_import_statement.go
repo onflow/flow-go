@@ -141,7 +141,7 @@ func (checker *Checker) importValues(
 		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
-			variable.Kind,
+			variable.DeclarationKind,
 			declaration.LocationPos,
 			true,
 			variable.ArgumentLabels,

@@ -36,6 +36,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
 		ContainerKindInterface,
+		nil,
 	)
 
 	checker.checkDestructors(
@@ -149,11 +150,11 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.DeclarationKind(),
-			IsConstant: true,
-			Type:       interfaceType,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.DeclarationKind(),
+			IsConstant:      true,
+			Type:            interfaceType,
+			Pos:             &identifier.Pos,
 		},
 	)
 

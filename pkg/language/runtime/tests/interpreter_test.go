@@ -540,12 +540,21 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 
 func TestInterpretReturns(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       fun returnEarly(): Int {
-           return 2
-           return 1
-       }
-	`)
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
+           fun returnEarly(): Int {
+               return 2
+               return 1
+           }
+        `,
+		nil,
+		nil,
+		func(err error) {
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+		},
+	)
 
 	value, err := inter.Invoke("returnEarly")
 	assert.Nil(t, err)
@@ -1246,41 +1255,51 @@ func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
 
 func TestInterpretIfStatement(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       fun testTrue(): Int {
-           if true {
-               return 2
-           } else {
+	inter := parseCheckAndInterpretWithExtra(t,
+		`
+           fun testTrue(): Int {
+               if true {
+                   return 2
+               } else {
+                   return 3
+               }
+               return 4
+           }
+
+           fun testFalse(): Int {
+               if false {
+                   return 2
+               } else {
+                   return 3
+               }
+               return 4
+           }
+
+           fun testNoElse(): Int {
+               if true {
+                   return 2
+               }
                return 3
            }
-           return 4
-       }
 
-       fun testFalse(): Int {
-           if false {
-               return 2
-           } else {
-               return 3
+           fun testElseIf(): Int {
+               if false {
+                   return 2
+               } else if true {
+                   return 3
+               }
+               return 4
            }
-           return 4
-       }
+        `,
+		nil,
+		nil,
+		func(err error) {
+			errs := ExpectCheckerErrors(t, err, 2)
 
-       fun testNoElse(): Int {
-           if true {
-               return 2
-           }
-           return 3
-       }
-
-       fun testElseIf(): Int {
-           if false {
-               return 2
-           } else if true {
-               return 3
-           }
-           return 4
-       }
-	`)
+			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+			assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
+		},
+	)
 
 	value, err := inter.Invoke("testTrue")
 	assert.Nil(t, err)

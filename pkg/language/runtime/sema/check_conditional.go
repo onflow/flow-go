@@ -19,7 +19,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 		checker.visitConditional(test, thenElement, elseElement)
 
 	case *ast.VariableDeclaration:
-		checker.visitConditionalBranches(
+		checker.checkConditionalBranches(
 			func() Type {
 				checker.withValueScope(func() {
 					checker.visitVariableDeclaration(test, true)
@@ -92,7 +92,7 @@ func (checker *Checker) visitConditional(
 		)
 	}
 
-	return checker.visitConditionalBranches(
+	return checker.checkConditionalBranches(
 		func() Type {
 			thenResult := thenElement.Accept(checker)
 			if thenResult == nil {
@@ -110,23 +110,80 @@ func (checker *Checker) visitConditional(
 	)
 }
 
-func (checker *Checker) visitConditionalBranches(
-	checkThen func() Type,
-	checkElse func() Type,
+// checkConditionalBranches checks two conditional branches.
+// It is assumed that either one of the branches is taken, so function returns,
+// resource uses and invalidations, as well as field initializations,
+// are only potential in each branch, but definite if they occur in both branches.
+//
+func (checker *Checker) checkConditionalBranches(
+	checkThen TypeCheckFunc,
+	checkElse TypeCheckFunc,
 ) (
 	thenType, elseType Type,
 ) {
+	functionActivation := checker.functionActivations.Current()
+
+	initialReturnInfo := functionActivation.ReturnInfo
+	thenReturnInfo := initialReturnInfo.Clone()
+	elseReturnInfo := initialReturnInfo.Clone()
+
+	var thenInitializedMembers *MemberSet
+	var elseInitializedMembers *MemberSet
+	if functionActivation.InitializationInfo != nil {
+		initialInitializedMembers := functionActivation.InitializationInfo.InitializedFieldMembers
+		thenInitializedMembers = initialInitializedMembers.Clone()
+		elseInitializedMembers = initialInitializedMembers.Clone()
+	}
+
 	initialResources := checker.resources
 	thenResources := initialResources.Clone()
 	elseResources := initialResources.Clone()
 
-	thenType = checker.checkWithResources(checkThen, thenResources)
-	elseType = checker.checkWithResources(checkElse, elseResources)
-
-	checker.resources.MergeBranches(
+	thenType = checker.checkBranch(
+		checkThen,
+		thenReturnInfo,
+		thenInitializedMembers,
 		thenResources,
+	)
+
+	elseType = checker.checkBranch(
+		checkElse,
+		elseReturnInfo,
+		elseInitializedMembers,
 		elseResources,
 	)
 
+	functionActivation.ReturnInfo.MergeBranches(thenReturnInfo, elseReturnInfo)
+
+	if functionActivation.InitializationInfo != nil {
+		functionActivation.InitializationInfo.InitializedFieldMembers =
+			thenInitializedMembers.Intersection(elseInitializedMembers)
+	}
+
+	checker.resources.MergeBranches(thenResources, elseResources)
+
 	return
+}
+
+// checkBranch checks a conditional branch.
+// It is assumed that function returns, resource uses and invalidations,
+// as well as field initializations, are only potential / temporary.
+//
+func (checker *Checker) checkBranch(
+	check TypeCheckFunc,
+	temporaryReturnInfo *ReturnInfo,
+	temporaryInitializedMembers *MemberSet,
+	temporaryResources *Resources,
+) Type {
+	return wrapTypeCheck(check,
+		func(f TypeCheckFunc) Type {
+			return checker.checkWithResources(f, temporaryResources)
+		},
+		func(f TypeCheckFunc) Type {
+			return checker.checkWithInitializedMembers(f, temporaryInitializedMembers)
+		},
+		func(f TypeCheckFunc) Type {
+			return checker.checkWithReturnInfo(f, temporaryReturnInfo)
+		},
+	)()
 }
