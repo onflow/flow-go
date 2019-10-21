@@ -1021,12 +1021,7 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 func (t *DictionaryType) isIndexableType() {}
 
 func (t *DictionaryType) ElementType(isAssignment bool) Type {
-	valueType := t.ValueType
-	if isAssignment {
-		return valueType
-	} else {
-		return &OptionalType{Type: valueType}
-	}
+	return &OptionalType{Type: t.ValueType}
 }
 
 func (t *DictionaryType) IndexingType() Type {

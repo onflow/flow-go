@@ -150,7 +150,7 @@ func TestCheckDictionaryRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(key: "abc")
+          let old: Int? = x.remove(key: "abc")
       }
     `)
 
@@ -162,7 +162,33 @@ func TestCheckInvalidDictionaryRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(key: true)
+          let old: Int? = x.remove(key: true)
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckDictionaryInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          let old: Int? = x.insert(key: "abc", 3)
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidDictionaryInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          let old: Int? = x.insert(key: true, 3)
       }
     `)
 
@@ -300,7 +326,7 @@ func TestCheckArrayRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.remove(at: 1)
+          let old: Int? = x.remove(at: 1)
           return x
       }
     `)
@@ -313,7 +339,7 @@ func TestCheckInvalidArrayRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.remove(at: "1")
+          let old: Int? = x.remove(at: "1")
           return x
       }
     `)
@@ -328,7 +354,7 @@ func TestCheckArrayRemoveFirst(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeFirst()
+          let old: Int? = x.removeFirst()
           return x
       }
     `)
@@ -341,7 +367,7 @@ func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeFirst(1)
+          let old: Int? = x.removeFirst(1)
           return x
       }
 	`)
@@ -356,7 +382,7 @@ func TestCheckArrayRemoveLast(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeLast()
+          let old: Int? = x.removeLast()
           return x
       }
     `)

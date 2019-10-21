@@ -1204,7 +1204,12 @@ type HasKeyString interface {
 }
 
 func (v DictionaryValue) Set(keyValue Value, value Value) {
-	v[dictionaryKey(keyValue)] = value
+	key := dictionaryKey(keyValue)
+	if someValue, ok := value.(SomeValue); ok {
+		v[key] = someValue.Value
+	} else {
+		delete(v, key)
+	}
 }
 
 func (v DictionaryValue) String() string {
@@ -1228,18 +1233,51 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(v)))
+
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
-				key := dictionaryKey(arguments[0])
-				value, ok := v[key]
-				if !ok {
-					return trampoline.Done{Result: NilValue{}}
-				}
+				keyValue := arguments[0]
+
+				key := dictionaryKey(keyValue)
+				value, hadValue := v[key]
+
 				delete(v, key)
-				return trampoline.Done{Result: SomeValue{Value: value}}
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: value},
+				}
 			},
 		)
+
+	case "insert":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				keyValue := arguments[0]
+				newValue := arguments[1]
+
+				key := dictionaryKey(keyValue)
+				oldValue, hadValue := v[key]
+				v[key] = newValue
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: oldValue},
+				}
+			},
+		)
+
 	default:
 		panic(&errors.UnreachableError{})
 	}
