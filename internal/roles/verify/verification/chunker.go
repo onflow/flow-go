@@ -19,7 +19,7 @@ func CollectionToChunks(collection *types.Collection, maxComputationLimit uint64
 		}
 		// if adding tx would overflow the chunk
 		if totalComputationLimit+tx.ComputeLimit > maxComputationLimit {
-			chunks = append(chunks, types.Chunk{Transactions: activeTxs, TotalComputationLimit: totalComputationLimit})
+			chunks = append(chunks, *types.NewChunk(activeTxs, totalComputationLimit))
 			activeTxs = make([]*types.Transaction, 0)
 			totalComputationLimit = 0
 		}
@@ -27,8 +27,8 @@ func CollectionToChunks(collection *types.Collection, maxComputationLimit uint64
 		totalComputationLimit += tx.ComputeLimit
 	}
 	// complete last chunk
-	if len(activeTxs) >= 0 {
-		chunks = append(chunks, types.Chunk{Transactions: activeTxs, TotalComputationLimit: totalComputationLimit})
+	if len(activeTxs) > 0 {
+		chunks = append(chunks, *types.NewChunk(activeTxs, totalComputationLimit))
 	}
 	return chunks, nil
 }
