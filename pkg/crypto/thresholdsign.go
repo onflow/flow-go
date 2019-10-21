@@ -1,7 +1,16 @@
 package crypto
 
+// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
+// #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
+// #include "thresholdsign_include.h"
+import "C"
+
+// TODO: remove -wall after reaching a stable version
+// TDOD: enable QUIET in relic
+
 import (
 	"fmt"
+	"unsafe"
 )
 
 // NewThresholdSigner creates a new instance of Threshold siger using BLS
@@ -108,8 +117,14 @@ func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
 		s.ClearShares()
 		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
 	}
+	thresholdSignature := make([]byte, signatureLengthBLS_BLS12381)
 	// Interpolate at point 0
-	return nil, nil
+	C.interpolateSignaturesAtZero(
+		(*C.uchar)((unsafe.Pointer)(&thresholdSignature[0])),
+		(**C.uchar)(&s.shares[0]),
+		(*C.int)(&s.signers[0]), (C.int)(len(s.signers)),
+	)
+	return thresholdSignature, nil
 }
 
 // clear the shares and signers lists
