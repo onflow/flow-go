@@ -69,7 +69,7 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
           if var y = x {
               return y
 		  }
-		  
+
 		  return 0
       }
 	`)
@@ -101,7 +101,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
          if var y = x {
              return y
 		 }
-		 
+
 		 return nil
      }
 	`)
@@ -116,7 +116,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
          if var y: Int? = x {
              return y
 		 }
-		 
+
 		 return nil
      }
 	`)
@@ -131,7 +131,7 @@ func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {
          if var y = x {
              // ...
 		 }
-		 
+
 		 return
      }
 	`)
@@ -148,7 +148,7 @@ func TestCheckInvalidIfStatementTestWithDeclarationSameType(t *testing.T) {
           if var y: Int? = x {
              return y
 		  }
-		  
+
 		  return nil
       }
 	`)

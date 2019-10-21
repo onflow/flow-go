@@ -4565,7 +4565,7 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 
 	_, _, err := parser.ParseProgram(`
         import from from 0x0;
-        fun foo() {}; 
+        fun foo() {};
 	`)
 
 	assert.Nil(t, err)

@@ -2,11 +2,13 @@ package tests
 
 import (
 	"fmt"
-	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 

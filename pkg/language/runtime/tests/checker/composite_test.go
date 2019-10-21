@@ -1667,10 +1667,10 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s Test {
-    
+
                   fun test(x: Int) {}
               }
-    
+
               let test %[2]s %[3]s Test()
               let void = test.test(1)
             `,

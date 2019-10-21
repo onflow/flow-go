@@ -1627,7 +1627,7 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionary(t *testing.T) {
 
       let x <- create X()
       let xs <- {
-          "x": <-x, 
+          "x": <-x,
           "x2": <-x
       }
     `)

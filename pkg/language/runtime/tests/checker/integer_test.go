@@ -82,7 +82,7 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 
 			code := fmt.Sprintf(`
                 let min: %s = %s
-                let max: %s = %s 
+                let max: %s = %s
             `,
 				ty.String(),
 				ty.(sema.Ranged).Min(),
