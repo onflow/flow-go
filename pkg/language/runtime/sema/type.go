@@ -1079,7 +1079,7 @@ func (t *DictionaryType) IsResourceType() bool {
 func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
 	case "length":
-		return NewMemberForType(t, "length", Member{
+		return NewMemberForType(t, field, Member{
 			Type:         &IntType{},
 			VariableKind: ast.VariableKindConstant,
 		})
