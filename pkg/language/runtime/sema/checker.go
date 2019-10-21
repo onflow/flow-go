@@ -160,13 +160,11 @@ func (checker *Checker) checkerError() *CheckerError {
 	return nil
 }
 
-func (checker *Checker) report(errs ...error) {
-	for _, err := range errs {
-		if err == nil {
-			continue
-		}
-		checker.errors = append(checker.errors, errs...)
+func (checker *Checker) report(err error) {
+	if err == nil {
+		return
 	}
+	checker.errors = append(checker.errors, err)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
