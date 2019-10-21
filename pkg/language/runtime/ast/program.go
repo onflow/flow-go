@@ -9,8 +9,7 @@ type Program struct {
 	compositeDeclarations []*CompositeDeclaration
 	functionDeclarations  []*FunctionDeclaration
 	eventDeclarations     []*EventDeclaration
-	importLocations       map[LocationID]ImportLocation
-	imports               map[LocationID]*Program
+	importedPrograms      map[LocationID]*Program
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {
@@ -65,26 +64,26 @@ func (p *Program) EventDeclarations() []*EventDeclaration {
 	return p.eventDeclarations
 }
 
-func (p *Program) Imports() map[LocationID]*Program {
-	if p.imports == nil {
-		p.imports = make(map[LocationID]*Program)
+// ImportedPrograms returns the sub-programs imported by this program, indexed by location ID.
+func (p *Program) ImportedPrograms() map[LocationID]*Program {
+	if p.importedPrograms == nil {
+		p.importedPrograms = make(map[LocationID]*Program)
 	}
 
-	return p.imports
+	return p.importedPrograms
 }
 
-func (p *Program) ImportLocations() map[LocationID]ImportLocation {
-	if p.importLocations == nil {
-		p.importLocations = make(map[LocationID]ImportLocation)
+// ImportLocations returns the import locations declared by this program.
+func (p *Program) ImportLocations() []ImportLocation {
+	importLocations := make([]ImportLocation, 0)
 
-		for _, declaration := range p.Declarations {
-			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
-				p.importLocations[importDeclaration.Location.ID()] = importDeclaration.Location
-			}
+	for _, declaration := range p.Declarations {
+		if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
+			importLocations = append(importLocations, importDeclaration.Location)
 		}
 	}
 
-	return p.importLocations
+	return importLocations
 }
 
 type ImportResolver func(location ImportLocation) (*Program, error)
@@ -112,9 +111,9 @@ func (p *Program) resolveImports(
 ) error {
 	locations := p.ImportLocations()
 
-	for locationID, location := range locations {
+	for _, location := range locations {
 
-		imported, ok := resolved[locationID]
+		imported, ok := resolved[location.ID()]
 		if !ok {
 			var err error
 			imported, err = resolver(location)
@@ -122,7 +121,7 @@ func (p *Program) resolveImports(
 				return err
 			}
 			if imported != nil {
-				resolved[locationID] = imported
+				resolved[location.ID()] = imported
 			}
 		}
 
@@ -130,20 +129,20 @@ func (p *Program) resolveImports(
 			continue
 		}
 
-		p.setImportedProgram(locationID, imported)
+		p.setImportedProgram(location.ID(), imported)
 
-		if resolving[locationID] {
+		if resolving[location.ID()] {
 			return CyclicImportsError{Location: location}
 		}
 
-		resolving[locationID] = true
+		resolving[location.ID()] = true
 
 		err := imported.resolveImports(resolver, resolving, resolved)
 		if err != nil {
 			return err
 		}
 
-		delete(resolving, locationID)
+		delete(resolving, location.ID())
 	}
 
 	return nil
@@ -151,9 +150,9 @@ func (p *Program) resolveImports(
 
 // setImportedProgram adds an imported program to the set of imports, indexed by location ID.
 func (p *Program) setImportedProgram(locationID LocationID, program *Program) {
-	if p.imports == nil {
-		p.imports = make(map[LocationID]*Program)
+	if p.importedPrograms == nil {
+		p.importedPrograms = make(map[LocationID]*Program)
 	}
 
-	p.imports[locationID] = program
+	p.importedPrograms[locationID] = program
 }

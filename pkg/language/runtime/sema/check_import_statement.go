@@ -6,7 +6,7 @@ import (
 )
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	imports := checker.Program.Imports()
+	imports := checker.Program.ImportedPrograms()
 
 	imported := imports[declaration.Location.ID()]
 	if imported == nil {

@@ -4442,7 +4442,7 @@ func TestParseImportWithString(t *testing.T) {
 
 	importLocation := StringImportLocation("test.bpl")
 
-	actualImports := actual.Imports()
+	actualImports := actual.ImportedPrograms()
 
 	assert.Equal(t,
 		map[LocationID]*Program{},
@@ -4485,7 +4485,7 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	importLocation := AddressImportLocation([]byte{18, 52})
 
-	actualImports := actual.Imports()
+	actualImports := actual.ImportedPrograms()
 
 	assert.Equal(t,
 		map[LocationID]*Program{},
