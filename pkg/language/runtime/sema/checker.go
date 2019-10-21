@@ -243,6 +243,32 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 
 			return true
 		}
+
+	case *ast.ArrayExpression:
+
+		// Variable sized array literals are compatible with constant sized target types
+		// if their element type matches and the element count matches
+
+		if variableSizedValueType, isVariableSizedValue :=
+			valueType.(*VariableSizedType); isVariableSizedValue {
+
+			if constantSizedTargetType, isConstantSizedTarget :=
+				targetType.(*ConstantSizedType); isConstantSizedTarget {
+
+				valueElementType := variableSizedValueType.ElementType(false)
+				targetElementType := constantSizedTargetType.ElementType(false)
+
+				// TODO: report helpful error when counts mismatch
+
+				literalCount := len(typedExpression.Values)
+
+				if IsSubType(valueElementType, targetElementType) &&
+					literalCount == constantSizedTargetType.Size {
+
+					return true
+				}
+			}
+		}
 	}
 
 	return IsSubType(valueType, targetType)

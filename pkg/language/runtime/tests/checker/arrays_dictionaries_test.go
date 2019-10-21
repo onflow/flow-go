@@ -615,3 +615,27 @@ func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
 }
+
+func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x: [Int; 3] = [1, 2, 3]
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x: [Int; 2] = [1, 2, 3]
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
