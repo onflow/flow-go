@@ -139,14 +139,14 @@ func (checker *Checker) checkConditionalBranches(
 	thenResources := initialResources.Clone()
 	elseResources := initialResources.Clone()
 
-	thenType = checker.checkConditionalBranch(
+	thenType = checker.checkBranch(
 		checkThen,
 		thenReturnInfo,
 		thenInitializedMembers,
 		thenResources,
 	)
 
-	elseType = checker.checkConditionalBranch(
+	elseType = checker.checkBranch(
 		checkElse,
 		elseReturnInfo,
 		elseInitializedMembers,
@@ -165,11 +165,11 @@ func (checker *Checker) checkConditionalBranches(
 	return
 }
 
-// checkConditionalBranch checks a conditional branch.
+// checkBranch checks a conditional branch.
 // It is assumed that function returns, resource uses and invalidations,
 // as well as field initializations, are only potential / temporary.
 //
-func (checker *Checker) checkConditionalBranch(
+func (checker *Checker) checkBranch(
 	check TypeCheckFunc,
 	temporaryReturnInfo *ReturnInfo,
 	temporaryInitializedMembers *MemberSet,

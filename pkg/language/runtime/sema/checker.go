@@ -774,7 +774,7 @@ func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
 	initialResources := checker.resources
 	temporaryResources := initialResources.Clone()
 
-	result := checker.checkConditionalBranch(
+	result := checker.checkBranch(
 		check,
 		temporaryReturnInfo,
 		temporaryInitializedMembers,
