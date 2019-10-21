@@ -2,68 +2,76 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common/interface_entry"
+
 	"github.com/raviqqe/hamt"
 )
 
-// ResourceInfo is the info for a resource variable.
+// ResourceInfo is the info for a resource.
 //
 type ResourceInfo struct {
-	// DefinitivelyInvalidated is true if the invalidation of the variable
+	// DefinitivelyInvalidated is true if the invalidation of the resource
 	// can be considered definitive
 	DefinitivelyInvalidated bool
-	// Invalidations is the set of invalidations
+	// Invalidations is the set of invalidations of the resource
 	Invalidations ResourceInvalidations
-	// UsePositions is the set of uses
+	// UsePositions is the set of uses of the resource
 	UsePositions ResourceUses
 }
 
-// Resources is a map which contains invalidation info for resource variables.
+// Resources is a map which contains invalidation info for resources.
 //
 type Resources struct {
 	resources hamt.Map
 	Returns   bool
 }
 
-// Get returns the invalidation info for the given variable.
+// entry returns a `hamt` entry for the given resource.
 //
-func (ris *Resources) Get(variable *Variable) ResourceInfo {
-	key := VariableEntry{variable: variable}
-	existing := ris.resources.Find(key)
+func (ris *Resources) entry(resource interface{}) hamt.Entry {
+	return interface_entry.InterfaceEntry{Interface: resource}
+}
+
+// Get returns the invalidation info for the given resource.
+//
+func (ris *Resources) Get(resource interface{}) ResourceInfo {
+	entry := ris.entry(resource)
+	existing := ris.resources.Find(entry)
 	if existing == nil {
 		return ResourceInfo{}
 	}
 	return existing.(ResourceInfo)
 }
 
-// AddInvalidation adds the given invalidation to the set of invalidations for the given resource variable.
-// Marks the variable to be definitely invalidated.
+// AddInvalidation adds the given invalidation to the set of invalidations for the given resource.
+// Marks the resource to be definitely invalidated.
 //
-func (ris *Resources) AddInvalidation(variable *Variable, invalidation ResourceInvalidation) {
-	key := VariableEntry{variable: variable}
-	info := ris.Get(variable)
+func (ris *Resources) AddInvalidation(resource interface{}, invalidation ResourceInvalidation) {
+	info := ris.Get(resource)
 	info.DefinitivelyInvalidated = true
 	info.Invalidations = info.Invalidations.Insert(invalidation)
-	ris.resources = ris.resources.Insert(key, info)
+	entry := ris.entry(resource)
+	ris.resources = ris.resources.Insert(entry, info)
 }
 
-// AddUse adds the given use position to the set of use positions for the given resource variable.
+// AddUse adds the given use position to the set of use positions for the given resource.
 //
-func (ris *Resources) AddUse(variable *Variable, use ast.Position) {
-	info := ris.Get(variable)
+func (ris *Resources) AddUse(resource interface{}, use ast.Position) {
+	info := ris.Get(resource)
 	info.UsePositions = info.UsePositions.Insert(use)
-	key := VariableEntry{variable: variable}
-	ris.resources = ris.resources.Insert(key, info)
+	entry := ris.entry(resource)
+	ris.resources = ris.resources.Insert(entry, info)
 }
 
-func (ris *Resources) MarkUseAfterInvalidationReported(variable *Variable, pos ast.Position) {
-	info := ris.Get(variable)
+func (ris *Resources) MarkUseAfterInvalidationReported(resource interface{}, pos ast.Position) {
+	info := ris.Get(resource)
 	info.UsePositions = info.UsePositions.MarkUseAfterInvalidationReported(pos)
-	key := VariableEntry{variable: variable}
-	ris.resources = ris.resources.Insert(key, info)
+	entry := ris.entry(resource)
+	ris.resources = ris.resources.Insert(entry, info)
 }
 
-func (ris *Resources) IsUseAfterInvalidationReported(variable *Variable, pos ast.Position) bool {
-	info := ris.Get(variable)
+func (ris *Resources) IsUseAfterInvalidationReported(resource interface{}, pos ast.Position) bool {
+	info := ris.Get(resource)
 	return info.UsePositions.IsUseAfterInvalidationReported(pos)
 }
 
@@ -78,12 +86,12 @@ func (ris *Resources) Size() int {
 	return ris.resources.Size()
 }
 
-func (ris *Resources) FirstRest() (*Variable, ResourceInfo, *Resources) {
+func (ris *Resources) FirstRest() (interface{}, ResourceInfo, *Resources) {
 	entry, value, rest := ris.resources.FirstRest()
-	variable := entry.(VariableEntry).variable
+	resource := entry.(interface_entry.InterfaceEntry).Interface
 	info := value.(ResourceInfo)
 	resources := &Resources{resources: rest}
-	return variable, info, resources
+	return resource, info, resources
 }
 
 // MergeBranches merges the given resources from two branches into these resources.
@@ -100,23 +108,22 @@ func (ris *Resources) MergeBranches(thenResources *Resources, elseResources *Res
 		elseReturns = elseResources.Returns
 	}
 
-	for variable, infoTuple := range infoTuples {
-		info := ris.Get(variable)
+	for resource, infoTuple := range infoTuples {
+		info := ris.Get(resource)
 
-		// The resource variable can be considered definitely invalidated in both branches
+		// The resource can be considered definitely invalidated in both branches
 		// if in both branches, there were invalidations or the branch returned.
 		//
 		// The assumption that a returning branch results in a definitive invalidation
-		// can be made, because we check at the point of the return if the variable
+		// can be made, because we check at the point of the return if the resource
 		// was invalidated.
 
 		definitelyInvalidatedInBranches :=
 			(!infoTuple.thenInfo.Invalidations.IsEmpty() || thenResources.Returns) &&
 				(!infoTuple.elseInfo.Invalidations.IsEmpty() || elseReturns)
 
-		// The resource variable can be considered definitively invalidated
-		// if it was already invalidated,
-		// or the variable was invalidated in both branches
+		// The resource can be considered definitively invalidated if it was already invalidated,
+		// or the resource was invalidated in both branches
 
 		info.DefinitivelyInvalidated =
 			info.DefinitivelyInvalidated ||
@@ -141,8 +148,8 @@ func (ris *Resources) MergeBranches(thenResources *Resources, elseResources *Res
 				Merge(infoTuple.elseInfo.UsePositions)
 		}
 
-		key := VariableEntry{variable: variable}
-		ris.resources = ris.resources.Insert(key, info)
+		entry := ris.entry(resource)
+		ris.resources = ris.resources.Insert(entry, info)
 	}
 
 	ris.Returns = ris.Returns ||
@@ -154,20 +161,20 @@ type BranchesResourceInfo struct {
 	elseInfo ResourceInfo
 }
 
-type BranchesResourceInfos map[*Variable]BranchesResourceInfo
+type BranchesResourceInfos map[interface{}]BranchesResourceInfo
 
 func (infos BranchesResourceInfos) Add(
 	resources *Resources,
 	setValue func(*BranchesResourceInfo, ResourceInfo),
 ) {
-	var variable *Variable
+	var resource interface{}
 	var resourceInfo ResourceInfo
 
 	for resources.Size() != 0 {
-		variable, resourceInfo, resources = resources.FirstRest()
-		branchesResourceInfo := infos[variable]
+		resource, resourceInfo, resources = resources.FirstRest()
+		branchesResourceInfo := infos[resource]
 		setValue(&branchesResourceInfo, resourceInfo)
-		infos[variable] = branchesResourceInfo
+		infos[resource] = branchesResourceInfo
 	}
 }
 

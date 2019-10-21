@@ -591,14 +591,27 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
+	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
+
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if !checker.isSelfFieldAccess(expression) {
+		if selfFieldAccessMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
 	case *ast.IndexExpression:
 		reportInvalidNestedMove()
+		return
+	}
+
+	invalidation := ResourceInvalidation{
+		Kind:     kind,
+		StartPos: expression.StartPosition(),
+		EndPos:   expression.EndPosition(),
+	}
+
+	if selfFieldAccessMember != nil {
+		checker.resources.AddInvalidation(selfFieldAccessMember, invalidation)
 		return
 	}
 
@@ -612,12 +625,7 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	checker.resources.AddInvalidation(variable,
-		ResourceInvalidation{
-			Kind: kind,
-			Pos:  identifierExpression.Pos,
-		},
-	)
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(

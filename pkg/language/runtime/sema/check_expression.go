@@ -13,7 +13,7 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 
 	if variable.Type.IsResourceType() {
 		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
-		checker.checkResourceVariableUseAfterInvalidation(variable, expression.Identifier)
+		checker.checkResourceUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
@@ -39,24 +39,6 @@ func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Varia
 		&ResourceCapturingError{
 			Name: useIdentifier.Identifier,
 			Pos:  useIdentifier.Pos,
-		},
-	)
-}
-
-// checkResourceVariableUseAfterInvalidation checks if a resource variable
-// is used after it was previously invalidated (moved or destroyed)
-//
-func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Variable, useIdentifier ast.Identifier) {
-	resourceInfo := checker.resources.Get(variable)
-	if resourceInfo.Invalidations.Size() == 0 {
-		return
-	}
-
-	checker.report(
-		&ResourceUseAfterInvalidationError{
-			Name:          useIdentifier.Identifier,
-			Pos:           useIdentifier.Pos,
-			Invalidations: resourceInfo.Invalidations.All(),
 		},
 	)
 }

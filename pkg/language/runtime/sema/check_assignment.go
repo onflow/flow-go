@@ -21,9 +21,10 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		// Assignment to self-field is allowed. This is necessary to initialize
 		// fields in the initializer
 
-		// TODO: improve exception
+		// TODO: improve exception: this is only allowed once, in the initializer
+		//    https://github.com/dapperlabs/flow-go/issues/947
 
-		if checker.isSelfFieldAccess(assignment.Target) {
+		if checker.selfFieldAccessMember(assignment.Target) != nil {
 			checker.recordResourceInvalidation(
 				assignment.Value,
 				valueType,
@@ -44,23 +45,26 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 	return nil
 }
 
-func (checker *Checker) isSelfFieldAccess(expression ast.Expression) bool {
+func (checker *Checker) selfFieldAccessMember(expression ast.Expression) *Member {
 	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
 	if !isMemberExpression {
-		return false
+		return nil
 	}
 
 	identifierExpression, isIdentifierExpression := memberExpression.Expression.(*ast.IdentifierExpression)
 	if !isIdentifierExpression {
-		return false
+		return nil
 	}
 
 	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
-	if variable == nil {
-		return false
+	if variable == nil ||
+		variable.Kind != common.DeclarationKindSelf {
+
+		return nil
 	}
 
-	return variable.Kind == common.DeclarationKindSelf
+	fieldName := memberExpression.Identifier.Identifier
+	return variable.Type.(*CompositeType).Members[fieldName]
 }
 
 func (checker *Checker) visitAssignmentValueType(
