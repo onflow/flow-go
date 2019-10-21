@@ -1205,10 +1205,14 @@ type HasKeyString interface {
 
 func (v DictionaryValue) Set(keyValue Value, value Value) {
 	key := dictionaryKey(keyValue)
-	if someValue, ok := value.(SomeValue); ok {
-		v[key] = someValue.Value
-	} else {
+	switch typedValue := value.(type) {
+	case SomeValue:
+		v[key] = typedValue.Value
+		return
+	case NilValue:
 		delete(v, key)
+	default:
+		panic(&errors.UnreachableError{})
 	}
 }
 
