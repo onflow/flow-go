@@ -72,7 +72,7 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 
 // Testing Threshold Signature
 func TestThresholdSignature(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5

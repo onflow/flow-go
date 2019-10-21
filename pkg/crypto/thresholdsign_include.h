@@ -6,6 +6,6 @@
 #include "misc.h"
 #include "bls_include.h"
 
-void interpolateSignaturesAtZero(byte*,	byte[][SIGNATURE_LEN],int[], int);
+void interpolateSignaturesAtZero(byte*,	byte* ,uint32_t*, int);
 
 #endif

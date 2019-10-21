@@ -10,7 +10,6 @@ import "C"
 
 import (
 	"fmt"
-	"unsafe"
 )
 
 // NewThresholdSigner creates a new instance of Threshold siger using BLS
@@ -27,8 +26,8 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 	if err != nil {
 		return nil, err
 	}
-	shares := make([]Signature, 0, size)
-	signers := make([]int, 0, size)
+	shares := make([]byte, 0, size*signatureLengthBLS_BLS12381)
+	signers := make([]uint32, 0, size)
 
 	return &ThresholdSinger{
 		size:               size,
@@ -42,15 +41,16 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 
 // ThresholdSinger holds the data needed for threshold signaures
 type ThresholdSinger struct {
-	size               int
-	threshold          int
-	currentPrivateKey  PrivateKey
-	groupPublicKey     PublicKey
-	nodePublicKeys     []PublicKey
-	hashAlgo           Hasher
-	messageToSign      []byte
-	shares             []Signature
-	signers            []int
+	size              int
+	threshold         int
+	currentPrivateKey PrivateKey
+	groupPublicKey    PublicKey
+	nodePublicKeys    []PublicKey
+	hashAlgo          Hasher
+	messageToSign     []byte
+	shares            []byte // simulates an array of Signatures
+	// (or a matrix of by bytes) to solve a cgo issue
+	signers            []uint32
 	thresholdSignature Signature
 }
 
@@ -113,21 +113,21 @@ func (s *ThresholdSinger) VerifyThresholdSignature(thresholdSignature Signature)
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
 func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
-	if len(s.shares) != len(s.signers) {
+	if len(s.shares) != len(s.signers)*signatureLengthBLS_BLS12381 {
 		s.ClearShares()
 		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
 	}
 	thresholdSignature := make([]byte, signatureLengthBLS_BLS12381)
 	// Interpolate at point 0
 	C.interpolateSignaturesAtZero(
-		(*C.uchar)((unsafe.Pointer)(&thresholdSignature[0])),
-		(**C.uchar)(&s.shares[0]),
-		(*C.int)(&s.signers[0]), (C.int)(len(s.signers)),
+		(*C.uchar)(&thresholdSignature[0]),
+		(*C.uchar)(&s.shares[0]),
+		(*C.uint32_t)(&s.signers[0]), (C.int)(len(s.signers)),
 	)
 	return thresholdSignature, nil
 }
 
-// clear the shares and signers lists
+// ClearShares clears the shares and signers lists
 func (s *ThresholdSinger) ClearShares() {
 	s.thresholdSignature = nil
 	s.signers = s.signers[:0]
@@ -146,9 +146,9 @@ func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature
 		return false, nil, err
 	}
 	if verif {
-		s.shares = append(s.shares, Signature(share))
-		s.signers = append(s.signers, orig)
-		if len(s.shares) == (s.threshold + 1) {
+		s.shares = append(s.shares, share...)
+		s.signers = append(s.signers, uint32(orig))
+		if len(s.signers) == (s.threshold + 1) {
 			thresholdSignature, err := s.reconstructThresholdSignature()
 			if err != nil {
 				return false, nil, err

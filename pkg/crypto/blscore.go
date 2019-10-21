@@ -7,9 +7,6 @@ import "C"
 
 // TODO: remove -wall after reaching a stable version
 // TDOD: enable QUIET in relic
-import (
-	"unsafe"
-)
 
 // Go wrappers to C types
 type pointG1 C.ep_st
@@ -67,7 +64,7 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 // seeds the internal relic random function
 func seedRelic(seed []byte) {
 	// TODO: define the length of seed
-	C._seed_relic((*C.uchar)((unsafe.Pointer)(&seed[0])), (C.int)(len(seed)))
+	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
 // returns a random number on Z/Z.r
@@ -83,7 +80,7 @@ func randZr(x *scalar) error {
 // returns the hash to G1 point
 func hashToG1(data []byte) {
 	l := len(data)
-	_ = C._hashToG1((*C.uchar)((unsafe.Pointer)(&data[0])), (C.int)(l))
+	_ = C._hashToG1((*C.uchar)(&data[0]), (C.int)(l))
 }
 
 // sets a scalar to a small integer
@@ -93,7 +90,7 @@ func (x *scalar) setInt(a int) {
 
 // writePointG2 writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
-	C._ep2_write_bin_compact((*C.uchar)((unsafe.Pointer)(&dest[0])),
+	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
 		(C.int)(pubKeyLengthBLS_BLS12381),
 	)
@@ -102,7 +99,7 @@ func writePointG2(dest []byte, a *pointG2) {
 // readVerifVector reads a G2 point from a slice of bytes
 func readPointG2(a *pointG2, data []byte) {
 	C._ep2_read_bin_compact((*C.ep2_st)(a),
-		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(*C.uchar)(&data[0]),
 		(C.int)(len(data)),
 	)
 }
@@ -111,9 +108,9 @@ func readPointG2(a *pointG2, data []byte) {
 func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 	s := make([]byte, a.signatureLength)
 
-	C._blsSign((*C.uchar)((unsafe.Pointer)(&s[0])),
+	C._blsSign((*C.uchar)(&s[0]),
 		(*C.bn_st)(sk),
-		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
 	return s
 }
@@ -121,8 +118,8 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 // Checks the validity of a bls signature
 func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
 	verif := C._blsVerify((*C.ep2_st)(pk),
-		(*C.uchar)((unsafe.Pointer)(&s[0])),
-		(*C.uchar)((unsafe.Pointer)(&data[0])),
+		(*C.uchar)(&s[0]),
+		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
 
 	const sigValid = 1 // same value as in include.h
