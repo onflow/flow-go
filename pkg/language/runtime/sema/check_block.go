@@ -22,11 +22,13 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 		if functionActivation.ReturnInfo.DefinitelyReturned &&
 			!functionActivation.ReportedDeadCode {
 
+			lastStatement := statements[len(statements)-1]
+
 			checker.report(
 				&UnreachableStatementError{
 					Range: ast.Range{
 						StartPos: statement.StartPosition(),
-						EndPos:   statement.EndPosition(),
+						EndPos:   lastStatement.EndPosition(),
 					},
 				},
 			)
