@@ -9,9 +9,8 @@ type sha2_256Algo struct {
 func (s *sha2_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	s.Write(data)
-	digest := make(Hash, HashLengthSha2_256)
-	s.Sum(digest[:0])
-	return digest
+	digest := make(Hash, 0, HashLengthSha2_256)
+	return s.Sum(digest)
 }
 
 // SumHash returns the SHA2-256 output and resets the hash state
@@ -31,9 +30,8 @@ type sha2_384Algo struct {
 func (s *sha2_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	s.Write(data)
-	digest := make(Hash, HashLengthSha2_384)
-	s.Sum(digest[:0])
-	return digest
+	digest := make(Hash, 0, HashLengthSha2_384)
+	return s.Sum(digest)
 }
 
 // SumHash returns the SHA2-384 output and resets the hash state

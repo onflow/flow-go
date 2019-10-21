@@ -4,19 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"testing"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func checkBytes(t *testing.T, input, expected, result []byte) {
-	expectedHex := make([]byte, len(expected)*2)
-	resultHex := make([]byte, len(result)*2)
-	hex.Encode(expectedHex, expected)
-	hex.Encode(resultHex, result)
 	if !bytes.Equal(expected, result) {
-		t.Errorf("hash mismatch: expect: %s have: %s, input is %s", expectedHex, resultHex, input)
+		t.Errorf("hash mismatch: expect: %x have: %x, input is %s", expected, result, input)
 	} else {
-		t.Logf("hash test ok: expect: %s, input: %s", expectedHex, input)
+		t.Logf("hash test ok: expect: %x, input: %s", expected, input)
 	}
 }
 
@@ -27,7 +21,7 @@ func TestSha3_256(t *testing.T) {
 
 	alg, err := NewHasher(SHA3_256)
 	if err != nil {
-		log.Error(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	hash := alg.ComputeHash(input)
@@ -48,7 +42,7 @@ func TestSha3_384(t *testing.T) {
 
 	alg, err := NewHasher(SHA3_384)
 	if err != nil {
-		log.Error(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	hash := alg.ComputeHash(input)
@@ -69,7 +63,7 @@ func TestSha2_256(t *testing.T) {
 
 	alg, err := NewHasher(SHA2_256)
 	if err != nil {
-		log.Error(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	hash := alg.ComputeHash(input)
@@ -90,7 +84,7 @@ func TestSha2_384(t *testing.T) {
 
 	alg, err := NewHasher(SHA2_384)
 	if err != nil {
-		log.Error(err.Error())
+		t.Error(err.Error())
 		return
 	}
 	hash := alg.ComputeHash(input)
