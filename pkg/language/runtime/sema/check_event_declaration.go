@@ -15,6 +15,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 		constructorFunctionType,
 		nil,
 		false,
+		nil,
 	)
 
 	// check that parameters are primitive types
@@ -57,11 +58,11 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.DeclarationKind(),
-			IsConstant: true,
-			Type:       eventType,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.DeclarationKind(),
+			IsConstant:      true,
+			Type:            eventType,
+			Pos:             &identifier.Pos,
 		},
 	)
 

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"log"
 	"net"
 	"time"
@@ -31,9 +30,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	peers := []string{}
+
+	for _, port := range portPool {
+		if port != servePort {
+			peers = append(peers, port)
+		}
+	}
+
 	// step 2: registering the grpc services if any
 	// Note: this example is not built upon any grpc service, hence we pass nil
-	node := gnode.NewNode(zerolog.Logger{}, nil)
+	// we pass 0 for static fanout to simulate the Gossip ONE_TO_MANY, i.e., connection on the fly
+	node := gnode.NewNode(nil, servePort, peers, 0, 10)
 
 	// step 3: passing the listener to the instance of gnode
 	go node.Serve(listener)
@@ -54,13 +62,6 @@ func main() {
 	// add the Time function to the node's registry
 	node.RegisterFunc("Time", Time)
 
-	peers := make([]string, 0)
-	for _, port := range portPool {
-		if port != servePort {
-			peers = append(peers, port)
-		}
-	}
-
 	t := time.Tick(5 * time.Second)
 
 	for {
@@ -68,7 +69,7 @@ func main() {
 		case <-t:
 			go func() {
 				log.Println("Gossiping")
-				payload := &Message{Text: []byte("Ping")}
+				payload := &Message{Text: []byte(time.Now().String())}
 				bytes, err := proto.Marshal(payload)
 				if err != nil {
 					log.Fatalf("could not marshal message: %v", err)

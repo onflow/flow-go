@@ -36,7 +36,7 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
                           init() %[3]s
                           init(y: Int) %[3]s
                       }
-	                `,
+                    `,
 					kind.Keyword(),
 					interfaceKeyword,
 					body,
@@ -82,7 +82,7 @@ func TestCheckInvalidResourceDestructorOverloading(t *testing.T) {
                       destroy() %[2]s
                       destroy(y: Int) %[2]s
                   }
-	            `,
+                `,
 				interfaceKeyword,
 				body,
 			))

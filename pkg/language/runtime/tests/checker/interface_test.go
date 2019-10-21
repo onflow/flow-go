@@ -277,9 +277,9 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s interface Test {}
-    
+
               %[1]s TestImpl: Test {}
-    
+
               let test: %[2]sTest %[3]s %[4]s TestImpl()
 	        `,
 				kind.Keyword(),
@@ -435,7 +435,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
               %[1]s TestImpl: Test {
                   var x: Int
-    
+
                   init(x: Int) {
                       self.x = x
                   }
@@ -888,7 +888,7 @@ func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 
               %[1]s TestImpl: Test {
                   var x: Bool
-    
+
                   init(x: Bool) {
                      self.x = x
                   }

@@ -17,7 +17,7 @@ func TestCheckInvalidFunctionCallWithTooFewArguments(t *testing.T) {
       fun test(): Int {
           return f()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -34,7 +34,7 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
       fun test(): Int {
           return f(x: 1)
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -49,7 +49,7 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
       fun test(): Int {
           return f(1)
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -64,7 +64,7 @@ func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
       fun test(): Int {
           return f(x: 1)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -82,7 +82,7 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
           let g = f
           return g(1)
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -97,7 +97,7 @@ func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
       fun test(): Int {
           return f(1)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -114,7 +114,7 @@ func TestCheckFunctionCallIncorrectArgumentLabel(t *testing.T) {
       fun test(): Int {
           return f(y: 1)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -131,7 +131,7 @@ func TestCheckInvalidFunctionCallWithTooManyArguments(t *testing.T) {
       fun test(): Int {
           return f(2, 3)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -146,7 +146,7 @@ func TestCheckInvalidFunctionCallOfBool(t *testing.T) {
       fun test(): Int {
           return true()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -159,7 +159,7 @@ func TestCheckInvalidFunctionCallOfInteger(t *testing.T) {
       fun test(): Int {
           return 2()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -176,7 +176,7 @@ func TestCheckInvalidFunctionCallWithWrongType(t *testing.T) {
       fun test(): Int {
           return f(x: true)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -193,7 +193,7 @@ func TestCheckInvalidFunctionCallWithWrongTypeAndMissingArgumentLabel(t *testing
       fun test(): Int {
           return f(true)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 

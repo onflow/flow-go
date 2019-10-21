@@ -52,15 +52,15 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		return &InvalidType{}
 	}
 
+	// invoked expression has function type
+
 	functionType := invokableType.InvocationFunctionType()
 
 	var returnType Type = &InvalidType{}
 
-	// invoked expression has function type
-
 	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
 
-	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
 	// check that the correct argument labels are supplied in the invocation
 
@@ -99,6 +99,14 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		returnType,
 		inCreate,
 	)
+
+	// Update the return info for invocations that do not return (i.e. have a `Never` return type)
+
+	if returnType.Equal(&NeverType{}) {
+		functionActivation := checker.functionActivations.Current()
+		functionActivation.ReturnInfo.MaybeReturned = true
+		functionActivation.ReturnInfo.DefinitelyReturned = true
+	}
 
 	return returnType
 }

@@ -18,7 +18,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test %[2]s %[3]s T() as? <-T
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -65,12 +65,12 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s T {}
+                  %[1]s T {}
 
-              fun test(r: <-T) {
-                  %[2]s r
-              }
-	        `,
+                  fun test(r: <-T) {
+                      %[2]s r
+                  }
+                `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -103,12 +103,12 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s T {}
+                  %[1]s T {}
 
-              fun test(r: T) {
-                  %[2]s r
-              }
-	        `,
+                  fun test(r: T) {
+                      %[2]s r
+                  }
+                `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -140,12 +140,12 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s T {}
+                  %[1]s T {}
 
-              fun test(): <-T {
-                  return %[2]s %[3]s T()
-              }
-	        `,
+                  fun test(): <-T {
+                      return %[2]s %[3]s T()
+                  }
+                `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -182,7 +182,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
               fun test(): T {
                   return %[2]s %[3]s T()
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -216,7 +216,7 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: <-T %[2]s %[3]s T()
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -254,7 +254,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test: T %[2]s %[3]s T()
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -307,7 +307,7 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 
                   %[3]s
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				destructor,
@@ -365,7 +365,7 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 
                   %[3]s
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				destructor,
@@ -406,7 +406,7 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
               let test = fun (r: <-T) {
                   %[2]s r
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -445,7 +445,7 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
               let test = fun (r: T) {
                   %[2]s r
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -483,7 +483,7 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
               let test = fun (): <-T {
                   return %[2]s %[3]s T()
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -523,7 +523,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
               let test = fun (): T {
                   return %[2]s %[3]s T()
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -559,7 +559,7 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
               let test: ((<-T): Void) = fun (r: <-T) {
                   %[2]s r
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -597,7 +597,7 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
               let test: ((T): Void) = fun (r: T) {
                   %[2]s r
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.DestructionKeyword(),
 			))
@@ -632,7 +632,7 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
               let test: ((): <-T) = fun (): <-T {
                   return %[2]s %[3]s T()
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -672,7 +672,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
               let test: ((): T) = fun (): T {
                   return %[2]s %[3]s T()
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.ConstructionKeyword(),
@@ -707,7 +707,7 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
               %[1]s T {}
 
               let test %[2]s %[3]s T() as? T
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -760,7 +760,7 @@ func TestCheckUnaryMove(t *testing.T) {
           let x <- foo(x: <-create X())
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 
@@ -774,7 +774,7 @@ func TestCheckImmediateDestroy(t *testing.T) {
       fun test() {
           destroy create X()
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -788,7 +788,7 @@ func TestCheckIndirectDestroy(t *testing.T) {
           let x <- create X()
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -798,8 +798,8 @@ func TestCheckInvalidResourceCreationWithoutCreate(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-	  let x <- X()
-	`)
+      let x <- X()
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -815,7 +815,7 @@ func TestCheckInvalidDestroy(t *testing.T) {
       fun test() {
           destroy X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -831,7 +831,7 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
           var x <- create X()
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -850,7 +850,7 @@ func TestCheckUnaryCreateAndDestroyWithInitializer(t *testing.T) {
           var x <- create X(x: 1)
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -869,7 +869,7 @@ func TestCheckInvalidUnaryCreateAndDestroyWithWrongInitializerArguments(t *testi
           var x <- create X(y: true)
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -885,7 +885,7 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
       fun test() {
           create X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -896,12 +896,12 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	t.Run("UnassignedResource", func(t *testing.T) {
 
 		_, err := ParseAndCheck(t, `
-			resource X {}
-			
-			fun test() {
-				create X()
-			}
-		`)
+            resource X {}
+
+            fun test() {
+                create X()
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -911,16 +911,16 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	t.Run("ImmediateMemberAccess", func(t *testing.T) {
 
 		_, err := ParseAndCheck(t, `
-			resource Foo {
-				fun bar(): Int {
-					return 42
-				}
-			}
+            resource Foo {
+                fun bar(): Int {
+                    return 42
+                }
+            }
 
-			fun test() {
-				let x = (create Foo()).bar()
-			}
-		`)
+            fun test() {
+                let x = (create Foo()).bar()
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -930,20 +930,20 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	t.Run("ImmediateMemberAccessFunctionInvocation", func(t *testing.T) {
 
 		_, err := ParseAndCheck(t, `
-			resource Foo {
-				fun bar(): Int {
-					return 42
-				}
-			}
-	
-			fun createResource(): <-Foo {
-				return <-create Foo()
-			}
-	
-			fun test() {
-				let x = createResource().bar()
-			}
-		`)
+            resource Foo {
+                fun bar(): Int {
+                    return 42
+                }
+            }
+
+            fun createResource(): <-Foo {
+                return <-create Foo()
+            }
+
+            fun test() {
+                let x = createResource().bar()
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -953,13 +953,13 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	t.Run("ImmediateIndexing", func(t *testing.T) {
 
 		_, err := ParseAndCheck(t, `
-			resource Foo {}
+            resource Foo {}
 
-			fun test() {
-				let x <- [<-create Foo(), <-create Foo()][0]
+            fun test() {
+                let x <- [<-create Foo(), <-create Foo()][0]
                 destroy x
-			}
-		`)
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 2)
 
@@ -970,12 +970,12 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
 
 		_, err := ParseAndCheck(t, `
-			resource Foo {}
+            resource Foo {}
 
-			fun test() {
-				let x <- makeFoos()[0]
+            fun test() {
+                let x <- makeFoos()[0]
                 destroy x
-			}
+            }
 
             fun makeFoos(): <-[Foo] {
                 return <-[
@@ -983,7 +983,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
                     <-create Foo()
                 ]
             }
-		`)
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1000,7 +1000,7 @@ func TestCheckResourceReturn(t *testing.T) {
       fun test(): <-X {
           return <-create X()
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1013,7 +1013,7 @@ func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
       fun test(): <-X {
           return create X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1028,7 +1028,7 @@ func TestCheckInvalidResourceReturnMissingMoveInvalidReturnType(t *testing.T) {
       fun test(): Y {
           return create X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1044,7 +1044,7 @@ func TestCheckInvalidNonResourceReturnWithMove(t *testing.T) {
       fun test(): X {
           return <-X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1063,7 +1063,7 @@ func TestCheckResourceArgument(t *testing.T) {
       fun bar() {
           foo(<-create X())
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1080,7 +1080,7 @@ func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
       fun bar() {
           foo(create X())
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1097,7 +1097,7 @@ func TestCheckInvalidResourceArgumentMissingMoveInvalidParameterType(t *testing.
       fun bar() {
           foo(create X())
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1115,7 +1115,7 @@ func TestCheckInvalidNonResourceArgumentWithMove(t *testing.T) {
       fun bar() {
           foo(<-X())
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1129,7 +1129,7 @@ func TestCheckResourceVariableDeclarationTransfer(t *testing.T) {
 
       let x <- create X()
       let y <- x
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1141,7 +1141,7 @@ func TestCheckInvalidResourceVariableDeclarationIncorrectTransfer(t *testing.T) 
 
       let x = create X()
       let y = x
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1156,7 +1156,7 @@ func TestCheckInvalidNonResourceVariableDeclarationMoveTransfer(t *testing.T) {
 
       let x = X()
       let y <- x
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1174,7 +1174,7 @@ func TestCheckInvalidResourceAssignmentTransfer(t *testing.T) {
          destroy x2
          x2 <- x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1193,7 +1193,7 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
         destroy x2
         x2 = x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1212,7 +1212,7 @@ func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
         var x2 = X()
         x2 <- x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1227,7 +1227,7 @@ func TestCheckInvalidResourceLossThroughVariableDeclaration(t *testing.T) {
       fun test() {
         let x <- create X()
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1243,7 +1243,7 @@ func TestCheckInvalidResourceLossThroughVariableDeclarationAfterCreation(t *test
           let x <- create X()
           let y <- x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1260,7 +1260,7 @@ func TestCheckInvalidResourceLossThroughAssignment(t *testing.T) {
           let y <- create X()
           x <- y
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1278,7 +1278,7 @@ func TestCheckResourceMoveThroughReturn(t *testing.T) {
           let x <- create X()
           return <-x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1296,7 +1296,7 @@ func TestCheckResourceMoveThroughArgumentPassing(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1315,7 +1315,7 @@ func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1332,7 +1332,7 @@ func TestCheckInvalidResourceUseAfterMoveToVariable(t *testing.T) {
           let y <- x
           let z <- x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1364,7 +1364,7 @@ func TestCheckInvalidResourceFieldUseAfterMoveToVariable(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1387,7 +1387,7 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1411,7 +1411,7 @@ func TestCheckResourceUseInIfStatement(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1435,7 +1435,7 @@ func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1460,7 +1460,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1494,7 +1494,7 @@ func TestCheckInvalidResourceLossAfterDestroyInIfStatementThenBranch(t *testing.
              destroy x
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1518,7 +1518,7 @@ func TestCheckInvalidResourceLossAndUseAfterDestroyInIfStatementThenBranch(t *te
           }
           x.id
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1533,7 +1533,7 @@ func TestCheckResourceMoveIntoArray(t *testing.T) {
 
       let x <- create X()
       let xs <- [<-x]
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1545,7 +1545,7 @@ func TestCheckInvalidResourceMoveIntoArrayMissingMoveOperation(t *testing.T) {
 
       let x <- create X()
       let xs <- [x]
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1559,7 +1559,7 @@ func TestCheckInvalidNonResourceMoveIntoArray(t *testing.T) {
 
       let x = X()
       let xs = [<-x]
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1573,7 +1573,7 @@ func TestCheckInvalidUseAfterResourceMoveIntoArray(t *testing.T) {
 
       let x <- create X()
       let xs <- [<-x, <-x]
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1587,7 +1587,7 @@ func TestCheckResourceMoveIntoDictionary(t *testing.T) {
 
       let x <- create X()
       let xs <- {"x": <-x}
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1599,7 +1599,7 @@ func TestCheckInvalidResourceMoveIntoDictionaryMissingMoveOperation(t *testing.T
 
       let x <- create X()
       let xs <- {"x": x}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1613,7 +1613,7 @@ func TestCheckInvalidNonResourceMoveIntoDictionary(t *testing.T) {
 
       let x = X()
       let xs = {"x": <-x}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1627,10 +1627,10 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionary(t *testing.T) {
 
       let x <- create X()
       let xs <- {
-          "x": <-x, 
+          "x": <-x,
           "x2": <-x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1644,7 +1644,7 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
 
       let x <- create X()
       let xs <- {<-x: <-x}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1663,7 +1663,7 @@ func TestCheckInvalidResourceUseAfterMoveInWhileStatement(t *testing.T) {
           }
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1688,7 +1688,7 @@ func TestCheckResourceUseInWhileStatement(t *testing.T) {
           }
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1711,7 +1711,7 @@ func TestCheckInvalidResourceUseInWhileStatementAfterDestroy(t *testing.T) {
           }
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1731,7 +1731,7 @@ func TestCheckInvalidResourceUseInWhileStatementAfterDestroyAndLoss(t *testing.T
               destroy x
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1758,7 +1758,7 @@ func TestCheckInvalidResourceUseInNestedWhileStatementAfterDestroyAndLoss1(t *te
               }
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1786,7 +1786,7 @@ func TestCheckInvalidResourceUseInNestedWhileStatementAfterDestroyAndLoss2(t *te
               destroy x
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
@@ -1812,9 +1812,9 @@ func TestCheckResourceUseInNestedWhileStatement(t *testing.T) {
                   x.id
               }
           }
-		  destroy x
+          destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1829,11 +1829,12 @@ func TestCheckInvalidResourceLossThroughReturn(t *testing.T) {
           return
           destroy x
       }
-	`)
+    `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossThroughReturnInIfStatementThrenBranch(t *testing.T) {
@@ -1848,7 +1849,7 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementThrenBranch(t *testin
           }
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1874,11 +1875,12 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+	assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
 }
 
 func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *testing.T) {
@@ -1899,7 +1901,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *test
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1921,7 +1923,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
       fun absorb(_ x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -2062,7 +2064,7 @@ func TestCheckResourceInterfaceConformance(t *testing.T) {
       resource Y: X {
           fun test() {}
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -2078,7 +2080,7 @@ func TestCheckInvalidResourceInterfaceConformance(t *testing.T) {
       }
 
       resource Y: X {}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -2097,7 +2099,7 @@ func TestCheckResourceInterfaceUseAsType(t *testing.T) {
       resource Y: X {}
 
       let x: <-X <- create Y()
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -2142,7 +2144,7 @@ func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
       fun createX(): <-X {
           return <-create X(id: 1)
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -2162,7 +2164,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
       fun foo(x: <-X) {
           destroy x
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
@@ -2186,7 +2188,7 @@ func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
       fun test(): Int {
           return createFoo().bar
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -2211,7 +2213,7 @@ func TestCheckResourceInterfaceDestruction(t *testing.T) {
       fun bar() {
           foo(x: <-create Y())
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -2245,7 +2247,7 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
           destroy bar
           return <-[<-foo2, <-foo3]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -2287,7 +2289,7 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
           destroy bar
           return <-[<-foo2, <-foo3]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 

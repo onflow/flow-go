@@ -7,15 +7,16 @@ import (
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/order"
 	"github.com/rs/zerolog"
 )
 
-var defaultLogger = zerolog.New(ioutil.Discard)
+var defaultLogger zerolog.Logger = zerolog.New(ioutil.Discard)
 
 func TestAsyncQueue(t *testing.T) {
-	//gn := NewNode(defaultLogger, nil)
-	gn := NewNode(zerolog.Logger{}, nil)
-	go gn.sweeper()
+	a := NewNode(nil, "", []string{}, 0, 10)
+	go a.sweeper()
+
 
 	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
@@ -36,7 +37,7 @@ func TestAsyncQueue(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		_, gotErr := gn.AsyncQueue(tc.ctx, nil)
+		_, gotErr := a.AsyncQueue(tc.ctx, &shared.GossipMessage{})
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
@@ -56,7 +57,7 @@ func TestAsyncQueue(t *testing.T) {
 }
 
 func TestSyncQueue(t *testing.T) {
-	gn := NewNode(defaultLogger, nil)
+	gn := NewNode(nil, "", []string{}, 0, 10)
 	//to handle the queue
 	go gn.sweeper()
 
@@ -100,6 +101,7 @@ func TestSyncQueue(t *testing.T) {
 			err: fmt.Errorf("non nil"),
 		},
 	}
+
 	for _, tc := range tt {
 		_, gotErr := gn.SyncQueue(tc.ctx, tc.msg)
 
@@ -122,7 +124,7 @@ func TestSyncQueue(t *testing.T) {
 }
 
 func TestMessageHandler(t *testing.T) {
-	gn := NewNode(defaultLogger, nil)
+	gn := NewNode(nil, "", []string{}, 0, 10)
 
 	//add gn function for testing
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
@@ -141,7 +143,7 @@ func TestMessageHandler(t *testing.T) {
 	}
 
 	tt := []struct {
-		e   *entry
+		e   *order.Order
 		err error
 	}{
 		{
@@ -150,15 +152,15 @@ func TestMessageHandler(t *testing.T) {
 			err: fmt.Errorf("non nil"),
 		},
 		{ //entry with existing function
-			e:   &entry{ctx: context.Background(), msg: genMsg([]byte("msg"), nil, "exists")},
+			e:   order.NewOrder(context.Background(), genMsg([]byte("msg"), nil, "exists"), true),
 			err: nil,
 		},
 		{ //entry with non-existing function
-			e:   &entry{ctx: context.Background(), msg: genMsg([]byte("msg"), nil, "doesntexist")},
+			e:   order.NewOrder(context.Background(), genMsg([]byte("msg"), nil, "doesntexist"), true),
 			err: fmt.Errorf("non nil"),
 		},
 		{ //entry with nil message
-			e:   &entry{ctx: context.Background()},
+			e:   order.NewOrder(context.Background(), nil, true),
 			err: fmt.Errorf("non nil"),
 		},
 	}
@@ -180,5 +182,71 @@ func TestMessageHandler(t *testing.T) {
 		if tc.err != nil && gotErr != nil {
 			continue
 		}
+	}
+}
+
+func TestTryStore(t *testing.T) {
+
+	node := NewNode(nil, "", []string{}, 0, 10)
+
+	//generating two messages with different script
+	msg1, _ := generateGossipMessage([]byte("hello"), []string{}, "")
+	msg2, _ := generateGossipMessage([]byte("hi"), []string{}, "")
+
+
+	// pretending that the node received msg2
+	h2, _ := computeHash(msg2)
+	node.hashCache.receive(string(h2))
+
+	tt := []struct {
+		msg          *shared.GossipMessage
+		expectedBool bool
+	}{
+		{// msg1 is not stored in the store
+			msg:          msg1,
+			expectedBool: false,
+		},
+		{// msg1 is in the store
+			msg:          msg2,
+			expectedBool: true,
+		},
+	}
+
+	// test if storage reports the correct state of the message
+	for _, tc := range tt {
+		rep, _ := node.tryStore(tc.msg)
+		if rep != tc.expectedBool {
+			t.Errorf("tryStore: Expected: %v, Got: %v", tc.expectedBool, rep)
+		}
+	}
+}
+
+func TestPickRandom(t *testing.T) {
+	n := &Node{}
+	n.peers = []string{
+		"Wyatt",
+		"Jayden",
+		"John",
+		"Owen",
+		"Dylan",
+		"Luke",
+		"Gabriel",
+		"Anthony",
+		"Isaac",
+		"Grayson",
+		"Jack",
+		"Julian",
+		"Levi",
+		"Christopher",
+		"Joshua",
+		"Andrew",
+		"Lincoln",
+	}
+
+	n.staticFanoutNum = 2
+	n.pickGossipPartners()
+
+	if size := len(n.fanoutSet); size != 2 {
+		t.Errorf("expected a new fanout set of size 2, received fanout set of size: %v", size)
 	}
 }

@@ -1,9 +1,11 @@
 package sema
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
 func TestResources_Add(t *testing.T) {
