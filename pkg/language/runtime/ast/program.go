@@ -65,19 +65,26 @@ func (p *Program) EventDeclarations() []*EventDeclaration {
 	return p.eventDeclarations
 }
 
-func (p *Program) Imports() (map[LocationID]ImportLocation, map[LocationID]*Program) {
+func (p *Program) Imports() map[LocationID]*Program {
 	if p.imports == nil {
-		p.importLocations = make(map[LocationID]ImportLocation)
 		p.imports = make(map[LocationID]*Program)
+	}
+
+	return p.imports
+}
+
+func (p *Program) ImportLocations() map[LocationID]ImportLocation {
+	if p.importLocations == nil {
+		p.importLocations = make(map[LocationID]ImportLocation)
 
 		for _, declaration := range p.Declarations {
 			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
 				p.importLocations[importDeclaration.Location.ID()] = importDeclaration.Location
-				p.imports[importDeclaration.Location.ID()] = nil
 			}
 		}
 	}
-	return p.importLocations, p.imports
+
+	return p.importLocations
 }
 
 type ImportResolver func(location ImportLocation) (*Program, error)
@@ -103,9 +110,9 @@ func (p *Program) resolveImports(
 	resolving map[LocationID]bool,
 	resolved map[LocationID]*Program,
 ) error {
-	locations, imports := p.Imports()
-	for locationID := range imports {
-		location := locations[locationID]
+	locations := p.ImportLocations()
+
+	for locationID, location := range locations {
 
 		imported, ok := resolved[locationID]
 		if !ok {
@@ -123,7 +130,8 @@ func (p *Program) resolveImports(
 			continue
 		}
 
-		imports[locationID] = imported
+		p.setImportedProgram(locationID, imported)
+
 		if resolving[locationID] {
 			return CyclicImportsError{Location: location}
 		}
@@ -137,5 +145,15 @@ func (p *Program) resolveImports(
 
 		delete(resolving, locationID)
 	}
+
 	return nil
+}
+
+// setImportedProgram adds an imported program to the set of imports, indexed by location ID.
+func (p *Program) setImportedProgram(locationID LocationID, program *Program) {
+	if p.imports == nil {
+		p.imports = make(map[LocationID]*Program)
+	}
+
+	p.imports[locationID] = program
 }

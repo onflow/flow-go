@@ -29,9 +29,8 @@ func (checker *Checker) resolveImports(
 	resolving map[ast.LocationID]bool,
 	resolved map[ast.LocationID]*Checker,
 ) error {
-	locations, imports := checker.Program.Imports()
-	for locationID := range imports {
-		location := locations[locationID]
+	locations := checker.Program.ImportLocations()
+	for locationID, location := range locations {
 
 		importedChecker, ok := resolved[locationID]
 		if !ok {
