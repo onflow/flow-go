@@ -10,6 +10,7 @@ type Program struct {
 	functionDeclarations  []*FunctionDeclaration
 	eventDeclarations     []*EventDeclaration
 	importedPrograms      map[LocationID]*Program
+	importLocations       []ImportLocation
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {
@@ -75,15 +76,17 @@ func (p *Program) ImportedPrograms() map[LocationID]*Program {
 
 // ImportLocations returns the import locations declared by this program.
 func (p *Program) ImportLocations() []ImportLocation {
-	importLocations := make([]ImportLocation, 0)
+	if p.importLocations == nil {
+		p.importLocations = make([]ImportLocation, 0)
 
-	for _, declaration := range p.Declarations {
-		if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
-			importLocations = append(importLocations, importDeclaration.Location)
+		for _, declaration := range p.Declarations {
+			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
+				p.importLocations = append(p.importLocations, importDeclaration.Location)
+			}
 		}
 	}
 
-	return importLocations
+	return p.importLocations
 }
 
 type ImportResolver func(location ImportLocation) (*Program, error)
