@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/rs/zerolog"
 	"log"
 	"os"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
@@ -57,8 +56,8 @@ func main() {
 
 // PutKey distributes a text to the servers whose address is specified in serverAddress
 func PutKey(key string) error {
-	node := gnode.NewNode(zerolog.Logger{},nil)
 	serverAddress := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
+	node := gnode.NewNode(nil, "127.0.0.1:50004", serverAddress, 0, 10)
 
 	subRequest, err := GenerateSubmitTransactionRequest(key)
 	if err != nil {
@@ -75,8 +74,8 @@ func PutKey(key string) error {
 
 // CheckKey checks whether the key exists in the distributed storage
 func CheckKey(key string) error {
-	node := gnode.NewNode(zerolog.Logger{},nil)
 	storageAddrs := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
+	node := gnode.NewNode(nil, "127.0.0.1:50004", storageAddrs, 0, 10)
 
 	getRequest, err := GenerateGetTransactionRequest(key)
 	if err != nil {

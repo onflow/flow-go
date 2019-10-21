@@ -12,7 +12,11 @@ message GossipMessage {
   string Sender = 4;                // Address of the sender of this message
   repeated string Path = 5;         // Address of the nodes that this message visited so far
   uint64 TTL = 6;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
-  string uuid = 7;                  // The Uniqe identifier of the message. 
+}
+
+message HashMessage {
+  bytes hashBytes = 1;
+  string senderAddr = 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////
