@@ -42,7 +42,7 @@ type Interface interface {
 	// AddAccountKey appends a key to an account.
 	AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(address types.Address, index int) error
+	RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(address types.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.

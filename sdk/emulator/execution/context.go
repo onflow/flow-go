@@ -135,27 +135,34 @@ func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, 
 //
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
-func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) error {
+func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
+		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if index < 0 || index > len(publicKeys)-1 {
-		return fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
+		return nil, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
 	}
+
+	removedKey := publicKeys[index]
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 	keyWeights = append(keyWeights[:index], keyWeights[index+1:]...)
 
-	return r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	err = r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	if err != nil {
+		return nil, err
+	}
+
+	return removedKey, nil
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {

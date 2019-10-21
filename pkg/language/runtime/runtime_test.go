@@ -17,7 +17,7 @@ type testRuntimeInterface struct {
 	setValue           func(controller, owner, key, value []byte) (err error)
 	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
 	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
-	removeAccountKey   func(address types.Address, index int) error
+	removeAccountKey   func(address types.Address, index int) (publicKey []byte, err error)
 	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
@@ -44,7 +44,7 @@ func (i *testRuntimeInterface) AddAccountKey(address types.Address, publicKey []
 	return i.addAccountKey(address, publicKey, keyWeight)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) error {
+func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
 	return i.removeAccountKey(address, index)
 }
 
