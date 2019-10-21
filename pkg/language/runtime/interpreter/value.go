@@ -1211,6 +1211,7 @@ func (v DictionaryValue) Set(keyValue Value, value Value) {
 		return
 	case NilValue:
 		delete(v, key)
+		return
 	default:
 		panic(&errors.UnreachableError{})
 	}
