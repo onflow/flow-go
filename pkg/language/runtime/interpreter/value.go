@@ -1365,6 +1365,10 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
+func (v NilValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return trampoline.Done{}
+}
+
 func (NilValue) String() string {
 	return "nil"
 }
@@ -1385,6 +1389,10 @@ func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
+}
+
+func (v SomeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 
 func (v SomeValue) String() string {

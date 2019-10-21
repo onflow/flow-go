@@ -4770,6 +4770,69 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 	)
 }
 
+
+func TestInterpretResourceDestroyOptionalSome(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          destroy maybeR
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyOptionalNil(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let maybeR: <-R? <- nil
+          destroy maybeR
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
 // TestInterpretResourceDestroyExpressionResourceInterfaceCondition tests that
 // the resource interface's destructor is called, even if the conforming resource
 // does not have an destructor
