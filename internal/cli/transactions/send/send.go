@@ -2,7 +2,6 @@ package send
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -32,7 +31,7 @@ var Cmd = &cobra.Command{
 		signerAddr := types.HexToAddress(signer.Address)
 		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
 		if err != nil {
-			utils.Exit("Failed to load signer key", 1)
+			utils.Exit(1, "Failed to load signer key")
 		}
 
 		var code []byte
@@ -40,7 +39,7 @@ var Cmd = &cobra.Command{
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
-				utils.Exit(fmt.Sprintf("Failed to load BPL code from %s", conf.Code), 1)
+				utils.Exitf(1, "Failed to load BPL code from %s", conf.Code)
 			}
 		}
 
@@ -54,17 +53,17 @@ var Cmd = &cobra.Command{
 
 		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
-			utils.Exit("Failed to sign transaction", 1)
+			utils.Exit(1, "Failed to sign transaction")
 		}
 
 		client, err := client.New("localhost:5000")
 		if err != nil {
-			utils.Exit("Failed to connect to emulator", 1)
+			utils.Exit(1, "Failed to connect to emulator")
 		}
 
 		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
-			utils.Exit("Failed to send transaction", 1)
+			utils.Exitf(1, "Failed to send transaction: %v", err)
 		}
 	},
 }
