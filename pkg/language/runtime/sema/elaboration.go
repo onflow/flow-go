@@ -27,7 +27,7 @@ type Elaboration struct {
 	EventDeclarationTypes              map[*ast.EventDeclaration]*EventType
 	// NOTE: not indexed by `ast.Type`, as IndexExpression might index
 	//   with "type" which is an expression, i.e., an IdentifierExpression.
-	//   See `Checker.visitStorageIndexingExpression`
+	//   See `Checker.visitTypeIndexingExpression`
 	IndexExpressionIndexingTypes map[*ast.IndexExpression]Type
 }
 
