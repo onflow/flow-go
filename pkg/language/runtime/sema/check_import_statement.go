@@ -6,8 +6,8 @@ import (
 )
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	imports := checker.Program.ImportedPrograms()
 
-	_, imports := checker.Program.Imports()
 	imported := imports[declaration.Location.ID()]
 	if imported == nil {
 		checker.report(
@@ -141,7 +141,7 @@ func (checker *Checker) importValues(
 		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
-			variable.Kind,
+			variable.DeclarationKind,
 			declaration.LocationPos,
 			true,
 			variable.ArgumentLabels,

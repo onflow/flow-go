@@ -150,8 +150,8 @@ func (*TypeMismatchError) isSemanticError() {}
 func (e *TypeMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected `%s`, got `%s`",
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
 }
 
@@ -163,7 +163,10 @@ type NotIndexableTypeError struct {
 }
 
 func (e *NotIndexableTypeError) Error() string {
-	return fmt.Sprintf("cannot index into value which has type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot index into value which has type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotIndexableTypeError) isSemanticError() {}
@@ -178,7 +181,7 @@ type NotIndexingTypeError struct {
 func (e *NotIndexingTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot index with value which has type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
@@ -192,7 +195,10 @@ type NotEquatableTypeError struct {
 }
 
 func (e *NotEquatableTypeError) Error() string {
-	return fmt.Sprintf("cannot compare value which has type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot compare value which has type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotEquatableTypeError) isSemanticError() {}
@@ -205,7 +211,9 @@ type NotCallableError struct {
 }
 
 func (e *NotCallableError) Error() string {
-	return fmt.Sprintf("cannot call type: `%s`", e.Type.String())
+	return fmt.Sprintf("cannot call type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotCallableError) isSemanticError() {}
@@ -281,8 +289,8 @@ func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
 		"cannot apply unary operation %s to type: expected `%s`, got `%s`",
 		e.Operation.Symbol(),
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
 }
 
@@ -303,8 +311,8 @@ func (e *InvalidBinaryOperandError) Error() string {
 		"cannot apply binary operation %s to %s-hand type: expected `%s`, got `%s`",
 		e.Operation.Symbol(),
 		e.Side.Name(),
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
 }
 
@@ -323,8 +331,8 @@ func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
 		"cannot apply binary operation %s to different types: `%s`, `%s`",
 		e.Operation.Symbol(),
-		e.LeftType.String(),
-		e.RightType.String(),
+		e.LeftType,
+		e.RightType,
 	)
 }
 
@@ -447,16 +455,16 @@ func (*InvalidDeclarationError) isSemanticError() {}
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	ContainerTypeIdentifier string
-	FirstFieldName          string
-	FirstFieldPos           ast.Position
+	ContainerType  Type
+	FirstFieldName string
+	FirstFieldPos  ast.Position
 }
 
 func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerTypeIdentifier,
+		e.ContainerType,
 	)
 }
 
@@ -481,7 +489,7 @@ type NotDeclaredMemberError struct {
 func (e *NotDeclaredMemberError) Error() string {
 	return fmt.Sprintf(
 		"value of type `%s` has no member `%s`",
-		e.Type.String(),
+		e.Type,
 		e.Name,
 	)
 }
@@ -513,16 +521,15 @@ func (*AssignmentToConstantMemberError) isSemanticError() {}
 
 type FieldUninitializedError struct {
 	Name          string
-	CompositeType *CompositeType
-	Initializer   *ast.SpecialFunctionDeclaration
+	ContainerType Type
 	Pos           ast.Position
 }
 
 func (e *FieldUninitializedError) Error() string {
 	return fmt.Sprintf(
-		"field `%s` of type `%s` is not initialized",
+		"missing initialization of field `%s` in type `%s`",
 		e.Name,
-		e.CompositeType.Identifier,
+		e.ContainerType,
 	)
 }
 
@@ -562,7 +569,7 @@ type InvalidReturnValueError struct {
 func (e *InvalidReturnValueError) Error() string {
 	return fmt.Sprintf(
 		"invalid return with value from function without %s return type",
-		(&VoidType{}).String(),
+		&VoidType{},
 	)
 }
 
@@ -604,7 +611,7 @@ type InvalidConformanceError struct {
 func (e *InvalidConformanceError) Error() string {
 	return fmt.Sprintf(
 		"cannot conform to non-interface type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
@@ -782,7 +789,7 @@ type UnsupportedTypeError struct {
 func (e *UnsupportedTypeError) Error() string {
 	return fmt.Sprintf(
 		"unsupported type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
@@ -854,7 +861,7 @@ type InvalidIntegerLiteralRangeError struct {
 func (e *InvalidIntegerLiteralRangeError) Error() string {
 	return fmt.Sprintf(
 		"integer literal out of range: expected `%s`, in range [%s, %s]",
-		e.ExpectedType.String(),
+		e.ExpectedType,
 		e.ExpectedRangeMin,
 		e.ExpectedRangeMax,
 	)
@@ -1285,7 +1292,10 @@ type InvalidEventParameterTypeError struct {
 }
 
 func (e *InvalidEventParameterTypeError) Error() string {
-	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"unsupported event parameter type: `%s`",
+		e.Type,
+	)
 }
 
 func (*InvalidEventParameterTypeError) isSemanticError() {}
@@ -1310,7 +1320,10 @@ type EmitNonEventError struct {
 }
 
 func (e *EmitNonEventError) Error() string {
-	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot emit non-event type: `%s`",
+		e.Type,
+	)
 }
 
 func (*EmitNonEventError) isSemanticError() {}
@@ -1342,16 +1355,16 @@ func (*InvalidDestructorError) isSemanticError() {}
 // MissingDestructorError
 
 type MissingDestructorError struct {
-	ContainerTypeIdentifier string
-	FirstFieldName          string
-	FirstFieldPos           ast.Position
+	ContainerType  Type
+	FirstFieldName string
+	FirstFieldPos  ast.Position
 }
 
 func (e *MissingDestructorError) Error() string {
 	return fmt.Sprintf(
 		"missing destructor for resource field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerTypeIdentifier,
+		e.ContainerType,
 	)
 }
 
@@ -1409,5 +1422,67 @@ func (e *ResourceFieldNotInvalidatedError) StartPosition() ast.Position {
 
 func (e *ResourceFieldNotInvalidatedError) EndPosition() ast.Position {
 	length := len(e.FieldName)
+	return e.Pos.Shifted(length - 1)
+}
+
+// UninitializedFieldAccessError
+
+type UninitializedFieldAccessError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *UninitializedFieldAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access uninitialized field: `%s`",
+		e.Name,
+	)
+}
+
+func (*UninitializedFieldAccessError) isSemanticError() {}
+
+func (e *UninitializedFieldAccessError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UninitializedFieldAccessError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// UnreachableStatementError
+
+type UnreachableStatementError struct {
+	ast.Range
+}
+
+func (e *UnreachableStatementError) Error() string {
+	return "unreachable statement"
+}
+
+func (*UnreachableStatementError) isSemanticError() {}
+
+// UninitializedUseError
+
+type UninitializedUseError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *UninitializedUseError) Error() string {
+	return fmt.Sprintf(
+		"cannot use incompletely initialized value: `%s`",
+		e.Name,
+	)
+}
+
+func (*UninitializedUseError) isSemanticError() {}
+
+func (e *UninitializedUseError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UninitializedUseError) EndPosition() ast.Position {
+	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }

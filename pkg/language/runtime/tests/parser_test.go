@@ -4442,12 +4442,10 @@ func TestParseImportWithString(t *testing.T) {
 
 	importLocation := StringImportLocation("test.bpl")
 
-	_, actualImports := actual.Imports()
+	actualImports := actual.ImportedPrograms()
 
 	assert.Equal(t,
-		map[LocationID]*Program{
-			importLocation.ID(): nil,
-		},
+		map[LocationID]*Program{},
 		actualImports,
 	)
 
@@ -4487,12 +4485,10 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	importLocation := AddressImportLocation([]byte{18, 52})
 
-	_, actualImports := actual.Imports()
+	actualImports := actual.ImportedPrograms()
 
 	assert.Equal(t,
-		map[LocationID]*Program{
-			importLocation.ID(): nil,
-		},
+		map[LocationID]*Program{},
 		actualImports,
 	)
 
@@ -4573,7 +4569,7 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 
 	_, _, err := parser.ParseProgram(`
         import from from 0x0;
-        fun foo() {}; 
+        fun foo() {};
 	`)
 
 	assert.Nil(t, err)

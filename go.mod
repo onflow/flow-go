@@ -13,14 +13,12 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
-	github.com/google/uuid v1.1.1
 	github.com/google/wire v0.3.0
 	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/kr/pty v1.1.3 // indirect
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
-	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/pkg/errors v0.8.1
@@ -41,8 +39,6 @@ require (
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/text v0.3.2
 	google.golang.org/grpc v1.21.1
-	gopkg.in/myesui/uuid.v1 v1.0.0
-	gotest.tools v2.2.0+incompatible // indirect
 	mellium.im/sasl v0.2.1 // indirect
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )

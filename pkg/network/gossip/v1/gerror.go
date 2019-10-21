@@ -26,4 +26,5 @@ func (g *gossipError) Error() string {
 
 var (
 	ErrTimedOut = errors.New("request timed out")
+	ErrInternal = errors.New("gnode internal error")
 )

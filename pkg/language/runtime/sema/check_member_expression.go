@@ -2,11 +2,45 @@ package sema
 
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
+// NOTE: only called if the member expression is *not* an assignment
+//
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	member := checker.visitMember(expression)
 
 	if member == nil {
 		return &InvalidType{}
+	}
+
+	selfFieldMember := checker.selfFieldAccessMember(expression)
+	if selfFieldMember != nil {
+
+		functionActivation := checker.functionActivations.Current()
+
+		// Prevent an access to a field before it was initialized.
+		//
+		// If this is not an assignment to a `self` member, and the member is a field
+		// which must be initialized, ensure the field has been initialized.
+		//
+		// An access of a member which is not a field / which must not be initialized, is safe
+		// (e.g. a composite function call)
+
+		info := functionActivation.InitializationInfo
+		isInInitializer := info != nil
+
+		if isInInitializer {
+			fieldInitialized := info.InitializedFieldMembers.Contains(selfFieldMember)
+
+			field := info.FieldMembers[selfFieldMember]
+			if field != nil && !fieldInitialized {
+
+				checker.report(
+					&UninitializedFieldAccessError{
+						Name: field.Identifier.Identifier,
+						Pos:  field.Identifier.Pos,
+					},
+				)
+			}
+		}
 	}
 
 	return member.Type
@@ -20,15 +54,33 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 
 	accessedExpression := expression.Expression
 
-	expressionType := accessedExpression.Accept(checker).(Type)
+	var expressionType Type
+
+	func() {
+		previousMemberExpression := checker.currentMemberExpression
+		checker.currentMemberExpression = expression
+		defer func() {
+			checker.currentMemberExpression = previousMemberExpression
+		}()
+
+		expressionType = accessedExpression.Accept(checker).(Type)
+	}()
 
 	checker.checkAccessResourceLoss(expressionType, accessedExpression)
 
-	selfFieldAccessMember := checker.selfFieldAccessMember(expression)
-	if selfFieldAccessMember != nil {
-		// NOTE: capturing is already handled by access to self
-		checker.checkResourceUseAfterInvalidation(selfFieldAccessMember, expression.Identifier)
-		checker.resources.AddUse(selfFieldAccessMember, expression.Identifier.Pos)
+	// If the the access is to a member of `self` and a resource,
+	// its use must be recorded/checked, so that it isn't used after it was invalidated
+
+	selfFieldMember := checker.selfFieldAccessMember(expression)
+	if selfFieldMember != nil &&
+		selfFieldMember.Type.IsResourceType() {
+
+		// NOTE: Preventing the capturing of the resource field is already implicitly handled:
+		// By definition, the resource field can only be nested in a resource,
+		// so `self` is a resource, and the capture of it is checked separately
+
+		checker.checkResourceUseAfterInvalidation(selfFieldMember, expression.Identifier)
+		checker.resources.AddUse(selfFieldMember, expression.Identifier.Pos)
 	}
 
 	origins := checker.memberOrigins[expressionType]

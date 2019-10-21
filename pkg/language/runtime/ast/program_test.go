@@ -35,14 +35,14 @@ func TestProgram_ResolveImports(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	_, importsA := a.Imports()
+	importsA := a.ImportedPrograms()
 
 	actual := importsA[StringImportLocation("b").ID()]
 	if actual != b {
 		assert.Fail(t, "not b", actual)
 	}
 
-	_, importsB := b.Imports()
+	importsB := b.ImportedPrograms()
 
 	actual = importsB[StringImportLocation("c").ID()]
 	if actual != c {

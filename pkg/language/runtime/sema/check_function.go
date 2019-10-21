@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/exit_detector"
 )
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
@@ -53,6 +52,7 @@ func (checker *Checker) visitFunctionDeclaration(
 		functionType,
 		declaration.FunctionBlock,
 		options.mustExit,
+		nil,
 	)
 
 	return nil
@@ -95,6 +95,7 @@ func (checker *Checker) checkFunction(
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
+	initializationInfo *InitializationInfo,
 ) {
 	// check argument labels
 	checker.checkArgumentLabels(parameterList)
@@ -117,26 +118,49 @@ func (checker *Checker) checkFunction(
 
 				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
 
+				functionActivation := checker.functionActivations.Current()
+				functionActivation.InitializationInfo = initializationInfo
+
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,
 				)
+
+				if mustExit {
+					returnType := functionType.ReturnTypeAnnotation.Type
+					checker.checkFunctionExits(functionBlock, returnType)
+				}
+
+				if initializationInfo != nil {
+					checker.checkFieldMembersInitialized(initializationInfo)
+				}
 			},
 		)
-
-		if _, returnTypeIsVoid := functionType.ReturnTypeAnnotation.Type.(*VoidType); !returnTypeIsVoid {
-			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
-				checker.report(
-					&MissingReturnStatementError{
-						Range: ast.Range{
-							StartPos: functionBlock.StartPosition(),
-							EndPos:   functionBlock.EndPosition(),
-						},
-					},
-				)
-			}
-		}
 	}
+}
+
+// checkFunctionExits checks that the given function block exits
+// with a return-type appropriate return statement.
+// The return is not needed if the function has a `Void` return type.
+//
+func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, returnType Type) {
+	if _, returnTypeIsVoid := returnType.(*VoidType); returnTypeIsVoid {
+		return
+	}
+
+	functionActivation := checker.functionActivations.Current()
+	if functionActivation.ReturnInfo.DefinitelyReturned {
+		return
+	}
+
+	checker.report(
+		&MissingReturnStatementError{
+			Range: ast.Range{
+				StartPos: functionBlock.StartPosition(),
+				EndPos:   functionBlock.EndPosition(),
+			},
+		},
+	)
 }
 
 func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
@@ -234,12 +258,12 @@ func (checker *Checker) declareParameters(
 		parameterType := parameterTypeAnnotation.Type
 
 		variable := &Variable{
-			Identifier: identifier.Identifier,
-			Kind:       common.DeclarationKindParameter,
-			IsConstant: true,
-			Type:       parameterType,
-			Depth:      depth,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: common.DeclarationKindParameter,
+			IsConstant:      true,
+			Type:            parameterType,
+			Depth:           depth,
+			Pos:             &identifier.Pos,
 		}
 		checker.valueActivations.Set(identifier.Identifier, variable)
 		checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
@@ -314,6 +338,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		functionType,
 		expression.FunctionBlock,
 		true,
+		nil,
 	)
 
 	// function expressions are not allowed in conditions
@@ -330,4 +355,24 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	}
 
 	return functionType
+}
+
+// checkFieldMembersInitialized checks that all fields that were required
+// to be initialized (as stated in the initialization info) have been initialized.
+//
+func (checker *Checker) checkFieldMembersInitialized(info *InitializationInfo) {
+	for member, field := range info.FieldMembers {
+		isInitialized := info.InitializedFieldMembers.Contains(member)
+		if isInitialized {
+			continue
+		}
+
+		checker.report(
+			&FieldUninitializedError{
+				Name:          field.Identifier.Identifier,
+				Pos:           field.Identifier.Pos,
+				ContainerType: info.ContainerType,
+			},
+		)
+	}
 }

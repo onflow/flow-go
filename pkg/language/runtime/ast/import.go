@@ -56,6 +56,7 @@ func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 
 type ImportLocation interface {
 	isImportLocation()
+	// ID returns the canonical ID for this import location.
 	ID() LocationID
 }
 
