@@ -83,6 +83,27 @@ func TestSha2_256(t *testing.T) {
 	checkBytes(t, input, expected, hash)
 }
 
+// Sanity checks of SHA2_256
+func TestSha2_384(t *testing.T) {
+	input := []byte("test")
+	expected, _ := hex.DecodeString("768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9")
+
+	alg, err := NewHasher(SHA2_384)
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	hash := alg.ComputeHash(input)
+	checkBytes(t, input, expected, hash)
+
+	alg.Reset()
+	alg.Add([]byte("te"))
+	alg.Add([]byte("s"))
+	alg.Add([]byte("t"))
+	hash = alg.SumHash()
+	checkBytes(t, input, expected, hash)
+}
+
 // SHA3_256 bench
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
@@ -108,6 +129,16 @@ func BenchmarkSha3_384(b *testing.B) {
 func BenchmarkSha2_256(b *testing.B) {
 	a := []byte("Bench me!")
 	alg, _ := NewHasher(SHA2_256)
+	for i := 0; i < b.N; i++ {
+		alg.ComputeHash(a)
+	}
+	return
+}
+
+// SHA2_256 bench
+func BenchmarkSha2_384(b *testing.B) {
+	a := []byte("Bench me!")
+	alg, _ := NewHasher(SHA2_384)
 	for i := 0; i < b.N; i++ {
 		alg.ComputeHash(a)
 	}
