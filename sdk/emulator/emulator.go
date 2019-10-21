@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -505,8 +504,6 @@ func mergeOptions(optA, optB EmulatedBlockchainOptions) EmulatedBlockchainOption
 	if optB.OnEventEmitted == nil {
 		optB.OnEventEmitted = optA.OnEventEmitted
 	}
-
-	fmt.Println("OPTIONS!", optB)
 
 	return optB
 }
