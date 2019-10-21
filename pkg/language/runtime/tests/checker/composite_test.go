@@ -53,7 +53,7 @@ func TestCheckComposite(t *testing.T) {
                       return self.foo
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -79,7 +79,7 @@ func TestCheckInitializerName(t *testing.T) {
               %s Test {
                   init() {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -105,7 +105,7 @@ func TestCheckDestructor(t *testing.T) {
               %s Test {
                   destroy() {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -148,7 +148,7 @@ func TestCheckInvalidUnknownSpecialFunction(t *testing.T) {
                       %[1]s %[2]s Test {
                           initializer() {}
                       }
-	                `,
+                    `,
 					kind.Keyword(),
 					interfaceKeyword,
 				))
@@ -193,7 +193,7 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
                           let init: Int
                           let destroy: Bool
                       }
-	                `,
+                    `,
 					kind.Keyword(),
 					interfaceKeyword,
 				))
@@ -267,7 +267,7 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
                           fun init() %[3]s
                           fun destroy() %[3]s
                       }
-	                `,
+                    `,
 					kind.Keyword(),
 					interfaceKeyword,
 					body,
@@ -305,7 +305,7 @@ func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
                   let x: Int
                   let x: Int
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -340,7 +340,7 @@ func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
                   fun x() {}
                   fun x() {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -374,7 +374,7 @@ func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
                   let x: Int
                   fun x() {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -414,7 +414,7 @@ func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 
                   fun y() {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -439,7 +439,7 @@ func TestCheckInvalidCompositeFieldType(t *testing.T) {
               %s Test {
                   let x: X
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -473,7 +473,7 @@ func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
               %s Test {
                   init(x: X) {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -506,7 +506,7 @@ func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
               %s Test {
                   init(x: Int, x: Int) {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -540,7 +540,7 @@ func TestCheckInvalidCompositeSpecialFunction(t *testing.T) {
                   init() { X }
                   destroy() { Y }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -579,7 +579,7 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
               %s Test {
                   fun test() { X }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -613,7 +613,7 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
                   init() { self }
                   destroy() { self }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -650,7 +650,7 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
               %s Test {
                   fun test() { self }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -729,13 +729,13 @@ func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 func TestCheckInvalidResourceMissingDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-	   resource Test {
+       resource Test {
            let test: <-Test
            init(test: <-Test) {
                self.test <- test
            }
-	   }
-	`)
+       }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -745,7 +745,7 @@ func TestCheckInvalidResourceMissingDestructor(t *testing.T) {
 func TestCheckResourceWithDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-	   resource Test {
+       resource Test {
            let test: <-Test
 
            init(test: <-Test) {
@@ -755,8 +755,8 @@ func TestCheckResourceWithDestructor(t *testing.T) {
            destroy() {
                destroy self.test
            }
-	   }
-	`)
+       }
+    `)
 
 	assert.Nil(t, err)
 }
@@ -793,14 +793,14 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
 			}
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-	               resource %[1]s Test {
+                   resource %[1]s Test {
                        let test: Test
 
                        init(test: <-Test) %[2]s
 
                        destroy() %[3]s
-	               }
-	            `,
+                   }
+                `,
 				interfaceKeyword,
 				initializerBody,
 				destructorBody,
@@ -862,7 +862,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
                       self.bar
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -916,7 +916,7 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
                       alsoSelf.foo = 4
                   }
               }
-	        `,
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 			))
@@ -1001,7 +1001,7 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
                       self %[2]s %[3]s Test()
                   }
               }
-	        `,
+            `,
 				testCase.compositeKind.Keyword(),
 				testCase.compositeKind.TransferOperator(),
 				testCase.compositeKind.ConstructionKeyword(),
@@ -1027,7 +1027,7 @@ func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
                       self.bar = 2
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1077,7 +1077,7 @@ func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
                       self.foo = false
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1121,7 +1121,7 @@ func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
                       self.foo = 2
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1158,7 +1158,7 @@ func TestCheckCompositeFunctionCall(t *testing.T) {
                       self.foo()
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1188,7 +1188,7 @@ func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
                       self.baz()
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1225,7 +1225,7 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
                       self.foo = 2
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1275,7 +1275,7 @@ func TestCheckCompositeInstantiation(t *testing.T) {
               }
 
               let test: %[2]sTest %[3]s %[4]s Test(x: 3)
-    	    `,
+            `,
 				kind.Keyword(),
 				kind.Annotation(),
 				kind.TransferOperator(),
@@ -1306,7 +1306,7 @@ func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
               let x = 1
               %[1]s Foo {}
               %[1]s Foo {}
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1371,7 +1371,7 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
                   let x = 1
                   %[1]s Foo {}
                   %[2]s Foo {}
-	            `,
+                `,
 					firstKind.Keyword(),
 					secondKind.Keyword(),
 				))
@@ -1393,7 +1393,7 @@ func TestCheckInvalidForwardReference(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       let x = y
       let y = x
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1439,7 +1439,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
                   }
 
                   let foo: %[3]sFoo %[4]s %[5]s Bar()
-    	        `,
+                `,
 					firstKind.Keyword(),
 					secondKind.Keyword(),
 					firstKind.Annotation(),
@@ -1464,7 +1464,7 @@ func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
               %s Foo {
                   fun test(self: Int) {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1497,7 +1497,7 @@ func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
               %s Foo {
                   init(self: Int) {}
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1535,8 +1535,8 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
                   }
               }
 
-	          let test %[2]s %[3]s Test()
-	        `,
+              let test %[2]s %[3]s Test()
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -1568,8 +1568,8 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
                   init(x: Int) {}
               }
 
-	          let test %[2]s %[3]s Test(x: 1)
-	        `,
+              let test %[2]s %[3]s Test(x: 1)
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -1601,8 +1601,8 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
                   init(x: Int) {}
               }
 
-	          let test %[2]s %[3]s Test(1)
-	        `,
+              let test %[2]s %[3]s Test(1)
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -1638,8 +1638,8 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
               }
 
               let test %[2]s %[3]s Test()
-	          let void = test.test(x: 1)
-	        `,
+              let void = test.test(x: 1)
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -1667,13 +1667,13 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s Test {
-    
+
                   fun test(x: Int) {}
               }
-    
+
               let test %[2]s %[3]s Test()
-	          let void = test.test(1)
-	        `,
+              let void = test.test(1)
+            `,
 				kind.Keyword(),
 				kind.TransferOperator(),
 				kind.ConstructionKeyword(),
@@ -1780,7 +1780,7 @@ func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
                       self.x = x
                   }
               }
-	        `, kind.Keyword()))
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1815,7 +1815,7 @@ func TestCheckCompositeFunction(t *testing.T) {
                       return %[2]s self
                   }
               }
-	        `, kind.Keyword(), kind.Annotation()))
+            `, kind.Keyword(), kind.Annotation()))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -1892,7 +1892,7 @@ func TestCheckInvalidDestructorParameters(t *testing.T) {
                   resource %[1]s Test {
                       destroy(x: Int) %[2]s
                   }
-	            `,
+                `,
 				interfaceKeyword,
 				destructorBody,
 			))
@@ -1907,7 +1907,7 @@ func TestCheckInvalidDestructorParameters(t *testing.T) {
 func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-	   resource Test {
+       resource Test {
            let test: <-Test
 
            init(test: <-Test) {
@@ -1915,8 +1915,8 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
            }
 
            destroy() {}
-	   }
-	`)
+       }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1926,7 +1926,7 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-	   resource Test {
+       resource Test {
            let test: <-Test
 
            init(test: <-Test) {
@@ -1938,8 +1938,8 @@ func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t 
                    destroy self.test
                }
            }
-	   }
-	`)
+       }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1951,7 +1951,7 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
 	_, err := ParseAndCheck(t, `
        struct S {}
 
-	   resource Test {
+       resource Test {
            let s: S
 
            init(s: S) {
@@ -1959,8 +1959,8 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
            }
 
            destroy() {}
-	   }
-	`)
+       }
+    `)
 
 	assert.Nil(t, err)
 }
@@ -1968,7 +1968,7 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
 func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-	   resource Test {
+       resource Test {
            let test: <-Test
 
            init(test: <-Test) {
@@ -1979,12 +1979,12 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
                absorb(<-self.test)
                absorb(<-self.test)
            }
-	   }
+       }
 
        fun absorb(_ test: <-Test) {
            destroy test
        }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -2018,7 +2018,7 @@ func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 	_, err := ParseAndCheck(t, `
        var duplicate: ((): <-Test)? = nil
 
-	   resource Test {
+       resource Test {
            let test: <-Test
 
            init(test: <-Test) {
@@ -2030,8 +2030,8 @@ func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
                    return <-self.test
                }
            }
-	   }
-	`)
+       }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

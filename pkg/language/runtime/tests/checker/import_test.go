@@ -44,10 +44,10 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 func TestCheckImportAll(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-	   fun answer(): Int {
-	       return 42
-		}
-	`)
+       fun answer(): Int {
+           return 42
+        }
+    `)
 
 	assert.Nil(t, err)
 
@@ -71,7 +71,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
        let x = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
@@ -96,12 +96,12 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 func TestCheckImportSome(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-	   fun answer(): Int {
-	       return 42
+       fun answer(): Int {
+           return 42
        }
 
        let x = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
@@ -128,7 +128,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 	imported, _, err := parser.ParseProgram(`
        let x: Bool = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
@@ -154,8 +154,8 @@ func TestCheckImportTypes(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-	           %s Test {}
-	        `, kind.Keyword()))
+               %s Test {}
+            `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
 

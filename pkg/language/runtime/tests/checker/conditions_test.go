@@ -18,7 +18,7 @@ func TestCheckFunctionConditions(t *testing.T) {
               x == 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -34,7 +34,7 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
               z == 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -62,7 +62,7 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
               2
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -79,7 +79,7 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
               before(x) != 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -92,7 +92,7 @@ func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) 
               before() != 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -110,7 +110,7 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
               before(x) != 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -130,7 +130,7 @@ func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *tes
           }
           let before = 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -143,7 +143,7 @@ func TestCheckFunctionWithBeforeVariable(t *testing.T) {
       fun test(x: Int) {
           let before = 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -158,7 +158,7 @@ func TestCheckFunctionPostCondition(t *testing.T) {
           let y = x
           return y
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -172,7 +172,7 @@ func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -192,7 +192,7 @@ func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -208,7 +208,7 @@ func TestCheckFunctionPostConditionWithResult(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -221,7 +221,7 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
               result == 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -241,7 +241,7 @@ func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(
           }
           let result = 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -254,7 +254,7 @@ func TestCheckFunctionWithoutReturnTypeAndResultParameterAndPostConditionWithRes
               result == 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -269,7 +269,7 @@ func TestCheckInvalidFunctionWithReturnTypeAndLocalResultAndPostConditionWithRes
           let result = 1
           return result * 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -286,7 +286,7 @@ func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult
           }
           return result * 2
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -299,7 +299,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
               (fun (): Int { return 2 })() == 2
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -314,7 +314,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
              1 == 2: "nope"
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -327,7 +327,7 @@ func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *test
              1 == 2: true
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -343,7 +343,7 @@ func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
           }
           return ""
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -356,7 +356,7 @@ func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
              1 == 2: before(x)
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -369,7 +369,7 @@ func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
              1 == 2: x
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }

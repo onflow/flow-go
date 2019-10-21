@@ -26,7 +26,7 @@ func TestCheckStorageIndexing(t *testing.T) {
           let b = storage[Bool]
           let c = storage[[Int]]
           let d = storage[{String: Int}]
-	    `,
+        `,
 		storageValueDeclaration,
 		nil,
 		nil,
@@ -76,7 +76,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
               storage[Int] = 1
               storage[Bool] = true
           }
-	    `,
+        `,
 		storageValueDeclaration,
 		nil,
 		nil,
@@ -93,7 +93,7 @@ func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
               storage[Int] = "1"
               storage[Bool] = 1
           }
-	    `,
+        `,
 		storageValueDeclaration,
 		nil,
 		nil,
@@ -112,7 +112,7 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
           fun test() {
               storage["1"] = "1"
           }
-	    `,
+        `,
 		storageValueDeclaration,
 		nil,
 		nil,
@@ -128,7 +128,7 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 	_, err := ParseAndCheckWithExtra(t,
 		`
           let x = storage["1"]
-	    `,
+        `,
 		storageValueDeclaration,
 		nil,
 		nil,
