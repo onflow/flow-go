@@ -20,4 +20,9 @@ FROM gcr.io/distroless/base
 
 COPY --from=build-env /build/app /bin/app
 
-ENTRYPOINT ["/bin/app"]
+# Export HTTP and GRPC ports
+EXPOSE 8000
+EXPOSE 9090
+
+# Start the emulator and initialize project config by generating a root key.
+ENTRYPOINT ["/bin/app", "emulator", "start", "--init"]
