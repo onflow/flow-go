@@ -172,6 +172,7 @@ func (checker *Checker) visitIndexingExpression(
 		checker.checkAccessResourceLoss(result, targetExpression)
 	}()
 
+	// TODO: generalize to e.g. `TypeIndexable`
 	_, isStorage := indexedType.(*StorageType)
 	if isStorage {
 
@@ -200,7 +201,7 @@ func (checker *Checker) visitIndexingExpression(
 			}
 		}
 
-		return checker.visitStorageIndexingExpression(
+		return checker.visitTypeIndexingExpression(
 			indexExpression,
 			indexingType,
 			isAssignment,
@@ -220,7 +221,7 @@ func (checker *Checker) visitIndexingExpression(
 			return &InvalidType{}
 		}
 
-		return checker.visitNormalIndexingExpression(
+		return checker.visitValueIndexingExpression(
 			targetExpression,
 			indexedType,
 			indexExpression.IndexingExpression,
@@ -229,7 +230,7 @@ func (checker *Checker) visitIndexingExpression(
 	}
 }
 
-func (checker *Checker) visitNormalIndexingExpression(
+func (checker *Checker) visitValueIndexingExpression(
 	indexedExpression ast.Expression,
 	indexedType Type,
 	indexingExpression ast.Expression,
@@ -274,7 +275,7 @@ func (checker *Checker) visitNormalIndexingExpression(
 	return elementType
 }
 
-func (checker *Checker) visitStorageIndexingExpression(
+func (checker *Checker) visitTypeIndexingExpression(
 	indexExpression *ast.IndexExpression,
 	indexingType ast.Type,
 	isAssignment bool,
