@@ -1,4 +1,4 @@
-package emulator_test
+package emulator
 
 import (
 	"math/big"
@@ -6,12 +6,29 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
+// addTwoScript runs a script that adds 2 to a value.
+const addTwoScript = `
+	fun main(account: Account) {
+		let controller = [1]
+		let owner = [2]
+		let key = [3]
+		let value = getValue(controller, owner, key)
+		setValue(controller, owner, key, value + 2)
+	}
+`
+
+const sampleCall = `
+	fun main(): Int {
+		return getValue([1], [2], [3])
+	}
+`
+
 func TestWorldStates(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
 	tx1 := &types.Transaction{
@@ -134,7 +151,7 @@ func TestWorldStates(t *testing.T) {
 }
 
 func TestQueryByVersion(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := NewEmulatedBlockchain(DefaultOptions)
 
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
@@ -174,12 +191,12 @@ func TestQueryByVersion(t *testing.T) {
 
 	// Get transaction at invalid world state version (errors)
 	tx, err := b.GetTransactionAtVersion(tx1.Hash(), invalidWorldState)
-	assert.IsType(t, err, &emulator.ErrInvalidStateVersion{})
+	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, tx)
 
 	// tx1 does not exist at ws1
 	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
-	assert.IsType(t, err, &emulator.ErrTransactionNotFound{})
+	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx1 does exist at ws2
@@ -189,7 +206,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx2 does not exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
-	assert.IsType(t, err, &emulator.ErrTransactionNotFound{})
+	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx2 does exist at ws3
@@ -199,7 +216,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// Call script at invalid world state version (errors)
 	value, err := b.CallScriptAtVersion([]byte(sampleCall), invalidWorldState)
-	assert.IsType(t, err, &emulator.ErrInvalidStateVersion{})
+	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, value)
 
 	// Value at ws1 is 0
