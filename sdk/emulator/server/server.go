@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -75,11 +75,12 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}
 
 	address := server.backend.blockchain.RootAccountAddress()
-	prKey, _ := utils.EncodePrivateKey(server.backend.blockchain.RootKey())
+	prKey := server.backend.blockchain.RootKey()
+	prKeyBytes, _ := prKey.Encode()
 
 	logger.WithFields(log.Fields{
 		"address": address.Hex(),
-		"prKey":   prKey,
+		"prKey":   hex.EncodeToString(prKeyBytes),
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
 	observe.RegisterObserveServiceServer(server.grpcServer, server.backend)
