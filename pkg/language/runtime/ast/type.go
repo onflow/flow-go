@@ -128,3 +128,24 @@ func (t *FunctionType) String() string {
 
 	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnTypeAnnotation.String())
 }
+
+// ReferenceType
+
+type ReferenceType struct {
+	Type     Type
+	StartPos Position
+}
+
+func (*ReferenceType) isType() {}
+
+func (t *ReferenceType) String() string {
+	return fmt.Sprintf("&%s", t.Type)
+}
+
+func (t *ReferenceType) StartPosition() Position {
+	return t.StartPos
+}
+
+func (t *ReferenceType) EndPosition() Position {
+	return t.Type.EndPosition()
+}

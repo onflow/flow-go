@@ -2,9 +2,10 @@ package tests
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -5649,4 +5650,72 @@ func TestParseDestructor(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, actual)
+}
+
+func TestParseReferenceType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: &[&R] = 1
+	`)
+
+	assert.Nil(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					Move: false,
+					Type: &ReferenceType{
+						Type: &VariableSizedType{
+							Type: &ReferenceType{
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "R",
+										Pos:        Position{Offset: 18, Line: 2, Column: 17},
+									},
+								},
+								StartPos: Position{Offset: 17, Line: 2, Column: 16},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 16, Line: 2, Column: 15},
+								EndPos:   Position{Offset: 19, Line: 2, Column: 18},
+							},
+						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 21, Line: 2, Column: 20},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Range: Range{
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseInvalidReferenceToOptionalType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: &R? = 1
+	`)
+
+	assert.Nil(t, actual)
+
+	assert.IsType(t, parser.Error{}, err)
 }
