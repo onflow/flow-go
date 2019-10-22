@@ -69,3 +69,7 @@ lint:
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint test
+
+.PHONY: docker-build-emulator
+docker-build-emulator:
+	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(git rev-parse --short HEAD)" .
