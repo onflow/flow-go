@@ -19,3 +19,6 @@ For example, to run the emulator on port 9001 in verbose mode:
 ```bash
 docker run -e BAM_PORT=9001 -e BAM_VERBOSE=true gcr.io/dl-flow/emulator
 ```
+
+## Building
+To build the container locally, use `make docker-build-emulator`.
