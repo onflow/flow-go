@@ -5007,7 +5007,9 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "from",
 					Value:      interpreter.NewIntValue(2),
 				},
-			}},
+			},
+			nil,
+		},
 		{
 			"Transfer",
 			[]interpreter.EventField{
@@ -5019,7 +5021,9 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "from",
 					Value:      interpreter.NewIntValue(4),
 				},
-			}},
+			},
+			nil,
+		},
 		{
 			"TransferAmount",
 			[]interpreter.EventField{
@@ -5035,7 +5039,9 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "amount",
 					Value:      interpreter.NewIntValue(100),
 				},
-			}},
+			},
+			nil,
+		},
 	}
 
 	assert.Equal(t, expectedEvents, actualEvents)

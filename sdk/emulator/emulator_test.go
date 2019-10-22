@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -488,7 +489,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MultipleAccounts", func(t *testing.T) {
 		loggedMessages := make([]string, 0)
 
-		b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
 			OnLogMessage: func(msg string) {
 				loggedMessages = append(loggedMessages, msg)
 			},
@@ -1096,7 +1097,7 @@ func TestQueryByVersion(t *testing.T) {
 func TestRuntimeLogger(t *testing.T) {
 	loggedMessages := make([]string, 0)
 
-	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
+	b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
 		OnLogMessage: func(msg string) {
 			loggedMessages = append(loggedMessages, msg)
 		},
@@ -1114,37 +1115,124 @@ func TestRuntimeLogger(t *testing.T) {
 }
 
 func TestEventEmitted(t *testing.T) {
-	events := make([]types.Event, 0)
+	t.Run("EmittedFromTransaction", func(t *testing.T) {
+		events := make([]types.Event, 0)
 
-	b := NewEmulatedBlockchain(&EmulatedBlockchainOptions{
-		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-			events = append(events, event)
-		},
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
+
+		script := []byte(`
+			event MyEvent(x: Int, y: Int)
+			
+			fun main() {
+			  emit MyEvent(x: 1, y: 2)
+			}
+		`)
+
+		tx := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err := b.SubmitTransaction(tx)
+		assert.Nil(t, err)
+
+		require.Len(t, events, 1)
+
+		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 	})
 
-	script := []byte(`
-		event MyEvent(x: Int, y: Int)
+	t.Run("EmittedFromScript", func(t *testing.T) {
+		events := make([]types.Event, 0)
 
-		fun main() {
-		  emit MyEvent(x: 1, y: 2)
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
+
+		script := []byte(`
+			event MyEvent(x: Int, y: Int)
+			
+			fun main() {
+			  emit MyEvent(x: 1, y: 2)
+			}
+		`)
+
+		_, err := b.CallScript(script)
+		assert.Nil(t, err)
+
+		require.Len(t, events, 1)
+
+		expectedID := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+	})
+
+	t.Run("EmittedFromAccount", func(t *testing.T) {
+		events := make([]types.Event, 0)
+
+		b := NewEmulatedBlockchain(EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				events = append(events, event)
+			},
+		})
+
+		accountScript := []byte(`
+			event MyEvent(x: Int, y: Int)
+		`)
+
+		publicKeyA, _ := b.RootKey().Publickey().Encode()
+
+		accountKeyA := types.AccountKey{
+			PublicKey: publicKeyA,
+			Weight:    constants.AccountKeyWeightThreshold,
 		}
-	`)
 
-	tx := &types.Transaction{
-		Script:             script,
-		ReferenceBlockHash: nil,
-		Nonce:              getNonce(),
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-	}
+		addressA, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript, getNonce())
+		assert.Nil(t, err)
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		script := []byte(fmt.Sprintf(`
+			import 0x%s
+			
+			fun main() {
+				emit MyEvent(x: 1, y: 2)
+			}
+		`, addressA.Hex()))
 
-	err := b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+		tx := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
 
-	require.Len(t, events, 1)
-	assert.Equal(t, "MyEvent", events[0].ID)
-	assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-	assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err = b.SubmitTransaction(tx)
+		assert.Nil(t, err)
+
+		require.Len(t, events, 1)
+
+		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
+
+		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
+		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+	})
 }

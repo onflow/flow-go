@@ -72,7 +72,12 @@ type Runtime interface {
 	// ExecuteScript executes the given script.
 	// It returns errors if the program has errors (e.g syntax errors, type errors),
 	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error)
+	ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error)
+
+	// ExecuteTransaction executes the given transaction.
+	// It returns errors if the program has errors (e.g syntax errors, type errors),
+	// and if the execution fails.
+	ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error
 }
 
 // mockRuntime is a mocked version of the Flow runtime
@@ -83,8 +88,12 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
 	return nil, nil
+}
+
+func (r *mockRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
+	return nil
 }
 
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
@@ -278,15 +287,41 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 		values[field.Identifier] = value.ToGoValue()
 	}
 
+	var eventID string
+
+	switch location := eventValue.ImportLocation.(type) {
+	case ast.AddressImportLocation:
+		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
+	case ast.TransactionImportLocation:
+		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
+	case ast.ScriptImportLocation:
+		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
+	default:
+		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
+	}
+
 	event := types.Event{
-		ID:     eventValue.ID,
+		ID:     eventID,
 		Values: values,
 	}
 
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
+func (r *interpreterRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
+	_, err := r.executeScript(script, runtimeInterface, ast.TransactionImportLocation(txID))
+	return err
+}
+
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
+	return r.executeScript(script, runtimeInterface, ast.ScriptImportLocation(scriptID))
+}
+
+func (r *interpreterRuntime) executeScript(
+	script []byte,
+	runtimeInterface Interface,
+	location ast.ImportLocation,
+) (interface{}, error) {
 	program, err := r.parse(script, runtimeInterface)
 	if err != nil {
 		return nil, err
@@ -357,6 +392,8 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
+
+	inter.ImportLocation = location
 
 	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
 		r.emitEvent(eventValue, runtimeInterface)

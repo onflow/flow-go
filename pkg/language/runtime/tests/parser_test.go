@@ -4440,20 +4440,22 @@ func TestParseImportWithString(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 
+	importLocation := StringImportLocation("test.bpl")
+
+	actualImports := actual.ImportedPrograms()
+
 	assert.Equal(t,
-		map[ImportLocation]*Program{
-			StringImportLocation("test.bpl"): nil,
-		},
-		actual.Imports(),
+		map[LocationID]*Program{},
+		actualImports,
 	)
 
-	actual.Imports()[StringImportLocation("test.bpl")] = &Program{}
+	actualImports[importLocation.ID()] = &Program{}
 
 	assert.Equal(t,
-		map[ImportLocation]*Program{
-			StringImportLocation("test.bpl"): {},
+		map[LocationID]*Program{
+			importLocation.ID(): &Program{},
 		},
-		actual.Imports(),
+		actualImports,
 	)
 }
 
@@ -4481,20 +4483,22 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 
+	importLocation := AddressImportLocation([]byte{18, 52})
+
+	actualImports := actual.ImportedPrograms()
+
 	assert.Equal(t,
-		map[ImportLocation]*Program{
-			AddressImportLocation([]byte{18, 52}): nil,
-		},
-		actual.Imports(),
+		map[LocationID]*Program{},
+		actualImports,
 	)
 
-	actual.Imports()[AddressImportLocation([]byte{18, 52})] = &Program{}
+	actualImports[importLocation.ID()] = &Program{}
 
 	assert.Equal(t,
-		map[ImportLocation]*Program{
-			AddressImportLocation([]byte{18, 52}): {},
+		map[LocationID]*Program{
+			importLocation.ID(): &Program{},
 		},
-		actual.Imports(),
+		actualImports,
 	)
 }
 

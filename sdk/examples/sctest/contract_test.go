@@ -87,7 +87,7 @@ func generateInspectNFTScript(nftCodeAddr, userAddr types.Address, expectedID in
 }
 
 func newEmulator() *emulator.EmulatedBlockchain {
-	return emulator.NewEmulatedBlockchain(&emulator.EmulatedBlockchainOptions{
+	return emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
 		OnLogMessage: func(msg string) {},
 	})
 }
