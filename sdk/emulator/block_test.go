@@ -53,6 +53,7 @@ func TestCommitBlock(t *testing.T) {
 	// tx1 status becomes TransactionSealed
 	tx, _ = b.GetTransaction(tx1.Hash())
 	assert.Equal(t, types.TransactionSealed, tx.Status)
+
 	// tx2 status stays TransactionReverted
 	tx, _ = b.GetTransaction(tx2.Hash())
 	assert.Equal(t, types.TransactionReverted, tx.Status)
