@@ -13,7 +13,7 @@ import (
 func TestCallScript(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := &types.Transaction{
+	tx := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		ComputeLimit:       10,
@@ -21,7 +21,7 @@ func TestCallScript(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))
@@ -29,7 +29,7 @@ func TestCallScript(t *testing.T) {
 	assert.Equal(t, big.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
-	err = b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx)
 	assert.Nil(t, err)
 
 	// Sample call (value is 2)
