@@ -28,6 +28,7 @@ func TestCreateAccount(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -63,6 +64,7 @@ func TestCreateAccount(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -101,6 +103,7 @@ func TestCreateAccount(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -129,6 +132,7 @@ func TestCreateAccount(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -166,6 +170,7 @@ func TestCreateAccount(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -203,7 +208,7 @@ func TestAddAccountKey(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             templates.AddAccountKey(accountKeyA),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -219,7 +224,7 @@ func TestAddAccountKey(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -245,7 +250,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             templates.AddAccountKey(accountKey),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -264,7 +269,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -283,7 +288,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx3 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -302,7 +307,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx4 := &types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
-		Nonce:              2,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -334,7 +339,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -345,7 +350,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
-			Nonce:              1,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressB},
@@ -369,7 +374,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -380,7 +385,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
-			Nonce:              1,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressB},
@@ -404,7 +409,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6})
+		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -422,7 +427,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             unauthorizedUpdateAccountCodeScript,
 			ReferenceBlockHash: nil,
-			Nonce:              1,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []types.Address{accountAddressA},
@@ -457,7 +462,7 @@ func TestImportAccountCode(t *testing.T) {
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
-	address, err := b.CreateAccount([]types.AccountKey{accountKey}, accountScript)
+	address, err := b.CreateAccount([]types.AccountKey{accountKey}, accountScript, getNonce())
 	assert.Nil(t, err)
 
 	script := []byte(fmt.Sprintf(`
@@ -474,6 +479,7 @@ func TestImportAccountCode(t *testing.T) {
 	tx := &types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},

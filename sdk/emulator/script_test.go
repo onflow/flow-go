@@ -16,6 +16,7 @@ func TestCallScript(t *testing.T) {
 	tx := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},

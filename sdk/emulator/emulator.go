@@ -4,8 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/sdk/templates"
-
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"

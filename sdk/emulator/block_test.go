@@ -15,6 +15,7 @@ func TestCommitBlock(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -31,6 +32,7 @@ func TestCommitBlock(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
+		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},

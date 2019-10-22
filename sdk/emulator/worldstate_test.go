@@ -34,6 +34,7 @@ func TestWorldStates(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -44,7 +45,7 @@ func TestWorldStates(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -156,6 +157,7 @@ func TestQueryByVersion(t *testing.T) {
 	tx1 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
@@ -166,7 +168,7 @@ func TestQueryByVersion(t *testing.T) {
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
-		Nonce:              1,
+		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
