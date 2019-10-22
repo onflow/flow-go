@@ -81,3 +81,12 @@ func (e *Range) StartPosition() Position {
 func (e *Range) EndPosition() Position {
 	return e.EndPos
 }
+
+// NewRangeFromPositioned
+
+func NewRangeFromPositioned(hasPosition HasPosition) Range {
+	return Range{
+		StartPos: hasPosition.StartPosition(),
+		EndPos:   hasPosition.EndPosition(),
+	}
+}

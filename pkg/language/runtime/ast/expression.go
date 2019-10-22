@@ -322,7 +322,7 @@ func (e *MemberExpression) EndPosition() Position {
 	return e.Identifier.EndPosition()
 }
 
-// IndexingExpression
+// IndexExpression
 
 type IndexExpression struct {
 	TargetExpression Expression

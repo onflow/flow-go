@@ -145,7 +145,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	valueType Type,
 ) (elementType Type) {
 
-	elementType = checker.visitIndexingExpression(target, true)
+	elementType, _ = checker.visitIndexExpression(target, true)
 
 	if elementType == nil {
 		return &InvalidType{}
