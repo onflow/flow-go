@@ -3,8 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"net"
 	"net/http"
 	"time"
@@ -16,7 +14,9 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // EmulatorServer is a local server that runs a Flow Emulator instance.
