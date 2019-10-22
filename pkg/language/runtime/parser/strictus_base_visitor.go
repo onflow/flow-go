@@ -275,6 +275,10 @@ func (v *BaseStrictusVisitor) VisitDestroyExpression(ctx *DestroyExpressionConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

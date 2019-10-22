@@ -259,7 +259,7 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		case ast.AddressImportLocation:
 			location = AddressImportLocation(astLocation)
 		default:
-			panic(runtimeErrors.UnreachableError{})
+			panic(&runtimeErrors.UnreachableError{})
 		}
 		script, err := runtimeInterface.ResolveImport(location)
 		if err != nil {

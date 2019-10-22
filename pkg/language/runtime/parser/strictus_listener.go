@@ -208,6 +208,9 @@ type StrictusListener interface {
 	// EnterDestroyExpression is called when entering the destroyExpression production.
 	EnterDestroyExpression(c *DestroyExpressionContext)
 
+	// EnterReferenceExpression is called when entering the referenceExpression production.
+	EnterReferenceExpression(c *ReferenceExpressionContext)
+
 	// EnterIdentifierExpression is called when entering the identifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
 
@@ -480,6 +483,9 @@ type StrictusListener interface {
 
 	// ExitDestroyExpression is called when exiting the destroyExpression production.
 	ExitDestroyExpression(c *DestroyExpressionContext)
+
+	// ExitReferenceExpression is called when exiting the referenceExpression production.
+	ExitReferenceExpression(c *ReferenceExpressionContext)
 
 	// ExitIdentifierExpression is called when exiting the identifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)

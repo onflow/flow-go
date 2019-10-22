@@ -5715,3 +5715,65 @@ func TestParseInvalidReferenceToOptionalType(t *testing.T) {
 
 	assert.IsType(t, parser.Error{}, err)
 }
+
+func TestParseReference(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x = &account.storage[R] as R
+	`)
+
+	assert.Nil(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				Value: &ReferenceExpression{
+					Expression: &IndexExpression{
+						TargetExpression: &MemberExpression{
+							Expression: &IdentifierExpression{
+								Identifier: Identifier{
+									Identifier: "account",
+									Pos:        Position{Offset: 17, Line: 2, Column: 16},
+								},
+							},
+							Identifier: Identifier{
+								Identifier: "storage",
+								Pos:        Position{Offset: 25, Line: 2, Column: 24},
+							},
+						},
+						IndexingExpression: &IdentifierExpression{
+							Identifier: Identifier{
+								Identifier: "R",
+								Pos:        Position{Offset: 33, Line: 2, Column: 32},
+							},
+						},
+						IndexingType: nil,
+						Range: Range{
+							StartPos: Position{Offset: 32, Line: 2, Column: 31},
+							EndPos:   Position{Offset: 34, Line: 2, Column: 33},
+						},
+					},
+					Type: &NominalType{
+						Identifier: Identifier{
+							Identifier: "R",
+							Pos:        Position{Offset: 39, Line: 2, Column: 38},
+						},
+					},
+					StartPos: Position{Offset: 16, Line: 2, Column: 15},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 14, Line: 2, Column: 13},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	assert.Equal(t, expected, actual)
+}
