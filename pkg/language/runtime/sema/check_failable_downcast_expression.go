@@ -20,9 +20,11 @@ func (checker *Checker) VisitFailableDowncastExpression(expression *ast.Failable
 
 		checker.report(
 			&UnsupportedTypeError{
-				Type:     leftHandType,
-				StartPos: leftHandExpression.StartPosition(),
-				EndPos:   leftHandExpression.EndPosition(),
+				Type: leftHandType,
+				Range: ast.Range{
+					StartPos: leftHandExpression.StartPosition(),
+					EndPos:   leftHandExpression.EndPosition(),
+				},
 			},
 		)
 	}

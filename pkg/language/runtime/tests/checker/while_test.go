@@ -13,7 +13,7 @@ func TestCheckInvalidWhileTest(t *testing.T) {
       fun test() {
           while 1 {}
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -26,7 +26,7 @@ func TestCheckWhileTest(t *testing.T) {
       fun test() {
           while true {}
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -37,7 +37,7 @@ func TestCheckInvalidWhileBlock(t *testing.T) {
       fun test() {
           while true { x }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -52,7 +52,7 @@ func TestCheckBreakStatement(t *testing.T) {
                break
            }
        }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -67,7 +67,7 @@ func TestCheckInvalidBreakStatement(t *testing.T) {
                }
            }
        }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -82,7 +82,7 @@ func TestCheckContinueStatement(t *testing.T) {
                continue
            }
        }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -97,7 +97,7 @@ func TestCheckInvalidContinueStatement(t *testing.T) {
                }
            }
        }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

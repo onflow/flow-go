@@ -25,9 +25,8 @@ type TargetExpression interface {
 // BoolExpression
 
 type BoolExpression struct {
-	Value    bool
-	StartPos Position
-	EndPos   Position
+	Value bool
+	Range
 }
 
 func (*BoolExpression) isExpression() {}
@@ -48,14 +47,6 @@ func (e *BoolExpression) String() string {
 	} else {
 		return "false"
 	}
-}
-
-func (e *BoolExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *BoolExpression) EndPosition() Position {
-	return e.EndPos
 }
 
 // NilExpression
@@ -91,9 +82,8 @@ func (e *NilExpression) EndPosition() Position {
 // StringExpression
 
 type StringExpression struct {
-	Value    string
-	StartPos Position
-	EndPos   Position
+	Value string
+	Range
 }
 
 func (*StringExpression) isExpression() {}
@@ -113,20 +103,11 @@ func (e *StringExpression) String() string {
 	return ""
 }
 
-func (e *StringExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *StringExpression) EndPosition() Position {
-	return e.EndPos
-}
-
 // IntExpression
 
 type IntExpression struct {
-	Value    *big.Int
-	StartPos Position
-	EndPos   Position
+	Value *big.Int
+	Range
 }
 
 func (*IntExpression) isExpression() {}
@@ -145,20 +126,11 @@ func (e *IntExpression) String() string {
 	return e.Value.String()
 }
 
-func (e *IntExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *IntExpression) EndPosition() Position {
-	return e.EndPos
-}
-
 // ArrayExpression
 
 type ArrayExpression struct {
-	Values   []Expression
-	StartPos Position
-	EndPos   Position
+	Values []Expression
+	Range
 }
 
 func (*ArrayExpression) isExpression() {}
@@ -186,20 +158,11 @@ func (e *ArrayExpression) String() string {
 	return builder.String()
 }
 
-func (e *ArrayExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *ArrayExpression) EndPosition() Position {
-	return e.EndPos
-}
-
 // DictionaryExpression
 
 type DictionaryExpression struct {
-	Entries  []Entry
-	StartPos Position
-	EndPos   Position
+	Entries []Entry
+	Range
 }
 
 func (*DictionaryExpression) isExpression() {}
@@ -227,14 +190,6 @@ func (e *DictionaryExpression) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
-}
-
-func (e *DictionaryExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *DictionaryExpression) EndPosition() Position {
-	return e.EndPos
 }
 
 type Entry struct {
@@ -374,8 +329,7 @@ type IndexExpression struct {
 	// only IndexingExpression or IndexingType is set
 	IndexingExpression Expression
 	IndexingType       Type
-	StartPos           Position
-	EndPos             Position
+	Range
 }
 
 func (*IndexExpression) isExpression() {}
@@ -409,14 +363,6 @@ func (e *IndexExpression) String() string {
 		"%s[%s]",
 		e.TargetExpression, indexString,
 	)
-}
-
-func (e *IndexExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *IndexExpression) EndPosition() Position {
-	return e.EndPos
 }
 
 // ConditionalExpression
@@ -458,8 +404,7 @@ func (e *ConditionalExpression) EndPosition() Position {
 type UnaryExpression struct {
 	Operation  Operation
 	Expression Expression
-	StartPos   Position
-	EndPos     Position
+	Range
 }
 
 func (*UnaryExpression) isExpression() {}
@@ -479,14 +424,6 @@ func (e *UnaryExpression) String() string {
 		"%s%s",
 		e.Operation.Symbol(), e.Expression,
 	)
-}
-
-func (e *UnaryExpression) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *UnaryExpression) EndPosition() Position {
-	return e.EndPos
 }
 
 // BinaryExpression
@@ -527,7 +464,7 @@ func (e *BinaryExpression) EndPosition() Position {
 // FunctionExpression
 
 type FunctionExpression struct {
-	Parameters           Parameters
+	ParameterList        *ParameterList
 	ReturnTypeAnnotation *TypeAnnotation
 	FunctionBlock        *FunctionBlock
 	StartPos             Position

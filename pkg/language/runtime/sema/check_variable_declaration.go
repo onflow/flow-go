@@ -26,8 +26,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				&TypeMismatchError{
 					ExpectedType: &OptionalType{},
 					ActualType:   valueType,
-					StartPos:     declaration.Value.StartPosition(),
-					EndPos:       declaration.Value.EndPosition(),
+					Range: ast.Range{
+						StartPos: declaration.Value.StartPosition(),
+						EndPos:   declaration.Value.EndPosition(),
+					},
 				},
 			)
 		}
@@ -54,8 +56,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 						&TypeMismatchError{
 							ExpectedType: declarationType,
 							ActualType:   optionalValueType.Type,
-							StartPos:     declaration.Value.StartPosition(),
-							EndPos:       declaration.Value.EndPosition(),
+							Range: ast.Range{
+								StartPos: declaration.Value.StartPosition(),
+								EndPos:   declaration.Value.EndPosition(),
+							},
 						},
 					)
 				}
@@ -66,8 +70,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 						&TypeMismatchError{
 							ExpectedType: declarationType,
 							ActualType:   valueType,
-							StartPos:     declaration.Value.StartPosition(),
-							EndPos:       declaration.Value.EndPosition(),
+							Range: ast.Range{
+								StartPos: declaration.Value.StartPosition(),
+								EndPos:   declaration.Value.EndPosition(),
+							},
 						},
 					)
 				}

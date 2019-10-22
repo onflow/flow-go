@@ -14,16 +14,22 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 
 	checker.checkTransfer(assignment.Transfer, valueType)
 
-	// Assignment of a resource or assignment to a resource is not valid,
+	// An assignment of a resource or an assignment to a resource is not valid,
 	// as it would result in a resource loss
 
 	if valueType.IsResourceType() || targetType.IsResourceType() {
-		// Assignment to self-field is allowed. This is necessary to initialize
-		// fields in the initializer
 
-		// TODO: improve exception
+		// However, an assignment to a `self` field in the initializer is allowed.
+		// In that case the value that is assigned must be invalidated.
+		//
+		// The check for a repeated assignment of a constant field after initialization
+		// is not part of this logic here, see `visitMemberExpressionAssignment`
 
-		if checker.isSelfFieldAccess(assignment.Target) {
+		selfFieldMember := checker.selfFieldAccessMember(assignment.Target)
+
+		if selfFieldMember != nil &&
+			checker.functionActivations.Current().InitializationInfo != nil {
+
 			checker.recordResourceInvalidation(
 				assignment.Value,
 				valueType,
@@ -32,8 +38,10 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		} else {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					StartPos: assignment.StartPosition(),
-					EndPos:   assignment.EndPosition(),
+					Range: ast.Range{
+						StartPos: assignment.StartPosition(),
+						EndPos:   assignment.EndPosition(),
+					},
 				},
 			)
 		}
@@ -42,23 +50,26 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 	return nil
 }
 
-func (checker *Checker) isSelfFieldAccess(expression ast.Expression) bool {
+func (checker *Checker) selfFieldAccessMember(expression ast.Expression) *Member {
 	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
 	if !isMemberExpression {
-		return false
+		return nil
 	}
 
 	identifierExpression, isIdentifierExpression := memberExpression.Expression.(*ast.IdentifierExpression)
 	if !isIdentifierExpression {
-		return false
+		return nil
 	}
 
 	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
-	if variable == nil {
-		return false
+	if variable == nil ||
+		variable.DeclarationKind != common.DeclarationKindSelf {
+
+		return nil
 	}
 
-	return variable.Kind == common.DeclarationKindSelf
+	fieldName := memberExpression.Identifier.Identifier
+	return variable.Type.(*CompositeType).Members[fieldName]
 }
 
 func (checker *Checker) visitAssignmentValueType(
@@ -100,9 +111,11 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	if variable.IsConstant {
 		checker.report(
 			&AssignmentToConstantError{
-				Name:     identifier,
-				StartPos: target.StartPosition(),
-				EndPos:   target.EndPosition(),
+				Name: identifier,
+				Range: ast.Range{
+					StartPos: target.StartPosition(),
+					EndPos:   target.EndPosition(),
+				},
 			},
 		)
 	}
@@ -115,8 +128,10 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -143,8 +158,10 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -164,23 +181,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	// check member is not constant
+	// If the value type is valid, check that the value can be assigned to the member type
 
-	if member.VariableKind == ast.VariableKindConstant {
-		if member.IsInitialized {
-			checker.report(
-				&AssignmentToConstantMemberError{
-					Name:     target.Identifier.Identifier,
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
-			)
-		}
-	}
-
-	member.IsInitialized = true
-
-	// if value type is valid, check value can be assigned to member
 	if !IsInvalidType(valueType) &&
 		!checker.IsTypeCompatible(valueExpression, valueType, member.Type) {
 
@@ -188,10 +190,80 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				StartPos:     valueExpression.StartPosition(),
-				EndPos:       valueExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
 			},
 		)
+	}
+
+	reportAssignmentToConstant := func() {
+		checker.report(
+			&AssignmentToConstantMemberError{
+				Name: target.Identifier.Identifier,
+				Range: ast.Range{
+					StartPos: valueExpression.StartPosition(),
+					EndPos:   valueExpression.EndPosition(),
+				},
+			},
+		)
+	}
+
+	// If this is an assignment to a `self` field, it needs special handling
+	// depending on if the assignment is in an initializer or not
+
+	selfFieldMember := checker.selfFieldAccessMember(target)
+	if selfFieldMember != nil {
+
+		functionActivation := checker.functionActivations.Current()
+
+		// If this is an assignment to a `self` field in the initializer,
+		// ensure it is only assigned once, to initialize it
+
+		if functionActivation.InitializationInfo != nil {
+
+			// If the function has already returned, the initialization
+			// is not definitive, and it must be ignored
+
+			if !functionActivation.ReturnInfo.MaybeReturned {
+
+				// If the field is constant and it has already previously been
+				// initialized, report an error for the repeated assignment
+
+				initializedFieldMembers := functionActivation.InitializationInfo.InitializedFieldMembers
+
+				if selfFieldMember.VariableKind == ast.VariableKindConstant &&
+					initializedFieldMembers.Contains(selfFieldMember) {
+
+					// TODO: dedicated error: assignment to constant after initialization
+
+					reportAssignmentToConstant()
+				} else {
+					// This is the initial assignment to the field, record it
+
+					initializedFieldMembers.Add(selfFieldMember)
+				}
+			}
+
+		} else if selfFieldMember.VariableKind == ast.VariableKindConstant {
+
+			// If this is an assignment outside the initializer,
+			// an assignment to a constant field is invalid
+
+			reportAssignmentToConstant()
+		}
+
+	} else {
+
+		// The assignment is not to a `self` field. Report if there is an attempt
+		// to assign to a constant field, which is always invalid,
+		// independent of the location of the assignment (initializer or not)
+
+		if member.VariableKind == ast.VariableKindConstant {
+
+			reportAssignmentToConstant()
+		}
 	}
 
 	return member.Type

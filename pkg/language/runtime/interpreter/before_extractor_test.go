@@ -12,7 +12,7 @@ func TestBeforeExtractor(t *testing.T) {
 
 	expression, inputIsComplete, err := parser.ParseExpression(`
         before(x + before(y)) + z
-	`)
+    `)
 
 	assert.True(t, inputIsComplete)
 

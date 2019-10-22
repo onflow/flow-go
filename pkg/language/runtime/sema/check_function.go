@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/exit_detector"
 )
 
 func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclaration) ast.Repr {
@@ -38,7 +37,7 @@ func (checker *Checker) visitFunctionDeclaration(
 
 	functionType := checker.Elaboration.FunctionDeclarationFunctionTypes[declaration]
 	if functionType == nil {
-		functionType = checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+		functionType = checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
 
 		if options.declareFunction {
 			checker.declareFunctionDeclaration(declaration, functionType)
@@ -48,11 +47,12 @@ func (checker *Checker) visitFunctionDeclaration(
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 
 	checker.checkFunction(
-		declaration.Parameters,
+		declaration.ParameterList,
 		declaration.ReturnTypeAnnotation.StartPos,
 		functionType,
 		declaration.FunctionBlock,
 		options.mustExit,
+		nil,
 	)
 
 	return nil
@@ -62,7 +62,7 @@ func (checker *Checker) declareFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	functionType *FunctionType,
 ) {
-	argumentLabels := declaration.Parameters.ArgumentLabels()
+	argumentLabels := declaration.ParameterList.ArgumentLabels()
 
 	variable, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
@@ -90,16 +90,17 @@ func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDec
 }
 
 func (checker *Checker) checkFunction(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypePosition ast.Position,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
+	initializationInfo *InitializationInfo,
 ) {
 	// check argument labels
-	checker.checkArgumentLabels(parameters)
+	checker.checkArgumentLabels(parameterList)
 
-	checker.checkParameters(parameters, functionType.ParameterTypeAnnotations)
+	checker.checkParameters(parameterList, functionType.ParameterTypeAnnotations)
 	if functionType.ReturnTypeAnnotation != nil {
 		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
@@ -115,30 +116,55 @@ func (checker *Checker) checkFunction(
 				checker.enterValueScope()
 				defer checker.leaveValueScope()
 
-				checker.declareParameters(parameters, functionType.ParameterTypeAnnotations)
+				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
+
+				functionActivation := checker.functionActivations.Current()
+				functionActivation.InitializationInfo = initializationInfo
 
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,
 				)
+
+				if mustExit {
+					returnType := functionType.ReturnTypeAnnotation.Type
+					checker.checkFunctionExits(functionBlock, returnType)
+				}
+
+				if initializationInfo != nil {
+					checker.checkFieldMembersInitialized(initializationInfo)
+				}
 			},
 		)
-
-		if _, returnTypeIsVoid := functionType.ReturnTypeAnnotation.Type.(*VoidType); !returnTypeIsVoid {
-			if mustExit && !exit_detector.FunctionBlockExits(functionBlock) {
-				checker.report(
-					&MissingReturnStatementError{
-						StartPos: functionBlock.StartPosition(),
-						EndPos:   functionBlock.EndPosition(),
-					},
-				)
-			}
-		}
 	}
 }
 
-func (checker *Checker) checkParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
-	for i, parameter := range parameters {
+// checkFunctionExits checks that the given function block exits
+// with a return-type appropriate return statement.
+// The return is not needed if the function has a `Void` return type.
+//
+func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, returnType Type) {
+	if _, returnTypeIsVoid := returnType.(*VoidType); returnTypeIsVoid {
+		return
+	}
+
+	functionActivation := checker.functionActivations.Current()
+	if functionActivation.ReturnInfo.DefinitelyReturned {
+		return
+	}
+
+	checker.report(
+		&MissingReturnStatementError{
+			Range: ast.Range{
+				StartPos: functionBlock.StartPosition(),
+				EndPos:   functionBlock.EndPosition(),
+			},
+		},
+	)
+}
+
+func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
+	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
 	}
@@ -174,11 +200,11 @@ func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position
 
 // checkArgumentLabels checks that all argument labels (if any) are unique
 //
-func (checker *Checker) checkArgumentLabels(parameters ast.Parameters) {
+func (checker *Checker) checkArgumentLabels(parameterList *ast.ParameterList) {
 
 	argumentLabelPositions := map[string]ast.Position{}
 
-	for _, parameter := range parameters {
+	for _, parameter := range parameterList.Parameters {
 		label := parameter.Label
 		if label == "" || label == ArgumentLabelNotRequired {
 			continue
@@ -204,11 +230,13 @@ func (checker *Checker) checkArgumentLabels(parameters ast.Parameters) {
 // declareParameters declares a constant for each parameter,
 // ensuring names are unique and constants don't already exist
 //
-func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTypeAnnotations []*TypeAnnotation) {
-
+func (checker *Checker) declareParameters(
+	parameterList *ast.ParameterList,
+	parameterTypeAnnotations []*TypeAnnotation,
+) {
 	depth := checker.valueActivations.Depth()
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		identifier := parameter.Identifier
 
 		// check if variable with this identifier is already declared in the current scope
@@ -230,12 +258,12 @@ func (checker *Checker) declareParameters(parameters ast.Parameters, parameterTy
 		parameterType := parameterTypeAnnotation.Type
 
 		variable := &Variable{
-			Identifier: identifier.Identifier,
-			Kind:       common.DeclarationKindParameter,
-			IsConstant: true,
-			Type:       parameterType,
-			Depth:      depth,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: common.DeclarationKindParameter,
+			IsConstant:      true,
+			Type:            parameterType,
+			Depth:           depth,
+			Pos:             &identifier.Pos,
 		}
 		checker.valueActivations.Set(identifier.Identifier, variable)
 		checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
@@ -300,16 +328,17 @@ func (checker *Checker) declareBefore() {
 func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpression) ast.Repr {
 
 	// TODO: infer
-	functionType := checker.functionType(expression.Parameters, expression.ReturnTypeAnnotation)
+	functionType := checker.functionType(expression.ParameterList, expression.ReturnTypeAnnotation)
 
 	checker.Elaboration.FunctionExpressionFunctionType[expression] = functionType
 
 	checker.checkFunction(
-		expression.Parameters,
+		expression.ParameterList,
 		expression.ReturnTypeAnnotation.StartPos,
 		functionType,
 		expression.FunctionBlock,
 		true,
+		nil,
 	)
 
 	// function expressions are not allowed in conditions
@@ -317,11 +346,33 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 	if checker.inCondition {
 		checker.report(
 			&FunctionExpressionInConditionError{
-				StartPos: expression.StartPosition(),
-				EndPos:   expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: expression.StartPosition(),
+					EndPos:   expression.EndPosition(),
+				},
 			},
 		)
 	}
 
 	return functionType
+}
+
+// checkFieldMembersInitialized checks that all fields that were required
+// to be initialized (as stated in the initialization info) have been initialized.
+//
+func (checker *Checker) checkFieldMembersInitialized(info *InitializationInfo) {
+	for member, field := range info.FieldMembers {
+		isInitialized := info.InitializedFieldMembers.Contains(member)
+		if isInitialized {
+			continue
+		}
+
+		checker.report(
+			&FieldUninitializedError{
+				Name:          field.Identifier.Identifier,
+				Pos:           field.Identifier.Pos,
+				ContainerType: info.ContainerType,
+			},
+		)
+	}
 }

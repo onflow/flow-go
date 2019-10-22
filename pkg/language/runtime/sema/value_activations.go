@@ -71,13 +71,13 @@ func (a *ValueActivations) Declare(
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
-		Identifier:     identifier,
-		Kind:           kind,
-		IsConstant:     isConstant,
-		Depth:          depth,
-		Type:           ty,
-		Pos:            &pos,
-		ArgumentLabels: argumentLabels,
+		Identifier:      identifier,
+		DeclarationKind: kind,
+		IsConstant:      isConstant,
+		Depth:           depth,
+		Type:            ty,
+		Pos:             &pos,
+		ArgumentLabels:  argumentLabels,
 	}
 	a.activations.Set(identifier, variable)
 	return variable, err

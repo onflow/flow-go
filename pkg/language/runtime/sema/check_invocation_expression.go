@@ -12,8 +12,10 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	if _, isEventType := typ.(*EventType); isEventType {
 		checker.report(
 			&InvalidEventUsageError{
-				StartPos: invocationExpression.StartPosition(),
-				EndPos:   invocationExpression.EndPosition(),
+				Range: ast.Range{
+					StartPos: invocationExpression.StartPosition(),
+					EndPos:   invocationExpression.EndPosition(),
+				},
 			},
 		)
 		return &InvalidType{}
@@ -39,24 +41,26 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		if !IsInvalidType(expressionType) {
 			checker.report(
 				&NotCallableError{
-					Type:     expressionType,
-					StartPos: invokedExpression.StartPosition(),
-					EndPos:   invokedExpression.EndPosition(),
+					Type: expressionType,
+					Range: ast.Range{
+						StartPos: invokedExpression.StartPosition(),
+						EndPos:   invokedExpression.EndPosition(),
+					},
 				},
 			)
 		}
 		return &InvalidType{}
 	}
 
+	// invoked expression has function type
+
 	functionType := invokableType.InvocationFunctionType()
 
 	var returnType Type = &InvalidType{}
 
-	// invoked expression has function type
-
 	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
 
-	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
 	// check that the correct argument labels are supplied in the invocation
 
@@ -96,6 +100,14 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		inCreate,
 	)
 
+	// Update the return info for invocations that do not return (i.e. have a `Never` return type)
+
+	if returnType.Equal(&NeverType{}) {
+		functionActivation := checker.functionActivations.Current()
+		functionActivation.ReturnInfo.MaybeReturned = true
+		functionActivation.ReturnInfo.DefinitelyReturned = true
+	}
+
 	return returnType
 }
 
@@ -124,8 +136,10 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 
 	checker.report(
 		&MissingCreateError{
-			StartPos: invocationExpression.StartPosition(),
-			EndPos:   invocationExpression.EndPosition(),
+			Range: ast.Range{
+				StartPos: invocationExpression.StartPosition(),
+				EndPos:   invocationExpression.EndPosition(),
+			},
 		},
 	)
 }
@@ -184,8 +198,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: "",
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -196,8 +212,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 				checker.report(
 					&MissingArgumentLabelError{
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              argument.Expression.StartPosition(),
-						EndPos:                argument.Expression.EndPosition(),
+						Range: ast.Range{
+							StartPos: argument.Expression.StartPosition(),
+							EndPos:   argument.Expression.EndPosition(),
+						},
 					},
 				)
 			} else if providedLabel != argumentLabel {
@@ -205,8 +223,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -234,8 +254,10 @@ func (checker *Checker) checkInvocationArguments(
 				&ArgumentCountError{
 					ParameterCount: parameterCount,
 					ArgumentCount:  argumentCount,
-					StartPos:       invocationExpression.StartPosition(),
-					EndPos:         invocationExpression.EndPosition(),
+					Range: ast.Range{
+						StartPos: invocationExpression.StartPosition(),
+						EndPos:   invocationExpression.EndPosition(),
+					},
 				},
 			)
 		}
@@ -265,8 +287,10 @@ func (checker *Checker) checkInvocationArguments(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
 					ActualType:   argumentType,
-					StartPos:     argument.Expression.StartPosition(),
-					EndPos:       argument.Expression.EndPosition(),
+					Range: ast.Range{
+						StartPos: argument.Expression.StartPosition(),
+						EndPos:   argument.Expression.EndPosition(),
+					},
 				},
 			)
 		}

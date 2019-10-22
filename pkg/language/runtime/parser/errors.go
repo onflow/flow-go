@@ -83,19 +83,10 @@ type InvalidIntegerLiteralError struct {
 	Literal                   string
 	IntegerLiteralKind        IntegerLiteralKind
 	InvalidIntegerLiteralKind InvalidIntegerLiteralKind
-	StartPos                  ast.Position
-	EndPos                    ast.Position
+	ast.Range
 }
 
 func (*InvalidIntegerLiteralError) isParseError() {}
-
-func (e *InvalidIntegerLiteralError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidIntegerLiteralError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 func (e *InvalidIntegerLiteralError) Error() string {
 	if e.IntegerLiteralKind == IntegerLiteralKindUnknown {

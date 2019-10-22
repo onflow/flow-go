@@ -7,18 +7,9 @@ import (
 // EventDeclaration
 
 type EventDeclaration struct {
-	Identifier Identifier
-	Parameters Parameters
-	StartPos   Position
-	EndPos     Position
-}
-
-func (e *EventDeclaration) StartPosition() Position {
-	return e.StartPos
-}
-
-func (e *EventDeclaration) EndPosition() Position {
-	return e.EndPos
+	Identifier    Identifier
+	ParameterList *ParameterList
+	Range
 }
 
 func (e *EventDeclaration) Accept(visitor Visitor) Repr {

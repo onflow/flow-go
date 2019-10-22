@@ -219,13 +219,12 @@ func (*StringType) IsResourceType() bool {
 	return false
 }
 
-func (t *StringType) GetMember(field string) *Member {
+func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
 	case "length":
 		return NewMemberForType(t, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
 	case "concat":
 		return NewMemberForType(t, "concat", Member{
@@ -565,11 +564,19 @@ type ArrayType interface {
 	isArrayType()
 }
 
-func getArrayMember(ty ArrayType, field string) *Member {
+func getArrayMember(t ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
+
 	switch field {
 	case "append":
-		elementType := ty.ElementType(false)
-		return NewMemberForType(ty, "append", Member{
+		// Appending elements to a constant sized array is not allowed
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
+			return nil
+		}
+
+		elementType := t.ElementType(false)
+		return NewMemberForType(t, field, Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
@@ -579,11 +586,32 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&VoidType{},
 				),
 			},
-			IsInitialized: true,
 		})
+
 	case "concat":
-		typeAnnotation := NewTypeAnnotation(ty)
-		return NewMemberForType(ty, "concat", Member{
+		// TODO: maybe allow constant sized:
+		//    concatenate with variable sized and return variable sized
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
+			return nil
+		}
+
+		// TODO: maybe allow for resource element type
+
+		elementType := t.ElementType(false)
+
+		if elementType.IsResourceType() {
+			report(
+				&InvalidResourceArrayMemberError{
+					Name:  field,
+					Range: targetRange,
+				},
+			)
+		}
+
+		typeAnnotation := NewTypeAnnotation(t)
+		return NewMemberForType(t, field, Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
@@ -591,11 +619,18 @@ func getArrayMember(ty ArrayType, field string) *Member {
 				},
 				ReturnTypeAnnotation: typeAnnotation,
 			},
-			IsInitialized: true,
 		})
+
 	case "insert":
-		elementType := ty.ElementType(false)
-		return NewMemberForType(ty, "insert", Member{
+		// Inserting elements into to a constant sized array is not allowed
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
+			return nil
+		}
+
+		elementType := t.ElementType(false)
+		return NewMemberForType(t, field, Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
@@ -606,12 +641,20 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&VoidType{},
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
+
 	case "remove":
-		elementType := ty.ElementType(false)
-		return NewMemberForType(ty, "remove", Member{
+		// Removing elements from a constant sized array is not allowed
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
+			return nil
+		}
+
+		elementType := t.ElementType(false)
+
+		return NewMemberForType(t, field, Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
@@ -621,41 +664,74 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					elementType,
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"at"},
 		})
-	case "removeFirst":
-		elementType := ty.ElementType(false)
-		return NewMemberForType(ty, "removeFirst", Member{
-			VariableKind: ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
-			IsInitialized: true,
-		})
-	case "removeLast":
-		elementType := ty.ElementType(false)
-		return NewMemberForType(ty, "removeLast", Member{
-			VariableKind: ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
-			IsInitialized: true,
-		})
-	case "contains":
-		elementType := ty.ElementType(false)
 
-		// impossible for array of resources to have
-		// a `contains` function
-		if elementType.IsResourceType() {
+	case "removeFirst":
+		// Removing elements from a constant sized array is not allowed
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		return NewMemberForType(ty, "contains", Member{
+		elementType := t.ElementType(false)
+
+		return NewMemberForType(t, field, Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
+			},
+		})
+
+	case "removeLast":
+		// Removing elements from a constant sized array is not allowed
+
+		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+			// TODO: maybe return member but report helpful error?
+			return nil
+		}
+
+		elementType := t.ElementType(false)
+
+		return NewMemberForType(t, field, Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
+			},
+		})
+
+	case "contains":
+		elementType := t.ElementType(false)
+
+		// It impossible for an array of resources to have a `contains` function:
+		// if the resource is passed as an argument, it cannot be inside the array
+
+		if elementType.IsResourceType() {
+			report(
+				&InvalidResourceArrayMemberError{
+					Name:  field,
+					Range: targetRange,
+				},
+			)
+		}
+
+		// TODO: implement Equatable interface: https://github.com/dapperlabs/bamboo-node/issues/78
+
+		if !IsEquatableType(elementType) {
+			report(
+				&NotEquatableTypeError{
+					Type:  elementType,
+					Range: targetRange,
+				},
+			)
+		}
+
+		return NewMemberForType(t, field, Member{
 			VariableKind: ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
@@ -665,14 +741,14 @@ func getArrayMember(ty ArrayType, field string) *Member {
 					&BoolType{},
 				),
 			},
-			IsInitialized: true,
 		})
+
 	case "length":
-		return NewMemberForType(ty, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+		return NewMemberForType(t, field, Member{
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
+
 	default:
 		return nil
 	}
@@ -699,8 +775,8 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
-func (t *VariableSizedType) GetMember(identifier string) *Member {
-	return getArrayMember(t, identifier)
+func (t *VariableSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	return getArrayMember(t, identifier, targetRange, report)
 }
 
 func (t *VariableSizedType) IsResourceType() bool {
@@ -740,8 +816,8 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 		t.Size == otherArray.Size
 }
 
-func (t *ConstantSizedType) GetMember(identifier string) *Member {
-	return getArrayMember(t, identifier)
+func (t *ConstantSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	return getArrayMember(t, identifier, targetRange, report)
 }
 
 func (t *ConstantSizedType) IsResourceType() bool {
@@ -890,7 +966,7 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
-func (t *CompositeType) GetMember(identifier string) *Member {
+func (t *CompositeType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
 
@@ -903,7 +979,6 @@ func (t *CompositeType) IsResourceType() bool {
 type Member struct {
 	Type           Type
 	VariableKind   ast.VariableKind
-	IsInitialized  bool
 	ArgumentLabels []string
 }
 
@@ -936,7 +1011,7 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 }
 
 type HasMembers interface {
-	GetMember(string) *Member
+	GetMember(field string, targetRange ast.Range, report func(error)) *Member
 }
 
 // InterfaceType
@@ -965,7 +1040,7 @@ func (t *InterfaceType) Equal(other Type) bool {
 		otherInterface.Identifier == t.Identifier
 }
 
-func (t *InterfaceType) GetMember(identifier string) *Member {
+func (t *InterfaceType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
 
@@ -1001,14 +1076,31 @@ func (t *DictionaryType) IsResourceType() bool {
 		t.ValueType.IsResourceType()
 }
 
-func (t *DictionaryType) GetMember(identifer string) *Member {
-	switch identifer {
+func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
+	switch field {
 	case "length":
-		return NewMemberForType(t, "length", Member{
-			Type:          &IntType{},
-			VariableKind:  ast.VariableKindConstant,
-			IsInitialized: true,
+		return NewMemberForType(t, field, Member{
+			Type:         &IntType{},
+			VariableKind: ast.VariableKindConstant,
 		})
+
+	case "insert":
+		return NewMemberForType(t, field, Member{
+			VariableKind: ast.VariableKindConstant,
+			Type: &FunctionType{
+				ParameterTypeAnnotations: NewTypeAnnotations(
+					t.KeyType,
+					t.ValueType,
+				),
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&OptionalType{
+						Type: t.ValueType,
+					},
+				),
+			},
+			ArgumentLabels: []string{"key", ArgumentLabelNotRequired},
+		})
+
 	case "remove":
 		return NewMemberForType(t, "remove", Member{
 			VariableKind: ast.VariableKindConstant,
@@ -1022,9 +1114,9 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 					},
 				),
 			},
-			IsInitialized:  true,
 			ArgumentLabels: []string{"key"},
 		})
+
 	default:
 		return nil
 	}
@@ -1033,12 +1125,7 @@ func (t *DictionaryType) GetMember(identifer string) *Member {
 func (t *DictionaryType) isIndexableType() {}
 
 func (t *DictionaryType) ElementType(isAssignment bool) Type {
-	valueType := t.ValueType
-	if isAssignment {
-		return valueType
-	} else {
-		return &OptionalType{Type: valueType}
-	}
+	return &OptionalType{Type: t.ValueType}
 }
 
 func (t *DictionaryType) IndexingType() Type {

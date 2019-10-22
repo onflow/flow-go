@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
@@ -13,11 +14,72 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 
 	if variable.Type.IsResourceType() {
 		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
-		checker.checkResourceVariableUseAfterInvalidation(variable, expression.Identifier)
+		checker.checkResourceUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
+	checker.checkSelfVariableUseInInitializer(variable, expression.Pos)
+
 	return variable.Type
+}
+
+// checkSelfVariableUseInInitializer checks uses of `self` in the initializer
+// and ensures it is properly initialized
+//
+func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, position ast.Position) {
+
+	// Is this a use of `self`?
+
+	if variable.DeclarationKind != common.DeclarationKindSelf {
+		return
+	}
+
+	// Is this use of `self` in an initializer?
+
+	initializationInfo := checker.functionActivations.Current().InitializationInfo
+	if initializationInfo == nil {
+		return
+	}
+
+	// The use of `self` is inside the initializer
+
+	checkInitializationComplete := func() {
+		if initializationInfo.InitializationComplete() {
+			return
+		}
+
+		checker.report(
+			&UninitializedUseError{
+				Name: variable.Identifier,
+				Pos:  position,
+			},
+		)
+	}
+
+	if checker.currentMemberExpression != nil {
+
+		// The use of `self` is inside a member access
+
+		// If the member expression refers to a field that must be initialized,
+		// it must be initialized. This check is handled in `VisitMemberExpression`
+
+		// Otherwise, the member access is to a non-field, e.g. a function,
+		// in which case *all* fields must have been initialized
+
+		selfFieldMember := checker.selfFieldAccessMember(checker.currentMemberExpression)
+		field := initializationInfo.FieldMembers[selfFieldMember]
+
+		if field == nil {
+			checkInitializationComplete()
+		}
+
+	} else {
+		// The use of `self` is *not* inside a member access, i.e. `self` is used
+		// as a standalone expression, e.g. to pass it as an argument to a function.
+		// Ensure that *all* fields were initialized
+
+		checkInitializationComplete()
+	}
 }
 
 // checkResourceVariableCapturingInFunction checks if a resource variable is captured in a function
@@ -43,24 +105,6 @@ func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Varia
 	)
 }
 
-// checkResourceVariableUseAfterInvalidation checks if a resource variable
-// is used after it was previously invalidated (moved or destroyed)
-//
-func (checker *Checker) checkResourceVariableUseAfterInvalidation(variable *Variable, useIdentifier ast.Identifier) {
-	resourceInfo := checker.resources.Get(variable)
-	if resourceInfo.Invalidations.Size() == 0 {
-		return
-	}
-
-	checker.report(
-		&ResourceUseAfterInvalidationError{
-			Name:          useIdentifier.Identifier,
-			Pos:           useIdentifier.Pos,
-			Invalidations: resourceInfo.Invalidations.All(),
-		},
-	)
-}
-
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
 	result := statement.Expression.Accept(checker)
 
@@ -69,8 +113,10 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 
 		checker.report(
 			&ResourceLossError{
-				StartPos: statement.Expression.StartPosition(),
-				EndPos:   statement.Expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: statement.Expression.StartPosition(),
+					EndPos:   statement.Expression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -126,6 +172,7 @@ func (checker *Checker) visitIndexingExpression(
 		checker.checkAccessResourceLoss(result, targetExpression)
 	}()
 
+	// TODO: generalize to e.g. `TypeIndexable`
 	_, isStorage := indexedType.(*StorageType)
 	if isStorage {
 
@@ -143,8 +190,10 @@ func (checker *Checker) visitIndexingExpression(
 			if indexingType == nil {
 				checker.report(
 					&InvalidStorageIndexingError{
-						StartPos: indexExpression.IndexingExpression.StartPosition(),
-						EndPos:   indexExpression.IndexingExpression.EndPosition(),
+						Range: ast.Range{
+							StartPos: indexExpression.IndexingExpression.StartPosition(),
+							EndPos:   indexExpression.IndexingExpression.EndPosition(),
+						},
 					},
 				)
 
@@ -152,7 +201,7 @@ func (checker *Checker) visitIndexingExpression(
 			}
 		}
 
-		return checker.visitStorageIndexingExpression(
+		return checker.visitTypeIndexingExpression(
 			indexExpression,
 			indexingType,
 			isAssignment,
@@ -162,15 +211,17 @@ func (checker *Checker) visitIndexingExpression(
 		if indexExpression.IndexingType != nil {
 			checker.report(
 				&InvalidIndexingError{
-					StartPos: indexExpression.IndexingType.StartPosition(),
-					EndPos:   indexExpression.IndexingType.EndPosition(),
+					Range: ast.Range{
+						StartPos: indexExpression.IndexingType.StartPosition(),
+						EndPos:   indexExpression.IndexingType.EndPosition(),
+					},
 				},
 			)
 
 			return &InvalidType{}
 		}
 
-		return checker.visitNormalIndexingExpression(
+		return checker.visitValueIndexingExpression(
 			targetExpression,
 			indexedType,
 			indexExpression.IndexingExpression,
@@ -179,7 +230,7 @@ func (checker *Checker) visitIndexingExpression(
 	}
 }
 
-func (checker *Checker) visitNormalIndexingExpression(
+func (checker *Checker) visitValueIndexingExpression(
 	indexedExpression ast.Expression,
 	indexedType Type,
 	indexingExpression ast.Expression,
@@ -191,9 +242,11 @@ func (checker *Checker) visitNormalIndexingExpression(
 	if !isIndexableType {
 		checker.report(
 			&NotIndexableTypeError{
-				Type:     indexedType,
-				StartPos: indexedExpression.StartPosition(),
-				EndPos:   indexedExpression.EndPosition(),
+				Type: indexedType,
+				Range: ast.Range{
+					StartPos: indexedExpression.StartPosition(),
+					EndPos:   indexedExpression.EndPosition(),
+				},
 			},
 		)
 
@@ -210,9 +263,11 @@ func (checker *Checker) visitNormalIndexingExpression(
 
 		checker.report(
 			&NotIndexingTypeError{
-				Type:     indexingType,
-				StartPos: indexingExpression.StartPosition(),
-				EndPos:   indexingExpression.EndPosition(),
+				Type: indexingType,
+				Range: ast.Range{
+					StartPos: indexingExpression.StartPosition(),
+					EndPos:   indexingExpression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -220,7 +275,7 @@ func (checker *Checker) visitNormalIndexingExpression(
 	return elementType
 }
 
-func (checker *Checker) visitStorageIndexingExpression(
+func (checker *Checker) visitTypeIndexingExpression(
 	indexExpression *ast.IndexExpression,
 	indexingType ast.Type,
 	isAssignment bool,

@@ -34,8 +34,7 @@ func (e *unsupportedAssignmentTargetExpression) Error() string {
 type unsupportedOperation struct {
 	kind      common.OperationKind
 	operation ast.Operation
-	startPos  ast.Position
-	endPos    ast.Position
+	ast.Range
 }
 
 func (e *unsupportedOperation) Error() string {
@@ -44,14 +43,6 @@ func (e *unsupportedOperation) Error() string {
 		e.kind.Name(),
 		e.operation.Symbol(),
 	)
-}
-
-func (e *unsupportedOperation) StartPosition() ast.Position {
-	return e.startPos
-}
-
-func (e *unsupportedOperation) EndPosition() ast.Position {
-	return e.endPos
 }
 
 // CheckerError
@@ -132,9 +123,8 @@ func (e *NotDeclaredError) EndPosition() ast.Position {
 // AssignmentToConstantError
 
 type AssignmentToConstantError struct {
-	Name     string
-	StartPos ast.Position
-	EndPos   ast.Position
+	Name string
+	ast.Range
 }
 
 func (e *AssignmentToConstantError) Error() string {
@@ -143,21 +133,12 @@ func (e *AssignmentToConstantError) Error() string {
 
 func (*AssignmentToConstantError) isSemanticError() {}
 
-func (e *AssignmentToConstantError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *AssignmentToConstantError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // TypeMismatchError
 
 type TypeMismatchError struct {
 	ExpectedType Type
 	ActualType   Type
-	StartPos     ast.Position
-	EndPos       ast.Position
+	ast.Range
 }
 
 func (e *TypeMismatchError) Error() string {
@@ -169,117 +150,80 @@ func (*TypeMismatchError) isSemanticError() {}
 func (e *TypeMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected `%s`, got `%s`",
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
-}
-
-func (e *TypeMismatchError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *TypeMismatchError) EndPosition() ast.Position {
-	return e.EndPos
 }
 
 // NotIndexableTypeError
 
 type NotIndexableTypeError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *NotIndexableTypeError) Error() string {
-	return fmt.Sprintf("cannot index into value which has type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot index into value which has type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotIndexableTypeError) isSemanticError() {}
 
-func (e *NotIndexableTypeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotIndexableTypeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // NotIndexingTypeError
 
 type NotIndexingTypeError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *NotIndexingTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot index with value which has type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
 func (*NotIndexingTypeError) isSemanticError() {}
 
-func (e *NotIndexingTypeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotIndexingTypeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // NotEquatableTypeError
 
 type NotEquatableTypeError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *NotEquatableTypeError) Error() string {
-	return fmt.Sprintf("cannot compare value which has type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot compare value which has type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotEquatableTypeError) isSemanticError() {}
 
-func (e *NotEquatableTypeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotEquatableTypeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // NotCallableError
 
 type NotCallableError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *NotCallableError) Error() string {
-	return fmt.Sprintf("cannot call type: `%s`", e.Type.String())
+	return fmt.Sprintf("cannot call type: `%s`",
+		e.Type,
+	)
 }
 
 func (*NotCallableError) isSemanticError() {}
-
-func (e *NotCallableError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotCallableError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // ArgumentCountError
 
 type ArgumentCountError struct {
 	ParameterCount int
 	ArgumentCount  int
-	StartPos       ast.Position
-	EndPos         ast.Position
+	ast.Range
 }
 
 func (e *ArgumentCountError) Error() string {
@@ -292,22 +236,13 @@ func (e *ArgumentCountError) Error() string {
 
 func (*ArgumentCountError) isSemanticError() {}
 
-func (e *ArgumentCountError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *ArgumentCountError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // MissingArgumentLabelError
 
 // TODO: suggest adding argument label
 
 type MissingArgumentLabelError struct {
 	ExpectedArgumentLabel string
-	StartPos              ast.Position
-	EndPos                ast.Position
+	ast.Range
 }
 
 func (e *MissingArgumentLabelError) Error() string {
@@ -319,21 +254,12 @@ func (e *MissingArgumentLabelError) Error() string {
 
 func (*MissingArgumentLabelError) isSemanticError() {}
 
-func (e *MissingArgumentLabelError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *MissingArgumentLabelError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // IncorrectArgumentLabelError
 
 type IncorrectArgumentLabelError struct {
 	ExpectedArgumentLabel string
 	ActualArgumentLabel   string
-	StartPos              ast.Position
-	EndPos                ast.Position
+	ast.Range
 }
 
 func (e *IncorrectArgumentLabelError) Error() string {
@@ -350,42 +276,25 @@ func (e *IncorrectArgumentLabelError) Error() string {
 
 func (*IncorrectArgumentLabelError) isSemanticError() {}
 
-func (e *IncorrectArgumentLabelError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *IncorrectArgumentLabelError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidUnaryOperandError
 
 type InvalidUnaryOperandError struct {
 	Operation    ast.Operation
 	ExpectedType Type
 	ActualType   Type
-	StartPos     ast.Position
-	EndPos       ast.Position
+	ast.Range
 }
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
 		"cannot apply unary operation %s to type: expected `%s`, got `%s`",
 		e.Operation.Symbol(),
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
 }
 
 func (*InvalidUnaryOperandError) isSemanticError() {}
-
-func (e *InvalidUnaryOperandError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidUnaryOperandError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // InvalidBinaryOperandError
 
@@ -394,8 +303,7 @@ type InvalidBinaryOperandError struct {
 	Side         common.OperandSide
 	ExpectedType Type
 	ActualType   Type
-	StartPos     ast.Position
-	EndPos       ast.Position
+	ast.Range
 }
 
 func (e *InvalidBinaryOperandError) Error() string {
@@ -403,20 +311,12 @@ func (e *InvalidBinaryOperandError) Error() string {
 		"cannot apply binary operation %s to %s-hand type: expected `%s`, got `%s`",
 		e.Operation.Symbol(),
 		e.Side.Name(),
-		e.ExpectedType.String(),
-		e.ActualType.String(),
+		e.ExpectedType,
+		e.ActualType,
 	)
 }
 
 func (*InvalidBinaryOperandError) isSemanticError() {}
-
-func (e *InvalidBinaryOperandError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // InvalidBinaryOperandsError
 
@@ -424,35 +324,25 @@ type InvalidBinaryOperandsError struct {
 	Operation ast.Operation
 	LeftType  Type
 	RightType Type
-	StartPos  ast.Position
-	EndPos    ast.Position
+	ast.Range
 }
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
 		"cannot apply binary operation %s to different types: `%s`, `%s`",
 		e.Operation.Symbol(),
-		e.LeftType.String(),
-		e.RightType.String(),
+		e.LeftType,
+		e.RightType,
 	)
 }
 
 func (*InvalidBinaryOperandsError) isSemanticError() {}
 
-func (e *InvalidBinaryOperandsError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidBinaryOperandsError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // ControlStatementError
 
 type ControlStatementError struct {
 	ControlStatement common.ControlStatement
-	StartPos         ast.Position
-	EndPos           ast.Position
+	ast.Range
 }
 
 func (e *ControlStatementError) Error() string {
@@ -463,14 +353,6 @@ func (e *ControlStatementError) Error() string {
 }
 
 func (*ControlStatementError) isSemanticError() {}
-
-func (e *ControlStatementError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *ControlStatementError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // InvalidAccessModifierError
 
@@ -544,9 +426,8 @@ func (e *UnknownSpecialFunctionError) EndPosition() ast.Position {
 // InvalidVariableKindError
 
 type InvalidVariableKindError struct {
-	Kind     ast.VariableKind
-	StartPos ast.Position
-	EndPos   ast.Position
+	Kind ast.VariableKind
+	ast.Range
 }
 
 func (e *InvalidVariableKindError) Error() string {
@@ -558,20 +439,11 @@ func (e *InvalidVariableKindError) Error() string {
 
 func (*InvalidVariableKindError) isSemanticError() {}
 
-func (e *InvalidVariableKindError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidVariableKindError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
-	Kind     common.DeclarationKind
-	StartPos ast.Position
-	EndPos   ast.Position
+	Kind common.DeclarationKind
+	ast.Range
 }
 
 func (e *InvalidDeclarationError) Error() string {
@@ -580,27 +452,19 @@ func (e *InvalidDeclarationError) Error() string {
 
 func (*InvalidDeclarationError) isSemanticError() {}
 
-func (e *InvalidDeclarationError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidDeclarationError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // MissingInitializerError
 
 type MissingInitializerError struct {
-	ContainerTypeIdentifier string
-	FirstFieldName          string
-	FirstFieldPos           ast.Position
+	ContainerType  Type
+	FirstFieldName string
+	FirstFieldPos  ast.Position
 }
 
 func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerTypeIdentifier,
+		e.ContainerType,
 	)
 }
 
@@ -617,16 +481,15 @@ func (e *MissingInitializerError) EndPosition() ast.Position {
 // NotDeclaredMemberError
 
 type NotDeclaredMemberError struct {
-	Name     string
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Name string
+	Type Type
+	ast.Range
 }
 
 func (e *NotDeclaredMemberError) Error() string {
 	return fmt.Sprintf(
 		"value of type `%s` has no member `%s`",
-		e.Type.String(),
+		e.Type,
 		e.Name,
 	)
 }
@@ -637,14 +500,6 @@ func (e *NotDeclaredMemberError) SecondaryError() string {
 
 func (*NotDeclaredMemberError) isSemanticError() {}
 
-func (e *NotDeclaredMemberError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *NotDeclaredMemberError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // AssignmentToConstantMemberError
 
 // TODO: maybe split up into two errors:
@@ -652,9 +507,8 @@ func (e *NotDeclaredMemberError) EndPosition() ast.Position {
 //  - assignment to function
 
 type AssignmentToConstantMemberError struct {
-	Name     string
-	StartPos ast.Position
-	EndPos   ast.Position
+	Name string
+	ast.Range
 }
 
 func (e *AssignmentToConstantMemberError) Error() string {
@@ -663,28 +517,19 @@ func (e *AssignmentToConstantMemberError) Error() string {
 
 func (*AssignmentToConstantMemberError) isSemanticError() {}
 
-func (e *AssignmentToConstantMemberError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *AssignmentToConstantMemberError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // FieldUninitializedError
 
 type FieldUninitializedError struct {
 	Name          string
-	CompositeType *CompositeType
-	Initializer   *ast.SpecialFunctionDeclaration
+	ContainerType Type
 	Pos           ast.Position
 }
 
 func (e *FieldUninitializedError) Error() string {
 	return fmt.Sprintf(
-		"field `%s` of type `%s` is not initialized",
+		"missing initialization of field `%s` in type `%s`",
 		e.Name,
-		e.CompositeType.Identifier,
+		e.ContainerType,
 	)
 }
 
@@ -706,8 +551,7 @@ func (e *FieldUninitializedError) EndPosition() ast.Position {
 // FunctionExpressionInConditionError
 
 type FunctionExpressionInConditionError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *FunctionExpressionInConditionError) Error() string {
@@ -716,37 +560,20 @@ func (e *FunctionExpressionInConditionError) Error() string {
 
 func (*FunctionExpressionInConditionError) isSemanticError() {}
 
-func (e *FunctionExpressionInConditionError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *FunctionExpressionInConditionError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // UnexpectedReturnValueError
 
 type InvalidReturnValueError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidReturnValueError) Error() string {
 	return fmt.Sprintf(
 		"invalid return with value from function without %s return type",
-		(&VoidType{}).String(),
+		&VoidType{},
 	)
 }
 
 func (*InvalidReturnValueError) isSemanticError() {}
-
-func (e *InvalidReturnValueError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidReturnValueError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // InvalidImplementationError
 
@@ -784,7 +611,7 @@ type InvalidConformanceError struct {
 func (e *InvalidConformanceError) Error() string {
 	return fmt.Sprintf(
 		"cannot conform to non-interface type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
@@ -873,8 +700,7 @@ func (e *DuplicateConformanceError) EndPosition() ast.Position {
 
 type UnresolvedImportError struct {
 	ImportLocation ast.ImportLocation
-	StartPos       ast.Position
-	EndPos         ast.Position
+	ast.Range
 }
 
 func (e *UnresolvedImportError) Error() string {
@@ -886,22 +712,13 @@ func (e *UnresolvedImportError) Error() string {
 
 func (*UnresolvedImportError) isSemanticError() {}
 
-func (e *UnresolvedImportError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *UnresolvedImportError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // RepeatedImportError
 
 // TODO: make warning?
 
 type RepeatedImportError struct {
 	ImportLocation ast.ImportLocation
-	StartPos       ast.Position
-	EndPos         ast.Position
+	ast.Range
 }
 
 func (e *RepeatedImportError) Error() string {
@@ -912,14 +729,6 @@ func (e *RepeatedImportError) Error() string {
 }
 
 func (*RepeatedImportError) isSemanticError() {}
-
-func (e *RepeatedImportError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *RepeatedImportError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // NotExportedError
 
@@ -973,34 +782,24 @@ func (e *ImportedProgramError) EndPosition() ast.Position {
 // UnsupportedTypeError
 
 type UnsupportedTypeError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *UnsupportedTypeError) Error() string {
 	return fmt.Sprintf(
 		"unsupported type: `%s`",
-		e.Type.String(),
+		e.Type,
 	)
 }
 
 func (*UnsupportedTypeError) isSemanticError() {}
 
-func (e *UnsupportedTypeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *UnsupportedTypeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // UnsupportedDeclarationError
 
 type UnsupportedDeclarationError struct {
 	DeclarationKind common.DeclarationKind
-	StartPos        ast.Position
-	EndPos          ast.Position
+	ast.Range
 }
 
 func (e *UnsupportedDeclarationError) Error() string {
@@ -1012,20 +811,11 @@ func (e *UnsupportedDeclarationError) Error() string {
 
 func (*UnsupportedDeclarationError) isSemanticError() {}
 
-func (e *UnsupportedDeclarationError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *UnsupportedDeclarationError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // UnsupportedOverloadingError
 
 type UnsupportedOverloadingError struct {
 	DeclarationKind common.DeclarationKind
-	StartPos        ast.Position
-	EndPos          ast.Position
+	ast.Range
 }
 
 func (e *UnsupportedOverloadingError) Error() string {
@@ -1037,21 +827,12 @@ func (e *UnsupportedOverloadingError) Error() string {
 
 func (*UnsupportedOverloadingError) isSemanticError() {}
 
-func (e *UnsupportedOverloadingError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *UnsupportedOverloadingError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // CompositeKindMismatchError
 
 type CompositeKindMismatchError struct {
 	ExpectedKind common.CompositeKind
 	ActualKind   common.CompositeKind
-	StartPos     ast.Position
-	EndPos       ast.Position
+	ast.Range
 }
 
 func (e *CompositeKindMismatchError) Error() string {
@@ -1068,28 +849,19 @@ func (e *CompositeKindMismatchError) SecondaryError() string {
 	)
 }
 
-func (e *CompositeKindMismatchError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *CompositeKindMismatchError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidIntegerLiteralRangeError
 
 type InvalidIntegerLiteralRangeError struct {
 	ExpectedType     Type
 	ExpectedRangeMin *big.Int
 	ExpectedRangeMax *big.Int
-	StartPos         ast.Position
-	EndPos           ast.Position
+	ast.Range
 }
 
 func (e *InvalidIntegerLiteralRangeError) Error() string {
 	return fmt.Sprintf(
 		"integer literal out of range: expected `%s`, in range [%s, %s]",
-		e.ExpectedType.String(),
+		e.ExpectedType,
 		e.ExpectedRangeMin,
 		e.ExpectedRangeMax,
 	)
@@ -1097,19 +869,10 @@ func (e *InvalidIntegerLiteralRangeError) Error() string {
 
 func (*InvalidIntegerLiteralRangeError) isSemanticError() {}
 
-func (e *InvalidIntegerLiteralRangeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidIntegerLiteralRangeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // MissingReturnStatementError
 
 type MissingReturnStatementError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *MissingReturnStatementError) Error() string {
@@ -1118,20 +881,11 @@ func (e *MissingReturnStatementError) Error() string {
 
 func (*MissingReturnStatementError) isSemanticError() {}
 
-func (e *MissingReturnStatementError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *MissingReturnStatementError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // UnsupportedExpressionError
 
 type UnsupportedExpressionError struct {
 	ExpressionKind common.ExpressionKind
-	StartPos       ast.Position
-	EndPos         ast.Position
+	ast.Range
 }
 
 func (e *UnsupportedExpressionError) Error() string {
@@ -1142,14 +896,6 @@ func (e *UnsupportedExpressionError) Error() string {
 }
 
 func (*UnsupportedExpressionError) isSemanticError() {}
-
-func (e *UnsupportedExpressionError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *UnsupportedExpressionError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // MissingMoveAnnotationError
 
@@ -1240,8 +986,7 @@ func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
 // InvalidConstructionError
 
 type InvalidConstructionError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidConstructionError) Error() string {
@@ -1250,19 +995,10 @@ func (e *InvalidConstructionError) Error() string {
 
 func (*InvalidConstructionError) isSemanticError() {}
 
-func (e *InvalidConstructionError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidConstructionError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidDestructionError
 
 type InvalidDestructionError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidDestructionError) Error() string {
@@ -1271,19 +1007,10 @@ func (e *InvalidDestructionError) Error() string {
 
 func (*InvalidDestructionError) isSemanticError() {}
 
-func (e *InvalidDestructionError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidDestructionError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // ResourceLossError
 
 type ResourceLossError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *ResourceLossError) Error() string {
@@ -1292,19 +1019,11 @@ func (e *ResourceLossError) Error() string {
 
 func (*ResourceLossError) isSemanticError() {}
 
-func (e *ResourceLossError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *ResourceLossError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // ResourceUseAfterInvalidationError
 
 type ResourceUseAfterInvalidationError struct {
-	Name          string
-	Pos           ast.Position
+	StartPos      ast.Position
+	EndPos        ast.Position
 	Invalidations []ResourceInvalidation
 	InLoop        bool
 	// NOTE: cached values, use `Cause()`
@@ -1337,20 +1056,17 @@ func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool
 }
 
 func (e *ResourceUseAfterInvalidationError) Error() string {
-	message := ""
 	wasMoved, wasDestroyed := e.Cause()
 	switch {
 	case wasMoved && wasDestroyed:
-		message = "use of moved or destroyed resource"
+		return "use of moved or destroyed resource"
 	case wasMoved:
-		message = "use of moved resource"
+		return "use of moved resource"
 	case wasDestroyed:
-		message = "use of destroyed resource"
+		return "use of destroyed resource"
 	default:
 		panic(&errors.UnreachableError{})
 	}
-
-	return fmt.Sprintf("%s: `%s`", message, e.Name)
 }
 
 func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
@@ -1391,7 +1107,7 @@ func (e *ResourceUseAfterInvalidationError) HasInvalidationInPreviousLoopIterati
 	// if all invalidations occur after the use
 
 	for _, invalidation := range e.Invalidations {
-		if invalidation.Pos.Compare(e.Pos) < 0 {
+		if invalidation.StartPos.Compare(e.StartPos) < 0 {
 			return false
 		}
 	}
@@ -1403,8 +1119,10 @@ func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNo
 	for _, invalidation := range e.Invalidations {
 		notes = append(notes, ResourceInvalidationNote{
 			ResourceInvalidation: invalidation,
-			StartPos:             invalidation.Pos,
-			EndPos:               invalidation.Pos.Shifted(len(e.Name) - 1),
+			Range: ast.Range{
+				StartPos: invalidation.StartPos,
+				EndPos:   invalidation.EndPos,
+			},
 		})
 	}
 	return
@@ -1413,27 +1131,18 @@ func (e *ResourceUseAfterInvalidationError) ErrorNotes() (notes []errors.ErrorNo
 func (*ResourceUseAfterInvalidationError) isSemanticError() {}
 
 func (e *ResourceUseAfterInvalidationError) StartPosition() ast.Position {
-	return e.Pos
+	return e.StartPos
 }
 
 func (e *ResourceUseAfterInvalidationError) EndPosition() ast.Position {
-	return e.Pos.Shifted(len(e.Name) - 1)
+	return e.EndPos
 }
 
 // ResourceInvalidationNote
 
 type ResourceInvalidationNote struct {
 	ResourceInvalidation
-	StartPos ast.Position
-	EndPos   ast.Position
-}
-
-func (n ResourceInvalidationNote) StartPosition() ast.Position {
-	return n.StartPos
-}
-
-func (n ResourceInvalidationNote) EndPosition() ast.Position {
-	return n.EndPos
+	ast.Range
 }
 
 func (n ResourceInvalidationNote) Message() string {
@@ -1450,8 +1159,7 @@ func (n ResourceInvalidationNote) Message() string {
 // MissingCreateError
 
 type MissingCreateError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *MissingCreateError) Error() string {
@@ -1459,14 +1167,6 @@ func (e *MissingCreateError) Error() string {
 }
 
 func (*MissingCreateError) isSemanticError() {}
-
-func (e *MissingCreateError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *MissingCreateError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // MissingMoveOperationError
 
@@ -1491,8 +1191,7 @@ func (e *MissingMoveOperationError) EndPosition() ast.Position {
 // InvalidMoveOperationError
 
 type InvalidMoveOperationError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidMoveOperationError) Error() string {
@@ -1500,14 +1199,6 @@ func (e *InvalidMoveOperationError) Error() string {
 }
 
 func (*InvalidMoveOperationError) isSemanticError() {}
-
-func (e *InvalidMoveOperationError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidMoveOperationError) EndPosition() ast.Position {
-	return e.EndPos
-}
 
 // ResourceCapturingError
 
@@ -1556,8 +1247,7 @@ func (e *InvalidResourceFieldError) EndPosition() ast.Position {
 // InvalidStorageIndexingError
 
 type InvalidStorageIndexingError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidStorageIndexingError) Error() string {
@@ -1566,19 +1256,10 @@ func (e *InvalidStorageIndexingError) Error() string {
 
 func (*InvalidStorageIndexingError) isSemanticError() {}
 
-func (e *InvalidStorageIndexingError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidStorageIndexingError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidIndexingError
 
 type InvalidIndexingError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidIndexingError) Error() string {
@@ -1587,20 +1268,11 @@ func (e *InvalidIndexingError) Error() string {
 
 func (*InvalidIndexingError) isSemanticError() {}
 
-func (e *InvalidIndexingError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidIndexingError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidSwapExpressionError
 
 type InvalidSwapExpressionError struct {
-	Side     common.OperandSide
-	StartPos ast.Position
-	EndPos   ast.Position
+	Side common.OperandSide
+	ast.Range
 }
 
 func (e *InvalidSwapExpressionError) Error() string {
@@ -1612,41 +1284,26 @@ func (e *InvalidSwapExpressionError) Error() string {
 
 func (*InvalidSwapExpressionError) isSemanticError() {}
 
-func (e *InvalidSwapExpressionError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidSwapExpressionError) EndPosition() ast.Position {
-	return e.EndPos
-}
-  
 // InvalidEventParameterTypeError
 
 type InvalidEventParameterTypeError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *InvalidEventParameterTypeError) Error() string {
-	return fmt.Sprintf("unsupported event parameter type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"unsupported event parameter type: `%s`",
+		e.Type,
+	)
 }
 
 func (*InvalidEventParameterTypeError) isSemanticError() {}
 
-func (e *InvalidEventParameterTypeError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidEventParameterTypeError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidEventUsageError
 
 type InvalidEventUsageError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidEventUsageError) Error() string {
@@ -1655,62 +1312,38 @@ func (e *InvalidEventUsageError) Error() string {
 
 func (*InvalidEventUsageError) isSemanticError() {}
 
-func (e *InvalidEventUsageError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidEventUsageError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // EmitNonEventError
 
 type EmitNonEventError struct {
-	Type     Type
-	StartPos ast.Position
-	EndPos   ast.Position
+	Type Type
+	ast.Range
 }
 
 func (e *EmitNonEventError) Error() string {
-	return fmt.Sprintf("cannot emit non-event type: `%s`", e.Type.String())
+	return fmt.Sprintf(
+		"cannot emit non-event type: `%s`",
+		e.Type,
+	)
 }
 
 func (*EmitNonEventError) isSemanticError() {}
 
-func (e *EmitNonEventError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *EmitNonEventError) EndPosition() ast.Position {
-	return e.EndPos
-}
-  
 // InvalidResourceAssignmentError
 
 type InvalidResourceAssignmentError struct {
- 	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
-  
+
 func (e *InvalidResourceAssignmentError) Error() string {
 	return "cannot assign to resource-typed target. consider swapping (<->)"
 }
 
 func (*InvalidResourceAssignmentError) isSemanticError() {}
 
-func (e *InvalidResourceAssignmentError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidResourceAssignmentError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // InvalidDestructorError
 
 type InvalidDestructorError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidDestructorError) Error() string {
@@ -1719,27 +1352,19 @@ func (e *InvalidDestructorError) Error() string {
 
 func (*InvalidDestructorError) isSemanticError() {}
 
-func (e *InvalidDestructorError) StartPosition() ast.Position {
-	return e.StartPos
-}
-
-func (e *InvalidDestructorError) EndPosition() ast.Position {
-	return e.EndPos
-}
-
 // MissingDestructorError
 
 type MissingDestructorError struct {
-	ContainerTypeIdentifier string
-	FirstFieldName          string
-	FirstFieldPos           ast.Position
+	ContainerType  Type
+	FirstFieldName string
+	FirstFieldPos  ast.Position
 }
 
 func (e *MissingDestructorError) Error() string {
 	return fmt.Sprintf(
 		"missing destructor for resource field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerTypeIdentifier,
+		e.ContainerType,
 	)
 }
 
@@ -1756,8 +1381,7 @@ func (e *MissingDestructorError) EndPosition() ast.Position {
 // InvalidDestructorParametersError
 
 type InvalidDestructorParametersError struct {
-	StartPos ast.Position
-	EndPos   ast.Position
+	ast.Range
 }
 
 func (e *InvalidDestructorParametersError) Error() string {
@@ -1770,10 +1394,111 @@ func (e *InvalidDestructorParametersError) SecondaryError() string {
 
 func (*InvalidDestructorParametersError) isSemanticError() {}
 
-func (e *InvalidDestructorParametersError) StartPosition() ast.Position {
-	return e.StartPos
+// ResourceFieldNotInvalidatedError
+
+type ResourceFieldNotInvalidatedError struct {
+	FieldName string
+	TypeName  string
+	Pos       ast.Position
 }
 
-func (e *InvalidDestructorParametersError) EndPosition() ast.Position {
-	return e.EndPos
+func (e *ResourceFieldNotInvalidatedError) Error() string {
+	return fmt.Sprintf(
+		"field `%s` of resource type `%s` is not invalidated (moved or destroyed)",
+		e.FieldName,
+		e.TypeName,
+	)
 }
+
+func (e *ResourceFieldNotInvalidatedError) SecondaryError() string {
+	return "not invalidated"
+}
+
+func (*ResourceFieldNotInvalidatedError) isSemanticError() {}
+
+func (e *ResourceFieldNotInvalidatedError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *ResourceFieldNotInvalidatedError) EndPosition() ast.Position {
+	length := len(e.FieldName)
+	return e.Pos.Shifted(length - 1)
+}
+
+// UninitializedFieldAccessError
+
+type UninitializedFieldAccessError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *UninitializedFieldAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access uninitialized field: `%s`",
+		e.Name,
+	)
+}
+
+func (*UninitializedFieldAccessError) isSemanticError() {}
+
+func (e *UninitializedFieldAccessError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UninitializedFieldAccessError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// UnreachableStatementError
+
+type UnreachableStatementError struct {
+	ast.Range
+}
+
+func (e *UnreachableStatementError) Error() string {
+	return "unreachable statement"
+}
+
+func (*UnreachableStatementError) isSemanticError() {}
+
+// UninitializedUseError
+
+type UninitializedUseError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *UninitializedUseError) Error() string {
+	return fmt.Sprintf(
+		"cannot use incompletely initialized value: `%s`",
+		e.Name,
+	)
+}
+
+func (*UninitializedUseError) isSemanticError() {}
+
+func (e *UninitializedUseError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *UninitializedUseError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// InvalidResourceArrayMemberError
+
+type InvalidResourceArrayMemberError struct {
+	Name string
+	ast.Range
+}
+
+func (e *InvalidResourceArrayMemberError) Error() string {
+	return fmt.Sprintf(
+		"array member `%s` is not available for resource arrays",
+		e.Name,
+	)
+}
+
+func (*InvalidResourceArrayMemberError) isSemanticError() {}

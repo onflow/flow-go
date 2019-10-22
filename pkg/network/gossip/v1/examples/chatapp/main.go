@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
+	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
+	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
 	"os"
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	"github.com/golang/protobuf/proto"
-
 )
 
 // Demo of a simple chat application based on the gossip node implementation
@@ -42,12 +40,8 @@ func main() {
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
 	// Registering the gRPC services provided by the messageReceiver to the gossip registry
-	node := gnode.NewNode(zerolog.Logger{}, NewReceiverServerRegistry(&messageReceiver{}))
-	myPort := listener.Addr().String()
-	fmt.Println("Chat app serves at port: ", myPort)
 
-	// step 3: passing the listener to the instance of gnode
-	go node.Serve(listener)
+	myPort := listener.Addr().String()
 
 	// finding the port number of other nodes
 	othersPort := make([]string, 0)
@@ -57,6 +51,12 @@ func main() {
 		}
 	}
 
+	node := gnode.NewNode(NewReceiverServerRegistry(&messageReceiver{}), myPort, othersPort, 2, 10)
+	fmt.Println("Chat app serves at port: ", myPort)
+
+	// step 3: passing the listener to the instance of gnode
+	go node.Serve(listener)
+
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("Enter Message: ")
@@ -65,7 +65,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not create message payload: %v", err)
 		}
-		_, err = node.AsyncGossip(context.Background(), payloadBytes, othersPort, "DisplayMessage")
+		//recipients are set to nil meaning that the message is targeted for all, i.e., ONE_TO_ALL gossip
+		_, err = node.AsyncGossip(context.Background(), payloadBytes, nil, "DisplayMessage")
 		if err != nil {
 			log.Println(err)
 		}

@@ -27,25 +27,26 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program             *ast.Program
-	PredeclaredValues   map[string]ValueDeclaration
-	PredeclaredTypes    map[string]TypeDeclaration
-	ImportCheckers      map[ast.ImportLocation]*Checker
-	errors              []error
-	valueActivations    *ValueActivations
-	resources           *Resources
-	typeActivations     *TypeActivations
-	functionActivations *FunctionActivations
-	GlobalValues        map[string]*Variable
-	GlobalTypes         map[string]Type
-	inCondition         bool
-	Occurrences         *Occurrences
-	variableOrigins     map[*Variable]*Origin
-	memberOrigins       map[Type]map[string]*Origin
-	seenImports         map[ast.ImportLocation]bool
-	isChecked           bool
-	inCreate            bool
-	Elaboration         *Elaboration
+	Program                 *ast.Program
+	PredeclaredValues       map[string]ValueDeclaration
+	PredeclaredTypes        map[string]TypeDeclaration
+	ImportCheckers          map[ast.ImportLocation]*Checker
+	errors                  []error
+	valueActivations        *ValueActivations
+	resources               *Resources
+	typeActivations         *TypeActivations
+	functionActivations     *FunctionActivations
+	GlobalValues            map[string]*Variable
+	GlobalTypes             map[string]Type
+	inCondition             bool
+	Occurrences             *Occurrences
+	variableOrigins         map[*Variable]*Origin
+	memberOrigins           map[Type]map[string]*Origin
+	seenImports             map[ast.ImportLocation]bool
+	isChecked               bool
+	inCreate                bool
+	Elaboration             *Elaboration
+	currentMemberExpression *ast.MemberExpression
 }
 
 func NewChecker(
@@ -53,6 +54,12 @@ func NewChecker(
 	predeclaredValues map[string]ValueDeclaration,
 	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
+
+	functionActivations := &FunctionActivations{}
+	functionActivations.EnterFunction(&FunctionType{
+		ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{})},
+		0,
+	)
 
 	checker := &Checker{
 		Program:             program,
@@ -62,7 +69,7 @@ func NewChecker(
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
-		functionActivations: &FunctionActivations{},
+		functionActivations: functionActivations,
 		GlobalValues:        map[string]*Variable{},
 		GlobalTypes:         map[string]Type{},
 		Occurrences:         NewOccurrences(),
@@ -114,11 +121,11 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.TypeDeclarationKind(),
-			IsConstant: true,
-			Type:       ty,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.TypeDeclarationKind(),
+			IsConstant:      true,
+			Type:            ty,
+			Pos:             &identifier.Pos,
 		},
 	)
 }
@@ -153,13 +160,11 @@ func (checker *Checker) checkerError() *CheckerError {
 	return nil
 }
 
-func (checker *Checker) report(errs ...error) {
-	for _, err := range errs {
-		if err == nil {
-			continue
-		}
-		checker.errors = append(checker.errors, errs...)
+func (checker *Checker) report(err error) {
+	if err == nil {
+		return
 	}
+	checker.errors = append(checker.errors, err)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
@@ -193,7 +198,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
-	functionType := checker.functionType(declaration.Parameters, declaration.ReturnTypeAnnotation)
+	functionType := checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
 	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
 	checker.declareFunctionDeclaration(declaration, functionType)
 }
@@ -236,6 +241,32 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 
 			return true
 		}
+
+	case *ast.ArrayExpression:
+
+		// Variable sized array literals are compatible with constant sized target types
+		// if their element type matches and the element count matches
+
+		if variableSizedValueType, isVariableSizedValue :=
+			valueType.(*VariableSizedType); isVariableSizedValue {
+
+			if constantSizedTargetType, isConstantSizedTarget :=
+				targetType.(*ConstantSizedType); isConstantSizedTarget {
+
+				valueElementType := variableSizedValueType.ElementType(false)
+				targetElementType := constantSizedTargetType.ElementType(false)
+
+				// TODO: report helpful error when counts mismatch
+
+				literalCount := len(typedExpression.Values)
+
+				if IsSubType(valueElementType, targetElementType) &&
+					literalCount == constantSizedTargetType.Size {
+
+					return true
+				}
+			}
+		}
 	}
 
 	return IsSubType(valueType, targetType)
@@ -257,8 +288,10 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 				ExpectedType:     integerType,
 				ExpectedRangeMin: rangeMin,
 				ExpectedRangeMax: rangeMax,
-				StartPos:         expression.StartPosition(),
-				EndPos:           expression.EndPosition(),
+				Range: ast.Range{
+					StartPos: expression.StartPosition(),
+					EndPos:   expression.EndPosition(),
+				},
 			},
 		)
 	}
@@ -421,11 +454,11 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 }
 
 func (checker *Checker) functionType(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
 	convertedParameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(parameters)
+		checker.parameterTypeAnnotations(parameterList)
 
 	convertedReturnTypeAnnotation :=
 		checker.ConvertTypeAnnotation(returnTypeAnnotation)
@@ -436,11 +469,11 @@ func (checker *Checker) functionType(
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameters ast.Parameters) []*TypeAnnotation {
+func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterList) []*TypeAnnotation {
 
-	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameters))
+	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameterList.Parameters))
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,
@@ -456,7 +489,7 @@ func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.P
 	if !ok {
 		origin = &Origin{
 			Type:            variable.Type,
-			DeclarationKind: variable.Kind,
+			DeclarationKind: variable.DeclarationKind,
 			StartPos:        variable.Pos,
 			// TODO:
 			EndPos: variable.Pos,
@@ -543,14 +576,16 @@ func (checker *Checker) checkResourceLoss(depth int) {
 		// TODO: handle `self` and `result` properly
 
 		if variable.Type.IsResourceType() &&
-			variable.Kind != common.DeclarationKindSelf &&
-			variable.Kind != common.DeclarationKindResult &&
+			variable.DeclarationKind != common.DeclarationKindSelf &&
+			variable.DeclarationKind != common.DeclarationKindResult &&
 			!checker.resources.Get(variable).DefinitivelyInvalidated {
 
 			checker.report(
 				&ResourceLossError{
-					StartPos: *variable.Pos,
-					EndPos:   variable.Pos.Shifted(len(name) - 1),
+					Range: ast.Range{
+						StartPos: *variable.Pos,
+						EndPos:   variable.Pos.Shifted(len(name) - 1),
+					},
 				},
 			)
 
@@ -563,9 +598,6 @@ func (checker *Checker) withValueScope(f func()) {
 	defer checker.leaveValueScope()
 	f()
 }
-
-// TODO: create mapping between composite declaration member -> variable
-//   then look up in `resourceVariable`
 
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
@@ -587,14 +619,28 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
+	selfFieldMember := checker.selfFieldAccessMember(expression)
+
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if !checker.isSelfFieldAccess(expression) {
+		if selfFieldMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
+
 	case *ast.IndexExpression:
 		reportInvalidNestedMove()
+		return
+	}
+
+	invalidation := ResourceInvalidation{
+		Kind:     kind,
+		StartPos: expression.StartPosition(),
+		EndPos:   expression.EndPosition(),
+	}
+
+	if selfFieldMember != nil {
+		checker.resources.AddInvalidation(selfFieldMember, invalidation)
 		return
 	}
 
@@ -608,16 +654,11 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	checker.resources.AddInvalidation(variable,
-		ResourceInvalidation{
-			Kind: kind,
-			Pos:  identifierExpression.Pos,
-		},
-	)
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(
-	check func() Type,
+	check TypeCheckFunc,
 	temporaryResources *Resources,
 ) Type {
 	originalResources := checker.resources
@@ -625,6 +666,37 @@ func (checker *Checker) checkWithResources(
 	defer func() {
 		checker.resources = originalResources
 	}()
+
+	return check()
+}
+
+func (checker *Checker) checkWithReturnInfo(
+	check TypeCheckFunc,
+	temporaryReturnInfo *ReturnInfo,
+) Type {
+	functionActivation := checker.functionActivations.Current()
+	initialReturnInfo := functionActivation.ReturnInfo
+	functionActivation.ReturnInfo = temporaryReturnInfo
+	defer func() {
+		functionActivation.ReturnInfo = initialReturnInfo
+	}()
+
+	return check()
+}
+
+func (checker *Checker) checkWithInitializedMembers(
+	check TypeCheckFunc,
+	temporaryInitializedMembers *MemberSet,
+) Type {
+	if temporaryInitializedMembers != nil {
+		functionActivation := checker.functionActivations.Current()
+		initializationInfo := functionActivation.InitializationInfo
+		initialInitializedMembers := initializationInfo.InitializedFieldMembers
+		initializationInfo.InitializedFieldMembers = temporaryInitializedMembers
+		defer func() {
+			initializationInfo.InitializedFieldMembers = initialInitializedMembers
+		}()
+	}
 
 	return check()
 }
@@ -670,8 +742,10 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 
 	checker.report(
 		&ResourceLossError{
-			StartPos: expression.StartPosition(),
-			EndPos:   expression.EndPosition(),
+			Range: ast.Range{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
 		},
 	)
 }
@@ -702,4 +776,42 @@ func (checker *Checker) checkResourceFieldNesting(
 			},
 		)
 	}
+}
+
+// checkPotentiallyUnevaluated runs the given type checking function
+// under the assumption that the checked expression might not be evaluated.
+// That means that resource invalidation and returns are not definite,
+// but only potential
+//
+func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
+	functionActivation := checker.functionActivations.Current()
+
+	initialReturnInfo := functionActivation.ReturnInfo
+	temporaryReturnInfo := initialReturnInfo.Clone()
+
+	var temporaryInitializedMembers *MemberSet
+	if functionActivation.InitializationInfo != nil {
+		initialInitializedMembers := functionActivation.InitializationInfo.InitializedFieldMembers
+		temporaryInitializedMembers = initialInitializedMembers.Clone()
+	}
+
+	initialResources := checker.resources
+	temporaryResources := initialResources.Clone()
+
+	result := checker.checkBranch(
+		check,
+		temporaryReturnInfo,
+		temporaryInitializedMembers,
+		temporaryResources,
+	)
+
+	functionActivation.ReturnInfo.MaybeReturned =
+		functionActivation.ReturnInfo.MaybeReturned ||
+			temporaryReturnInfo.MaybeReturned
+
+	// NOTE: the definitive return state does not change
+
+	checker.resources.MergeBranches(temporaryResources, nil)
+
+	return result
 }

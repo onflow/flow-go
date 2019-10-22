@@ -7,9 +7,10 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -87,7 +88,7 @@ func generateInspectNFTScript(nftCodeAddr, userAddr types.Address, expectedID in
 
 func newEmulator() *emulator.EmulatedBlockchain {
 	return emulator.NewEmulatedBlockchain(&emulator.EmulatedBlockchainOptions{
-		RuntimeLogger: func(msg string) {},
+		OnLogMessage: func(msg string) {},
 	})
 }
 

@@ -49,6 +49,8 @@ type Interface interface {
 	GetSigningAccounts() []types.Address
 	// Log logs a string.
 	Log(string)
+	// EmitEvent is called when an event is emitted by the runtime.
+	EmitEvent(types.Event)
 }
 
 type Error struct {
@@ -267,6 +269,23 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 	}
 }
 
+// emitEvent converts an event value to native Go types and emits it to the runtime interface.
+func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtimeInterface Interface) {
+	values := make(map[string]interface{})
+
+	for _, field := range eventValue.Fields {
+		value := field.Value.(interpreter.ExportableValue)
+		values[field.Identifier] = value.ToGoValue()
+	}
+
+	event := types.Event{
+		ID:     eventValue.ID,
+		Values: values,
+	}
+
+	runtimeInterface.EmitEvent(event)
+}
+
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface) (interface{}, error) {
 	program, err := r.parse(script, runtimeInterface)
 	if err != nil {
@@ -338,6 +357,10 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
+
+	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
+		r.emitEvent(eventValue, runtimeInterface)
+	})
 
 	if err := inter.Interpret(); err != nil {
 		return nil, Error{[]error{err}}

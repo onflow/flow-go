@@ -36,6 +36,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
 		ContainerKindInterface,
+		nil,
 	)
 
 	checker.checkDestructors(
@@ -70,8 +71,10 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				StartPos:        declaration.Identifier.StartPosition(),
-				EndPos:          declaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: declaration.Identifier.StartPosition(),
+					EndPos:   declaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -85,8 +88,10 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
-				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
+					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -145,11 +150,11 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.DeclarationKind(),
-			IsConstant: true,
-			Type:       interfaceType,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.DeclarationKind(),
+			IsConstant:      true,
+			Type:            interfaceType,
+			Pos:             &identifier.Pos,
 		},
 	)
 

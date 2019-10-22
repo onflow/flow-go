@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema/self_field_analyzer"
 )
 
 func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
@@ -22,6 +21,19 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.Members.Functions,
 	)
 
+	// The initializer must initialize all members that are fields,
+	// e.g. not composite functions (which are by definition constant and "initialized")
+
+	fieldMembers := map[*Member]*ast.FieldDeclaration{}
+
+	for _, field := range declaration.Members.Fields {
+		fieldName := field.Identifier.Identifier
+		member := compositeType.Members[fieldName]
+		fieldMembers[member] = field
+	}
+
+	initializationInfo := NewInitializationInfo(compositeType, fieldMembers)
+
 	checker.checkInitializers(
 		declaration.Members.Initializers(),
 		declaration.Members.Fields,
@@ -30,6 +42,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.Identifier.Identifier,
 		compositeType.ConstructorParameterTypeAnnotations,
 		ContainerKindComposite,
+		initializationInfo,
 	)
 
 	checker.checkDestructors(
@@ -43,8 +56,6 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	)
 
 	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
-
-	checker.checkFieldsInitialized(declaration, compositeType)
 
 	checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
 
@@ -76,8 +87,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				StartPos:        declaration.Identifier.StartPosition(),
-				EndPos:          declaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: declaration.Identifier.StartPosition(),
+					EndPos:   declaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -91,8 +104,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
-				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
+					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -121,11 +136,11 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.DeclarationKind(),
-			IsConstant: true,
-			Type:       compositeType,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.DeclarationKind(),
+			IsConstant:      true,
+			Type:            compositeType,
+			Pos:             &identifier.Pos,
 		},
 	)
 
@@ -158,7 +173,7 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 	initializerCount := len(initializers)
 	if initializerCount > 0 {
 		firstInitializer := initializers[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
+		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.ParameterList)
 
 		if initializerCount > 1 {
 			secondInitializer := initializers[1]
@@ -166,8 +181,10 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
+					Range: ast.Range{
+						StartPos: secondInitializer.StartPosition(),
+						EndPos:   secondInitializer.EndPosition(),
+					},
 				},
 			)
 		}
@@ -231,8 +248,10 @@ func (checker *Checker) checkCompositeConformance(
 			&CompositeKindMismatchError{
 				ExpectedKind: compositeType.Kind,
 				ActualKind:   interfaceType.CompositeKind,
-				StartPos:     interfaceIdentifier.StartPosition(),
-				EndPos:       interfaceIdentifier.EndPosition(),
+				Range: ast.Range{
+					StartPos: interfaceIdentifier.StartPosition(),
+					EndPos:   interfaceIdentifier.EndPosition(),
+				},
 			},
 		)
 	}
@@ -309,31 +328,6 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 	return true
 }
 
-func (checker *Checker) checkFieldsInitialized(
-	declaration *ast.CompositeDeclaration,
-	compositeType *CompositeType,
-) {
-	for _, initializer := range declaration.Members.Initializers() {
-		unassigned, errs := self_field_analyzer.CheckSelfFieldInitializations(
-			declaration.Members.Fields,
-			initializer.FunctionBlock,
-		)
-
-		for _, field := range unassigned {
-			checker.report(
-				&FieldUninitializedError{
-					Name:          field.Identifier.Identifier,
-					Pos:           field.Identifier.Pos,
-					CompositeType: compositeType,
-					Initializer:   initializer,
-				},
-			)
-		}
-
-		checker.report(errs...)
-	}
-}
-
 func (checker *Checker) declareCompositeConstructor(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
@@ -355,7 +349,7 @@ func (checker *Checker) declareCompositeConstructor(
 	if len(initializers()) > 0 {
 		firstInitializer := initializers()[0]
 
-		argumentLabels = firstInitializer.Parameters.ArgumentLabels()
+		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
 
 		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
@@ -398,9 +392,8 @@ func (checker *Checker) membersAndOrigins(
 		identifier := field.Identifier.Identifier
 
 		members[identifier] = &Member{
-			Type:          fieldType,
-			VariableKind:  field.VariableKind,
-			IsInitialized: false,
+			Type:         fieldType,
+			VariableKind: field.VariableKind,
 		}
 
 		origins[identifier] =
@@ -411,9 +404,11 @@ func (checker *Checker) membersAndOrigins(
 
 			checker.report(
 				&InvalidVariableKindError{
-					Kind:     field.VariableKind,
-					StartPos: field.Identifier.Pos,
-					EndPos:   field.Identifier.Pos,
+					Kind: field.VariableKind,
+					Range: ast.Range{
+						StartPos: field.Identifier.Pos,
+						EndPos:   field.Identifier.Pos,
+					},
 				},
 			)
 		}
@@ -421,16 +416,15 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
-		functionType := checker.functionType(function.Parameters, function.ReturnTypeAnnotation)
+		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
-		argumentLabels := function.Parameters.ArgumentLabels()
+		argumentLabels := function.ParameterList.ArgumentLabels()
 
 		identifier := function.Identifier.Identifier
 
 		members[identifier] = &Member{
 			Type:           functionType,
 			VariableKind:   ast.VariableKindConstant,
-			IsInitialized:  true,
 			ArgumentLabels: argumentLabels,
 		}
 
@@ -449,11 +443,12 @@ func (checker *Checker) checkInitializers(
 	containerTypeIdentifier string,
 	initializerParameterTypeAnnotations []*TypeAnnotation,
 	containerKind ContainerKind,
+	initializationInfo *InitializationInfo,
 ) {
 	count := len(initializers)
 
 	if count == 0 {
-		checker.checkNoInitializerNoFields(fields, containerKind, containerTypeIdentifier)
+		checker.checkNoInitializerNoFields(fields, containerType, containerKind)
 		return
 	}
 
@@ -468,6 +463,7 @@ func (checker *Checker) checkInitializers(
 		containerTypeIdentifier,
 		initializerParameterTypeAnnotations,
 		containerKind,
+		initializationInfo,
 	)
 }
 
@@ -477,8 +473,8 @@ func (checker *Checker) checkInitializers(
 //
 func (checker *Checker) checkNoInitializerNoFields(
 	fields []*ast.FieldDeclaration,
+	containerType Type,
 	containerKind ContainerKind,
-	typeIdentifier string,
 ) {
 	if len(fields) == 0 || containerKind == ContainerKindInterface {
 		return
@@ -489,9 +485,9 @@ func (checker *Checker) checkNoInitializerNoFields(
 
 	checker.report(
 		&MissingInitializerError{
-			ContainerTypeIdentifier: typeIdentifier,
-			FirstFieldName:          firstField.Identifier.Identifier,
-			FirstFieldPos:           firstField.Identifier.Pos,
+			ContainerType:  containerType,
+			FirstFieldName: firstField.Identifier.Identifier,
+			FirstFieldPos:  firstField.Identifier.Pos,
 		},
 	)
 }
@@ -503,6 +499,7 @@ func (checker *Checker) checkSpecialFunction(
 	typeIdentifier string,
 	parameterTypeAnnotations []*TypeAnnotation,
 	containerKind ContainerKind,
+	initializationInfo *InitializationInfo,
 ) {
 	// NOTE: new activation, so `self`
 	// is only visible inside the special function
@@ -518,11 +515,12 @@ func (checker *Checker) checkSpecialFunction(
 	}
 
 	checker.checkFunction(
-		specialFunction.Parameters,
+		specialFunction.ParameterList,
 		ast.Position{},
 		functionType,
 		specialFunction.FunctionBlock,
 		true,
+		initializationInfo,
 	)
 
 	if containerKind == ContainerKindInterface &&
@@ -568,12 +566,12 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	depth := checker.valueActivations.Depth() + 1
 
 	self := &Variable{
-		Identifier: SelfIdentifier,
-		Kind:       common.DeclarationKindSelf,
-		Type:       selfType,
-		IsConstant: true,
-		Depth:      depth,
-		Pos:        nil,
+		Identifier:      SelfIdentifier,
+		DeclarationKind: common.DeclarationKindSelf,
+		Type:            selfType,
+		IsConstant:      true,
+		Depth:           depth,
+		Pos:             nil,
 	}
 	checker.valueActivations.Set(SelfIdentifier, self)
 	checker.recordVariableDeclarationOccurrence(SelfIdentifier, self)
@@ -686,8 +684,10 @@ func (checker *Checker) checkDestructors(
 
 			checker.report(
 				&InvalidDestructorError{
-					StartPos: firstDestructor.Identifier.StartPosition(),
-					EndPos:   firstDestructor.Identifier.EndPosition(),
+					Range: ast.Range{
+						StartPos: firstDestructor.Identifier.StartPosition(),
+						EndPos:   firstDestructor.Identifier.EndPosition(),
+					},
 				},
 			)
 		}
@@ -696,7 +696,7 @@ func (checker *Checker) checkDestructors(
 	}
 
 	if count == 0 {
-		checker.checkNoDestructorNoResourceFields(members, fields, containerTypeIdentifier, containerKind)
+		checker.checkNoDestructorNoResourceFields(members, fields, containerType, containerKind)
 		return
 	}
 
@@ -717,8 +717,10 @@ func (checker *Checker) checkDestructors(
 		checker.report(
 			&UnsupportedOverloadingError{
 				DeclarationKind: common.DeclarationKindDestructor,
-				StartPos:        secondDestructor.StartPosition(),
-				EndPos:          secondDestructor.EndPosition(),
+				Range: ast.Range{
+					StartPos: secondDestructor.StartPosition(),
+					EndPos:   secondDestructor.EndPosition(),
+				},
 			},
 		)
 	}
@@ -731,7 +733,7 @@ func (checker *Checker) checkDestructors(
 func (checker *Checker) checkNoDestructorNoResourceFields(
 	members map[string]*Member,
 	fields map[string]*ast.FieldDeclaration,
-	containerTypeIdentifier string,
+	containerType Type,
 	containerKind ContainerKind,
 ) {
 	if containerKind == ContainerKindInterface {
@@ -745,9 +747,9 @@ func (checker *Checker) checkNoDestructorNoResourceFields(
 
 		checker.report(
 			&MissingDestructorError{
-				ContainerTypeIdentifier: containerTypeIdentifier,
-				FirstFieldName:          memberName,
-				FirstFieldPos:           fields[memberName].StartPos,
+				ContainerType:  containerType,
+				FirstFieldName: memberName,
+				FirstFieldPos:  fields[memberName].StartPos,
 			},
 		)
 
@@ -764,17 +766,19 @@ func (checker *Checker) checkDestructor(
 	containerKind ContainerKind,
 ) {
 
-	if len(destructor.Parameters) != 0 {
+	if len(destructor.ParameterList.Parameters) != 0 {
 		checker.report(
 			&InvalidDestructorParametersError{
-				StartPos: destructor.Parameters.StartPosition(),
-				EndPos:   destructor.Parameters.EndPosition(),
+				Range: ast.Range{
+					StartPos: destructor.ParameterList.StartPosition(),
+					EndPos:   destructor.ParameterList.EndPosition(),
+				},
 			},
 		)
 	}
 
 	parameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(destructor.Parameters)
+		checker.parameterTypeAnnotations(destructor.ParameterList)
 
 	checker.checkSpecialFunction(
 		destructor,
@@ -783,8 +787,54 @@ func (checker *Checker) checkDestructor(
 		containerTypeIdentifier,
 		parameterTypeAnnotations,
 		containerKind,
+		nil,
 	)
 
-	// TODO: check all resources fields are invalidated
+	checker.checkResourceFieldInvalidation(containerType, containerTypeIdentifier)
+}
 
+// checkResourceFieldInvalidation checks that if the container is a resource,
+// that all resource fields are invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceFieldInvalidation(containerType Type, containerTypeIdentifier string) {
+	compositeType, isComposite := containerType.(*CompositeType)
+	if !isComposite || compositeType.Kind != common.CompositeKindResource {
+		return
+	}
+
+	for name, member := range compositeType.Members {
+		if !member.Type.IsResourceType() {
+			return
+		}
+
+		info := checker.resources.Get(member)
+		if !info.DefinitivelyInvalidated {
+			checker.report(
+				&ResourceFieldNotInvalidatedError{
+					FieldName: name,
+					TypeName:  containerTypeIdentifier,
+					// TODO:
+					Pos: ast.Position{},
+				},
+			)
+		}
+	}
+}
+
+// checkResourceUseAfterInvalidation checks if a resource (variable or composite member)
+// is used after it was previously invalidated (moved or destroyed)
+//
+func (checker *Checker) checkResourceUseAfterInvalidation(resource interface{}, useIdentifier ast.Identifier) {
+	resourceInfo := checker.resources.Get(resource)
+	if resourceInfo.Invalidations.Size() == 0 {
+		return
+	}
+
+	checker.report(
+		&ResourceUseAfterInvalidationError{
+			StartPos:      useIdentifier.StartPosition(),
+			EndPos:        useIdentifier.EndPosition(),
+			Invalidations: resourceInfo.Invalidations.All(),
+		},
+	)
 }
