@@ -43,7 +43,7 @@ type Storage interface {
 // StorageVerifier should be designed as an standalone package to verify proofs of storage
 type StorageVerifier interface {
 	// verify if a provided proof for getRegisters is accurate
-	VerifyGetRegistersProof(registers *[]Register, proof StorageProof, stateCommitment StateCommitment) (verified bool, err error)
+	VerifyGetRegistersProof(registers []Register, proof StorageProof, stateCommitment StateCommitment) (verified bool, err error)
 	// verify if a provided proof updateRegister is accurate
 	VerifyUpdateRegistersProof(updates []RegisterUpdate, proof StorageProof, initialStateCommitment StateCommitment, finalStateCommitment StateCommitment) (verified bool, err error)
 }
