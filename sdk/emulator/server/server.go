@@ -23,7 +23,7 @@ import (
 //
 // The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
-	backend *Backend
+	backend    *Backend
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
@@ -49,15 +49,23 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger.Debug(msg)
 	}
 
+	eventStore := events.NewMemStore()
+
 	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-		// TODO: store events for indexing
+		logger.Infof("Event emitted: %s", event)
+
+		ctx := context.Background()
+		err := eventStore.Add(ctx, blockNumber, event)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to save event %s", event.ID)
+		}
 	}
 
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
-			logger: logger,
-			eventStore: events.NewMemStore(),
+			logger:     logger,
+			eventStore: eventStore,
 		},
 		grpcServer: grpc.NewServer(),
 		config:     conf,
