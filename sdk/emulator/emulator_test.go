@@ -187,17 +187,84 @@ func TestSubmitTransaction(t *testing.T) {
 	assert.Equal(t, types.TransactionFinalized, tx.Status)
 }
 
+// TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	// Create empty transaction (no required fields)
-	tx1 := &types.Transaction{}
+	t.Run("EmptyTransaction", func(t *testing.T) {
+		// Create empty transaction (no required fields)
+		tx1 := &types.Transaction{}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	// Submit tx1
-	err := b.SubmitTransaction(tx1)
-	assert.IsType(t, err, &ErrInvalidTransaction{})
+		// Submit tx1
+		err := b.SubmitTransaction(tx1)
+		assert.IsType(t, err, &ErrInvalidTransaction{})
+	})
+
+	t.Run("MissingScript", func(t *testing.T) {
+		// Create transaction with no Script field
+		tx1 := &types.Transaction{
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		// Submit tx1
+		err := b.SubmitTransaction(tx1)
+		assert.IsType(t, err, &ErrInvalidTransaction{})
+	})
+
+	t.Run("MissingNonce", func(t *testing.T) {
+		// Create transaction with no Nonce field
+		tx1 := &types.Transaction{
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		// Submit tx1
+		err := b.SubmitTransaction(tx1)
+		assert.IsType(t, err, &ErrInvalidTransaction{})
+	})
+
+	t.Run("MissingComputeLimit", func(t *testing.T) {
+		// Create transaction with no ComputeLimit field
+		tx1 := &types.Transaction{
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		// Submit tx1
+		err := b.SubmitTransaction(tx1)
+		assert.IsType(t, err, &ErrInvalidTransaction{})
+	})
+
+	t.Run("MissingPayerAccount", func(t *testing.T) {
+		// Create transaction with no PayerAccount field
+		tx1 := &types.Transaction{
+			Script:             []byte(addTwoScript),
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+		}
+
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		// Submit tx1
+		err := b.SubmitTransaction(tx1)
+		assert.IsType(t, err, &ErrInvalidTransaction{})
+	})
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
