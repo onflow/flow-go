@@ -206,6 +206,13 @@ func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) 
 		return nil, err
 	}
 
+	b.logger.WithFields(log.Fields{
+		"eventID":    query.ID,
+		"startBlock": query.StartBlock,
+		"endBlock":   query.EndBlock,
+		"results":    len(events),
+	}).Debugf("🎁  GetEvents called")
+
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(events)
 	if err != nil {

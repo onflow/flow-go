@@ -53,7 +53,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
-			WithField("id", event.ID).
+			WithField("eventID", event.ID).
 			Infof("🔔  Event emitted: %s", event)
 
 		ctx := context.Background()
