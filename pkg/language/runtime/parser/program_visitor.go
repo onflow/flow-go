@@ -567,6 +567,14 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 		}
 	}
 
+	if ctx.reference != nil {
+		startPos := ast.PositionFromToken(ctx.reference)
+		result = &ast.ReferenceType{
+			Type:     result,
+			StartPos: startPos,
+		}
+	}
+
 	return result
 }
 

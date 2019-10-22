@@ -153,7 +153,9 @@ typeAnnotation
     ;
 
 fullType
-    : baseType ({p.noWhitespace()}? optionals+=Optional)*
+    : (reference=Ampersand {p.noWhitespace()}?)?
+      baseType
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
@@ -330,7 +332,7 @@ failableDowncastingExpression
 
 concatenatingExpression
     : additiveExpression
-    | concatenatingExpression Concat additiveExpression
+    | concatenatingExpression Ampersand additiveExpression
     ;
 
 additiveExpression
@@ -403,7 +405,7 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
-Concat : '&';
+Ampersand : '&';
 
 unaryOp
     : Minus
