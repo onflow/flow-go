@@ -191,8 +191,10 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if len(tx.MissingFields()) > 0 {
-		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: tx.MissingFields()}
+	missingFields := tx.MissingFields()
+
+	if len(missingFields) > 0 {
+		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
 	}
 
 	if _, exists := b.txPool[string(tx.Hash())]; exists {

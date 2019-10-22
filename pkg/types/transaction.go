@@ -24,6 +24,22 @@ func (s TransactionStatus) String() string {
 	return [...]string{"PENDING", "FINALIZED", "REVERTED", "SEALED"}[s]
 }
 
+// TransactionField represents a required transaction field.
+type TransactionField int
+
+const (
+	TransactionFieldScript TransactionField = iota
+	TransactionFieldRefBlockHash
+	TransactionFieldNonce
+	TransactionFieldComputeLimit
+	TransactionFieldPayerAccount
+)
+
+// String returns the string representation of a transaction field.
+func (f TransactionField) String() string {
+	return [...]string{"Script", "ReferenceBlockHash", "Nonce", "ComputeLimit", "PayerAccount"}[f]
+}
+
 // Transaction is a transaction that contains a script and optional signatures.
 type Transaction struct {
 	Script             []byte
@@ -106,24 +122,24 @@ func (tx *Transaction) MissingFields() []string {
 	requiredFields := make([]string, 0)
 
 	if len(tx.Script) == 0 {
-		requiredFields = append(requiredFields, "Script")
+		requiredFields = append(requiredFields, TransactionFieldScript.String())
 	}
 
 	// TODO: need to refactor tests to include ReferenceBlockHash field (i.e. b.GetLatestBlock().Hash() should do)
 	// if len(tx.ReferenceBlockHash) == 0 {
-	// 	requiredFields = append(requiredFields, "ReferenceBlockHash")
+	// 	requiredFields = append(requiredFields, TransactionFieldRefBlockHash.String())
 	// }
 
 	if tx.Nonce == 0 {
-		requiredFields = append(requiredFields, "Nonce")
+		requiredFields = append(requiredFields, TransactionFieldNonce.String())
 	}
 
 	if tx.ComputeLimit == 0 {
-		requiredFields = append(requiredFields, "ComputeLimit")
+		requiredFields = append(requiredFields, TransactionFieldComputeLimit.String())
 	}
 
-	if tx.PayerAccount == ZeroAddress() {
-		requiredFields = append(requiredFields, "PayerAccount")
+	if tx.PayerAccount == ZeroAddress {
+		requiredFields = append(requiredFields, TransactionFieldPayerAccount.String())
 	}
 
 	return requiredFields
