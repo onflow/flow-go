@@ -38,23 +38,27 @@ type EmulatedBlockchain struct {
 	rootAccountAddress types.Address
 	rootAccountKey     crypto.PrivateKey
 	lastCreatedAccount types.Account
+	onEventEmitted     func(event types.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
 	RootAccountKey crypto.PrivateKey
 	OnLogMessage   func(string)
-	OnEventEmitted func(event types.Event, blockNumber uint64, txhash crypto.Hash)
+	OnEventEmitted func(event types.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
 var DefaultOptions = EmulatedBlockchainOptions{
 	OnLogMessage:   func(string) {},
-	OnEventEmitted: func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
+	OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {},
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
+	// merge user-provided options with default options
+	opt = mergeOptions(DefaultOptions, opt)
+
 	worldStates := make(map[string][]byte)
 	intermediateWorldStates := make(map[string][]byte)
 	txPool := make(map[string]*types.Transaction)
@@ -67,18 +71,11 @@ func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
 		intermediateWorldStates: intermediateWorldStates,
 		pendingWorldState:       ws,
 		txPool:                  txPool,
+		onEventEmitted:          opt.OnEventEmitted,
 	}
 
-	// merge user-provided options with default options
-	opt = mergeOptions(DefaultOptions, opt)
-
 	runtime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(
-		runtime,
-		opt.OnLogMessage,
-		b.onAccountCreated,
-		opt.OnEventEmitted,
-	)
+	computer := execution.NewComputer(runtime, opt.OnLogMessage)
 
 	b.computer = computer
 	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
@@ -218,13 +215,9 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.txPool[string(tx.Hash())] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
-	// TODO: improve the pending block, provide all block information
-	prevBlock := b.pendingWorldState.GetLatestBlock()
-	blockNumber := prevBlock.Number + 1
-
 	registers := b.pendingWorldState.Registers.NewView()
 
-	err := b.computer.ExecuteTransaction(registers, tx, blockNumber)
+	events, err := b.computer.ExecuteTransaction(registers, tx)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
 
@@ -237,6 +230,12 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
 
 	b.updatePendingWorldStates(tx.Hash())
+
+	// TODO: improve the pending block, provide all block information
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+	blockNumber := prevBlock.Number + 1
+
+	b.emitTransactionEvents(events, blockNumber, tx.Hash())
 
 	return nil
 }
@@ -253,7 +252,14 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 // CallScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 	registers := b.pendingWorldState.Registers.NewView()
-	return b.computer.ExecuteScript(registers, script)
+	value, events, err := b.computer.ExecuteScript(registers, script)
+	if err != nil {
+		return nil, err
+	}
+
+	b.emitScriptEvents(events)
+
+	return value, nil
 }
 
 // CallScriptAtVersion executes a read-only script against a specified world state and returns the result.
@@ -264,7 +270,15 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 	}
 
 	registers := ws.Registers.NewView()
-	return b.computer.ExecuteScript(registers, script)
+
+	value, events, err := b.computer.ExecuteScript(registers, script)
+	if err != nil {
+		return nil, err
+	}
+
+	b.emitScriptEvents(events)
+
+	return value, nil
 }
 
 // CommitBlock takes all pending transactions and commits them into a block.
@@ -436,6 +450,34 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 	}
 }
 
+// emitTransactionEvents emits events that occurred during a transaction execution.
+//
+// This function parses AccountCreated events to update the lastCreatedAccount field.
+func (b *EmulatedBlockchain) emitTransactionEvents(events []types.Event, blockNumber uint64, txHash crypto.Hash) {
+	for _, event := range events {
+		// update lastCreatedAccount if this is an AccountCreated event
+		if event.ID == constants.EventAccountCreated {
+			accountAddress := event.Values["address"].(types.Address)
+
+			account, err := b.GetAccount(accountAddress)
+			if err != nil {
+				panic("failed to get newly-created account")
+			}
+
+			b.lastCreatedAccount = *account
+		}
+
+		b.onEventEmitted(event, blockNumber, txHash)
+	}
+}
+
+// emitScriptEvents emits events that occurred during a script execution.
+func (b *EmulatedBlockchain) emitScriptEvents(events []types.Event) {
+	for _, event := range events {
+		b.onEventEmitted(event, 0, nil)
+	}
+}
+
 // createRootAccount creates a new root account and commits it to the world state.
 func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Account, crypto.PrivateKey) {
 	registers := ws.Registers.NewView()
@@ -447,7 +489,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 	pubKeyBytes, _ := prKey.Publickey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
-	accountID, _ := runtimeContext.CreateAccount(
+	accountAddress, _ := runtimeContext.CreateAccount(
 		[][]byte{pubKeyBytes},
 		[]int{constants.AccountKeyWeightThreshold},
 		[]byte{},
@@ -455,7 +497,6 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	accountAddress := types.BytesToAddress(accountID)
 	account := runtimeContext.GetAccount(accountAddress)
 
 	return *account, prKey

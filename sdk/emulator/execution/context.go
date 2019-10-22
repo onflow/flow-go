@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -18,27 +17,18 @@ import (
 // The logic in this runtime context is specific to the emulator and is designed to be
 // used with an EmulatedBlockchain instance.
 type RuntimeContext struct {
-	registers        *types.RegistersView
-	signingAccounts  []types.Address
-	txMeta           *transactionMetadata
-	onLogMessage     func(string)
-	onAccountCreated func(types.Account)
-	onEventEmitted   func(event types.Event, blockNumber uint64, txhash crypto.Hash)
-}
-
-// transactionMetadata holds information about the transaction linked to this context.
-type transactionMetadata struct {
-	transaction types.Transaction
-	blockNumber uint64
+	registers       *types.RegistersView
+	signingAccounts []types.Address
+	onLogMessage    func(string)
+	events          []types.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers:        registers,
-		onLogMessage:     func(string) {},
-		onAccountCreated: func(types.Account) {},
-		onEventEmitted:   func(event types.Event, blockNumber uint64, txhash crypto.Hash) {},
+		registers:    registers,
+		onLogMessage: func(string) {},
+		events:       make([]types.Event, 0),
 	}
 }
 
@@ -63,24 +53,9 @@ func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
 	r.onLogMessage = callback
 }
 
-// SetOnAccountCreated registers a callback that is triggered when a new
-// account is created.
-func (r *RuntimeContext) SetOnAccountCreated(callback func(types.Account)) {
-	r.onAccountCreated = callback
-}
-
-// SetOnEventEmitted registers a callback that is trigger when an event is
-// emitted by the runtime.
-func (r *RuntimeContext) SetOnEventEmitted(callback func(event types.Event, blockNumber uint64, txhash crypto.Hash)) {
-	r.onEventEmitted = callback
-}
-
-// SetTransactionMetadata injects the metadata for the transaction being executed in this context.
-func (r *RuntimeContext) SetTransactionMetadata(tx types.Transaction, blockNumber uint64) {
-	r.txMeta = &transactionMetadata{
-		transaction: tx,
-		blockNumber: blockNumber,
-	}
+// Events returns all events emitted by the runtime to this context.
+func (r *RuntimeContext) Events() []types.Event {
+	return r.events
 }
 
 // GetValue gets a register value from the world state.
@@ -101,9 +76,9 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) ([]byte, error) {
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (types.Address, error) {
 	if len(publicKeys) != len(keyWeights) {
-		return nil, fmt.Errorf(
+		return types.Address{}, fmt.Errorf(
 			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
 			len(publicKeys),
 			len(keyWeights),
@@ -130,10 +105,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
-	account := r.GetAccount(accountAddress)
-	r.onAccountCreated(*account)
-
-	return accountID, nil
+	return accountAddress, nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -163,27 +135,34 @@ func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, 
 //
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
-func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) error {
+func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
+		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if index < 0 || index > len(publicKeys)-1 {
-		return fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
+		return nil, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
 	}
+
+	removedKey := publicKeys[index]
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 	keyWeights = append(keyWeights[:index], keyWeights[index+1:]...)
 
-	return r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	err = r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	if err != nil {
+		return nil, err
+	}
+
+	return removedKey, nil
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {
@@ -344,16 +323,7 @@ func (r *RuntimeContext) Log(message string) {
 
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *RuntimeContext) EmitEvent(event types.Event) {
-	// transaction metadata is included if this context is attached to a transaction
-	if r.txMeta != nil {
-		r.onEventEmitted(
-			event,
-			r.txMeta.blockNumber,
-			r.txMeta.transaction.Hash(),
-		)
-	} else {
-		r.onEventEmitted(event, 0, nil)
-	}
+	r.events = append(r.events, event)
 }
 
 func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {
