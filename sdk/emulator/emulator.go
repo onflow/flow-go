@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/sdk/templates"
+
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
@@ -193,6 +195,13 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	missingFields := tx.MissingFields()
+
+	// TODO: add more invalid transaction checks
+	if len(missingFields) > 0 {
+		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
+	}
+
 	if _, exists := b.txPool[string(tx.Hash())]; exists {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
@@ -380,12 +389,13 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte) (types.Address, error) {
+func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte, nonce uint64) (types.Address, error) {
 	createAccountScript := templates.CreateAccount(accountKeys, code)
 
 	tx := &types.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
+		Nonce:              nonce,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 	}

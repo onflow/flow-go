@@ -2296,3 +2296,233 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
 }
+
+func TestCheckResourceArrayAppend(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- []
+          xs.append(<-create X())
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckResourceArrayInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- []
+          xs.insert(at: 0, <-create X())
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckResourceArrayRemove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          let x <- xs.remove(at: 0)
+          destroy x
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceArrayRemoveResourceLoss(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          xs.remove(at: 0)
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckResourceArrayRemoveFirst(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          let x <- xs.removeFirst()
+          destroy x
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckResourceArrayRemoveLast(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          let x <- xs.removeLast()
+          destroy x
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceArrayContains(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          xs.contains(<-create X())
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidResourceArrayMemberError{}, errs[0])
+	assert.IsType(t, &sema.NotEquatableTypeError{}, errs[1])
+}
+
+func TestCheckResourceArrayLength(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test(): Int {
+          let xs: <-[X] <- [<-create X()]
+          let count = xs.length
+          destroy xs
+          return count
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceArrayConcat(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-[X] <- [<-create X()]
+          let xs2 <- [<-create X()]
+          let xs3 <- xs.concat(<-xs2)
+          destroy xs
+          destroy xs3
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidResourceArrayMemberError{}, errs[0])
+}
+
+func TestCheckResourceDictionaryRemove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {"x1": <-create X()}
+          let x <- xs.remove(key: "x1")
+          destroy x
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceDictionaryRemoveResourceLoss(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {"x1": <-create X()}
+          xs.remove(key: "x1")
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckResourceDictionaryInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {}
+          let old <- xs.insert(key: "x1", <-create X())
+          destroy old
+          destroy xs
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceDictionaryInsertResourceLoss(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {}
+          xs.insert(key: "x1", <-create X())
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckResourceDictionaryLength(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test(): Int {
+          let xs: <-{String: X} <- {"x1": <-create X()}
+          let count = xs.length
+          destroy xs
+          return count
+      }
+    `)
+
+	assert.Nil(t, err)
+}

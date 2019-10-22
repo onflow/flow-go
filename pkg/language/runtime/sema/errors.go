@@ -1486,3 +1486,19 @@ func (e *UninitializedUseError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// InvalidResourceArrayMemberError
+
+type InvalidResourceArrayMemberError struct {
+	Name string
+	ast.Range
+}
+
+func (e *InvalidResourceArrayMemberError) Error() string {
+	return fmt.Sprintf(
+		"array member `%s` is not available for resource arrays",
+		e.Name,
+	)
+}
+
+func (*InvalidResourceArrayMemberError) isSemanticError() {}

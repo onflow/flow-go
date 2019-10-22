@@ -1168,7 +1168,10 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 
 				// TODO: panic for duplicate keys?
 
-				newDictionary.Set(key, value)
+				// NOTE: important to box in optional, as assignment to dictionary
+				// is always considered as an optional
+
+				newDictionary.Set(key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}

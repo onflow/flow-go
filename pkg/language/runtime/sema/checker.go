@@ -160,13 +160,11 @@ func (checker *Checker) checkerError() *CheckerError {
 	return nil
 }
 
-func (checker *Checker) report(errs ...error) {
-	for _, err := range errs {
-		if err == nil {
-			continue
-		}
-		checker.errors = append(checker.errors, errs...)
+func (checker *Checker) report(err error) {
+	if err == nil {
+		return
 	}
+	checker.errors = append(checker.errors, err)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
@@ -242,6 +240,32 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 			checker.checkIntegerLiteral(typedExpression, unwrappedTargetType)
 
 			return true
+		}
+
+	case *ast.ArrayExpression:
+
+		// Variable sized array literals are compatible with constant sized target types
+		// if their element type matches and the element count matches
+
+		if variableSizedValueType, isVariableSizedValue :=
+			valueType.(*VariableSizedType); isVariableSizedValue {
+
+			if constantSizedTargetType, isConstantSizedTarget :=
+				targetType.(*ConstantSizedType); isConstantSizedTarget {
+
+				valueElementType := variableSizedValueType.ElementType(false)
+				targetElementType := constantSizedTargetType.ElementType(false)
+
+				// TODO: report helpful error when counts mismatch
+
+				literalCount := len(typedExpression.Values)
+
+				if IsSubType(valueElementType, targetElementType) &&
+					literalCount == constantSizedTargetType.Size {
+
+					return true
+				}
+			}
 		}
 	}
 
