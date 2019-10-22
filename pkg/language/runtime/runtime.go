@@ -291,11 +291,11 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 
 	switch location := eventValue.ImportLocation.(type) {
 	case ast.AddressImportLocation:
-		eventID = fmt.Sprintf("account.%s.%s", location.String(), eventValue.ID)
+		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
 	case ast.TransactionImportLocation:
-		eventID = fmt.Sprintf("tx.%s.%s", location.String(), eventValue.ID)
+		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
 	case ast.ScriptImportLocation:
-		eventID = fmt.Sprintf("script.%s.%s", location.String(), eventValue.ID)
+		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
