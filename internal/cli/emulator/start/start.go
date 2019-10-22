@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/dapperlabs/flow-go/internal/cli/initialize"
+
 	"github.com/psiemens/sconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,6 +23,7 @@ type Config struct {
 	Verbose       bool          `default:"false" flag:"verbose,v" info:"enable verbose logging"`
 	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
 	RootKey       string        `flag:"root-key" info:"root account key"`
+	Init          bool          `default:"false" flag:"init" info:"whether to initialize a new account profile"`
 }
 
 var (
@@ -32,6 +35,14 @@ var Cmd = &cobra.Command{
 	Use:   "start",
 	Short: "Starts the Flow emulator server",
 	Run: func(cmd *cobra.Command, args []string) {
+		if conf.Init {
+			pconf := initialize.InitializeProject()
+			rootAcct := pconf.Accounts["root"]
+
+			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
+			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
+			fmt.Printf("🔑  PrivateKey: %s\n\n", rootAcct.PrivateKey)
+		}
 		projectConf := project.LoadConfig()
 
 		if conf.Verbose {
