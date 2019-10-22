@@ -13,12 +13,15 @@ import (
 func TestRand(t *testing.T) {
 	sampleSize := 64768
 	tolerance := 0.05
-	sampleSpace := uint64(16) // this should be 2^something
+	sampleSpace := 16 // this should be 2^something
 	distribution := make([]float64, sampleSpace)
 	seed := []uint64{uint64(62534197802164589), uint64(121823123834)}
-	rand := NewRand(seed)
+	rand, err := NewRand(seed)
+	if err != nil {
+		t.Error(fmt.Sprintf("something wrong when trying to create a the random generator."))
+	}
 	for i := 0; i < sampleSize; i++ {
-		distribution[rand.UIntN(sampleSpace)] += 1.0
+		distribution[rand.IntN(sampleSpace)] += 1.0
 	}
 	stdev := stat.StdDev(distribution, nil)
 	mean := stat.Mean(distribution, nil)
