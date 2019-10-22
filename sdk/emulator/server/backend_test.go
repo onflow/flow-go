@@ -3,14 +3,15 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"testing"
+
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestPing(t *testing.T) {

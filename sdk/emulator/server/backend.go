@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
-
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/pkg/types/proto"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
