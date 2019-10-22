@@ -47,8 +47,8 @@ func TestGetEvents(t *testing.T) {
 		}
 	)
 
-	eventStore.Add(ctx, 1, &ev1)
-	eventStore.Add(ctx, 3, &ev2)
+	eventStore.Add(ctx, 1, ev1)
+	eventStore.Add(ctx, 3, ev2)
 
 	t.Run("should return error for invalid query", func(t *testing.T) {
 		// End block cannot be less than start block
