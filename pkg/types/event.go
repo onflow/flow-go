@@ -14,15 +14,19 @@ type Event struct {
 
 // String returns the string representation of this event.
 func (e Event) String() string {
-	values := make([]string, len(e.Values))
+	var values strings.Builder
 
 	i := 0
 	for key, value := range e.Values {
-		values[i] = fmt.Sprintf("%s: %s", key, value)
+		if i > 0 {
+			values.WriteString(", ")
+		}
+
+		values.WriteString(fmt.Sprintf("%s: %s", key, value))
 		i++
 	}
 
-	return fmt.Sprintf("%s(%s)", e.ID, strings.Join(values, ", "))
+	return fmt.Sprintf("%s(%s)", e.ID, values.String())
 }
 
 type EventQuery struct {
