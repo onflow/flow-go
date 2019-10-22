@@ -41,7 +41,6 @@ func TestSendTransaction(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-
 	t.Run("Server error", func(t *testing.T) {
 		// client should return error if RPC call fails
 		mockRPC.EXPECT().
@@ -167,8 +166,8 @@ func TestGetEvents(t *testing.T) {
 	mockEvent := types.Event{
 		ID: "Transfer",
 		Values: map[string]interface{}{
-			"to":   types.ZeroAddress(),
-			"from": types.ZeroAddress(),
+			"to":   types.ZeroAddress,
+			"from": types.ZeroAddress,
 			"id":   1,
 		},
 	}
@@ -208,7 +207,7 @@ func TestGetEvents(t *testing.T) {
 		// Set up the mock to return a malformed eventsJSON response
 		mockRPC.EXPECT().
 			GetEvents(ctx, gomock.Any()).
-			Return(&observe.GetEventsResponse{EventsJson: []byte{1,2,3,4}}, nil).
+			Return(&observe.GetEventsResponse{EventsJson: []byte{1, 2, 3, 4}}, nil).
 			Times(1)
 
 		// The client should return an error because it should fail to decode

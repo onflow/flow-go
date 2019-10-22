@@ -24,6 +24,22 @@ func (s TransactionStatus) String() string {
 	return [...]string{"PENDING", "FINALIZED", "REVERTED", "SEALED"}[s]
 }
 
+// TransactionField represents a required transaction field.
+type TransactionField int
+
+const (
+	TransactionFieldScript TransactionField = iota
+	TransactionFieldRefBlockHash
+	TransactionFieldNonce
+	TransactionFieldComputeLimit
+	TransactionFieldPayerAccount
+)
+
+// String returns the string representation of a transaction field.
+func (f TransactionField) String() string {
+	return [...]string{"Script", "ReferenceBlockHash", "Nonce", "ComputeLimit", "PayerAccount"}[f]
+}
+
 // Transaction is a transaction that contains a script and optional signatures.
 type Transaction struct {
 	Script             []byte
@@ -98,4 +114,33 @@ func (tx *Transaction) AddSignature(account Address, prKey crypto.PrivateKey) er
 	tx.Signatures = append(tx.Signatures, accountSig)
 
 	return nil
+}
+
+// MissingFields checks if a transaction is missing any required fields and returns those that are missing.
+func (tx *Transaction) MissingFields() []string {
+	// Required fields are Script, ReferenceBlockHash, Nonce, ComputeLimit, PayerAccount
+	missingFields := make([]string, 0)
+
+	if len(tx.Script) == 0 {
+		missingFields = append(missingFields, TransactionFieldScript.String())
+	}
+
+	// TODO: need to refactor tests to include ReferenceBlockHash field (i.e. b.GetLatestBlock().Hash() should do)
+	// if len(tx.ReferenceBlockHash) == 0 {
+	// 	missingFields = append(missingFields, TransactionFieldRefBlockHash.String())
+	// }
+
+	if tx.Nonce == 0 {
+		missingFields = append(missingFields, TransactionFieldNonce.String())
+	}
+
+	if tx.ComputeLimit == 0 {
+		missingFields = append(missingFields, TransactionFieldComputeLimit.String())
+	}
+
+	if tx.PayerAccount == ZeroAddress {
+		missingFields = append(missingFields, TransactionFieldPayerAccount.String())
+	}
+
+	return missingFields
 }
