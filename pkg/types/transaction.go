@@ -119,28 +119,28 @@ func (tx *Transaction) AddSignature(account Address, prKey crypto.PrivateKey) er
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tx *Transaction) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockHash, Nonce, ComputeLimit, PayerAccount
-	requiredFields := make([]string, 0)
+	missingFields := make([]string, 0)
 
 	if len(tx.Script) == 0 {
-		requiredFields = append(requiredFields, TransactionFieldScript.String())
+		missingFields = append(missingFields, TransactionFieldScript.String())
 	}
 
 	// TODO: need to refactor tests to include ReferenceBlockHash field (i.e. b.GetLatestBlock().Hash() should do)
 	// if len(tx.ReferenceBlockHash) == 0 {
-	// 	requiredFields = append(requiredFields, TransactionFieldRefBlockHash.String())
+	// 	missingFields = append(missingFields, TransactionFieldRefBlockHash.String())
 	// }
 
 	if tx.Nonce == 0 {
-		requiredFields = append(requiredFields, TransactionFieldNonce.String())
+		missingFields = append(missingFields, TransactionFieldNonce.String())
 	}
 
 	if tx.ComputeLimit == 0 {
-		requiredFields = append(requiredFields, TransactionFieldComputeLimit.String())
+		missingFields = append(missingFields, TransactionFieldComputeLimit.String())
 	}
 
 	if tx.PayerAccount == ZeroAddress {
-		requiredFields = append(requiredFields, TransactionFieldPayerAccount.String())
+		missingFields = append(missingFields, TransactionFieldPayerAccount.String())
 	}
 
-	return requiredFields
+	return missingFields
 }

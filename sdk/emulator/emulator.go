@@ -196,6 +196,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 
 	missingFields := tx.MissingFields()
 
+	// TODO: add more invalid transaction checks
 	if len(missingFields) > 0 {
 		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
 	}
