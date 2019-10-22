@@ -149,7 +149,7 @@ func (t *OptionalType) String() string {
 	if t.Type == nil {
 		return "optional"
 	}
-	return fmt.Sprintf("%s?", t.Type.String())
+	return fmt.Sprintf("%s?", t.Type)
 }
 
 func (t *OptionalType) Equal(other Type) bool {
@@ -763,7 +763,7 @@ func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
 func (t *VariableSizedType) String() string {
-	return fmt.Sprintf("[%s]", t.Type.String())
+	return fmt.Sprintf("[%s]", t.Type)
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -803,7 +803,7 @@ func (*ConstantSizedType) isType()      {}
 func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) String() string {
-	return fmt.Sprintf("[%s; %d]", t.Type.String(), t.Size)
+	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -865,7 +865,11 @@ func (t *FunctionType) String() string {
 		parameters.WriteString(parameterTypeAnnotation.String())
 	}
 
-	return fmt.Sprintf("((%s): %s)", parameters.String(), t.ReturnTypeAnnotation.String())
+	return fmt.Sprintf(
+		"((%s): %s)",
+		parameters.String(),
+		t.ReturnTypeAnnotation,
+	)
 }
 
 func (t *FunctionType) Equal(other Type) bool {
@@ -992,16 +996,16 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 			len(member.ArgumentLabels) != len(functionType.ParameterTypeAnnotations) {
 
 			panic(fmt.Sprintf(
-				"member %s.%s has incorrect argument label count",
-				ty.String(),
+				"member `%s.%s` has incorrect argument label count",
+				ty,
 				identifier,
 			))
 		}
 	} else {
 		if member.ArgumentLabels != nil {
 			panic(fmt.Sprintf(
-				"non-function member %s.%s should not declare argument labels",
-				ty.String(),
+				"non-function member `%s.%s` should not declare argument labels",
+				ty,
 				identifier,
 			))
 		}
@@ -1227,6 +1231,32 @@ func (t EventFieldType) String() string {
 func (t EventFieldType) Equal(other EventFieldType) bool {
 	return t.Identifier == other.Identifier &&
 		t.Type.Equal(other.Type)
+}
+
+// ReferenceType represents the reference to a value
+type ReferenceType struct {
+	Type Type
+}
+
+func (*ReferenceType) isType() {}
+
+func (t *ReferenceType) String() string {
+	if t.Type == nil {
+		return "reference"
+	}
+	return fmt.Sprintf("&%s", t.Type)
+}
+
+func (t *ReferenceType) Equal(other Type) bool {
+	otherReference, ok := other.(*ReferenceType)
+	if !ok {
+		return false
+	}
+	return t.Type.Equal(otherReference.Type)
+}
+
+func (t *ReferenceType) IsResourceType() bool {
+	return false
 }
 
 ////

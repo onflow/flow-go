@@ -271,7 +271,7 @@ var lexerLiteralNames = []string{
 var lexerSymbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal",
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
-	"Div", "Mod", "Concat", "Negate", "Move", "Optional", "NilCoalescing",
+	"Div", "Mod", "Ampersand", "Negate", "Move", "Optional", "NilCoalescing",
 	"FailableDowncasting", "OpenParen", "CloseParen", "Transaction", "Struct",
 	"Resource", "Contract", "Interface", "Fun", "Event", "Emit", "Pre", "Post",
 	"Pub", "PubSet", "Return", "Break", "Continue", "Let", "Var", "If", "Else",
@@ -284,7 +284,7 @@ var lexerSymbolicNames = []string{
 var lexerRuleNames = []string{
 	"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8",
 	"T__9", "T__10", "T__11", "Equal", "Unequal", "Less", "Greater", "LessEqual",
-	"GreaterEqual", "Plus", "Minus", "Mul", "Div", "Mod", "Concat", "Negate",
+	"GreaterEqual", "Plus", "Minus", "Mul", "Div", "Mod", "Ampersand", "Negate",
 	"Move", "Optional", "NilCoalescing", "FailableDowncasting", "OpenParen",
 	"CloseParen", "Transaction", "Struct", "Resource", "Contract", "Interface",
 	"Fun", "Event", "Emit", "Pre", "Post", "Pub", "PubSet", "Return", "Break",
@@ -354,7 +354,7 @@ const (
 	StrictusLexerMul                  = 21
 	StrictusLexerDiv                  = 22
 	StrictusLexerMod                  = 23
-	StrictusLexerConcat               = 24
+	StrictusLexerAmpersand            = 24
 	StrictusLexerNegate               = 25
 	StrictusLexerMove                 = 26
 	StrictusLexerOptional             = 27

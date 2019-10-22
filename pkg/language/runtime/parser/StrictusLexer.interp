@@ -95,7 +95,7 @@ Minus
 Mul
 Div
 Mod
-Concat
+Ampersand
 Negate
 Move
 Optional
@@ -166,7 +166,7 @@ Minus
 Mul
 Div
 Mod
-Concat
+Ampersand
 Negate
 Move
 Optional
