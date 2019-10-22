@@ -5650,8 +5650,6 @@ func TestParseDestructor(t *testing.T) {
 
 func TestParseReferenceType(t *testing.T) {
 
-	// NOTE: syntactically legal, but semantically invalid
-
 	actual, _, err := parser.ParseProgram(`
        let x: &[&R] = 1
 	`)
@@ -5705,4 +5703,15 @@ func TestParseReferenceType(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, actual)
+}
+
+func TestParseInvalidReferenceToOptionalType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: &R? = 1
+	`)
+
+	assert.Nil(t, actual)
+
+	assert.IsType(t, parser.Error{}, err)
 }

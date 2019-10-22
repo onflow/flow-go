@@ -426,8 +426,8 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 		}
 
 	case *ast.OptionalType:
-		result := checker.ConvertType(t.Type)
-		return &OptionalType{result}
+		ty := checker.ConvertType(t.Type)
+		return &OptionalType{ty}
 
 	case *ast.DictionaryType:
 		keyType := checker.ConvertType(t.KeyType)
@@ -437,6 +437,10 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 			KeyType:   keyType,
 			ValueType: valueType,
 		}
+
+	case *ast.ReferenceType:
+		ty := checker.ConvertType(t.Type)
+		return &ReferenceType{ty}
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})

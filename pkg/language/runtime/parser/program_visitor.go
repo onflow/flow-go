@@ -559,19 +559,22 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 	result := baseTypeResult.(ast.Type)
 
-	for _, optional := range ctx.optionals {
-		endPos := ast.PositionFromToken(optional)
-		result = &ast.OptionalType{
-			Type:   result,
-			EndPos: endPos,
-		}
-	}
+	// NOTE: only allow reference or optionals – prevent ambiguous
+	// and not particular useful types like `&R?`
 
 	if ctx.reference != nil {
 		startPos := ast.PositionFromToken(ctx.reference)
 		result = &ast.ReferenceType{
 			Type:     result,
 			StartPos: startPos,
+		}
+	} else {
+		for _, optional := range ctx.optionals {
+			endPos := ast.PositionFromToken(optional)
+			result = &ast.OptionalType{
+				Type:   result,
+				EndPos: endPos,
+			}
 		}
 	}
 

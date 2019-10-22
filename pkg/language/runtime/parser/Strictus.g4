@@ -152,10 +152,11 @@ typeAnnotation
     : Move? fullType
     ;
 
+// NOTE: only allow reference or optionals – prevent ambiguous
+// and not particular useful types like `&R?`
 fullType
-    : (reference=Ampersand {p.noWhitespace()}?)?
-      baseType
-      ({p.noWhitespace()}? optionals+=Optional)*
+    : reference=Ampersand {p.noWhitespace()}? baseType
+    | baseType ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
