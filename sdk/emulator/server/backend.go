@@ -203,7 +203,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) 
 
 	events, err := b.eventStore.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	b.logger.WithFields(log.Fields{
