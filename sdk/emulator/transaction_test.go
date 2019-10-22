@@ -57,6 +57,29 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	assert.IsType(t, err, &emulator.ErrDuplicateTransaction{})
 }
 
+func TestSubmitTransactionReverted(t *testing.T) {
+	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+	tx1 := &types.Transaction{
+		Script:             []byte("invalid script"),
+		ReferenceBlockHash: nil,
+		ComputeLimit:       10,
+		PayerAccount:       b.RootAccountAddress(),
+		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+	}
+
+	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+	// Submit invalid tx1 (errors)
+	err := b.SubmitTransaction(tx1)
+	assert.NotNil(t, err)
+
+	// tx1 status becomes TransactionReverted
+	tx, err := b.GetTransaction(tx1.Hash())
+	assert.Nil(t, err)
+	assert.Equal(t, types.TransactionReverted, tx.Status)
+}
+
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
@@ -291,27 +314,4 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressA.Bytes()))
 		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressB.Bytes()))
 	})
-}
-
-func TestSubmitTransactionReverted(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
-
-	tx1 := &types.Transaction{
-		Script:             []byte("invalid script"),
-		ReferenceBlockHash: nil,
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
-	}
-
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
-
-	// Submit invalid tx1 (errors)
-	err := b.SubmitTransaction(tx1)
-	assert.NotNil(t, err)
-
-	// tx1 status becomes TransactionReverted
-	tx, err := b.GetTransaction(tx1.Hash())
-	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionReverted, tx.Status)
 }
