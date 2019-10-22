@@ -15,15 +15,9 @@ import (
 )
 
 func TestCreateAccount(t *testing.T) {
-	var lastEvent types.Event
-
-	b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-		OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-			lastEvent = event
-		},
-	})
-
 	t.Run("SingleKey", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
 		accountKey := types.AccountKey{
 			PublicKey: []byte{1, 2, 3},
 			Weight:    constants.AccountKeyWeightThreshold,
@@ -43,12 +37,7 @@ func TestCreateAccount(t *testing.T) {
 		err := b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
-		assert.IsType(t, types.Address{}, lastEvent.Values["address"])
-
-		accountAddress := lastEvent.Values["address"].(types.Address)
-		account, err := b.GetAccount(accountAddress)
-		assert.Nil(t, err)
+		account := b.LastCreatedAccount()
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 1)
@@ -57,6 +46,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("MultipleKeys", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
 		accountKeyA := types.AccountKey{
 			PublicKey: []byte{1, 2, 3},
 			Weight:    constants.AccountKeyWeightThreshold,
@@ -81,12 +72,7 @@ func TestCreateAccount(t *testing.T) {
 		err := b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
-		assert.IsType(t, types.Address{}, lastEvent.Values["address"])
-
-		accountAddress := lastEvent.Values["address"].(types.Address)
-		account, err := b.GetAccount(accountAddress)
-		assert.Nil(t, err)
+		account := b.LastCreatedAccount()
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 2)
@@ -95,7 +81,9 @@ func TestCreateAccount(t *testing.T) {
 		assert.Empty(t, account.Code)
 	})
 
-	t.Run("MultipleKeysAndCode", func(t *testing.T) {
+	t.Run("KeysAndCode", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
 		accountKeyA := types.AccountKey{
 			PublicKey: []byte{1, 2, 3},
 			Weight:    constants.AccountKeyWeightThreshold,
@@ -122,12 +110,7 @@ func TestCreateAccount(t *testing.T) {
 		err := b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
-		assert.IsType(t, types.Address{}, lastEvent.Values["address"])
-
-		accountAddress := lastEvent.Values["address"].(types.Address)
-		account, err := b.GetAccount(accountAddress)
-		assert.Nil(t, err)
+		account := b.LastCreatedAccount()
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 2)
@@ -137,6 +120,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("CodeAndNoKeys", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
 		code := []byte("fun main() {}")
 
 		createAccountScript := templates.CreateAccount(nil, code)
@@ -153,15 +138,53 @@ func TestCreateAccount(t *testing.T) {
 		err := b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		assert.Equal(t, constants.EventAccountCreated, lastEvent.ID)
-		assert.IsType(t, types.Address{}, lastEvent.Values["address"])
+		account := b.LastCreatedAccount()
+
+		assert.Equal(t, uint64(0), account.Balance)
+		assert.Empty(t, account.Keys)
+		assert.Equal(t, code, account.Code)
+	})
+
+	t.Run("EventEmitted", func(t *testing.T) {
+		var lastEvent types.Event
+
+		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
+			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+				lastEvent = event
+			},
+		})
+
+		accountKey := types.AccountKey{
+			PublicKey: []byte{1, 2, 3},
+			Weight:    constants.AccountKeyWeightThreshold,
+		}
+
+		code := []byte("fun main() {}")
+
+		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKey}, code)
+
+		tx := &types.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err := b.SubmitTransaction(tx)
+		assert.Nil(t, err)
+
+		require.Equal(t, constants.EventAccountCreated, lastEvent.ID)
+		require.IsType(t, types.Address{}, lastEvent.Values["address"])
 
 		accountAddress := lastEvent.Values["address"].(types.Address)
 		account, err := b.GetAccount(accountAddress)
 		assert.Nil(t, err)
 
 		assert.Equal(t, uint64(0), account.Balance)
-		assert.Empty(t, account.Keys)
+		require.Len(t, account.Keys, 1)
+		assert.Equal(t, accountKey, account.Keys[0])
 		assert.Equal(t, code, account.Code)
 	})
 }
