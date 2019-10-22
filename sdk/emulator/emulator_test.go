@@ -1135,6 +1135,7 @@ func TestEventEmitted(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
@@ -1216,6 +1217,7 @@ func TestEventEmitted(t *testing.T) {
 		tx := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
