@@ -41,8 +41,14 @@ var Cmd = &cobra.Command{
 
 // InitializeProject generates a new root key and saves project config.
 func InitializeProject() *project.Config {
-	prKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
-	prKeyBytes, _ := prKey.Encode()
+	prKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
+	if err != nil {
+		panic(err)
+	}
+	prKeyBytes, err := prKey.Encode()
+	if err != nil {
+		panic(err)
+	}
 	prKeyHex := hex.EncodeToString(prKeyBytes)
 	address := types.HexToAddress("01").Hex()
 
