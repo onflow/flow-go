@@ -84,7 +84,7 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).  They also cannot be redeclared with the same name in a subscope. 
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).  They also cannot be redeclared with the same name in a subscope.
 
 ```bamboo
 // Declare a constant named `a`
@@ -574,28 +574,28 @@ Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
 
-  ```bamboo,file=string-length-field.bpl
+    ```bamboo,file=string-length-field.bpl
     let example = "hello"
 
     // Find the number of elements
     let length = example.length
     // `length` is 5
-  ```
+    ```
 
 - `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
 
-  ```bamboo,file=string-concat.bpl
+    ```bamboo,file=string-concat.bpl
     let example = "hello"
     let new = "world"
 
     // Concatenate the new string onto the example string and return the new string
     let helloWorld = example.concat(new)
     // `helloWorld` is now "helloworld"
-  ```
+    ```
 
 - `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
 
-  ```bamboo,file=string-slice.bpl
+    ```bamboo,file=string-slice.bpl
     let example = "helloworld"
 
     // Create a new slice of part of the original string
@@ -604,7 +604,7 @@ Strings have multiple built-in functions you can use.
 
     // Error: Out of bounds index
     let outOfBounds = example.slice(from: 2, upTo: 10)
-  ```
+    ```
 
 <!--
 
@@ -708,18 +708,18 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
 
 - `length: Int`: Returns the number of elements in the array.
 
-  ```bamboo,file=array-length-field.bpl
+    ```bamboo,file=array-length-field.bpl
     let numbers = [42, 23, 31, 12]
 
     // Find the number of elements
     let length = numbers.length
 
     // `length` is 4
-  ```
+    ```
 
 - `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
 
-  ```bamboo,file=array-concat.bpl
+    ```bamboo,file=array-concat.bpl
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
 
@@ -730,11 +730,11 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // `allNumbers` is `[42, 23, 31, 12, 11, 27]`
     // `numbers` is still `[42, 23, 31, 12]`
     // `moreNumbers` is still `[11, 27]`
-  ```
+    ```
 
 - `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
 
-  ```bamboo,file=array-contains.bpl
+    ```bamboo,file=array-contains.bpl
     let numbers = [42, 23, 31, 12]
 
     // Check if the array contains 11
@@ -749,7 +749,7 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // This results in a type error, as the array only contains integers
     //
     let containsKitty = numbers.contains("Kitty")
-  ```
+    ```
 
 ##### Variable-size Array Functions
 
@@ -757,7 +757,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
 - `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.
 
-  ```bamboo,file=array-append.bpl
+    ```bamboo,file=array-append.bpl
     let numbers = [42, 23, 31, 12]
 
     // Add a new element
@@ -766,11 +766,11 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Invalid: Wrong type
     numbers.append("SneakyString")
-  ```
+    ```
 
 - `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
 
-  ```bamboo,file=array-insert.bpl
+    ```bamboo,file=array-insert.bpl
     let numbers = [42, 23, 31, 12]
 
     // Insert a new element at position 1 of the array
@@ -779,13 +779,13 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Error: Out of bounds index
     numbers.insert(at: 12, 39)
-  ```
+    ```
 
 - `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
 - `removeFirst(): T`: Removes the first element from the array and returns it.
 - `removeLast(): T`: Removes the last element from the array and returns it.
 
-  ```bamboo,file=array-remove.bpl
+    ```bamboo,file=array-remove.bpl
     let numbers = [42, 23, 31, 12]
 
     // Remove element at position 1 of the array
@@ -805,7 +805,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
     let twelve = numbers.removeLast()
     // `numbers` is now `[31]`
     // `twelve` is `12`
-  ```
+    ```
 
 <!--
 
@@ -921,7 +921,8 @@ booleans[0] = true
 #### Dictionary Fields and Functions
 
 - `length: Int`: Returns the number of elements in the dictionary.
-- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the key as an optional, otherwise `nil`.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary.
+    Returns the value of type `V` if the dictionary contained the key as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -1117,9 +1118,9 @@ Logical operators work with the boolean values `true` and `false`.
 Comparison operators work with boolean and integer values.
 
 - Equality: `==`, for booleans and integers
+
     Both sides of the equality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
-
 
     ```bamboo,file=operator-equal-int.bpl
     1 == 1
@@ -1150,13 +1151,15 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-equal-int-nil.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
-    let y: Int? = nil
+    let y: Int?? = nil
     x == y
     // is false
     ```
 
     ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = 2
     x == y
@@ -1164,9 +1167,9 @@ Comparison operators work with boolean and integer values.
     ```
 
 - Inequality: `!=`, for booleans and integers (possibly optional)
+
     Both sides of the inequality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
-
 
     ```bamboo,file=operator-not-equal-int.bpl
     1 != 1
@@ -1197,13 +1200,15 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-not-equal-int-nil.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
-    let y: Int? = nil
+    let y: Int?? = nil
     x != y
     // is true
     ```
 
     ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = 2
     x != y
@@ -1692,7 +1697,7 @@ if a == 0 {
    b = 1
 }
 
-// parentheses can be used around the condition, but are not required
+// Parentheses can be used around the condition, but are not required
 if (a != 0) {
    b = 2
 }
@@ -1937,8 +1942,8 @@ fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
 
-// The arguments are not declared with a specific type,
-// but they are inferred to be `Int8` since the parameter types are `Int8`
+// The arguments are not declared with a specific type, but they are inferred
+// to be `Int8` since the parameter types of the function `add` are `Int8`.
 add(1, 2) // returns 3
 
 // Declare two constants which have type `Int32`
@@ -2039,9 +2044,9 @@ and when the value is returned from a function:
     Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-    Structures are not an ideal way to represent this ownership because they are copied. 
-    This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  
-    A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  
+    Structures are not an ideal way to represent this ownership because they are copied.
+    This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.
+    A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.
     A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
@@ -2102,11 +2107,11 @@ Synthetic fields are **not** stored in the composite value, i.e. they are derive
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
-// Both fields are initialized through the initializer
+// Both fields are initialized through the initializer.
 //
-// The public modifier is used here to allow these fields to be 
-// read in outer scopes.  Access control will be explained 
-// in a later section.
+// The public access modifier `pub` is used in this example to allow
+// thes fields to be read in outer scopes.
+// Access control will be explained in a later section.
 //
 struct Token {
     pub let id: Int
@@ -2251,7 +2256,7 @@ struct Rectangle {
     pub var height: Int
 
     // Declare a synthetic field named `area`,
-    // which computes the area based on the width and height
+    // which computes the area based on the `width` and `height` fields
     //
     pub synthetic area: Int {
         get {
@@ -2259,8 +2264,10 @@ struct Rectangle {
         }
     }
 
-    // in this case, since a getter is provided for `area`, 
-    // it cannot be assigned a value
+    // Declare an initializer which accepts width and height.
+    // As `area` is synthetic and there is only a getter provided for it,
+    // the `area` field it cannot be assigned a value
+    //
     init(width: Int, height: Int) {
         self.width = width
         self.height = height
@@ -2597,13 +2604,13 @@ Instead, consider using [interfaces](#interfaces).
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
- - **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
+- **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
- - **Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
+- **Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
 
- An element is made public by using the `pub` keyword.
+**By default, everything is private.**
 
-**By default, everything is private.** 
+An element is made public by using the `pub` keyword.
 
 The `(set)` suffix can be used to make variables also publicly writable.
 
@@ -2976,10 +2983,13 @@ token.withdraw(amount: 100)
 
 // Withdrawing tokens so that the balance is zero does not destroy the resource.
 // The resource has to be destroyed explicitly.
+//
 token.withdraw(amount: 90)
 ```
 
-The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
+The access level for variable fields in an implementation may be less restrictive than the interface requires.
+For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified),
+and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
 ```bamboo
 struct interface AnInterface {
@@ -3023,7 +3033,7 @@ struct interface Shape {
 // Declare a structure named `Square` the implements the `Shape` interface
 //
 struct Square: Shape {
-    // In addition to the required fields from the interface, 
+    // In addition to the required fields from the interface,
     // the type can also declare additional fields.
     pub var length: Int
 
@@ -3062,7 +3072,7 @@ struct Rectangle: Shape {
         self.height = height
     }
 
-    // As long as the function names and parameters match those 
+    // As long as the function names and parameters match those
     // of the required functions, the implementations can differ.
     pub fun scale(factor: Int) {
         self.width = self.width * factor
@@ -3285,7 +3295,7 @@ struct Point: Hashable {
         self.y = y
     }
 
-    // Implementing the function `equals` will allow points to be compared 
+    // Implementing the function `equals` will allow points to be compared
     // for equality and satisfies the `Equatable` interface
     pub fun equals(_ other: Self): Bool {
         // Points are equal if their coordinates match.
@@ -3298,7 +3308,7 @@ struct Point: Hashable {
             && other.y == self.y
     }
 
-    // Providing an implementation for the hash value field 
+    // Providing an implementation for the hash value field
     // satisfies the `Hashable` interface
     pub synthetic hashValue: Int {
         get {
@@ -3395,7 +3405,7 @@ account.storage[Counter] <- create Counter(count: 0)
 
 > 🚧 Status: The usage of external types is not implemented yet.
 
-Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.  
+Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
@@ -3527,8 +3537,8 @@ pub resource interface Vault: Provider, Receiver {
 }
 ```
 
-The transaction will import the above file to use it in the code.  
-Transactions can refer to local code with the `import` keyword, 
+The transaction will import the above file to use it in the code.
+Transactions can refer to local code with the `import` keyword,
 followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
 
@@ -3542,9 +3552,9 @@ the resource interface.  This essentially stores the resource interface in the a
 
 Once deployed, the resource interface is available in the account's `types` object, which is how the deployed types are accessed.
 
-When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public. 
+When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public.
 
-The `publish` operator is used to make the resource or interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to import the type, call the functions defined in the resource at the owners address, or call the functions in an published interface in a resource that implements it.
+The `publish` operator is used to make the resource or interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to import the type, call the functions defined in the resource at the owners address, or call the functions in a published interface in a resource that implements it.
 
 ```bamboo,file=deploy-resource-interface.bpl
 
@@ -3663,7 +3673,7 @@ transaction {
         // keyed by the resource interface `Provider`
         //
         // these are the references to the different ways that your token can be
-        // interacted with.  Provider for the owner(you). Receiver for any 
+        // interacted with.  Provider for the owner(you). Receiver for any
         // external accounts.
         //
         signer.storage[FungibleToken.Provider] =
