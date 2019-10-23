@@ -2,6 +2,7 @@ package gnode
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/golang/protobuf/proto"
@@ -16,16 +17,15 @@ func closeConnection(conn *grpc.ClientConn) {
 	}
 }
 
-
 // extractHashMsgInfo receives the bytes of a HashMessage instance, unmarshals it and returns
 // its components
-func extractHashMsgInfo(hashMsgBytes []byte) ([]byte, string, error) {
+func extractHashMsgInfo(hashMsgBytes []byte) ([]byte, *shared.Socket, error) {
 	hashMsg := &shared.HashMessage{}
 	if err := proto.Unmarshal(hashMsgBytes, hashMsg); err != nil {
-		return nil, "", fmt.Errorf("could not unmarshal message: %v", err)
+		return nil, &shared.Socket{}, fmt.Errorf("could not unmarshal message: %v", err)
 	}
 
-	return hashMsg.GetHashBytes(), hashMsg.GetSenderAddr(), nil
+	return hashMsg.GetHashBytes(), hashMsg.GetSenderSocket(), nil
 }
 
 // computeHash computes the hash of GossipMessage using sha256 algorithm

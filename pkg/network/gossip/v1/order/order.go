@@ -18,7 +18,17 @@ type Order struct {
 	done chan struct{}
 }
 
-// NewOrder returns a new order instance
+// NewSync constructs a new sync Order
+func NewSync(ctx context.Context, msg *shared.GossipMessage) *Order {
+	return NewOrder(ctx, msg, true)
+}
+
+// NewAsync constructs a new async order
+func NewAsync(ctx context.Context, msg *shared.GossipMessage) *Order {
+	return NewOrder(ctx, msg, false)
+}
+
+// NewOrder returns a new order instance.
 func NewOrder(ctx context.Context, msg *shared.GossipMessage, isSync bool) *Order {
 	var d chan struct{}
 	if isSync {
@@ -65,14 +75,18 @@ func (o *Order) Fill(resp []byte, err error) {
 
 // isSync checks if this Order is for a sync or async response
 func (o *Order) isSync() bool {
-	return o.sync
+	if o.done == nil {
+		return false
+	}
+
+	return true
 }
 
 func (o *Order) String() string {
-	return fmt.Sprintf("Order message: [%v], sync: %v", o.Msg, o.sync)
+	return fmt.Sprintf("Order message: [ %v ], sync: %v", o.Msg, o.isSync())
 }
 
-// Valid checks if the order is valid. Currently valid is defined as having a non-nil message field in the order ticket
+// Valid checks if the order is valid. Currently valid is defined as having a non-nil message
 func Valid(o *Order) bool {
 	return o != nil && o.Msg != nil
 }

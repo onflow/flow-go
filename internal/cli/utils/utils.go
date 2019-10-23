@@ -8,9 +8,14 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
-func Exit(msg string, code int) {
+func Exit(code int, msg string) {
 	fmt.Println(msg)
-	os.Exit(1)
+	os.Exit(code)
+}
+
+func Exitf(code int, msg string, args ...interface{}) {
+	fmt.Printf(msg+"\n", args...)
+	os.Exit(code)
 }
 
 func DecodePrivateKey(derHex string) (crypto.PrivateKey, error) {

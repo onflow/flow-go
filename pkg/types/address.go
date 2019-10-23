@@ -12,6 +12,9 @@ const (
 // Address represents the 20 byte address of an account.
 type Address [AddressLength]byte
 
+// ZeroAddress represents the "zero address" (account that no one owns).
+var ZeroAddress Address = Address{}
+
 // BytesToAddress returns Address with value b.
 //
 // If b is larger than len(h), b will be cropped from the left.
@@ -48,9 +51,4 @@ func (a Address) Hex() string {
 // String returns the string representation of the address.
 func (a Address) String() string {
 	return a.Hex()
-}
-
-// ZeroAddress represents the "zero address" (account that no one owns).
-func ZeroAddress() Address {
-	return Address{}
 }

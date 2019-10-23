@@ -15,9 +15,9 @@ type testRuntimeInterface struct {
 	resolveImport      func(ImportLocation) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error)
+	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
 	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
-	removeAccountKey   func(address types.Address, index int) error
+	removeAccountKey   func(address types.Address, index int) (publicKey []byte, err error)
 	updateAccountCode  func(address types.Address, code []byte) (err error)
 	getSigningAccounts func() []types.Address
 	log                func(string)
@@ -36,7 +36,7 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
 	return i.createAccount(publicKeys, keyWeights, code)
 }
 
@@ -44,7 +44,7 @@ func (i *testRuntimeInterface) AddAccountKey(address types.Address, publicKey []
 	return i.addAccountKey(address, publicKey, keyWeight)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) error {
+func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
 	return i.removeAccountKey(address, index)
 }
 
@@ -92,15 +92,15 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 			state.SetBytes(value)
 			return nil
 		},
-		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (accountID []byte, err error) {
-			return nil, nil
+		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
+			return types.Address{}, nil
 		},
 		updateAccountCode: func(address types.Address, code []byte) (err error) {
 			return nil
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
 
@@ -140,7 +140,7 @@ func TestRuntimeImport(t *testing.T) {
 		},
 	}
 
-	value, err := runtime.ExecuteScript(script, runtimeInterface)
+	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), value)
 }
@@ -161,7 +161,7 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Error(t, err)
 }
 
@@ -193,7 +193,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 		},
 	}
 
-	value, err := runtime.ExecuteScript(script, runtimeInterface)
+	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), value)
@@ -236,7 +236,7 @@ func TestRuntimeStorage(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	require.Nil(t, err)
 
@@ -273,10 +273,10 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface)
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script, runtimeInterface)
+	_, err = runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
 
 	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
@@ -346,10 +346,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	answer, err := runtime.ExecuteScript(script2, runtimeInterface)
+	answer, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(42), answer)
 }
@@ -389,10 +389,10 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	result, err := runtime.ExecuteScript(script2, runtimeInterface)
+	result, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Equal(t, big.NewInt(42), result)
 	assert.Nil(t, err)
 }
@@ -457,9 +457,9 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
 	assert.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface)
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
 }

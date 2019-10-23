@@ -40,8 +40,14 @@ func (rsr *ReceiverServerRegistry) DisplayMessage(ctx context.Context, payloadBy
 	return respByte, respErr
 }
 
-func (rsr *ReceiverServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-		"DisplayMessage": rsr.DisplayMessage,
+func (rsr *ReceiverServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+		0: rsr.DisplayMessage,
+	}
+}
+
+func (rsr *ReceiverServerRegistry) NameMapping() map[string]uint64 {
+	return map[string]uint64{
+		"DisplayMessage": 0,
 	}
 }
