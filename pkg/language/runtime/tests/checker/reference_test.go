@@ -261,12 +261,14 @@ func TestCheckReferenceUse(t *testing.T) {
           fun test(): [Int] {
               var r: <-R? <- create R()
               storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
               let ref = &storage[R] as R
               ref.x = 1
               let x1 = ref.x
               ref.setX(2)
               let x2 = ref.x
-              destroy r
               return [x1, x2]
           }
         `,
@@ -275,5 +277,117 @@ func TestCheckReferenceUse(t *testing.T) {
 		nil,
 	)
 
-	require.Nil(t, err)
+	assert.Nil(t, err)
+}
+
+func TestCheckReferenceUseArray(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t, `
+          resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
+              fun setX(_ newX: Int) {
+                  self.x = newX
+              }
+          }
+
+          fun test(): [Int] {
+              var rs: <-[R]? <- [<-create R()]
+              storage[[R]] <-> rs
+              // there was no old value, but it must be discarded
+              destroy rs
+
+              let ref = &storage[[R]] as [R]
+              ref[0].x = 1
+              let x1 = ref[0].x
+              ref[0].setX(2)
+              let x2 = ref[0].x
+              return [x1, x2]
+          }
+        `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t, `
+          resource R {}
+
+          fun test() {
+              var rs: <-[R]? <- [<-create R()]
+              storage[[R]] <-> rs
+              // there was no old value, but it must be discarded
+              destroy rs
+
+              let ref = &storage[[R]] as [R]
+              var other <- create R()
+              ref[0] <-> other
+              destroy other
+          }
+        `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t, `
+          resource R {}
+
+          fun test() {
+              var rs: <-[R]? <- [<-create R()]
+              storage[[R]] <-> rs
+              // there was no old value, but it must be discarded
+              destroy rs
+
+              let ref = &storage[[R]] as [R]
+              ref[0]
+          }
+        `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t, `
+          resource R {}
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as R
+              ref[0]
+          }
+        `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotIndexableTypeError{}, errs[0])
 }

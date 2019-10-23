@@ -24,7 +24,7 @@ type Type interface {
 
 type ValueIndexableType interface {
 	Type
-	isValueIndexableType()
+	isValueIndexableType() bool
 	ElementType(isAssignment bool) Type
 	IndexingType() Type
 }
@@ -260,6 +260,10 @@ func (*StringType) IsInvalidType() bool {
 	return false
 }
 
+func (*StringType) HasMembers() bool {
+	return true
+}
+
 func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
 	case "length":
@@ -296,7 +300,9 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 	}
 }
 
-func (t *StringType) isValueIndexableType() {}
+func (t *StringType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *StringType) ElementType(isAssignment bool) Type {
 	return &CharacterType{}
@@ -856,6 +862,10 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
+func (t *VariableSizedType) HasMembers() bool {
+	return true
+}
+
 func (t *VariableSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	return getArrayMember(t, identifier, targetRange, report)
 }
@@ -901,6 +911,10 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 
 	return t.Type.Equal(otherArray.Type) &&
 		t.Size == otherArray.Size
+}
+
+func (t *ConstantSizedType) HasMembers() bool {
+	return true
 }
 
 func (t *ConstantSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
@@ -1077,6 +1091,10 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
+func (t *CompositeType) HasMembers() bool {
+	return true
+}
+
 func (t *CompositeType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
@@ -1126,7 +1144,9 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 	return &member
 }
 
-type HasMembers interface {
+type MemberAccessibleType interface {
+	Type
+	HasMembers() bool
 	GetMember(field string, targetRange ast.Range, report func(error)) *Member
 }
 
@@ -1154,6 +1174,10 @@ func (t *InterfaceType) Equal(other Type) bool {
 
 	return otherInterface.CompositeKind == t.CompositeKind &&
 		otherInterface.Identifier == t.Identifier
+}
+
+func (t *InterfaceType) HasMembers() bool {
+	return true
 }
 
 func (t *InterfaceType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
@@ -1201,6 +1225,11 @@ func (t *DictionaryType) IsInvalidType() bool {
 	return t.KeyType.IsInvalidType() ||
 		t.ValueType.IsInvalidType()
 }
+
+func (t *DictionaryType) HasMembers() bool {
+	return true
+}
+
 func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
 	case "length":
@@ -1247,7 +1276,9 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 	}
 }
 
-func (t *DictionaryType) isValueIndexableType() {}
+func (t *DictionaryType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *DictionaryType) ElementType(isAssignment bool) Type {
 	return &OptionalType{Type: t.ValueType}
@@ -1399,13 +1430,45 @@ func (t *ReferenceType) IsInvalidType() bool {
 	return false
 }
 
+func (t *ReferenceType) HasMembers() bool {
+	referencedType, ok := t.Type.(MemberAccessibleType)
+	if !ok {
+		return false
+	}
+	return referencedType.HasMembers()
+}
+
 func (t *ReferenceType) GetMember(field string, targetRange ast.Range, report func(error)) *Member {
 	// forward to referenced type, if it has members
-	referencedTypeWithMember, ok := t.Type.(HasMembers)
+	referencedTypeWithMember, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return nil
 	}
 	return referencedTypeWithMember.GetMember(field, targetRange, report)
+}
+
+func (t *ReferenceType) isValueIndexableType() bool {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return false
+	}
+	return referencedType.isValueIndexableType()
+}
+
+func (t *ReferenceType) ElementType(isAssignment bool) Type {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return nil
+	}
+	return referencedType.ElementType(isAssignment)
+}
+
+func (t *ReferenceType) IndexingType() Type {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return nil
+	}
+	return referencedType.IndexingType()
 }
 
 ////

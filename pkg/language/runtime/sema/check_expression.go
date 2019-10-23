@@ -174,6 +174,17 @@ func (checker *Checker) visitIndexExpression(
 		checker.checkAccessResourceLoss(elementType, targetExpression)
 	}()
 
+	reportNotIndexableType := func() {
+		checker.report(
+			&NotIndexableTypeError{
+				Type:  targetType,
+				Range: ast.NewRangeFromPositioned(targetExpression),
+			},
+		)
+
+		elementType = &InvalidType{}
+	}
+
 	switch indexedType := targetType.(type) {
 	case TypeIndexableType:
 
@@ -209,6 +220,17 @@ func (checker *Checker) visitIndexExpression(
 		return
 
 	case ValueIndexableType:
+
+		// Check if the type instance is actually indexable. For most types (e.g. arrays and dictionaries)
+		// this is known statically (in the sense of this host language (Go), not the implemented language),
+		// i.e. a Go type switch would be sufficient.
+		// However, for some types (e.g. reference types) this depends on what type is referenced
+
+		if !indexedType.isValueIndexableType() {
+			reportNotIndexableType()
+			return
+		}
+
 		// indexing into value-indexable value using type?
 		if indexExpression.IndexingType != nil {
 			checker.report(
@@ -230,14 +252,7 @@ func (checker *Checker) visitIndexExpression(
 		return
 
 	default:
-		checker.report(
-			&NotIndexableTypeError{
-				Type:  indexedType,
-				Range: ast.NewRangeFromPositioned(targetExpression),
-			},
-		)
-
-		elementType = &InvalidType{}
+		reportNotIndexableType()
 		return
 	}
 }
