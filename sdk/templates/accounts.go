@@ -8,12 +8,17 @@ import (
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
+func CreateAccount(accountKeys []types.AccountKey, code []byte) ([]byte, error) {
 	publicKeys := make([][]byte, len(accountKeys))
 	keyWeights := make([]int, len(accountKeys))
 
 	for i, accountKey := range accountKeys {
-		publicKeys[i] = accountKey.PublicKey
+		accountKeyBytes, err := types.EncodeAccountKey(accountKey)
+		if err != nil {
+			return nil, err
+		}
+
+		publicKeys[i] = accountKeyBytes
 		keyWeights[i] = accountKey.Weight
 	}
 
@@ -30,7 +35,7 @@ func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
 		}
 	`, publicKeysStr, keyWeightsStr, codeStr)
 
-	return []byte(script)
+	return []byte(script), nil
 }
 
 // UpdateAccountCode generates a script that updates the code associated with an account.
@@ -48,18 +53,23 @@ func UpdateAccountCode(code []byte) []byte {
 }
 
 // AddAccountKey generates a script that adds a key to an account.
-func AddAccountKey(accountKey types.AccountKey) []byte {
-	publicKeyStr := cadenceEncodeBytes(accountKey.PublicKey)
+func AddAccountKey(accountKey types.AccountKey) ([]byte, error) {
+	accountKeyBytes, err := types.EncodeAccountKey(accountKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKeyStr := cadenceEncodeBytes(accountKeyBytes)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
-			let code = %s
+			let key = %s
 			let weight = %d
-			addAccountKey(account.address, code, weight)
+			addAccountKey(account.address, key, weight)
 		}
 	`, publicKeyStr, accountKey.Weight)
 
-	return []byte(script)
+	return []byte(script), nil
 }
 
 // RemoveAccountKey generates a script that removes a key from an account.

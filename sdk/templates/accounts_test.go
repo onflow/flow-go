@@ -6,24 +6,29 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/constants"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 func TestCreateAccount(t *testing.T) {
-	publicKey := []byte{4, 136, 178, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111, 117, 56, 107, 245, 122, 184, 40, 127, 172, 19, 175, 225, 131, 184, 22, 122, 23, 90, 172, 214, 144, 150, 92, 69, 119, 218, 11, 191, 120, 226, 74, 2, 217, 156, 75, 44, 44, 121, 152, 143, 47, 180, 169, 205, 18, 77, 47, 135, 146, 34, 34, 157, 69, 149, 177, 141, 80, 99, 66, 186, 33, 25, 73, 179, 224, 166, 205, 172}
+	publicKey := unittest.PublicKeyFixtures()[0]
 
 	accountKey := types.AccountKey{
 		PublicKey: publicKey,
+		SignAlgo:  publicKey.Algorithm(),
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
 	// create account with no code
-	scriptA := templates.CreateAccount([]types.AccountKey{accountKey}, []byte{})
+	scriptA, err := templates.CreateAccount([]types.AccountKey{accountKey}, []byte{})
+	assert.Nil(t, err)
 
 	expectedScriptA := []byte(`
 		fun main() {
-			let publicKeys: [[Int]] = [[4,136,178,30,0,0,0,0,0,0,0,0,0,111,117,56,107,245,122,184,40,127,172,19,175,225,131,184,22,122,23,90,172,214,144,150,92,69,119,218,11,191,120,226,74,2,217,156,75,44,44,121,152,143,47,180,169,205,18,77,47,135,146,34,34,157,69,149,177,141,80,99,66,186,33,25,73,179,224,166,205,172]]
+			let publicKeys: [[Int]] = [[248,98,184,91,48,89,48,19,6,7,42,134,72,206,61,2,1,6,8,42,134,72,206,61,3,1,7,3,66,0,4,114,176,116,164,82,208,167,100,161,218,52,49,143,68,203,22,116,13,241,207,171,30,107,80,229,228,20,93,192,110,93,21,28,156,37,36,79,18,62,83,201,182,254,35,117,4,163,126,119,121,144,10,173,83,202,38,227,181,124,92,61,112,48,196,1,2,130,3,232]]
 			let keyWeights: [Int] = [1000]
 			let code: [Int]? = []
 			createAccount(publicKeys, keyWeights, code)
@@ -33,11 +38,12 @@ func TestCreateAccount(t *testing.T) {
 	assert.Equal(t, expectedScriptA, scriptA)
 
 	// create account with code
-	scriptB := templates.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
+	scriptB, err := templates.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
+	assert.Nil(t, err)
 
 	expectedScriptB := []byte(`
 		fun main() {
-			let publicKeys: [[Int]] = [[4,136,178,30,0,0,0,0,0,0,0,0,0,111,117,56,107,245,122,184,40,127,172,19,175,225,131,184,22,122,23,90,172,214,144,150,92,69,119,218,11,191,120,226,74,2,217,156,75,44,44,121,152,143,47,180,169,205,18,77,47,135,146,34,34,157,69,149,177,141,80,99,66,186,33,25,73,179,224,166,205,172]]
+			let publicKeys: [[Int]] = [[248,98,184,91,48,89,48,19,6,7,42,134,72,206,61,2,1,6,8,42,134,72,206,61,3,1,7,3,66,0,4,114,176,116,164,82,208,167,100,161,218,52,49,143,68,203,22,116,13,241,207,171,30,107,80,229,228,20,93,192,110,93,21,28,156,37,36,79,18,62,83,201,182,254,35,117,4,163,126,119,121,144,10,173,83,202,38,227,181,124,92,61,112,48,196,1,2,130,3,232]]
 			let keyWeights: [Int] = [1000]
 			let code: [Int]? = [102,117,110,32,109,97,105,110,40,41,32,123,125]
 			createAccount(publicKeys, keyWeights, code)
