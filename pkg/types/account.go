@@ -26,6 +26,53 @@ type AccountKey struct {
 	Weight    int
 }
 
+type accountKeyWrapper struct {
+	PublicKey []byte
+	SignAlgo  uint
+	HashAlgo  uint
+	Weight    uint
+}
+
+func EncodeAccountKey(a AccountKey) ([]byte, error) {
+	publicKey, err := a.PublicKey.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	w := accountKeyWrapper{
+		PublicKey: publicKey,
+		SignAlgo:  uint(a.SignAlgo),
+		HashAlgo:  uint(a.HashAlgo),
+		Weight:    uint(a.Weight),
+	}
+
+	return rlp.EncodeToBytes(&w)
+}
+
+func DecodeAccountKey(b []byte) (AccountKey, error) {
+	var w accountKeyWrapper
+
+	err := rlp.DecodeBytes(b, &w)
+	if err != nil {
+		return AccountKey{}, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
+	hashAlgo := crypto.HashingAlgorithm(w.HashAlgo)
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, w.PublicKey)
+	if err != nil {
+		return AccountKey{}, err
+	}
+
+	return AccountKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(w.Weight),
+	}, nil
+}
+
 // AccountSignature is a signature associated with an account.
 type AccountSignature struct {
 	Account   Address
