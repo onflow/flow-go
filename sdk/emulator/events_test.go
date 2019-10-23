@@ -99,14 +99,14 @@ func TestEventEmitted(t *testing.T) {
 
 		publicKey := b.RootKey().PublicKey()
 
-		accountKey := types.AccountKey{
+		accountKey := types.AccountPublicKey{
 			PublicKey: publicKey,
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		address, err := b.CreateAccount([]types.AccountKey{accountKey}, accountScript, getNonce())
+		address, err := b.CreateAccount([]types.AccountPublicKey{accountKey}, accountScript, getNonce())
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`

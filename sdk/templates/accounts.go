@@ -8,11 +8,11 @@ import (
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(accountKeys []types.AccountKey, code []byte) ([]byte, error) {
+func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, error) {
 	publicKeys := make([][]byte, len(accountKeys))
 
 	for i, accountKey := range accountKeys {
-		accountKeyBytes, err := types.EncodeAccountKey(accountKey)
+		accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
 		if err != nil {
 			return nil, err
 		}
@@ -49,8 +49,8 @@ func UpdateAccountCode(code []byte) []byte {
 }
 
 // AddAccountKey generates a script that adds a key to an account.
-func AddAccountKey(accountKey types.AccountKey) ([]byte, error) {
-	accountKeyBytes, err := types.EncodeAccountKey(accountKey)
+func AddAccountKey(accountKey types.AccountPublicKey) ([]byte, error) {
+	accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
 	if err != nil {
 		return nil, err
 	}

@@ -171,7 +171,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKeyB := privateKeyB.PublicKey()
 
-	accountKeyB := types.AccountKey{
+	accountKeyB := types.AccountPublicKey{
 		PublicKey: publicKeyB,
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
@@ -179,7 +179,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	}
 
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, nil, getNonce())
+	accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, nil, getNonce())
 	assert.Nil(t, err)
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -297,21 +297,21 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("space cowboy"))
 		publicKeyB := privateKeyB.PublicKey()
 
-		accountKeyA := types.AccountKey{
+		accountKeyA := types.AccountPublicKey{
 			PublicKey: publicKeyA,
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
-		accountKeyB := types.AccountKey{
+		accountKeyB := types.AccountPublicKey{
 			PublicKey: publicKeyB,
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
-		accountAddressA, err := b.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil, getNonce())
+		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, nil, getNonce())
 
 		script := []byte("fun main(account: Account) {}")
 
@@ -377,7 +377,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 		publicKeyB := privateKeyB.PublicKey()
 
-		accountKeyB := types.AccountKey{
+		accountKeyB := types.AccountPublicKey{
 			PublicKey: publicKeyB,
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
@@ -385,7 +385,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		}
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, nil, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, nil, getNonce())
 		assert.Nil(t, err)
 
 		multipleAccountScript := []byte(`

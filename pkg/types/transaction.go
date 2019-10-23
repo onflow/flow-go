@@ -94,14 +94,13 @@ func (tx *Transaction) FullEncoding() []byte {
 
 // AddSignature signs the transaction with the given account and private key, then adds the signature to the list
 // of signatures.
-func (tx *Transaction) AddSignature(account Address, prKey crypto.PrivateKey) error {
-	// TODO: replace hard-coded hashing algorithm
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+func (tx *Transaction) AddSignature(account Address, key AccountPrivateKey) error {
+	hasher, err := crypto.NewHasher(key.HashAlgo)
 	if err != nil {
 		return err
 	}
 
-	sig, err := prKey.Sign(tx.CanonicalEncoding(), hasher)
+	sig, err := key.PrivateKey.Sign(tx.CanonicalEncoding(), hasher)
 	if err != nil {
 		return err
 	}

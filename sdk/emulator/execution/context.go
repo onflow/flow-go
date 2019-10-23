@@ -256,9 +256,9 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 		panic(err)
 	}
 
-	accountKeys := make([]types.AccountKey, len(publicKeys))
+	accountKeys := make([]types.AccountPublicKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountKey, err := types.DecodeAccountKey(publicKey)
+		accountKey, err := types.DecodeAccountPublicKey(publicKey)
 		if err != nil {
 			panic(err)
 		}

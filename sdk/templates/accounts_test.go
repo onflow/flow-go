@@ -15,7 +15,7 @@ import (
 func TestCreateAccount(t *testing.T) {
 	publicKey := unittest.PublicKeyFixtures()[0]
 
-	accountKey := types.AccountKey{
+	accountKey := types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  publicKey.Algorithm(),
 		HashAlgo:  crypto.SHA3_256,
@@ -23,7 +23,7 @@ func TestCreateAccount(t *testing.T) {
 	}
 
 	// create account with no code
-	scriptA, err := templates.CreateAccount([]types.AccountKey{accountKey}, []byte{})
+	scriptA, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, []byte{})
 	assert.Nil(t, err)
 
 	expectedScriptA := []byte(`
@@ -37,7 +37,7 @@ func TestCreateAccount(t *testing.T) {
 	assert.Equal(t, expectedScriptA, scriptA)
 
 	// create account with code
-	scriptB, err := templates.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
+	scriptB, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, []byte("fun main() {}"))
 	assert.Nil(t, err)
 
 	expectedScriptB := []byte(`

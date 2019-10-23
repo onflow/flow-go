@@ -21,14 +21,14 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("SingleKey", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKey := types.AccountKey{
+		accountKey := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKey}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, nil)
 		require.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -55,21 +55,21 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("MultipleKeys", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKeyA := types.AccountKey{
+		accountKeyA := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		accountKeyB := types.AccountKey{
+		accountKeyB := types.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, nil)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -97,14 +97,14 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("KeysAndCode", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKeyA := types.AccountKey{
+		accountKeyA := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		accountKeyB := types.AccountKey{
+		accountKeyB := types.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
@@ -113,7 +113,7 @@ func TestCreateAccount(t *testing.T) {
 
 		code := []byte("fun main() {}")
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, code)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -175,7 +175,7 @@ func TestCreateAccount(t *testing.T) {
 			},
 		})
 
-		accountKey := types.AccountKey{
+		accountKey := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
@@ -184,7 +184,7 @@ func TestCreateAccount(t *testing.T) {
 
 		code := []byte("fun main() {}")
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKey}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, code)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -220,7 +220,7 @@ func TestAddAccountKey(t *testing.T) {
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKey := privateKey.PublicKey()
 
-	accountKey := types.AccountKey{
+	accountKey := types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
@@ -267,7 +267,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKey := privateKey.PublicKey()
 
-	accountKey := types.AccountKey{
+	accountKey := types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
@@ -358,7 +358,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	publicKeyB := privateKeyB.PublicKey()
 
-	accountKeyB := types.AccountKey{
+	accountKeyB := types.AccountPublicKey{
 		PublicKey: publicKeyB,
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
@@ -371,7 +371,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -406,7 +406,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -441,7 +441,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -489,14 +489,14 @@ func TestImportAccountCode(t *testing.T) {
 
 	publicKey := b.RootKey().PublicKey()
 
-	accountKey := types.AccountKey{
+	accountKey := types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
-	address, err := b.CreateAccount([]types.AccountKey{accountKey}, accountScript, getNonce())
+	address, err := b.CreateAccount([]types.AccountPublicKey{accountKey}, accountScript, getNonce())
 	assert.Nil(t, err)
 
 	script := []byte(fmt.Sprintf(`

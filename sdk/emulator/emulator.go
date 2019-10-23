@@ -383,7 +383,7 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte, nonce uint64) (types.Address, error) {
+func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountPublicKey, code []byte, nonce uint64) (types.Address, error) {
 	createAccountScript, err := templates.CreateAccount(accountKeys, code)
 	if err != nil {
 		return types.Address{}, nil
@@ -416,7 +416,7 @@ func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code 
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) (accountKey types.AccountKey, err error) {
+) (accountKey types.AccountPublicKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
 		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
@@ -479,14 +479,14 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	}
 
-	accountKey := types.AccountKey{
+	accountKey := types.AccountPublicKey{
 		PublicKey: prKey.PublicKey(),
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
-	accountKeyBytes, _ := types.EncodeAccountKey(accountKey)
+	accountKeyBytes, _ := types.EncodeAccountPublicKey(accountKey)
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(

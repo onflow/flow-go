@@ -63,12 +63,12 @@ func AccountFixture() types.Account {
 		Address: AddressFixture(),
 		Balance: 10,
 		Code:    []byte("fun main() {}"),
-		Keys:    []types.AccountKey{AccountKeyFixture()},
+		Keys:    []types.AccountPublicKey{AccountPublicKeyFixture()},
 	}
 }
 
-func AccountKeyFixture() types.AccountKey {
-	return types.AccountKey{
+func AccountPublicKeyFixture() types.AccountPublicKey {
+	return types.AccountPublicKey{
 		PublicKey: PublicKeyFixtures()[0],
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,

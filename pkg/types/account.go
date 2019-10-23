@@ -13,33 +13,34 @@ type Account struct {
 	Address Address
 	Balance uint64
 	Code    []byte
-	Keys    []AccountKey
+	Keys    []AccountPublicKey
 }
 
-// AccountKey is a public key associated with an account.
+// AccountPublicKey is a public key associated with an account.
 //
-// An account key contains the public key, signing and hashing algorithms, and a key weight.
-type AccountKey struct {
+// An account public key contains the public key, signing and hashing algorithms, and a key weight.
+type AccountPublicKey struct {
 	PublicKey crypto.PublicKey
 	SignAlgo  crypto.SigningAlgorithm
 	HashAlgo  crypto.HashingAlgorithm
 	Weight    int
 }
 
-type accountKeyWrapper struct {
+// accountPublicKeyWrapper is used for encoding and decoding.
+type accountPublicKeyWrapper struct {
 	PublicKey []byte
 	SignAlgo  uint
 	HashAlgo  uint
 	Weight    uint
 }
 
-func EncodeAccountKey(a AccountKey) ([]byte, error) {
+func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
 		return nil, err
 	}
 
-	w := accountKeyWrapper{
+	w := accountPublicKeyWrapper{
 		PublicKey: publicKey,
 		SignAlgo:  uint(a.SignAlgo),
 		HashAlgo:  uint(a.HashAlgo),
@@ -49,12 +50,12 @@ func EncodeAccountKey(a AccountKey) ([]byte, error) {
 	return rlp.EncodeToBytes(&w)
 }
 
-func DecodeAccountKey(b []byte) (AccountKey, error) {
-	var w accountKeyWrapper
+func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
+	var w accountPublicKeyWrapper
 
 	err := rlp.DecodeBytes(b, &w)
 	if err != nil {
-		return AccountKey{}, err
+		return AccountPublicKey{}, err
 	}
 
 	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
@@ -62,10 +63,10 @@ func DecodeAccountKey(b []byte) (AccountKey, error) {
 
 	publicKey, err := crypto.DecodePublicKey(signAlgo, w.PublicKey)
 	if err != nil {
-		return AccountKey{}, err
+		return AccountPublicKey{}, err
 	}
 
-	return AccountKey{
+	return AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
@@ -73,18 +74,20 @@ func DecodeAccountKey(b []byte) (AccountKey, error) {
 	}, nil
 }
 
-// AccountSignature is a signature associated with an account.
-type AccountSignature struct {
-	Account   Address
-	Signature []byte
+type AccountPrivateKey struct {
+	PrivateKey crypto.PrivateKey
+	SignAlgo   crypto.SigningAlgorithm
+	HashAlgo   crypto.HashingAlgorithm
 }
 
-func (a AccountSignature) Encode() []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		a.Account.Bytes(),
-		a.Signature,
-	})
-	return b
+// PublicKey returns the public key configured with a weight.
+func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
+	return AccountPublicKey{
+		PublicKey: a.PrivateKey.PublicKey(),
+		SignAlgo:  a.SignAlgo,
+		HashAlgo:  a.HashAlgo,
+		Weight:    weight,
+	}
 }
 
 // CompatibleAlgorithms returns true if the given signing and hashing algorithms are compatible.
@@ -101,4 +104,18 @@ func CompatibleAlgorithms(signAlgo crypto.SigningAlgorithm, hashAlgo crypto.Hash
 	}
 
 	return t[signAlgo][hashAlgo]
+}
+
+// AccountSignature is a signature associated with an account.
+type AccountSignature struct {
+	Account   Address
+	Signature []byte
+}
+
+func (a AccountSignature) Encode() []byte {
+	b, _ := rlp.EncodeToBytes([]interface{}{
+		a.Account.Bytes(),
+		a.Signature,
+	})
+	return b
 }

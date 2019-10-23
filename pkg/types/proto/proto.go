@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -97,7 +96,7 @@ func MessageToAccount(m *shared.Account) (types.Account, error) {
 		return types.Account{}, ErrEmptyMessage
 	}
 
-	accountKeys := make([]types.AccountKey, len(m.Keys))
+	accountKeys := make([]types.AccountPublicKey, len(m.Keys))
 	for i, key := range m.Keys {
 		accountKey, err := MessageToAccountKey(key)
 		if err != nil {
@@ -133,9 +132,9 @@ func AccountToMessage(a types.Account) (*shared.Account, error) {
 	}, nil
 }
 
-func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
+func MessageToAccountKey(m *shared.AccountKey) (types.AccountPublicKey, error) {
 	if m == nil {
-		return types.AccountKey{}, ErrEmptyMessage
+		return types.AccountPublicKey{}, ErrEmptyMessage
 	}
 
 	signAlgo := crypto.SigningAlgorithm(m.GetSignAlgo())
@@ -143,10 +142,10 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
 
 	publicKey, err := crypto.DecodePublicKey(signAlgo, m.GetPublicKey())
 	if err != nil {
-		return types.AccountKey{}, err
+		return types.AccountPublicKey{}, err
 	}
 
-	return types.AccountKey{
+	return types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
@@ -154,7 +153,7 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
 	}, nil
 }
 
-func AccountKeyToMessage(a types.AccountKey) (*shared.AccountKey, error) {
+func AccountKeyToMessage(a types.AccountPublicKey) (*shared.AccountKey, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
 		return nil, err

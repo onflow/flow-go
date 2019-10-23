@@ -61,7 +61,7 @@ func TestAccount(t *testing.T) {
 func TestAccountKey(t *testing.T) {
 	RegisterTestingT(t)
 
-	keyA := unittest.AccountKeyFixture()
+	keyA := unittest.AccountPublicKeyFixture()
 
 	message, err := proto.AccountKeyToMessage(keyA)
 	Expect(err).ToNot(HaveOccurred())
