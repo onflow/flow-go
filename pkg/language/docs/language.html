@@ -659,7 +659,7 @@ let c = 1 ?? 2
 //
 let a: Int? = 1
 
-// Invalid: nil-coalescing operator is applied to a value of type `Int`,
+// Invalid: nil-coalescing operator is applied to a value of type `Int?`,
 // but the alternative has type `Bool`
 //
 let b = a ?? false
@@ -1236,71 +1236,103 @@ false || false
           <p>Comparison operators work with boolean and integer values.</p>
           <ul>
             <li>
-              <p>Equality: <code>==</code>, for booleans and integers (possibly optional)</p>
-              <pre><code class="language-bamboo,file=operator-equal-int.bpl">1 == 1
+              Equality: <code>==</code>, for booleans and integers
+              Both sides of the equality operator may be optional, even of different levels,
+              so it is for example possible to compare a non-optional with a double-optional (<code>??</code>).
+            </li>
+          </ul>
+          <pre><code>```bamboo,file=operator-equal-int.bpl
+1 == 1
 // is true
 
 1 == 2
 // is false
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-equal-bool.bpl">true == true
+```
+
+```bamboo,file=operator-equal-bool.bpl
+true == true
 // is true
 
 true == false
 // is false
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-equal-optional-int-nil.bpl">let x: Int? = 1
+```
+
+```bamboo,file=operator-equal-optional-int-nil.bpl
+let x: Int? = 1
 x == nil
 // is false
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl">let x: Int = 1
+```
+
+```bamboo,file=operator-equal-int-nil.bpl
+let x: Int = 1
 x == nil
 // is false
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-equal-int-nil.bpl">let x: Int? = 2
+```
+
+```bamboo,file=operator-equal-int-nil.bpl
+let x: Int? = 2
 let y: Int? = nil
 x == y
 // is false
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-equal-optional-int-optionals-int.bpl">let x: Int? = 2
-let y: Int? = 2
+```
+
+```bamboo,file=operator-equal-optional-int-optionals-int.bpl
+let x: Int? = 2
+let y: Int?? = 2
 x == y
 // is true
+```
 </code></pre>
-            </li>
+          <ul>
             <li>
-              <p>Inequality: <code>!=</code>, for booleans and integers (possibly optional)</p>
-              <pre><code class="language-bamboo,file=operator-not-equal-int.bpl">1 != 1
+              Inequality: <code>!=</code>, for booleans and integers (possibly optional)
+              Both sides of the inequality operator may be optional, even of different levels,
+              so it is for example possible to compare a non-optional with a double-optional (<code>??</code>).
+            </li>
+          </ul>
+          <pre><code>```bamboo,file=operator-not-equal-int.bpl
+1 != 1
 // is false
 
 1 != 2
 // is true
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-not-equal-bool.bpl">true != true
+```
+
+```bamboo,file=operator-not-equal-bool.bpl
+true != true
 // is false
 
 true != false
 // is true
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-nil.bpl">let x: Int? = 1
+```
+
+```bamboo,file=operator-not-equal-optional-int-nil.bpl
+let x: Int? = 1
 x != nil
 // is true
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl">let x: Int = 1
+```
+
+```bamboo,file=operator-not-equal-int-nil.bpl
+let x: Int = 1
 x != nil
 // is true
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-not-equal-int-nil.bpl">let x: Int? = 2
+```
+
+```bamboo,file=operator-not-equal-int-nil.bpl
+let x: Int? = 2
 let y: Int? = nil
 x != y
 // is true
-</code></pre>
-              <pre><code class="language-bamboo,file=operator-not-equal-optional-int-optionals-int.bpl">let x: Int? = 2
-let y: Int? = 2
+```
+
+```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
+let x: Int? = 2
+let y: Int?? = 2
 x != y
 // is false
+```
 </code></pre>
-            </li>
+          <ul>
             <li>
               <p>Less than: <code>&#x3C;</code>, for integers</p>
               <pre><code class="language-bamboo,file=operator-less.bpl">1 &#x3C; 1
@@ -2565,7 +2597,8 @@ resource[1]
             <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.</p>
           </li>
           <li>
-            <p><strong>Public</strong> (using the <code>pub</code> keyword) means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope. This does not allow the declaration to be publicly writable though.</p>
+            <p><strong>Public</strong> means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope. This does not allow the declaration to be publicly writable though.</p>
+            <p>An element is made public by using the <code>pub</code> keyword.</p>
           </li>
         </ul>
         <p><strong>By default, everything is private.</strong></p>

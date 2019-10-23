@@ -459,7 +459,7 @@ must be the non-optional or optional type matching the type of the left-hand sid
 //
 let a: Int? = 1
 
-// Invalid: nil-coalescing operator is applied to a value of type `Int`,
+// Invalid: nil-coalescing operator is applied to a value of type `Int?`,
 // but the alternative has type `Bool`
 //
 let b = a ?? false
@@ -1116,7 +1116,10 @@ Logical operators work with the boolean values `true` and `false`.
 
 Comparison operators work with boolean and integer values.
 
-- Equality: `==`, for booleans and integers (possibly optional)
+- Equality: `==`, for booleans and integers
+    Both sides of the equality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
+
 
     ```bamboo,file=operator-equal-int.bpl
     1 == 1
@@ -1155,12 +1158,15 @@ Comparison operators work with boolean and integer values.
 
     ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
     let x: Int? = 2
-    let y: Int? = 2
+    let y: Int?? = 2
     x == y
     // is true
     ```
 
 - Inequality: `!=`, for booleans and integers (possibly optional)
+    Both sides of the inequality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
+
 
     ```bamboo,file=operator-not-equal-int.bpl
     1 != 1
@@ -1199,7 +1205,7 @@ Comparison operators work with boolean and integer values.
 
     ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
     let x: Int? = 2
-    let y: Int? = 2
+    let y: Int?? = 2
     x != y
     // is false
     ```
@@ -2593,7 +2599,9 @@ Access control allows making certain parts of the program accessible/visible and
 
  - **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
- - **Public** (using the `pub` keyword) means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
+ - **Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
+
+ An element is made public by using the `pub` keyword.
 
 **By default, everything is private.** 
 
