@@ -115,7 +115,7 @@ func MessageToAccount(m *shared.Account) (types.Account, error) {
 }
 
 func AccountToMessage(a types.Account) (*shared.Account, error) {
-	accountKeys := make([]*shared.AccountKey, len(a.Keys))
+	accountKeys := make([]*shared.AccountPublicKey, len(a.Keys))
 	for i, key := range a.Keys {
 		accountKeyMsg, err := AccountKeyToMessage(key)
 		if err != nil {
@@ -132,7 +132,7 @@ func AccountToMessage(a types.Account) (*shared.Account, error) {
 	}, nil
 }
 
-func MessageToAccountKey(m *shared.AccountKey) (types.AccountPublicKey, error) {
+func MessageToAccountKey(m *shared.AccountPublicKey) (types.AccountPublicKey, error) {
 	if m == nil {
 		return types.AccountPublicKey{}, ErrEmptyMessage
 	}
@@ -153,13 +153,13 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountPublicKey, error) {
 	}, nil
 }
 
-func AccountKeyToMessage(a types.AccountPublicKey) (*shared.AccountKey, error) {
+func AccountKeyToMessage(a types.AccountPublicKey) (*shared.AccountPublicKey, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
 		return nil, err
 	}
 
-	return &shared.AccountKey{
+	return &shared.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  uint32(a.SignAlgo),
 		HashAlgo:  uint32(a.HashAlgo),
