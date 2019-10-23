@@ -672,6 +672,7 @@ func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -691,6 +692,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -705,6 +707,7 @@ func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
           let x = {"a": 1}[String?]
 	    `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -724,6 +727,7 @@ func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
           }
 	    `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)

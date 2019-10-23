@@ -24,7 +24,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 	// decode the actual data
 	v, err := decode(msg)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode message")
+		return nil, errors.Wrap(err, "could not deserialize message")
 	}
 
 	return v, nil

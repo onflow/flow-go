@@ -32,7 +32,13 @@ func parseCheckAndInterpretWithExtra(
 	handleCheckerError func(error),
 ) *interpreter.Interpreter {
 
-	checker, err := ParseAndCheckWithExtra(t, code, predefinedValueTypes, nil, nil)
+	checker, err := ParseAndCheckWithExtra(t,
+		code,
+		predefinedValueTypes,
+		nil,
+		nil,
+		nil,
+	)
 
 	if handleCheckerError != nil {
 		handleCheckerError(err)
@@ -3517,6 +3523,7 @@ func TestInterpretImport(t *testing.T) {
         `,
 		nil,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			assert.Equal(t,
 				ast.StringImportLocation("imported"),
@@ -3557,6 +3564,7 @@ func TestInterpretImportError(t *testing.T) {
 		valueDeclarations,
 		nil,
 		nil,
+		nil,
 	)
 	require.Nil(t, err)
 
@@ -3569,6 +3577,7 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		valueDeclarations,
+		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			assert.Equal(t,
@@ -4580,6 +4589,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
               Y().x()
           }
         `,
+		nil,
 		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {

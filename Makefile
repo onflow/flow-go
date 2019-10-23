@@ -24,7 +24,6 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/flow-go/internal/roles/collect/controller > internal/roles/collect/controller/README.md
 	godoc2md github.com/dapperlabs/flow-go/internal/roles/verify/processor > internal/roles/verify/processor/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/data/keyvalue > pkg/data/keyvalue/README.md
-	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip > pkg/network/gossip/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip/v1 > pkg/network/gossip/v1/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
@@ -51,9 +50,10 @@ generate-registries:
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-wire generate-mocks
+
 .PHONY: check-generated-code
 check-generated-code:
-	./scripts/check-generated-code.sh
+	./check-generated-code.sh
 
 .PHONY: build-cli
 build-cli:

@@ -466,6 +466,8 @@ func (r *interpreterRuntime) executeScript(
 		return nil, Error{[]error{err}}
 	}
 
+	checker.ImportLocation = location
+
 	if err := checker.Check(); err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -516,8 +518,6 @@ func (r *interpreterRuntime) executeScript(
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
-
-	inter.ImportLocation = location
 
 	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
 		r.emitEvent(eventValue, runtimeInterface)
