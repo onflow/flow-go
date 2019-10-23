@@ -1517,10 +1517,10 @@ func (v ReferenceValue) Copy() Value {
 	return v
 }
 
-func (v ReferenceValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v ReferenceValue) referencedValue() Value {
 	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
 	case SomeValue:
-		return referenced.Value.(MemberAccessibleValue).GetMember(interpreter, name)
+		return referenced.Value
 	case NilValue:
 		// TODO:
 		panic("referenced value is nil")
@@ -1529,16 +1529,24 @@ func (v ReferenceValue) GetMember(interpreter *Interpreter, name string) Value {
 	}
 }
 
+func (v ReferenceValue) GetMember(interpreter *Interpreter, name string) Value {
+	return v.referencedValue().(MemberAccessibleValue).
+		GetMember(interpreter, name)
+}
+
 func (v ReferenceValue) SetMember(interpreter *Interpreter, name string, value Value) {
-	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
-	case SomeValue:
-		referenced.Value.(MemberAccessibleValue).SetMember(interpreter, name, value)
-	case NilValue:
-		// TODO:
-		panic("referenced value is nil")
-	default:
-		panic(errors.UnreachableError{})
-	}
+	v.referencedValue().(MemberAccessibleValue).
+		SetMember(interpreter, name, value)
+}
+
+func (v ReferenceValue) Get(key Value) Value {
+	return v.referencedValue().(ValueIndexableValue).
+		Get(key)
+}
+
+func (v ReferenceValue) Set(key Value, value Value) {
+	v.referencedValue().(ValueIndexableValue).
+		Set(key, value)
 }
 
 func init() {

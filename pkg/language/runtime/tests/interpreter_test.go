@@ -4613,14 +4613,19 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 
 func TestInterpretStorage(t *testing.T) {
 
-	storedValues := map[sema.Type]interpreter.OptionalValue{}
+	storedValues := map[string]interpreter.OptionalValue{}
 
 	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 		Getter: func(key sema.Type) interpreter.OptionalValue {
-			return storedValues[key]
+			value, ok := storedValues[key.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
 		},
 		Setter: func(key sema.Type, value interpreter.OptionalValue) {
-			storedValues[key] = value
+			storedValues[key.String()] = value
 		},
 	}
 
@@ -5167,19 +5172,19 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 func TestInterpretReferenceUse(t *testing.T) {
 
-	storedValues := map[sema.Type]interpreter.OptionalValue{}
+	storedValues := map[string]interpreter.OptionalValue{}
 
 	storageValue := interpreter.StorageValue{
 		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			value, ok := storedValues[keyType]
+			value, ok := storedValues[keyType.String()]
 			if !ok {
 				return interpreter.NilValue{}
 			}
 			return value
 		},
 		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			storedValues[keyType] = value
+			storedValues[keyType.String()] = value
 		},
 	}
 
@@ -5199,12 +5204,14 @@ func TestInterpretReferenceUse(t *testing.T) {
           fun test(): [Int] {
               var r: <-R? <- create R()
               storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
               let ref = &storage[R] as R
               ref.x = 1
               let x1 = ref.x
               ref.setX(2)
               let x2 = ref.x
-              destroy r
               return [x1, x2]
           }
         `,
@@ -5220,6 +5227,72 @@ func TestInterpretReferenceUse(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretReferenceUseAccess(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithExtra(t, `
+          resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
+              fun setX(_ newX: Int) {
+                  self.x = newX
+              }
+          }
+
+          fun test(): [Int] {
+              var rs: <-[R]? <- [<-create R()]
+              storage[[R]] <-> rs
+              // there was no old value, but it must be discarded
+              destroy rs
+
+              let ref = &storage[[R]] as [R]
+              let x0 = ref[0].x
+              ref[0].x = 1
+              let x1 = ref[0].x
+              ref[0].setX(2)
+              let x2 = ref[0].x
+              return [x0, x1, x2]
+          }
+        `,
+		storageValueDeclaration,
+		map[string]interpreter.Value{
+			"storage": storageValue,
+		},
+		nil,
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(0),
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 		),
