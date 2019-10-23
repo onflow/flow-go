@@ -1,3 +1,5 @@
+REVISION := $(shell git rev-parse --short HEAD)
+
 .PHONY: build-relic
 build-relic:
 	./pkg/crypto/relic_build.sh
@@ -72,4 +74,24 @@ ci: install-tools generate check-generated-code lint test
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(git rev-parse --short HEAD)" .
+	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t gcr.io/dl-flow/emulator:$(REVISION) .
+
+.PHONY: docker-build-collect
+docker-build-collect:
+	docker build -f cmd/collect/Dockerfile -t gcr.io/dl-flow/collect:latest -t gcr.io/dl-flow/collect:$(REVISION) .
+
+.PHONY: docker-build-consensus
+docker-build-consensus:
+	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t gcr.io/dl-flow/consensus:$(REVISION)" .
+
+.PHONY: docker-build-execute
+docker-build-execute:
+	docker build -f cmd/execute/Dockerfile -t gcr.io/dl-flow/execute:latest -t gcr.io/dl-flow/execute:$(REVISION)" .
+
+.PHONY: docker-build-observe
+docker-build-observe:
+	docker build -f cmd/observe/Dockerfile -t gcr.io/dl-flow/observe:latest -t gcr.io/dl-flow/observe:$(REVISION)" .
+
+.PHONY: docker-build-verify
+docker-build-verify:
+	docker build -f cmd/verify/Dockerfile -t gcr.io/dl-flow/verify:latest -t gcr.io/dl-flow/verify:$(REVISION)" .
