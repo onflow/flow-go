@@ -242,3 +242,31 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 
 	assert.IsType(t, &sema.NonStorageReferenceError{}, errs[0])
 }
+
+func TestCheckReferenceUse(t *testing.T) {
+
+	_, err := ParseAndCheckWithExtra(t, `
+          var x = 0
+
+          resource R {
+              fun setX(_ newX: Int) {
+                  x = newX
+              }
+          }
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              let ref = &storage[R] as R
+              ref.setX(1)
+              destroy r
+              ref.setX(2)
+          }
+        `,
+		storageValueDeclaration,
+		nil,
+		nil,
+	)
+
+	require.Nil(t, err)
+}

@@ -1277,6 +1277,15 @@ func (t *ReferenceType) IsResourceType() bool {
 	return false
 }
 
+func (t *ReferenceType) GetMember(field string, targetRange ast.Range, report func(error)) *Member {
+	// forward to referenced type, if it has members
+	referencedTypeWithMember, ok := t.Type.(HasMembers)
+	if !ok {
+		return nil
+	}
+	return referencedTypeWithMember.GetMember(field, targetRange, report)
+}
+
 ////
 
 func IsSubType(subType Type, superType Type) bool {
