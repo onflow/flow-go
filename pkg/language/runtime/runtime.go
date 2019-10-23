@@ -517,7 +517,7 @@ func (r *interpreterRuntime) executeScript(
 		return nil, Error{[]error{err}}
 	}
 
-	inter.ImportLocation = location
+	inter.Checker.ImportLocation = location
 
 	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
 		r.emitEvent(eventValue, runtimeInterface)
