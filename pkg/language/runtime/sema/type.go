@@ -19,13 +19,21 @@ type Type interface {
 	IsResourceType() bool
 }
 
-// IndexableType
+// ValueIndexableType
 
-type IndexableType interface {
+type ValueIndexableType interface {
 	Type
-	isIndexableType()
+	isValueIndexableType()
 	ElementType(isAssignment bool) Type
 	IndexingType() Type
+}
+
+// TypeIndexableType
+
+type TypeIndexableType interface {
+	Type
+	isTypeIndexableType()
+	ElementType(indexingType Type, isAssignment bool) Type
 }
 
 // TypeAnnotation
@@ -255,7 +263,7 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 	}
 }
 
-func (t *StringType) isIndexableType() {}
+func (t *StringType) isValueIndexableType() {}
 
 func (t *StringType) ElementType(isAssignment bool) Type {
 	return &CharacterType{}
@@ -560,7 +568,7 @@ func (*UInt64Type) Max() *big.Int {
 // ArrayType
 
 type ArrayType interface {
-	IndexableType
+	ValueIndexableType
 	isArrayType()
 }
 
@@ -783,7 +791,7 @@ func (t *VariableSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
-func (t *VariableSizedType) isIndexableType() {}
+func (t *VariableSizedType) isValueIndexableType() {}
 
 func (t *VariableSizedType) ElementType(isAssignment bool) Type {
 	return t.Type
@@ -824,7 +832,7 @@ func (t *ConstantSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
-func (t *ConstantSizedType) isIndexableType() {}
+func (t *ConstantSizedType) isValueIndexableType() {}
 
 func (t *ConstantSizedType) ElementType(isAssignment bool) Type {
 	return t.Type
@@ -1126,7 +1134,7 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 	}
 }
 
-func (t *DictionaryType) isIndexableType() {}
+func (t *DictionaryType) isValueIndexableType() {}
 
 func (t *DictionaryType) ElementType(isAssignment bool) Type {
 	return &OptionalType{Type: t.ValueType}
@@ -1145,22 +1153,32 @@ type DictionaryEntryType struct {
 
 type StorageType struct{}
 
-func (h StorageType) isType() {}
+func (t *StorageType) isType() {}
 
-func (h StorageType) String() string {
+func (t *StorageType) String() string {
 	return "Storage"
 }
 
-func (h StorageType) Equal(other Type) bool {
+func (t *StorageType) Equal(other Type) bool {
 	_, ok := other.(*StorageType)
 	return ok
 }
 
-func (h StorageType) IsResourceType() bool {
+func (t *StorageType) IsResourceType() bool {
 	// NOTE: even though storage may contain resources,
 	//   we define it to not behave like a resource
 	return false
 }
+
+func (t *StorageType) isTypeIndexableType() {}
+
+func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
+	// NOTE: like dictionary
+	return &OptionalType{Type: indexingType}
+}
+
+//isTypeIndexableType()
+//ElementType(isAssignment bool) Type
 
 // EventType
 

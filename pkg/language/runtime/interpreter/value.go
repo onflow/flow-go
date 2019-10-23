@@ -26,12 +26,20 @@ type ExportableValue interface {
 	ToGoValue() interface{}
 }
 
-// IndexableValue
+// ValueIndexableValue
 
-type IndexableValue interface {
-	isIndexableValue()
+type ValueIndexableValue interface {
+	isValueIndexableValue()
 	Get(key Value) Value
 	Set(key Value, value Value)
+}
+
+// TypeIndexableValue
+
+type TypeIndexableValue interface {
+	isTypeIndexableValue()
+	Get(key sema.Type) Value
+	Set(key sema.Type, value Value)
 }
 
 // ConcatenatableValue
@@ -104,7 +112,7 @@ func NewStringValue(str string) StringValue {
 }
 
 func (StringValue) isValue()               {}
-func (StringValue) isIndexableValue()      {}
+func (StringValue) isValueIndexableValue() {}
 func (StringValue) isConcatenatableValue() {}
 
 func (v StringValue) Copy() Value {
@@ -236,7 +244,7 @@ func NewArrayValue(values ...Value) ArrayValue {
 }
 
 func (ArrayValue) isValue()               {}
-func (ArrayValue) isIndexableValue()      {}
+func (ArrayValue) isValueIndexableValue() {}
 func (ArrayValue) isConcatenatableValue() {}
 
 func (v ArrayValue) Copy() Value {
@@ -1181,7 +1189,7 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (DictionaryValue) isIndexableValue() {}
+func (DictionaryValue) isValueIndexableValue() {}
 
 func (v DictionaryValue) Get(keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
@@ -1399,11 +1407,20 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
+// OptionalValue
+
+type OptionalValue interface {
+	Value
+	isOptionalValue()
+}
+
 // NilValue
 
 type NilValue struct{}
 
 func (NilValue) isValue() {}
+
+func (NilValue) isOptionalValue() {}
 
 func (v NilValue) Copy() Value {
 	return v
@@ -1428,6 +1445,8 @@ type SomeValue struct {
 }
 
 func (SomeValue) isValue() {}
+
+func (SomeValue) isOptionalValue() {}
 
 func (v SomeValue) Copy() Value {
 	return SomeValue{
@@ -1474,8 +1493,8 @@ type ValueWithMembers interface {
 
 type StorageValue struct {
 	Identifier interface{}
-	Getter     func(key sema.Type) Value
-	Setter     func(key sema.Type, value Value)
+	Getter     func(key sema.Type) OptionalValue
+	Setter     func(key sema.Type, value OptionalValue)
 }
 
 func (StorageValue) isValue() {}
@@ -1487,14 +1506,14 @@ func (v StorageValue) Copy() Value {
 	}
 }
 
-func (StorageValue) isIndexableValue() {}
+func (StorageValue) isTypeIndexableValue() {}
 
 func (v StorageValue) Get(key sema.Type) Value {
 	return v.Getter(key)
 }
 
 func (v StorageValue) Set(key sema.Type, value Value) {
-	v.Setter(key, value)
+	v.Setter(key, value.(OptionalValue))
 }
 
 // ReferenceValue

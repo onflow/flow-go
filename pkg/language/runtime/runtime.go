@@ -650,13 +650,29 @@ func loadAccount(runtimeInterface Interface, address types.Address) (
 	return account, storedValue, nil
 }
 
-func storageValue(storedValue map[string]interpreter.Value) interpreter.StorageValue {
+func storageValue(storedValues map[string]interpreter.Value) interpreter.StorageValue {
 	return interpreter.StorageValue{
-		Getter: func(key sema.Type) interpreter.Value {
-			return storedValue[key.String()]
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			key := keyType.String()
+
+			value, ok := storedValues[key]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return interpreter.SomeValue{Value: value}
 		},
-		Setter: func(key sema.Type, value interpreter.Value) {
-			storedValue[key.String()] = value
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			key := keyType.String()
+			switch typedValue := value.(type) {
+			case interpreter.SomeValue:
+				storedValues[key] = typedValue.Value
+				return
+			case interpreter.NilValue:
+				delete(storedValues, key)
+				return
+			default:
+				panic(&runtimeErrors.UnreachableError{})
+			}
 		},
 	}
 }

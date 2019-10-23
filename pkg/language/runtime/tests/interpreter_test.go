@@ -4613,13 +4613,13 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 
 func TestInterpretStorage(t *testing.T) {
 
-	storedValues := map[sema.Type]interpreter.Value{}
+	storedValues := map[sema.Type]interpreter.OptionalValue{}
 
 	storageValue := interpreter.StorageValue{
-		Getter: func(key sema.Type) interpreter.Value {
+		Getter: func(key sema.Type) interpreter.OptionalValue {
 			return storedValues[key]
 		},
-		Setter: func(key sema.Type, value interpreter.Value) {
+		Setter: func(key sema.Type, value interpreter.OptionalValue) {
 			storedValues[key] = value
 		},
 	}
