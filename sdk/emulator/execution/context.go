@@ -276,14 +276,16 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 
 	// TODO: handle errors properly
 	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
-	publicKeys, keyWeights, _ := r.getAccountPublicKeys(accountID)
+	publicKeys, _, _ := r.getAccountPublicKeys(accountID)
 
 	accountKeys := make([]types.AccountKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountKeys[i] = types.AccountKey{
-			PublicKey: publicKey,
-			Weight:    keyWeights[i],
+		accountKey, err := types.DecodeAccountKey(publicKey)
+		if err != nil {
+			panic(err)
 		}
+
+		accountKeys[i] = accountKey
 	}
 
 	return &types.Account{

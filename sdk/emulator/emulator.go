@@ -348,10 +348,6 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
-func (b *EmulatedBlockchain) onAccountCreated(account types.Account) {
-	b.lastCreatedAccount = account
-}
-
 // LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 	return b.lastCreatedAccount
@@ -388,7 +384,10 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
 func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code []byte, nonce uint64) (types.Address, error) {
-	createAccountScript := templates.CreateAccount(accountKeys, code)
+	createAccountScript, err := templates.CreateAccount(accountKeys, code)
+	if err != nil {
+		return types.Address{}, nil
+	}
 
 	tx := &types.Transaction{
 		Script:             createAccountScript,
@@ -400,7 +399,7 @@ func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountKey, code 
 
 	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx)
+	err = b.SubmitTransaction(tx)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -427,15 +426,9 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
 	for _, accountKey := range account.Keys {
-		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, accountKey.PublicKey)
-		if err != nil {
-			continue
-		}
+		hasher, _ := crypto.NewHasher(accountKey.HashAlgo)
 
-		// TODO: replace hard-coded hashing algorithm
-		hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-
-		valid, err := publicKey.Verify(signature, message, hasher)
+		valid, err := accountKey.PublicKey.Verify(signature, message, hasher)
 		if err != nil {
 			continue
 		}
@@ -486,11 +479,18 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	}
 
-	pubKeyBytes, _ := prKey.PublicKey().Encode()
+	accountKey := types.AccountKey{
+		PublicKey: prKey.PublicKey(),
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
+		Weight:    constants.AccountKeyWeightThreshold,
+	}
+
+	accountKeyBytes, _ := types.EncodeAccountKey(accountKey)
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{pubKeyBytes},
+		[][]byte{accountKeyBytes},
 		[]int{constants.AccountKeyWeightThreshold},
 		[]byte{},
 	)
