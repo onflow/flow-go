@@ -1,23 +1,22 @@
 package gnode
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/golang/protobuf/proto"
 )
 
-
 //TestComputeHash tests the computeHash helper function
 func TestComputeHash(t *testing.T) {
 
-	msg1, _ := generateGossipMessage([]byte("hi"), []string{}, "")
+	msg1, _ := generateGossipMessage([]byte("hi"), []string{}, 0)
 	msg1Bytes, _ := proto.Marshal(msg1)
 	alg, _ := crypto.NewHasher(crypto.SHA3_256)
 	h1 := alg.ComputeHash(msg1Bytes)
 
-	msg2, _ := generateGossipMessage([]byte("nohi"), []string{}, "")
+	msg2, _ := generateGossipMessage([]byte("nohi"), []string{}, 0)
 	msg2Bytes, _ := proto.Marshal(msg2)
 	h2 := alg.ComputeHash(msg2Bytes)
 

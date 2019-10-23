@@ -22,10 +22,10 @@ func TestDatabase(t *testing.T) {
 	//value for each key is a GossipMessage with payload as byte representation of the key, and
 	//type as the key
 	for _, key := range initKeys {
-		err := mmd.Put(key, &shared.GossipMessage{
-			Payload:     []byte(key),
-			MessageType: key,
-		})
+		err := mmd.Put(key, &shared.GossipMessage{})
+		if err != nil {
+			t.Errorf("error putting: %v. expected: nil error, got: non nil error", key)
+		}
 		assert.Nil(t, err)
 	}
 
@@ -63,7 +63,7 @@ func TestDatabase(t *testing.T) {
 		if err == nil && tc.err != nil {
 			t.Errorf("error in get. Expected: non nil error, Got: nil error")
 		}
-		if message != nil && message.MessageType != tc.item {
+		if message != nil && string(message.Payload) != tc.item {
 			t.Errorf("error in get over message type. Expected: %v, Got: %v", tc.item, message.MessageType)
 		}
 		if message != nil && string(message.Payload) != tc.item {

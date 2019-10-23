@@ -116,12 +116,22 @@ func (essr *ExecuteServiceServerRegistry) GetRegistersAtBlockHeight(ctx context.
 	return respByte, respErr
 }
 
-func (essr *ExecuteServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-		"Ping":                      essr.Ping,
-		"ExecuteBlock":              essr.ExecuteBlock,
-		"NotifyBlockExecuted":       essr.NotifyBlockExecuted,
-		"GetRegisters":              essr.GetRegisters,
-		"GetRegistersAtBlockHeight": essr.GetRegistersAtBlockHeight,
+func (essr *ExecuteServiceServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+		0: essr.Ping,
+		1: essr.ExecuteBlock,
+		2: essr.NotifyBlockExecuted,
+		3: essr.GetRegisters,
+		4: essr.GetRegistersAtBlockHeight,
+	}
+}
+
+func (essr *ExecuteServiceServerRegistry) NameMapping() map[string]uint64 {
+	return map[string]uint64{
+		"Ping":                      0,
+		"ExecuteBlock":              1,
+		"NotifyBlockExecuted":       2,
+		"GetRegisters":              3,
+		"GetRegistersAtBlockHeight": 4,
 	}
 }

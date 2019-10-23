@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
 	proto "github.com/golang/protobuf/proto"
 )
 
@@ -57,7 +59,9 @@ func main() {
 // PutKey distributes a text to the servers whose address is specified in serverAddress
 func PutKey(key string) error {
 	serverAddress := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
-	node := gnode.NewNode(nil, "127.0.0.1:50004", serverAddress, 0, 10)
+	colReg := collect.NewCollectServiceServerRegistry(collector.NewCollector())
+	config := gnode.NewNodeConfig(colReg, "127.0.0.1:50004", serverAddress, 2, 10)
+	node := gnode.NewNode(config)
 
 	subRequest, err := GenerateSubmitTransactionRequest(key)
 	if err != nil {
@@ -66,7 +70,7 @@ func PutKey(key string) error {
 
 	_, err = node.SyncGossip(context.Background(), subRequest, serverAddress, "SubmitTransaction")
 	if err != nil {
-		return fmt.Errorf("could not reach some servers")
+		return fmt.Errorf("could not reach some servers: %v", err)
 	}
 
 	return nil
@@ -75,7 +79,9 @@ func PutKey(key string) error {
 // CheckKey checks whether the key exists in the distributed storage
 func CheckKey(key string) error {
 	storageAddrs := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
-	node := gnode.NewNode(nil, "127.0.0.1:50004", storageAddrs, 0, 10)
+	colReg := collect.NewCollectServiceServerRegistry(collector.NewCollector())
+	config := gnode.NewNodeConfig(colReg, "127.0.0.1:50004", storageAddrs, 2, 10)
+	node := gnode.NewNode(config)
 
 	getRequest, err := GenerateGetTransactionRequest(key)
 	if err != nil {
