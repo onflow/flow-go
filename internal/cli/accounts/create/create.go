@@ -69,6 +69,7 @@ var Cmd = &cobra.Command{
 
 		tx := types.Transaction{
 			Script:       script,
+			Nonce:        1,
 			ComputeLimit: 10,
 			PayerAccount: signerAddr,
 		}
