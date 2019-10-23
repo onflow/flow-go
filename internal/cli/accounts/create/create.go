@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/constants"
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -45,13 +46,10 @@ var Cmd = &cobra.Command{
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			publicKey, err := utils.EncodePublicKey(privateKey.PublicKey())
-			if err != nil {
-				utils.Exit(1, "Failed to encode public key")
-			}
-
 			accountKeys[i] = types.AccountKey{
-				PublicKey: publicKey,
+				PublicKey: privateKey.PublicKey(),
+				SignAlgo:  crypto.ECDSA_P256,
+				HashAlgo:  crypto.SHA3_256,
 				Weight:    constants.AccountKeyWeightThreshold,
 			}
 		}
@@ -65,7 +63,10 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := templates.CreateAccount(accountKeys, code)
+		script, err := templates.CreateAccount(accountKeys, code)
+		if err != nil {
+			utils.Exit(1, "Failed to generate transaction script")
+		}
 
 		tx := types.Transaction{
 			Script:       script,
