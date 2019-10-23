@@ -45,6 +45,7 @@ require (
 	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/text v0.3.2
+	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
 	google.golang.org/grpc v1.21.1
 	mellium.im/sasl v0.2.1 // indirect
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
