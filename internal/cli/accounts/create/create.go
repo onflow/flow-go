@@ -38,7 +38,7 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to load signer key")
 		}
 
-		accountKeys := make([]types.AccountKey, len(conf.Keys))
+		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
 
 		for i, privateKeyStr := range conf.Keys {
 			privateKey, err := utils.DecodePrivateKey(privateKeyStr)
@@ -46,7 +46,7 @@ var Cmd = &cobra.Command{
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			accountKeys[i] = types.AccountKey{
+			accountKeys[i] = types.AccountPublicKey{
 				PublicKey: privateKey.PublicKey(),
 				SignAlgo:  crypto.ECDSA_P256,
 				HashAlgo:  crypto.SHA3_256,
