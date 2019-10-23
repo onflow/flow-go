@@ -8,14 +8,14 @@ type RegisterValue [32]byte
 
 // Register (key value pairs)
 type Register struct {
-	id    *RegisterID
-	value *RegisterValue
+	ID    *RegisterID
+	Value *RegisterValue
 }
 
 // RegisterUpdate covers both first time value setting and change value
 type RegisterUpdate struct {
-	id       *RegisterID
-	newValue *RegisterValue
+	ID       *RegisterID
+	NewValue *RegisterValue
 }
 
 type StorageProof []byte
