@@ -16,6 +16,8 @@ COPY pkg/crypto/relic ./relic
 COPY pkg/crypto/relic_build.sh .
 
 # Build Relic (this places build artifacts in /build/relic/build)
+# NOTE: The Relic build script uses Bash-specific features, so we explicitly run
+# it with bash rather than the default shell.
 RUN bash ./relic_build.sh
 
 ## (2) Build the app binary
