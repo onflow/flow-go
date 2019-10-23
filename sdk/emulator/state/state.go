@@ -3,8 +3,8 @@ package state
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/types"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 

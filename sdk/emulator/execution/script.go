@@ -1,6 +1,6 @@
 package execution
 
-import "github.com/dapperlabs/flow-go/pkg/crypto"
+import "github.com/dapperlabs/flow-go/crypto"
 
 // ScriptHash computes the content hash of a Cadence script.
 func ScriptHash(script []byte) crypto.Hash {

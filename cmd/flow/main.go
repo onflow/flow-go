@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dapperlabs/flow-go/internal/cli"
+	"github.com/dapperlabs/flow-go/cli"
 )
 
 func main() {

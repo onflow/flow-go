@@ -11,12 +11,12 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/pkg/types/proto"
-	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/model/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/client/mocks"
+	"github.com/dapperlabs/flow-go/sdk/convert"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestSendTransaction(t *testing.T) {
@@ -34,7 +34,7 @@ func TestSendTransaction(t *testing.T) {
 		// client should return non-error if RPC call succeeds
 		mockRPC.EXPECT().
 			SendTransaction(ctx, gomock.Any()).
-			Return(&observe.SendTransactionResponse{Hash: tx.Hash()}, nil).
+			Return(&observation.SendTransactionResponse{Hash: tx.Hash()}, nil).
 			Times(1)
 
 		err := c.SendTransaction(ctx, tx)
@@ -63,8 +63,8 @@ func TestGetLatestBlock(t *testing.T) {
 	c := client.NewFromRPCClient(mockRPC)
 	ctx := context.Background()
 
-	res := &observe.GetLatestBlockResponse{
-		Block: proto.BlockHeaderToMessage(unittest.BlockHeaderFixture()),
+	res := &observation.GetLatestBlockResponse{
+		Block: convert.BlockHeaderToMessage(unittest.BlockHeaderFixture()),
 	}
 
 	t.Run("Success", func(t *testing.T) {
@@ -77,7 +77,7 @@ func TestGetLatestBlock(t *testing.T) {
 		blockHeaderA, err := c.GetLatestBlock(ctx, true)
 		assert.Nil(t, err)
 
-		blockHeaderB := proto.MessageToBlockHeader(res.GetBlock())
+		blockHeaderB := convert.MessageToBlockHeader(res.GetBlock())
 		assert.Equal(t, *blockHeaderA, blockHeaderB)
 	})
 
@@ -108,7 +108,7 @@ func TestCallScript(t *testing.T) {
 		// client should return non-error if RPC call succeeds
 		mockRPC.EXPECT().
 			CallScript(ctx, gomock.Any()).
-			Return(&observe.CallScriptResponse{Value: valueBytes}, nil).
+			Return(&observation.CallScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
 		value, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
@@ -132,7 +132,7 @@ func TestCallScript(t *testing.T) {
 		// client should return error if value is empty
 		mockRPC.EXPECT().
 			CallScript(ctx, gomock.Any()).
-			Return(&observe.CallScriptResponse{Value: []byte{}}, nil).
+			Return(&observation.CallScriptResponse{Value: []byte{}}, nil).
 			Times(1)
 
 		// error should be passed to user
@@ -144,7 +144,7 @@ func TestCallScript(t *testing.T) {
 		// client should return error if value is malformed
 		mockRPC.EXPECT().
 			CallScript(ctx, gomock.Any()).
-			Return(&observe.CallScriptResponse{Value: []byte("asdfafa")}, nil).
+			Return(&observation.CallScriptResponse{Value: []byte("asdfafa")}, nil).
 			Times(1)
 
 		// error should be passed to user
@@ -181,7 +181,7 @@ func TestGetEvents(t *testing.T) {
 		// Set up the mock to return a mocked event response
 		mockRPC.EXPECT().
 			GetEvents(ctx, gomock.Any()).
-			Return(&observe.GetEventsResponse{EventsJson: buf.Bytes()}, nil).
+			Return(&observation.GetEventsResponse{EventsJson: buf.Bytes()}, nil).
 			Times(1)
 
 		// The client should pass the response to the client
@@ -207,7 +207,7 @@ func TestGetEvents(t *testing.T) {
 		// Set up the mock to return a malformed eventsJSON response
 		mockRPC.EXPECT().
 			GetEvents(ctx, gomock.Any()).
-			Return(&observe.GetEventsResponse{EventsJson: []byte{1, 2, 3, 4}}, nil).
+			Return(&observation.GetEventsResponse{EventsJson: []byte{1, 2, 3, 4}}, nil).
 			Times(1)
 
 		// The client should return an error because it should fail to decode

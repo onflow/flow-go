@@ -1,3 +1,3 @@
-[submodule "pkg/crypto/relic"]
-	path = pkg/crypto/relic
+[submodule "crypto/relic"]
+	path = crypto/relic
 	url = https://github.com/relic-toolkit/relic

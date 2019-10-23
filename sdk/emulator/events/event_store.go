@@ -3,7 +3,7 @@ package events
 import (
 	"context"
 
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/types"
 )
 
 // Store stores an indexed representation of events to support querying.

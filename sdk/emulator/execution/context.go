@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/pkg/language/runtime"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/model/types"
 )
 
 // RuntimeContext implements host functionality required by the Cadence runtime.

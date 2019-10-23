@@ -11,14 +11,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/internal/roles/consensus/propagation"
-	"github.com/dapperlabs/flow-go/pkg/codec/capnp"
-	"github.com/dapperlabs/flow-go/pkg/module/committee"
-	"github.com/dapperlabs/flow-go/pkg/module/mempool"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/cache"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/middleware"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/state"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
+	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/network/codec/captain"
+	"github.com/dapperlabs/flow-go/network/trickle"
+	"github.com/dapperlabs/flow-go/network/trickle/cache"
+	"github.com/dapperlabs/flow-go/network/trickle/middleware"
+	"github.com/dapperlabs/flow-go/network/trickle/state"
 )
 
 func main() {
@@ -53,20 +54,26 @@ func main() {
 	log.Info().Msg("flow consensus node starting up")
 
 	// initialize the network codec
-	codec := capnp.NewCodec()
+	codec := captain.NewCodec()
 
 	log.Info().Msg("initializing engine modules")
 
 	// initialize the node identity list
 	com, err := committee.New(entries, identity)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize consensus committee")
+		log.Fatal().Err(err).Msg("could not initialize flow committee")
 	}
 
 	// initialize the collection memory pool
 	pool, err := mempool.New()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize collection mempool")
+		log.Fatal().Err(err).Msg("could not initialize engine mempool")
+	}
+
+	// initialize the engine cache
+	vol, err := volatile.New()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize engine volatile")
 	}
 
 	log.Info().Msg("initializing network modules")
@@ -113,7 +120,7 @@ func main() {
 	log.Info().Msg("initializing propagation engine")
 
 	// initialize the propagation engines
-	prop, err := propagation.NewEngine(log, net, com, pool)
+	prop, err := propagation.NewEngine(log, net, com, pool, vol)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize propagation engine")
 	}
