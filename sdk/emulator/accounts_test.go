@@ -198,7 +198,7 @@ func TestAddAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey, _ := privateKey.Publickey().Encode()
+	publicKey, _ := privateKey.PublicKey().Encode()
 
 	accountKeyA := types.AccountKey{
 		PublicKey: publicKey,
@@ -240,7 +240,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey, _ := privateKey.Publickey().Encode()
+	publicKey, _ := privateKey.PublicKey().Encode()
 
 	accountKey := types.AccountKey{
 		PublicKey: publicKey,
@@ -326,7 +326,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKeyB, _ := privateKeyB.Publickey().Encode()
+	publicKeyB, _ := privateKeyB.PublicKey().Encode()
 
 	accountKeyB := types.AccountKey{
 		PublicKey: publicKeyB,
@@ -455,7 +455,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	publicKey, _ := b.RootKey().Publickey().Encode()
+	publicKey, _ := b.RootKey().PublicKey().Encode()
 
 	accountKey := types.AccountKey{
 		PublicKey: publicKey,
