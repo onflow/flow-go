@@ -246,21 +246,28 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 func TestCheckReferenceUse(t *testing.T) {
 
 	_, err := ParseAndCheckWithExtra(t, `
-          var x = 0
-
           resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
               fun setX(_ newX: Int) {
-                  x = newX
+                  self.x = newX
               }
           }
 
-          fun test() {
+          fun test(): [Int] {
               var r: <-R? <- create R()
               storage[R] <-> r
               let ref = &storage[R] as R
-              ref.setX(1)
-              destroy r
+              ref.x = 1
+              let x1 = ref.x
               ref.setX(2)
+              let x2 = ref.x
+              destroy r
+              return [x1, x2]
           }
         `,
 		storageValueDeclaration,
