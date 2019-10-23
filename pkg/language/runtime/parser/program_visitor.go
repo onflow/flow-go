@@ -2,7 +2,6 @@ package parser
 
 import (
 	"encoding/hex"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"math/big"
 	"strconv"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
@@ -559,11 +559,22 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	}
 	result := baseTypeResult.(ast.Type)
 
-	for _, optional := range ctx.optionals {
-		endPos := ast.PositionFromToken(optional)
-		result = &ast.OptionalType{
-			Type:   result,
-			EndPos: endPos,
+	// NOTE: only allow reference or optionals – prevent ambiguous
+	// and not particular useful types like `&R?`
+
+	if ctx.reference != nil {
+		startPos := ast.PositionFromToken(ctx.reference)
+		result = &ast.ReferenceType{
+			Type:     result,
+			StartPos: startPos,
+		}
+	} else {
+		for _, optional := range ctx.optionals {
+			endPos := ast.PositionFromToken(optional)
+			result = &ast.OptionalType{
+				Type:   result,
+				EndPos: endPos,
+			}
 		}
 	}
 

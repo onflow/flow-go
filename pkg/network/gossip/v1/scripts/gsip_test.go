@@ -262,10 +262,17 @@ func (tvrsr *TVRemoteServerRegistry) TurnOff(ctx context.Context, payloadByte []
 	return respByte, respErr
 }
 
-func (tvrsr *TVRemoteServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-		"TurnOn":  tvrsr.TurnOn,
-		"TurnOff": tvrsr.TurnOff,
+func (tvrsr *TVRemoteServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+		0: tvrsr.TurnOn,
+		1: tvrsr.TurnOff,
+	}
+}
+
+func (tvrsr *TVRemoteServerRegistry) NameMapping() map[string]uint64 {
+	return map[string]uint64{
+		"TurnOn":  0,
+		"TurnOff": 1,
 	}
 }
 `,
@@ -310,7 +317,9 @@ func (tvrsr *TVRemoteServerRegistry) MessageTypes() map[string]gnode.HandleFunc 
 		}
 
 		if genCode != tc.genCode {
+			fmt.Println(genCode)
 			t.Error("generated code does not match expected code")
+			fmt.Println(tc.genCode)
 		}
 	}
 

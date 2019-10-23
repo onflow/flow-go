@@ -53,11 +53,10 @@ func (mhc *memoryHashCache) isConfirmed(hash string) bool {
 	return mhc.confirmedCache.contains(hash)
 }
 
-
 // memorySet is a thread safe set
 type memorySet struct {
 	mp map[string]bool
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 // newMemorySet returns an empty set
@@ -67,17 +66,15 @@ func newMemorySet() memorySet {
 	}
 }
 
-//put inserts the key into the memorySet in a thread safe manner
 func (m *memorySet) put(key string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	m.mp[key] = true
 }
 
-// contains returns true if the input key is in the set, and returns false otherwise
 func (m *memorySet) contains(key string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if _, ok := m.mp[key]; ok {
 		return true
 	}

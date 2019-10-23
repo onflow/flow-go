@@ -1073,7 +1073,7 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 
 	// get correct interpreter
 	if v.ImportLocation != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation]
+		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
 		if ok {
 			interpreter = subInterpreter
 		}
@@ -1204,7 +1204,17 @@ type HasKeyString interface {
 }
 
 func (v DictionaryValue) Set(keyValue Value, value Value) {
-	v[dictionaryKey(keyValue)] = value
+	key := dictionaryKey(keyValue)
+	switch typedValue := value.(type) {
+	case SomeValue:
+		v[key] = typedValue.Value
+		return
+	case NilValue:
+		delete(v, key)
+		return
+	default:
+		panic(&errors.UnreachableError{})
+	}
 }
 
 func (v DictionaryValue) String() string {
@@ -1228,18 +1238,51 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(v)))
+
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
-				key := dictionaryKey(arguments[0])
-				value, ok := v[key]
-				if !ok {
-					return trampoline.Done{Result: NilValue{}}
-				}
+				keyValue := arguments[0]
+
+				key := dictionaryKey(keyValue)
+				value, hadValue := v[key]
+
 				delete(v, key)
-				return trampoline.Done{Result: SomeValue{Value: value}}
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: value},
+				}
 			},
 		)
+
+	case "insert":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				keyValue := arguments[0]
+				newValue := arguments[1]
+
+				key := dictionaryKey(keyValue)
+				oldValue, hadValue := v[key]
+				v[key] = newValue
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: oldValue},
+				}
+			},
+		)
+
 	default:
 		panic(&errors.UnreachableError{})
 	}
@@ -1257,8 +1300,9 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID     string
-	Fields []EventField
+	ID             string
+	Fields         []EventField
+	ImportLocation ast.ImportLocation
 }
 
 func (EventValue) isValue() {}
@@ -1365,6 +1409,10 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
+func (v NilValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return trampoline.Done{}
+}
+
 func (NilValue) String() string {
 	return "nil"
 }
@@ -1385,6 +1433,10 @@ func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
+}
+
+func (v SomeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 
 func (v SomeValue) String() string {

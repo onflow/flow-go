@@ -1,5 +1,7 @@
 package types
 
+import "github.com/ethereum/go-ethereum/rlp"
+
 // Account represents an account on the Flow network.
 //
 // An account can be an externally owned account or a contract account with code.
@@ -16,4 +18,18 @@ type Account struct {
 type AccountKey struct {
 	PublicKey []byte
 	Weight    int
+}
+
+// AccountSignature is a signature associated with an account.
+type AccountSignature struct {
+	Account   Address
+	Signature []byte
+}
+
+func (a AccountSignature) Encode() []byte {
+	b, _ := rlp.EncodeToBytes([]interface{}{
+		a.Account.Bytes(),
+		a.Signature,
+	})
+	return b
 }

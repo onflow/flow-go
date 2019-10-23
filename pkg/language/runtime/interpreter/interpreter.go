@@ -65,7 +65,7 @@ type Interpreter struct {
 	ImportLocation      ast.ImportLocation
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
-	SubInterpreters     map[ast.ImportLocation]*Interpreter
+	SubInterpreters     map[ast.LocationID]*Interpreter
 	onEventEmitted      func(EventValue)
 }
 
@@ -78,7 +78,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		interfaces:          map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions:  map[string]map[string]FunctionValue{},
 		DestructorFunctions: map[string]*InterpretedFunctionValue{},
-		SubInterpreters:     map[ast.ImportLocation]*Interpreter{},
+		SubInterpreters:     map[ast.LocationID]*Interpreter{},
 		onEventEmitted:      func(EventValue) {},
 	}
 
@@ -1168,7 +1168,10 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 
 				// TODO: panic for duplicate keys?
 
-				newDictionary.Set(key, value)
+				// NOTE: important to box in optional, as assignment to dictionary
+				// is always considered as an optional
+
+				newDictionary.Set(key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1791,7 +1794,7 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
 	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
 	if err != nil {
@@ -1800,7 +1803,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter.ImportLocation = declaration.Location
 
-	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
 
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
@@ -1876,9 +1879,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				// TODO: use account as namespace for event ID
-				ID:     eventType.Identifier,
-				Fields: fields,
+				ID:             eventType.Identifier,
+				Fields:         fields,
+				ImportLocation: interpreter.ImportLocation,
 			}
 
 			return Done{Result: value}

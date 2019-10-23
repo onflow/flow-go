@@ -2,7 +2,8 @@ package ast
 
 import (
 	"encoding/gob"
-	"fmt"
+	"encoding/hex"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
@@ -55,7 +56,13 @@ func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 
 type ImportLocation interface {
 	isImportLocation()
+	// ID returns the canonical ID for this import location.
+	ID() LocationID
 }
+
+// LocationID
+
+type LocationID string
 
 // StringImportLocation
 
@@ -63,22 +70,58 @@ type StringImportLocation string
 
 func (StringImportLocation) isImportLocation() {}
 
+func (l StringImportLocation) ID() LocationID {
+	return LocationID(l)
+}
+
 func init() {
 	gob.Register(StringImportLocation(""))
 }
 
 // AddressImportLocation
 
-type AddressImportLocation string
+type AddressImportLocation []byte
 
 func (AddressImportLocation) isImportLocation() {}
 
+func (l AddressImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
 func (l AddressImportLocation) String() string {
-	return fmt.Sprintf("%#x", []byte(l))
+	return hex.EncodeToString([]byte(l))
+}
+
+// TransactionImportLocation
+
+type TransactionImportLocation []byte
+
+func (TransactionImportLocation) isImportLocation() {}
+
+func (l TransactionImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l TransactionImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+// ScriptImportLocation
+
+type ScriptImportLocation []byte
+
+func (ScriptImportLocation) isImportLocation() {}
+
+func (l ScriptImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l ScriptImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
 }
 
 func init() {
-	gob.Register(AddressImportLocation(""))
+	gob.Register(AddressImportLocation([]byte{}))
 }
 
 // HasImportLocation

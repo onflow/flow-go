@@ -8,22 +8,26 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 )
 
-// generating and printing an order for a gossip message in synchronous mode
-func ExampleNewOrder() {
-	msg, _ := generateMessage([]byte("hello"), []string{"example.org:1234"}, "display")
-	fmt.Println(NewOrder(context.Background(), msg, true))
-	// Output: Order message: [Payload:"hello" messageType:"display" Recipients:"example.org:1234" ], sync: true
+func ExampleNewSync() {
+	msg, _ := generateMessage([]byte("hello"), []string{"example.org:1234"}, 1)
+	fmt.Println(NewSync(context.Background(), msg))
+	// Output: Order message: [ Payload:"hello" messageType:1 Recipients:"example.org:1234"  ], sync: true
 }
 
-// generating an order for a message in synchronous mode, filling its result, and testing its done status
+func ExampleNewAsync() {
+	msg, _ := generateMessage([]byte("hello"), []string{"example.org:1234"}, 1)
+	fmt.Println(NewAsync(context.Background(), msg))
+	// Output: Order message: [ Payload:"hello" messageType:1 Recipients:"example.org:1234"  ], sync: false
+}
+
 func ExampleOrder() {
 	// temporary gossip message for example
-	msg, _ := generateMessage([]byte("hello"), []string{"example.org:1234"}, "display")
+	msg, _ := generateMessage([]byte("hello"), []string{"example.org:1234"}, 1)
 
 	// creating a Sync Order
-	ord := NewOrder(context.Background(), msg, true)
+	ord := NewSync(context.Background(), msg)
 
-	// filling the order's results
+	// fillig the order's results
 	// (will also notify callers who wait for ord to get finished)
 	go func() {
 		ord.Fill([]byte("Response"), nil)
@@ -33,20 +37,17 @@ func ExampleOrder() {
 	select {
 	case <-t:
 	case <-ord.Done():
-		resp, err := ord.Result()
+		resp, _ := ord.Result()
 		fmt.Println(string(resp))
-		fmt.Println(err)
 	}
-	// Output:
-	// Response
-	// <nil>
+	// Output: Response
 
 }
 
 // generateGossipMessage initializes a new gossip message made from the given inputs
 //Note: similar function already declared in message.go in gnode package. We redeclare it here in a simpler form for
 //test essentially since go does not allow cycle of imports in tests
-func generateMessage(payloadBytes []byte, recipients []string, msgType string) (*shared.GossipMessage, error) {
+func generateMessage(payloadBytes []byte, recipients []string, msgType uint64) (*shared.GossipMessage, error) {
 	return &shared.GossipMessage{
 		Payload:     payloadBytes,
 		MessageType: msgType,

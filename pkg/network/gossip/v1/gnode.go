@@ -4,23 +4,18 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-
-	"github.com/rs/zerolog/log"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/order"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
+	"github.com/rs/zerolog"
 )
 
 // To make sure that Node complies with the gossip.Service interface
 var _ gossip.Service = (*Node)(nil)
-
-const DefaultQueueSize = 10
 
 // Node is holding the required information for a functioning async gossip node
 type Node struct {
@@ -31,57 +26,58 @@ type Node struct {
 	hashCache hashCache
 	msgStore  messageDatabase
 
-	// queueSize is the buffer size of the node for holding incoming gossip messages.
+	// QueueSize is the buffer size of the node for holding incoming Gossip Messages
 	// Once buffer of a node gets full, it does not accept incoming messages
 	queueSize int
 
-	address         string
+	address         *shared.Socket
 	peers           []string
 	fanoutSet       []string
 	staticFanoutNum int
+
+	server ServePlacer
 }
 
-// NewNode returns a new instance of gnode with a specified registry, static fanout set size, and queue size.
-func NewNode(msgTypesRegistry Registry, addr string, peers []string, staticFanoutNum int, queueSize int) *Node {
-	//setting default queue size of the node to 10:
-	if queueSize <= 0 {
-		queueSize = DefaultQueueSize
-	}
-
+// NewNode returns a new instance of a Gossip node with a predefined registry of message types, a set of peers
+// and a staticFanoutNum indicating the size of the static fanout
+func NewNode(config *NodeConfig) *Node {
 	node := &Node{
-		logger:          log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger(),
-		regMngr:         newRegistryManager(msgTypesRegistry),
-		queueSize:       queueSize,
-		queue:           make(chan *order.Order, queueSize),
+		logger:          config.logger,
+		regMngr:         config.regMnger,
+		queueSize:       config.queueSize,
+		queue:           make(chan *order.Order, config.queueSize),
 		hashCache:       newMemoryHashCache(),
 		msgStore:        newMemMsgDatabase(),
-		address:         addr,
-		peers:           peers,
-		staticFanoutNum: staticFanoutNum,
+		address:         config.address,
+		peers:           config.peers,
+		staticFanoutNum: config.staticFanoutNum,
 	}
-
-	err := node.initDefault()
-	if err != nil {
-		log := (*node).logger.With().
-			Str("function", "NewNode").Logger()
-		log.Debug().Err(ErrInternal).Send()
-	}
-
+	node.server = protocols.NewGServer(node)
+	node.initDefault()
 	return node
 }
 
-// syncHashProposal receives a hash of a message that is meant to be sent as SyncGossip, so
-// that in case it has not been received, the function returns a non-nil value prompting the sender
-// to send the original message
+//SetProtocol sets the underlying protocol for sending and receiving messages. The protocol should
+//implement ServePlacer
+func (n *Node) SetProtocol(s ServePlacer) {
+	n.server = s
+}
+
+// syncHashProposal receives a hash of a message that is designated to be sent as SyncGossip() , so
+// that in case it has not been received, the function returns the address of the current node
+// prompting the sender to send the original message
 //Todo: This function is planned to be upgraded to a streaming version so that no return value is required upon a negative answer
 func (n *Node) syncHashProposal(ctx context.Context, hashMsgBytes []byte) ([]byte, error) {
-	// extract the info (hash) from the HashMessage
+	log := n.logger.With().
+		Str("function", "syncHashProposal").
+		Logger()
+
 	hashBytes, _, err := extractHashMsgInfo(hashMsgBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract hash message info: %v", err)
 	}
 
-	// cast bytes into string
+	// turn bytes of hash to a string
 	hash := string(hashBytes)
 
 	// if the message has been already received ignore the proposal
@@ -89,16 +85,27 @@ func (n *Node) syncHashProposal(ctx context.Context, hashMsgBytes []byte) ([]byt
 		return nil, nil
 	}
 
-	// cashing the hash as a confirmed one
+	// set the message as confirmed
 	n.hashCache.confirm(hash)
 
-	// returning the address of this node so that the sender sends the original message
-	return []byte(n.address), nil
+	address, err := proto.Marshal(n.address)
+
+	if err != nil {
+		log.Debug().Err(err).Send()
+		return nil, fmt.Errorf("could not marshal address: %v", err)
+	}
+
+	// return the address so that the sender sends the original message
+	return address, nil
 }
 
-// asyncHashProposal receives a hash of a message that is meant to be sent as an AsyncGossip, so that
+// asyncHashProposal receives a hash of a message that is designated to be sent as an AsyncGossip, so that
 // if it has not been received yet, a "requestMessage" is sent to the sender prompting him to send the original message
 func (n *Node) asyncHashProposal(ctx context.Context, hashMsgBytes []byte) ([]byte, error) {
+	log := n.logger.With().
+		Str("function", "asyncHashProposal").
+		Logger()
+
 	// extract the info (hash) from the HashMessage
 	hashBytes, senderAddr, err := extractHashMsgInfo(hashMsgBytes)
 	if err != nil {
@@ -108,39 +115,51 @@ func (n *Node) asyncHashProposal(ctx context.Context, hashMsgBytes []byte) ([]by
 	// turn bytes of hash to a string
 	hash := string(hashBytes)
 
-	// if the message has been already recieved ignore the proposal
+	// if the message has been already received ignore the proposal
 	if n.hashCache.isReceived(hash) {
 		return nil, nil
 	}
 	// set the message as confirmed
 	n.hashCache.confirm(hash)
 
-	// async sender does not wait for the response to the hash proposal, hence, we need to prepare a request message
-	// if we are interested in the original content of the proposed hash
 	// this message will request the original message
 	requestMsg, err := generateHashMessage(hashBytes, n.address)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return nil, fmt.Errorf("could not generate hash message: %v", err)
 	}
 
 	requestMsgBytes, err := proto.Marshal(requestMsg)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return nil, fmt.Errorf("could not marshal message: %v", err)
 	}
 
-	// send a requestMessage to the sender to ask the sender send the original message
-	_, err = n.gossip(context.Background(), requestMsgBytes, []string{senderAddr}, "requestMessage", false)
+	id, err := n.regMngr.MsgTypeToID("requestMessage")
 	if err != nil {
+		log.Debug().Err(err).Send()
+		return nil, fmt.Errorf("could not get message type id: %v", err)
+	}
+	//slice with the address to send the message to
+	address := []string{socketToString(senderAddr)}
+
+	// send a requestMessage to the sender to make him send the original message
+	_, err = n.gossip(context.Background(), requestMsgBytes, address, id, false)
+	if err != nil {
+		log.Debug().Err(err).Send()
 		return nil, fmt.Errorf("could not gossip message: %v", err)
 	}
 
 	return nil, nil
 }
 
-// requestMessage receives the hash of a message with the address of its sender as a result of a hash proposal,
-// so that if the message exists in the data store, it is sent to the requester.
+// requestMessage receives a hash of a message with the address of its sender, so that if the message
+// exists in the store, it is sent to the requester.
 func (n *Node) requestMessage(ctx context.Context, hashMsgBytes []byte) ([]byte, error) {
-	// extract the info (hash) from the HashMessage
+	log := n.logger.With().
+		Str("function", "requestMessage").
+		Logger()
+
 	hashBytes, senderAddr, err := extractHashMsgInfo(hashMsgBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract hash message info: %v", err)
@@ -149,116 +168,155 @@ func (n *Node) requestMessage(ctx context.Context, hashMsgBytes []byte) ([]byte,
 	// turn bytes of hash into a string
 	hash := string(hashBytes)
 
-	// in case the message requested does not exist return an error
+	// if the requested message does exist return an error
 	if !n.hashCache.isReceived(hash) {
-		return nil, fmt.Errorf("message of hash %v not found in storage", hash)
+		return nil, fmt.Errorf("no message of given hash is not found")
 	}
 
 	// obtain message from store
 	msg, err := n.msgStore.Get(hash)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return nil, fmt.Errorf("could not get message from database: %v", err)
 	}
 
+	//slice with the address to send the message to
+	address := []string{socketToString(senderAddr)}
+
 	// send the original message
-	_, err = n.gossip(ctx, msg.GetPayload(), []string{senderAddr}, msg.GetMessageType(), false)
+	_, err = n.gossip(ctx, msg.GetPayload(), address, msg.GetMessageType(), false)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return nil, fmt.Errorf("could not gossip message: %v", err)
 	}
 
 	return nil, nil
-
 }
 
 // SyncGossip synchronizes over the reply of recipients
 // i.e., it sends a message to all recipients and blocks for their reply
 func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error) {
+	log := n.logger.With().
+		Str("function", "SyncGossip").
+		Logger()
 
-	// generate GossipMessage type in order to hash it
-	msg, err := generateGossipMessage(payload, recipients, msgType)
+	id, err := n.regMngr.MsgTypeToID(msgType)
 	if err != nil {
-		return []*shared.GossipReply{}, fmt.Errorf("could not generate gossip message: %v", err)
+		log.Debug().Err(err).Send()
+		return nil, fmt.Errorf("could not get message type ID: %v", err)
 	}
 
-	// make sure message is stored in the database
+	// generate GossipMessage type in order to hash it
+	msg, err := generateGossipMessage(payload, recipients, id)
+	if err != nil {
+		log.Debug().Err(err).Send()
+		return []*shared.GossipReply{}, fmt.Errorf("could not generate gossip message: %v", err)
+	}
 	_, err = n.tryStore(msg)
-
 	// hash the GossipMessage
 	hash, err := computeHash(msg)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not generate hash: %v", err)
 	}
 
 	// generate the HashMessage to be sent in the hash proposal
 	hashMsg, err := generateHashMessage(hash, n.address)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not generate hash message: %v", err)
 	}
 
 	// marshal HashMessage to bytes
 	hashMsgBytes, err := proto.Marshal(hashMsg)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not marshal message: %v", err)
 	}
-
-	/*
-		Part I: sending individual one-to-one direct hash proposals.
-		Note: hash proposals in synchronous mode cannot be gossiped within the overlay since the proposer should be blocked till
-		a response
-	*/
 
 	// realRecipients will store the addresses of nodes who want the actual message
 	realRecipients := make([]string, 0)
 
-	// send sync hash proposals
-	replies, err := n.gossip(ctx, hashMsgBytes, recipients, "syncHashProposal", true)
-
-	// iterate over replies, if the reply is non-nil, this means it is equal to the address of the recipient
-	// and that the recipient wants the original message. Hence add his address to realRecipients
-	for _, rep := range replies {
-		if rep != nil && rep.ResponseByte != nil {
-			realRecipients = append(realRecipients, string(rep.ResponseByte))
-		}
+	msgID, err := n.regMngr.MsgTypeToID("syncHashProposal")
+	if err != nil {
+		log.Debug().Err(err).Send()
+		return []*shared.GossipReply{}, fmt.Errorf("could not get message type ID: %v", err)
 	}
 
-	/*
-		Part II: send actual message to addresses who have requested by positively responding to the hash proposal
-	*/
-	return n.gossip(ctx, payload, realRecipients, msgType, true)
+	// send syncHashProposal
+	replies, err := n.gossip(ctx, hashMsgBytes, recipients, msgID, true)
+
+	// iterate over replies, and for non-nil replies, they must be addresses
+	// so add them to realRecipients
+	for _, rep := range replies {
+		if rep.ResponseByte != nil {
+			socket := &shared.Socket{}
+			err := proto.Unmarshal(rep.ResponseByte, socket)
+
+			if err != nil {
+				//TODO: discuss handling erroneous address returns, we ignore them at the moment
+				continue
+			}
+
+			realRecipients = append(realRecipients, socketToString(socket))
+		}
+	}
+	// send actual message to addresses who request it
+	return n.gossip(context.Background(), payload, realRecipients, id, true)
 }
 
 // AsyncGossip synchronizes over the delivery
 // i.e., sends a message to all recipients, and only blocks for delivery without blocking for their response
 func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error) {
-	// generate GossipMessage type in order to hash it
-	msg, err := generateGossipMessage(payload, recipients, msgType)
+	log := n.logger.With().
+		Str("function", "AsyncGossip").
+		Logger()
+
+	msgID, err := n.regMngr.MsgTypeToID(msgType)
 	if err != nil {
+		log.Debug().Err(err).Send()
+		return []*shared.GossipReply{}, fmt.Errorf("could not get message type ID: %v", err)
+	}
+
+	// generate GossipMessage type in order to hash it
+	msg, err := generateGossipMessage(payload, recipients, msgID)
+	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not generate gossip message: %v", err)
 	}
 	_, err = n.tryStore(msg)
 
-	// hashing the GossipMessage
+	// hash the GossipMessage
 	hash, err := computeHash(msg)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not generate hash: %v", err)
 	}
 
-	// generating the HashMessage to be sent in the hash proposal
+	// generate the HashMessage to be sent in the hash proposal
 	hashMsg, err := generateHashMessage(hash, n.address)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not generate hash message: %v", err)
 	}
 
-	// marshaling HashMessage to bytes
+	// marshal HashMessage to bytes
 	hashMsgBytes, err := proto.Marshal(hashMsg)
 	if err != nil {
+		log.Debug().Err(err).Send()
 		return []*shared.GossipReply{}, fmt.Errorf("could not marshal message: %v", err)
 	}
 
-	// sending the hash proposal to recipients
-	_, err = n.gossip(ctx, hashMsgBytes, recipients, "asyncHashProposal", false)
+	msgID, err = n.regMngr.MsgTypeToID("asyncHashProposal")
 	if err != nil {
-		return nil, fmt.Errorf("could not gossip message: %v", err)
+		log.Debug().Err(err).Send()
+		return []*shared.GossipReply{}, fmt.Errorf("could not get message type ID: %v", err)
+	}
+
+	// send the hash proposal to recipients
+	_, err = n.gossip(ctx, hashMsgBytes, recipients, msgID, false)
+	if err != nil {
+		return []*shared.GossipReply{}, fmt.Errorf("could not gossip message: %v", err)
 	}
 
 	return []*shared.GossipReply{}, nil
@@ -288,10 +346,11 @@ func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shar
 		return &shared.GossipReply{}, fmt.Errorf("error in storing message: %v", err)
 	}
 
-	// if message already has been received discard it
+	// if message was confirmed, then ignore it
 	if msgExists {
 		return &shared.GossipReply{}, nil
 	}
+
 	// no recipient for a message means that the message is a gossip to ALL so the node also broadcasts that message
 	if len(msg.GetRecipients()) == 0 {
 		go func(ctx context.Context, msg *shared.GossipMessage) {
@@ -333,7 +392,7 @@ func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*share
 	if err != nil {
 		return &shared.GossipReply{}, fmt.Errorf("error in storing message: %v", err)
 	}
-	// if the message was already confirmed
+	// if the message was already confirmed, ignore it
 	if msgExists {
 		return &shared.GossipReply{}, nil
 	}
@@ -345,9 +404,6 @@ func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*share
 		}(ctx, msg)
 	}
 
-	/*
-		Part I: blocking on reception
-	*/
 	//getting blocked until either a timeout,
 	// or the message getting placed into the local nodes queue
 	select {
@@ -372,51 +428,22 @@ func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*share
 	if msgErr != nil {
 		return &shared.GossipReply{}, msgErr
 	}
-	return &shared.GossipReply{ResponseByte: msgReply}, nil
+	return &shared.GossipReply{ResponseByte: msgReply}, msgErr
 }
 
 // Serve starts an async node grpc server, and its sweeper as well
-func (n *Node) Serve(listener net.Listener) error {
-	log := n.logger.With().
-		Str("function", "Serve").
-		Logger()
-
+func (n *Node) Serve(listener net.Listener) {
 	// Send of the sweeper to monitor the queue
 	go n.sweeper()
-
-	s := grpc.NewServer()
-	shared.RegisterMessageReceiverServer(s, n)
-	if err := s.Serve(listener); err != nil {
-		err := fmt.Errorf("failed to serve: %v", err)
-		log.Panic().Err(err).Send()
-		return err
-	}
-
-	return nil
+	n.server.Serve(listener)
 }
 
-// initDefault adds the default functions to the registry of the node
-func (n *Node) initDefault() error {
-	err := n.pickGossipPartners()
-	if err != nil {
-		return err
-	}
-
-	err = n.RegisterFunc("syncHashProposal", n.syncHashProposal)
-	if err != nil {
-		return err
-	}
-
-	err = n.RegisterFunc("asyncHashProposal", n.asyncHashProposal)
-	if err != nil {
-		return err
-	}
-
-	err = n.RegisterFunc("requestMessage", n.requestMessage)
-	if err != nil {
-		return err
-	}
-	return nil
+// initDefault sets the gossip partners and adds the default functions to the registry of the node
+func (n *Node) initDefault() {
+	n.pickGossipPartners()
+	n.RegisterFunc("syncHashProposal", n.syncHashProposal)
+	n.RegisterFunc("asyncHashProposal", n.asyncHashProposal)
+	n.RegisterFunc("requestMessage", n.requestMessage)
 }
 
 // RegisterFunc allows the addition of new message types to the node's registry
@@ -424,16 +451,16 @@ func (n *Node) RegisterFunc(msgType string, f HandleFunc) error {
 	return n.regMngr.AddMessageType(msgType, f)
 }
 
-func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, msgType string, isSynchronous bool) ([]*shared.GossipReply, error) {
+func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, msgType uint64, isSynchronous bool) ([]*shared.GossipReply, error) {
+
 	log := n.logger.With().
 		Str("function", "gossip").
 		Logger()
 
 	gossipMsg, err := generateGossipMessage(payload, recipients, msgType)
 	if err != nil {
-		err := fmt.Errorf("could not generate gossip message:  %v", err)
-		log.Error().Err(err).Send()
-		return nil, err
+		log.Debug().Err(err).Send()
+		return nil, fmt.Errorf("could not generate gossip message. \n error: %v \n payload: %v\n, recipients: %v\n, msgType %v", err, payload, recipients, msgType)
 	}
 
 	// make sure message is in storage before gossiping
@@ -462,7 +489,6 @@ func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, 
 	// this is something we need to define for later, as currently there is no clear way
 	// to match errors to responses.
 	// Loop through recipients
-
 	for _, addr := range actualRecipients {
 		go func(addr string) {
 			reply, err := n.placeMessage(ctx, addr, gossipMsg, isSynchronous)
@@ -488,33 +514,9 @@ func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, 
 // placeMessage is invoked by the node, and encapsulates the process of placing a single message to a recipient's incoming queue
 // placeMessage takes a context, address of target node, the message to send, and
 // whether to use sync or async mode (true for sync, false for async)
-// placeMessage establishes and manages a gRPC client inside
+// placeMessage utilizes the internal server in the node
 func (n *Node) placeMessage(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool) (*shared.GossipReply, error) {
-	log := n.logger.With().
-		Str("function", "placeMessage").
-		Str("address", addr).
-		Logger()
-
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
-	if err != nil {
-		err := fmt.Errorf("could not connect to %s: %v", addr, err)
-		log.Error().Err(err).Send()
-		return nil, err
-	}
-	defer closeConnection(conn)
-	client := shared.NewMessageReceiverClient(conn)
-	var reply *shared.GossipReply
-	if isSynchronous {
-		reply, err = client.SyncQueue(ctx, msg)
-	} else {
-		reply, err = client.AsyncQueue(ctx, msg)
-	}
-	if err != nil {
-		err := fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
-		log.Error().Err(err).Send()
-		return nil, err
-	}
-	return reply, nil
+	return n.server.Place(ctx, addr, msg, isSynchronous, gossip.ModeOneToAll)
 }
 
 // sweeper looks for incoming message to the node's queue, and handles them concurrently
@@ -546,15 +548,20 @@ func (n *Node) messageHandler(ord *order.Order) error {
 	return nil
 }
 
-//concurrentHandler invokes messageHandler and prints the errors, if any,
+//concurrentHandler closes invokes messageHandler and prints the errors, if any,
 func concurrentHandler(n *Node, o *order.Order) {
+	log := n.logger.With().
+		Str("function", "messageHandler").
+		Logger()
+
 	err := n.messageHandler(o)
 	if err != nil {
+		log.Error().Msgf("Error handling message: %v", err)
 		fmt.Printf("Error handling message: %v\n", err)
 	}
 }
 
-// tryStore receives a gossip message and checks if it exits inside the node database.
+// tryStore receives a gossip message and checks if its present inside the node database.
 // in case it exists it return true, otherwise it adds the entry to the data base and returns false.
 func (n *Node) tryStore(msg *shared.GossipMessage) (bool, error) {
 	hashBytes, err := computeHash(msg)
@@ -591,9 +598,9 @@ func (n *Node) pickGossipPartners() error {
 	}
 
 	var (
-		gossipPartners     = make([]string, n.staticFanoutNum)
-		us                 = newUniqSelector(len(n.peers))
-		index          int = 0
+		gossipPartners = make([]string, n.staticFanoutNum)
+		us             = newUniqSelector(len(n.peers))
+		index          = 0
 		err            error
 	)
 

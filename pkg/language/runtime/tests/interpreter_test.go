@@ -4215,6 +4215,36 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	)
 }
 
+func TestInterpretDictionaryInsert(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var inserted: Int? = nil
+
+      fun test(): {String: Int} {
+          let x = {"abc": 1, "def": 2}
+          inserted = x.insert(key: "abc", 3)
+          return x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+	assert.Equal(t,
+		interpreter.DictionaryValue{
+			"def": interpreter.NewIntValue(2),
+			"abc": interpreter.NewIntValue(3),
+		},
+		value,
+	)
+
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		inter.Globals["inserted"].Value,
+	)
+}
+
 func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4770,6 +4800,130 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 	)
 }
 
+func TestInterpretResourceDestroyArray(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let rs <- [<-create R(), <-create R()]
+          destroy rs
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyDictionary(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let rs <- {"r1": <-create R(), "r2": <-create R()}
+          destroy rs
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(2),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyOptionalSome(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          destroy maybeR
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(1),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
+func TestInterpretResourceDestroyOptionalNil(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      var destructionCount = 0
+
+      resource R {
+          destroy() {
+              destructionCount = destructionCount + 1
+          }
+      }
+
+      fun test() {
+          let maybeR: <-R? <- nil
+          destroy maybeR
+      }
+    `)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+
+	_, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewIntValue(0),
+		inter.Globals["destructionCount"].Value,
+	)
+}
+
 // TestInterpretResourceDestroyExpressionResourceInterfaceCondition tests that
 // the resource interface's destructor is called, even if the conforming resource
 // does not have an destructor
@@ -4853,7 +5007,9 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "from",
 					Value:      interpreter.NewIntValue(2),
 				},
-			}},
+			},
+			nil,
+		},
 		{
 			"Transfer",
 			[]interpreter.EventField{
@@ -4865,7 +5021,9 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "from",
 					Value:      interpreter.NewIntValue(4),
 				},
-			}},
+			},
+			nil,
+		},
 		{
 			"TransferAmount",
 			[]interpreter.EventField{
@@ -4881,8 +5039,89 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Identifier: "amount",
 					Value:      interpreter.NewIntValue(100),
 				},
-			}},
+			},
+			nil,
+		},
 	}
 
 	assert.Equal(t, expectedEvents, actualEvents)
+}
+
+func TestInterpretSwapResourceDictionaryElementReturnSwapped(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource X {}
+
+      fun test(): <-X? {
+          let xs: <-{String: X} <- {}
+          var x: <-X? <- create X()
+          xs["foo"] <-> x
+          destroy xs
+          return <-x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		value,
+	)
+}
+
+func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource X {}
+
+      fun test(): <-{String: X} {
+          let xs: <-{String: X} <- {}
+          var x: <-X? <- create X()
+          xs["foo"] <-> x
+          destroy x
+          return <-xs
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	require.IsType(t,
+		interpreter.DictionaryValue{},
+		value,
+	)
+
+	assert.IsType(t,
+		interpreter.CompositeValue{},
+		value.(interpreter.DictionaryValue)["foo"],
+	)
+}
+
+func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource X {}
+
+      fun test(): <-X? {
+          let xs: <-{String: X} <- {"foo": <-create X()}
+          var x: <-X? <- nil
+          xs["foo"] <-> x
+          destroy xs
+          return <-x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	assert.Nil(t, err)
+
+	require.IsType(t,
+		interpreter.SomeValue{},
+		value,
+	)
+
+	assert.IsType(t,
+		interpreter.CompositeValue{},
+		value.(interpreter.SomeValue).Value,
+	)
 }

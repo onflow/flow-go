@@ -3,55 +3,56 @@
 package capnp
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/model/flow"
-	"github.com/dapperlabs/flow-go/pkg/model/hotstuff"
-	"github.com/dapperlabs/flow-go/pkg/model/message"
 	"github.com/pkg/errors"
 	capnp "zombiezen.com/go/capnproto2"
+
+	"github.com/dapperlabs/flow-go/pkg/model/collection"
+	"github.com/dapperlabs/flow-go/pkg/model/consensus"
+	"github.com/dapperlabs/flow-go/pkg/model/trickle"
+	"github.com/dapperlabs/flow-go/schema/captain"
 )
 
-func decode(msg *capnp.Message) (interface{}, error) {
+func decode(m *capnp.Message) (interface{}, error) {
 
 	// read into root type
-	z, err := ReadRootZ(msg)
+	msg, err := captain.ReadRootMessage(m)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read root")
 	}
 
-	// retrieve the embedded type
 	var v interface{}
-	switch z.Which() {
-	case Z_Which_ping:
-		v, err = decodePing(z)
-	case Z_Which_pong:
-		v, err = decodePong(z)
-	case Z_Which_auth:
-		v, err = decodeAuth(z)
-	case Z_Which_announce:
-		v, err = decodeAnnounce(z)
-	case Z_Which_request:
-		v, err = decodeRequest(z)
-	case Z_Which_event:
-		v, err = decodeEvent(z)
+	switch msg.Which() {
 
-	case Z_Which_collection:
-		v, err = decodeCollection(z)
-	case Z_Which_receipt:
-		v, err = decodeReceipt(z)
-	case Z_Which_approval:
-		v, err = decodeApproval(z)
-	case Z_Which_seal:
-		v, err = decodeSeal(z)
+	// trickle network overlay
+	case captain.Message_Which_auth:
+		v, err = decodeRootAuth(msg)
+	case captain.Message_Which_ping:
+		v, err = decodeRootPing(msg)
+	case captain.Message_Which_pong:
+		v, err = decodeRootPong(msg)
+	case captain.Message_Which_announce:
+		v, err = decodeRootAnnounce(msg)
+	case captain.Message_Which_request:
+		v, err = decodeRootRequest(msg)
+	case captain.Message_Which_response:
+		v, err = decodeRootResponse(msg)
 
-	case Z_Which_block:
-		v, err = decodeBlock(z)
-	case Z_Which_vote:
-		v, err = decodeVote(z)
-	case Z_Which_timeout:
-		v, err = decodeTimeout(z)
+		// collection - collection forwarding
+	case captain.Message_Which_guaranteedCollection:
+		v, err = decodeRootGuaranteedCollection(msg)
+
+		// consensus - collection propagation
+	case captain.Message_Which_snapshotRequest:
+		v, err = decodeRootSnapshotRequest(msg)
+	case captain.Message_Which_snapshotResponse:
+		v, err = decodeRootSnapshotResponse(msg)
+	case captain.Message_Which_mempoolRequest:
+		v, err = decodeRootMempoolRequest(msg)
+	case captain.Message_Which_mempoolResponse:
+		v, err = decodeRootMempoolResponse(msg)
 
 	default:
-		err = errors.Errorf("invalid decode code (%d)", z.Which())
+		err = errors.Errorf("invalid decode code (%d)", msg.Which())
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "could not decode value")
@@ -60,157 +61,256 @@ func decode(msg *capnp.Message) (interface{}, error) {
 	return v, nil
 }
 
-func decodePing(z Z) (*message.Ping, error) {
-	ping, err := z.Ping()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read ping")
-	}
-	v := &message.Ping{
-		Nonce: ping.Nonce(),
-	}
-	return v, nil
-}
+// trickle network overlay
 
-func decodePong(z Z) (*message.Pong, error) {
-	pong, err := z.Pong()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read pong")
-	}
-	v := &message.Pong{
-		Nonce: pong.Nonce(),
-	}
-	return v, nil
-}
-
-func decodeAuth(z Z) (*message.Auth, error) {
-	auth, err := z.Auth()
+func decodeRootAuth(msg captain.Message) (*trickle.Auth, error) {
+	auth, err := msg.Auth()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read auth")
 	}
-	node, err := auth.Node()
+	return decodeAuth(auth)
+}
+
+func decodeAuth(auth captain.Auth) (*trickle.Auth, error) {
+	nodeID, err := auth.NodeId()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read id")
+		return nil, errors.Wrap(err, "could not get node id")
 	}
-	v := &message.Auth{
-		Node: node,
+	v := &trickle.Auth{
+		NodeID: nodeID,
 	}
 	return v, nil
 }
 
-func decodeAnnounce(z Z) (*message.Announce, error) {
-	announce, err := z.Announce()
+func decodeRootPing(msg captain.Message) (*trickle.Ping, error) {
+	ping, err := msg.Ping()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not read ping")
+	}
+	return decodePing(ping)
+}
+
+func decodePing(ping captain.Ping) (*trickle.Ping, error) {
+	nonce := ping.Nonce()
+	v := &trickle.Ping{
+		Nonce: nonce,
+	}
+	return v, nil
+}
+
+func decodeRootPong(msg captain.Message) (*trickle.Pong, error) {
+	pong, err := msg.Pong()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not read pong")
+	}
+	return decodePong(pong)
+}
+
+func decodePong(pong captain.Pong) (*trickle.Pong, error) {
+	nonce := pong.Nonce()
+	v := &trickle.Pong{
+		Nonce: nonce,
+	}
+	return v, nil
+}
+
+func decodeRootAnnounce(msg captain.Message) (*trickle.Announce, error) {
+	ann, err := msg.Announce()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read announce")
 	}
-	id, err := announce.Id()
+	return decodeAnnounce(ann)
+}
+
+func decodeAnnounce(ann captain.Announce) (*trickle.Announce, error) {
+	engineID := ann.EngineId()
+	eventID, err := ann.EventId()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read hash")
+		return nil, errors.Wrap(err, "could not get event id")
 	}
-	v := &message.Announce{
-		Engine: announce.Engine(),
-		ID:     id,
+	v := &trickle.Announce{
+		EngineID: engineID,
+		EventID:  eventID,
 	}
 	return v, nil
 }
 
-func decodeRequest(z Z) (*message.Request, error) {
-	request, err := z.Request()
+func decodeRootRequest(msg captain.Message) (*trickle.Request, error) {
+	req, err := msg.Request()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read request")
 	}
-	id, err := request.Id()
+	return decodeRequest(req)
+}
+
+func decodeRequest(req captain.Request) (*trickle.Request, error) {
+	engineID := req.EngineId()
+	eventID, err := req.EventId()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read hash")
+		return nil, errors.Wrap(err, "could not get event id")
 	}
-	v := &message.Request{
-		Engine: request.Engine(),
-		ID:     id,
+	v := &trickle.Request{
+		EngineID: engineID,
+		EventID:  eventID,
 	}
 	return v, nil
 }
 
-func decodeEvent(z Z) (*message.Event, error) {
-	event, err := z.Event()
+func decodeRootResponse(msg captain.Message) (*trickle.Response, error) {
+	response, err := msg.Response()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read event")
+		return nil, errors.Wrap(err, "could not read response")
 	}
-	payload, err := event.Payload()
+	return decodeResponse(response)
+}
+
+func decodeResponse(response captain.Response) (*trickle.Response, error) {
+	engineID := response.EngineId()
+	eventID, err := response.EventId()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read payload")
+		return nil, errors.Wrap(err, "could not get event id")
 	}
-	v := &message.Event{
-		Engine:  event.Engine(),
-		Payload: payload,
+	originID, err := response.OriginId()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get origin id")
+	}
+	targetIDs, err := response.TargetIds()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get target id list")
+	}
+	vvs := make([]string, 0, targetIDs.Len())
+	for i := 0; i < targetIDs.Len(); i++ {
+		vv, err := targetIDs.At(i)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not get target id (%d)", i)
+		}
+		vvs = append(vvs, vv)
+	}
+	payload, err := response.Payload()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get payload")
+	}
+	v := &trickle.Response{
+		EngineID:  engineID,
+		EventID:   eventID,
+		OriginID:  originID,
+		TargetIDs: vvs,
+		Payload:   payload,
 	}
 	return v, nil
 }
 
-func decodeCollection(z Z) (*flow.Collection, error) {
-	collection, err := z.Collection()
+// collection - collection forwarding
+
+func decodeRootGuaranteedCollection(msg captain.Message) (*collection.GuaranteedCollection, error) {
+	coll, err := msg.GuaranteedCollection()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read collection")
+		return nil, errors.Wrap(err, "could not read fingerprint")
 	}
-	_ = collection
-	v := &flow.Collection{}
+	return decodeGuaranteedCollection(coll)
+}
+
+func decodeGuaranteedCollection(coll captain.GuaranteedCollection) (*collection.GuaranteedCollection, error) {
+	hash, err := coll.Hash()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get hash")
+	}
+	sig, err := coll.Signature()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get signature")
+	}
+	v := &collection.GuaranteedCollection{
+		Hash:      hash,
+		Signature: sig,
+	}
 	return v, nil
 }
 
-func decodeReceipt(z Z) (*flow.Receipt, error) {
-	receipt, err := z.Receipt()
+// consensus - collection propagation
+
+func decodeRootSnapshotRequest(msg captain.Message) (*consensus.SnapshotRequest, error) {
+	req, err := msg.SnapshotRequest()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read receipt")
+		return nil, errors.Wrap(err, "could not read snapshot request")
 	}
-	_ = receipt
-	v := &flow.Receipt{}
+	return decodeSnapshotRequest(req)
+}
+
+func decodeSnapshotRequest(req captain.SnapshotRequest) (*consensus.SnapshotRequest, error) {
+	nonce := req.Nonce()
+	hash, err := req.MempoolHash()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get mempool hash")
+	}
+	v := &consensus.SnapshotRequest{
+		Nonce:       nonce,
+		MempoolHash: hash,
+	}
 	return v, nil
 }
 
-func decodeApproval(z Z) (*flow.Approval, error) {
-	approval, err := z.Approval()
+func decodeRootSnapshotResponse(msg captain.Message) (*consensus.SnapshotResponse, error) {
+	res, err := msg.SnapshotResponse()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read approval")
+		return nil, errors.Wrap(err, "could not read snapshot response")
 	}
-	_ = approval
-	v := &flow.Approval{}
+	return decodeSnapshotResponse(res)
+}
+
+func decodeSnapshotResponse(res captain.SnapshotResponse) (*consensus.SnapshotResponse, error) {
+	nonce := res.Nonce()
+	mempoolHash, err := res.MempoolHash()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get mempool hash")
+	}
+	v := &consensus.SnapshotResponse{
+		Nonce:       nonce,
+		MempoolHash: mempoolHash,
+	}
 	return v, nil
 }
 
-func decodeSeal(z Z) (*flow.Seal, error) {
-	seal, err := z.Seal()
+func decodeRootMempoolRequest(msg captain.Message) (*consensus.MempoolRequest, error) {
+	req, err := msg.MempoolRequest()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read seal")
+		return nil, errors.Wrap(err, "could not read mempool request")
 	}
-	_ = seal
-	v := &flow.Seal{}
+	return decodeMempoolRequest(req)
+}
+
+func decodeMempoolRequest(req captain.MempoolRequest) (*consensus.MempoolRequest, error) {
+	nonce := req.Nonce()
+	v := &consensus.MempoolRequest{
+		Nonce: nonce,
+	}
 	return v, nil
 }
 
-func decodeBlock(z Z) (*hotstuff.Block, error) {
-	block, err := z.Block()
+func decodeRootMempoolResponse(msg captain.Message) (*consensus.MempoolResponse, error) {
+	res, err := msg.MempoolResponse()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read block")
+		return nil, errors.Wrap(err, "could not read mempool response")
 	}
-	_ = block
-	v := &hotstuff.Block{}
-	return v, nil
+	return decodeMempoolResponse(res)
 }
 
-func decodeVote(z Z) (*hotstuff.Vote, error) {
-	vote, err := z.Vote()
+func decodeMempoolResponse(res captain.MempoolResponse) (*consensus.MempoolResponse, error) {
+	nonce := res.Nonce()
+	fingerprints, err := res.Collections()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not read vote")
+		return nil, errors.Wrap(err, "could not get fingerprints")
 	}
-	_ = vote
-	v := &hotstuff.Vote{}
-	return v, nil
-}
-
-func decodeTimeout(z Z) (*hotstuff.Timeout, error) {
-	timeout, err := z.Timeout()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read timeout")
+	vvs := make([]*collection.GuaranteedCollection, 0, fingerprints.Len())
+	for i := 0; i < fingerprints.Len(); i++ {
+		vv, err := decodeGuaranteedCollection(fingerprints.At(i))
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not get fingerprint (%d)", i)
+		}
+		vvs = append(vvs, vv)
 	}
-	_ = timeout
-	v := &hotstuff.Timeout{}
+	v := &consensus.MempoolResponse{
+		Nonce:       nonce,
+		Collections: vvs,
+	}
 	return v, nil
 }

@@ -1,8 +1,11 @@
 package main
 
-import "text/template"
+import (
+	"text/template"
+)
 
 // registryTemplate is the template used when generating registry code
+
 var registryTemplate = template.Must(template.New("registry").Parse(registryTmplText))
 
 // registryTmplText contains the template structure to be used
@@ -52,10 +55,18 @@ func ({{ $reg.InterfaceShort }}r *{{ $reg.InterfaceLong }}Registry) {{ .Name }}(
 }
 {{- end}}
 
-func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-	 {{- range .Methods }}
-		"{{ .Name }}": {{ $reg.InterfaceShort }}r.{{ .Name }}, 
+func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+	 {{- range $Index, $Method := .Methods }}
+		{{ $Index }}: {{ $reg.InterfaceShort }}r.{{ $Method.Name }}, 
+		{{- end}}
+	}
+}
+
+func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) NameMapping() map[string]uint64{
+	return map[string]uint64{
+	 {{- range $Index, $Method := .Methods }}
+		"{{ $Method.Name }}": {{ $Index }}, 
 		{{- end}}
 	}
 }
