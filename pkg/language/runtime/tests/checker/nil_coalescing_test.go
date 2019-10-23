@@ -176,6 +176,7 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
 		}.ToValueDeclarations(),
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)

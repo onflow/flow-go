@@ -30,8 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	peers := []string{}
-
+	peers := make([]string, 0)
 	for _, port := range portPool {
 		if port != servePort {
 			peers = append(peers, port)
@@ -40,8 +39,9 @@ func main() {
 
 	// step 2: registering the grpc services if any
 	// Note: this example is not built upon any grpc service, hence we pass nil
-	// we pass 0 for static fanout to simulate the Gossip ONE_TO_MANY, i.e., connection on the fly
-	node := gnode.NewNode(nil, servePort, peers, 0, 10)
+
+	config := gnode.NewNodeConfig(nil, servePort, peers, 0, 10)
+	node := gnode.NewNode(config)
 
 	// step 3: passing the listener to the instance of gnode
 	go node.Serve(listener)
@@ -78,7 +78,7 @@ func main() {
 				// so you will notice that the responses returned to you will be empty
 				// (that is because AsyncGossip does not wait for the sent messages to be
 				// processed)
-				rep, err := node.SyncGossip(context.Background(), bytes, peers, "Time")
+				rep, err := node.AsyncGossip(context.Background(), bytes, peers, "Time")
 				if err != nil {
 					log.Println(err)
 				}

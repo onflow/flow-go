@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestAddMessageType tests adding new msgTypes to the registry
+//// TestAddMessageType tests adding new msgTypes to the registry
 func TestAddMessageType(t *testing.T) {
 	r := newRegistryManager(nil)
 
@@ -62,27 +62,27 @@ func TestAddMessageType(t *testing.T) {
 		t.Errorf("AddMessageType: Registry size mismatch, Expected 3, Got %v", len(r.msgTypes))
 	}
 
+	for i := 0; i < len(r.msgTypes); i++ {
+		if _, ok := r.msgTypes[uint64(i)]; !ok {
+			t.Errorf("Error in message indexing. Expected function at index %v, Got none", i)
+		}
+	}
+
 }
 
-//TestInvokeMessageType tests invoking added msgTypes to the registry
+// TestInvokeMessageType tests invoking added msgTypes to the registry
 func TestInvokeMessageType(t *testing.T) {
-	availableMessageTypes := make(map[string]HandleFunc)
+	r := newRegistryManager(nil)
 
-	availableMessageTypes["exists"] = func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
+	r.AddMessageType("exists", func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
 		return []byte("Response"), nil
-	}
-	availableMessageTypes["returnsInp"] = func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
+	})
+	r.AddMessageType("returnsInp", func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
 		return payloadBytes, nil
-	}
-	availableMessageTypes["returnsError"] = func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
+	})
+	r.AddMessageType("returnsError", func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
 		return nil, fmt.Errorf("non nil")
-	}
-
-	//MultiRegistry that contains the msgTypes defined above
-	mr := &MultiRegistry{msgTypes: availableMessageTypes}
-
-	//Registry Manager that wraps mr in entry to test the invoke functions
-	r := newRegistryManager(mr)
+	})
 
 	tt := []struct {
 		msgType string
@@ -117,13 +117,26 @@ func TestInvokeMessageType(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		resp, err := r.Invoke(context.Background(), tc.msgType, tc.input)
+		msgID, err := r.MsgTypeToID(tc.msgType)
+		if err == nil && tc.err != nil {
+			t.Error("MsgTypeToID: Expected an error, Got no error")
+		}
+
+		if err != nil && tc.err == nil {
+			t.Error("MsgTypeToID: Expected no error, Got an error")
+		}
+
+		if err != nil && tc.err != nil {
+			continue
+		}
+
+		resp, err := r.Invoke(context.Background(), msgID, tc.input)
 
 		if err != nil && tc.err != nil {
 			continue
 		}
 		if err == nil && tc.err != nil {
-			t.Errorf("AddMessageType: Expected an error, Got no error")
+			t.Error("AddMessageType: Expected an error, Got no error ", msgID, " ", tc.msgType)
 		}
 		if err != nil && tc.err == nil {
 			t.Errorf("AddMessageType: Expected no error, Got an error")
@@ -147,51 +160,4 @@ func TestInvokeMessageType(t *testing.T) {
 		}
 	}
 
-}
-
-//Test combining multiple multi registries into a single registry
-func TestNewMultiRegistry(t *testing.T) {
-
-	availableMessageType1 := map[string]HandleFunc{
-		"myfunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-		"myduplicatefunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-	}
-	mr1 := &MultiRegistry{msgTypes: availableMessageType1}
-
-	availableMessageType2 := map[string]HandleFunc{
-		"myotherfunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-		"myduplicatefunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-	}
-	mr2 := &MultiRegistry{msgTypes: availableMessageType2}
-
-	availableMessageType3 := map[string]HandleFunc{
-		"myuniquefunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-		"anotheruniquefunction": func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
-			return []byte("Response"), nil
-		},
-	}
-	mr3 := &MultiRegistry{msgTypes: availableMessageType3}
-
-	//with duplicates
-	combinedRegistries := NewMultiRegistry(mr1, mr2, mr3)
-
-	if len(combinedRegistries.MessageTypes()) != 5 {
-		t.Errorf("NewMultiRegistry: Size Expected: 5, Got: %v", len(combinedRegistries.MessageTypes()))
-	}
-
-	//without duplicates
-	combinedRegistries = NewMultiRegistry(mr1, mr3)
-	if len(combinedRegistries.MessageTypes()) != 4 {
-		t.Errorf("NewMultiRegistry: Size Expected: 4, Got: %v", len(combinedRegistries.MessageTypes()))
-	}
 }

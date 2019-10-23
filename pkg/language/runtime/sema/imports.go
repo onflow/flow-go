@@ -11,8 +11,8 @@ type ImportResolver func(location ast.ImportLocation) (*Checker, error)
 func (checker *Checker) ResolveImports(resolver ImportResolver) error {
 	return checker.resolveImports(
 		resolver,
-		map[ast.ImportLocation]bool{},
-		map[ast.ImportLocation]*Checker{},
+		map[ast.LocationID]bool{},
+		map[ast.LocationID]*Checker{},
 	)
 }
 
@@ -26,13 +26,14 @@ func (e CyclicImportsError) Error() string {
 
 func (checker *Checker) resolveImports(
 	resolver ImportResolver,
-	resolving map[ast.ImportLocation]bool,
-	resolved map[ast.ImportLocation]*Checker,
+	resolving map[ast.LocationID]bool,
+	resolved map[ast.LocationID]*Checker,
 ) error {
+	locations := checker.Program.ImportLocations()
 
-	imports := checker.Program.Imports()
-	for location := range imports {
-		importedChecker, ok := resolved[location]
+	for _, location := range locations {
+
+		importedChecker, ok := resolved[location.ID()]
 		if !ok {
 			var err error
 			importedChecker, err = resolver(location)
@@ -40,22 +41,27 @@ func (checker *Checker) resolveImports(
 				return err
 			}
 			if importedChecker != nil {
-				resolved[location] = importedChecker
+				resolved[location.ID()] = importedChecker
 			}
 		}
+
 		if importedChecker == nil {
 			continue
 		}
-		checker.ImportCheckers[location] = importedChecker
-		if resolving[location] {
+
+		checker.ImportCheckers[location.ID()] = importedChecker
+		if resolving[location.ID()] {
 			return CyclicImportsError{Location: location}
 		}
-		resolving[location] = true
+
+		resolving[location.ID()] = true
 		err := importedChecker.resolveImports(resolver, resolving, resolved)
 		if err != nil {
 			return err
 		}
-		delete(resolving, location)
+
+		delete(resolving, location.ID())
 	}
+
 	return nil
 }

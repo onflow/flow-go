@@ -20,6 +20,7 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 		}.ToValueDeclarations(),
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -36,6 +37,7 @@ func TestCheckAssertWithMessage(t *testing.T) {
 		stdlib.StandardLibraryFunctions{
 			stdlib.AssertFunction,
 		}.ToValueDeclarations(),
+		nil,
 		nil,
 		nil,
 	)

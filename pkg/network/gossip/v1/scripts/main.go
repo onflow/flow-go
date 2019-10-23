@@ -76,8 +76,8 @@ type registryInfo struct {
 // generateCodeFromFile generates a gossip registry code from the given generated
 // protobuf file containing a grpc server
 func generateCodeFromFile(filepath string) (string, error) {
-	var genRegistry = ""
-	var err error = nil
+	var genRegistry string
+	var err error
 
 	file, err := os.Open(filepath)
 	if err != nil {

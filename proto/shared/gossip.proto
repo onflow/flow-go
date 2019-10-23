@@ -7,17 +7,23 @@ option go_package = "shared";
 // Message models a single message that is supposed to get exchanged by the gossip network
 message GossipMessage {
   bytes Payload = 1;
-  string messageType = 2;           // Name of RPC method to be invoked on the message
+  uint64 messageType = 2;           // Name of RPC method to be invoked on the message
   repeated string Recipients = 3;   // Address of the recipients to which the message should be delivered
   string Sender = 4;                // Address of the sender of this message
   repeated string Path = 5;         // Address of the nodes that this message visited so far
   uint64 TTL = 6;                   // The time to live of the message, i.e., maximum number of hops it should be gossiped
 }
 
-message HashMessage {
-  bytes hashBytes = 1;
-  string senderAddr = 2;
+message Socket {
+  bytes ip = 1;
+  uint32 port = 2;
 }
+
+message HashMessage {
+  bytes  hashBytes = 1;
+  Socket senderSocket = 2;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 // 2 testing messages + rpc service to be deleted later
@@ -25,6 +31,8 @@ message HashMessage {
 service MessageReceiver {
   rpc AsyncQueue (GossipMessage) returns (GossipReply) {}
   rpc SyncQueue  (GossipMessage) returns (GossipReply) {}
+  rpc StreamAsyncQueue (stream GossipMessage) returns (stream GossipReply) {}
+  rpc StreamSyncQueue  (stream GossipMessage) returns (stream GossipReply) {}
 }
 
 message GossipReply {

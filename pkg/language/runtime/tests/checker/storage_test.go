@@ -33,6 +33,7 @@ func TestCheckStorageIndexing(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	require.Nil(t, err)
@@ -83,6 +84,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -98,6 +100,7 @@ func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
           }
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -119,6 +122,7 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -133,6 +137,7 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
           let x = storage["1"]
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)

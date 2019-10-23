@@ -18,16 +18,16 @@ func newUniqSelector(n int) *uniqueRand {
 	return &uniqueRand{generated: make(map[int]bool), n: n}
 }
 
-// Int returns a unique random integer that has not been returned by this intance
+// Int returns a unique random integer that has not been returned by this instance
 // of uniqueRand before.
 func (u *uniqueRand) Int() (int, error) {
 
-	// Decleration outside loop for performance concerns
+	// Declaration outside loop for performance concerns
 	var (
 		r   *big.Int
-		i   int = 0
+		i   = 0
 		err error
-		n64 int64 = int64(u.n)
+		n64 = int64(u.n)
 	)
 
 	max := big.NewInt(n64)
@@ -38,6 +38,7 @@ func (u *uniqueRand) Int() (int, error) {
 			return 0, fmt.Errorf("could not generate random number: %v", err)
 		}
 
+		//making sure that the number is in the range of indice
 		i = int(r.Int64() % n64)
 
 		if !u.generated[i] {

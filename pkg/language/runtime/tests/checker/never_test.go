@@ -20,6 +20,7 @@ func TestCheckNever(t *testing.T) {
 		}.ToValueDeclarations(),
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)

@@ -12,6 +12,14 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
+## Terminology
+
+In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
+
+ - `Invalid` means that the invalid program will not even be allowed to run.  The error is detected and reported statically by the type checker.
+
+ - `Error` refers to bad behavior that will result in a runtime error.
+
 ## Syntax and Behavior
 
 The programming language's syntax and behavior is inspired by Kotlin, Swift, Rust, TypeScript, and Solidity.
@@ -20,11 +28,13 @@ The programming language's syntax and behavior is inspired by Kotlin, Swift, Rus
 
 Comments can be used to document code. A comment is text that is not executed.
 
-*Single-line comments* start with two slashes (`//`):
+*Single-line comments* start with two slashes (`//`).  These comments can go on a line by themselves or they can go directly after a line of code.
 
 ```bamboo,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
+
+let x = 1  // Here is another comment after a line of code.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
@@ -74,7 +84,7 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).
+Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type, or changed into the corresponding other kind (variable to a constant and vice versa).  They also cannot be redeclared with the same name in a subscope.
 
 ```bamboo
 // Declare a constant named `a`
@@ -102,6 +112,12 @@ var b = 4
 // and it is declared as a constant
 //
 var a = 5
+
+// Invalid: cannot declare a variable with the name "b",
+// in a subscope because "b" is already in scope
+{
+    var b = 5
+}
 ```
 
 ## Type Annotations
@@ -409,7 +425,7 @@ If the left-hand side is non-nil, the right-hand side is not evaluated.
 let a: Int? = nil
 
 // Declare a constant with a non-optional integer type,
-// which is initialized to b if it is non-nil, or 42 otherwise
+// which is initialized to `a` if it is non-nil, or 42 otherwise
 //
 let b: Int = a ?? 42
 // `b` is 42, as `a` is nil
@@ -439,11 +455,11 @@ The alternative value, i.e. the right-hand side of the operator,
 must be the non-optional or optional type matching the type of the left-hand side.
 
 ```bamboo
-// Declare a constant with a non-optional integer type
+// Declare a constant with an optional integer type
 //
-let a = 1
+let a: Int? = 1
 
-// Invalid: nil-coalescing operator is applied to a value of type `Int`,
+// Invalid: nil-coalescing operator is applied to a value of type `Int?`,
 // but the alternative has type `Bool`
 //
 let b = a ?? false
@@ -483,7 +499,7 @@ let boolean = something as? Bool
 Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.
 
 ```bamboo,file=conditional-downcasting-any-array.bpl
-// Declare a constant named `numbers` which has type `[Any]`,
+// Declare a constant named `values` which has type `[Any]`,
 // i.e. an array of arbitrarily typed values
 //
 let values: [Any] = [1, true]
@@ -627,6 +643,8 @@ For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
 
 Variable-size arrays have the form `[T]`, where `T` is the element type.
 For example, the type `[Int16]` specifies a variable-size array of elements that have type `Int16`.
+
+It is important to understand that arrays are value types and are only ever copied when used as an initial value for a constant or variable, when assigning to a variable, as function parameter, or returned from a function call.
 
 ```bamboo,file=array-types.bpl
 let array: [Int8; 2] = [1, 2]
@@ -903,7 +921,8 @@ booleans[0] = true
 #### Dictionary Fields and Functions
 
 - `length: Int`: Returns the number of elements in the dictionary.
-- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the dictionary as an optional, otherwise `nil`.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary.
+    Returns the value of type `V` if the dictionary contained the key as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -1074,7 +1093,7 @@ Logical operators work with the boolean values `true` and `false`.
     // is false
     ```
 
-    If the left-hand side is true, the right-hand side is not evaluated.
+    If the left-hand side is false, the right-hand side is not evaluated.
 
 - Logical OR: `a || b`
 
@@ -1092,13 +1111,16 @@ Logical operators work with the boolean values `true` and `false`.
     // is false
     ```
 
-    If the left-hand side is false, the right-hand side is not evaluated.
+    If the left-hand side is true, the right-hand side is not evaluated.
 
 ### Comparison operators
 
 Comparison operators work with boolean and integer values.
 
-- Equality: `==`, for booleans and integers (possibly optional)
+- Equality: `==`, for booleans and integers
+
+    Both sides of the equality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
 
     ```bamboo,file=operator-equal-int.bpl
     1 == 1
@@ -1129,6 +1151,7 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-equal-int-nil.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = nil
     x == y
@@ -1136,6 +1159,7 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = 2
     x == y
@@ -1143,6 +1167,9 @@ Comparison operators work with boolean and integer values.
     ```
 
 - Inequality: `!=`, for booleans and integers (possibly optional)
+
+    Both sides of the inequality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
 
     ```bamboo,file=operator-not-equal-int.bpl
     1 != 1
@@ -1173,6 +1200,7 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-not-equal-int-nil.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = nil
     x != y
@@ -1180,6 +1208,7 @@ Comparison operators work with boolean and integer values.
     ```
 
     ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
+    // Comparison of different levels of optionals are possible
     let x: Int? = 2
     let y: Int?? = 2
     x != y
@@ -1279,9 +1308,9 @@ The parameters need to be enclosed in parentheses.
 The return type, if any, is separated from the parameters by a colon (`:`).
 The function code needs to be enclosed in opening and closing braces.
 
-Each parameter can have a label, the name that a function call needs to use to provide an argument value for the parameter.
+Each parameter needs to have a name, the name that is used within the function.  An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.
 Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label.
-If no argument label is provided, the function call must use the parameter name.
+If no `_` argument label is provided, the function call must use the parameter name.
 
 Each parameter needs to have a type annotation, which follows the parameter name after a colon.
 
@@ -1465,12 +1494,14 @@ fun assert(_ test: Bool) {
 
 ### Function Expressions
 
-Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., it is anonymous.
+Functions can be also used as expressions. The syntax is the same as for function declarations, except that function expressions have no name, i.e., anonymous.
 
 ```bamboo,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called
+//
+// This function's type is `((Int): Int)`
 //
 let double =
     fun (_ x: Int): Int {
@@ -1656,6 +1687,7 @@ If-statements allow a certain piece of code to be executed only when a given con
 
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
 The condition must be boolean and the braces are required.
+Parentheses around the condition are optional.
 
 ```bamboo,file=control-flow-if.bpl
 let a = 0
@@ -1665,15 +1697,16 @@ if a == 0 {
    b = 1
 }
 
-if a != 0 {
+// Parentheses can be used around the condition, but are not required
+if (a != 0) {
    b = 2
 }
 
 // `b` is 1
 ```
 
-An additional else-clause can be added to execute another piece of code when the condition is false.
-The else-clause is introduced by the `else` keyword.
+An additional, optional else-clause can be added to execute another piece of code when the condition is false.
+The else-clause is introduced by the `else` keyword followed by braces that contain the code that should be executed.
 
 ```bamboo,file=control-flow-if-else.bpl
 let a = 0
@@ -1761,13 +1794,13 @@ var i = 0
 var x = 0
 while i < 10 {
     i = i + 1
-    if i < 5 {
+    if i < 3 {
         continue
     }
     x = x + 1
 }
 
-// `x` is 6
+// `x` is 8
 ```
 
 The `break` statement can be used to stop the loop.
@@ -1902,13 +1935,15 @@ nand(false, false) // returns true
 nand(0, 0)
 ```
 
-Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`.
+Types are **not** automatically converted. For example, an integer is not automatically converted to a boolean, nor is an `Int32` automatically converted to an `Int8`, nor is an optional integer `Int?`  automatically converted to a non-optional integer `Int`, or vice-versa.
 
 ```bamboo,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
 
+// The arguments are not declared with a specific type, but they are inferred
+// to be `Int8` since the parameter types of the function `add` are `Int8`.
 add(1, 2) // returns 3
 
 // Declare two constants which have type `Int32`
@@ -1973,7 +2008,7 @@ let add = (a: Int8, b: Int8): Int {
 // `add` has type `((Int8, Int8): Int)`
 ```
 
-Type inference is performed for eacg expression / statement, and not across statements.
+Type inference is performed for each expression / statement, and not across statements.
 
 There are cases where types cannot be inferred.
 In these cases explicit type annotations are required.
@@ -2009,7 +2044,10 @@ and when the value is returned from a function:
     Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-    We think resources are a great way to represent such assets.
+    Structures are not an ideal way to represent this ownership because they are copied.
+    This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.
+    A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.
+    A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2053,9 +2091,9 @@ Fields are declared like variables and constants, however, they have no initial 
 
 There are three kinds of fields.
 
-Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
+Constant fields are also stored in the composite value, but after they are inititalized with a value, they **cannot** have new values assigned to them. They are declared using the `let` keyword.
 
-Constant fields are also stored in the composite value, but they can **not** have new values assigned to them. They are declared using the `let` keyword.
+Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
 Synthetic fields are **not** stored in the composite value, i.e. they are derived/computed from other values. They can have new values assigned to them and are declared using the `synthetic` keyword. Synthetic fields must have a getter and a setter. Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters). Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
 
@@ -2069,11 +2107,15 @@ Synthetic fields are **not** stored in the composite value, i.e. they are derive
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
-// Both fields are initialized through the initializer
+// Both fields are initialized through the initializer.
+//
+// The public access modifier `pub` is used in this example to allow
+// thes fields to be read in outer scopes.
+// Access control will be explained in a later section.
 //
 struct Token {
-    let id: Int
-    var balance: Int
+    pub let id: Int
+    pub var balance: Int
 
     init(id: Int, balance: Int) {
         self.id = id
@@ -2129,7 +2171,7 @@ struct Token {
 
 ### Composite Data Type Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  Assignments are not allowed at all in getters and setters.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
@@ -2139,9 +2181,9 @@ Getters are declared using the `get` keyword. Getters have no parameters and the
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
-    // which ensures the read value is always positive
+    // which ensures the read value is always non-negative
     //
-    var balance: Int {
+    pub var balance: Int {
         get {
            post {
                result >= 0
@@ -2178,7 +2220,7 @@ struct SetterExample {
     // Declare a variable field named `balance` with a setter
     // which requires written values to be positive
     //
-    var balance: Int {
+    pub var balance: Int {
         set(newBalance) {
             pre {
                 newBalance >= 0
@@ -2210,18 +2252,22 @@ Synthetic fields are read-only when only a getter is provided.
 
 ```bamboo,file=composite-type-synthetic-field-getter-only.bpl
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     // Declare a synthetic field named `area`,
-    // which computes the area based on the width and height
+    // which computes the area based on the `width` and `height` fields
     //
-    synthetic area: Int {
+    pub synthetic area: Int {
         get {
             return width * height
         }
     }
 
+    // Declare an initializer which accepts width and height.
+    // As `area` is synthetic and there is only a getter provided for it,
+    // the `area` field it cannot be assigned a value
+    //
     init(width: Int, height: Int) {
         self.width = width
         self.height = height
@@ -2241,8 +2287,8 @@ Synthetic fields are readable and writable when both a getter and a setter is de
 //
 struct GoalTracker {
 
-    var goal: Int
-    var completed: Int
+    pub var goal: Int
+    pub var completed: Int
 
     // Declare a synthetic field which is both readable
     // and writable.
@@ -2257,7 +2303,7 @@ struct GoalTracker {
     // based on the number of target goals
     // and the new remaining number of goals
     //
-    synthetic left: Double {
+    pub synthetic left: Double {
         get {
             return self.goal - self.completed
         }
@@ -2297,8 +2343,8 @@ Just like in the initializer, the special constant `self` refers to the composit
 // and has variable fields for the width and height
 //
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     init(width: Int, height: Int) {
         self.width = width
@@ -2308,7 +2354,7 @@ struct Rectangle {
     // Declare a function named "scale", which scales
     // the rectangle by the given factor
     //
-    fun scale(factor: Int) {
+    pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
     }
@@ -2327,8 +2373,8 @@ Functions support overloading.
 // and has variable fields for the width and height
 //
 struct Rectangle {
-    var width: Int
-    var height: Int
+    pub var width: Int
+    pub var height: Int
 
     init(width: Int, height: Int) {
         self.width = width
@@ -2338,7 +2384,7 @@ struct Rectangle {
     // Declare a function named "scale", which independently scales
     // the width by a given factor and the height by a given factor
     //
-    fun scale(widthFactor: Int, heightFactor: Int) {
+    pub fun scale(widthFactor: Int, heightFactor: Int) {
         self.width = self.width * widthFactor
         self.height = self.height * heightFactor
     }
@@ -2347,7 +2393,7 @@ struct Rectangle {
     // both width and height by a given factor.
     // The function calls the `scale` function declared above
     //
-    fun scale(factor: Int) {
+    pub fun scale(factor: Int) {
         self.scale(
             widthFactor: factor,
             heightFactor: factor
@@ -2369,7 +2415,7 @@ and when returned from a function:
 // Declare a structure named `SomeStruct`, with a variable integer field
 //
 struct SomeStruct {
-    var value: Int
+    pub var value: Int
 
     init(value: Int) {
         self.value = value
@@ -2391,20 +2437,22 @@ a.value // is *0*
 
 #### Resources
 
-Resources are **moved** when used as an initial value for a constant or variable,
+Resources are types that can only be stored in one location at a time.  They are **moved** when used as an initial value for a constant or variable,
 when assigned to a different variable,
 when passed as an argument to a function,
 and when returned from a function.
 
 When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
-To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it moved to a different variable, or when it moved to a function.
+Invoking a member field or method of a resource does not destroy it.
+
+To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, or when it is moved to a function.
 
 ```bamboo,file=resource-behavior.bpl
 // Declare a resource named `SomeResource`, with a variable integer field
 //
 resource SomeResource {
-    var value: Int
+    pub var value: Int
 
     init(value: Int) {
         self.value = value
@@ -2451,7 +2499,7 @@ Resources **must** be used **exactly once**. To destroy a resource, the `destroy
 ```bamboo,file=resource-loss.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-let c = SomeResource(value: 10)
+let c <- create SomeResource(value: 10)
 
 // Invalid: `c` is not used, but must be! `c` cannot be lost
 ```
@@ -2459,7 +2507,7 @@ let c = SomeResource(value: 10)
 ```bamboo,file=resource-destruction.bpl
 // Declare another, unrelated value of resource type `SomeResource`
 //
-let d = SomeResource(value: 20)
+let d <- create SomeResource(value: 20)
 
 // Destroy the resource referred to by constant `d`
 //
@@ -2478,7 +2526,7 @@ To make it explicit that the type is moved, it must be prefixed with `<-` in typ
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`
 //
-let someResource: <-SomeResource <- create SomeResource()
+let someResource: <-SomeResource <- create SomeResource(value: 5)
 
 // Declare a function which consumes a resource.
 //
@@ -2538,7 +2586,7 @@ resource[1]
 
 ### Unbound References / Nulls
 
-There is **no** support for `null`s.
+There is **no** support for `null`.
 
 ### Inheritance and Abstract Types
 
@@ -2556,11 +2604,13 @@ Instead, consider using [interfaces](#interfaces).
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
-**Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
+- **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** means the declaration is accessible/visible in all scopes, the current and inner scopes like for private, and the outer scopes. For example, a private field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
+- **Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
 
-By default, everything is private. The `pub` keyword is used to make declarations public.
+**By default, everything is private.**
+
+An element is made public by using the `pub` keyword.
 
 The `(set)` suffix can be used to make variables also publicly writable.
 
@@ -2765,6 +2815,10 @@ resource interface FungibleToken {
     // given the initial balance, must initialize the balance field
     //
     init(balance: Int) {
+        pre {
+            balance >= 0:
+                "Balances are always non-negative"
+        }
         post {
             self.balance == balance:
                 "the balance must be initialized to the initial balance"
@@ -2893,7 +2947,7 @@ resource ExampleToken: FungibleToken {
     // in the interface have to be repeated here in the implementation
     //
     pub fun deposit(_ token: <-ExampleToken) {
-        self.balance = self.balance + amount
+        self.balance = self.balance + token.balance
         destroy token
     }
 }
@@ -2906,12 +2960,13 @@ let token <- create ExampleToken(balance: 100)
 // Withdraw 10 units from the token.
 //
 // The amount satisfies the precondition of the `withdraw` function
-// in the `FungibleToken` interface
+// in the `FungibleToken` interface.
+// Invoking a member of a resource does not destroy it, so the `token` resource is still valid.
 //
 let withdrawn <- token.withdraw(amount: 10)
 
 // The postcondition of the `withdraw` function in the `FungibleToken`
-// interface ensured the balance field of the token was updated properly
+// interface ensured the balance field of the token was updated properly.
 //
 // `token.balance` is 90
 // `withdrawn.balance` is 10
@@ -2925,9 +2980,16 @@ receiver.deposit(<-withdrawn)
 // is larger than the field `balance` (100 > 90)
 //
 token.withdraw(amount: 100)
+
+// Withdrawing tokens so that the balance is zero does not destroy the resource.
+// The resource has to be destroyed explicitly.
+//
+token.withdraw(amount: 90)
 ```
 
-The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
+The access level for variable fields in an implementation may be less restrictive than the interface requires.
+For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified),
+and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
 ```bamboo
 struct interface AnInterface {
@@ -2942,7 +3004,7 @@ struct AnImplementation: AnInterface {
     // Declare a publicly settable variable field named `a`that has type `Int`.
     // This implementation satisfies the requirement for interface `AnInterface`:
     // The field is at least publicly readable, but this implementation also
-    // allows the field to be written to in all scopes
+    // allows the field to be written to in all scopes.
     //
     pub(set) var a: Int
 
@@ -2971,12 +3033,12 @@ struct interface Shape {
 // Declare a structure named `Square` the implements the `Shape` interface
 //
 struct Square: Shape {
-    // In addition to the required fields from the interface, 
-    // the type can also declare additional fields
+    // In addition to the required fields from the interface,
+    // the type can also declare additional fields.
     pub var length: Int
 
     // Since `area` was not declared as a constant, variable,
-    // field in the interface, it can be declared 
+    // field in the interface, it can be declared.
     pub synthetic area: Int {
         get {
             return self.length * self.length
@@ -2987,13 +3049,13 @@ struct Square: Shape {
         self.length = length
     }
 
-    // here we have provided the implementation of the required `scale` function
+    // here we have provided the implementation of the required `scale` function.
     pub fun scale(factor: Int) {
         self.length = self.length * factor
     }
 }
 
-// Declare a structure named `Rectangle` that also implements the `Shape` interface
+// Declare a structure named `Rectangle` that also implements the `Shape` interface.
 //
 struct Rectangle: Shape {
     pub var width: Int
@@ -3010,8 +3072,8 @@ struct Rectangle: Shape {
         self.height = height
     }
 
-    // As long as the function names and parameters match those 
-    // of the required functions, the implementations can differ
+    // As long as the function names and parameters match those
+    // of the required functions, the implementations can differ.
     pub fun scale(factor: Int) {
         self.width = self.width * factor
         self.height = self.height * factor
@@ -3020,7 +3082,7 @@ struct Rectangle: Shape {
 
 
 
-// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`
+// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`.
 //
 var shape: Shape = Rectangle(width: 10, height: 20)
 ```
@@ -3028,12 +3090,12 @@ var shape: Shape = Rectangle(width: 10, height: 20)
 Values implementing an interface are assignable to variables that have the interface as their type.
 
 ```bamboo,file=interface-type-assignment.bpl
-// Assign a value of type `Square` to the variable `shape` that has type `Shape`
+// Assign a value of type `Square` to the variable `shape` that has type `Shape`.
 //
 shape = Square(length: 30)
 
-// Invalid: cannot initialize a constant that has type `Rectangle`
-// with a value that has type `Square`
+// Invalid: cannot initialize a constant that has type `Rectangle`.
+// with a value that has type `Square`.
 //
 let rectangle: Rectangle = Square(length: 10)
 ```
@@ -3041,16 +3103,16 @@ let rectangle: Rectangle = Square(length: 10)
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
 ```bamboo,file=interface-type-fields-and-functions.bpl
-// Declare a constant which has the type `Shape`
-// and is initialized with a value that has type `Rectangle`
+// Declare a constant which has the type `Shape`.
+// and is initialized with a value that has type `Rectangle`.
 //
 let shape: Shape = Rectangle(width: 2, height: 3)
 
-// Access the field `area` declared in the interface `Shape`
+// Access the field `area` declared in the interface `Shape`.
 //
 shape.area // is 6
 
-// Call the function `scale` declared in the interface `Shape`
+// Call the function `scale` declared in the interface `Shape`.
 //
 shape.scale(factor: 3)
 
@@ -3064,18 +3126,18 @@ Interface implementation requirements can be declared by following the interface
 and one or more names of interfaces of the same kind, separated by commas.
 
 ```bamboo,file=interface-implementation-requirement.bpl
-// Declare a structure interface named `Shape`
+// Declare a structure interface named `Shape`.
 //
 struct interface Shape {}
 
 // Declare a structure interface named `Polygon`.
 // Require implementing types to also implement
-// the structure interface `Shape`
+// the structure interface `Shape`.
 //
 struct interface Polygon: Shape {}
 
 // Declare a structure named `Hexagon` that implements the `Polygon` interface.
-// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it
+// This also is required to implement the `Shape` interface, because the `Polygon` interface requires it.
 //
 struct Hexagon: Polygon {}
 
@@ -3093,7 +3155,7 @@ Declaring an interface inside another does not require implementing types of the
 // Resources implementing `OuterInterface` do not need to provide
 // an implementation of `InnerInterface`.
 //
-// Structures may just implement `InnerInterface`
+// Structures may just implement `InnerInterface`.
 //
 resource interface OuterInterface {
 
@@ -3102,12 +3164,12 @@ resource interface OuterInterface {
 
 // Declare a resource named `SomeOuter` that implements the interface `OuterInterface`
 //
-// The resource is not required to implement `OuterInterface.InnerInterface`
+// The resource is not required to implement `OuterInterface.InnerInterface`.
 //
 resource SomeOuter: OuterInterface {}
 
-// Declare a structure named `SomeInner` that implements `InnerInterface`
-// which is nested in interface `OuterInterface`
+// Declare a structure named `SomeInner` that implements `InnerInterface`.
+// which is nested in interface `OuterInterface`.
 //
 struct SomeInner: OuterInterface.InnerInterface {}
 
@@ -3122,7 +3184,7 @@ For example, a resource interface may require an implementing type to provide a 
 // Declare a resource interface named `FungibleToken`.
 //
 // Require implementing types to provide a resource type named `Vault`
-// which must have a field named `balance`
+// which must have a field named `balance`.
 //
 resource interface FungibleToken {
 
@@ -3233,7 +3295,7 @@ struct Point: Hashable {
         self.y = y
     }
 
-    // Implementing the function `equals` will allow points to be compared 
+    // Implementing the function `equals` will allow points to be compared
     // for equality and satisfies the `Equatable` interface
     pub fun equals(_ other: Self): Bool {
         // Points are equal if their coordinates match.
@@ -3246,7 +3308,7 @@ struct Point: Hashable {
             && other.y == self.y
     }
 
-    // Providing an implementation for the hash value field 
+    // Providing an implementation for the hash value field
     // satisfies the `Hashable` interface
     pub synthetic hashValue: Int {
         get {
@@ -3304,18 +3366,18 @@ Like resources, attestations are associated with an [account](#accounts).
 ```bamboo
 struct interface Account {
     address: Address
+    storage: Storage  // explained below
 }
 ```
 
 ## Account Storage
 
-Accounts have a `storage` object which contains the stored values of the account.
+All accounts have a `storage` object which contains the stored values of the account.
 
-Only **resources** can be stored.
+Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually store a mixture of contracts, resources, and structs within their storage.
 
-Stored values are keyed by a **type**, i.e., the access operator `[]` is used for both reading and writing stored values.
+The stored value must be a subtype of the type it is keyed by.  This means that if a `Vault` type is being stored as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
 
-The stored value must be a subtype of the type it is keyed by.
 
 ```bamboo
 // Declare a resource named `Counter`
@@ -3336,46 +3398,53 @@ let account: Account = // ...
 // The type `Counter` is used as the key to refer to the stored value
 //
 account.storage[Counter] <- create Counter(count: 0)
-```
 
-## Usage of External Types
-
-> 🚧 Status: The usage of external types is not implemented yet.
-
-It is possible to use external types through the `import` keyword, followed by the type name, the `from` keyword, and the address literal where the declaration is deployed.
-
-```bamboo
-// Declaration for an interface named `Counter`,
-// declared and deployed externally
-//
-resource interface Counter {
-    pub count: Int
-    pub fun increment(_ count: Int)
-}
-
-// Use the type `Counter` from address
-// 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d.
-//
-import Counter from 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d
 ```
 
 ## Transactions
 
+> 🚧 Status: The usage of external types is not implemented yet.
+
 Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
 
-Transactions have three phases: Preparation, execution, and postconditions.
+Transactions are structured as such:
 
-The preparer acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-The preparer has the permissions to read and write to storage of all signer accounts.
+Before the transaction declaration, there can be imports of any necessary local or external types and interfaces that are needed, using the `import` keyword, followed by `from`, and then followed by the location.  If importing a local file's type definition, the location will be the path to the file that has the definition.  If importing an external type that has been published by another account, that account's `Address` must be included
+
+Importing an external resource does not move it from the account that holds it.  It simply imports the type definition so that it can be used within a transaction.
+
+```bamboo
+    // type import from a local file
+    import Counter from "examples/counter.bpl"
+
+    // type import from an external account
+    import Counter from 0x299F20A29311B9248F12
+```
+
+Next is definitions of any new types that will be used or deployed within the transaction.  These are kind of like global constants or variables.
+
+Next is the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of code that executes sequentially.
+
+The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
+The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
+
+The **execute phase** is where all interaction with external contracts happens.  This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
+
+The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
-The preparer is declared using the `prepare` keyword and the execution phase is declared using the `execute` keyword.
+
+Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
+
+The preparer is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
 ```bamboo,file=transaction-declaration.bpl
+// Optional: Importing external types from other accounts using `import`
+
 transaction {
 
-    // Optional: fields, which must be initialized in `prepare`
+    // Optional: type declarations and fields, which must be initialized in `prepare`
 
     // The preparer needs to have as many account parameters
     // as there are signers for the transaction
@@ -3396,73 +3465,79 @@ transaction {
 
 ### Deployment
 
-Transactions can deploy resources and resource interfaces.
+Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that will be   deployed to an account.  Imagine it is in a file called `FungibleToken.bpl`.
 
 ```bamboo,file=fungible-token-interface.bpl
 // Declare a resource interface for a fungible token.
 //
-// It requires implementing types to provide a resource named `Vault`,
+// It requires implementing types to provide a resource implementation named `Vault`,
 // which needs to implement the interfaces `Provider` and `Receiver`
 //
-resource interface FungibleToken {
 
-    pub resource interface Provider {
+pub resource interface Provider {
 
-        pub fun withdraw(amount: Int): <-Vault {
-            pre {
-                amount > 0:
-                    "withdrawal amount must be positive"
-            }
+    pub fun withdraw(amount: Int): <-Vault {
+        pre {
+            amount > 0:
+                "withdrawal amount must be positive"
+        }
+        post {
+            result.balance == amount:
+                "incorrect amount returned"
+        }
+    }
+}
+
+pub resource interface Receiver {
+    pub fun deposit(vault: <-Vault)
+}
+
+// Vault is an interface that implements both Provider and Receiver
+pub resource interface Vault: Provider, Receiver {
+
+    pub balance: Int {
+        set(newBalance) {
             post {
-                result.balance == amount:
-                    "incorrect amount returned"
+                newBalance >= 0:
+                    "Balances are always non-negative"
+            }
+        }
+        get {
+            post {
+                result >= 0:
+                    "Balances are always non-negative"
             }
         }
     }
 
-    pub resource interface Receiver {
-        pub fun deposit(vault: <-Vault)
+    init(balance: Int) {
+        post {
+            self.balance == balance:
+                "the balance must be initialized to the initial balance"
+        }
     }
 
-    pub resource Vault: Provider, Receiver {
-
-        pub balance: Int {
-            get {
-                post {
-                    result >= 0:
-                        "Balances are always non-negative"
-                }
-            }
+    pub fun withdraw(amount: Int): <-Self {
+        pre {
+            amount <= self.balance:
+                "insufficient funds: the amount must be smaller or equal to the balance"
         }
-
-        init(balance: Int) {
-            post {
-                self.balance == balance:
-                    "the balance must be initialized to the initial balance"
-            }
+        post {
+            self.balance == before(self.balance) - amount:
+                "Incorrect amount removed"
         }
+    }
 
-        pub fun withdraw(amount: Int): <-Self {
-            pre {
-                amount <= self.balance:
-                    "insufficient funds: the amount must be smaller or equal to the balance"
-            }
-            post {
-                self.balance == before(self.balance) - amount:
-                    "Incorrect amount removed"
-            }
-        }
-
-        pub fun deposit(vault: <-Self) {
-            post {
-                self.balance == before(self.balance) + vault.balance:
-                    "the amount must be added to the balance"
-            }
+    pub fun deposit(vault: <-Self) {
+        post {
+            self.balance == before(self.balance) + vault.balance:
+                "the amount must be added to the balance"
         }
     }
 }
 ```
 
+The transaction will import the above file to use it in the code.
 Transactions can refer to local code with the `import` keyword,
 followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
@@ -3473,48 +3548,48 @@ and the string literal for the path of the file which contains the code of the t
 -->
 
 The preparer can use the signing account's `deploy` function to deploy
-the resource interface.
+the resource interface.  This essentially stores the resource interface in the account's `types` object so it can be used again.
 
-Once deployed, the resource interfaces is available in the account's `types` object.
+Once deployed, the resource interface is available in the account's `types` object, which is how the deployed types are accessed.
 
-The `publish` operator is used to make the resource interface type publicly available.
+When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public.
+
+The `publish` operator is used to make the resource or interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to import the type, call the functions defined in the resource at the owners address, or call the functions in a published interface in a resource that implements it.
 
 ```bamboo,file=deploy-resource-interface.bpl
 
-// Refer to the resource interface type `FungibleToken`
+// Refer to the resource interface type `Vault`
 // in the local file "FungibleToken.bpl"
 //
-import FungibleToken from "FungibleToken.bpl"
+import Vault from "FungibleToken.bpl"
 
-// Execute a transaction which deploys the code for
-// the resource interface `FungibleToken`, and makes
-// the deployed type publicly available
+// Define a transaction which deploys the code for
+// the resource interface `Vault`, and makes
+// the deployed interface type publicly available
 //
 transaction {
 
     prepare(signer: Account) {
-        // Deploy the  resource interface type `FungibleToken`
+        // Deploy the  resource interface type `Vault`
         // in the signing account
-        signer.deploy(FungibleToken)
+        signer.deploy(Vault)
 
         // Make the deployed type publicly available
-        //
-        publish signer.types[FungibleToken]
+        // now, anyone can import the `Vault` interface from your account
+        publish signer.types[Vault]
     }
 }
 ```
+Now, anybody can import the vault interface from the account storage if they want to use it for their resources.
 
-Just like resource interfaces it is possible to deploy resources.
+Just like resource interfaces it is possible to deploy resources.  Imagine this resource definition below is also in the local file `FungibleToken.bpl` that was used above.
 
 ```bamboo,file=example-token.bpl
-// Declare a resource named `ExampleToken` which implements
-// the resource interface `FungibleToken`
+// Declare a resource named `FungibleToken` which implements
+// the resource interface `Vault`
 //
-resource ExampleToken {}
+resource FungibleToken: Vault {
 
-impl FungibleToken for ExampleToken {
-
-    resource Vault {
         pub var balance: Int
 
         init(balance: Int) {
@@ -3530,33 +3605,38 @@ impl FungibleToken for ExampleToken {
             self.balance = self.balance + vault.balance
             destroy vault
         }
-    }
-
-    impl Receiver for Vault {}
-    impl Provider for Vault {}
 }
 ```
 
+Now, in the same transaction that was used to deploy and publish the interface, the resource can also be stored and published.
+
 ```bamboo,file=deploy-resource.bpl
-import ExampleToken from "ExampleToken.bpl"
+import FungibleToken from "FungibleToken.bpl"
 
 // Execute a transaction which deploys the code for
-// the resource `ExampleToken`, and makes the deployed
+// the resource `FungibleToken`, and makes the deployed
 // type publicly available
 //
 transaction {
 
     prepare(signer: Account) {
-        signer.deploy(ExampleToken)
-        publish signer.types[ExampleToken]
+        signer.deploy(Vault)
+        publish signer.types[Vault]
+
+        signer.deploy(FungibleToken)
+        signer.storage[FungibleToken] <- create FungibleToken(balance: 100)
+        publish signer.types[FungibleToken]
     }
 }
 ```
 
-### Interacting with Deployed Resources
+Now, the `Vault` and the `FungibleToken` types are deployed to the account and published so that anyone who wants to use them or interact with them can easily do so by importing them.
 
-Transactions can also refer to deployed code with the `import` keyword
-and the address of the account which contains the publicly available type.
+In many scenarios, publishing the entire interface for the resource may be necessary because everyone might want to be able to access all functionality of the type.  In most situations though, including this one, it is important to expose only a subset of the functionality of the resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface,  the receiver interface is the only one that should be published.
+
+The next section will show how an account can deploy its own instance of `FungibleToken` based on a published external type and publish the correct interface.
+
+### Interacting with Deployed Resources
 
 <!-- TODO:
      move explanation for using statement into separate section?
@@ -3570,10 +3650,10 @@ References are created by using the `&` operator, followed by the stored resourc
 the `as` operator, and the resource interface type.
 
 ```bamboo,file=setup-transaction.bpl
-// Refer to the resource type `ExampleToken` deployed
+// Refer to the resource type `FungibleToken`  which was "deployed" above
 // at example address 0x42
 //
-import ExampleToken from 0x42
+import FungibleToken from 0x42
 
 // Execute a transaction which creates a new example token vault
 // for the signing account
@@ -3585,38 +3665,42 @@ transaction {
         //
         // NOTE: the vault is not publicly accessible
         //
-        signer.storage[ExampleToken.Vault] <- create ExampleToken.Vault()
+        signer.storage[FungibleToken] <- create FungibleToken()
 
         // Store two storage references in the signing account:
         // One reference to the stored vault, keyed by the resource
         // interface `Provider`, and another reference to the stored vault,
         // keyed by the resource interface `Provider`
         //
-        signer.storage[ExampleToken.Provider] =
-            &signer.storage[ExampleToken.Vault] as ExampleToken.Provider
+        // these are the references to the different ways that your token can be
+        // interacted with.  Provider for the owner(you). Receiver for any
+        // external accounts.
+        //
+        signer.storage[FungibleToken.Provider] =
+            &signer.storage[FungibleToken.Vault] as FungibleToken.Provider
 
-        signer.storage[ExampleToken.Receiver] =
-            &signer.storage[ExampleToken.Vault] as ExampleToken.Receiver
+        signer.storage[FungibleToken.Receiver] =
+            &signer.storage[FungibleToken.Vault] as FungibleToken.Receiver
 
         // Publish only the receiver so it can be accessed publicly.
         //
         // NOTE: neither the vault nor the publisher are published
         //
-        publish signer.storage[ExampleToken.Receiver]
+        publish signer.storage[FungibleToken.Receiver]
     }
 }
 ```
 
 ```bamboo,file=send-transaction.bpl
-// Refer to the resource type `ExampleToken` deployed
+// Refer to the resource type `FungibleToken` deployed
 // at example address 0x42
 //
-import ExampleToken from 0x42
+import FungibleToken from 0x42
 
 // Execute a transaction which sends five coins from one account to another.
 //
-// The transaction fails unless there is a `ExampleToken.Provider` available
-// for the sending account and there is a public `ExampleToken.Receiver`
+// The transaction fails unless there is a `FungibleToken.Provider` available
+// for the sending account and there is a public `FungibleToken.Receiver`
 // available for the recipient account.
 //
 // Only a signature from the sender is required.
@@ -3625,21 +3709,19 @@ import ExampleToken from 0x42
 //
 transaction {
 
-    let sentFunds: ExampleToken.Vault
+    let sentFunds: FungibleToken.Vault
 
     prepare(signer: Account) {
-        // Get the stored provider for the signing account.
-        //
-        // As the access is performed in the preparer,
-        // the unpublished reference `ExampleToken.Provider`
-        // can be accessed (if it exists)
-        //
-        let provider <- signer.storage[ExampleToken.Provider]
 
-        // Withdraw five coins (as a vault) from the provider
-        // and move it into the field `sentFunds`
-        //
-        self.sentFunds <- provider.withdraw(amount: 5)
+        // Call the stored provider's withdraw function
+        // and move a 5 token instance of it to the field `sentFunds`
+
+        // As the access is performed in the preparer,
+        // the unpublished reference `FungibleToken.Provider`
+        // can be accessed (if it exists)
+
+        self.sentFunds <- signer.storage[FungibleToken.Provider].withdraw(amount: 5)
+
     }
 
     execute {
@@ -3647,19 +3729,19 @@ transaction {
         //
         let recipient: Account = // ...
 
-        // Get the stored receiver for the recipient account
-        //
-        let receiver <- recipient.storage[ExampleToken.Receiver]
-
         // Deposit the amount withdrawn from the signer
-        // in the recipient's vault through the receiver
+        // in the recipient's vault through the stored receiver in the recipient account
         //
-        receiver.deposit(vault: <-self.sentFunds)
+
+        recipient.storage[ExampleToken.Receiver].deposit(vault: <-self.sentFunds)
     }
 }
 ```
 
 ## Built-in Functions
+
+### Transaction information
+There is currently no built-in function that allows getting the address of the signers of a transaction, the current block number, or timestamp.  These are being worked on.
 
 ### `panic`
 

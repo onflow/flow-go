@@ -62,10 +62,9 @@ type Interpreter struct {
 	activations         *activations.Activations
 	Globals             map[string]*Variable
 	interfaces          map[string]*ast.InterfaceDeclaration
-	ImportLocation      ast.ImportLocation
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
-	SubInterpreters     map[ast.ImportLocation]*Interpreter
+	SubInterpreters     map[ast.LocationID]*Interpreter
 	onEventEmitted      func(EventValue)
 }
 
@@ -78,7 +77,7 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		interfaces:          map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions:  map[string]map[string]FunctionValue{},
 		DestructorFunctions: map[string]*InterpretedFunctionValue{},
-		SubInterpreters:     map[ast.ImportLocation]*Interpreter{},
+		SubInterpreters:     map[ast.LocationID]*Interpreter{},
 		onEventEmitted:      func(EventValue) {},
 	}
 
@@ -577,7 +576,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							ConditionKind: condition.Kind,
 							Message:       message,
 							LocationRange: LocationRange{
-								ImportLocation: interpreter.ImportLocation,
+								ImportLocation: interpreter.Checker.ImportLocation,
 								Range: ast.Range{
 									StartPos: condition.Test.StartPosition(),
 									EndPos:   condition.Test.EndPosition(),
@@ -1261,7 +1260,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					// TODO: optimize: only potentially used by host-functions
 					location := Location{
 						Position:       invocationExpression.StartPosition(),
-						ImportLocation: interpreter.ImportLocation,
+						ImportLocation: interpreter.Checker.ImportLocation,
 					}
 					return function.invoke(argumentCopies, location)
 				})
@@ -1432,7 +1431,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location Location) Trampoline {
 
 			value := CompositeValue{
-				ImportLocation: interpreter.ImportLocation,
+				ImportLocation: interpreter.Checker.ImportLocation,
 				Identifier:     identifier,
 				Fields:         &map[string]Value{},
 				Functions:      &functions,
@@ -1794,16 +1793,18 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location]
+	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
 	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
 	if err != nil {
 		panic(err)
 	}
 
-	subInterpreter.ImportLocation = declaration.Location
+	if subInterpreter.Checker.ImportLocation == nil {
+		subInterpreter.Checker.ImportLocation = declaration.Location
+	}
 
-	interpreter.SubInterpreters[declaration.Location] = subInterpreter
+	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
 
 	return subInterpreter.interpret().
 		Then(func(_ interface{}) {
@@ -1879,9 +1880,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				// TODO: use account as namespace for event ID
-				ID:     eventType.Identifier,
-				Fields: fields,
+				ID:             eventType.Identifier,
+				Fields:         fields,
+				ImportLocation: interpreter.Checker.ImportLocation,
 			}
 
 			return Done{Result: value}
@@ -1929,7 +1930,7 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			// TODO: optimize: only potentially used by host-functions
 			location := Location{
 				Position:       expression.StartPosition(),
-				ImportLocation: interpreter.ImportLocation,
+				ImportLocation: interpreter.Checker.ImportLocation,
 			}
 
 			return value.(DestroyableValue).Destroy(interpreter, location)

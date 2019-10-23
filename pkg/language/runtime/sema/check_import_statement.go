@@ -6,9 +6,9 @@ import (
 )
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	imports := checker.Program.ImportedPrograms()
 
-	imports := checker.Program.Imports()
-	imported := imports[declaration.Location]
+	imported := imports[declaration.Location.ID()]
 	if imported == nil {
 		checker.report(
 			&UnresolvedImportError{
@@ -22,7 +22,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		return nil
 	}
 
-	if checker.seenImports[declaration.Location] {
+	if checker.seenImports[declaration.Location.ID()] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
@@ -34,9 +34,9 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		)
 		return nil
 	}
-	checker.seenImports[declaration.Location] = true
+	checker.seenImports[declaration.Location.ID()] = true
 
-	importChecker, ok := checker.ImportCheckers[declaration.Location]
+	importChecker, ok := checker.ImportCheckers[declaration.Location.ID()]
 	var checkerErr *CheckerError
 	if !ok || importChecker == nil {
 		var err error
@@ -46,7 +46,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			checker.PredeclaredTypes,
 		)
 		if err == nil {
-			checker.ImportCheckers[declaration.Location] = importChecker
+			checker.ImportCheckers[declaration.Location.ID()] = importChecker
 		}
 	}
 
