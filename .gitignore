@@ -1,3 +1,5 @@
+/cmd/consensus/consensus
+
 # Test binary, build with `go test -c`
 *.test
 
@@ -7,7 +9,8 @@
 .DS_Store
 
 flow.json
- 
+
 # IDE related files
 .idea
 .vscode
+git

@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/pkg/model/flow"
-	"github.com/dapperlabs/flow-go/pkg/model/hotstuff"
-	"github.com/dapperlabs/flow-go/pkg/model/message"
+	"github.com/dapperlabs/flow-go/pkg/model/collection"
+	"github.com/dapperlabs/flow-go/pkg/model/consensus"
+	"github.com/dapperlabs/flow-go/pkg/model/trickle"
 )
 
 // decode will decode the envelope into an entity.
@@ -18,44 +18,42 @@ func decode(env Envelope) (interface{}, error) {
 	// create the desired message
 	var v interface{}
 	switch env.Code {
+
+	// trickle overlay network
 	case CodePing:
-		v = message.Ping{}
+		v = &trickle.Ping{}
 	case CodePong:
-		v = message.Pong{}
+		v = &trickle.Pong{}
 	case CodeAuth:
-		v = message.Auth{}
+		v = &trickle.Auth{}
 	case CodeAnnounce:
-		v = message.Announce{}
+		v = &trickle.Announce{}
 	case CodeRequest:
-		v = message.Request{}
-	case CodeEvent:
-		v = message.Event{}
+		v = &trickle.Request{}
+	case CodeResponse:
+		v = &trickle.Response{}
 
-	case CodeCollection:
-		v = flow.Collection{}
-	case CodeReceipt:
-		v = flow.Receipt{}
-	case CodeApproval:
-		v = flow.Approval{}
-	case CodeSeal:
-		v = flow.Seal{}
+	case CodeGuaranteedCollection:
+		v = &collection.GuaranteedCollection{}
 
-	case CodeBlock:
-		v = hotstuff.Block{}
-	case CodeVote:
-		v = hotstuff.Vote{}
-	case CodeTimeout:
-		v = hotstuff.Timeout{}
+	case CodeSnapshotRequest:
+		v = &consensus.SnapshotRequest{}
+	case CodeSnapshotResponse:
+		v = &consensus.SnapshotResponse{}
+	case CodeMempoolRequest:
+		v = &consensus.MempoolRequest{}
+	case CodeMempoolResponse:
+		v = &consensus.MempoolResponse{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)
 	}
 
 	// unmarshal the payload
-	err := json.Unmarshal(env.Data, &v)
+	err := json.Unmarshal(env.Data, v)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not decode payload")
 	}
 
-	return &v, nil
+	return v, nil
 }
