@@ -1,20 +1,35 @@
 package crypto
 
-// AlgoName is the supported algos type
-type AlgoName string
+// SigningAlgorithm is an identifier for a signing algorithm and curve.
+type SigningAlgorithm int
 
 const (
-	// Supported Hashing algorithms
-	SHA2_256 AlgoName = "SHA2_256"
-	SHA2_384 AlgoName = "SHA2_384"
-	SHA3_256 AlgoName = "SHA3_256"
-	SHA3_384 AlgoName = "SHA3_384"
-
-	// Supported Signing algorithms
-	BLS_BLS12381    = "BLS_BLS12381"
-	ECDSA_P256      = "ECDSA_P256"
-	ECDSA_SECp256k1 = "ECDSA_SECp256k1"
+	// Supported signing algorithms
+	BLS_BLS12381 SigningAlgorithm = iota
+	ECDSA_P256
+	ECDSA_SECp256k1
 )
+
+// String returns the string representation of this signing algorithm.
+func (f SigningAlgorithm) String() string {
+	return [...]string{"BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
+}
+
+// HashingAlgorithm is an identifier for a hashing algorithm.
+type HashingAlgorithm int
+
+const (
+	// Supported hashing algorithms
+	SHA2_256 HashingAlgorithm = iota
+	SHA2_384
+	SHA3_256
+	SHA3_384
+)
+
+// String returns the string representation of this hashing algorithm.
+func (f HashingAlgorithm) String() string {
+	return [...]string{"SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384"}[f]
+}
 
 const (
 	// Lengths of hash outputs in bytes

@@ -111,8 +111,8 @@ type PrKeyECDSA struct {
 }
 
 // AlgoName returns the name of the algo related to the private key
-func (sk *PrKeyECDSA) AlgoName() AlgoName {
-	return sk.alg.name
+func (sk *PrKeyECDSA) Algorithm() SigningAlgorithm {
+	return sk.alg.algo
 }
 
 // KeySize returns the length of the private key
@@ -141,8 +141,8 @@ type PubKeyECDSA struct {
 }
 
 // AlgoName returns the name of the algo related to the private key
-func (pk *PubKeyECDSA) AlgoName() AlgoName {
-	return pk.alg.name
+func (pk *PubKeyECDSA) Algorithm() SigningAlgorithm {
+	return pk.alg.algo
 }
 
 // KeySize returns the length of the public key

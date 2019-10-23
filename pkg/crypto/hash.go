@@ -13,61 +13,71 @@ import (
 )
 
 // NewHasher initializes and chooses a hashing algorithm
-func NewHasher(name AlgoName) (Hasher, error) {
-	switch name {
+func NewHasher(algo HashingAlgorithm) (Hasher, error) {
+	switch algo {
 	case SHA3_256:
-		algo := &sha3_256Algo{
+		hasher := &sha3_256Algo{
 			commonHasher: &commonHasher{
-				name:       name,
+				algo:       algo,
 				outputSize: HashLengthSha3_256,
 				Hash:       sha3.New256()}}
 
 		// Output length sanity check, size() is provided by Hash.hash
-		if algo.outputSize != algo.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_256, algo.Size())}
+		if hasher.outputSize != hasher.Size() {
+			return nil, cryptoError{
+				fmt.Sprintf("%s requires an output length %d", SHA3_256, hasher.Size()),
+			}
 		}
-		return algo, nil
+		return hasher, nil
 
 	case SHA3_384:
-		algo := &sha3_384Algo{
+		hasher := &sha3_384Algo{
 			commonHasher: &commonHasher{
-				name:       name,
+				algo:       algo,
 				outputSize: HashLengthSha3_384,
 				Hash:       sha3.New384()}}
 		// Output length sanity check, size() is provided by Hash.hash
-		if algo.outputSize != algo.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA3_384, algo.Size())}
+		if hasher.outputSize != hasher.Size() {
+			return nil, cryptoError{
+				fmt.Sprintf("%s requires an output length %d", SHA3_384, hasher.Size()),
+			}
 		}
-		return algo, nil
+		return hasher, nil
 
 	case SHA2_256:
-		algo := &sha2_256Algo{
+		hasher := &sha2_256Algo{
 			commonHasher: &commonHasher{
-				name:       name,
+				algo:       algo,
 				outputSize: HashLengthSha2_256,
 				Hash:       sha256.New()}}
 
 		// Output length sanity check, size() is provided by Hash.hash
-		if algo.outputSize != algo.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA2_256, algo.Size())}
+		if hasher.outputSize != hasher.Size() {
+			return nil, cryptoError{
+				fmt.Sprintf("%s requires an output length %d", SHA2_256, hasher.Size()),
+			}
 		}
-		return algo, nil
+		return hasher, nil
 
 	case SHA2_384:
-		algo := &sha2_384Algo{
+		hasher := &sha2_384Algo{
 			commonHasher: &commonHasher{
-				name:       name,
+				algo:       algo,
 				outputSize: HashLengthSha2_384,
 				Hash:       sha512.New384()}}
 
 		// Output length sanity check, size() is provided by Hash.hash
-		if algo.outputSize != algo.Size() {
-			return nil, cryptoError{fmt.Sprintf("%s requires an output length %d", SHA2_384, algo.Size())}
+		if hasher.outputSize != hasher.Size() {
+			return nil, cryptoError{
+				fmt.Sprintf("%s requires an output length %d", SHA2_384, hasher.Size()),
+			}
 		}
-		return algo, nil
+		return hasher, nil
 
 	default:
-		return nil, cryptoError{fmt.Sprintf("the hashing algorithm %s is not supported.", name)}
+		return nil, cryptoError{
+			fmt.Sprintf("the hashing algorithm %s is not supported.", algo),
+		}
 	}
 }
 
@@ -87,7 +97,8 @@ func (h Hash) Hex() string {
 // Hasher interface
 
 type Hasher interface {
-	Name() AlgoName
+	// Algorithm returns the hashing algorithm for this hasher.
+	Algorithm() HashingAlgorithm
 	// Size returns the hash output length
 	Size() int
 	// ComputeHash returns the hash output
@@ -102,22 +113,19 @@ type Hasher interface {
 
 // commonHasher holds the common data for all hashers
 type commonHasher struct {
-	name       AlgoName
+	algo       HashingAlgorithm
 	outputSize int
 	hash.Hash
 }
 
-// Name returns the name of the algorithm
-func (a *commonHasher) Name() AlgoName {
-	return a.name
+func (a *commonHasher) Algorithm() HashingAlgorithm {
+	return a.algo
 }
 
-// Name returns the size of the output
 func (a *commonHasher) Size() int {
 	return a.outputSize
 }
 
-// AddBytes adds bytes to the current hash state
 func (a *commonHasher) Add(data []byte) {
 	a.Write(data)
 }

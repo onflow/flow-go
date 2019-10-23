@@ -25,9 +25,9 @@ func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
 	}
 }
 
-func benchSign(b *testing.B, alg AlgoName, halg Hasher) {
+func benchSign(b *testing.B, algo SigningAlgorithm, halg Hasher) {
 	seed := []byte("keyseed")
-	sk, _ := GeneratePrivateKey(alg, seed)
+	sk, _ := GeneratePrivateKey(algo, seed)
 
 	input := []byte("Bench input")
 
@@ -38,9 +38,9 @@ func benchSign(b *testing.B, alg AlgoName, halg Hasher) {
 	b.StopTimer()
 }
 
-func benchVerify(b *testing.B, alg AlgoName, halg Hasher) {
+func benchVerify(b *testing.B, algo SigningAlgorithm, halg Hasher) {
 	seed := []byte("keyseed")
-	sk, _ := GeneratePrivateKey(alg, seed)
+	sk, _ := GeneratePrivateKey(algo, seed)
 	pk := sk.Publickey()
 
 	input := []byte("Bench input")
@@ -81,7 +81,7 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 
 // ECDSA tests
 func TestECDSA(t *testing.T) {
-	ECDSAcurves := []AlgoName{ECDSA_P256, ECDSA_SECp256k1}
+	ECDSAcurves := []SigningAlgorithm{ECDSA_P256, ECDSA_SECp256k1}
 	for _, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 
