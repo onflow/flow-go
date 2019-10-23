@@ -5,7 +5,8 @@ type SigningAlgorithm int
 
 const (
 	// Supported signing algorithms
-	BLS_BLS12381 SigningAlgorithm = iota
+	UnknownSigningAlgorithm SigningAlgorithm = iota
+	BLS_BLS12381
 	ECDSA_P256
 	ECDSA_SECp256k1
 )
@@ -20,7 +21,8 @@ type HashingAlgorithm int
 
 const (
 	// Supported hashing algorithms
-	SHA2_256 HashingAlgorithm = iota
+	UnknownHashingAlgorithm HashingAlgorithm = iota
+	SHA2_256
 	SHA2_384
 	SHA3_256
 	SHA3_384
