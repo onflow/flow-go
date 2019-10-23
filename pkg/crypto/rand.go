@@ -1,6 +1,6 @@
 package crypto
 
-// Rand is a deterministic pseudo random number generator
+// Rand is a pseudo random number generator
 type Rand struct {
 	states     []uint64
 	stateIndex int
@@ -32,7 +32,9 @@ func NewRand(seed []uint64) (*Rand, error) {
 		}
 	}
 	// stateIndex initialized with first element of seed % rand size
-	rand := &Rand{states: seed, stateIndex: int(seed[0] % uint64(size))}
+	states := make([]uint64, len(seed))
+	copy(states, seed)
+	rand := &Rand{states: states, stateIndex: int(seed[0] % uint64(size))}
 	// initial next
 	for i := range rand.states {
 		rand.next(i)
