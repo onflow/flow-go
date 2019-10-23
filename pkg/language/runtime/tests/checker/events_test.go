@@ -3,6 +3,8 @@ package checker
 import (
 	"testing"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
@@ -99,5 +101,27 @@ func TestCheckEmitEvent(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	})
+
+	t.Run("EmitImported", func(t *testing.T) {
+		checker, err := ParseAndCheck(t, `
+			event Transfer(to: Int, from: Int)
+		`)
+		assert.Nil(t, err)
+
+		_, err = ParseAndCheckWithExtra(t, `
+			import Transfer from "imported"
+
+			fun test() {
+				emit Transfer(to: 1, from: 2)
+			}
+			`,
+			nil,
+			nil,
+			func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
+		)
+		assert.Error(t, err)
 	})
 }
