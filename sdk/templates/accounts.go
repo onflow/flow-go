@@ -10,7 +10,6 @@ import (
 // CreateAccount generates a script that creates a new account.
 func CreateAccount(accountKeys []types.AccountKey, code []byte) ([]byte, error) {
 	publicKeys := make([][]byte, len(accountKeys))
-	keyWeights := make([]int, len(accountKeys))
 
 	for i, accountKey := range accountKeys {
 		accountKeyBytes, err := types.EncodeAccountKey(accountKey)
@@ -19,21 +18,18 @@ func CreateAccount(accountKeys []types.AccountKey, code []byte) ([]byte, error) 
 		}
 
 		publicKeys[i] = accountKeyBytes
-		keyWeights[i] = accountKey.Weight
 	}
 
 	publicKeysStr := cadenceEncodeBytesArray(publicKeys)
-	keyWeightsStr := cadenceEncodeIntArray(keyWeights)
 	codeStr := cadenceEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main() {
 			let publicKeys: [[Int]] = %s
-			let keyWeights: [Int] = %s
 			let code: [Int]? = %s
-			createAccount(publicKeys, keyWeights, code)
+			createAccount(publicKeys, code)
 		}
-	`, publicKeysStr, keyWeightsStr, codeStr)
+	`, publicKeysStr, codeStr)
 
 	return []byte(script), nil
 }
@@ -64,10 +60,9 @@ func AddAccountKey(accountKey types.AccountKey) ([]byte, error) {
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
 			let key = %s
-			let weight = %d
-			addAccountKey(account.address, key, weight)
+			addAccountKey(account.address, key)
 		}
-	`, publicKeyStr, accountKey.Weight)
+	`, publicKeyStr)
 
 	return []byte(script), nil
 }
