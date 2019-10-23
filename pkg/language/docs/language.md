@@ -12,9 +12,11 @@ The language's goals are, in order of importance:
 - *Auditability*: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - *Simplicity*: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
-In this document, various terminology is used to describe syntax or behavior that is not allowed in the language:
+## Terminology
 
-`Invalid` means that the error is checked statically by the type checker.
+In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
+
+`Invalid` means that the invalid program will not even be allowed to run.  The error is detected and reported statically by the type checker.
 
 `Error` refers to bad behavior that will result in a runtime error.
 
@@ -26,7 +28,7 @@ The programming language's syntax and behavior is inspired by Kotlin, Swift, Rus
 
 Comments can be used to document code. A comment is text that is not executed.
 
-*Single-line comments* start with two slashes (`//`).  These comments can go on a line by themselves or they can go directly after a line of BPL code.
+*Single-line comments* start with two slashes (`//`).  These comments can go on a line by themselves or they can go directly after a line of code.
 
 ```bamboo,file=single-line-comment.bpl
 // This is a comment on a single line.
@@ -111,8 +113,8 @@ var b = 4
 //
 var a = 5
 
-// Invalid: cannot declare a variable with the name 'b',
-// in a subscope because b is already in scope
+// Invalid: cannot declare a variable with the name "b",
+// in a subscope because "b" is already in scope
 {
     var b = 5
 }
@@ -423,7 +425,7 @@ If the left-hand side is non-nil, the right-hand side is not evaluated.
 let a: Int? = nil
 
 // Declare a constant with a non-optional integer type,
-// which is initialized to a if it is non-nil, or 42 otherwise
+// which is initialized to `a` if it is non-nil, or 42 otherwise
 //
 let b: Int = a ?? 42
 // `b` is 42, as `a` is nil
@@ -453,13 +455,13 @@ The alternative value, i.e. the right-hand side of the operator,
 must be the non-optional or optional type matching the type of the left-hand side.
 
 ```bamboo
-// Declare a constant with a non-optional integer type
+// Declare a constant with an optional integer type
 //
 let a: Int? = 1
 
 // Invalid: nil-coalescing operator is applied to a value of type `Int`,
 // but the alternative has type `Bool`
-// 
+//
 let b = a ?? false
 ```
 
@@ -572,28 +574,28 @@ Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
 
-```bamboo,file=string-length-field.bpl
+  ```bamboo,file=string-length-field.bpl
     let example = "hello"
 
     // Find the number of elements
     let length = example.length
     // `length` is 5
-```
+  ```
 
 - `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
 
-```bamboo,file=string-concat.bpl
+  ```bamboo,file=string-concat.bpl
     let example = "hello"
     let new = "world"
 
     // Concatenate the new string onto the example string and return the new string
     let helloWorld = example.concat(new)
     // `helloWorld` is now "helloworld"
-```
+  ```
 
 - `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
 
-```bamboo,file=string-slice.bpl
+  ```bamboo,file=string-slice.bpl
     let example = "helloworld"
 
     // Create a new slice of part of the original string
@@ -602,7 +604,7 @@ Strings have multiple built-in functions you can use.
 
     // Error: Out of bounds index
     let outOfBounds = example.slice(from: 2, upTo: 10)
-```
+  ```
 
 <!--
 
@@ -706,18 +708,18 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
 
 - `length: Int`: Returns the number of elements in the array.
 
-```bamboo,file=array-length-field.bpl
+  ```bamboo,file=array-length-field.bpl
     let numbers = [42, 23, 31, 12]
 
     // Find the number of elements
     let length = numbers.length
 
     // `length` is 4
-```
+  ```
 
 - `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
 
-```bamboo,file=array-concat.bpl
+  ```bamboo,file=array-concat.bpl
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
 
@@ -728,11 +730,11 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // `allNumbers` is `[42, 23, 31, 12, 11, 27]`
     // `numbers` is still `[42, 23, 31, 12]`
     // `moreNumbers` is still `[11, 27]`
-```
+  ```
 
 - `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
 
-```bamboo,file=array-contains.bpl
+  ```bamboo,file=array-contains.bpl
     let numbers = [42, 23, 31, 12]
 
     // Check if the array contains 11
@@ -747,7 +749,7 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // This results in a type error, as the array only contains integers
     //
     let containsKitty = numbers.contains("Kitty")
-```
+  ```
 
 ##### Variable-size Array Functions
 
@@ -755,7 +757,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
 - `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.
 
-```bamboo,file=array-append.bpl
+  ```bamboo,file=array-append.bpl
     let numbers = [42, 23, 31, 12]
 
     // Add a new element
@@ -764,11 +766,11 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Invalid: Wrong type
     numbers.append("SneakyString")
-```
+  ```
 
 - `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
 
-```bamboo,file=array-insert.bpl
+  ```bamboo,file=array-insert.bpl
     let numbers = [42, 23, 31, 12]
 
     // Insert a new element at position 1 of the array
@@ -777,13 +779,13 @@ The following functions can only be used on variable-sized arrays.  It is invali
 
     // Error: Out of bounds index
     numbers.insert(at: 12, 39)
-    ```
+  ```
 
 - `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
 - `removeFirst(): T`: Removes the first element from the array and returns it.
 - `removeLast(): T`: Removes the last element from the array and returns it.
 
-    ```bamboo,file=array-remove.bpl
+  ```bamboo,file=array-remove.bpl
     let numbers = [42, 23, 31, 12]
 
     // Remove element at position 1 of the array
@@ -803,7 +805,7 @@ The following functions can only be used on variable-sized arrays.  It is invali
     let twelve = numbers.removeLast()
     // `numbers` is now `[31]`
     // `twelve` is `12`
-    ```
+  ```
 
 <!--
 
@@ -919,7 +921,7 @@ booleans[0] = true
 #### Dictionary Fields and Functions
 
 - `length: Int`: Returns the number of elements in the dictionary.
-- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the value as an optional, otherwise `nil`.
+- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary. Returns the value of type `V` if the dictionary contained the key as an optional, otherwise `nil`.
 
 #### Dictionary Keys
 
@@ -1295,7 +1297,7 @@ The parameters need to be enclosed in parentheses.
 The return type, if any, is separated from the parameters by a colon (`:`).
 The function code needs to be enclosed in opening and closing braces.
 
-Each parameter needs to have a label, the name that a function call needs to use to provide an argument value for the parameter.
+Each parameter needs to have a name, the name that is used within the function.  An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.
 Argument labels precede the parameter name. The special argument label `_` indicates that a function call can omit the argument label.
 If no `_` argument label is provided, the function call must use the parameter name.
 
@@ -1684,6 +1686,7 @@ if a == 0 {
    b = 1
 }
 
+// parentheses can be used around the condition, but are not required
 if (a != 0) {
    b = 2
 }
@@ -1928,8 +1931,8 @@ fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
 
-// these parameters are not declared with a specific type,
-// but they are inferred to be `int8` since the parameter types are `int8`
+// The arguments are not declared with a specific type,
+// but they are inferred to be `Int8` since the parameter types are `Int8`
 add(1, 2) // returns 3
 
 // Declare two constants which have type `Int32`
@@ -2074,7 +2077,7 @@ Fields are declared like variables and constants, however, they have no initial 
 
 There are three kinds of fields.
 
-Constant fields are also stored in the composite value, but after the first value, they **cannot** have new values assigned to them. They are declared using the `let` keyword.
+Constant fields are also stored in the composite value, but after they are inititalized with a value, they **cannot** have new values assigned to them. They are declared using the `let` keyword.
 
 Variable fields are stored in the composite value and can have new values assigned to them. They are declared using the `var` keyword.
 
@@ -2091,6 +2094,10 @@ Synthetic fields are **not** stored in the composite value, i.e. they are derive
 // named `id` and a variable field named `balance`.
 //
 // Both fields are initialized through the initializer
+//
+// The public modifier is used here to allow these fields to be 
+// read in outer scopes.  Access control will be explained 
+// in a later section.
 //
 struct Token {
     pub let id: Int
@@ -2414,16 +2421,16 @@ a.value // is *0*
 
 #### Resources
 
-Resources are linear data types that can only be stored in one location at a time.  They are **moved** when used as an initial value for a constant or variable,
+Resources are types that can only be stored in one location at a time.  They are **moved** when used as an initial value for a constant or variable,
 when assigned to a different variable,
 when passed as an argument to a function,
 and when returned from a function.
 
 When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
 
-To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, or when it is moved to a function.
+Invoking a member field or method of a resource does not destroy it.
 
-A reference to a resource can be created and used, but only for reading fields and calling public functions, not for modifying the resource.
+To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, or when it is moved to a function.
 
 ```bamboo,file=resource-behavior.bpl
 // Declare a resource named `SomeResource`, with a variable integer field
@@ -2581,9 +2588,9 @@ Instead, consider using [interfaces](#interfaces).
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
-**Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
+ - **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
 
-**Public** (using the `pub` keyword) means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writeable though.
+ - **Public** (using the `pub` keyword) means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
 
 **By default, everything is private.** 
 
@@ -2843,7 +2850,7 @@ resource interface FungibleToken {
     // NOTE: the first parameter has the type `<-Self`,
     // i.e. the resource type implementing this interface
     //
-    pub fun deposit(_ token: <-Self): Void {
+    pub fun deposit(_ token: <-Self) {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -2935,13 +2942,13 @@ let token <- create ExampleToken(balance: 100)
 // Withdraw 10 units from the token.
 //
 // The amount satisfies the precondition of the `withdraw` function
-// in the `FungibleToken` interface
-// invoking a member of a resource does not destroy it, so the `token` resource is still valid
+// in the `FungibleToken` interface.
+// Invoking a member of a resource does not destroy it, so the `token` resource is still valid.
 //
 let withdrawn <- token.withdraw(amount: 10)
 
 // The postcondition of the `withdraw` function in the `FungibleToken`
-// interface ensured the balance field of the token was updated properly
+// interface ensured the balance field of the token was updated properly.
 //
 // `token.balance` is 90
 // `withdrawn.balance` is 10
@@ -3338,16 +3345,13 @@ Like resources, attestations are associated with an [account](#accounts).
 ```bamboo
 struct interface Account {
     address: Address
-    storage: (WHAT TYPE IS THIS?)
-    types: (WHAT TYPE IS THIS?)
+    storage: Storage  // explained below
 }
 ```
 
 ## Account Storage
 
-There is only one account type in Flow. All accounts have a `storage` object which contains the stored values of the account.  
-
-`account.storage[]`
+All accounts have a `storage` object which contains the stored values of the account.
 
 Account storage is a key-value store where the **keys are types**.  The access operator `[]` is used for both reading and writing stored values.  Accounts will usually store a mixture of contracts, resources, and structs within their storage.
 
@@ -3377,12 +3381,13 @@ let account: Account = // ...
 //
 account.storage[Counter] <- create Counter(count: 0)
 
-account.types[Counter]  //stores the type definition of Counter
 ```
 
 ## Transactions
 
-Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.  Transactions can do some things that normal contracts cannot, like writing to account storage.
+> 🚧 Status: The usage of external types is not implemented yet.
+
+Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.  
 
 Transactions are structured as such:
 
@@ -3398,13 +3403,9 @@ Importing an external resource does not move it from the account that holds it. 
     import Counter from 0x299F20A29311B9248F12
 ```
 
-
-> 🚧 Status: The usage of external types is not implemented yet.
-
-
 Next is definitions of any new types that will be used or deployed within the transaction.  These are kind of like global constants or variables.
 
-Next is the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of bpl code that executes sequentially.
+Next is the body of the transaction, which is broken into three main phases: Preparation, execution, and postconditions, only in that order.  Each phase is a block of code that executes sequentially.
 
 The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
 The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
@@ -3611,7 +3612,7 @@ transaction {
 }
 ```
 
-Now, the Vault interface and the FungibleToken resource are deployed to the account and published so that anyone who wants to use them or interact with them can easily do so by importing the types into their bpl code! 
+Now, the `Vault` and the `FungibleToken` types are deployed to the account and published so that anyone who wants to use them or interact with them can easily do so by importing them.
 
 In many scenarios, publishing the entire interface for the resource may be necessary because everyone might want to be able to access all functionality of the type.  In most situations though, including this one, it is important to expose only a subset of the functionality of the resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface,  the receiver interface is the only one that should be published.
 
@@ -3637,7 +3638,7 @@ the `as` operator, and the resource interface type.
 import FungibleToken from 0x42
 
 // Execute a transaction which creates a new example token vault
-// for the new signing account
+// for the signing account
 //
 transaction {
 
@@ -3721,7 +3722,8 @@ transaction {
 
 ## Built-in Functions
 
-#### There is currently no built-in function that allows you to get the address of the sender of a transaction or the current block number or timestamp.  These are being worked on.
+### Transaction information
+There is currently no built-in function that allows getting the address of the signers of a transaction, the current block number, or timestamp.  These are being worked on.
 
 ### `panic`
 
