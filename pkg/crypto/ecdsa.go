@@ -121,7 +121,7 @@ func (sk *PrKeyECDSA) KeySize() int {
 }
 
 // Pubkey returns the public key associated to the private key
-func (sk *PrKeyECDSA) Publickey() PublicKey {
+func (sk *PrKeyECDSA) PublicKey() PublicKey {
 	return &PubKeyECDSA{
 		alg:      sk.alg,
 		goPubKey: &sk.goPrKey.PublicKey,

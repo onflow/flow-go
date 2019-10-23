@@ -486,7 +486,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
 	}
 
-	pubKeyBytes, _ := prKey.Publickey().Encode()
+	pubKeyBytes, _ := prKey.PublicKey().Encode()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(

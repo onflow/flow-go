@@ -141,8 +141,8 @@ type PrivateKey interface {
 	KeySize() int
 	// Sign generates a signature using the provided hasher.
 	Sign([]byte, Hasher) (Signature, error)
-	// Publickey returns the public key.
-	Publickey() PublicKey
+	// PublicKey returns the public key.
+	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
 	Encode() ([]byte, error)
 }

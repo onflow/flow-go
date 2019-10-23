@@ -97,7 +97,7 @@ func TestEventEmitted(t *testing.T) {
 			event MyEvent(x: Int, y: Int)
 		`)
 
-		publicKeyA, _ := b.RootKey().Publickey().Encode()
+		publicKeyA, _ := b.RootKey().PublicKey().Encode()
 
 		accountKeyA := types.AccountKey{
 			PublicKey: publicKeyA,

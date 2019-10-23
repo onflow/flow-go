@@ -87,7 +87,7 @@ func (sk *PrKeyBLS_BLS12381) computePublicKey() {
 	sk.pk = newPk
 }
 
-func (sk *PrKeyBLS_BLS12381) Publickey() PublicKey {
+func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
