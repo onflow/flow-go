@@ -7,7 +7,7 @@ import (
 func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	typ := checker.checkInvocationExpression(statement.InvocationExpression)
 
-	if !IsInvalidType(typ) {
+	if !typ.IsInvalidType() {
 		// check that emitted expression is an event
 		if _, isEventType := typ.(*EventType); !isEventType {
 			checker.report(&EmitNonEventError{

@@ -53,7 +53,7 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 
 	// Check that the referenced expression's type is a resource or resource interface
 
-	if !IsInvalidType(referencedType) &&
+	if !referencedType.IsInvalidType() &&
 		!referencedType.IsResourceType() {
 
 		checker.report(
@@ -66,7 +66,7 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 
 	// Check that the result type is a resource or resource interface
 
-	if !IsInvalidType(resultType) &&
+	if !resultType.IsInvalidType() &&
 		!resultType.IsResourceType() {
 
 		checker.report(
@@ -79,8 +79,8 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 
 	// Check that the referenced expression's type is a subtype of the result type
 
-	if !IsInvalidType(referencedType) &&
-		!IsInvalidType(resultType) &&
+	if !referencedType.IsInvalidType() &&
+		!resultType.IsInvalidType() &&
 		!IsSubType(referencedType, resultType) {
 
 		checker.report(

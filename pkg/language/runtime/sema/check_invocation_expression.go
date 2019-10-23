@@ -38,7 +38,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	invokableType, ok := expressionType.(InvokableType)
 	if !ok {
-		if !IsInvalidType(expressionType) {
+		if !expressionType.IsInvalidType() {
 			checker.report(
 				&NotCallableError{
 					Type: expressionType,
@@ -280,7 +280,7 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentTypes[i] = argumentType
 
-		if !IsInvalidType(parameterType) &&
+		if !parameterType.IsInvalidType() &&
 			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 
 			checker.report(

@@ -205,7 +205,7 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
 			interfaceTypes = append(interfaceTypes, interfaceType)
 
-		} else if !IsInvalidType(convertedType) {
+		} else if !convertedType.IsInvalidType() {
 			checker.report(
 				&InvalidConformanceError{
 					Type: convertedType,

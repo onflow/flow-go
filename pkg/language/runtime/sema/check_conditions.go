@@ -28,7 +28,9 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 	testType := condition.Test.Accept(checker).(Type)
 
-	if !IsInvalidType(testType) && !IsSubType(testType, &BoolType{}) {
+	if !testType.IsInvalidType() &&
+		!IsSubType(testType, &BoolType{}) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
@@ -47,7 +49,7 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 		messageType := condition.Message.Accept(checker).(Type)
 
-		if !IsInvalidType(messageType) &&
+		if !messageType.IsInvalidType() &&
 			!IsSubType(messageType, &StringType{}) {
 
 			checker.report(

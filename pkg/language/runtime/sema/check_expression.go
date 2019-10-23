@@ -165,7 +165,7 @@ func (checker *Checker) visitIndexExpression(
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if IsInvalidType(targetType) {
+	if targetType.IsInvalidType() {
 		elementType = &InvalidType{}
 		return
 	}
@@ -255,7 +255,7 @@ func (checker *Checker) visitValueIndexingExpression(
 	// check indexing expression's type can be used to index
 	// into indexed expression's type
 
-	if !IsInvalidType(indexingType) &&
+	if !indexingType.IsInvalidType() &&
 		!IsSubType(indexingType, indexedType.IndexingType()) {
 
 		checker.report(
@@ -277,7 +277,7 @@ func (checker *Checker) visitTypeIndexingExpression(
 ) Type {
 
 	keyType := checker.ConvertType(indexingType)
-	if IsInvalidType(keyType) {
+	if keyType.IsInvalidType() {
 		return &InvalidType{}
 	}
 

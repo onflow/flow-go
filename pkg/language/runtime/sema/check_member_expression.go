@@ -98,7 +98,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	}
 
 	if member == nil {
-		if !IsInvalidType(expressionType) {
+		if !expressionType.IsInvalidType() {
 			checker.report(
 				&NotDeclaredMemberError{
 					Type: expressionType,
