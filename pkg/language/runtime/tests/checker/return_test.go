@@ -74,7 +74,14 @@ func testExits(t *testing.T, tests []exitTest) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
 			code := fmt.Sprintf("fun test(): Any {%s}", test.body)
-			_, err := ParseAndCheckWithExtra(t, code, test.valueDeclarations, nil, nil)
+			_, err := ParseAndCheckWithExtra(
+				t,
+				code,
+				test.valueDeclarations,
+				nil,
+				nil,
+				nil,
+			)
 
 			if test.exits {
 				assert.Nil(t, err)

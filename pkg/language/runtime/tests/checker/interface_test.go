@@ -253,6 +253,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 				}.ToValueDeclarations(),
 				nil,
 				nil,
+				nil,
 			)
 
 			// TODO: add support for non-structure / non-resource declarations
