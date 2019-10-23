@@ -708,7 +708,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			publicKeys[i] = publicKey
 		}
 
-		code, err := toByteArray(arguments[2])
+		code, err := toByteArray(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
@@ -729,8 +729,8 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
-		if len(arguments) != 3 {
-			panic(fmt.Sprintf("addAccountKey requires 3 parameters"))
+		if len(arguments) != 2 {
+			panic(fmt.Sprintf("addAccountKey requires 2 parameters"))
 		}
 
 		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
