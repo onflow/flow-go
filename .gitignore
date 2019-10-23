@@ -4,14 +4,10 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Since we have integration_tests that uses node
-node_modules
-
 .DS_Store
 
 flow.json
  
-.idea
-
 # IDE related files
+.idea
 .vscode
