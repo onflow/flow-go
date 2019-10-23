@@ -13,8 +13,8 @@ Package templates provides functions for generating common Cadence scripts.
 
 
 ## <a name="pkg-index">Index</a>
-* [func AddAccountKey(accountKey types.AccountKey) []byte](#AddAccountKey)
-* [func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte](#CreateAccount)
+* [func AddAccountKey(accountKey types.AccountPublicKey) ([]byte, error)](#AddAccountKey)
+* [func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, error)](#CreateAccount)
 * [func RemoveAccountKey(index int) []byte](#RemoveAccountKey)
 * [func UpdateAccountCode(code []byte) []byte](#UpdateAccountCode)
 
@@ -26,23 +26,23 @@ Package templates provides functions for generating common Cadence scripts.
 
 
 
-## <a name="AddAccountKey">func</a> [AddAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1238:1292#L51)
+## <a name="AddAccountKey">func</a> [AddAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1172:1241#L52)
 ``` go
-func AddAccountKey(accountKey types.AccountKey) []byte
+func AddAccountKey(accountKey types.AccountPublicKey) ([]byte, error)
 ```
 AddAccountKey generates a script that adds a key to an account.
 
 
 
-## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=157:227#L11)
+## <a name="CreateAccount">func</a> [CreateAccount](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=157:242#L11)
 ``` go
-func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte
+func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, error)
 ```
 CreateAccount generates a script that creates a new account.
 
 
 
-## <a name="RemoveAccountKey">func</a> [RemoveAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1637:1676#L66)
+## <a name="RemoveAccountKey">func</a> [RemoveAccountKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=1643:1682#L71)
 ``` go
 func RemoveAccountKey(index int) []byte
 ```
@@ -50,7 +50,7 @@ RemoveAccountKey generates a script that removes a key from an account.
 
 
 
-## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=927:969#L37)
+## <a name="UpdateAccountCode">func</a> [UpdateAccountCode](https://github.com/dapperlabs/flow-go/tree/master/sdk/templates/accounts.go?s=861:903#L38)
 ``` go
 func UpdateAccountCode(code []byte) []byte
 ```
