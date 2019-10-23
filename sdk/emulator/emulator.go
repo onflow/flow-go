@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"sync"
 	"time"
 
@@ -36,14 +37,14 @@ type EmulatedBlockchain struct {
 	mut                sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
-	rootAccountKey     crypto.PrivateKey
+	rootAccountKey     types.AccountPrivateKey
 	lastCreatedAccount types.Account
 	onEventEmitted     func(event types.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
-	RootAccountKey crypto.PrivateKey
+	RootAccountKey *types.AccountPrivateKey
 	OnLogMessage   func(string)
 	OnEventEmitted func(event types.Event, blockNumber uint64, txHash crypto.Hash)
 }
@@ -93,7 +94,7 @@ func (b *EmulatedBlockchain) RootAccountAddress() types.Address {
 }
 
 // RootKey returns the root private key for this blockchain.
-func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
+func (b *EmulatedBlockchain) RootKey() types.AccountPrivateKey {
 	return b.rootAccountKey
 }
 
@@ -472,19 +473,17 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []types.Event) {
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Account, crypto.PrivateKey) {
+func createRootAccount(
+	ws *state.WorldState,
+	privateKey *types.AccountPrivateKey,
+) (types.Account, types.AccountPrivateKey) {
 	registers := ws.Registers.NewView()
 
-	if prKey == nil {
-		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	if privateKey == nil {
+		privateKey, _ = keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
 	}
 
-	accountKey := types.AccountPublicKey{
-		PublicKey: prKey.PublicKey(),
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
+	accountKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
 	accountKeyBytes, _ := types.EncodeAccountPublicKey(accountKey)
 
@@ -498,7 +497,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (types.Acc
 
 	account := runtimeContext.GetAccount(accountAddress)
 
-	return *account, prKey
+	return *account, *privateKey
 }
 
 // mergeOptions merges the values of two EmulatedBlockchainOptions structs.
