@@ -259,8 +259,14 @@
       <section>
         <h2 id="terminology"><a href="#terminology" aria-hidden="true"><span class="icon icon-link"></span></a>Terminology</h2>
         <p>In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:</p>
-        <p><code>Invalid</code> means that the invalid program will not even be allowed to run. The error is detected and reported statically by the type checker.</p>
-        <p><code>Error</code> refers to bad behavior that will result in a runtime error.</p>
+        <ul>
+          <li>
+            <p><code>Invalid</code> means that the invalid program will not even be allowed to run. The error is detected and reported statically by the type checker.</p>
+          </li>
+          <li>
+            <p><code>Error</code> refers to bad behavior that will result in a runtime error.</p>
+          </li>
+        </ul>
       </section>
       <section>
         <h2 id="syntax-and-behavior"><a href="#syntax-and-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Syntax and Behavior</h2>
@@ -273,7 +279,7 @@
         <pre><code class="language-bamboo,file=single-line-comment.bpl">// This is a comment on a single line.
 // Another comment line that is not executed.
 
-let x = 1  // Here is another comment after a line of BPL code.
+let x = 1  // Here is another comment after a line of code.
 </code></pre>
         <p><em>Multi-line comments</em> start with a slash and an asterisk (<code>/*</code>) and end with an asterisk and a slash (<code>*/</code>):</p>
         <pre><code class="language-bamboo,file=multi-line-comment.bpl">/* This is a comment which
@@ -2019,7 +2025,10 @@ let dictionary = {}
               Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
               We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
             </p>
-            <p>Structs are not an ideal way to represent this ownership because they can be copied. If resources could be copied, this would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value. A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred. A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.</p>
+            <p>
+              Structures are not an ideal way to represent this ownership because they are copied.
+              This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.<br>A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.<br>A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
+            </p>
           </li>
         </ul>
         <p>
@@ -2975,7 +2984,7 @@ receiver.deposit(&#x3C;-withdrawn)
 token.withdraw(amount: 100)
 
 // Withdrawing tokens so that the balance is zero does not destroy the resource.
-// the resource has to be destroyed explicitly.
+// The resource has to be destroyed explicitly.
 token.withdraw(amount: 90)
 </code></pre>
           <p>The access level for variable fields in an implementation may be less restrictive than the interface requires. For example, an interface may require a field to be at least public (i.e. the <code>pub</code> keyword is specified), and an implementation may provide a variable field which is public, but also publicly settable (the <code>pub(set)</code> keyword is specified).</p>
@@ -3341,8 +3350,6 @@ let attestation: @Token = @token
         <p>All accounts have a <code>storage</code> object which contains the stored values of the account.</p>
         <p>Account storage is a key-value store where the <strong>keys are types</strong>. The access operator <code>[]</code> is used for both reading and writing stored values. Accounts will usually store a mixture of contracts, resources, and structs within their storage.</p>
         <p>The stored value must be a subtype of the type it is keyed by. This means that if a <code>Vault</code> type is being stored as the key, the value must be a value that has the type <code>Vault</code> or has any of the subtypes of <code>Vault</code>.</p>
-        <p>Initializing values in account storage can only happen within the body of a transaction. Initialize a storage value within a member function of a struct or resource that is already in your account storage is not permitted.</p>
-        <p>When a value is stored in an account's <code>account.storage[]</code>, or when a type is deployed to an account using the <code>deploy</code> function, the type of the data you just stored is also recorded in the <code>account.types[]</code> record. <code>account.types[]</code> is used to publish type definitions that other accounts can have access to, which will be covered later. <code>account.types[]</code> will never need to be writted to.</p>
         <pre><code class="language-bamboo">// Declare a resource named `Counter`
 //
 resource Counter {

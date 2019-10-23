@@ -16,9 +16,9 @@ The language's goals are, in order of importance:
 
 In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
 
-`Invalid` means that the invalid program will not even be allowed to run.  The error is detected and reported statically by the type checker.
+ - `Invalid` means that the invalid program will not even be allowed to run.  The error is detected and reported statically by the type checker.
 
-`Error` refers to bad behavior that will result in a runtime error.
+ - `Error` refers to bad behavior that will result in a runtime error.
 
 ## Syntax and Behavior
 
@@ -34,7 +34,7 @@ Comments can be used to document code. A comment is text that is not executed.
 // This is a comment on a single line.
 // Another comment line that is not executed.
 
-let x = 1  // Here is another comment after a line of BPL code.
+let x = 1  // Here is another comment after a line of code.
 ```
 
 *Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
@@ -2033,7 +2033,10 @@ and when the value is returned from a function:
     Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
     We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
 
-    Structs are not an ideal way to represent this ownership because they can be copied.  If resources could be copied, this would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  A struct is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  A struct could be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
+    Structures are not an ideal way to represent this ownership because they are copied. 
+    This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.  
+    A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.  
+    A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2964,7 +2967,7 @@ receiver.deposit(<-withdrawn)
 token.withdraw(amount: 100)
 
 // Withdrawing tokens so that the balance is zero does not destroy the resource.
-// the resource has to be destroyed explicitly.
+// The resource has to be destroyed explicitly.
 token.withdraw(amount: 90)
 ```
 
@@ -3357,9 +3360,6 @@ Account storage is a key-value store where the **keys are types**.  The access o
 
 The stored value must be a subtype of the type it is keyed by.  This means that if a `Vault` type is being stored as the key, the value must be a value that has the type `Vault` or has any of the subtypes of `Vault`.
 
-Initializing values in account storage can only happen within the body of a transaction. Initialize a storage value within a member function of a struct or resource that is already in your account storage is not permitted.
-
-When a value is stored in an account's `account.storage[]`, or when a type is deployed to an account using the `deploy` function, the type of the data you just stored is also recorded in the `account.types[]` record.  `account.types[]` is used to publish type definitions that other accounts can have access to, which will be covered later.  `account.types[]` will never need to be writted to.
 
 ```bamboo
 // Declare a resource named `Counter`
