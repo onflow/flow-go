@@ -48,8 +48,12 @@ func AccountFixture() types.Account {
 }
 
 func AccountKeyFixture() types.AccountKey {
+	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+
 	return types.AccountKey{
-		PublicKey: []byte{1, 2, 3},
+		PublicKey: privateKey.PublicKey(),
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 }

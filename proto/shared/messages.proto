@@ -112,6 +112,8 @@ message Account {
 
 message AccountKey {
   bytes public_key = 1;
-  uint32 weight = 2;
+  uint32 sign_algo = 2;
+  uint32 hash_algo = 3;
+  uint32 weight = 4;
 }
 

@@ -115,10 +115,14 @@ func MessageToAccount(m *shared.Account) (types.Account, error) {
 	}, nil
 }
 
-func AccountToMessage(a types.Account) *shared.Account {
+func AccountToMessage(a types.Account) (*shared.Account, error) {
 	accountKeys := make([]*shared.AccountKey, len(a.Keys))
 	for i, key := range a.Keys {
-		accountKeys[i] = AccountKeyToMessage(key)
+		accountKeyMsg, err := AccountKeyToMessage(key)
+		if err != nil {
+			return nil, err
+		}
+		accountKeys[i] = accountKeyMsg
 	}
 
 	return &shared.Account{
@@ -126,7 +130,7 @@ func AccountToMessage(a types.Account) *shared.Account {
 		Balance: a.Balance,
 		Code:    a.Code,
 		Keys:    accountKeys,
-	}
+	}, nil
 }
 
 func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
@@ -134,17 +138,34 @@ func MessageToAccountKey(m *shared.AccountKey) (types.AccountKey, error) {
 		return types.AccountKey{}, ErrEmptyMessage
 	}
 
+	signAlgo := crypto.SigningAlgorithm(m.GetSignAlgo())
+	hashAlgo := crypto.HashingAlgorithm(m.GetHashAlgo())
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, m.GetPublicKey())
+	if err != nil {
+		return types.AccountKey{}, err
+	}
+
 	return types.AccountKey{
-		PublicKey: m.PublicKey,
-		Weight:    int(m.Weight),
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(m.GetWeight()),
 	}, nil
 }
 
-func AccountKeyToMessage(a types.AccountKey) *shared.AccountKey {
-	return &shared.AccountKey{
-		PublicKey: a.PublicKey,
-		Weight:    uint32(a.Weight),
+func AccountKeyToMessage(a types.AccountKey) (*shared.AccountKey, error) {
+	publicKey, err := a.PublicKey.Encode()
+	if err != nil {
+		return nil, err
 	}
+
+	return &shared.AccountKey{
+		PublicKey: publicKey,
+		SignAlgo:  uint32(a.SignAlgo),
+		HashAlgo:  uint32(a.HashAlgo),
+		Weight:    uint32(a.Weight),
+	}, nil
 }
 
 func MessageToEventQuery(m *observe.GetEventsRequest) types.EventQuery {

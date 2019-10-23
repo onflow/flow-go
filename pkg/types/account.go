@@ -1,6 +1,10 @@
 package types
 
-import "github.com/ethereum/go-ethereum/rlp"
+import (
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/dapperlabs/flow-go/pkg/crypto"
+)
 
 // Account represents an account on the Flow network.
 //
@@ -14,9 +18,11 @@ type Account struct {
 
 // AccountKey is a public key associated with an account.
 //
-// An account key contains the public key encoded as bytes and a key weight.
+// An account key contains the public key, signing and hashing algorithms, and a key weight.
 type AccountKey struct {
-	PublicKey []byte
+	PublicKey crypto.PublicKey
+	SignAlgo  crypto.SigningAlgorithm
+	HashAlgo  crypto.HashingAlgorithm
 	Weight    int
 }
 
