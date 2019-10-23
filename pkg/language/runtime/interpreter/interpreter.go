@@ -1936,7 +1936,18 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 		})
 }
 
-func (interpreter *Interpreter) VisitReferenceExpression(expression *ast.ReferenceExpression) ast.Repr {
-	// TODO:
-	panic(&errors.UnreachableError{})
+func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
+	indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
+	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			storage := result.(StorageValue)
+
+			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+
+			referenceValue := ReferenceValue{
+				StorageIdentifier: storage.Identifier,
+				Type:              indexingType,
+			}
+			return Done{Result: referenceValue}
+		})
 }

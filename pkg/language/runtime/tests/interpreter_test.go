@@ -4615,6 +4615,15 @@ func TestInterpretStorage(t *testing.T) {
 
 	storedValues := map[sema.Type]interpreter.Value{}
 
+	storageValue := interpreter.StorageValue{
+		Getter: func(key sema.Type) interpreter.Value {
+			return storedValues[key]
+		},
+		Setter: func(key sema.Type, value interpreter.Value) {
+			storedValues[key] = value
+		},
+	}
+
 	inter := parseCheckAndInterpretWithExtra(t,
 		`
           fun test(): Int? {
@@ -4624,14 +4633,7 @@ func TestInterpretStorage(t *testing.T) {
         `,
 		storageValueDeclaration,
 		map[string]interpreter.Value{
-			"storage": interpreter.StorageValue{
-				Getter: func(key sema.Type) interpreter.Value {
-					return storedValues[key]
-				},
-				Setter: func(key sema.Type, value interpreter.Value) {
-					storedValues[key] = value
-				},
-			},
+			"storage": storageValue,
 		},
 		nil,
 	)
@@ -5117,5 +5119,46 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 	assert.IsType(t,
 		interpreter.CompositeValue{},
 		value.(interpreter.SomeValue).Value,
+	)
+}
+
+func TestInterpretReferenceExpression(t *testing.T) {
+
+	storageIdentifier := struct{}{}
+
+	storageValue := interpreter.StorageValue{
+		Identifier: &storageIdentifier,
+	}
+
+	inter := parseCheckAndInterpretWithExtra(t, `
+          resource R {}
+
+          fun test(): &R {
+              return &storage[R] as R
+          }
+        `,
+		storageValueDeclaration,
+		map[string]interpreter.Value{
+			"storage": storageValue,
+		},
+		nil,
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	require.IsType(t,
+		interpreter.ReferenceValue{},
+		value,
+	)
+
+	rType := inter.Checker.GlobalTypes["R"]
+
+	require.Equal(t,
+		interpreter.ReferenceValue{
+			StorageIdentifier: &storageIdentifier,
+			Type:              rType,
+		},
+		value,
 	)
 }

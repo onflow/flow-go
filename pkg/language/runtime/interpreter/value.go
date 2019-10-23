@@ -1472,8 +1472,9 @@ type ValueWithMembers interface {
 // StorageValue
 
 type StorageValue struct {
-	Getter func(key sema.Type) Value
-	Setter func(key sema.Type, value Value)
+	Identifier interface{}
+	Getter     func(key sema.Type) Value
+	Setter     func(key sema.Type, value Value)
 }
 
 func (StorageValue) isValue() {}
@@ -1495,7 +1496,18 @@ func (v StorageValue) Set(key sema.Type, value Value) {
 	v.Setter(key, value)
 }
 
-//
+// ReferenceValue
+
+type ReferenceValue struct {
+	StorageIdentifier interface{}
+	Type              sema.Type
+}
+
+func (ReferenceValue) isValue() {}
+
+func (v ReferenceValue) Copy() Value {
+	return v
+}
 
 func init() {
 	gob.Register(VoidValue{})
@@ -1516,4 +1528,5 @@ func init() {
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
 	gob.Register(AnyValue{})
+	gob.Register(ReferenceValue{})
 }
