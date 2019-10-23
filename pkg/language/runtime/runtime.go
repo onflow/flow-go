@@ -38,9 +38,9 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
+	CreateAccount(publicKeys [][]byte, code []byte) (address types.Address, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error
+	AddAccountKey(address types.Address, publicKey []byte) error
 	// RemoveAccountKey removes a key from an account by index.
 	RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
@@ -162,10 +162,6 @@ var createAccountFunctionType = sema.FunctionType{
 				Type: &sema.IntType{},
 			},
 		},
-		// keyWeights
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
 		// code
 		&sema.OptionalType{
 			Type: &sema.VariableSizedType{
@@ -189,8 +185,6 @@ var addAccountKeyFunctionType = sema.FunctionType{
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
 		},
-		// keyWeight
-		&sema.IntType{},
 	),
 	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
@@ -714,17 +708,12 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			publicKeys[i] = publicKey
 		}
 
-		keyWeights, err := toIntArray(arguments[1])
-		if err != nil {
-			panic(fmt.Sprintf("createAccount requires the second parameter to be an array"))
-		}
-
 		code, err := toByteArray(arguments[2])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
 
-		accountAddress, err := runtimeInterface.CreateAccount(publicKeys, keyWeights, code)
+		accountAddress, err := runtimeInterface.CreateAccount(publicKeys, code)
 		if err != nil {
 			panic(err)
 		}
@@ -754,14 +743,9 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
-		keyWeight, ok := arguments[2].(interpreter.IntValue)
-		if !ok {
-			panic(fmt.Sprintf("addAccountKey requires the third parameter to be an integer"))
-		}
-
 		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
 
-		err = runtimeInterface.AddAccountKey(accountAddress, publicKey, keyWeight.IntValue())
+		err = runtimeInterface.AddAccountKey(accountAddress, publicKey)
 		if err != nil {
 			panic(err)
 		}
