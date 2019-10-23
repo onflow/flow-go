@@ -168,10 +168,10 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]
 	publicKeys = make([][]byte, count)
 
 	for i := 0; i < count; i++ {
-		publicKey, publicKeyExists := r.registers.Get(
+		publicKey, exists := r.registers.Get(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 		)
-		if !publicKeyExists {
+		if !exists {
 			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
@@ -249,9 +249,12 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
-	// TODO: handle errors properly
 	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
-	publicKeys, _ := r.getAccountPublicKeys(accountID)
+
+	publicKeys, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		panic(err)
+	}
 
 	accountKeys := make([]types.AccountKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
