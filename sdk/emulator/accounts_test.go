@@ -10,20 +10,26 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 func TestCreateAccount(t *testing.T) {
+	publicKeys := unittest.PublicKeyFixtures()
+
 	t.Run("SingleKey", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		accountKey := types.AccountKey{
-			PublicKey: []byte{1, 2, 3},
+			PublicKey: publicKeys[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKey}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKey}, nil)
+		require.Nil(t, err)
 
 		tx := &types.Transaction{
 			Script:             createAccountScript,
@@ -35,7 +41,7 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-		err := b.SubmitTransaction(tx)
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		account := b.LastCreatedAccount()
@@ -50,16 +56,21 @@ func TestCreateAccount(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		accountKeyA := types.AccountKey{
-			PublicKey: []byte{1, 2, 3},
+			PublicKey: publicKeys[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
 		accountKeyB := types.AccountKey{
-			PublicKey: []byte{4, 5, 6},
+			PublicKey: publicKeys[1],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, nil)
+		assert.Nil(t, err)
 
 		tx := &types.Transaction{
 			Script:             createAccountScript,
@@ -71,7 +82,7 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-		err := b.SubmitTransaction(tx)
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		account := b.LastCreatedAccount()
@@ -87,18 +98,23 @@ func TestCreateAccount(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		accountKeyA := types.AccountKey{
-			PublicKey: []byte{1, 2, 3},
+			PublicKey: publicKeys[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
 		accountKeyB := types.AccountKey{
-			PublicKey: []byte{4, 5, 6},
+			PublicKey: publicKeys[1],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
 		code := []byte("fun main() {}")
 
-		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKeyA, accountKeyB}, code)
+		assert.Nil(t, err)
 
 		tx := &types.Transaction{
 			Script:             createAccountScript,
@@ -110,7 +126,7 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-		err := b.SubmitTransaction(tx)
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		account := b.LastCreatedAccount()
@@ -127,7 +143,8 @@ func TestCreateAccount(t *testing.T) {
 
 		code := []byte("fun main() {}")
 
-		createAccountScript := templates.CreateAccount(nil, code)
+		createAccountScript, err := templates.CreateAccount(nil, code)
+		assert.Nil(t, err)
 
 		tx := &types.Transaction{
 			Script:             createAccountScript,
@@ -139,7 +156,7 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-		err := b.SubmitTransaction(tx)
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		account := b.LastCreatedAccount()
@@ -159,13 +176,16 @@ func TestCreateAccount(t *testing.T) {
 		})
 
 		accountKey := types.AccountKey{
-			PublicKey: []byte{1, 2, 3},
+			PublicKey: publicKeys[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
 		code := []byte("fun main() {}")
 
-		createAccountScript := templates.CreateAccount([]types.AccountKey{accountKey}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountKey{accountKey}, code)
+		assert.Nil(t, err)
 
 		tx := &types.Transaction{
 			Script:             createAccountScript,
@@ -177,7 +197,7 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-		err := b.SubmitTransaction(tx)
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		require.Equal(t, constants.EventAccountCreated, lastEvent.ID)
@@ -198,15 +218,20 @@ func TestAddAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey, _ := privateKey.PublicKey().Encode()
+	publicKey := privateKey.PublicKey()
 
-	accountKeyA := types.AccountKey{
+	accountKey := types.AccountKey{
 		PublicKey: publicKey,
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
+	addKeyScript, err := templates.AddAccountKey(accountKey)
+	assert.Nil(t, err)
+
 	tx1 := &types.Transaction{
-		Script:             templates.AddAccountKey(accountKeyA),
+		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
@@ -216,7 +241,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	script := []byte("fun main(account: Account) {}")
@@ -240,15 +265,20 @@ func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey, _ := privateKey.PublicKey().Encode()
+	publicKey := privateKey.PublicKey()
 
 	accountKey := types.AccountKey{
 		PublicKey: publicKey,
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
+	addKeyScript, err := templates.AddAccountKey(accountKey)
+	assert.Nil(t, err)
+
 	tx1 := &types.Transaction{
-		Script:             templates.AddAccountKey(accountKey),
+		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
@@ -258,7 +288,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	account, err := b.GetAccount(b.RootAccountAddress())
@@ -326,10 +356,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 func TestUpdateAccountCode(t *testing.T) {
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKeyB, _ := privateKeyB.PublicKey().Encode()
+	publicKeyB := privateKeyB.PublicKey()
 
 	accountKeyB := types.AccountKey{
 		PublicKey: publicKeyB,
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
@@ -455,10 +487,12 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	publicKey, _ := b.RootKey().PublicKey().Encode()
+	publicKey := b.RootKey().PublicKey()
 
 	accountKey := types.AccountKey{
 		PublicKey: publicKey,
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 

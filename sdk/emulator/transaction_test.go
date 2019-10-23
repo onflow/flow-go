@@ -169,10 +169,12 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	privateKeyA := b.RootKey()
 
 	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKeyB, _ := privateKeyB.PublicKey().Encode()
+	publicKeyB := privateKeyB.PublicKey()
 
 	accountKeyB := types.AccountKey{
 		PublicKey: publicKeyB,
+		SignAlgo:  crypto.ECDSA_P256,
+		HashAlgo:  crypto.SHA3_256,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
@@ -290,18 +292,22 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		publicKeyA, _ := privateKeyA.PublicKey().Encode()
+		publicKeyA := privateKeyA.PublicKey()
 
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("space cowboy"))
-		publicKeyB, _ := privateKeyB.PublicKey().Encode()
+		publicKeyB := privateKeyB.PublicKey()
 
 		accountKeyA := types.AccountKey{
 			PublicKey: publicKeyA,
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
 		accountKeyB := types.AccountKey{
 			PublicKey: publicKeyB,
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold / 2,
 		}
 
@@ -369,10 +375,12 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		publicKeyB, _ := privateKeyB.PublicKey().Encode()
+		publicKeyB := privateKeyB.PublicKey()
 
 		accountKeyB := types.AccountKey{
 			PublicKey: publicKeyB,
+			SignAlgo:  crypto.ECDSA_P256,
+			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
