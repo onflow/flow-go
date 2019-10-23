@@ -819,8 +819,7 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(CompositeValue)
-
+			structure := result.(MemberAccessibleValue)
 			structure.SetMember(interpreter, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
@@ -1181,7 +1180,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			value := result.(ValueWithMembers)
+			value := result.(MemberAccessibleValue)
 			return value.GetMember(interpreter, expression.Identifier.Identifier)
 		})
 }
@@ -1937,8 +1936,8 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 
 			referenceValue := ReferenceValue{
-				StorageIdentifier: storage.Identifier,
-				Type:              indexingType,
+				Storage:      storage,
+				IndexingType: indexingType,
 			}
 			return Done{Result: referenceValue}
 		})

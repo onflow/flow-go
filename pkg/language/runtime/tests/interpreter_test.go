@@ -5130,11 +5130,7 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 
 func TestInterpretReferenceExpression(t *testing.T) {
 
-	storageIdentifier := struct{}{}
-
-	storageValue := interpreter.StorageValue{
-		Identifier: &storageIdentifier,
-	}
+	storageValue := interpreter.StorageValue{}
 
 	inter := parseCheckAndInterpretWithExtra(t, `
           resource R {}
@@ -5162,9 +5158,71 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 	require.Equal(t,
 		interpreter.ReferenceValue{
-			StorageIdentifier: &storageIdentifier,
-			Type:              rType,
+			Storage:      storageValue,
+			IndexingType: rType,
 		},
+		value,
+	)
+}
+
+func TestInterpretReferenceUse(t *testing.T) {
+
+	storedValues := map[sema.Type]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithExtra(t, `
+          resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
+              fun setX(_ newX: Int) {
+                  self.x = newX
+              }
+          }
+
+          fun test(): [Int] {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              let ref = &storage[R] as R
+              ref.x = 1
+              let x1 = ref.x
+              ref.setX(2)
+              let x2 = ref.x
+              destroy r
+              return [x1, x2]
+          }
+        `,
+		storageValueDeclaration,
+		map[string]interpreter.Value{
+			"storage": storageValue,
+		},
+		nil,
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
 		value,
 	)
 }

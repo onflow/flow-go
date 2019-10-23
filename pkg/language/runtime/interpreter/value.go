@@ -29,7 +29,6 @@ type ExportableValue interface {
 // ValueIndexableValue
 
 type ValueIndexableValue interface {
-	isValueIndexableValue()
 	Get(key Value) Value
 	Set(key Value, value Value)
 }
@@ -37,15 +36,20 @@ type ValueIndexableValue interface {
 // TypeIndexableValue
 
 type TypeIndexableValue interface {
-	isTypeIndexableValue()
 	Get(key sema.Type) Value
 	Set(key sema.Type, value Value)
+}
+
+// MemberAccessibleValue
+
+type MemberAccessibleValue interface {
+	GetMember(interpreter *Interpreter, name string) Value
+	SetMember(interpreter *Interpreter, name string, value Value)
 }
 
 // ConcatenatableValue
 
 type ConcatenatableValue interface {
-	isConcatenatableValue()
 	Concat(other ConcatenatableValue) Value
 }
 
@@ -111,9 +115,7 @@ func NewStringValue(str string) StringValue {
 	return StringValue{&str}
 }
 
-func (StringValue) isValue()               {}
-func (StringValue) isValueIndexableValue() {}
-func (StringValue) isConcatenatableValue() {}
+func (StringValue) isValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
@@ -243,9 +245,7 @@ func NewArrayValue(values ...Value) ArrayValue {
 	}
 }
 
-func (ArrayValue) isValue()               {}
-func (ArrayValue) isValueIndexableValue() {}
-func (ArrayValue) isConcatenatableValue() {}
+func (ArrayValue) isValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -1189,8 +1189,6 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (DictionaryValue) isValueIndexableValue() {}
-
 func (v DictionaryValue) Get(keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
@@ -1482,19 +1480,11 @@ func (v AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// ValueWithMembers
-
-type ValueWithMembers interface {
-	GetMember(interpreter *Interpreter, name string) Value
-	SetMember(interpreter *Interpreter, name string, value Value)
-}
-
 // StorageValue
 
 type StorageValue struct {
-	Identifier interface{}
-	Getter     func(key sema.Type) OptionalValue
-	Setter     func(key sema.Type, value OptionalValue)
+	Getter func(key sema.Type) OptionalValue
+	Setter func(key sema.Type, value OptionalValue)
 }
 
 func (StorageValue) isValue() {}
@@ -1505,8 +1495,6 @@ func (v StorageValue) Copy() Value {
 		Setter: v.Setter,
 	}
 }
-
-func (StorageValue) isTypeIndexableValue() {}
 
 func (v StorageValue) Get(key sema.Type) Value {
 	return v.Getter(key)
@@ -1519,14 +1507,38 @@ func (v StorageValue) Set(key sema.Type, value Value) {
 // ReferenceValue
 
 type ReferenceValue struct {
-	StorageIdentifier interface{}
-	Type              sema.Type
+	Storage      StorageValue
+	IndexingType sema.Type
 }
 
 func (ReferenceValue) isValue() {}
 
 func (v ReferenceValue) Copy() Value {
 	return v
+}
+
+func (v ReferenceValue) GetMember(interpreter *Interpreter, name string) Value {
+	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+	case SomeValue:
+		return referenced.Value.(MemberAccessibleValue).GetMember(interpreter, name)
+	case NilValue:
+		// TODO:
+		panic("referenced value is nil")
+	default:
+		panic(errors.UnreachableError{})
+	}
+}
+
+func (v ReferenceValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+	case SomeValue:
+		referenced.Value.(MemberAccessibleValue).SetMember(interpreter, name, value)
+	case NilValue:
+		// TODO:
+		panic("referenced value is nil")
+	default:
+		panic(errors.UnreachableError{})
+	}
 }
 
 func init() {
