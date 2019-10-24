@@ -391,3 +391,61 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
 
 	assert.IsType(t, &sema.NotIndexableTypeError{}, errs[0])
 }
+
+func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t, `
+          resource interface I {
+              fun foo()
+          }
+
+          resource R: I {
+              fun foo() {}
+          }
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as I
+              ref.foo()
+          }
+        `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t, `
+          resource interface I {}
+
+          resource R: I {
+              fun foo() {}
+          }
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as I
+              ref.foo()
+          }
+        `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+}
