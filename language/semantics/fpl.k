@@ -350,6 +350,25 @@ module FPL-CONFIGURATION
     <env> .Map </env>
 endmodule
 
+module FPL-VARIABLE-DECLARATION
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  context let _ : _:Type = HOLE
+  context var _ : _:Type = HOLE
+
+  rule <k> let X : T:Type = V:Val => . ... </k>
+       <env> Rho => Rho [ X <- env(let, V, T) ] </env>
+  rule <k> var X : T:Type = V:Val => . ... </k>
+       <env> Rho => Rho [ X <- env(var, V, T) ] </env>
+
+  rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
+  rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
+
+  rule <k> X:Ident => V ... </k>
+       <env>... X |-> env(... v: V) ...</env>
+endmodule
+
 module FPL
   imports FPL-CONFIGURATION
   imports FPL-VARIABLE-DECLARATION
