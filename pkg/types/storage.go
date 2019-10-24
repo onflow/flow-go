@@ -32,9 +32,9 @@ type Storage interface {
 
 	// Untrusted methods (providing proofs)
 	// Get registers at specific StateCommitment by a list of register ids with proofs
-	GetRegisters(registerIds []*RegisterID, stateCommitment StateCommitment) (registers []*Register, proof StorageProof, err error)
+	GetRegistersWithProof(registerIds []*RegisterID, stateCommitment StateCommitment) (registers []*Register, proof StorageProof, err error)
 	// Batched atomic updates of a subset of registers at specific state with proofs
-	UpdateRegister(registerIds []*RegisterID, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proof StorageProof, err error)
+	UpdateRegisterWithProof(registerIds []*RegisterID, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proof StorageProof, err error)
 }
 
 // StorageVerifier should be designed as an standalone package to verify proofs of storage
