@@ -90,22 +90,6 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 	}
 }
 
-// CompatibleAlgorithms returns true if the given signing and hashing algorithms are compatible.
-func CompatibleAlgorithms(signAlgo crypto.SigningAlgorithm, hashAlgo crypto.HashingAlgorithm) bool {
-	t := map[crypto.SigningAlgorithm]map[crypto.HashingAlgorithm]bool{
-		crypto.ECDSA_P256: {
-			crypto.SHA2_256: true,
-			crypto.SHA3_256: true,
-		},
-		crypto.ECDSA_SECp256k1: {
-			crypto.SHA2_256: true,
-			crypto.SHA3_256: true,
-		},
-	}
-
-	return t[signAlgo][hashAlgo]
-}
-
 // AccountSignature is a signature associated with an account.
 type AccountSignature struct {
 	Account   Address
