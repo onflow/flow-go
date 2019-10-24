@@ -1,11 +1,14 @@
 package checker
 
 import (
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
+
 	"testing"
 )
 
@@ -33,7 +36,7 @@ func TestCheckStorageIndexing(t *testing.T) {
 		nil,
 	)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{

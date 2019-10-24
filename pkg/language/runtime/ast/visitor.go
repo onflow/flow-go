@@ -53,6 +53,7 @@ type ExpressionVisitor interface {
 	VisitFailableDowncastExpression(*FailableDowncastExpression) Repr
 	VisitCreateExpression(*CreateExpression) Repr
 	VisitDestroyExpression(*DestroyExpression) Repr
+	VisitReferenceExpression(*ReferenceExpression) Repr
 }
 
 type Visitor interface {

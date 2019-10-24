@@ -144,36 +144,38 @@ func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) 
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression, false)
+	elementType, _ := checker.visitIndexExpression(expression, false)
+	return elementType
 }
 
-// visitIndexingExpression checks if the indexed expression is indexable,
+// visitIndexExpression checks if the indexed expression is indexable,
 // checks if the indexing expression can be used to index into the indexed expression,
 // and returns the expected element type
 //
-func (checker *Checker) visitIndexingExpression(
+func (checker *Checker) visitIndexExpression(
 	indexExpression *ast.IndexExpression,
 	isAssignment bool,
-) (result Type) {
+) (elementType Type, targetType Type) {
 
 	targetExpression := indexExpression.TargetExpression
-	indexedType := targetExpression.Accept(checker).(Type)
+	targetType = targetExpression.Accept(checker).(Type)
 
 	// NOTE: check indexed type first for UX reasons
 
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if IsInvalidType(indexedType) {
-		return &InvalidType{}
+	if IsInvalidType(targetType) {
+		elementType = &InvalidType{}
+		return
 	}
 
 	defer func() {
-		checker.checkAccessResourceLoss(result, targetExpression)
+		checker.checkAccessResourceLoss(elementType, targetExpression)
 	}()
 
 	// TODO: generalize to e.g. `TypeIndexable`
-	_, isStorage := indexedType.(*StorageType)
+	_, isStorage := targetType.(*StorageType)
 	if isStorage {
 
 		indexingType := indexExpression.IndexingType
@@ -190,43 +192,41 @@ func (checker *Checker) visitIndexingExpression(
 			if indexingType == nil {
 				checker.report(
 					&InvalidStorageIndexingError{
-						Range: ast.Range{
-							StartPos: indexExpression.IndexingExpression.StartPosition(),
-							EndPos:   indexExpression.IndexingExpression.EndPosition(),
-						},
+						Range: ast.NewRangeFromPositioned(indexExpression.IndexingExpression),
 					},
 				)
 
-				return &InvalidType{}
+				elementType = &InvalidType{}
+				return
 			}
 		}
 
-		return checker.visitTypeIndexingExpression(
+		elementType = checker.visitTypeIndexingExpression(
 			indexExpression,
 			indexingType,
 			isAssignment,
 		)
+		return
 	} else {
 		// indexing into non-storage value using type?
 		if indexExpression.IndexingType != nil {
 			checker.report(
 				&InvalidIndexingError{
-					Range: ast.Range{
-						StartPos: indexExpression.IndexingType.StartPosition(),
-						EndPos:   indexExpression.IndexingType.EndPosition(),
-					},
+					Range: ast.NewRangeFromPositioned(indexExpression.IndexingType),
 				},
 			)
 
-			return &InvalidType{}
+			elementType = &InvalidType{}
+			return
 		}
 
-		return checker.visitValueIndexingExpression(
+		elementType = checker.visitValueIndexingExpression(
 			targetExpression,
-			indexedType,
+			targetType,
 			indexExpression.IndexingExpression,
 			isAssignment,
 		)
+		return
 	}
 }
 
@@ -242,11 +242,8 @@ func (checker *Checker) visitValueIndexingExpression(
 	if !isIndexableType {
 		checker.report(
 			&NotIndexableTypeError{
-				Type: indexedType,
-				Range: ast.Range{
-					StartPos: indexedExpression.StartPosition(),
-					EndPos:   indexedExpression.EndPosition(),
-				},
+				Type:  indexedType,
+				Range: ast.NewRangeFromPositioned(indexedExpression),
 			},
 		)
 
@@ -263,11 +260,8 @@ func (checker *Checker) visitValueIndexingExpression(
 
 		checker.report(
 			&NotIndexingTypeError{
-				Type: indexingType,
-				Range: ast.Range{
-					StartPos: indexingExpression.StartPosition(),
-					EndPos:   indexingExpression.EndPosition(),
-				},
+				Type:  indexingType,
+				Range: ast.NewRangeFromPositioned(indexingExpression),
 			},
 		)
 	}

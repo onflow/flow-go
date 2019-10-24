@@ -212,6 +212,9 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#destroyExpression.
 	VisitDestroyExpression(ctx *DestroyExpressionContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#referenceExpression.
+	VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#identifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 

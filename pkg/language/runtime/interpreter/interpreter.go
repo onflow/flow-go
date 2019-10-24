@@ -1936,3 +1936,8 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			return value.(DestroyableValue).Destroy(interpreter, location)
 		})
 }
+
+func (interpreter *Interpreter) VisitReferenceExpression(expression *ast.ReferenceExpression) ast.Repr {
+	// TODO:
+	panic(&errors.UnreachableError{})
+}
