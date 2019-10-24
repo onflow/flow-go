@@ -361,12 +361,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 	accountWeights := make(map[types.Address]int)
 
 	for _, accountSig := range tx.Signatures {
-		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountPublicKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		accountWeights[accountSig.Account] += accountKey.Weight
+		accountWeights[accountSig.Account] += accountPublicKey.Weight
 	}
 
 	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
@@ -384,8 +384,8 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountPublicKey, code []byte, nonce uint64) (types.Address, error) {
-	createAccountScript, err := templates.CreateAccount(accountKeys, code)
+func (b *EmulatedBlockchain) CreateAccount(keys []types.AccountPublicKey, code []byte, nonce uint64) (types.Address, error) {
+	createAccountScript, err := templates.CreateAccount(keys, code)
 	if err != nil {
 		return types.Address{}, nil
 	}
@@ -417,29 +417,29 @@ func (b *EmulatedBlockchain) CreateAccount(accountKeys []types.AccountPublicKey,
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig types.AccountSignature,
 	message []byte,
-) (accountKey types.AccountPublicKey, err error) {
+) (accountPublicKey types.AccountPublicKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return accountPublicKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
-	for _, accountKey := range account.Keys {
-		hasher, _ := crypto.NewHasher(accountKey.HashAlgo)
+	for _, accountPublicKey := range account.Keys {
+		hasher, _ := crypto.NewHasher(accountPublicKey.HashAlgo)
 
-		valid, err := accountKey.PublicKey.Verify(signature, message, hasher)
+		valid, err := accountPublicKey.PublicKey.Verify(signature, message, hasher)
 		if err != nil {
 			continue
 		}
 
 		if valid {
-			return accountKey, nil
+			return accountPublicKey, nil
 		}
 	}
 
-	return accountKey, &ErrInvalidSignaturePublicKey{
+	return accountPublicKey, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }
