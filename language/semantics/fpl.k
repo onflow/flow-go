@@ -369,6 +369,15 @@ module FPL-VARIABLE-DECLARATION
        <env>... X |-> env(... v: V) ...</env>
 endmodule
 
+module FPL-ARITHMETIC
+  imports FPL-CONFIGURATION
+
+  rule <k> I1 + I2 => I1 +Int I2 ... </k>
+  rule <k> I1 == I2 => I1 ==Int I2 ... </k>
+  rule <k> B1 == B2 => B1 ==Bool B2 ... </k>
+
+endmodule
+
 module FPL
   imports FPL-CONFIGURATION
   imports FPL-VARIABLE-DECLARATION
