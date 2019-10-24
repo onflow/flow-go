@@ -3,8 +3,9 @@ package types
 // TODO: these functions will be moved to a separate `encoding` package in a future PR
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
 // accountPublicKeyWrapper is used for encoding and decoding.
