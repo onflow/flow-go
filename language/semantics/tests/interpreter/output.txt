@@ -1,0 +1,11 @@
+<generatedTop>
+  <k>
+    .Pgm
+  </k>
+  <scope>
+    global
+  </scope>
+  <env>
+    .Map
+  </env>
+</generatedTop>
