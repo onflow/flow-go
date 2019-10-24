@@ -168,7 +168,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	privateKeyA := b.RootKey()
 
-	privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	accountAddressA := b.RootAccountAddress()
@@ -264,7 +264,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		// use key-pair that does not exist on root account
-		invalidKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("invalid key"))
+		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("invalid key"))
 
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
@@ -284,10 +284,10 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("KeyWeights", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		privateKeyA, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 		publicKeyA := privateKeyA.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
-		privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("space cowboy"))
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("space cowboy"))
 		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
 		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
@@ -353,7 +353,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		privateKeyA := b.RootKey()
 
-		privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 		accountAddressA := b.RootAccountAddress()

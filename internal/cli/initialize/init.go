@@ -42,7 +42,7 @@ var Cmd = &cobra.Command{
 
 // InitProject generates a new root key and saves project config.
 func InitProject() *project.Config {
-	privateKey, err := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte{})
+	privateKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
 	if err != nil {
 		utils.Exitf(1, "Failed to generate private key: %v", err)
 	}
