@@ -1,10 +1,5 @@
 package types
 
-import (
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
-)
-
 // TODO: these functions will be moved to a separate `encoding` package in a future PR
 
 import (
