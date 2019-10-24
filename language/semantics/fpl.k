@@ -9,7 +9,7 @@ module FPL-COMMON-SYNTAX
    */
   imports INT-SYNTAX
 
-  syntax IntLit ::= Int [token]
+  syntax IntLit ::= Int
   syntax Ident
   syntax FPLString
 
