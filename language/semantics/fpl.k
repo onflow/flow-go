@@ -401,4 +401,8 @@ module FPL-TESTING
   imports FPL-TESTING-COMMON-SYNTAX
 
   rule <k> assert true => . ... </k>
+
+  rule <k> .Pgm </k>
+       <env> E => .Map </env>
+    requires E =/=K .Map
 endmodule
