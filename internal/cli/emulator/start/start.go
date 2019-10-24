@@ -66,7 +66,7 @@ func getRootPrivateKey(projectConf *project.Config) *types.AccountPrivateKey {
 		prKeyDer, err := hex.DecodeString(conf.RootKey)
 		privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
 		if err != nil {
-			utils.Exit(1, "Failed to decode private key")
+			utils.Exitf(1, "Failed to decode private key: %v", err)
 		}
 
 		return &privateKey
@@ -75,7 +75,7 @@ func getRootPrivateKey(projectConf *project.Config) *types.AccountPrivateKey {
 
 		privateKey, err := rootAccount.PrivateKey()
 		if err != nil {
-			utils.Exit(1, "Failed to decode private key")
+			utils.Exitf(1, "Failed to decode private key: %v", err)
 		}
 
 		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)

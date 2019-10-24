@@ -44,12 +44,12 @@ var Cmd = &cobra.Command{
 func InitProject() *project.Config {
 	privateKey, err := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte{})
 	if err != nil {
-		utils.Exitf(1, "Failed to generate private key: %s\n", err.Error())
+		utils.Exitf(1, "Failed to generate private key: %v", err)
 	}
 
 	privateKeyBytes, err := types.EncodeAccountPrivateKey(privateKey)
 	if err != nil {
-		utils.Exitf(1, "Failed to encode private key: %s\n", err.Error())
+		utils.Exitf(1, "Failed to encode private key: %v", err)
 	}
 
 	privateKeyHex := hex.EncodeToString(privateKeyBytes)
