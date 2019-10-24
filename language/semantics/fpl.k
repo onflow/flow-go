@@ -19,7 +19,7 @@ module FPL-COMMON-SYNTAX
      in semantic rules in FPL-RULE-SYNTAX
    */
   imports FPL-TYPE-ANNOTATION
-  imports INT-SYNTAX
+  imports UNSIGNED-INT-SYNTAX
 
   syntax IntLit ::= Int
   syntax Ident
@@ -274,11 +274,18 @@ module FPL-SYNTAX
   imports FPL-TOKENS
 endmodule
 
+module FPL-SCOPES
+    syntax Ident
+    syntax Scope ::= "global" | local(Ident)
+endmodule
+
 module FPL
   imports DOMAINS
   imports FPL-COMMON-SYNTAX
+  imports FPL-SCOPES
 
   syntax KResult ::= Int
   configuration
     <k>$PGM:Pgm</k>
+    <scope> global </scope>
 endmodule
