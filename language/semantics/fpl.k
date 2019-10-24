@@ -41,6 +41,9 @@ module FPL-COMMON-SYNTAX
    | "import" ImportSource
    | "import" TypeIds "from" ImportSource
 
+  rule struct Ident { Items } => struct Ident : .TypeIds { Items } [macro]
+  rule resource Ident { Items } => resource Ident : .TypeIds { Items } [macro]
+
   syntax Transaction ::=
      "transaction" "{"
         Fields
@@ -55,6 +58,8 @@ module FPL-COMMON-SYNTAX
 
   syntax FunDef ::= "fun" Ident "(" Formals ")"           "{" FunBody "}"
                   | "fun" Ident "(" Formals ")" ":" Annot "{" FunBody "}"
+
+  rule fun Ident ( Formals ) { Body::FunBody } => fun Ident ( Formals ) : noAnnot() { Body } [macro]
 
   syntax CompositeItems ::= List{CompositeItemAccess,""}
   syntax CompositeItemAccess ::= Access CompositeItem
@@ -79,10 +84,18 @@ module FPL-COMMON-SYNTAX
                               |       Ident ":" Type
                               |       Ident ":" Type "{" AccessorContracts "}"
 
+  rule (var  Ident : Type)::InterfaceFieldDecl => var Ident : Type { .AccessorContracts } [macro]
+  rule (let  Ident : Type)::InterfaceFieldDecl => let Ident : Type { .AccessorContracts } [macro]
+  rule      (Ident : Type)::InterfaceFieldDecl =>     Ident : Type { .AccessorContracts } [macro]
+
   syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")"
                             | "fun" Ident "(" Formals ")"           ContractBlock
                             | "fun" Ident "(" Formals ")" ":" Annot
                             | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
+
+  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : noAnnot() {} [macro]
+  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : noAnnot() Block [macro]
+  rule fun Ident ( Formals ) : Annot              => fun Ident ( Formals ) : Annot {} [macro]
 
   syntax AccessorContracts ::= List{AccessorContract,""}
   syntax AccessorContract ::=
@@ -115,6 +128,11 @@ module FPL-COMMON-SYNTAX
    | "var" Ident           "<-" Exp
    | "var" Ident ":" Annot "<-" Exp
 
+  rule  let Ident  = Exp          => let Ident : noAnnot()  = Exp [macro]
+  rule  let Ident <- Exp          => let Ident : noAnnot() <- Exp [macro]
+  rule (var Ident  = Exp)::VarDef => var Ident : noAnnot()  = Exp [macro]
+  rule  var Ident <- Exp          => var Ident : noAnnot() <- Exp [macro]
+
   syntax Formal ::= Ident Ident ":" Type
                   |       Ident ":" Type
   syntax Formals ::= List{Formal,","}
@@ -126,6 +144,11 @@ module FPL-COMMON-SYNTAX
                     | "pre" "{" Conditions "}" "post" "{" Conditions "}"
   syntax ContractBlock ::= "{" Contract "}"
                          | "{" "}"
+
+  rule {} => { pre { .Conditions } post { .Conditions } } [macro]
+  rule pre { Cond } => pre { Cond } post { .Conditions } [macro]
+  rule post { Cond } => pre { .Conditions } post { Cond } [macro]
+
   syntax Conditions ::= NeList{Condition,""}
   syntax Condition ::= Exp
                      | Exp ":" FPLString
@@ -147,6 +170,9 @@ module FPL-COMMON-SYNTAX
   syntax IfStmt ::= "if" IfCond "{" Block "}"
                   | "if" IfCond "{" Block "}" "else" "{" Block "}"
                   | "if" IfCond "{" Block "}" "else" IfStmt
+
+  rule if Cond { Block } => if Cond { Block } else { .Block } [macro]
+  rule if Cond { Block } else If => if Cond { Block } else { If } [macro]
 
   syntax IfCond ::= Exp
                   | "var" Ident "=" Exp
@@ -198,6 +224,8 @@ module FPL-COMMON-SYNTAX
                | Exp "||" Exp  [left, seqstrict]
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
+
+  rule fun ( Formals ) { Body } => fun ( Formals ) : noAnnot() { Body } [macro]
 
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
