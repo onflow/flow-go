@@ -2,12 +2,12 @@ package emulator_test
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
@@ -168,18 +168,11 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	privateKeyA := b.RootKey()
 
-	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKeyB := privateKeyB.PublicKey()
-
-	accountKeyB := types.AccountPublicKey{
-		PublicKey: publicKeyB,
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, nil, getNonce())
+	accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, nil, getNonce())
 	assert.Nil(t, err)
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -271,7 +264,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		// use key-pair that does not exist on root account
-		invalidKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("invalid key"))
+		invalidKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("invalid key"))
 
 		tx1 := &types.Transaction{
 			Script:             []byte(addTwoScript),
@@ -291,27 +284,13 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("KeyWeights", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		privateKeyA, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		publicKeyA := privateKeyA.PublicKey()
+		privateKeyA, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+		publicKeyA := privateKeyA.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
-		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("space cowboy"))
-		publicKeyB := privateKeyB.PublicKey()
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("space cowboy"))
+		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
-		accountKeyA := types.AccountPublicKey{
-			PublicKey: publicKeyA,
-			SignAlgo:  crypto.ECDSA_P256,
-			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold / 2,
-		}
-
-		accountKeyB := types.AccountPublicKey{
-			PublicKey: publicKeyB,
-			SignAlgo:  crypto.ECDSA_P256,
-			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold / 2,
-		}
-
-		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, nil, getNonce())
+		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
 
 		script := []byte("fun main(account: Account) {}")
 
@@ -374,18 +353,11 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		privateKeyA := b.RootKey()
 
-		privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-		publicKeyB := privateKeyB.PublicKey()
-
-		accountKeyB := types.AccountPublicKey{
-			PublicKey: publicKeyB,
-			SignAlgo:  crypto.ECDSA_P256,
-			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
-		}
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, nil, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, nil, getNonce())
 		assert.Nil(t, err)
 
 		multipleAccountScript := []byte(`
