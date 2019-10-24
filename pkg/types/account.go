@@ -80,7 +80,7 @@ type AccountPrivateKey struct {
 	HashAlgo   crypto.HashingAlgorithm
 }
 
-// PublicKey returns the public key configured with a weight.
+// PublicKey returns a weighted public key.
 func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 	return AccountPublicKey{
 		PublicKey: a.PrivateKey.PublicKey(),
