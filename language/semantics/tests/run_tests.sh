@@ -1,11 +1,16 @@
 #!/bin/bash
-trap 'exit 0' INT
+
+function ctrl_c() {
+  kill % &> /dev/null
+  printf "\n"
+  exit 0
+}
+
+trap ctrl_c INT
 
 export OPAMROOT=/usr/lib/kframework/lib/opamroot
 cd $(dirname $0)
 export KRUN_COMPILED_DEF="$(cd ..;pwd)"
-echo $KRUN_COMPILED_DEF
-test_parse () { kast "$1"; }
 
 if [ -t 1 ]; then
   FANCY=true
@@ -13,21 +18,26 @@ else
   FANCY=false
 fi
 
-for f in parser/valid/*.bpl; do
+test_parse () { kast "$1"; }
+
+for f in parser/valid/*.fpl; do
   if [ "$FANCY" = true ]; then
     printf "\e[2K\rRUNNING %.$(($(tput cols)-8))s" "$f"
   fi
-  if ! test_parse $f &> /dev/null; then
+  test_parse $f &> /dev/null &
+  if ! wait % ; then
     if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
     printf "FAIL %s\n" "$f" 
+    sleep 1
   fi
 done
 
-for f in parser/invalid/*.bpl; do
+for f in parser/invalid/*.fpl; do
   if [ "$FANCY" = true ]; then
     printf "\e[2K\rRUNNING %.$(($(tput cols)-8))s" "$f"
   fi
-  if test_parse $f &> /dev/null; then
+  test_parse $f &> /dev/null &
+  if ! wait % ; then
     if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
     printf "FAIL %s\n" "$f" 
   fi

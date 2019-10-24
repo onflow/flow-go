@@ -1,12 +1,12 @@
 .PHONY: kompiled test clean
 
-kompiled: bpl-kompiled/timestamp
+kompiled: fpl-kompiled/timestamp
 
-bpl-kompiled/timestamp: bpl.k
-	kompile bpl.k
+fpl-kompiled/timestamp: fpl.k
+	kompile fpl.k
 
 test: kompiled
 	tests/run_tests.sh
 
 clean:
-	rm -rf bpl-kompiled/
+	rm -rf fpl-kompiled/
