@@ -22,14 +22,14 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("SingleKey", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKey := types.AccountPublicKey{
+		publicKey := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKey}, nil)
 		require.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -49,28 +49,28 @@ func TestCreateAccount(t *testing.T) {
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 1)
-		assert.Equal(t, accountKey, account.Keys[0])
+		assert.Equal(t, publicKey, account.Keys[0])
 		assert.Empty(t, account.Code)
 	})
 
 	t.Run("MultipleKeys", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKeyA := types.AccountPublicKey{
+		publicKeyA := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		accountKeyB := types.AccountPublicKey{
+		publicKeyB := types.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, nil)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -90,22 +90,22 @@ func TestCreateAccount(t *testing.T) {
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 2)
-		assert.Equal(t, accountKeyA, account.Keys[0])
-		assert.Equal(t, accountKeyB, account.Keys[1])
+		assert.Equal(t, publicKeyA, account.Keys[0])
+		assert.Equal(t, publicKeyB, account.Keys[1])
 		assert.Empty(t, account.Code)
 	})
 
 	t.Run("KeysAndCode", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		accountKeyA := types.AccountPublicKey{
+		publicKeyA := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
 			Weight:    constants.AccountKeyWeightThreshold,
 		}
 
-		accountKeyB := types.AccountPublicKey{
+		publicKeyB := types.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
@@ -114,7 +114,7 @@ func TestCreateAccount(t *testing.T) {
 
 		code := []byte("fun main() {}")
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKeyA, accountKeyB}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, code)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -134,8 +134,8 @@ func TestCreateAccount(t *testing.T) {
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 2)
-		assert.Equal(t, accountKeyA, account.Keys[0])
-		assert.Equal(t, accountKeyB, account.Keys[1])
+		assert.Equal(t, publicKeyA, account.Keys[0])
+		assert.Equal(t, publicKeyB, account.Keys[1])
 		assert.Equal(t, code, account.Code)
 	})
 
@@ -176,7 +176,7 @@ func TestCreateAccount(t *testing.T) {
 			},
 		})
 
-		accountKey := types.AccountPublicKey{
+		publicKey := types.AccountPublicKey{
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
@@ -185,7 +185,7 @@ func TestCreateAccount(t *testing.T) {
 
 		code := []byte("fun main() {}")
 
-		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, code)
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKey}, code)
 		assert.Nil(t, err)
 
 		tx := &types.Transaction{
@@ -210,7 +210,7 @@ func TestCreateAccount(t *testing.T) {
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 1)
-		assert.Equal(t, accountKey, account.Keys[0])
+		assert.Equal(t, publicKey, account.Keys[0])
 		assert.Equal(t, code, account.Code)
 	})
 }
@@ -218,7 +218,7 @@ func TestCreateAccount(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
@@ -258,7 +258,7 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
@@ -342,7 +342,7 @@ func TestRemoveAccountKey(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {

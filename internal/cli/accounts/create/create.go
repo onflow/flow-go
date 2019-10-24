@@ -2,6 +2,7 @@ package create
 
 import (
 	"context"
+	"encoding/hex"
 	"io/ioutil"
 	"log"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -33,25 +33,25 @@ var Cmd = &cobra.Command{
 
 		signer := projectConf.Accounts[conf.Signer]
 		signerAddr := types.HexToAddress(signer.Address)
-		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
+		signerKey, err := signer.PrivateKey()
 		if err != nil {
 			utils.Exit(1, "Failed to load signer key")
 		}
 
 		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
 
-		for i, privateKeyStr := range conf.Keys {
-			privateKey, err := utils.DecodePrivateKey(privateKeyStr)
+		for i, privateKeyHex := range conf.Keys {
+			prKeyDer, err := hex.DecodeString(privateKeyHex)
 			if err != nil {
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			accountKeys[i] = types.AccountPublicKey{
-				PublicKey: privateKey.PublicKey(),
-				SignAlgo:  crypto.ECDSA_P256,
-				HashAlgo:  crypto.SHA3_256,
-				Weight:    constants.AccountKeyWeightThreshold,
+			privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
+			if err != nil {
+				utils.Exit(1, "Failed to decode private key")
 			}
+
+			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 
 		var code []byte

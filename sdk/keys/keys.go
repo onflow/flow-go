@@ -1,3 +1,4 @@
+// Package keys provides utilities for generating, encoding, and decoding Flow account keys.
 package keys
 
 import (
@@ -5,38 +6,42 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
+// KeyType is a key format supported by Flow.
 type KeyType int
 
 const (
-	KeyTypeUnknown KeyType = iota
-	KeyTypeECDSA_P256_SHA2_256
-	KeyTypeECDSA_P256_SHA3_256
-	KeyTypeECDSA_SECp256k1_SHA2_256
-	KeyTypeECDSA_SECp256k1_SHA3_256
+	UnknownKeyType KeyType = iota
+	ECDSA_P256_SHA2_256
+	ECDSA_P256_SHA3_256
+	ECDSA_SECp256k1_SHA2_256
+	ECDSA_SECp256k1_SHA3_256
 )
 
+// SigningAlgorithm returns the signing algorithm for this key type.
 func (k KeyType) SigningAlgorithm() crypto.SigningAlgorithm {
 	switch k {
-	case KeyTypeECDSA_P256_SHA2_256, KeyTypeECDSA_P256_SHA3_256:
+	case ECDSA_P256_SHA2_256, ECDSA_P256_SHA3_256:
 		return crypto.ECDSA_P256
-	case KeyTypeECDSA_SECp256k1_SHA2_256, KeyTypeECDSA_SECp256k1_SHA3_256:
+	case ECDSA_SECp256k1_SHA2_256, ECDSA_SECp256k1_SHA3_256:
 		return crypto.ECDSA_SECp256k1
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
 }
 
+// SigningAlgorithm returns the hashing algorithm for this key type.
 func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	switch k {
-	case KeyTypeECDSA_P256_SHA2_256, KeyTypeECDSA_SECp256k1_SHA2_256:
+	case ECDSA_P256_SHA2_256, ECDSA_SECp256k1_SHA2_256:
 		return crypto.SHA2_256
-	case KeyTypeECDSA_P256_SHA3_256, KeyTypeECDSA_SECp256k1_SHA3_256:
+	case ECDSA_P256_SHA3_256, ECDSA_SECp256k1_SHA3_256:
 		return crypto.SHA3_256
 	default:
 		return crypto.UnknownHashingAlgorithm
 	}
 }
 
+// GeneratePrivateKey generates a private key of the specified key type.
 func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.GeneratePrivateKey(keyType.SigningAlgorithm(), seed)
 	if err != nil {
@@ -50,6 +55,7 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, 
 	}, nil
 }
 
+// DecodePrivateKey decodes a private key against a specified key type.
 func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.DecodePrivateKey(keyType.SigningAlgorithm(), b)
 	if err != nil {
@@ -63,6 +69,7 @@ func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error
 	}, nil
 }
 
+// DecodePublicKey decodes a public key against a specified key type.
 func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error) {
 	publicKey, err := crypto.DecodePublicKey(keyType.SigningAlgorithm(), b)
 	if err != nil {

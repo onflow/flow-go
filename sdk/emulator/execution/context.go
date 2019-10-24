@@ -256,21 +256,21 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 		panic(err)
 	}
 
-	accountKeys := make([]types.AccountPublicKey, len(publicKeys))
+	accountPublicKeys := make([]types.AccountPublicKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountKey, err := types.DecodeAccountPublicKey(publicKey)
+		accountPublicKey, err := types.DecodeAccountPublicKey(publicKey)
 		if err != nil {
 			panic(err)
 		}
 
-		accountKeys[i] = accountKey
+		accountPublicKeys[i] = accountPublicKey
 	}
 
 	return &types.Account{
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
-		Keys:    accountKeys,
+		Keys:    accountPublicKeys,
 	}
 }
 

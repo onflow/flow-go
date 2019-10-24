@@ -1,8 +1,6 @@
 package types
 
 import (
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 )
 
@@ -26,6 +24,7 @@ type AccountPublicKey struct {
 	Weight    int
 }
 
+// AccountPrivateKey is a private key associated with an account.
 type AccountPrivateKey struct {
 	PrivateKey crypto.PrivateKey
 	SignAlgo   crypto.SigningAlgorithm
@@ -46,12 +45,4 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 type AccountSignature struct {
 	Account   Address
 	Signature []byte
-}
-
-func (a AccountSignature) Encode() []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		a.Account.Bytes(),
-		a.Signature,
-	})
-	return b
 }
