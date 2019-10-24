@@ -37,39 +37,39 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	}
 }
 
-func GeneratePrivateKey(keyType KeyType, seed []byte) (*types.AccountPrivateKey, error) {
+func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.GeneratePrivateKey(keyType.SigningAlgorithm(), seed)
 	if err != nil {
-		return nil, err
+		return types.AccountPrivateKey{}, err
 	}
 
-	return &types.AccountPrivateKey{
+	return types.AccountPrivateKey{
 		PrivateKey: privateKey,
 		SignAlgo:   keyType.SigningAlgorithm(),
 		HashAlgo:   keyType.HashingAlgorithm(),
 	}, nil
 }
 
-func DecodePrivateKey(keyType KeyType, b []byte) (*types.AccountPrivateKey, error) {
+func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.DecodePrivateKey(keyType.SigningAlgorithm(), b)
 	if err != nil {
-		return nil, err
+		return types.AccountPrivateKey{}, err
 	}
 
-	return &types.AccountPrivateKey{
+	return types.AccountPrivateKey{
 		PrivateKey: privateKey,
 		SignAlgo:   keyType.SigningAlgorithm(),
 		HashAlgo:   keyType.HashingAlgorithm(),
 	}, nil
 }
 
-func DecodePublicKey(keyType KeyType, weight int, b []byte) (*types.AccountPublicKey, error) {
+func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error) {
 	publicKey, err := crypto.DecodePublicKey(keyType.SigningAlgorithm(), b)
 	if err != nil {
-		return nil, err
+		return types.AccountPublicKey{}, err
 	}
 
-	return &types.AccountPublicKey{
+	return types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  keyType.SigningAlgorithm(),
 		HashAlgo:  keyType.HashingAlgorithm(),
