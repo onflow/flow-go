@@ -17,10 +17,7 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 					Operation:    expression.Operation,
 					ExpectedType: &BoolType{},
 					ActualType:   valueType,
-					Range: ast.Range{
-						StartPos: expression.Expression.StartPosition(),
-						EndPos:   expression.Expression.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Expression),
 				},
 			)
 		}
@@ -33,10 +30,7 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 					Operation:    expression.Operation,
 					ExpectedType: &IntegerType{},
 					ActualType:   valueType,
-					Range: ast.Range{
-						StartPos: expression.Expression.StartPosition(),
-						EndPos:   expression.Expression.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Expression),
 				},
 			)
 		}
@@ -60,9 +54,6 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindUnary,
 		operation: expression.Operation,
-		Range: ast.Range{
-			StartPos: expression.StartPos,
-			EndPos:   expression.EndPos,
-		},
+		Range:     ast.NewRangeFromPositioned(expression),
 	})
 }

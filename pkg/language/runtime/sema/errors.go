@@ -2,8 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"math/big"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"

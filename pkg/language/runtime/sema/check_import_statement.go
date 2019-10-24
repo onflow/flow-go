@@ -13,10 +13,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		checker.report(
 			&UnresolvedImportError{
 				ImportLocation: declaration.Location,
-				Range: ast.Range{
-					StartPos: declaration.LocationPos,
-					EndPos:   declaration.LocationPos,
-				},
+				Range:          ast.NewRangeFromPositioned(declaration),
 			},
 		)
 		return nil

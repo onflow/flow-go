@@ -113,10 +113,7 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 
 		checker.report(
 			&ResourceLossError{
-				Range: ast.Range{
-					StartPos: statement.Expression.StartPosition(),
-					EndPos:   statement.Expression.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(statement.Expression),
 			},
 		)
 	}

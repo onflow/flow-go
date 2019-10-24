@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 	"github.com/rivo/uniseg"
 	"golang.org/x/text/unicode/norm"

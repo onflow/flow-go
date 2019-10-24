@@ -55,10 +55,7 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 			&TypeMismatchError{
 				ExpectedType: resultType,
 				ActualType:   elseType,
-				Range: ast.Range{
-					StartPos: expression.Else.StartPosition(),
-					EndPos:   expression.Else.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(expression.Else),
 			},
 		)
 	}
@@ -84,10 +81,7 @@ func (checker *Checker) visitConditional(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
 				ActualType:   testType,
-				Range: ast.Range{
-					StartPos: test.StartPosition(),
-					EndPos:   test.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(test),
 			},
 		)
 	}

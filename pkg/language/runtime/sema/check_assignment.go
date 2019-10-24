@@ -38,10 +38,7 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		} else {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					Range: ast.Range{
-						StartPos: assignment.StartPosition(),
-						EndPos:   assignment.EndPosition(),
-					},
+					Range: ast.NewRangeFromPositioned(assignment),
 				},
 			)
 		}
@@ -111,11 +108,8 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	if variable.IsConstant {
 		checker.report(
 			&AssignmentToConstantError{
-				Name: identifier,
-				Range: ast.Range{
-					StartPos: target.StartPosition(),
-					EndPos:   target.EndPosition(),
-				},
+				Name:  identifier,
+				Range: ast.NewRangeFromPositioned(target),
 			},
 		)
 	}
@@ -128,10 +122,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -158,10 +149,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -190,10 +178,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -201,11 +186,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	reportAssignmentToConstant := func() {
 		checker.report(
 			&AssignmentToConstantMemberError{
-				Name: target.Identifier.Identifier,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Name:  target.Identifier.Identifier,
+				Range: ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}

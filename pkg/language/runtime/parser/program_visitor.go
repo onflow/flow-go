@@ -1212,10 +1212,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			TargetExpression:   wrapped,
 			IndexingExpression: partialAccessExpression.IndexingExpression,
 			IndexingType:       partialAccessExpression.IndexingType,
-			Range: ast.Range{
-				StartPos: partialAccessExpression.StartPos,
-				EndPos:   partialAccessExpression.EndPos,
-			},
+			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{

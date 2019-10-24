@@ -22,10 +22,7 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		panic(&unsupportedOperation{
 			kind:      common.OperationKindBinary,
 			operation: operation,
-			Range: ast.Range{
-				StartPos: expression.StartPosition(),
-				EndPos:   expression.EndPosition(),
-			},
+			Range:     ast.NewRangeFromPositioned(expression),
 		})
 	}
 
@@ -133,10 +130,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					Range: ast.Range{
-						StartPos: expression.StartPosition(),
-						EndPos:   expression.EndPosition(),
-					},
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -148,10 +142,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &IntegerType{},
 					ActualType:   leftType,
-					Range: ast.Range{
-						StartPos: expression.Left.StartPosition(),
-						EndPos:   expression.Left.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -163,10 +154,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Side:         common.OperandSideRight,
 					ExpectedType: &IntegerType{},
 					ActualType:   rightType,
-					Range: ast.Range{
-						StartPos: expression.Right.StartPosition(),
-						EndPos:   expression.Right.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -179,10 +167,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				Range: ast.Range{
-					StartPos: expression.StartPosition(),
-					EndPos:   expression.EndPosition(),
-				},
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -218,10 +203,7 @@ func (checker *Checker) checkBinaryExpressionEquality(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				Range: ast.Range{
-					StartPos: expression.StartPosition(),
-					EndPos:   expression.EndPosition(),
-				},
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -248,10 +230,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					Range: ast.Range{
-						StartPos: expression.StartPosition(),
-						EndPos:   expression.EndPosition(),
-					},
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -263,10 +242,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &BoolType{},
 					ActualType:   leftType,
-					Range: ast.Range{
-						StartPos: expression.Left.StartPosition(),
-						EndPos:   expression.Left.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -278,10 +254,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Side:         common.OperandSideRight,
 					ExpectedType: &BoolType{},
 					ActualType:   rightType,
-					Range: ast.Range{
-						StartPos: expression.Right.StartPosition(),
-						EndPos:   expression.Right.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -307,10 +280,7 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &OptionalType{},
 					ActualType:   leftType,
-					Range: ast.Range{
-						StartPos: expression.Left.StartPosition(),
-						EndPos:   expression.Left.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -335,10 +305,7 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 						Side:         common.OperandSideRight,
 						ExpectedType: leftOptional,
 						ActualType:   rightType,
-						Range: ast.Range{
-							StartPos: expression.Right.StartPosition(),
-							EndPos:   expression.Right.EndPosition(),
-						},
+						Range:        ast.NewRangeFromPositioned(expression.Right),
 					},
 				)
 			} else {
@@ -372,10 +339,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					Range: ast.Range{
-						StartPos: expression.StartPosition(),
-						EndPos:   expression.EndPosition(),
-					},
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -387,10 +351,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Side:         common.OperandSideLeft,
 					ExpectedType: rightType,
 					ActualType:   leftType,
-					Range: ast.Range{
-						StartPos: expression.Left.StartPosition(),
-						EndPos:   expression.Left.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -402,10 +363,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Side:         common.OperandSideRight,
 					ExpectedType: leftType,
 					ActualType:   rightType,
-					Range: ast.Range{
-						StartPos: expression.Right.StartPosition(),
-						EndPos:   expression.Right.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -418,10 +376,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				Range: ast.Range{
-					StartPos: expression.StartPosition(),
-					EndPos:   expression.EndPosition(),
-				},
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
