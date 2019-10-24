@@ -182,6 +182,7 @@ func (checker *Checker) visitIndexExpression(
 			},
 		)
 
+		// set the return value properly
 		elementType = &InvalidType{}
 	}
 
