@@ -275,6 +275,7 @@ module FPL-SYNTAX
 endmodule
 
 module FPL-SCOPES
+    syntax Ident
     syntax Scope ::= "global" | local(Ident)
 endmodule
 
