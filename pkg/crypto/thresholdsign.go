@@ -87,6 +87,7 @@ func (s *ThresholdSinger) SignShare() (Signature, error) {
 	if s.currentPrivateKey == nil {
 		return nil, cryptoError{"The private key of the current node is not set"}
 	}
+	// call receiveshare?
 	return s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 }
 
@@ -110,23 +111,6 @@ func (s *ThresholdSinger) VerifyThresholdSignature(thresholdSignature Signature)
 	return s.groupPublicKey.Verify(thresholdSignature, s.messageToSign, s.hashAlgo)
 }
 
-// ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
-func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
-	// sanity check
-	if len(s.shares) != len(s.signers)*signatureLengthBLS_BLS12381 {
-		s.ClearShares()
-		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
-	}
-	thresholdSignature := make([]byte, signatureLengthBLS_BLS12381)
-	// Interpolate at point 0
-	C.interpolateSignaturesAtZero(
-		(*C.uchar)(&thresholdSignature[0]),
-		(*C.uchar)(&s.shares[0]),
-		(*C.uint32_t)(&s.signers[0]), (C.int)(len(s.signers)),
-	)
-	return thresholdSignature, nil
-}
-
 // ClearShares clears the shares and signers lists
 func (s *ThresholdSinger) ClearShares() {
 	s.thresholdSignature = nil
@@ -148,13 +132,33 @@ func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature
 	if verif {
 		s.shares = append(s.shares, share...)
 		s.signers = append(s.signers, uint32(orig))
+		// thresholdSignature is only computed once
 		if len(s.signers) == (s.threshold + 1) {
+			fmt.Println(s.signers)
 			thresholdSignature, err := s.reconstructThresholdSignature()
 			if err != nil {
-				return false, nil, err
+				return true, nil, err
 			}
 			s.thresholdSignature = thresholdSignature
+			fmt.Println(thresholdSignature)
 		}
 	}
 	return verif, s.thresholdSignature, nil
+}
+
+// ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
+func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
+	// sanity check
+	if len(s.shares) != len(s.signers)*signatureLengthBLS_BLS12381 {
+		s.ClearShares()
+		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
+	}
+	thresholdSignature := make([]byte, signatureLengthBLS_BLS12381)
+	// Lagrange Interpolate at point 0
+	C.G1_lagrangeInterpolateAtZero(
+		(*C.uchar)(&thresholdSignature[0]),
+		(*C.uchar)(&s.shares[0]),
+		(*C.uint32_t)(&s.signers[0]), (C.int)(len(s.signers)),
+	)
+	return thresholdSignature, nil
 }

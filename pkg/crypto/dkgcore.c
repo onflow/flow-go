@@ -5,7 +5,6 @@
 #define N_max 250
 #define N_bits_max 8  // log(250)  
 #define T_max  ((N_max-1)/2)
-#define BITS_TO_DIGITS(x) ((x)/64)
 
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
 // r being the order of G1
@@ -63,7 +62,7 @@ static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
          const int x, const bn_st* r, const bn_st* u){
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
-    ep_new(&bn_x);
+    bn_new(&bn_x);
     bn_new_size(&bn_x, BITS_TO_DIGITS(Fr_BITS+N_bits_max));
     bn_set_dig(&bn_x, 1);
     

@@ -18,13 +18,13 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSinger,
 	for {
 		select {
 		case newMsg := <-chans[current]:
-			log.Infof("%d Receiving DKG from %d:", current, newMsg.orig)
+			log.Debugf("%d Receiving DKG from %d:", current, newMsg.orig)
 			out := dkg[current].ReceiveDKGMsg(newMsg.orig, newMsg.msg.(DKGmsg))
 			out.processDkgOutput(current, dkg, chans, t)
 
 		// if timeout, finalize DKG and sign the share
 		case <-time.After(time.Second):
-			log.Infof("%d quit dkg \n", current)
+			log.Debugf("%d quit dkg \n", current)
 			sk, groupPK, nodesPK, err := dkg[current].EndDKG()
 			assert.NotNil(t, sk)
 			assert.NotNil(t, groupPK)
@@ -53,16 +53,20 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 	for {
 		select {
 		case newMsg := <-chans[current]:
-			log.Infof("%d Receiving TS from %d:", current, newMsg.orig)
-			verif, _, err := ts[current].ReceiveThresholdSignatureMsg(newMsg.orig, newMsg.msg.(Signature))
+			//if current == 1 {
+			log.Debugf("%d Receiving TS from %d:", current, newMsg.orig)
+			verif, thresholdSignature, err := ts[current].ReceiveThresholdSignatureMsg(newMsg.orig, newMsg.msg.(Signature))
 			assert.Nil(t, err)
 			assert.True(t, verif,
 				fmt.Sprintf("the signature share sent from %d to %d is not correct", newMsg.orig, current))
-			//verif, err = ts[current].VerifyThresholdSignature(thresholdSignature)
-			//assert.Nil(t, err)
-			//assert.True(t, verif, "the threshold signature is not correct")
+			if thresholdSignature != nil {
+				verif, err = ts[current].VerifyThresholdSignature(thresholdSignature)
+				assert.Nil(t, err)
+				assert.True(t, verif, "the threshold signature is not correct")
+			}
+			//}
 
-		// if timeout, finalize DKG and sign the share
+		// if timeout, finalize TS
 		case <-time.After(time.Second):
 			tsSync <- 0
 			return
@@ -72,8 +76,8 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 
 // Testing Threshold Signature
 func TestThresholdSignature(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-	log.Info("DKG starts")
+	log.SetLevel(log.InfoLevel)
+	log.Debug("DKG starts")
 	// number of nodes to test
 	n := 5
 	lead := 0

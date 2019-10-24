@@ -6,6 +6,6 @@
 #include "misc.h"
 #include "bls_include.h"
 
-void interpolateSignaturesAtZero(byte*,	byte* ,uint32_t*, int);
+void G1_lagrangeInterpolateAtZero(byte*, const byte* , const uint32_t*, const int);
 
 #endif

@@ -49,7 +49,6 @@ void _bn_randZr(bn_t x) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
-    //bn_set_dig(x, 0);
 }
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.

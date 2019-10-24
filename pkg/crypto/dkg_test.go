@@ -32,7 +32,7 @@ type toProcess struct {
 // This is a testing function
 // it simulates sending a message from one node to another
 func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProcess) {
-	log.Infof("%d Sending to %d:\n", orig, dest)
+	log.Debugf("%d Sending to %d:\n", orig, dest)
 	log.Debug(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	chans[dest] <- newMsg
@@ -41,7 +41,7 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 // This is a testing function
 // it simulates broadcasting a message from one node to all nodes
 func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) {
-	log.Infof("%d Broadcasting:", orig)
+	log.Debugf("%d Broadcasting:", orig)
 	log.Debug(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	for i := 0; i < len(chans); i++ {
@@ -58,12 +58,12 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 	for {
 		select {
 		case newMsg := <-chans[current]:
-			log.Infof("%d Receiving from %d:", current, newMsg.orig)
+			log.Debugf("%d Receiving from %d:", current, newMsg.orig)
 			out := dkg[current].ReceiveDKGMsg(newMsg.orig, newMsg.msg.(DKGmsg))
 			out.processDkgOutput(current, dkg, chans, t)
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
-			log.Infof("%d quit \n", current)
+			log.Debugf("%d quit \n", current)
 			_, pk, _, _ := dkg[current].EndDKG()
 			pkChan <- pk
 			quit <- 0
