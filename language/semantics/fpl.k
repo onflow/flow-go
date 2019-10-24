@@ -19,7 +19,7 @@ module FPL-COMMON-SYNTAX
      in semantic rules in FPL-RULE-SYNTAX
    */
   imports FPL-TYPE-ANNOTATION
-  imports INT-SYNTAX
+  imports UNSIGNED-INT-SYNTAX
 
   syntax IntLit ::= Int
   syntax Ident
