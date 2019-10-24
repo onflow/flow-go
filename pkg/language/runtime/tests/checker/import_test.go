@@ -2,13 +2,15 @@ package checker
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidImport(t *testing.T) {
@@ -29,6 +31,7 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
            import "unknown"
            import "unknown"
         `,
+		nil,
 		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
@@ -59,6 +62,7 @@ func TestCheckImportAll(t *testing.T) {
         `,
 		nil,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
@@ -81,6 +85,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 
            let x = answer()
         `,
+		nil,
 		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
@@ -113,6 +118,7 @@ func TestCheckImportSome(t *testing.T) {
         `,
 		nil,
 		nil,
+		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
@@ -136,6 +142,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		`
            import x from "imported"
         `,
+		nil,
 		nil,
 		nil,
 		func(location ast.ImportLocation) (program *ast.Program, e error) {
@@ -180,6 +187,7 @@ func TestCheckImportTypes(t *testing.T) {
 					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
+				nil,
 				nil,
 				nil,
 				func(location ast.ImportLocation) (program *ast.Program, e error) {

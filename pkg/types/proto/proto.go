@@ -147,11 +147,11 @@ func AccountKeyToMessage(a types.AccountKey) *shared.AccountKey {
 	}
 }
 
-func MessageToEventQuery(m *observe.GetEventsRequest) *types.EventQuery {
-	return &types.EventQuery{
-		ID: m.GetEventId(),
+func MessageToEventQuery(m *observe.GetEventsRequest) types.EventQuery {
+	return types.EventQuery{
+		ID:         m.GetEventId(),
 		StartBlock: m.GetStartBlock(),
-		EndBlock: m.GetEndBlock(),
+		EndBlock:   m.GetEndBlock(),
 	}
 }
 

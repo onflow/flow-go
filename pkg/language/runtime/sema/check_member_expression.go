@@ -90,28 +90,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifierEndPosition := expression.Identifier.EndPosition()
 
 	if ty, ok := expressionType.(HasMembers); ok {
-		member = ty.GetMember(identifier)
-	}
-
-	if _, isArrayType := expressionType.(ArrayType); isArrayType && member != nil {
-		// TODO: implement Equatable interface: https://github.com/dapperlabs/bamboo-node/issues/78
-		if identifier == "contains" {
-			functionType := member.Type.(*FunctionType)
-
-			if !IsEquatableType(functionType.ParameterTypeAnnotations[0].Type) {
-				checker.report(
-					&NotEquatableTypeError{
-						Type: expressionType,
-						Range: ast.Range{
-							StartPos: identifierStartPosition,
-							EndPos:   identifierEndPosition,
-						},
-					},
-				)
-
-				return nil
-			}
+		targetRange := ast.Range{
+			StartPos: expression.Expression.StartPosition(),
+			EndPos:   expression.Expression.EndPosition(),
 		}
+		member = ty.GetMember(identifier, targetRange, checker.report)
 	}
 
 	if member == nil {

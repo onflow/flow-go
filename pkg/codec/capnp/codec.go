@@ -43,7 +43,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// create capnp message
 	msg, err := encode(v)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode message")
+		return nil, errors.Wrap(err, "could not serialize message")
 	}
 
 	// get the bytes
@@ -67,7 +67,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	// decode the message
 	v, err := decode(msg)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode message")
+		return nil, errors.Wrap(err, "could not deserialize message")
 	}
 
 	return v, nil

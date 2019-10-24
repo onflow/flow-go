@@ -12,7 +12,7 @@ import (
 )
 
 func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
-	return ParseAndCheckWithExtra(t, code, nil, nil, nil)
+	return ParseAndCheckWithExtra(t, code, nil, nil, nil, nil)
 }
 
 func ParseAndCheckWithExtra(
@@ -20,6 +20,7 @@ func ParseAndCheckWithExtra(
 	code string,
 	values map[string]sema.ValueDeclaration,
 	types map[string]sema.TypeDeclaration,
+	importLocation ast.ImportLocation,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
@@ -37,6 +38,7 @@ func ParseAndCheckWithExtra(
 	if err != nil {
 		return checker, err
 	}
+	checker.ImportLocation = importLocation
 
 	err = checker.Check()
 	return checker, err

@@ -289,3 +289,39 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckSwapResourceDictionaryElement(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {}
+          var x: <-X? <- create X()
+          xs["foo"] <-> x
+          destroy xs
+          destroy x
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidSwapResourceDictionaryElement(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs: <-{String: X} <- {}
+          var x <- create X()
+          xs["foo"] <-> x
+          destroy xs
+          destroy x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}

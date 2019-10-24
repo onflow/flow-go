@@ -2,9 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"net"
 	"net/http"
 	"time"
@@ -13,17 +12,18 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // EmulatorServer is a local server that runs a Flow Emulator instance.
 //
 // The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
-	backend *Backend
+	backend    *Backend
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
@@ -49,15 +49,25 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		logger.Debug(msg)
 	}
 
+	eventStore := events.NewMemStore()
+
 	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
-		// TODO: store events for indexing
+		logger.
+			WithField("eventID", event.ID).
+			Infof("🔔  Event emitted: %s", event)
+
+		ctx := context.Background()
+		err := eventStore.Add(ctx, blockNumber, event)
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to save event %s", event.ID)
+		}
 	}
 
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
-			logger: logger,
-			eventStore: events.NewMemStore(),
+			logger:     logger,
+			eventStore: eventStore,
 		},
 		grpcServer: grpc.NewServer(),
 		config:     conf,
@@ -65,11 +75,12 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}
 
 	address := server.backend.blockchain.RootAccountAddress()
-	prKey, _ := utils.EncodePrivateKey(server.backend.blockchain.RootKey())
+	prKey := server.backend.blockchain.RootKey()
+	prKeyBytes, _ := prKey.Encode()
 
 	logger.WithFields(log.Fields{
 		"address": address.Hex(),
-		"prKey":   prKey,
+		"prKey":   hex.EncodeToString(prKeyBytes),
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
 	observe.RegisterObserveServiceServer(server.grpcServer, server.backend)

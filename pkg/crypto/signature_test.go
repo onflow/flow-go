@@ -69,12 +69,14 @@ func TestBLS_BLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLS_BLS12381Sign(b *testing.B) {
-	benchSign(b, BLS_BLS12381, nil)
+	halg, _ := NewHasher(SHA3_384)
+	benchSign(b, BLS_BLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLS_BLS12381Verify(b *testing.B) {
-	benchVerify(b, BLS_BLS12381, nil)
+	halg, _ := NewHasher(SHA3_384)
+	benchVerify(b, BLS_BLS12381, halg)
 }
 
 // ECDSA tests
