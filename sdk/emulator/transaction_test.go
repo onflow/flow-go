@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/sdk/keys"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestSubmitTransaction(t *testing.T) {
