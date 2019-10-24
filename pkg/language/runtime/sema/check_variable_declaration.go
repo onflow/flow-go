@@ -12,7 +12,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	checker.Elaboration.VariableDeclarationValueTypes[declaration] = valueType
 
-	valueIsInvalid := IsInvalidType(valueType)
+	valueIsInvalid := valueType.IsInvalidType()
 
 	// if the variable declaration is a optional binding, the value must be optional
 
@@ -45,7 +45,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation.StartPos)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !valueIsInvalid && !IsInvalidType(declarationType) {
+		if declarationType != nil && valueType != nil && !valueIsInvalid && !declarationType.IsInvalidType() {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&

@@ -26,18 +26,30 @@ type ExportableValue interface {
 	ToGoValue() interface{}
 }
 
-// IndexableValue
+// ValueIndexableValue
 
-type IndexableValue interface {
-	isIndexableValue()
+type ValueIndexableValue interface {
 	Get(key Value) Value
 	Set(key Value, value Value)
+}
+
+// TypeIndexableValue
+
+type TypeIndexableValue interface {
+	Get(key sema.Type) Value
+	Set(key sema.Type, value Value)
+}
+
+// MemberAccessibleValue
+
+type MemberAccessibleValue interface {
+	GetMember(interpreter *Interpreter, name string) Value
+	SetMember(interpreter *Interpreter, name string, value Value)
 }
 
 // ConcatenatableValue
 
 type ConcatenatableValue interface {
-	isConcatenatableValue()
 	Concat(other ConcatenatableValue) Value
 }
 
@@ -103,9 +115,7 @@ func NewStringValue(str string) StringValue {
 	return StringValue{&str}
 }
 
-func (StringValue) isValue()               {}
-func (StringValue) isIndexableValue()      {}
-func (StringValue) isConcatenatableValue() {}
+func (StringValue) isValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
@@ -235,9 +245,7 @@ func NewArrayValue(values ...Value) ArrayValue {
 	}
 }
 
-func (ArrayValue) isValue()               {}
-func (ArrayValue) isIndexableValue()      {}
-func (ArrayValue) isConcatenatableValue() {}
+func (ArrayValue) isValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -1181,8 +1189,6 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (DictionaryValue) isIndexableValue() {}
-
 func (v DictionaryValue) Get(keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
@@ -1399,11 +1405,20 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
+// OptionalValue
+
+type OptionalValue interface {
+	Value
+	isOptionalValue()
+}
+
 // NilValue
 
 type NilValue struct{}
 
 func (NilValue) isValue() {}
+
+func (NilValue) isOptionalValue() {}
 
 func (v NilValue) Copy() Value {
 	return v
@@ -1428,6 +1443,8 @@ type SomeValue struct {
 }
 
 func (SomeValue) isValue() {}
+
+func (SomeValue) isOptionalValue() {}
 
 func (v SomeValue) Copy() Value {
 	return SomeValue{
@@ -1463,18 +1480,11 @@ func (v AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// ValueWithMembers
-
-type ValueWithMembers interface {
-	GetMember(interpreter *Interpreter, name string) Value
-	SetMember(interpreter *Interpreter, name string, value Value)
-}
-
 // StorageValue
 
 type StorageValue struct {
-	Getter func(key sema.Type) Value
-	Setter func(key sema.Type, value Value)
+	Getter func(key sema.Type) OptionalValue
+	Setter func(key sema.Type, value OptionalValue)
 }
 
 func (StorageValue) isValue() {}
@@ -1486,17 +1496,58 @@ func (v StorageValue) Copy() Value {
 	}
 }
 
-func (StorageValue) isIndexableValue() {}
-
 func (v StorageValue) Get(key sema.Type) Value {
 	return v.Getter(key)
 }
 
 func (v StorageValue) Set(key sema.Type, value Value) {
-	v.Setter(key, value)
+	v.Setter(key, value.(OptionalValue))
 }
 
-//
+// ReferenceValue
+
+type ReferenceValue struct {
+	Storage      StorageValue
+	IndexingType sema.Type
+}
+
+func (ReferenceValue) isValue() {}
+
+func (v ReferenceValue) Copy() Value {
+	return v
+}
+
+func (v ReferenceValue) referencedValue() Value {
+	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+	case SomeValue:
+		return referenced.Value
+	case NilValue:
+		// TODO:
+		panic("referenced value is nil")
+	default:
+		panic(errors.UnreachableError{})
+	}
+}
+
+func (v ReferenceValue) GetMember(interpreter *Interpreter, name string) Value {
+	return v.referencedValue().(MemberAccessibleValue).
+		GetMember(interpreter, name)
+}
+
+func (v ReferenceValue) SetMember(interpreter *Interpreter, name string, value Value) {
+	v.referencedValue().(MemberAccessibleValue).
+		SetMember(interpreter, name, value)
+}
+
+func (v ReferenceValue) Get(key Value) Value {
+	return v.referencedValue().(ValueIndexableValue).
+		Get(key)
+}
+
+func (v ReferenceValue) Set(key Value, value Value) {
+	v.referencedValue().(ValueIndexableValue).
+		Set(key, value)
+}
 
 func init() {
 	gob.Register(VoidValue{})
@@ -1517,4 +1568,5 @@ func init() {
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
 	gob.Register(AnyValue{})
+	gob.Register(ReferenceValue{})
 }

@@ -127,7 +127,7 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidStorageIndexingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
 }
 
 func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
@@ -144,5 +144,5 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidStorageIndexingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
 }

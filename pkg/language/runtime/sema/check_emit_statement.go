@@ -7,7 +7,7 @@ import (
 func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	typ := checker.checkInvocationExpression(statement.InvocationExpression)
 
-	if IsInvalidType(typ) {
+	if typ.IsInvalidType() {
 		return nil
 	}
 

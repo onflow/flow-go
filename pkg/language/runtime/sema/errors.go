@@ -1244,17 +1244,17 @@ func (e *InvalidResourceFieldError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidStorageIndexingError
+// InvalidTypeIndexingError
 
-type InvalidStorageIndexingError struct {
+type InvalidTypeIndexingError struct {
 	ast.Range
 }
 
-func (e *InvalidStorageIndexingError) Error() string {
-	return "invalid index into storage: expected type"
+func (e *InvalidTypeIndexingError) Error() string {
+	return "invalid index: expected type"
 }
 
-func (*InvalidStorageIndexingError) isSemanticError() {}
+func (*InvalidTypeIndexingError) isSemanticError() {}
 
 // InvalidIndexingError
 

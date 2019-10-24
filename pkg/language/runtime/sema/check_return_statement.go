@@ -19,7 +19,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	valueIsInvalid := IsInvalidType(valueType)
+	valueIsInvalid := valueType.IsInvalidType()
 
 	returnType := functionActivation.ReturnType
 
@@ -42,7 +42,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 		}
 	} else {
 
-		if !IsInvalidType(returnType) &&
+		if !returnType.IsInvalidType() &&
 			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
 
 			checker.report(

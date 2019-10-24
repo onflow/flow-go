@@ -13,7 +13,7 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	// e.g. in boolean logic or in nil-coalescing
 
 	leftType := expression.Left.Accept(checker).(Type)
-	leftIsInvalid := IsInvalidType(leftType)
+	leftIsInvalid := leftType.IsInvalidType()
 
 	operation := expression.Operation
 	operationKind := binaryOperationKind(operation)
@@ -38,7 +38,7 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		// Right hand side will always be evaluated
 
 		rightType := expression.Right.Accept(checker).(Type)
-		rightIsInvalid := IsInvalidType(rightType)
+		rightIsInvalid := rightType.IsInvalidType()
 
 		anyInvalid := leftIsInvalid || rightIsInvalid
 
@@ -81,7 +81,7 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 			return expression.Right.Accept(checker).(Type)
 		})
 
-		rightIsInvalid := IsInvalidType(rightType)
+		rightIsInvalid := rightType.IsInvalidType()
 
 		anyInvalid := leftIsInvalid || rightIsInvalid
 

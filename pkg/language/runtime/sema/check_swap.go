@@ -30,7 +30,7 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 				},
 			},
 		)
-	} else if !IsInvalidType(leftType) {
+	} else if !leftType.IsInvalidType() {
 		// Only check the right-hand side if checking the left-hand side
 		// doesn't produce errors. This prevents potentially confusing
 		// duplicate errors
@@ -55,7 +55,7 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 				},
 			},
 		)
-	} else if !IsInvalidType(rightType) {
+	} else if !rightType.IsInvalidType() {
 		// Only check the right-hand side if checking the left-hand side
 		// doesn't produce errors. This prevents potentially confusing
 		// duplicate errors

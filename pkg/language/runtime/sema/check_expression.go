@@ -165,7 +165,7 @@ func (checker *Checker) visitIndexExpression(
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if IsInvalidType(targetType) {
+	if targetType.IsInvalidType() {
 		elementType = &InvalidType{}
 		return
 	}
@@ -174,13 +174,24 @@ func (checker *Checker) visitIndexExpression(
 		checker.checkAccessResourceLoss(elementType, targetExpression)
 	}()
 
-	// TODO: generalize to e.g. `TypeIndexable`
-	_, isStorage := targetType.(*StorageType)
-	if isStorage {
+	reportNotIndexableType := func() {
+		checker.report(
+			&NotIndexableTypeError{
+				Type:  targetType,
+				Range: ast.NewRangeFromPositioned(targetExpression),
+			},
+		)
+
+		// set the return value properly
+		elementType = &InvalidType{}
+	}
+
+	switch indexedType := targetType.(type) {
+	case TypeIndexableType:
 
 		indexingType := indexExpression.IndexingType
 
-		// indexing into storage using expression?
+		// indexing into type-indexable using expression?
 		if indexExpression.IndexingExpression != nil {
 
 			// The parser may have parsed a type as an expression,
@@ -191,7 +202,7 @@ func (checker *Checker) visitIndexExpression(
 			indexingType = ast.ExpressionAsType(indexExpression.IndexingExpression)
 			if indexingType == nil {
 				checker.report(
-					&InvalidStorageIndexingError{
+					&InvalidTypeIndexingError{
 						Range: ast.NewRangeFromPositioned(indexExpression.IndexingExpression),
 					},
 				)
@@ -202,13 +213,26 @@ func (checker *Checker) visitIndexExpression(
 		}
 
 		elementType = checker.visitTypeIndexingExpression(
+			indexedType,
 			indexExpression,
 			indexingType,
 			isAssignment,
 		)
 		return
-	} else {
-		// indexing into non-storage value using type?
+
+	case ValueIndexableType:
+
+		// Check if the type instance is actually indexable. For most types (e.g. arrays and dictionaries)
+		// this is known statically (in the sense of this host language (Go), not the implemented language),
+		// i.e. a Go type switch would be sufficient.
+		// However, for some types (e.g. reference types) this depends on what type is referenced
+
+		if !indexedType.isValueIndexableType() {
+			reportNotIndexableType()
+			return
+		}
+
+		// indexing into value-indexable value using type?
 		if indexExpression.IndexingType != nil {
 			checker.report(
 				&InvalidIndexingError{
@@ -222,41 +246,33 @@ func (checker *Checker) visitIndexExpression(
 
 		elementType = checker.visitValueIndexingExpression(
 			targetExpression,
-			targetType,
+			indexedType,
 			indexExpression.IndexingExpression,
 			isAssignment,
 		)
+		return
+
+	default:
+		reportNotIndexableType()
 		return
 	}
 }
 
 func (checker *Checker) visitValueIndexingExpression(
 	indexedExpression ast.Expression,
-	indexedType Type,
+	indexedType ValueIndexableType,
 	indexingExpression ast.Expression,
 	isAssignment bool,
 ) Type {
 	indexingType := indexingExpression.Accept(checker).(Type)
 
-	indexableType, isIndexableType := indexedType.(IndexableType)
-	if !isIndexableType {
-		checker.report(
-			&NotIndexableTypeError{
-				Type:  indexedType,
-				Range: ast.NewRangeFromPositioned(indexedExpression),
-			},
-		)
-
-		return &InvalidType{}
-	}
-
-	elementType := indexableType.ElementType(isAssignment)
+	elementType := indexedType.ElementType(isAssignment)
 
 	// check indexing expression's type can be used to index
 	// into indexed expression's type
 
-	if !IsInvalidType(indexingType) &&
-		!IsSubType(indexingType, indexableType.IndexingType()) {
+	if !indexingType.IsInvalidType() &&
+		!IsSubType(indexingType, indexedType.IndexingType()) {
 
 		checker.report(
 			&NotIndexingTypeError{
@@ -270,21 +286,18 @@ func (checker *Checker) visitValueIndexingExpression(
 }
 
 func (checker *Checker) visitTypeIndexingExpression(
+	indexedType TypeIndexableType,
 	indexExpression *ast.IndexExpression,
 	indexingType ast.Type,
 	isAssignment bool,
 ) Type {
 
 	keyType := checker.ConvertType(indexingType)
-	if IsInvalidType(keyType) {
+	if keyType.IsInvalidType() {
 		return &InvalidType{}
 	}
 
 	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
 
-	if isAssignment {
-		return keyType
-	} else {
-		return &OptionalType{Type: keyType}
-	}
+	return indexedType.ElementType(keyType, isAssignment)
 }
