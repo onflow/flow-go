@@ -1,10 +1,11 @@
 package sema
 
 import (
+	"github.com/raviqqe/hamt"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/raviqqe/hamt"
 )
 
 type ValueActivations struct {

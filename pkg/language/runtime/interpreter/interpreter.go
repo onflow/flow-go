@@ -92,8 +92,18 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 }
 
 // SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+//
 func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
 	interpreter.onEventEmitted = callback
+}
+
+// locationRange returns a new location range for the given positioned element.
+//
+func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
+	return LocationRange{
+		ImportLocation: interpreter.Checker.ImportLocation,
+		Range:          ast.NewRangeFromPositioned(hasPosition),
+	}
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -798,7 +808,8 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 				return target.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						typedResult.Set(indexingValue, value)
+						locationRange := interpreter.locationRange(target)
+						typedResult.Set(locationRange, indexingValue, value)
 
 						// NOTE: no result, so it does *not* act like a return-statement
 						return Done{}
@@ -819,7 +830,8 @@ func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.Memb
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(MemberAccessibleValue)
-			structure.SetMember(interpreter, target.Identifier.Identifier, value)
+			locationRange := interpreter.locationRange(target)
+			structure.SetMember(interpreter, locationRange, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -1164,12 +1176,15 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 					dictionaryType.ValueType,
 				)
 
+				// TODO: improve: should be just for current entry
+				locationRange := interpreter.locationRange(expression)
+
 				// TODO: panic for duplicate keys?
 
 				// NOTE: important to box in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(key, SomeValue{value})
+				newDictionary.Set(locationRange, key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1180,7 +1195,8 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(MemberAccessibleValue)
-			return value.GetMember(interpreter, expression.Identifier.Identifier)
+			locationRange := interpreter.locationRange(expression)
+			return value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 		})
 }
 
@@ -1192,7 +1208,8 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 				return expression.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						value := typedResult.Get(indexingValue)
+						locationRange := interpreter.locationRange(expression)
+						value := typedResult.Get(locationRange, indexingValue)
 						return Done{Result: value}
 					})
 

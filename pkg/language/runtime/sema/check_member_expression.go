@@ -95,10 +95,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	// However, for some types (e.g. reference types) this depends on what type is referenced
 
 	if ty, ok := expressionType.(MemberAccessibleType); ok && ty.HasMembers() {
-		targetRange := ast.Range{
-			StartPos: expression.Expression.StartPosition(),
-			EndPos:   expression.Expression.EndPosition(),
-		}
+		targetRange := ast.NewRangeFromPositioned(expression.Expression)
 		member = ty.GetMember(identifier, targetRange, checker.report)
 	}
 

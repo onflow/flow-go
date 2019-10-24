@@ -822,10 +822,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 			if ifStatement, ok := ifStatementContext.Accept(v).(*ast.IfStatement); ok {
 				elseBlock = &ast.Block{
 					Statements: []ast.Statement{ifStatement},
-					Range: ast.Range{
-						StartPos: ifStatement.StartPosition(),
-						EndPos:   ifStatement.EndPosition(),
-					},
+					Range:      ast.NewRangeFromPositioned(ifStatement),
 				}
 			}
 		}
@@ -1215,10 +1212,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			TargetExpression:   wrapped,
 			IndexingExpression: partialAccessExpression.IndexingExpression,
 			IndexingType:       partialAccessExpression.IndexingType,
-			Range: ast.Range{
-				StartPos: partialAccessExpression.StartPos,
-				EndPos:   partialAccessExpression.EndPos,
-			},
+			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{

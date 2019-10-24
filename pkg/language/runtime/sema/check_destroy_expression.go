@@ -22,10 +22,7 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 
 		checker.report(
 			&InvalidDestructionError{
-				Range: ast.Range{
-					StartPos: expression.Expression.StartPosition(),
-					EndPos:   expression.Expression.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(expression.Expression),
 			},
 		)
 

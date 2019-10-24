@@ -12,10 +12,7 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 	if _, isEventType := typ.(*EventType); isEventType {
 		checker.report(
 			&InvalidEventUsageError{
-				Range: ast.Range{
-					StartPos: invocationExpression.StartPosition(),
-					EndPos:   invocationExpression.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(invocationExpression),
 			},
 		)
 		return &InvalidType{}
@@ -41,11 +38,8 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		if !expressionType.IsInvalidType() {
 			checker.report(
 				&NotCallableError{
-					Type: expressionType,
-					Range: ast.Range{
-						StartPos: invokedExpression.StartPosition(),
-						EndPos:   invokedExpression.EndPosition(),
-					},
+					Type:  expressionType,
+					Range: ast.NewRangeFromPositioned(invokedExpression),
 				},
 			)
 		}
@@ -136,10 +130,7 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 
 	checker.report(
 		&MissingCreateError{
-			Range: ast.Range{
-				StartPos: invocationExpression.StartPosition(),
-				EndPos:   invocationExpression.EndPosition(),
-			},
+			Range: ast.NewRangeFromPositioned(invocationExpression),
 		},
 	)
 }
@@ -212,10 +203,7 @@ func (checker *Checker) checkInvocationArgumentLabels(
 				checker.report(
 					&MissingArgumentLabelError{
 						ExpectedArgumentLabel: argumentLabel,
-						Range: ast.Range{
-							StartPos: argument.Expression.StartPosition(),
-							EndPos:   argument.Expression.EndPosition(),
-						},
+						Range:                 ast.NewRangeFromPositioned(argument.Expression),
 					},
 				)
 			} else if providedLabel != argumentLabel {
@@ -254,10 +242,7 @@ func (checker *Checker) checkInvocationArguments(
 				&ArgumentCountError{
 					ParameterCount: parameterCount,
 					ArgumentCount:  argumentCount,
-					Range: ast.Range{
-						StartPos: invocationExpression.StartPosition(),
-						EndPos:   invocationExpression.EndPosition(),
-					},
+					Range:          ast.NewRangeFromPositioned(invocationExpression),
 				},
 			)
 		}
@@ -287,10 +272,7 @@ func (checker *Checker) checkInvocationArguments(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
 					ActualType:   argumentType,
-					Range: ast.Range{
-						StartPos: argument.Expression.StartPosition(),
-						EndPos:   argument.Expression.EndPosition(),
-					},
+					Range:        ast.NewRangeFromPositioned(argument.Expression),
 				},
 			)
 		}

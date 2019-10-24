@@ -56,15 +56,14 @@ func TestCheckInvalidReferenceType(t *testing.T) {
 
 func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 
-	checker, err := ParseAndCheckWithExtra(t, `
+	checker, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           let ref = &storage[R] as R
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	require.Nil(t, err)
@@ -84,16 +83,15 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 
 func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource interface T {}
           resource R: T {}
 
           let ref = &storage[R] as T
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -101,15 +99,14 @@ func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionType(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           let ref = &storage[R] as X
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -119,15 +116,14 @@ func TestCheckInvalidReferenceExpressionType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           let ref = &storage[X] as R
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -137,16 +133,15 @@ func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           struct R {}
           resource T {}
 
           let ref = &storage[R] as T
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
@@ -157,16 +152,15 @@ func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) 
 
 func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
           struct T {}
 
           let ref = &storage[R] as T
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
@@ -177,16 +171,15 @@ func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           struct R {}
           struct T {}
 
           let ref = &storage[R] as T
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 3)
@@ -198,16 +191,15 @@ func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
           resource T {}
 
           let ref = &storage[R] as T
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -217,16 +209,15 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 
 func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           let r <- create R()
           let ref = &r as R
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -236,16 +227,15 @@ func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
 
 func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           let rs <- [<-create R()]
           let ref = &rs[0] as R
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -255,7 +245,7 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 
 func TestCheckReferenceUse(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {
               var x: Int
 
@@ -282,10 +272,9 @@ func TestCheckReferenceUse(t *testing.T) {
               return [x1, x2]
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -293,7 +282,7 @@ func TestCheckReferenceUse(t *testing.T) {
 
 func TestCheckReferenceUseArray(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {
               var x: Int
 
@@ -320,10 +309,9 @@ func TestCheckReferenceUseArray(t *testing.T) {
               return [x1, x2]
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -331,7 +319,7 @@ func TestCheckReferenceUseArray(t *testing.T) {
 
 func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           fun test() {
@@ -346,10 +334,9 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
               destroy other
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -357,7 +344,7 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
 
 func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           fun test() {
@@ -370,10 +357,9 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
               ref[0]
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -383,7 +369,7 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
 
 func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           fun test() {
@@ -396,13 +382,70 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
               ref[0]
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotIndexableTypeError{}, errs[0])
+}
+
+func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t, `
+          resource interface I {
+              fun foo()
+          }
+
+          resource R: I {
+              fun foo() {}
+          }
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as I
+              ref.foo()
+          }
+        `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t, `
+          resource interface I {}
+
+          resource R: I {
+              fun foo() {}
+          }
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as I
+              ref.foo()
+          }
+        `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 }

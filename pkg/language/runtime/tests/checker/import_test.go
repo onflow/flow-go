@@ -26,16 +26,15 @@ func TestCheckInvalidImport(t *testing.T) {
 
 func TestCheckInvalidRepeatedImport(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
            import "unknown"
            import "unknown"
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return &ast.Program{}, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return &ast.Program{}, nil
+			},
 		},
 	)
 
@@ -54,17 +53,16 @@ func TestCheckImportAll(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -79,17 +77,16 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import answer from "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -110,17 +107,16 @@ func TestCheckImportSome(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import answer from "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -138,15 +134,14 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import x from "imported"
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return imported, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return imported, nil
+			},
 		},
 	)
 
@@ -176,7 +171,7 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 			}
 
-			_, err = ParseAndCheckWithExtra(t,
+			_, err = ParseAndCheckWithOptions(t,
 				fmt.Sprintf(
 					`
                       import "imported"
@@ -187,11 +182,10 @@ func TestCheckImportTypes(t *testing.T) {
 					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
-				nil,
-				nil,
-				nil,
-				func(location ast.ImportLocation) (program *ast.Program, e error) {
-					return checker.Program, nil
+				ParseAndCheckOptions{
+					ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+						return checker.Program, nil
+					},
 				},
 			)
 
