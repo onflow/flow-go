@@ -480,7 +480,7 @@ func createRootAccount(
 	registers := ws.Registers.NewView()
 
 	if privateKey == nil {
-		privateKey, _ = keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+		*privateKey, _ = keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
 	}
 
 	accountKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)

@@ -2,6 +2,7 @@ package emulator_test
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -217,17 +218,10 @@ func TestCreateAccount(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey := privateKey.PublicKey()
+	privateKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
-	accountKey := types.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
-
-	addKeyScript, err := templates.AddAccountKey(accountKey)
+	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.Nil(t, err)
 
 	tx1 := &types.Transaction{
@@ -264,17 +258,10 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKey := privateKey.PublicKey()
+	privateKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
-	accountKey := types.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
-
-	addKeyScript, err := templates.AddAccountKey(accountKey)
+	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.Nil(t, err)
 
 	tx1 := &types.Transaction{
@@ -355,15 +342,8 @@ func TestRemoveAccountKey(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	privateKeyB, _ := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
-	publicKeyB := privateKeyB.PublicKey()
-
-	accountKeyB := types.AccountPublicKey{
-		PublicKey: publicKeyB,
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
@@ -371,7 +351,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -406,7 +386,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -441,7 +421,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{accountKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
@@ -487,16 +467,9 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	publicKey := b.RootKey().PublicKey()
+	publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
 
-	accountKey := types.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
-	}
-
-	address, err := b.CreateAccount([]types.AccountPublicKey{accountKey}, accountScript, getNonce())
+	address, err := b.CreateAccount([]types.AccountPublicKey{publicKey}, accountScript, getNonce())
 	assert.Nil(t, err)
 
 	script := []byte(fmt.Sprintf(`
