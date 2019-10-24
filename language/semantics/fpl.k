@@ -20,6 +20,7 @@ module FPL-COMMON-SYNTAX
    */
   imports FPL-TYPE-ANNOTATION
   imports UNSIGNED-INT-SYNTAX
+  imports BOOL-SYNTAX
 
   syntax IntLit ::= Int
   syntax Ident
@@ -188,8 +189,7 @@ module FPL-COMMON-SYNTAX
                | Ident
                | "self"
                | "nil"
-               | "true"
-               | "false"
+               | Bool
                | "(" Exp ")" [bracket]
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
