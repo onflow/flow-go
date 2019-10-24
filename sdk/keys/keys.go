@@ -1,3 +1,4 @@
+// Package keys provides utilities for generating, encoding, and decoding Flow account keys.
 package keys
 
 import (
@@ -40,6 +41,7 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	}
 }
 
+// GeneratePrivateKey generates a private key of the specified key type.
 func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.GeneratePrivateKey(keyType.SigningAlgorithm(), seed)
 	if err != nil {
@@ -53,6 +55,7 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, 
 	}, nil
 }
 
+// DecodePrivateKey decodes a private key against a specified key type.
 func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error) {
 	privateKey, err := crypto.DecodePrivateKey(keyType.SigningAlgorithm(), b)
 	if err != nil {
@@ -66,6 +69,7 @@ func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error
 	}, nil
 }
 
+// DecodePublicKey decodes a public key against a specified key type.
 func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error) {
 	publicKey, err := crypto.DecodePublicKey(keyType.SigningAlgorithm(), b)
 	if err != nil {
