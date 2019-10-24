@@ -1,26 +1,47 @@
-# NOTE: this Dockerfile must be run in the context of the top level repo folder
-FROM golang:1.12 as build-env
+# NOTE: Must be run in the context of the repo's root directory
 
-RUN apt-get update && apt-get install -y \
-	build-essential \
-	cmake
+## (1) Build Relic first to maximize caching
+FROM golang:1.13-alpine3.10 AS build-relic
 
+RUN apk update && apk add \
+    build-base \
+    cmake \
+    bash
+
+RUN mkdir /build
+WORKDIR /build
+
+# Copy over *only* files necessary for Relic
+COPY pkg/crypto/relic ./relic
+COPY pkg/crypto/relic_build.sh .
+
+# Build Relic (this places build artifacts in /build/relic/build)
+# NOTE: The Relic build script uses Bash-specific features, so we explicitly run
+# it with bash rather than the default shell.
+RUN bash ./relic_build.sh
+
+## (2) Build the app binary
+FROM golang:1.13-alpine3.10 AS build-app
+
+RUN apk update && apk add build-base
+
+# Build the app binary in /app
 RUN mkdir /app
 WORKDIR /app
 
-COPY go.mod .	
+COPY go.mod .
 COPY go.sum .
-
 RUN go mod download
 
 COPY . .
+# Copy over Relic build artifacts
+COPY --from=build-relic /build/relic/build ./pkg/crypto/relic/build
 
-RUN make build-relic
-RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /go/bin/app ./cmd/verify/
+RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/verify
 
-FROM alpine
-RUN mkdir /lib64 && ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-COPY --from=build-env /go/bin/app /go/bin/app
+## (3) Add the binary to a fresh Alpine image
+FROM alpine:3.10
 
-WORKDIR /go/bin
-ENTRYPOINT ["./app"]
+COPY --from=build-app /app/app /bin/app
+
+ENTRYPOINT ["/bin/app"]
