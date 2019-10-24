@@ -385,4 +385,20 @@ module FPL
 
   rule T::TopDefinition ; Ts::Pgm => T ~> Ts
 endmodule
+
+module FPL-TESTING-COMMON-SYNTAX
+  imports FPL-COMMON-SYNTAX
+  syntax Definition ::= "assert" Exp [strict]
+endmodule
+
+module FPL-TESTING-SYNTAX
+  imports FPL-SYNTAX
+  imports FPL-TESTING-COMMON-SYNTAX
+endmodule
+
+module FPL-TESTING
+  imports FPL
+  imports FPL-TESTING-COMMON-SYNTAX
+
+  rule <k> assert true => . ... </k>
 endmodule
