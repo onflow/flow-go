@@ -340,6 +340,7 @@ func TestCheckSwapStorage(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)

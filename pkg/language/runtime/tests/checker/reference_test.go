@@ -285,6 +285,7 @@ func TestCheckReferenceUse(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -322,6 +323,7 @@ func TestCheckReferenceUseArray(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -347,6 +349,7 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -368,6 +371,7 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
           }
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -393,6 +397,7 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
           }
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
