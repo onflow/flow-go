@@ -1,17 +1,34 @@
 package project
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 const ConfigPath = "flow.json"
 
 type AccountConfig struct {
-	Address    string `json:"address"`
-	PrivateKey string `json:"privateKey"`
+	Address       string `json:"address"`
+	PrivateKeyHex string `json:"privateKey"`
+}
+
+func (a *AccountConfig) PrivateKey() (types.AccountPrivateKey, error) {
+	privateKeyBytes, err := hex.DecodeString(a.PrivateKeyHex)
+	if err != nil {
+		return types.AccountPrivateKey{}, err
+	}
+
+	privateKey, _ := types.DecodeAccountPrivateKey(privateKeyBytes)
+	if err != nil {
+		return types.AccountPrivateKey{}, err
+	}
+
+	return privateKey, nil
 }
 
 type Config struct {

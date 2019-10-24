@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"github.com/dapperlabs/flow-go/sdk/keys"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -475,22 +475,24 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []types.Event) {
 // createRootAccount creates a new root account and commits it to the world state.
 func createRootAccount(
 	ws *state.WorldState,
-	privateKey *types.AccountPrivateKey,
+	customPrivateKey *types.AccountPrivateKey,
 ) (types.Account, types.AccountPrivateKey) {
 	registers := ws.Registers.NewView()
 
-	if privateKey == nil {
-		newPrivateKey, _ := keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
-		privateKey = &newPrivateKey
+	var privateKey types.AccountPrivateKey
+
+	if customPrivateKey == nil {
+		privateKey, _ = keys.GeneratePrivateKey(keys.KeyTypeECDSA_P256_SHA3_256, []byte("elephant ears"))
+	} else {
+		privateKey = *customPrivateKey
 	}
 
-	accountKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
-
-	accountKeyBytes, _ := types.EncodeAccountPublicKey(accountKey)
+	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKeyBytes, _ := types.EncodeAccountPublicKey(publicKey)
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{accountKeyBytes},
+		[][]byte{publicKeyBytes},
 		[]byte{},
 	)
 
@@ -498,7 +500,7 @@ func createRootAccount(
 
 	account := runtimeContext.GetAccount(accountAddress)
 
-	return *account, *privateKey
+	return *account, privateKey
 }
 
 // mergeOptions merges the values of two EmulatedBlockchainOptions structs.

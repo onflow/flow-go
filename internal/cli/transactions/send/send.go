@@ -29,7 +29,7 @@ var Cmd = &cobra.Command{
 
 		signer := projectConf.Accounts[conf.Signer]
 		signerAddr := types.HexToAddress(signer.Address)
-		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
+		signerKey, err := signer.PrivateKey()
 		if err != nil {
 			utils.Exit(1, "Failed to load signer key")
 		}

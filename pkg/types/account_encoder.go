@@ -15,6 +15,13 @@ type accountPublicKeyWrapper struct {
 	Weight    uint
 }
 
+// accountPrivateKeyWrapper is used for encoding and decoding.
+type accountPrivateKeyWrapper struct {
+	PrivateKey []byte
+	SignAlgo   uint
+	HashAlgo   uint
+}
+
 func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
@@ -52,6 +59,44 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
 		Weight:    int(w.Weight),
+	}, nil
+}
+
+func EncodeAccountPrivateKey(a AccountPrivateKey) ([]byte, error) {
+	privateKey, err := a.PrivateKey.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	w := accountPrivateKeyWrapper{
+		PrivateKey: privateKey,
+		SignAlgo:   uint(a.SignAlgo),
+		HashAlgo:   uint(a.HashAlgo),
+	}
+
+	return rlp.EncodeToBytes(&w)
+}
+
+func DecodeAccountPrivateKey(b []byte) (AccountPrivateKey, error) {
+	var w accountPrivateKeyWrapper
+
+	err := rlp.DecodeBytes(b, &w)
+	if err != nil {
+		return AccountPrivateKey{}, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
+	hashAlgo := crypto.HashingAlgorithm(w.HashAlgo)
+
+	privateKey, err := crypto.DecodePrivateKey(signAlgo, w.PrivateKey)
+	if err != nil {
+		return AccountPrivateKey{}, err
+	}
+
+	return AccountPrivateKey{
+		PrivateKey: privateKey,
+		SignAlgo:   signAlgo,
+		HashAlgo:   hashAlgo,
 	}, nil
 }
 
