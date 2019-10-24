@@ -9,18 +9,17 @@ import (
 
 func TestCheckNever(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
             fun test(): Int {
                 return panic("XXX")
             }
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.PanicFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)

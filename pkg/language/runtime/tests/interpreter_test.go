@@ -20,33 +20,36 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
-func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithExtra(t, code, nil, nil, nil)
+type ParseCheckAndInterpretOptions struct {
+	PredefinedValueTypes map[string]sema.ValueDeclaration
+	PredefinedValues     map[string]interpreter.Value
+	HandleCheckerError   func(error)
 }
 
-func parseCheckAndInterpretWithExtra(
+func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
+	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{})
+}
+
+func parseCheckAndInterpretWithOptions(
 	t *testing.T,
 	code string,
-	predefinedValueTypes map[string]sema.ValueDeclaration,
-	predefinedValues map[string]interpreter.Value,
-	handleCheckerError func(error),
+	options ParseCheckAndInterpretOptions,
 ) *interpreter.Interpreter {
 
-	checker, err := ParseAndCheckWithExtra(t,
+	checker, err := ParseAndCheckWithOptions(t,
 		code,
-		predefinedValueTypes,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: options.PredefinedValueTypes,
+		},
 	)
 
-	if handleCheckerError != nil {
-		handleCheckerError(err)
+	if options.HandleCheckerError != nil {
+		options.HandleCheckerError(err)
 	} else {
 		require.Nil(t, err)
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
+	inter, err := interpreter.NewInterpreter(checker, options.PredefinedValues)
 
 	require.Nil(t, err)
 
@@ -548,19 +551,19 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 
 func TestInterpretReturns(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
            fun returnEarly(): Int {
                return 2
                return 1
            }
         `,
-		nil,
-		nil,
-		func(err error) {
-			errs := ExpectCheckerErrors(t, err, 1)
+		ParseCheckAndInterpretOptions{
+			HandleCheckerError: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+			},
 		},
 	)
 
@@ -1263,7 +1266,7 @@ func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
 
 func TestInterpretIfStatement(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
            fun testTrue(): Int {
                if true {
@@ -1299,13 +1302,13 @@ func TestInterpretIfStatement(t *testing.T) {
                return 4
            }
         `,
-		nil,
-		nil,
-		func(err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
+		ParseCheckAndInterpretOptions{
+			HandleCheckerError: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 2)
 
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
+			},
 		},
 	)
 
@@ -3513,7 +3516,7 @@ func TestInterpretImport(t *testing.T) {
     `)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import answer from "imported"
 
@@ -3521,15 +3524,14 @@ func TestInterpretImport(t *testing.T) {
               return answer()
           }
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringImportLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -3555,20 +3557,19 @@ func TestInterpretImportError(t *testing.T) {
 			stdlib.PanicFunction,
 		}.ToValueDeclarations()
 
-	checkerImported, err := ParseAndCheckWithExtra(t,
+	checkerImported, err := ParseAndCheckWithOptions(t,
 		`
           fun answer(): Int {
               return panic("?!")
           }
         `,
-		valueDeclarations,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: valueDeclarations,
+		},
 	)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import answer from "imported"
 
@@ -3576,15 +3577,15 @@ func TestInterpretImportError(t *testing.T) {
               return answer()
           }
         `,
-		valueDeclarations,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			Values: valueDeclarations,
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringImportLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -4580,7 +4581,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
     `)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import Y from "imported"
 
@@ -4589,15 +4590,14 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
               Y().x()
           }
         `,
-		nil,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringImportLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -4639,18 +4639,19 @@ func TestInterpretStorage(t *testing.T) {
 		},
 	}
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
           fun test(): Int? {
               storage[Int] = 42
               return storage[Int]
           }
         `,
-		storageValueDeclaration,
-		map[string]interpreter.Value{
-			"storage": storageValue,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
 		},
-		nil,
 	)
 
 	value, err := inter.Invoke("test")
@@ -5147,18 +5148,19 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 	storageValue := interpreter.StorageValue{}
 
-	inter := parseCheckAndInterpretWithExtra(t, `
+	inter := parseCheckAndInterpretWithOptions(t, `
           resource R {}
 
           fun test(): &R {
               return &storage[R] as R
           }
         `,
-		storageValueDeclaration,
-		map[string]interpreter.Value{
-			"storage": storageValue,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
 		},
-		nil,
 	)
 
 	value, err := inter.Invoke("test")
@@ -5198,7 +5200,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 		},
 	}
 
-	inter := parseCheckAndInterpretWithExtra(t, `
+	inter := parseCheckAndInterpretWithOptions(t, `
           resource R {
               var x: Int
 
@@ -5225,11 +5227,12 @@ func TestInterpretReferenceUse(t *testing.T) {
               return [x1, x2]
           }
         `,
-		storageValueDeclaration,
-		map[string]interpreter.Value{
-			"storage": storageValue,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
 		},
-		nil,
 	)
 
 	value, err := inter.Invoke("test")
@@ -5262,7 +5265,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 		},
 	}
 
-	inter := parseCheckAndInterpretWithExtra(t, `
+	inter := parseCheckAndInterpretWithOptions(t, `
           resource R {
               var x: Int
 
@@ -5290,11 +5293,12 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
               return [x0, x1, x2]
           }
         `,
-		storageValueDeclaration,
-		map[string]interpreter.Value{
-			"storage": storageValue,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
 		},
-		nil,
 	)
 
 	value, err := inter.Invoke("test")

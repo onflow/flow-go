@@ -166,17 +166,16 @@ func TestCheckNilCoalescingBothOptional(t *testing.T) {
 
 func TestCheckNilCoalescingWithNever(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.PanicFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)

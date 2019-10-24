@@ -23,17 +23,16 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 
 func TestCheckStorageIndexing(t *testing.T) {
 
-	checker, err := ParseAndCheckWithExtra(t,
+	checker, err := ParseAndCheckWithOptions(t,
 		`
           let a = storage[Int]
           let b = storage[Bool]
           let c = storage[[Int]]
           let d = storage[{String: Int}]
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	require.Nil(t, err)
@@ -74,17 +73,16 @@ func TestCheckStorageIndexing(t *testing.T) {
 
 func TestCheckStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage[Int] = 1
               storage[Bool] = true
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -92,17 +90,16 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage[Int] = "1"
               storage[Bool] = 1
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
@@ -113,16 +110,15 @@ func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage["1"] = "1"
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -132,14 +128,13 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           let x = storage["1"]
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)

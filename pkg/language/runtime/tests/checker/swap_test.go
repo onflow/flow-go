@@ -328,7 +328,7 @@ func TestCheckInvalidSwapResourceDictionaryElement(t *testing.T) {
 
 func TestCheckSwapStorage(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t, `
+	_, err := ParseAndCheckWithOptions(t, `
           resource R {}
 
           fun test() {
@@ -337,9 +337,9 @@ func TestCheckSwapStorage(t *testing.T) {
               destroy r
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)

@@ -12,33 +12,37 @@ import (
 )
 
 func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
-	return ParseAndCheckWithExtra(t, code, nil, nil, nil, nil)
+	return ParseAndCheckWithOptions(t, code, ParseAndCheckOptions{})
 }
 
-func ParseAndCheckWithExtra(
+type ParseAndCheckOptions struct {
+	Values         map[string]sema.ValueDeclaration
+	Types          map[string]sema.TypeDeclaration
+	ImportLocation ast.ImportLocation
+	ImportResolver ast.ImportResolver
+}
+
+func ParseAndCheckWithOptions(
 	t *testing.T,
 	code string,
-	values map[string]sema.ValueDeclaration,
-	types map[string]sema.TypeDeclaration,
-	importLocation ast.ImportLocation,
-	resolver ast.ImportResolver,
+	options ParseAndCheckOptions,
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
 
 	require.Nil(t, err)
 
-	if resolver != nil {
-		err := program.ResolveImports(resolver)
+	if options.ImportResolver != nil {
+		err := program.ResolveImports(options.ImportResolver)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	checker, err := sema.NewChecker(program, values, types)
+	checker, err := sema.NewChecker(program, options.Values, options.Types)
 	if err != nil {
 		return checker, err
 	}
-	checker.ImportLocation = importLocation
+	checker.ImportLocation = options.ImportLocation
 
 	err = checker.Check()
 	return checker, err

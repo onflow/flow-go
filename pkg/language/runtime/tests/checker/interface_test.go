@@ -238,7 +238,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheckWithExtra(t,
+			_, err := ParseAndCheckWithOptions(t,
 				fmt.Sprintf(`
                   %[1]s interface Test {}
 
@@ -248,12 +248,11 @@ func TestCheckInterfaceUse(t *testing.T) {
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
-				stdlib.StandardLibraryFunctions{
-					stdlib.PanicFunction,
-				}.ToValueDeclarations(),
-				nil,
-				nil,
-				nil,
+				ParseAndCheckOptions{
+					Values: stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				},
 			)
 
 			// TODO: add support for non-structure / non-resource declarations
