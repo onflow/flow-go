@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o pipefail
+
 function ctrl_c() {
   kill % &> /dev/null
   printf "\n"
@@ -42,5 +44,17 @@ for f in parser/invalid/*.fpl; do
     printf "FAIL %s\n" "$f" 
   fi
 done
+
+for f in interpreter/*.fpl; do
+  if [ "$FANCY" = true ]; then
+    printf "\e[2K\rRUNNING %.$(($(tput cols)-8))s" "$f"
+  fi
+  krun $f | diff - interpreter/output.txt &
+  if ! wait % ; then
+    if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
+    printf "FAIL %s\n" "$f" 
+  fi
+done
+
 if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
 echo DONE

@@ -20,6 +20,7 @@ module FPL-COMMON-SYNTAX
    */
   imports FPL-TYPE-ANNOTATION
   imports UNSIGNED-INT-SYNTAX
+  imports BOOL-SYNTAX
 
   syntax IntLit ::= Int
   syntax Ident
@@ -188,8 +189,7 @@ module FPL-COMMON-SYNTAX
                | Ident
                | "self"
                | "nil"
-               | "true"
-               | "false"
+               | Bool
                | "(" Exp ")" [bracket]
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
@@ -279,13 +279,130 @@ module FPL-SCOPES
     syntax Scope ::= "global" | local(Ident)
 endmodule
 
-module FPL
+module FPL-VALUES
+  imports BOOL-SYNTAX
+  imports INT-SYNTAX
+
+  syntax Val ::= Int | Bool
+  syntax Exp ::= Val
+  syntax KResult ::= Val
+
+endmodule
+
+module FPL-ENV
+  syntax Val
+  syntax Type
+  syntax Mutability ::= "let" | "var"
+  syntax EnvEntry ::= env(mut: Mutability, v: Val, t: Type)
+endmodule
+
+module FPL-TYPING
+  imports FPL-CONFIGURATION
+  imports FPL-ENV
+
+  syntax Type ::= type(Exp) [function]
+  syntax Ident ::= "Bool" [token]
+                 | "Int8" [token]
+                 | "Int16" [token]
+                 | "Int32" [token]
+                 | "Int64" [token]
+                 | "UInt8" [token]
+                 | "UInt16" [token]
+                 | "UInt32" [token]
+                 | "UInt64" [token]
+                 | "Int" [token]
+
+  rule type(I:Int) => Int
+  rule type(B:Bool) => Bool
+  rule [[ type(X:Ident) => T ]]
+       <env>... X |-> env(... t: T) ...</env>
+  rule type(- E => E)
+  rule type(! _) => Bool
+  rule type(_ * _) => Int
+  rule type(E &* _ => E)
+  rule type(_ / _) => Int
+  rule type(_ % _) => Int
+  rule type(_ + _) => Int
+  rule type(E &+ _ => E)
+  rule type(_ - _) => Int
+  rule type(E &- _ => E)
+  rule type(_ && _) => Bool
+  rule type(_ || _) => Bool
+  rule type(_ == _) => Bool
+  rule type(_ != _) => Bool
+  rule type(_ < _) => Bool
+  rule type(_ <= _) => Bool
+  rule type(_ > _) => Bool
+  rule type(_ >= _) => Bool
+  rule type(_ ? E : _) => E
+  
+endmodule
+
+module FPL-CONFIGURATION
   imports DOMAINS
   imports FPL-COMMON-SYNTAX
   imports FPL-SCOPES
+  imports FPL-VALUES
 
-  syntax KResult ::= Int
   configuration
     <k>$PGM:Pgm</k>
     <scope> global </scope>
+    <env> .Map </env>
+endmodule
+
+module FPL-VARIABLE-DECLARATION
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  context let _ : _:Type = HOLE
+  context var _ : _:Type = HOLE
+
+  rule <k> let X : T:Type = V:Val => . ... </k>
+       <env> Rho => Rho [ X <- env(let, V, T) ] </env>
+  rule <k> var X : T:Type = V:Val => . ... </k>
+       <env> Rho => Rho [ X <- env(var, V, T) ] </env>
+
+  rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
+  rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
+
+  rule <k> X:Ident => V ... </k>
+       <env>... X |-> env(... v: V) ...</env>
+endmodule
+
+module FPL-ARITHMETIC
+  imports FPL-CONFIGURATION
+
+  rule <k> I1 + I2 => I1 +Int I2 ... </k>
+  rule <k> I1 == I2 => I1 ==Int I2 ... </k>
+  rule <k> B1 == B2 => B1 ==Bool B2 ... </k>
+
+endmodule
+
+module FPL
+  imports FPL-CONFIGURATION
+  imports FPL-VARIABLE-DECLARATION
+  imports FPL-ARITHMETIC
+
+  rule T::TopDefinition ; Ts::Pgm => T ~> Ts
+endmodule
+
+module FPL-TESTING-COMMON-SYNTAX
+  imports FPL-COMMON-SYNTAX
+  syntax Definition ::= "assert" Exp [strict]
+endmodule
+
+module FPL-TESTING-SYNTAX
+  imports FPL-SYNTAX
+  imports FPL-TESTING-COMMON-SYNTAX
+endmodule
+
+module FPL-TESTING
+  imports FPL
+  imports FPL-TESTING-COMMON-SYNTAX
+
+  rule <k> assert true => . ... </k>
+
+  rule <k> .Pgm </k>
+       <env> E => .Map </env>
+    requires E =/=K .Map
 endmodule
