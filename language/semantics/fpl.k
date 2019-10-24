@@ -289,6 +289,55 @@ module FPL-VALUES
 
 endmodule
 
+module FPL-ENV
+  syntax Val
+  syntax Type
+  syntax Mutability ::= "let" | "var"
+  syntax EnvEntry ::= env(mut: Mutability, v: Val, t: Type)
+endmodule
+
+module FPL-TYPING
+  imports FPL-CONFIGURATION
+  imports FPL-ENV
+
+  syntax Type ::= type(Exp) [function]
+  syntax Ident ::= "Bool" [token]
+                 | "Int8" [token]
+                 | "Int16" [token]
+                 | "Int32" [token]
+                 | "Int64" [token]
+                 | "UInt8" [token]
+                 | "UInt16" [token]
+                 | "UInt32" [token]
+                 | "UInt64" [token]
+                 | "Int" [token]
+
+  rule type(I:Int) => Int
+  rule type(B:Bool) => Bool
+  rule [[ type(X:Ident) => T ]]
+       <env>... X |-> env(... t: T) ...</env>
+  rule type(- E => E)
+  rule type(! _) => Bool
+  rule type(_ * _) => Int
+  rule type(E &* _ => E)
+  rule type(_ / _) => Int
+  rule type(_ % _) => Int
+  rule type(_ + _) => Int
+  rule type(E &+ _ => E)
+  rule type(_ - _) => Int
+  rule type(E &- _ => E)
+  rule type(_ && _) => Bool
+  rule type(_ || _) => Bool
+  rule type(_ == _) => Bool
+  rule type(_ != _) => Bool
+  rule type(_ < _) => Bool
+  rule type(_ <= _) => Bool
+  rule type(_ > _) => Bool
+  rule type(_ >= _) => Bool
+  rule type(_ ? E : _) => E
+  
+endmodule
+
 module FPL-CONFIGURATION
   imports DOMAINS
   imports FPL-COMMON-SYNTAX
