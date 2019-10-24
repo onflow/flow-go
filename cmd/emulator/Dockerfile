@@ -1,26 +1,33 @@
 # NOTE: Must be run in the context of the repo's root directory
 
-# Build Relic first to maximize caching
-FROM debian:buster AS build-relic
+## (1) Build Relic first to maximize caching
+FROM golang:1.13-alpine3.10 AS build-relic
 
-RUN apt-get update && apt-get install -y \
-	build-essential \
-	cmake
+RUN apk update && apk add \
+    build-base \
+    cmake \
+    bash
 
 RUN mkdir /build
 WORKDIR /build
 
-# Copy over only files necessary for Relic
+# Copy over *only* files necessary for Relic
 COPY pkg/crypto/relic ./relic
 COPY pkg/crypto/relic_build.sh .
 
 # Build Relic (this places build artifacts in /build/relic/build)
-RUN ./relic_build.sh
+# NOTE: The Relic build script uses Bash-specific features, so we explicitly run
+# it with bash rather than the default shell.
+RUN bash ./relic_build.sh
 
-FROM golang:1.13 AS build-app
+## (2) Build the app binary
+FROM golang:1.13-alpine3.10 AS build-app
 
-RUN mkdir /build
-WORKDIR /build
+RUN apk update && apk add build-base
+
+# Build the app binary in /app
+RUN mkdir /app
+WORKDIR /app
 
 COPY go.mod .
 COPY go.sum .
@@ -32,9 +39,10 @@ COPY --from=build-relic /build/relic/build ./pkg/crypto/relic/build
 
 RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/emulator
 
-FROM gcr.io/distroless/base
+## (3) Add the binary to a fresh Alpine image
+FROM alpine:3.10
 
-COPY --from=build-app /build/app /bin/app
+COPY --from=build-app /app/app /bin/app
 
 # Expose HTTP and GRPC ports
 EXPOSE 8000
