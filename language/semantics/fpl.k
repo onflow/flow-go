@@ -274,11 +274,17 @@ module FPL-SYNTAX
   imports FPL-TOKENS
 endmodule
 
+module FPL-SCOPES
+    syntax Scope ::= "global" | local(Ident)
+endmodule
+
 module FPL
   imports DOMAINS
   imports FPL-COMMON-SYNTAX
+  imports FPL-SCOPES
 
   syntax KResult ::= Int
   configuration
     <k>$PGM:Pgm</k>
+    <scope> global </scope>
 endmodule
