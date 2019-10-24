@@ -64,6 +64,7 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	require.Nil(t, err)
@@ -92,6 +93,7 @@ func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	assert.Nil(t, err)
@@ -105,6 +107,7 @@ func TestCheckInvalidReferenceExpressionType(t *testing.T) {
           let ref = &storage[R] as X
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -124,6 +127,7 @@ func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -140,6 +144,7 @@ func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) 
           let ref = &storage[R] as T
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -161,6 +166,7 @@ func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
@@ -178,6 +184,7 @@ func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
           let ref = &storage[R] as T
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
@@ -200,6 +207,7 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -218,6 +226,7 @@ func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
 		storageValueDeclaration,
 		nil,
 		nil,
+		nil,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -234,6 +243,7 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
           let ref = &rs[0] as R
         `,
 		storageValueDeclaration,
+		nil,
 		nil,
 		nil,
 	)
