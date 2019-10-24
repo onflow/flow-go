@@ -279,13 +279,33 @@ module FPL-SCOPES
     syntax Scope ::= "global" | local(Ident)
 endmodule
 
-module FPL
+module FPL-VALUES
+  imports BOOL-SYNTAX
+  imports INT-SYNTAX
+
+  syntax Val ::= Int | Bool
+  syntax Exp ::= Val
+  syntax KResult ::= Val
+
+endmodule
+
+module FPL-CONFIGURATION
   imports DOMAINS
   imports FPL-COMMON-SYNTAX
   imports FPL-SCOPES
+  imports FPL-VALUES
 
-  syntax KResult ::= Int
   configuration
     <k>$PGM:Pgm</k>
     <scope> global </scope>
+    <env> .Map </env>
+endmodule
+
+module FPL
+  imports FPL-CONFIGURATION
+  imports FPL-VARIABLE-DECLARATION
+  imports FPL-ARITHMETIC
+
+  rule T::TopDefinition ; Ts::Pgm => T ~> Ts
+endmodule
 endmodule
