@@ -1,26 +1,17 @@
-module BPL-TOKENS
-  /* This module defines concrete token syntax that
-     we want to allow in programs but not in rules
-     of this semantics, to avoid ambiguity with K syntax.
-   */
-  imports BPL-TERMS
-  syntax IntLit ::=
-     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
-   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
-   | r"-?0b[01]([_01]*[01])?" [token]
-   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
-  syntax Ident ::=
-     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
-  syntax BPLString ::=
-     r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
-endmodule
+module FPL-COMMON-SYNTAX
+  /* This module defines most of the Flow AST,
+     containing all productions whose actual syntax can be
+     used in K rules without ambiguity.
 
-module BPL-TERMS
+     The remaining constructs are given their actual syntax for
+     parsing programs in FPL-SYNTAX and a syntax that can be used
+     in semantic rules in FPL-RULE-SYNTAX
+   */
   imports INT-SYNTAX
 
   syntax IntLit ::= Int [token]
   syntax Ident
-  syntax BPLString
+  syntax FPLString
 
   syntax Definition ::=
      FunDef
@@ -45,8 +36,8 @@ module BPL-TERMS
      "}"
   syntax Fields ::= List{FieldDecl,""}
 
-  syntax FileName ::= BPLString
-  syntax ImportSource ::= IntLit | BPLString
+  syntax FileName ::= FPLString
+  syntax ImportSource ::= IntLit | FPLString
 
   syntax FunDef ::= "fun" Ident "(" Formals ")" OptAnnot "{" FunBody "}"
 
@@ -110,7 +101,7 @@ module BPL-TERMS
                     | ""
   syntax Conditions ::= NeList{Condition,""}
   syntax Condition ::= Exp OptCondMessage
-  syntax OptCondMessage ::= ":" BPLString
+  syntax OptCondMessage ::= ":" FPLString
                           | ""
 
   syntax OptAnnot ::= ":" Type
@@ -142,7 +133,7 @@ module BPL-TERMS
                 | Path "." Ident
 
   syntax Exp ::= IntLit
-               | BPLString
+               | FPLString
                | Ident
                | "self"
                | "nil"
@@ -205,14 +196,33 @@ module BPL-TERMS
   syntax Pgm ::= List{TopDefinition,";"}
 endmodule
 
-module BPL-SYNTAX
-  imports BPL-TERMS
-  imports BPL-TOKENS
+module FPL-TOKENS
+  /* This modules defines the lexical syntax of
+     tokens that we need for parsing programs, but
+     but must not be parsed in K rules, to
+     avoid ambiguity with K syntax
+   */
+  imports FPL-COMMON-SYNTAX
+  syntax IntLit ::=
+     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
+   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
+   | r"-?0b[01]([_01]*[01])?" [token]
+   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
+  syntax Ident ::=
+     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
+  syntax FPLString ::=
+     r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
 endmodule
 
-module BPL
+module FPL-SYNTAX
+  /* This module defines the concrete syntax available in programs */
+  imports FPL-COMMON-SYNTAX
+  imports FPL-TOKENS
+endmodule
+
+module FPL
   imports DOMAINS
-  imports BPL-TERMS
+  imports FPL-COMMON-SYNTAX
 
   syntax KResult ::= Int
   configuration
