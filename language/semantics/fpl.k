@@ -1,3 +1,14 @@
+module FPL-TYPE-ANNOTATION
+  syntax Type
+  syntax Annot ::= Type | noAnnot()
+
+endmodule
+
+module FPL-TYPE-ANNOTATION-PROGRAM-PARSING
+  syntax Type
+  syntax Annot ::= Type
+endmodule
+
 module FPL-COMMON-SYNTAX
   /* This module defines most of the Flow AST,
      containing all productions whose actual syntax can be
@@ -7,6 +18,7 @@ module FPL-COMMON-SYNTAX
      parsing programs in FPL-SYNTAX and a syntax that can be used
      in semantic rules in FPL-RULE-SYNTAX
    */
+  imports FPL-TYPE-ANNOTATION
   imports INT-SYNTAX
 
   syntax IntLit ::= Int
@@ -16,8 +28,10 @@ module FPL-COMMON-SYNTAX
   syntax Definition ::=
      FunDef
    | VarDef
-   | "struct" Ident OptConformances "{" CompositeItems "}"
-   | "resource" Ident OptConformances "{" CompositeItems "}"
+   | "struct" Ident ":" TypeIds "{" CompositeItems "}"
+   | "struct" Ident             "{" CompositeItems "}"
+   | "resource" Ident ":" TypeIds "{" CompositeItems "}"
+   | "resource" Ident             "{" CompositeItems "}"
    | "interface" Ident "{" InterfaceItems "}"
    // should there be separate "struct interface" and "resource interface"?
    | "impl" TypeId "for" TypeId "{" ImplBody "}"
@@ -39,73 +53,82 @@ module FPL-COMMON-SYNTAX
   syntax FileName ::= FPLString
   syntax ImportSource ::= IntLit | FPLString
 
-  syntax FunDef ::= "fun" Ident "(" Formals ")" OptAnnot "{" FunBody "}"
+  syntax FunDef ::= "fun" Ident "(" Formals ")"           "{" FunBody "}"
+                  | "fun" Ident "(" Formals ")" ":" Annot "{" FunBody "}"
 
-  syntax CompositeItems ::= List{CompositeItem,""}
-  syntax CompositeItem ::= Access Definition
-                         | Access FieldDecl
-                         | Access "init" "(" Formals ")" "{" FunBody "}"
+  syntax CompositeItems ::= List{CompositeItemAccess,""}
+  syntax CompositeItemAccess ::= Access CompositeItem
+                               | CompositeItem
+  syntax CompositeItem ::= Definition
+                         | FieldDecl
+                         | "init" "(" Formals ")" "{" FunBody "}"
   syntax Access ::= "pub" "(" "set" ")"
                   | "pub"
-                  | ""
 
-  syntax OptConformances ::= "" | ":" TypeIds
+  syntax InterfaceItems ::= List{InterfaceItemAccess,""}
+  syntax InterfaceItemAccess ::= Access InterfaceItem
+                               | InterfaceItem
+  syntax InterfaceItem ::= Definition
+                         | InterfaceFieldDecl
+                         | InterfaceFunDecl
+                         | "init" "(" Formals ")"
+  syntax InterfaceFieldDecl ::= "var" Ident ":" Type
+                              | "var" Ident ":" Type "{" AccessorContracts "}"
+                              | "let" Ident ":" Type
+                              | "let" Ident ":" Type "{" AccessorContracts "}"
+                              |       Ident ":" Type
+                              |       Ident ":" Type "{" AccessorContracts "}"
 
-  syntax InterfaceItems ::= List{InterfaceItem,""}
-  syntax InterfaceItem ::= Access Definition
-                         | Access InterfaceFieldDecl
-                         | Access InterfaceFunDecl
-                         | Access "init" "(" Formals ")"
-  syntax InterfaceFieldDecl ::= "var" Ident ":" Type OptFieldContracts
-                              | "let" Ident ":" Type OptFieldContracts
-                              |       Ident ":" Type OptFieldContracts
-  syntax OptFieldContracts ::= "{" AccessorContracts "}"
-                             | ""
-  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")" OptAnnot
-                            | "fun" Ident "(" Formals ")" OptAnnot "{" Contract "}"
+  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")"
+                            | "fun" Ident "(" Formals ")"           ContractBlock
+                            | "fun" Ident "(" Formals ")" ":" Annot
+                            | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
 
   syntax AccessorContracts ::= List{AccessorContract,""}
   syntax AccessorContract ::=
-     "get" "{" Contract "}"
-   | "set" "(" Ident ")" "{" Contract "}"
+     "get"               ContractBlock
+   | "set" "(" Ident ")" ContractBlock
 
-  syntax ImplBody ::= List{ImplItem,";"}
-  syntax ImplItem ::= Access Definition
-                    | Access FunDef
-                    | Access FieldDecl // must be a synthetic field
+  syntax ImplBody ::= List{ImplItemAccess,";"}
+  syntax ImplItemAccess ::= Access ImplItem
+                          | ImplItem
+  syntax ImplItem ::= Definition
+                    | FunDef
+                    | FieldDecl // must be a synthetic field
 
   syntax FieldDecl ::=
      "let" Ident ":" Type
    | "var" Ident ":" Type
    | "synthetic" Ident "{" AccessorDefs "}"
   syntax AccessorDefs ::= List{AccessorDef,""}
-  syntax AccessorDef ::= "get" "{" FunBody "}"
+  syntax AccessorDef ::= "get"               "{" FunBody "}"
                        | "set" "(" Ident ")" "{" FunBody "}"
   // Nesting left out for now
 
   syntax VarDef ::=
-     "let" Ident OptAnnot "=" Exp
-   | "let" Ident OptAnnot "<-" Exp
-   | "var" Ident OptAnnot "=" Exp
-   | "var" Ident OptAnnot "<-" Exp
+     "let" Ident            "=" Exp
+   | "let" Ident ":" Annot  "=" Exp
+   | "let" Ident           "<-" Exp
+   | "let" Ident ":" Annot "<-" Exp
+   | "var" Ident            "=" Exp
+   | "var" Ident ":" Annot  "=" Exp
+   | "var" Ident           "<-" Exp
+   | "var" Ident ":" Annot "<-" Exp
 
   syntax Formal ::= Ident Ident ":" Type
                   |       Ident ":" Type
   syntax Formals ::= List{Formal,","}
 
-  syntax FunBody ::= Contract Block
-  syntax Contract ::= OptPre OptPost
-  syntax OptPre ::= "pre" "{" Conditions "}"
-                  | ""
-  syntax OptPost ::= "post" "{" Conditions "}"
-                    | ""
+  syntax FunBody ::= Block
+                   | Contract Block
+  syntax Contract ::= "pre" "{" Conditions "}"
+                    | "post" "{" Conditions "}"
+                    | "pre" "{" Conditions "}" "post" "{" Conditions "}"
+  syntax ContractBlock ::= "{" Contract "}"
+                         | "{" "}"
   syntax Conditions ::= NeList{Condition,""}
-  syntax Condition ::= Exp OptCondMessage
-  syntax OptCondMessage ::= ":" FPLString
-                          | ""
-
-  syntax OptAnnot ::= ":" Type
-                    | ""    [klabel(noAnnot)]
+  syntax Condition ::= Exp
+                     | Exp ":" FPLString
 
   syntax Stmt ::= VarDef
                 | FunDef
@@ -114,15 +137,17 @@ module FPL-COMMON-SYNTAX
                 | Exp
                 // Deploy?
                 // Publish?
-                | "if" IfCond "{" Block "}" Elses
+                | IfStmt
                 | "while" Exp "{" Block "}"
                 | "continue"
                 | "break"
                 | "return"
                 | "return" Exp
-  syntax Elses ::= ""
-                 | "else" "{" Block "}"
-                 | "else" "if" IfCond "{" Block "}" Elses
+
+  syntax IfStmt ::= "if" IfCond "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" IfStmt
+
   syntax IfCond ::= Exp
                   | "var" Ident "=" Exp
   syntax Block ::= List{Stmt,";"}
@@ -143,7 +168,8 @@ module FPL-COMMON-SYNTAX
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
                | "{" DictEntries "}" [strict(1)]
-               | "fun" "(" Formals ")" OptAnnot "{" FunBody "}"
+               | "fun" "(" Formals ")" "{" FunBody "}"
+               | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
                | Exp "[" Exp "]" [left, seqstrict]
                | Exp "." Ident    [left, strict(1)] // field access
                | Ident "(" Actuals ")" [strict(2)]
