@@ -76,7 +76,7 @@ func (tx *Transaction) CanonicalEncoding() []byte {
 func (tx *Transaction) FullEncoding() []byte {
 	sigs := make([][]byte, len(tx.ScriptAccounts))
 	for i, sig := range tx.Signatures {
-		sigs[i] = sig.Encode()
+		sigs[i] = EncodeAccountSignature(sig)
 	}
 
 	b, _ := rlp.EncodeToBytes([]interface{}{
