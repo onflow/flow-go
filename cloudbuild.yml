@@ -1,6 +1,6 @@
 steps:
   - name: "gcr.io/cloud-builders/docker"
     entrypoint: "make"
-    args: ["docker-build-${IMAGE_NAME}"]
-images: ["gcr.io/dl-dapper/${_IMAGE_NAME}"]
+    args: ["docker-build-${_IMAGE_NAME}"]
+images: ["gcr.io/dl-flow/${_IMAGE_NAME}"]
 logsBucket: "gs://flow-go-cloudbuild-logs"
