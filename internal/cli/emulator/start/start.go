@@ -3,7 +3,6 @@ package start
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/types"
 	"os"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/initialize"
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
