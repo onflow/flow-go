@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
@@ -29,7 +30,10 @@ func ParseAndCheckWithOptions(
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
 
-	require.Nil(t, err)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+		return nil, err
+	}
 
 	if options.ImportResolver != nil {
 		err := program.ResolveImports(options.ImportResolver)

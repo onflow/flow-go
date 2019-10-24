@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
@@ -46,7 +47,10 @@ func parseCheckAndInterpretWithOptions(
 	if options.HandleCheckerError != nil {
 		options.HandleCheckerError(err)
 	} else {
-		require.Nil(t, err)
+		if !assert.Nil(t, err) {
+			assert.FailNow(t, errors.UnrollChildErrors(err))
+			return nil
+		}
 	}
 
 	inter, err := interpreter.NewInterpreter(checker, options.PredefinedValues)
@@ -1922,7 +1926,8 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
 		actual,
@@ -1935,7 +1940,8 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 		value,
 	)
 
-	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
 		actual,
@@ -1956,7 +1962,8 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
       let test = Test()
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
 		actual,
@@ -3739,7 +3746,8 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
-		inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.NewStringValue("abc")),
+		inter.Globals["x"].Value.(interpreter.DictionaryValue).
+			Get(interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
 	)
 }
 
@@ -5312,4 +5320,44 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 		),
 		value,
 	)
+}
+
+func TestInterpretReferenceDereferenceFailure(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          resource R {
+              fun foo() {}
+          }
+
+          fun test() {
+              let ref = &storage[R] as R
+              ref.foo()
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
+		},
+	)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.DereferenceError{}, err)
 }

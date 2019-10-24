@@ -822,10 +822,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 			if ifStatement, ok := ifStatementContext.Accept(v).(*ast.IfStatement); ok {
 				elseBlock = &ast.Block{
 					Statements: []ast.Statement{ifStatement},
-					Range: ast.Range{
-						StartPos: ifStatement.StartPosition(),
-						EndPos:   ifStatement.EndPosition(),
-					},
+					Range:      ast.NewRangeFromPositioned(ifStatement),
 				}
 			}
 		}
