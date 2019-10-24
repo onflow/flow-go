@@ -1,7 +1,8 @@
 steps:
   - name: "gcr.io/cloud-builders/git"
-    entrypoint: "sh"
-    args: ["git", "init", "&&", "git", "submodule", "update", "--init", "--recursive"]
+    args: ["init"]
+  - name: "gcr.io/cloud-builders/git"
+    args: ["submodule", "update", "--init", "--recursive"]
   - name: "gcr.io/cloud-builders/docker"
     args: ["build", "-t", "gcr.io/dl-flow/${_IMAGE_NAME}:$SHORT_SHA", "-f", "cmd/${_IMAGE_NAME}/Dockerfile", "."]
 images: ["gcr.io/dl-flow/${_IMAGE_NAME}"]
