@@ -18,7 +18,7 @@ func (e *Encoder) Encode(v interface{}) error {
 	// encode the message
 	msg, err := encode(v)
 	if err != nil {
-		return errors.Wrap(err, "could not encode message")
+		return errors.Wrap(err, "could not serialize message")
 	}
 
 	// serialize the message

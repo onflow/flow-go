@@ -30,6 +30,7 @@ type Checker struct {
 	Program                 *ast.Program
 	PredeclaredValues       map[string]ValueDeclaration
 	PredeclaredTypes        map[string]TypeDeclaration
+	ImportLocation          ast.ImportLocation
 	ImportCheckers          map[ast.LocationID]*Checker
 	errors                  []error
 	valueActivations        *ValueActivations

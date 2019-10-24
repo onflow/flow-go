@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/pkg/model/flow"
-	"github.com/dapperlabs/flow-go/pkg/model/hotstuff"
-	"github.com/dapperlabs/flow-go/pkg/model/message"
+	"github.com/dapperlabs/flow-go/pkg/model/collection"
+	"github.com/dapperlabs/flow-go/pkg/model/consensus"
+	"github.com/dapperlabs/flow-go/pkg/model/trickle"
 )
 
 func encode(v interface{}) (*Envelope, error) {
@@ -17,34 +17,31 @@ func encode(v interface{}) (*Envelope, error) {
 	// determine the message type
 	var code uint8
 	switch v.(type) {
-	case *message.Ping:
+
+	case *trickle.Ping:
 		code = CodePing
-	case *message.Pong:
+	case *trickle.Pong:
 		code = CodePong
-	case *message.Auth:
+	case *trickle.Auth:
 		code = CodeAuth
-	case *message.Announce:
+	case *trickle.Announce:
 		code = CodeAnnounce
-	case *message.Request:
+	case *trickle.Request:
 		code = CodeRequest
-	case *message.Event:
-		code = CodeEvent
+	case *trickle.Response:
+		code = CodeResponse
 
-	case *flow.Collection:
-		code = CodeCollection
-	case *flow.Receipt:
-		code = CodeReceipt
-	case *flow.Approval:
-		code = CodeApproval
-	case *flow.Seal:
-		code = CodeSeal
+	case *collection.GuaranteedCollection:
+		code = CodeGuaranteedCollection
 
-	case *hotstuff.Block:
-		code = CodeBlock
-	case *hotstuff.Vote:
-		code = CodeVote
-	case *hotstuff.Timeout:
-		code = CodeTimeout
+	case *consensus.SnapshotRequest:
+		code = CodeSnapshotRequest
+	case *consensus.SnapshotResponse:
+		code = CodeSnapshotResponse
+	case *consensus.MempoolRequest:
+		code = CodeMempoolRequest
+	case *consensus.MempoolResponse:
+		code = CodeMempoolResponse
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)
