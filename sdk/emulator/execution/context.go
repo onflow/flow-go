@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // RuntimeContext implements host functionality required by the Cadence runtime.
@@ -89,7 +90,10 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (types.
 	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
-	r.setAccountPublicKeys(accountID, publicKeys)
+	err := r.setAccountPublicKeys(accountID, publicKeys)
+	if err != nil {
+		return types.Address{}, err
+	}
 
 	r.registers.Set(keyLatestAccount, accountID)
 
@@ -201,6 +205,10 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 	)
 
 	for i, publicKey := range publicKeys {
+		if err := keys.ValidateEncodedPublicKey(publicKey); err != nil {
+			return err
+		}
+
 		r.registers.Set(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
