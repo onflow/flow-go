@@ -37,7 +37,7 @@ for f in parser/invalid/*.fpl; do
     printf "\e[2K\rRUNNING %.$(($(tput cols)-8))s" "$f"
   fi
   test_parse $f &> /dev/null &
-  if ! wait % ; then
+  if wait % ; then
     if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
     printf "FAIL %s\n" "$f" 
   fi

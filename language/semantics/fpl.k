@@ -1,32 +1,37 @@
-module BPL-TOKENS
-  /* This module defines concrete token syntax that
-     we want to allow in programs but not in rules
-     of this semantics, to avoid ambiguity with K syntax.
-   */
-  imports BPL-TERMS
-  syntax IntLit ::=
-     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
-   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
-   | r"-?0b[01]([_01]*[01])?" [token]
-   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
-  syntax Ident ::=
-     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
-  syntax BPLString ::=
-     r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
+module FPL-TYPE-ANNOTATION
+  syntax Type
+  syntax Annot ::= Type | noAnnot()
+
 endmodule
 
-module BPL-TERMS
+module FPL-TYPE-ANNOTATION-PROGRAM-PARSING
+  syntax Type
+  syntax Annot ::= Type
+endmodule
+
+module FPL-COMMON-SYNTAX
+  /* This module defines most of the Flow AST,
+     containing all productions whose actual syntax can be
+     used in K rules without ambiguity.
+
+     The remaining constructs are given their actual syntax for
+     parsing programs in FPL-SYNTAX and a syntax that can be used
+     in semantic rules in FPL-RULE-SYNTAX
+   */
+  imports FPL-TYPE-ANNOTATION
   imports INT-SYNTAX
 
-  syntax IntLit ::= Int [token]
+  syntax IntLit ::= Int
   syntax Ident
-  syntax BPLString
+  syntax FPLString
 
   syntax Definition ::=
      FunDef
    | VarDef
-   | "struct" Ident OptConformances "{" CompositeItems "}"
-   | "resource" Ident OptConformances "{" CompositeItems "}"
+   | "struct" Ident ":" TypeIds "{" CompositeItems "}"
+   | "struct" Ident             "{" CompositeItems "}"
+   | "resource" Ident ":" TypeIds "{" CompositeItems "}"
+   | "resource" Ident             "{" CompositeItems "}"
    | "interface" Ident "{" InterfaceItems "}"
    // should there be separate "struct interface" and "resource interface"?
    | "impl" TypeId "for" TypeId "{" ImplBody "}"
@@ -35,6 +40,9 @@ module BPL-TERMS
      Definition
    | "import" ImportSource
    | "import" TypeIds "from" ImportSource
+
+  rule struct Ident { Items } => struct Ident : .TypeIds { Items } [macro]
+  rule resource Ident { Items } => resource Ident : .TypeIds { Items } [macro]
 
   syntax Transaction ::=
      "transaction" "{"
@@ -45,76 +53,105 @@ module BPL-TERMS
      "}"
   syntax Fields ::= List{FieldDecl,""}
 
-  syntax FileName ::= BPLString
-  syntax ImportSource ::= IntLit | BPLString
+  syntax FileName ::= FPLString
+  syntax ImportSource ::= IntLit | FPLString
 
-  syntax FunDef ::= "fun" Ident "(" Formals ")" OptAnnot "{" FunBody "}"
+  syntax FunDef ::= "fun" Ident "(" Formals ")"           "{" FunBody "}"
+                  | "fun" Ident "(" Formals ")" ":" Annot "{" FunBody "}"
 
-  syntax CompositeItems ::= List{CompositeItem,""}
-  syntax CompositeItem ::= Access Definition
-                         | Access FieldDecl
-                         | Access "init" "(" Formals ")" "{" FunBody "}"
+  rule fun Ident ( Formals ) { Body::FunBody } => fun Ident ( Formals ) : noAnnot() { Body } [macro]
+
+  syntax CompositeItems ::= List{CompositeItemAccess,""}
+  syntax CompositeItemAccess ::= Access CompositeItem
+                               | CompositeItem
+  syntax CompositeItem ::= Definition
+                         | FieldDecl
+                         | "init" "(" Formals ")" "{" FunBody "}"
   syntax Access ::= "pub" "(" "set" ")"
                   | "pub"
-                  | ""
 
-  syntax OptConformances ::= "" | ":" TypeIds
+  syntax InterfaceItems ::= List{InterfaceItemAccess,""}
+  syntax InterfaceItemAccess ::= Access InterfaceItem
+                               | InterfaceItem
+  syntax InterfaceItem ::= Definition
+                         | InterfaceFieldDecl
+                         | InterfaceFunDecl
+                         | "init" "(" Formals ")"
+  syntax InterfaceFieldDecl ::= "var" Ident ":" Type
+                              | "var" Ident ":" Type "{" AccessorContracts "}"
+                              | "let" Ident ":" Type
+                              | "let" Ident ":" Type "{" AccessorContracts "}"
+                              |       Ident ":" Type
+                              |       Ident ":" Type "{" AccessorContracts "}"
 
-  syntax InterfaceItems ::= List{InterfaceItem,""}
-  syntax InterfaceItem ::= Access Definition
-                         | Access InterfaceFieldDecl
-                         | Access InterfaceFunDecl
-                         | Access "init" "(" Formals ")"
-  syntax InterfaceFieldDecl ::= "var" Ident ":" Type OptFieldContracts
-                              | "let" Ident ":" Type OptFieldContracts
-                              |       Ident ":" Type OptFieldContracts
-  syntax OptFieldContracts ::= "{" AccessorContracts "}"
-                             | ""
-  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")" OptAnnot
-                            | "fun" Ident "(" Formals ")" OptAnnot "{" Contract "}"
+  rule (var  Ident : Type)::InterfaceFieldDecl => var Ident : Type { .AccessorContracts } [macro]
+  rule (let  Ident : Type)::InterfaceFieldDecl => let Ident : Type { .AccessorContracts } [macro]
+  rule      (Ident : Type)::InterfaceFieldDecl =>     Ident : Type { .AccessorContracts } [macro]
+
+  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")"
+                            | "fun" Ident "(" Formals ")"           ContractBlock
+                            | "fun" Ident "(" Formals ")" ":" Annot
+                            | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
+
+  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : noAnnot() {} [macro]
+  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : noAnnot() Block [macro]
+  rule fun Ident ( Formals ) : Annot              => fun Ident ( Formals ) : Annot {} [macro]
 
   syntax AccessorContracts ::= List{AccessorContract,""}
   syntax AccessorContract ::=
-     "get" "{" Contract "}"
-   | "set" "(" Ident ")" "{" Contract "}"
+     "get"               ContractBlock
+   | "set" "(" Ident ")" ContractBlock
 
-  syntax ImplBody ::= List{ImplItem,";"}
-  syntax ImplItem ::= Access Definition
-                    | Access FunDef
-                    | Access FieldDecl // must be a synthetic field
+  syntax ImplBody ::= List{ImplItemAccess,";"}
+  syntax ImplItemAccess ::= Access ImplItem
+                          | ImplItem
+  syntax ImplItem ::= Definition
+                    | FunDef
+                    | FieldDecl // must be a synthetic field
 
   syntax FieldDecl ::=
      "let" Ident ":" Type
    | "var" Ident ":" Type
    | "synthetic" Ident "{" AccessorDefs "}"
   syntax AccessorDefs ::= List{AccessorDef,""}
-  syntax AccessorDef ::= "get" "{" FunBody "}"
+  syntax AccessorDef ::= "get"               "{" FunBody "}"
                        | "set" "(" Ident ")" "{" FunBody "}"
   // Nesting left out for now
 
   syntax VarDef ::=
-     "let" Ident OptAnnot "=" Exp
-   | "let" Ident OptAnnot "<-" Exp
-   | "var" Ident OptAnnot "=" Exp
-   | "var" Ident OptAnnot "<-" Exp
+     "let" Ident            "=" Exp
+   | "let" Ident ":" Annot  "=" Exp
+   | "let" Ident           "<-" Exp
+   | "let" Ident ":" Annot "<-" Exp
+   | "var" Ident            "=" Exp
+   | "var" Ident ":" Annot  "=" Exp
+   | "var" Ident           "<-" Exp
+   | "var" Ident ":" Annot "<-" Exp
+
+  rule  let Ident  = Exp          => let Ident : noAnnot()  = Exp [macro]
+  rule  let Ident <- Exp          => let Ident : noAnnot() <- Exp [macro]
+  rule (var Ident  = Exp)::VarDef => var Ident : noAnnot()  = Exp [macro]
+  rule  var Ident <- Exp          => var Ident : noAnnot() <- Exp [macro]
 
   syntax Formal ::= Ident Ident ":" Type
                   |       Ident ":" Type
   syntax Formals ::= List{Formal,","}
 
-  syntax FunBody ::= Contract Block
-  syntax Contract ::= OptPre OptPost
-  syntax OptPre ::= "pre" "{" Conditions "}"
-                  | ""
-  syntax OptPost ::= "post" "{" Conditions "}"
-                    | ""
-  syntax Conditions ::= NeList{Condition,""}
-  syntax Condition ::= Exp OptCondMessage
-  syntax OptCondMessage ::= ":" BPLString
-                          | ""
+  syntax FunBody ::= Block
+                   | Contract Block
+  syntax Contract ::= "pre" "{" Conditions "}"
+                    | "post" "{" Conditions "}"
+                    | "pre" "{" Conditions "}" "post" "{" Conditions "}"
+  syntax ContractBlock ::= "{" Contract "}"
+                         | "{" "}"
 
-  syntax OptAnnot ::= ":" Type
-                    | ""    [klabel(noAnnot)]
+  rule {} => { pre { .Conditions } post { .Conditions } } [macro]
+  rule pre { Cond } => pre { Cond } post { .Conditions } [macro]
+  rule post { Cond } => pre { .Conditions } post { Cond } [macro]
+
+  syntax Conditions ::= NeList{Condition,""}
+  syntax Condition ::= Exp
+                     | Exp ":" FPLString
 
   syntax Stmt ::= VarDef
                 | FunDef
@@ -123,15 +160,20 @@ module BPL-TERMS
                 | Exp
                 // Deploy?
                 // Publish?
-                | "if" IfCond "{" Block "}" Elses
+                | IfStmt
                 | "while" Exp "{" Block "}"
                 | "continue"
                 | "break"
                 | "return"
                 | "return" Exp
-  syntax Elses ::= ""
-                 | "else" "{" Block "}"
-                 | "else" "if" IfCond "{" Block "}" Elses
+
+  syntax IfStmt ::= "if" IfCond "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" IfStmt
+
+  rule if Cond { Block } => if Cond { Block } else { .Block } [macro]
+  rule if Cond { Block } else If => if Cond { Block } else { If } [macro]
+
   syntax IfCond ::= Exp
                   | "var" Ident "=" Exp
   syntax Block ::= List{Stmt,";"}
@@ -142,7 +184,7 @@ module BPL-TERMS
                 | Path "." Ident
 
   syntax Exp ::= IntLit
-               | BPLString
+               | FPLString
                | Ident
                | "self"
                | "nil"
@@ -152,7 +194,8 @@ module BPL-TERMS
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
                | "{" DictEntries "}" [strict(1)]
-               | "fun" "(" Formals ")" OptAnnot "{" FunBody "}"
+               | "fun" "(" Formals ")" "{" FunBody "}"
+               | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
                | Exp "[" Exp "]" [left, seqstrict]
                | Exp "." Ident    [left, strict(1)] // field access
                | Ident "(" Actuals ")" [strict(2)]
@@ -182,6 +225,8 @@ module BPL-TERMS
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
+  rule fun ( Formals ) { Body } => fun ( Formals ) : noAnnot() { Body } [macro]
+
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
 
@@ -205,14 +250,33 @@ module BPL-TERMS
   syntax Pgm ::= List{TopDefinition,";"}
 endmodule
 
-module BPL-SYNTAX
-  imports BPL-TERMS
-  imports BPL-TOKENS
+module FPL-TOKENS
+  /* This modules defines the lexical syntax of
+     tokens that we need for parsing programs, but
+     but must not be parsed in K rules, to
+     avoid ambiguity with K syntax
+   */
+  imports FPL-COMMON-SYNTAX
+  syntax IntLit ::=
+     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
+   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
+   | r"-?0b[01]([_01]*[01])?" [token]
+   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
+  syntax Ident ::=
+     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
+  syntax FPLString ::=
+     r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
 endmodule
 
-module BPL
+module FPL-SYNTAX
+  /* This module defines the concrete syntax available in programs */
+  imports FPL-COMMON-SYNTAX
+  imports FPL-TOKENS
+endmodule
+
+module FPL
   imports DOMAINS
-  imports BPL-TERMS
+  imports FPL-COMMON-SYNTAX
 
   syntax KResult ::= Int
   configuration
