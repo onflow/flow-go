@@ -37,9 +37,9 @@ func TestSubmitTransaction(t *testing.T) {
 	assert.Nil(t, err)
 
 	// tx1 status becomes TransactionFinalized
-	tx, err := b.GetTransaction(tx1.Hash)
+	tx2, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionFinalized, tx.Status)
+	assert.Equal(t, types.TransactionFinalized, tx2.Status)
 }
 
 // TODO: Add test case for missing ReferenceBlockHash
@@ -48,91 +48,91 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("EmptyTransaction", func(t *testing.T) {
 		// Create empty transaction (no required fields)
-		tx1 := types.Transaction{}
+		tx := types.Transaction{}
 
-		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
-		tx1.AddSignature(b.RootAccountAddress(), sig)
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err = b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
 	t.Run("MissingScript", func(t *testing.T) {
 		// Create transaction with no Script field
-		tx1 := types.Transaction{
+		tx := types.Transaction{
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
-		tx1.AddSignature(b.RootAccountAddress(), sig)
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err = b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
 	t.Run("MissingNonce", func(t *testing.T) {
 		// Create transaction with no Nonce field
-		tx1 := types.Transaction{
+		tx := types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
-		tx1.AddSignature(b.RootAccountAddress(), sig)
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err = b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
 	t.Run("MissingComputeLimit", func(t *testing.T) {
 		// Create transaction with no ComputeLimit field
-		tx1 := types.Transaction{
+		tx := types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
-		tx1.AddSignature(b.RootAccountAddress(), sig)
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err = b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
 	t.Run("MissingPayerAccount", func(t *testing.T) {
 		// Create transaction with no PayerAccount field
-		tx1 := types.Transaction{
+		tx := types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 		}
 
-		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
-		tx1.AddSignature(b.RootAccountAddress(), sig)
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err = b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 }
@@ -140,7 +140,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := types.Transaction{
+	tx := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -149,17 +149,17 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.Nil(t, err)
 
-	tx1.AddSignature(b.RootAccountAddress(), sig)
+	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err = b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx)
 	assert.Nil(t, err)
 
 	// Submit tx1 again (errors)
-	err = b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx)
 	assert.IsType(t, err, &emulator.ErrDuplicateTransaction{})
 }
 
@@ -187,9 +187,9 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// tx1 status becomes TransactionReverted
-	tx, err := b.GetTransaction(tx1.Hash)
+	tx2, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionReverted, tx.Status)
+	assert.Equal(t, types.TransactionReverted, tx2.Status)
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
