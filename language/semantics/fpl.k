@@ -290,12 +290,14 @@ endmodule
 module FPL-VALUES
   imports BOOL-SYNTAX
   imports INT-SYNTAX
+  imports STRING-SYNTAX
 
   syntax Type
   syntax Val ::= Int | Bool
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
   syntax KResult ::= TypedVal | Int // for constant expressions
+  syntax FPLString ::= String
 
 endmodule
 
@@ -360,6 +362,34 @@ module FPL-TYPING
   rule #type(IntLit, T) => T
   rule #type(T, IntLit) => T
   rule #type(T, T) => T
+
+  syntax Ident ::= "panic" [token]
+
+  syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
+  rule pow8 => 256 [macro]
+  rule pow16 => 65536 [macro]
+  rule pow32 => 4294967296 [macro]
+  rule pow64 => 18446744073709551616 [macro]
+
+  syntax Int ::= "min8" | "min16" | "min32" | "min64"
+  rule min8 => -128 [macro]
+  rule min16 => -32768 [macro]
+  rule min32 => -2147483648 [macro]
+  rule min64 => -9223372036854775808 [macro]
+
+  syntax Exp ::= check(TypedVal) [function]
+  rule check(v(V, T)) => #fun(V' => #if V' ==K V #then v(V, T) #else panic("Integer overflow") #fi)(chop(v(V, T)))
+
+  syntax Exp ::= chop(TypedVal) [function]
+  rule chop(v(I, Int)) => v(I, Int)
+  rule chop(v(I, UInt8)) => v(I modInt pow8, UInt8)
+  rule chop(v(I, UInt16)) => v(I modInt pow16, UInt16)
+  rule chop(v(I, UInt32)) => v(I modInt pow32, UInt32)
+  rule chop(v(I, UInt64)) => v(I modInt pow64, UInt64)
+  rule chop(v(I, Int8)) => v((I -Int min8) modInt pow8 +Int min8, Int8)
+  rule chop(v(I, Int16)) => v((I -Int min16) modInt pow16 +Int min16, Int16)
+  rule chop(v(I, Int32)) => v((I -Int min32) modInt pow32 +Int min32, Int32)
+  rule chop(v(I, Int64)) => v((I -Int min64) modInt pow64 +Int min64, Int64)
 
 endmodule
 
