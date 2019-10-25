@@ -404,7 +404,7 @@ module FPL-TYPING
   rule min64 => -9223372036854775808 [macro]
 
   syntax Exp ::= check(TypedVal) [function]
-  rule check(v(V, T)) => #fun(V' => #if V' ==K V #then v(V, T) #else panic("Integer overflow") #fi)(chop(v(V, T)))
+  rule check(v(V, T)) => #fun(V' => #if V' ==K v(V, T) #then v(V, T) #else panic("Integer overflow") #fi)(chop(v(V, T)))
 
   syntax Exp ::= chop(TypedVal) [function]
   rule chop(v(I, Int)) => v(I, Int)
