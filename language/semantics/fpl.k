@@ -67,7 +67,7 @@ module FPL-COMMON-SYNTAX
                                | CompositeItem
   syntax CompositeItem ::= Definition
                          | FieldDecl
-                         | "init" "(" Formals ")" "{" FunBody "}"
+                         | "init" "(" Formals ")" FunBody
   syntax Access ::= "pub" "(" "set" ")"
                   | "pub"
 
@@ -115,8 +115,8 @@ module FPL-COMMON-SYNTAX
    | "var" Ident ":" Type
    | "synthetic" Ident "{" AccessorDefs "}"
   syntax AccessorDefs ::= List{AccessorDef,""}
-  syntax AccessorDef ::= "get"               "{" FunBody "}"
-                       | "set" "(" Ident ")" "{" FunBody "}"
+  syntax AccessorDef ::= "get"               FunBody
+                       | "set" "(" Ident ")" FunBody
   // Nesting left out for now
 
   syntax VarDef ::=
@@ -197,8 +197,8 @@ module FPL-COMMON-SYNTAX
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
                | "{" DictEntries "}" [strict(1)]
-               | "fun" "(" Formals ")" "{" FunBody "}"
-               | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
+               | "fun" "(" Formals ")" FunBody
+               | "fun" "(" Formals ")" ":" Annot FunBody
                | Exp "[" Exp "]" [left, seqstrict]
                | Exp "." Ident    [left, strict(1)] // field access
                | Ident "(" Actuals ")" [strict(2)]
@@ -407,6 +407,14 @@ module FPL-FUNCTIONS
   rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
        <funs> Rho => Rho [ F <- funDef(Fs, T, C, B) ] </funs>
 
+  syntax Bool ::= checkLabels(Formals,Actuals) [function]
+  rule checkLabels(.Formals, .Actuals) => true
+  rule checkLabels(((Lbl _ : _), FS), ((ArgLbl : _), AS)) => checkLabels(FS,AS)
+     when Lbl ==K ArgLbl
+  rule checkLabels(((Lbl _ : _), FS), (_::Exp, AS)) => checkLabels(FS,AS)
+     when Lbl ==K #token("_","Ident")
+  rule checkLabels(_,_) => false [owise]
+
   syntax Map ::= initArgs(Formals,Actuals) [function]
                | initArg(Formal,Actual) [function]
   rule initArgs(.Formals, .Actuals) => .Map
@@ -415,11 +423,9 @@ module FPL-FUNCTIONS
   rule initArg((Lbl Name : T), (ArgLbl : X)) =>
        Name |-> env(let, X, T)
      when Lbl ==K ArgLbl
-  /*
   rule initArg((NoLbl Name : T), X:Val) =>
        Name |-> env(let, X, T)
      when NoLbl ==K #token("_","Ident")
-   */
 
   rule <k>((F:Ident)(Args) ~> K) => B:Block</k>
        <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
@@ -468,5 +474,6 @@ module FPL-TESTING
 
   rule <k> .Pgm </k>
        <env> E => .Map </env>
+       <funs> _ => .Map </funs>
     requires E =/=K .Map
 endmodule
