@@ -2,6 +2,7 @@
 package keys
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/encoding"
 	"github.com/dapperlabs/flow-go/pkg/types"
@@ -41,6 +42,8 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 		return crypto.UnknownHashingAlgorithm
 	}
 }
+
+const KeyWeightThreshold = constants.AccountKeyWeightThreshold
 
 // GeneratePrivateKey generates a private key of the specified key type.
 func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error) {
