@@ -322,7 +322,9 @@ endmodule
 
 module FPL-FUN-ENV
   imports FPL-COMMON-SYNTAX
-  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block)
+  imports MAP
+
+  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
 endmodule
 
 module FPL-PANIC
@@ -475,8 +477,8 @@ module FPL-FUNCTIONS
   imports FPL-TYPING
 
   rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
-       <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L) ] </env>
-       <store>... .Map => !L |-> funDef(Fs, T, C, B) ...</store>
+       <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
+       <store>... .Map => !L |-> funDef(Fs, T, C, B, Rho [ F <- env(let, ((types(Fs)): T), !L) ]) ...</store>
 
   syntax Types ::= types(Formals) [function]
   rule types(.Formals) => .Types
@@ -500,8 +502,8 @@ module FPL-FUNCTIONS
     requires NoLbl ==K #token("_","Ident")
 
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
-       <env> (_::Map F |-> env(... loc: L)) #as Rho </env>
-       <store>... L |-> funDef(... args: Params, body: B) ...</store>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
+       <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
        <stack> .List => ListItem(frame(K, Rho)) ...</stack>
   rule <k>return X:TypedVal ~> _ => X ~> K</k>
        <env>_ => Rho</env>
