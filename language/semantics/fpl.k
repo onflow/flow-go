@@ -307,9 +307,11 @@ module FPL-VALUES
 endmodule
 
 module FPL-ENV
-  syntax TypedVal
+  imports INT-SYNTAX
+
+  syntax Type
   syntax Mutability ::= "let" | "var"
-  syntax EnvEntry ::= env(mut: Mutability, v: TypedVal)
+  syntax EnvEntry ::= env(mut: Mutability, t: Type, loc: Int)
 endmodule
 
 module FPL-STACK
@@ -360,9 +362,10 @@ module FPL-TYPING
   rule #type(I:Int) => IntLit
   rule #type(B:Bool) => Bool
   rule [[ #type(X:Ident) => T ]]
-       <env>... X |-> env(... v: v(_, T)) ...</env>
-  rule [[ #type(Fun:Ident(Provided:Actuals)) => R ]]
-       <funs>... Fun |-> funDef(... args: Expected, result: R) ...</funs>
+       <env>... X |-> env(... t: T) ...</env>
+  rule [[ #type(X:Ident(_)) => R ]]
+       <env>... X |-> env(... loc: L) ...</env>
+       <store>... L |-> funDef(... result: R) ...</store>
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -429,8 +432,8 @@ module FPL-CONFIGURATION
     <k>$PGM:Pgm</k>
     <scope> global </scope>
     <env> .Map </env>
+    <store> .Map </store>
     <stack> .List </stack>
-    <funs> .Map </funs>
 endmodule
 
 module FPL-VARIABLE-DECLARATION
@@ -446,15 +449,18 @@ module FPL-VARIABLE-DECLARATION
   rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
 
   rule <k> let X : T:Type = v(V, T) => . ... </k>
-       <env> Rho => Rho [ X <- env(let, v(V, T)) ] </env>
+       <env> Rho => Rho [ X <- env(let, T, !L:Int) ] </env>
+       <store>... .Map => !L |-> V ...</store>
   rule <k> var X : T:Type = v(V, T) => . ... </k>
-       <env> Rho => Rho [ X <- env(var, v(V, T)) ] </env>
+       <env> Rho => Rho [ X <- env(var, T, !L:Int) ] </env>
+       <store>... .Map => !L |-> V ...</store>
 
   rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
   rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
 
-  rule <k> X:Ident => V ... </k>
-       <env>... X |-> env(... v: V) ...</env>
+  rule <k> X:Ident => v(V, T) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
 endmodule
 
 module FPL-STMTS
@@ -469,7 +475,12 @@ module FPL-FUNCTIONS
   imports FPL-TYPING
 
   rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
-       <funs> Rho => Rho [ F <- funDef(Fs, T, C, B) ] </funs>
+       <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L) ] </env>
+       <store>... .Map => !L |-> funDef(Fs, T, C, B) ...</store>
+
+  syntax Types ::= types(Formals) [function]
+  rule types(.Formals) => .Types
+  rule types(_ _ : T, Fs) => T, types(Fs)
 
   syntax Bool ::= checkLabels(Formals,Actuals) [function]
   rule checkLabels(.Formals, .Actuals) => true
@@ -489,12 +500,12 @@ module FPL-FUNCTIONS
     requires NoLbl ==K #token("_","Ident")
 
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
-       <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
-       <env> Env </env>
-       <stack> .List => ListItem(frame(K, Env)) ...</stack>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho </env>
+       <store>... L |-> funDef(... args: Params, body: B) ...</store>
+       <stack> .List => ListItem(frame(K, Rho)) ...</stack>
   rule <k>return X:TypedVal ~> _ => X ~> K</k>
-       <env>_ => Env</env>
-       <stack> ListItem(frame(K,Env)) => .List ...</stack>
+       <env>_ => Rho</env>
+       <stack> ListItem(frame(K,Rho)) => .List ...</stack>
 
 endmodule
 
@@ -625,8 +636,8 @@ module FPL-TESTING
 
   rule <k> .Pgm #Or panic(_) </k>
        <env> E => .Map </env>
-       <funs> _ => .Map </funs>
-    requires E =/=K .Map
+       <store> S => .Map </store>
+    requires E =/=K .Map orBool S =/=K .Map
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
