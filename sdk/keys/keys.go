@@ -30,7 +30,7 @@ func (k KeyType) SigningAlgorithm() crypto.SigningAlgorithm {
 	}
 }
 
-// SigningAlgorithm returns the hashing algorithm for this key type.
+// HashingAlgorithm returns the hashing algorithm for this key type.
 func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	switch k {
 	case ECDSA_P256_SHA2_256, ECDSA_SECp256k1_SHA2_256:
