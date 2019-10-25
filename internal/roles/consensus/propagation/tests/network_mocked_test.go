@@ -33,7 +33,7 @@ func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int)
 
 	nodeEntry := allNodes[nodeIndex]
 
-	nodeID, err := committee.EntryToId(nodeEntry)
+	nodeID, err := committee.EntryToID(nodeEntry)
 	if err != nil {
 		return nil, err
 	}

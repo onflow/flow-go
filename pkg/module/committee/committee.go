@@ -21,8 +21,10 @@ type Committee struct {
 	nodes map[string]*model.Node
 }
 
-// EntryToFields takes the a committee entry and returns the node identity.
-// > EntryToId("consensus-consensus1@localhost:7297")
+// EntryToFields takes the a committee entry and returns the parsed node
+// info fields
+//
+// > EntryToFields("consensus-consensus1@localhost:7297")
 // "consensus", "consensus1", "localhost:7297", nil
 func EntryToFields(entry string) (string, string, string, error) {
 	// try to parse the nodes
@@ -37,7 +39,8 @@ func EntryToFields(entry string) (string, string, string, error) {
 	return role, id, address, nil
 }
 
-func EntryToId(entry string) (string, error) {
+// EntryToID takes the a committee entry and returns the node identity.
+func EntryToID(entry string) (string, error) {
 	_, id, _, err := EntryToFields(entry)
 	return id, err
 }
