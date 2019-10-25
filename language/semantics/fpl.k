@@ -290,8 +290,9 @@ module FPL-SYNTAX
 endmodule
 
 module FPL-SCOPES
-    syntax Ident
-    syntax Scope ::= "global" | local(Ident)
+    imports INT-SYNTAX
+
+    syntax Scope ::= "global" | local(Int)
 endmodule
 
 module FPL-VALUES
@@ -317,9 +318,10 @@ module FPL-ENV
 endmodule
 
 module FPL-STACK
-  imports DOMAINS
-  imports FPL-ENV
-  syntax Frame ::= frame(code:K, env: Map)
+  imports MAP
+
+  syntax Scope
+  syntax Frame ::= frame(code:K, env: Map, scope: Scope)
 endmodule
 
 module FPL-FUN-ENV
@@ -506,10 +508,12 @@ module FPL-FUNCTIONS
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
        <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
        <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
-       <stack> .List => ListItem(frame(K, Rho)) ...</stack>
-  rule <k>return X:TypedVal ~> _ => X ~> K</k>
-       <env>_ => Rho</env>
-       <stack> ListItem(frame(K,Rho)) => .List ...</stack>
+       <scope> Scope => local(L) </scope>
+       <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
+  rule <k> return X:TypedVal ~> _ => X ~> K </k>
+       <env> _ => Rho </env>
+       <scope> _ => Scope </scope>
+       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
 
 endmodule
 
