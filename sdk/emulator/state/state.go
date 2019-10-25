@@ -136,16 +136,16 @@ func (ws *WorldState) InsertTransaction(tx *types.Transaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
-	if _, exists := ws.Transactions[string(tx.Hash())]; exists {
+	if _, exists := ws.Transactions[string(tx.Hash)]; exists {
 		return
 	}
 
-	ws.Transactions[string(tx.Hash())] = tx
+	ws.Transactions[string(tx.Hash)] = tx
 
 	ws.latestStateMutex.Lock()
 	defer ws.latestStateMutex.Unlock()
 
-	ws.LatestState = tx.Hash()
+	ws.LatestState = tx.Hash
 }
 
 // UpdateTransactionStatus updates the transaction status of an existing transaction.
@@ -159,5 +159,5 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.Transa
 	defer ws.transactionsMutex.Unlock()
 
 	tx.Status = status
-	ws.Transactions[string(tx.Hash())] = tx
+	ws.Transactions[string(tx.Hash)] = tx
 }
