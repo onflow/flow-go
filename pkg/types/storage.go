@@ -12,12 +12,6 @@ type Register struct {
 	Value *RegisterValue
 }
 
-// RegisterUpdate covers both first time value setting and change value
-type RegisterUpdate struct {
-	ID       *RegisterID
-	NewValue *RegisterValue
-}
-
 type StorageProof []byte
 type StateCommitment []byte
 
@@ -26,15 +20,15 @@ type StateCommitment []byte
 type Storage interface {
 	// Trusted methods (without proof)
 	// Get registers at specific StateCommitment by a list of register ids
-	GetRegisters(registerIds []*RegisterID, stateCommitment StateCommitment) (registers []*Register, err error)
+	GetRegisters(registerIds []RegisterID, stateCommitment StateCommitment) (registers []Register, err error)
 	// Batched atomic updates of a subset of registers at specific state
-	UpdateRegister(registerIds []*RegisterID, stateCommitment StateCommitment) (newStateCommitment StateCommitment, err error)
+	UpdateRegister(registers []Register, stateCommitment StateCommitment) (newStateCommitment StateCommitment, err error)
 
 	// Untrusted methods (providing proofs)
 	// Get registers at specific StateCommitment by a list of register ids with proofs
-	GetRegistersWithProof(registerIds []*RegisterID, stateCommitment StateCommitment) (registers []*Register, proof StorageProof, err error)
+	GetRegistersWithProof(registerIds []RegisterID, stateCommitment StateCommitment) (registers []Register, proof StorageProof, err error)
 	// Batched atomic updates of a subset of registers at specific state with proofs
-	UpdateRegisterWithProof(registerIds []*RegisterID, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proof StorageProof, err error)
+	UpdateRegisterWithProof(registers []Register, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proof StorageProof, err error)
 }
 
 // StorageVerifier should be designed as an standalone package to verify proofs of storage
@@ -42,5 +36,5 @@ type StorageVerifier interface {
 	// verify if a provided proof for getRegisters is accurate
 	VerifyGetRegistersProof(registers []Register, proof StorageProof, stateCommitment StateCommitment) (verified bool, err error)
 	// verify if a provided proof updateRegister is accurate
-	VerifyUpdateRegistersProof(updates []RegisterUpdate, proof StorageProof, initialStateCommitment StateCommitment, finalStateCommitment StateCommitment) (verified bool, err error)
+	VerifyUpdateRegistersProof(registers []Register, proof StorageProof, initialStateCommitment StateCommitment, finalStateCommitment StateCommitment) (verified bool, err error)
 }
