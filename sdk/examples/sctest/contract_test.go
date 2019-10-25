@@ -114,7 +114,7 @@ func TestCreateMinter(t *testing.T) {
 	// GreatNFTMinter must be instantiated with initialID > 0 and
 	// specialMod > 1
 	t.Run("Cannot create minter with negative initial ID", func(t *testing.T) {
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, -1, 2),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
@@ -134,7 +134,7 @@ func TestCreateMinter(t *testing.T) {
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, 1, 1),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
@@ -154,7 +154,7 @@ func TestCreateMinter(t *testing.T) {
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, 1, 2),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
@@ -183,7 +183,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Next, instantiate the minter
-	createMinterTx := &types.Transaction{
+	createMinterTx := types.Transaction{
 		Script:         generateCreateMinterScript(contractAddr, 1, 2),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,
@@ -200,7 +200,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Mint the first NFT
-	mintTx := &types.Transaction{
+	mintTx := types.Transaction{
 		Script:         generateMintScript(contractAddr),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,
@@ -221,7 +221,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Mint a second NF
-	mintTx2 := &types.Transaction{
+	mintTx2 := types.Transaction{
 		Script:         generateMintScript(contractAddr),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,

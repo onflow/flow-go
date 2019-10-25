@@ -87,7 +87,7 @@ func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublic
 
 // SignTransaction signs a transaction with a private key.
 func SignTransaction(
-	tx *types.Transaction,
+	tx types.Transaction,
 	privateKey types.AccountPrivateKey,
 ) (crypto.Signature, error) {
 	hasher, err := crypto.NewHasher(privateKey.HashAlgo)
@@ -95,7 +95,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(*tx)
+	b, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(tx)
 	if err != nil {
 		return nil, err
 	}

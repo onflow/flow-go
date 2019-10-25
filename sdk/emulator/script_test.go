@@ -14,7 +14,7 @@ import (
 func TestCallScript(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx := &types.Transaction{
+	tx := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),

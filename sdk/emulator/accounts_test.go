@@ -32,7 +32,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKey}, nil)
 		require.Nil(t, err)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -76,7 +76,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil)
 		assert.Nil(t, err)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -123,7 +123,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, code)
 		assert.Nil(t, err)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -156,7 +156,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount(nil, code)
 		assert.Nil(t, err)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -200,7 +200,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKey}, code)
 		assert.Nil(t, err)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -239,7 +239,7 @@ func TestAddAccountKey(t *testing.T) {
 	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.Nil(t, err)
 
-	tx1 := &types.Transaction{
+	tx1 := types.Transaction{
 		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -258,7 +258,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	script := []byte("fun main(account: Account) {}")
 
-	tx2 := &types.Transaction{
+	tx2 := types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -285,7 +285,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.Nil(t, err)
 
-	tx1 := &types.Transaction{
+	tx1 := types.Transaction{
 		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -307,7 +307,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 2)
 
-	tx2 := &types.Transaction{
+	tx2 := types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -329,7 +329,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 1)
 
-	tx3 := &types.Transaction{
+	tx3 := types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -351,7 +351,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 1)
 
-	tx4 := &types.Transaction{
+	tx4 := types.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -392,7 +392,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -433,7 +433,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []byte{4, 5, 6}, account.Code)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -478,7 +478,7 @@ func TestUpdateAccountCode(t *testing.T) {
 			}
 		`, accountAddressB.Hex()))
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             unauthorizedUpdateAccountCodeScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -528,7 +528,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`, address.Hex()))
 
-	tx := &types.Transaction{
+	tx := types.Transaction{
 		Script:             script,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),

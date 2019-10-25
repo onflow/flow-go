@@ -192,11 +192,11 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
+func (b *EmulatedBlockchain) SubmitTransaction(tx types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	hash.SetTransactionHash(tx)
+	hash.SetTransactionHash(&tx)
 
 	// TODO: add more invalid transaction checks
 	missingFields := tx.MissingFields()
@@ -212,16 +212,16 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash}
 	}
 
-	if err := b.verifySignatures(*tx); err != nil {
+	if err := b.verifySignatures(tx); err != nil {
 		return err
 	}
 
-	b.txPool[string(tx.Hash)] = tx
-	b.pendingWorldState.InsertTransaction(tx)
+	b.txPool[string(tx.Hash)] = &tx
+	b.pendingWorldState.InsertTransaction(&tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
 
-	events, err := b.computer.ExecuteTransaction(registers, *tx)
+	events, err := b.computer.ExecuteTransaction(registers, tx)
 	if err != nil {
 		b.pendingWorldState.UpdateTransactionStatus(tx.Hash, types.TransactionReverted)
 
@@ -398,7 +398,7 @@ func (b *EmulatedBlockchain) CreateAccount(publicKeys []types.AccountPublicKey, 
 		return types.Address{}, nil
 	}
 
-	tx := &types.Transaction{
+	tx := types.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,

@@ -5,13 +5,14 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/psiemens/sconfig"
+	"github.com/spf13/cobra"
+
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/keys"
-	"github.com/psiemens/sconfig"
-	"github.com/spf13/cobra"
 )
 
 type Config struct {
@@ -44,7 +45,7 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
@@ -64,7 +65,7 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to connect to emulator")
 		}
 
-		err = client.SendTransaction(context.Background(), *tx)
+		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
 			utils.Exitf(1, "Failed to send transaction: %v", err)
 		}

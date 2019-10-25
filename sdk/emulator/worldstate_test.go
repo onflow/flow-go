@@ -33,7 +33,7 @@ func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
-	tx1 := &types.Transaction{
+	tx1 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
@@ -42,14 +42,14 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(tx1)
+	hash.SetTransactionHash(&tx1)
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := &types.Transaction{
+	tx2 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
@@ -58,14 +58,14 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(tx2)
+	hash.SetTransactionHash(&tx2)
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
-	tx3 := &types.Transaction{
+	tx3 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
@@ -169,7 +169,7 @@ func TestWorldStates(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.Transaction{
+	tx1 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
@@ -178,14 +178,14 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(tx1)
+	hash.SetTransactionHash(&tx1)
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := &types.Transaction{
+	tx2 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
@@ -194,7 +194,7 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(tx2)
+	hash.SetTransactionHash(&tx2)
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)

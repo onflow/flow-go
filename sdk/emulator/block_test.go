@@ -1,6 +1,7 @@
 package emulator_test
 
 import (
+	"github.com/dapperlabs/flow-go/pkg/hash"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ import (
 func TestCommitBlock(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := &types.Transaction{
+	tx1 := types.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -21,6 +22,8 @@ func TestCommitBlock(t *testing.T) {
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
+
+	hash.SetTransactionHash(&tx1)
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
@@ -36,7 +39,7 @@ func TestCommitBlock(t *testing.T) {
 
 	assert.Equal(t, types.TransactionFinalized, tx.Status)
 
-	tx2 := &types.Transaction{
+	tx2 := types.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -44,6 +47,8 @@ func TestCommitBlock(t *testing.T) {
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
+
+	hash.SetTransactionHash(&tx2)
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)

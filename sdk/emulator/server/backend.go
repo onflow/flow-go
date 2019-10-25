@@ -53,7 +53,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = b.blockchain.SubmitTransaction(&tx)
+	err = b.blockchain.SubmitTransaction(tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:

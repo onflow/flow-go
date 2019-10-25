@@ -69,7 +69,7 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to generate transaction script")
 		}
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,
@@ -88,7 +88,7 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to connect to emulator")
 		}
 
-		err = client.SendTransaction(context.Background(), *tx)
+		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
 			utils.Exit(1, "Failed to send account creation transaction")
 		}

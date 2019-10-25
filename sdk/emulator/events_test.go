@@ -2,6 +2,7 @@ package emulator_test
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/hash"
 	"math/big"
 	"testing"
 
@@ -34,13 +35,15 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 		}
+
+		hash.SetTransactionHash(&tx)
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
@@ -114,7 +117,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`, address.Hex()))
 
-		tx := &types.Transaction{
+		tx := types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
