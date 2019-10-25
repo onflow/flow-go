@@ -233,9 +233,11 @@ module FPL-COMMON-SYNTAX
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
 
-  syntax Actual ::= Ident ":" Exp [strict(2)]
+  syntax KResult
+  syntax Actual ::= Ident ":" Exp [hybrid, strict(2)]
                   | Exp
-  syntax Actuals ::= List{Actual,","} [seqstrict, klabel(actuals)]
+  syntax Actuals ::= List{Actual,","} [seqstrict, klabel(actuals), hybrid]
+  rule isKResult(.Actuals) => true
 
   syntax TypeId ::= Ident // plus fully qualified names
   syntax TypeIds ::= List{TypeId,","}
