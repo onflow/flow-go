@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/network/trickle/mocks"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"math/rand"
 	"os"
 	"testing"
@@ -98,26 +98,26 @@ func TestSubmitCollection(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
 		// can be delivery directly to another engine on a different node
 		_, nodes, err := createConnectedNodes([]string{"consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7297"})
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		node1 := nodes[0]
 		node2 := nodes[1]
 
 		hash, err := randHash()
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		gc := &collection.GuaranteedCollection{
 			Hash: hash,
 		}
 		// node1's engine receives a collection hash
 		err = node1.engine.SubmitGuaranteedCollection(gc)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		// inspect node2's mempool to check if node2's engine received the collection hash
 		coll, err := node2.pool.Get(hash)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		// should match
-		assert.Equal(t, coll.Hash, hash)
+		require.Equal(t, coll.Hash, hash)
 	})
 }
