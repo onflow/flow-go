@@ -431,10 +431,100 @@ endmodule
 
 module FPL-ARITHMETIC
   imports FPL-CONFIGURATION
+  imports FPL-TYPING
 
-  rule <k> I1 + I2 => I1 +Int I2 ... </k>
-  rule <k> I1 == I2 => I1 ==Int I2 ... </k>
-  rule <k> B1 == B2 => B1 ==Bool B2 ... </k>
+  syntax Exp ::= intExp(Exp, Exp)
+  rule intExp(L, R)
+    => ((L * R)
+   #Or ((L &* R)
+   #Or ((L / R)
+   #Or ((L &/ R)
+   #Or ((L % R)
+   #Or ((L + R)
+   #Or ((L &+ R)
+   #Or ((L - R)
+   #Or ((L &- R)
+   #Or ((L == R)
+   #Or ((L != R)
+   #Or ((L < R)
+   #Or ((L <= R)
+   #Or ((L > R)
+   #Or (L >= R)))))))))))))))::Exp [macro]
+
+  rule <k> intExp(I1:Int, v(I2, T)) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+  rule <k> intExp(v(I1, T), I2:Int) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+
+  syntax Exp ::= fillExp(TypedVal, TypedVal, Exp) [function]
+  rule fillExp(L, R, _ * _) => L * R
+  rule fillExp(L, R, _ &* _) => L &* R
+  rule fillExp(L, R, _ / _) => L / R
+  rule fillExp(L, R, _ &/ _) => L &/ R
+  rule fillExp(L, R, _ % _) => L % R
+  rule fillExp(L, R, _ + _) => L + R
+  rule fillExp(L, R, _ &+ _) => L &+ R
+  rule fillExp(L, R, _ - _) => L - R
+  rule fillExp(L, R, _ &- _) => L &- R
+  rule fillExp(L, R, _ == _) => L == R
+  rule fillExp(L, R, _ != _) => L != R
+  rule fillExp(L, R, _ < _) => L < R
+  rule fillExp(L, R, _ <= _) => L <= R
+  rule fillExp(L, R, _ > _) => L > R
+  rule fillExp(L, R, _ >= _) => L >= R
+
+  rule <k> B:Bool => v(B, Bool) ... </k>
+
+  rule <k> - I:Int => 0 -Int I ... </k>
+  rule <k> - v(I, T) => v(0 -Int I, T) ... </k>
+
+  rule <k> ! v(B, T) => v(notBool B, T) ... </k>
+
+  rule <k> I1  * I2 => I1 *Int I2 ... </k>
+  rule <k> I1 &* I2 => I1 *Int I2 ... </k>
+  rule <k> I1  / I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1 &/ I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  % I2 => I1 %Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  + I2 => I1 +Int I2 ... </k>
+  rule <k> I1 &+ I2 => I1 +Int I2 ... </k>
+  rule <k> (I1  - I2)::Exp => I1 -Int I2 ... </k>
+  rule <k> I1 &- I2 => I1 -Int I2 ... </k>
+  rule <k> I1 == I2 => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> I1 != I2 => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> I1 < I2 => v(I1 <Int I2, Bool) ... </k>
+  rule <k> I1 <= I2 => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> I1 > I2 => v(I1 >Int I2, Bool) ... </k>
+  rule <k> I1 >= I2 => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(I1, T)  * v(I2, T) => check(v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T) &* v(I2, T) => chop (v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T)  / v(I2, T) => check(v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T) &/ v(I2, T) => chop (v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  % v(I2, T) => check(v(I1 %Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  + v(I2, T) => check(v(I1 +Int I2, T)) ... </k>
+  rule <k> v(I1, T) &+ v(I2, T) => chop (v(I1 +Int I2, T)) ... </k>
+  rule <k> (v(I1, T)  - v(I2, T))::Exp => check(v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, T) &- v(I2, T) => chop (v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, _) == v(I2, _) => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> v(I1, _) != v(I2, _) => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) < v(I2, T) => v(I1 <Int I2, Bool) ... </k>
+  rule <k> v(I1, T) <= v(I2, T) => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) > v(I2, T) => v(I1 >Int I2, Bool) ... </k>
+  rule <k> v(I1, T) >= v(I2, T) => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(B1, _) == v(B2, _) => v(B1 ==Bool B2, Bool) ... </k>
+  rule <k> v(B1, _) != v(B2, _) => v(B1 =/=Bool B2, Bool) ... </k>
+
+  rule <k> v(true, T) && E => E ... </k>
+  rule <k> v(false, T) && _ => v(false, Bool) ... </k>
+  rule <k> v(true, T) || E => v(true, Bool) ... </k>
+  rule <k> v(false, T) || E => E ... </k>
+
+  rule v(true, T) ? E1 : E2 => giveType(E1, type(E1, E2))
+  rule v(false, T) ? E1 : E2 => giveType(E2, type(E1, E2))
+
+  syntax Exp ::= giveType(Exp, Type) [strict(1)]
+  rule giveType(v(...) #as V, _) => V
+  rule giveType(I:Int, IntLit) => I
+  rule giveType(I:Int, T) => v(I, T) requires T =/=K IntLit
 
 endmodule
 
