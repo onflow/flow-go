@@ -1,9 +1,6 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/assert"
-	"math/rand"
-
 	"github.com/dapperlabs/flow-go/internal/roles/consensus/propagation"
 	"github.com/dapperlabs/flow-go/pkg/model/collection"
 	"github.com/dapperlabs/flow-go/pkg/module/committee"
@@ -11,6 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/network/trickle/mocks"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"os"
 	"testing"
 )
@@ -74,7 +73,7 @@ func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*MockProperga
 
 	hub := mocks.NewNetworkHub()
 
-	nodes := make([]*MockPropergationNode, len(nodeEntries))
+	nodes := make([]*MockPropergationNode, 0)
 	for i := range nodeEntries {
 		node, err := NewMockPropgationNode(hub, nodeEntries, i)
 		if err != nil {
