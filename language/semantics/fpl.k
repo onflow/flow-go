@@ -323,10 +323,19 @@ module FPL-FUN-ENV
   syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block)
 endmodule
 
+module FPL-PANIC
+  imports FPL-CONFIGURATION
+
+  syntax Exp ::= panic(String)
+
+  rule <k> panic(_) ~> (_:KItem ~> _ => .K) </k>
+endmodule
+
 module FPL-TYPING
   imports FPL-CONFIGURATION
   imports FPL-ENV
   imports FPL-FUN-ENV
+  imports FPL-PANIC
 
   syntax Type ::= type(Exp) [function]
                 | #type(Exp) [function]
@@ -381,8 +390,6 @@ module FPL-TYPING
   rule #type(IntLit, T) => T
   rule #type(T, IntLit) => T
   rule #type(T, T) => T
-
-  syntax Ident ::= "panic" [token]
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
   rule pow8 => 256 [macro]
@@ -619,8 +626,11 @@ module FPL-TESTING
 
   rule <k> assert v(true,Bool) => . ... </k>
 
-  rule <k> .Pgm </k>
+  rule <k> .Pgm #Or panic(_) </k>
        <env> E => .Map </env>
        <funs> _ => .Map </funs>
     requires E =/=K .Map
+
+  rule <k> panic(S::String => "") </k>
+    requires S =/=String ""
 endmodule
