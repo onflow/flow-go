@@ -56,5 +56,16 @@ for f in interpreter/*.fpl; do
   fi
 done
 
+for f in interpreter/panic/*.fpl; do
+  if [ "$FANCY" = true ]; then
+    printf "\e[2K\rRUNNING %.$(($(tput cols)-8))s" "$f"
+  fi
+  krun $f | diff - interpreter/panic/output.txt &
+  if ! wait % ; then
+    if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
+    printf "FAIL %s\n" "$f" 
+  fi
+done
+
 if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
 echo DONE
