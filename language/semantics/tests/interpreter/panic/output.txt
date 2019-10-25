@@ -1,0 +1,17 @@
+<generatedTop>
+  <k>
+    panic ( "" )
+  </k>
+  <scope>
+    global
+  </scope>
+  <env>
+    .Map
+  </env>
+  <stack>
+    .List
+  </stack>
+  <funs>
+    .Map
+  </funs>
+</generatedTop>

@@ -1,0 +1,2 @@
+let x = 2 + 4;
+assert x == 6

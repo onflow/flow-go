@@ -187,6 +187,8 @@ module FPL-COMMON-SYNTAX
                 | Path "[" Exp "]"
                 | Path "." Ident
 
+  syntax left lval
+
   syntax Exp ::= IntLit
                | FPLString
                | Ident
@@ -199,32 +201,38 @@ module FPL-COMMON-SYNTAX
                | "{" DictEntries "}" [strict(1)]
                | "fun" "(" Formals ")" FunBody
                | "fun" "(" Formals ")" ":" Annot FunBody
-               | Exp "[" Exp "]" [left, seqstrict]
-               | Exp "." Ident    [left, strict(1)] // field access
-               | Ident "(" Actuals ")" [strict(2)]
+               | Exp "[" Exp "]" [lval, seqstrict]
+               | Exp "." Ident    [lval, strict(1)] // field access
+               | Ident "(" Actuals ")" [strict(2), klabel(call)]
                | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
-//               | TypeId "(" Actuals ")"          // struct creation
+               | TypeId "(" Actuals ")" [klabel(call)]          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
-               > "-" Exp       [      strict]
-               | "!" Exp       [      strict]
-               > Exp "*" Exp   [left, seqstrict]
-               | Exp "&*" Exp  [left, seqstrict]
-               | Exp "/" Exp   [left, seqstrict]
-               | Exp "%" Exp   [left, seqstrict]
-               > Exp "+" Exp   [left, seqstrict]
-               | Exp "&+" Exp  [left, seqstrict]
-               | Exp "-" Exp   [left, seqstrict]
-               | Exp "&-" Exp  [left, seqstrict]
-               > Exp "?" "?" Exp  [left, strict(1)]
-               | Exp "as?" Exp [      seqstrict]
-               > Exp "==" Exp  [      seqstrict]
-               | Exp "!=" Exp  [      seqstrict]
-               | Exp "<" Exp   [      seqstrict]
-               | Exp "<=" Exp  [      seqstrict]
-               | Exp ">" Exp   [      seqstrict]
-               | Exp ">=" Exp  [      seqstrict]
-               > Exp "&&" Exp  [left, seqstrict]
-               | Exp "||" Exp  [left, seqstrict]
+               > non-assoc:
+                 "-" Exp       [strict]
+               | "!" Exp       [strict]
+               > left:
+                 Exp "*" Exp   [seqstrict]
+               | Exp "&*" Exp  [seqstrict]
+               | Exp "/" Exp   [seqstrict]
+               | Exp "&/" Exp  [seqstrict]
+               | Exp "%" Exp   [seqstrict]
+               > left: Exp "+" Exp   [seqstrict]
+               | Exp "&+" Exp  [seqstrict]
+               | Exp "-" Exp   [seqstrict]
+               | Exp "&-" Exp  [seqstrict]
+               > left:
+                 Exp "?" "?" Exp  [strict(1)]
+               | Exp "as?" Exp [seqstrict]
+               > left:
+                 Exp "==" Exp  [seqstrict]
+               | Exp "!=" Exp  [seqstrict]
+               | Exp "<" Exp   [seqstrict]
+               | Exp "<=" Exp  [seqstrict]
+               | Exp ">" Exp   [seqstrict]
+               | Exp ">=" Exp  [seqstrict]
+               > left:
+                 Exp "&&" Exp  [strict(1)]
+               | Exp "||" Exp  [strict(1)]
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
@@ -287,18 +295,21 @@ endmodule
 module FPL-VALUES
   imports BOOL-SYNTAX
   imports INT-SYNTAX
+  imports STRING-SYNTAX
 
+  syntax Type
   syntax Val ::= Int | Bool
-  syntax Exp ::= Val
-  syntax KResult ::= Val
+  syntax TypedVal ::= v(Val, Type)
+  syntax Exp ::= TypedVal
+  syntax KResult ::= TypedVal | Int // for constant expressions
+  syntax FPLString ::= String
 
 endmodule
 
 module FPL-ENV
-  syntax Val
-  syntax Type
+  syntax TypedVal
   syntax Mutability ::= "let" | "var"
-  syntax EnvEntry ::= env(mut: Mutability, v: Val, t: Type)
+  syntax EnvEntry ::= env(mut: Mutability, v: TypedVal)
 endmodule
 
 module FPL-STACK
@@ -312,12 +323,23 @@ module FPL-FUN-ENV
   syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block)
 endmodule
 
+module FPL-PANIC
+  imports FPL-CONFIGURATION
+
+  syntax Exp ::= panic(String)
+
+  rule <k> panic(_) ~> (_:KItem ~> _ => .K) </k>
+endmodule
+
 module FPL-TYPING
   imports FPL-CONFIGURATION
   imports FPL-ENV
   imports FPL-FUN-ENV
+  imports FPL-PANIC
 
   syntax Type ::= type(Exp) [function]
+                | #type(Exp) [function]
+                | infer(Type) [function]
   syntax Ident ::= "Bool" [token]
                  | "Int8" [token]
                  | "Int16" [token]
@@ -329,34 +351,71 @@ module FPL-TYPING
                  | "UInt64" [token]
                  | "Int" [token]
 
-  rule type(I:Int) => Int
-  rule type(B:Bool) => Bool
-  rule [[ type(X:Ident) => T ]]
-       <env>... X |-> env(... t: T) ...</env>
-  rule type(- E => E)
-  rule type(! _) => Bool
-  rule type(_ * _) => Int
-  rule type(E &* _ => E)
-  rule type(_ / _) => Int
-  rule type(_ % _) => Int
-  rule type(_ + _) => Int
-  rule type(E &+ _ => E)
-  rule type(_ - _) => Int
-  rule type(E &- _ => E)
-  rule type(_ && _) => Bool
-  rule type(_ || _) => Bool
-  rule type(_ == _) => Bool
-  rule type(_ != _) => Bool
-  rule type(_ < _) => Bool
-  rule type(_ <= _) => Bool
-  rule type(_ > _) => Bool
-  rule type(_ >= _) => Bool
-  rule type(_ ? E : _) => E
+  syntax Ident ::= "IntLit" [token]
 
-  rule [[type(Fun:Ident(Provided:Actuals)) => R]]
+  rule type(E) => infer(#type(E))
+  rule infer(IntLit) => Int
+  rule infer(T) => T [owise]
+
+  rule #type(I:Int) => IntLit
+  rule #type(B:Bool) => Bool
+  rule [[ #type(X:Ident) => T ]]
+       <env>... X |-> env(... v: v(_, T)) ...</env>
+  rule [[ #type(Fun:Ident(Provided:Actuals)) => R ]]
        <funs>... Fun |-> funDef(... args: Expected, result: R) ...</funs>
-    // TODO: check argument types
+  rule #type(- E => E)
+  rule #type(! _) => Bool
+  rule #type(E1 * E2) => type(E1, E2)
+  rule #type(E1 &* E2) => type(E1, E2)
+  rule #type(E1 / E2) => type(E1, E2)
+  rule #type(E1 % E2) => type(E1, E2)
+  rule #type(E1 + E2) => type(E1, E2)
+  rule #type(E1 &+ E2) => type(E1, E2)
+  rule #type(E1 - E2) => type(E1, E2)
+  rule #type(E1 &- E2) => type(E1, E2)
+  rule #type(_ && _) => Bool
+  rule #type(_ || _) => Bool
+  rule #type(_ == _) => Bool
+  rule #type(_ != _) => Bool
+  rule #type(_ < _) => Bool
+  rule #type(_ <= _) => Bool
+  rule #type(_ > _) => Bool
+  rule #type(_ >= _) => Bool
+  rule #type(_ ? E1 : E2) => type(E1, E2)
 
+  syntax Type ::= type(Exp, Exp) [function]
+                | #type(Type, Type) [function]
+
+  rule type(E1, E2) => #type(#type(E1), #type(E2))
+  rule #type(IntLit, T) => T
+  rule #type(T, IntLit) => T
+  rule #type(T, T) => T
+
+  syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
+  rule pow8 => 256 [macro]
+  rule pow16 => 65536 [macro]
+  rule pow32 => 4294967296 [macro]
+  rule pow64 => 18446744073709551616 [macro]
+
+  syntax Int ::= "min8" | "min16" | "min32" | "min64"
+  rule min8 => -128 [macro]
+  rule min16 => -32768 [macro]
+  rule min32 => -2147483648 [macro]
+  rule min64 => -9223372036854775808 [macro]
+
+  syntax Exp ::= check(TypedVal) [function]
+  rule check(v(V, T)) => #fun(V' => #if V' ==K v(V, T) #then v(V, T) #else panic("Integer overflow") #fi)(chop(v(V, T)))
+
+  syntax Exp ::= chop(TypedVal) [function]
+  rule chop(v(I, Int)) => v(I, Int)
+  rule chop(v(I, UInt8)) => v(I modInt pow8, UInt8)
+  rule chop(v(I, UInt16)) => v(I modInt pow16, UInt16)
+  rule chop(v(I, UInt32)) => v(I modInt pow32, UInt32)
+  rule chop(v(I, UInt64)) => v(I modInt pow64, UInt64)
+  rule chop(v(I, Int8)) => v((I -Int min8) modInt pow8 +Int min8, Int8)
+  rule chop(v(I, Int16)) => v((I -Int min16) modInt pow16 +Int min16, Int16)
+  rule chop(v(I, Int32)) => v((I -Int min32) modInt pow32 +Int min32, Int32)
+  rule chop(v(I, Int64)) => v((I -Int min64) modInt pow64 +Int min64, Int64)
 endmodule
 
 module FPL-CONFIGURATION
@@ -379,12 +438,17 @@ module FPL-VARIABLE-DECLARATION
   imports FPL-TYPING
 
   context let _ : _:Type = HOLE
+    requires notBool isInt(HOLE)
   context var _ : _:Type = HOLE
+    requires notBool isInt(HOLE)
 
-  rule <k> let X : T:Type = V:Val => . ... </k>
-       <env> Rho => Rho [ X <- env(let, V, T) ] </env>
-  rule <k> var X : T:Type = V:Val => . ... </k>
-       <env> Rho => Rho [ X <- env(var, V, T) ] </env>
+  rule <k> let _ : T:Type = (V:Int => v(V, T)) ... </k>
+  rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
+
+  rule <k> let X : T:Type = v(V, T) => . ... </k>
+       <env> Rho => Rho [ X <- env(let, v(V, T)) ] </env>
+  rule <k> var X : T:Type = v(V, T) => . ... </k>
+       <env> Rho => Rho [ X <- env(var, v(V, T)) ] </env>
 
   rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
   rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
@@ -410,28 +474,25 @@ module FPL-FUNCTIONS
   syntax Bool ::= checkLabels(Formals,Actuals) [function]
   rule checkLabels(.Formals, .Actuals) => true
   rule checkLabels(((Lbl _ : _), FS), ((ArgLbl : _), AS)) => checkLabels(FS,AS)
-     when Lbl ==K ArgLbl
+    requires Lbl ==K ArgLbl
   rule checkLabels(((Lbl _ : _), FS), (_::Exp, AS)) => checkLabels(FS,AS)
-     when Lbl ==K #token("_","Ident")
+    requires Lbl ==K #token("_","Ident")
   rule checkLabels(_,_) => false [owise]
 
-  syntax Map ::= initArgs(Formals,Actuals) [function]
-               | initArg(Formal,Actual) [function]
-  rule initArgs(.Formals, .Actuals) => .Map
-  rule initArgs((F, FS), (A, AS)) => initArg(F,A) initArgs(FS,AS)
+  syntax Block ::= initArgs(Formals,Actuals) [function]
+  syntax Stmt ::= initArg(Formal,Actual) [function]
+  rule initArgs(.Formals, .Actuals) => .Block
+  rule initArgs((F, FS), (A, AS)) => initArg(F,A) ; initArgs(FS,AS)
 
-  rule initArg((Lbl Name : T), (ArgLbl : X)) =>
-       Name |-> env(let, X, T)
-     when Lbl ==K ArgLbl
-  rule initArg((NoLbl Name : T), X:Val) =>
-       Name |-> env(let, X, T)
-     when NoLbl ==K #token("_","Ident")
+  rule initArg((Lbl Name : T), (ArgLbl : X)) => let Name : T = X
+  rule initArg((NoLbl Name : T), X) => let Name : T = X
+    requires NoLbl ==K #token("_","Ident")
 
-  rule <k>((F:Ident)(Args) ~> K) => B:Block</k>
+  rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
        <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
-       <env>Env => initArgs(Params, Args) </env>
+       <env> Env </env>
        <stack> .List => ListItem(frame(K, Env)) ...</stack>
-  rule <k>return X:Val ~> _ => X ~> K</k>
+  rule <k>return X:TypedVal ~> _ => X ~> K</k>
        <env>_ => Env</env>
        <stack> ListItem(frame(K,Env)) => .List ...</stack>
 
@@ -439,10 +500,100 @@ endmodule
 
 module FPL-ARITHMETIC
   imports FPL-CONFIGURATION
+  imports FPL-TYPING
 
-  rule <k> I1 + I2 => I1 +Int I2 ... </k>
-  rule <k> I1 == I2 => I1 ==Int I2 ... </k>
-  rule <k> B1 == B2 => B1 ==Bool B2 ... </k>
+  syntax Exp ::= intExp(Exp, Exp)
+  rule intExp(L, R)
+    => ((L * R)
+   #Or ((L &* R)
+   #Or ((L / R)
+   #Or ((L &/ R)
+   #Or ((L % R)
+   #Or ((L + R)
+   #Or ((L &+ R)
+   #Or ((L - R)
+   #Or ((L &- R)
+   #Or ((L == R)
+   #Or ((L != R)
+   #Or ((L < R)
+   #Or ((L <= R)
+   #Or ((L > R)
+   #Or (L >= R)))))))))))))))::Exp [macro]
+
+  rule <k> intExp(I1:Int, v(I2, T)) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+  rule <k> intExp(v(I1, T), I2:Int) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+
+  syntax Exp ::= fillExp(TypedVal, TypedVal, Exp) [function]
+  rule fillExp(L, R, _ * _) => L * R
+  rule fillExp(L, R, _ &* _) => L &* R
+  rule fillExp(L, R, _ / _) => L / R
+  rule fillExp(L, R, _ &/ _) => L &/ R
+  rule fillExp(L, R, _ % _) => L % R
+  rule fillExp(L, R, _ + _) => L + R
+  rule fillExp(L, R, _ &+ _) => L &+ R
+  rule fillExp(L, R, _ - _) => L - R
+  rule fillExp(L, R, _ &- _) => L &- R
+  rule fillExp(L, R, _ == _) => L == R
+  rule fillExp(L, R, _ != _) => L != R
+  rule fillExp(L, R, _ < _) => L < R
+  rule fillExp(L, R, _ <= _) => L <= R
+  rule fillExp(L, R, _ > _) => L > R
+  rule fillExp(L, R, _ >= _) => L >= R
+
+  rule <k> B:Bool => v(B, Bool) ... </k>
+
+  rule <k> - I:Int => 0 -Int I ... </k>
+  rule <k> - v(I, T) => v(0 -Int I, T) ... </k>
+
+  rule <k> ! v(B, T) => v(notBool B, T) ... </k>
+
+  rule <k> I1  * I2 => I1 *Int I2 ... </k>
+  rule <k> I1 &* I2 => I1 *Int I2 ... </k>
+  rule <k> I1  / I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1 &/ I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  % I2 => I1 %Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  + I2 => I1 +Int I2 ... </k>
+  rule <k> I1 &+ I2 => I1 +Int I2 ... </k>
+  rule <k> (I1  - I2)::Exp => I1 -Int I2 ... </k>
+  rule <k> I1 &- I2 => I1 -Int I2 ... </k>
+  rule <k> I1 == I2 => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> I1 != I2 => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> I1 < I2 => v(I1 <Int I2, Bool) ... </k>
+  rule <k> I1 <= I2 => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> I1 > I2 => v(I1 >Int I2, Bool) ... </k>
+  rule <k> I1 >= I2 => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(I1, T)  * v(I2, T) => check(v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T) &* v(I2, T) => chop (v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T)  / v(I2, T) => check(v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T) &/ v(I2, T) => chop (v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  % v(I2, T) => check(v(I1 %Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  + v(I2, T) => check(v(I1 +Int I2, T)) ... </k>
+  rule <k> v(I1, T) &+ v(I2, T) => chop (v(I1 +Int I2, T)) ... </k>
+  rule <k> (v(I1, T)  - v(I2, T))::Exp => check(v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, T) &- v(I2, T) => chop (v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, _) == v(I2, _) => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> v(I1, _) != v(I2, _) => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) < v(I2, T) => v(I1 <Int I2, Bool) ... </k>
+  rule <k> v(I1, T) <= v(I2, T) => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) > v(I2, T) => v(I1 >Int I2, Bool) ... </k>
+  rule <k> v(I1, T) >= v(I2, T) => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(B1, _) == v(B2, _) => v(B1 ==Bool B2, Bool) ... </k>
+  rule <k> v(B1, _) != v(B2, _) => v(B1 =/=Bool B2, Bool) ... </k>
+
+  rule <k> v(true, T) && E => E ... </k>
+  rule <k> v(false, T) && _ => v(false, Bool) ... </k>
+  rule <k> v(true, T) || E => v(true, Bool) ... </k>
+  rule <k> v(false, T) || E => E ... </k>
+
+  rule v(true, T) ? E1 : E2 => giveType(E1, type(E1, E2))
+  rule v(false, T) ? E1 : E2 => giveType(E2, type(E1, E2))
+
+  syntax Exp ::= giveType(Exp, Type) [strict(1)]
+  rule giveType(v(...) #as V, _) => V
+  rule giveType(I:Int, IntLit) => I
+  rule giveType(I:Int, T) => v(I, T) requires T =/=K IntLit
 
 endmodule
 
@@ -470,10 +621,13 @@ module FPL-TESTING
   imports FPL
   imports FPL-TESTING-COMMON-SYNTAX
 
-  rule <k> assert true => . ... </k>
+  rule <k> assert v(true,Bool) => . ... </k>
 
-  rule <k> .Pgm </k>
+  rule <k> .Pgm #Or panic(_) </k>
        <env> E => .Map </env>
        <funs> _ => .Map </funs>
     requires E =/=K .Map
+
+  rule <k> panic(S::String => "") </k>
+    requires S =/=String ""
 endmodule

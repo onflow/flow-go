@@ -1,0 +1,4 @@
+let x = -2;
+let y = -(-2);
+assert x == -2;
+assert y == 2
