@@ -14,8 +14,8 @@ import (
 	"testing"
 )
 
-// MockPropergationNode is a mocked node instance for testing propagation engine.
-type MockPropergationNode struct {
+// mockPropagationNode is a mocked node instance for testing propagation engine.
+type mockPropagationNode struct {
 	// the real engine to be tested
 	engine *propagation.Engine
 	// a mocked network layer in order for the MockHub to route events in memory to a targeted node
@@ -24,8 +24,8 @@ type MockPropergationNode struct {
 	pool *mempool.Mempool
 }
 
-// NewMockPropgationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
-func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int) (*MockPropergationNode, error) {
+// newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
+func newMockPropagationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int) (*mockPropagationNode, error) {
 	if nodeIndex >= len(allNodes) {
 		return nil, errors.Errorf("nodeIndex is out of range: %v", nodeIndex)
 	}
@@ -59,23 +59,23 @@ func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int)
 		return nil, err
 	}
 
-	return &MockPropergationNode{
+	return &mockPropagationNode{
 		engine: engine,
 		net:    net,
 		pool:   pool,
 	}, nil
 }
 
-func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*MockPropergationNode, error) {
+func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*mockPropagationNode, error) {
 	if len(nodeEntries) == 0 {
 		return nil, nil, errors.New("NodeEntries must not be empty")
 	}
 
 	hub := mocks.NewNetworkHub()
 
-	nodes := make([]*MockPropergationNode, 0)
+	nodes := make([]*mockPropagationNode, 0)
 	for i := range nodeEntries {
-		node, err := NewMockPropgationNode(hub, nodeEntries, i)
+		node, err := newMockPropagationNode(hub, nodeEntries, i)
 		if err != nil {
 			return nil, nil, err
 		}
