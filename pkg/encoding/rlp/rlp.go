@@ -58,7 +58,7 @@ func (e *Encoder) DecodeAccountPublicKey(b []byte) (a types.AccountPublicKey, er
 	}, nil
 }
 
-func (e *Encoder) EncodeAccountPrivateKey(a *types.AccountPrivateKey) ([]byte, error) {
+func (e *Encoder) EncodeAccountPrivateKey(a types.AccountPrivateKey) ([]byte, error) {
 	privateKey, err := a.PrivateKey.Encode()
 	if err != nil {
 		return nil, err

@@ -56,33 +56,24 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, 
 	}, nil
 }
 
-// DecodePrivateKey decodes a private key against a specified key type.
-func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error) {
-	privateKey, err := crypto.DecodePrivateKey(keyType.SigningAlgorithm(), b)
-	if err != nil {
-		return types.AccountPrivateKey{}, err
-	}
-
-	return types.AccountPrivateKey{
-		PrivateKey: privateKey,
-		SignAlgo:   keyType.SigningAlgorithm(),
-		HashAlgo:   keyType.HashingAlgorithm(),
-	}, nil
+// EncodePrivateKey encodes a private key as bytes.
+func EncodePrivateKey(a types.AccountPrivateKey) ([]byte, error) {
+	return encoding.DefaultEncoder.EncodeAccountPrivateKey(a)
 }
 
-// DecodePublicKey decodes a public key against a specified key type.
-func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error) {
-	publicKey, err := crypto.DecodePublicKey(keyType.SigningAlgorithm(), b)
-	if err != nil {
-		return types.AccountPublicKey{}, err
-	}
+// DecodePrivateKey decodes a private key.
+func DecodePrivateKey(b []byte) (types.AccountPrivateKey, error) {
+	return encoding.DefaultEncoder.DecodeAccountPrivateKey(b)
+}
 
-	return types.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  keyType.SigningAlgorithm(),
-		HashAlgo:  keyType.HashingAlgorithm(),
-		Weight:    weight,
-	}, nil
+// EncodePublicKey encodes a public key as bytes.
+func EncodePublicKey(a types.AccountPublicKey) ([]byte, error) {
+	return encoding.DefaultEncoder.EncodeAccountPublicKey(a)
+}
+
+// DecodePublicKey decodes a public key.
+func DecodePublicKey(b []byte) (types.AccountPublicKey, error) {
+	return encoding.DefaultEncoder.DecodeAccountPublicKey(b)
 }
 
 // SignTransaction signs a transaction with a private key.
