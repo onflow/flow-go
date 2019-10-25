@@ -474,26 +474,23 @@ module FPL-FUNCTIONS
   syntax Bool ::= checkLabels(Formals,Actuals) [function]
   rule checkLabels(.Formals, .Actuals) => true
   rule checkLabels(((Lbl _ : _), FS), ((ArgLbl : _), AS)) => checkLabels(FS,AS)
-     when Lbl ==K ArgLbl
+    requires Lbl ==K ArgLbl
   rule checkLabels(((Lbl _ : _), FS), (_::Exp, AS)) => checkLabels(FS,AS)
-     when Lbl ==K #token("_","Ident")
+    requires Lbl ==K #token("_","Ident")
   rule checkLabels(_,_) => false [owise]
 
-  syntax Map ::= initArgs(Formals,Actuals) [function]
-               | initArg(Formal,Actual) [function]
-  rule initArgs(.Formals, .Actuals) => .Map
-  rule initArgs((F, FS), (A, AS)) => initArg(F,A) initArgs(FS,AS)
+  syntax Block ::= initArgs(Formals,Actuals) [function]
+  syntax Stmt ::= initArg(Formal,Actual) [function]
+  rule initArgs(.Formals, .Actuals) => .Block
+  rule initArgs((F, FS), (A, AS)) => initArg(F,A) ; initArgs(FS,AS)
 
-  rule initArg((Lbl Name : T), (ArgLbl : X)) =>
-       Name |-> env(let, X)
-     when Lbl ==K ArgLbl
-  rule initArg((NoLbl Name : T), X:TypedVal) =>
-       Name |-> env(let, X)
-     when NoLbl ==K #token("_","Ident")
+  rule initArg((Lbl Name : T), (ArgLbl : X)) => let Name : T = X
+  rule initArg((NoLbl Name : T), X) => let Name : T = X
+    requires NoLbl ==K #token("_","Ident")
 
-  rule <k>((F:Ident)(Args) ~> K) => B:Block</k>
+  rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
        <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
-       <env>Env => initArgs(Params, Args) </env>
+       <env> Env </env>
        <stack> .List => ListItem(frame(K, Env)) ...</stack>
   rule <k>return X:TypedVal ~> _ => X ~> K</k>
        <env>_ => Env</env>
