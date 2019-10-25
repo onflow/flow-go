@@ -16,6 +16,9 @@ type MockNetwork struct {
 	engines map[uint8]network.Engine
 }
 
+// NewNetwork create a mocked network.
+// The committee has the identity of the node already, so only `committee` is needed
+// in order for a mock hub to find each other.
 func NewNetwork(com module.Committee, hub *MockHub) (*MockNetwork, error) {
 	o := &MockNetwork{
 		com:     com,
@@ -56,6 +59,7 @@ func (mn *MockNetwork) GetID() string {
 	return me.ID
 }
 
+// Register implements pkg/module/Network's interface
 func (mn *MockNetwork) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
 	_, ok := mn.engines[engineID]
 	if ok {

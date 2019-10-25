@@ -39,6 +39,7 @@ func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int)
 	}
 
 	log := zerolog.New(os.Stderr).With().Logger()
+
 	pool, err := mempool.New()
 	if err != nil {
 		return nil, err
@@ -70,7 +71,9 @@ func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*MockProperga
 	if len(nodeEntries) == 0 {
 		return nil, nil, errors.New("NodeEntries must not be empty")
 	}
+
 	hub := mocks.NewNetworkHub()
+
 	nodes := make([]*MockPropergationNode, len(nodeEntries))
 	for i := range nodeEntries {
 		node, err := NewMockPropgationNode(hub, nodeEntries, i)
@@ -79,6 +82,7 @@ func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*MockProperga
 		}
 		nodes = append(nodes, node)
 	}
+
 	return hub, nodes, nil
 }
 
