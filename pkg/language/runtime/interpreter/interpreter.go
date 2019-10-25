@@ -68,7 +68,15 @@ type Interpreter struct {
 	onEventEmitted      func(EventValue)
 }
 
-func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+type InterpreterOpt func(*Interpreter)
+
+func WithOnEventEmittedHandler(handler func(EventValue)) InterpreterOpt {
+	return func(inter *Interpreter) {
+		inter.onEventEmitted = handler
+	}
+}
+
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, opts ...InterpreterOpt) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
 		PredefinedValues:    predefinedValues,
@@ -86,6 +94,10 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for _, opt := range opts {
+		opt(interpreter)
 	}
 
 	return interpreter, nil
@@ -576,7 +588,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							ConditionKind: condition.Kind,
 							Message:       message,
 							LocationRange: LocationRange{
-								ImportLocation: interpreter.Checker.ImportLocation,
+								ImportLocation: interpreter.Checker.Location,
 								Range: ast.Range{
 									StartPos: condition.Test.StartPosition(),
 									EndPos:   condition.Test.EndPosition(),
@@ -1259,8 +1271,8 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 					// TODO: optimize: only potentially used by host-functions
 					location := LocationPosition{
-						Position:       invocationExpression.StartPosition(),
-						ImportLocation: interpreter.Checker.ImportLocation,
+						Position: invocationExpression.StartPosition(),
+						Location: interpreter.Checker.Location,
 					}
 					return function.invoke(argumentCopies, location)
 				})
@@ -1431,7 +1443,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := CompositeValue{
-				ImportLocation: interpreter.Checker.ImportLocation,
+				ImportLocation: interpreter.Checker.Location,
 				Identifier:     identifier,
 				Fields:         &map[string]Value{},
 				Functions:      &functions,
@@ -1795,13 +1807,17 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
-	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	subInterpreter, err := NewInterpreter(
+		importedChecker,
+		interpreter.PredefinedValues,
+		WithOnEventEmittedHandler(interpreter.onEventEmitted),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	if subInterpreter.Checker.ImportLocation == nil {
-		subInterpreter.Checker.ImportLocation = declaration.Location
+	if subInterpreter.Checker.Location == nil {
+		subInterpreter.Checker.Location = declaration.Location
 	}
 
 	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
@@ -1882,7 +1898,7 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			value := EventValue{
 				ID:             eventType.Identifier,
 				Fields:         fields,
-				ImportLocation: interpreter.Checker.ImportLocation,
+				ImportLocation: interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}
@@ -1894,6 +1910,9 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			event := result.(EventValue)
+
+			fmt.Println("VisitEmitStatement", event.String())
+			fmt.Println("onEventEmitted", interpreter.onEventEmitted)
 
 			interpreter.onEventEmitted(event)
 
@@ -1929,8 +1948,8 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 
 			// TODO: optimize: only potentially used by host-functions
 			location := LocationPosition{
-				Position:       expression.StartPosition(),
-				ImportLocation: interpreter.Checker.ImportLocation,
+				Position: expression.StartPosition(),
+				Location: interpreter.Checker.Location,
 			}
 
 			return value.(DestroyableValue).Destroy(interpreter, location)

@@ -96,7 +96,7 @@ func (e AssertionError) Error() string {
 }
 
 func (e AssertionError) ImportLocation() ast.Location {
-	return e.Location.ImportLocation
+	return e.Location.Location
 }
 
 // AssertFunction
@@ -155,7 +155,7 @@ func (e PanicError) Error() string {
 }
 
 func (e PanicError) ImportLocation() ast.Location {
-	return e.Location.ImportLocation
+	return e.Location.Location
 }
 
 // PanicFunction

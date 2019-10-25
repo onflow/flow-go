@@ -323,6 +323,7 @@ func (r *RuntimeContext) Log(message string) {
 
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *RuntimeContext) EmitEvent(event types.Event) {
+	fmt.Println("RuntimeContext.EmitEvent", event.String())
 	r.events = append(r.events, event)
 }
 

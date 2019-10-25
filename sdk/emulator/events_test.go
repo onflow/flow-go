@@ -91,10 +91,17 @@ func TestEventEmitted(t *testing.T) {
 			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
+			OnLogMessage: func(msg string) { fmt.Println("LOG:", msg) },
 		})
 
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
+
+			fun emitMyEvent(x: Int, y: Int) {
+				log("1")
+				emit MyEvent(x: x, y: y)
+				log("2")
+			}
 		`)
 
 		publicKeyA, _ := b.RootKey().Publickey().Encode()
@@ -111,7 +118,7 @@ func TestEventEmitted(t *testing.T) {
 			import 0x%s
 			
 			fun main() {
-				emit MyEvent(x: 1, y: 2)
+				emitMyEvent(x: 1, y: 2)
 			}
 		`, addressA.Hex()))
 
