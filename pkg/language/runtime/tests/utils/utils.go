@@ -20,7 +20,7 @@ func ParseAndCheckWithExtra(
 	code string,
 	values map[string]sema.ValueDeclaration,
 	types map[string]sema.TypeDeclaration,
-	importLocation ast.ImportLocation,
+	location ast.Location,
 	resolver ast.ImportResolver,
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
@@ -34,11 +34,10 @@ func ParseAndCheckWithExtra(
 		}
 	}
 
-	checker, err := sema.NewChecker(program, values, types)
+	checker, err := sema.NewChecker(program, values, types, location)
 	if err != nil {
 		return checker, err
 	}
-	checker.ImportLocation = importLocation
 
 	err = checker.Check()
 	return checker, err

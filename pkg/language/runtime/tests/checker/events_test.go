@@ -118,7 +118,8 @@ func TestCheckEmitEvent(t *testing.T) {
 			`,
 			nil,
 			nil,
-			func(location ast.ImportLocation) (program *ast.Program, e error) {
+			nil,
+			func(location ast.Location) (program *ast.Program, e error) {
 				return checker.Program, nil
 			},
 		)

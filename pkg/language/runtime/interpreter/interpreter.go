@@ -315,7 +315,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(boxedArguments, Location{})
+	trampoline = function.invoke(boxedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
@@ -1258,7 +1258,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					}
 
 					// TODO: optimize: only potentially used by host-functions
-					location := Location{
+					location := LocationPosition{
 						Position:       invocationExpression.StartPosition(),
 						ImportLocation: interpreter.Checker.ImportLocation,
 					}
@@ -1428,7 +1428,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	interpreter.CompositeFunctions[identifier] = functions
 
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := CompositeValue{
 				ImportLocation: interpreter.Checker.ImportLocation,
@@ -1461,7 +1461,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
+	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1870,7 +1870,7 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
@@ -1928,7 +1928,7 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			value := result.(Value)
 
 			// TODO: optimize: only potentially used by host-functions
-			location := Location{
+			location := LocationPosition{
 				Position:       expression.StartPosition(),
 				ImportLocation: interpreter.Checker.ImportLocation,
 			}

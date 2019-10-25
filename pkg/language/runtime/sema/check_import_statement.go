@@ -44,6 +44,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			imported,
 			checker.PredeclaredValues,
 			checker.PredeclaredTypes,
+			declaration.Location,
 		)
 		if err == nil {
 			checker.ImportCheckers[declaration.Location.ID()] = importChecker

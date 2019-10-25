@@ -1166,6 +1166,7 @@ func (h StorageType) IsResourceType() bool {
 
 type EventType struct {
 	Identifier                          string
+	ImportLocation                      ast.Location
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }

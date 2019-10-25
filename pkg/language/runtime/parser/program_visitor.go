@@ -120,7 +120,7 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	var location ast.ImportLocation
+	var location ast.Location
 	var locationPos ast.Position
 	var endPos ast.Position
 
@@ -128,7 +128,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	stringLiteralContext := ctx.StringLiteral()
 	if stringLiteralContext != nil {
 		stringExpression := stringLiteralContext.Accept(v).(*ast.StringExpression)
-		location = ast.StringImportLocation(stringExpression.Value)
+		location = ast.StringLocation(stringExpression.Value)
 		locationPos = stringExpression.StartPos
 		endPos = stringExpression.EndPos
 	} else {
@@ -150,7 +150,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 			// unreachable, hex literal should always be valid
 			panic(err)
 		}
-		location = ast.AddressImportLocation(address)
+		location = ast.AddressLocation(address)
 		symbol := hexadecimalLiteralNode.GetSymbol()
 		locationPos = ast.PositionFromToken(symbol)
 		endPos = ast.EndPosition(locationPos, symbol.GetStop())

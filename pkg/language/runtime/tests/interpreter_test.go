@@ -1611,7 +1611,7 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -1627,6 +1627,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			testFunction,
 		}.ToValueDeclarations(),
 		nil,
+		ast.StringLocation(""),
 	)
 	assert.Nil(t, err)
 
@@ -3524,9 +3525,9 @@ func TestInterpretImport(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			assert.Equal(t,
-				ast.StringImportLocation("imported"),
+				ast.StringLocation("imported"),
 				location,
 			)
 			return checkerImported.Program, nil
@@ -3579,9 +3580,9 @@ func TestInterpretImportError(t *testing.T) {
 		valueDeclarations,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			assert.Equal(t,
-				ast.StringImportLocation("imported"),
+				ast.StringLocation("imported"),
 				location,
 			)
 			return checkerImported.Program, nil
@@ -4592,9 +4593,9 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			assert.Equal(t,
-				ast.StringImportLocation("imported"),
+				ast.StringLocation("imported"),
 				location,
 			)
 			return checkerImported.Program, nil

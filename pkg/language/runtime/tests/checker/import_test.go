@@ -34,7 +34,7 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			return &ast.Program{}, nil
 		},
 	)
@@ -63,7 +63,7 @@ func TestCheckImportAll(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
 	)
@@ -88,7 +88,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
 	)
@@ -119,7 +119,7 @@ func TestCheckImportSome(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			return checker.Program, nil
 		},
 	)
@@ -145,7 +145,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
+		func(location ast.Location) (program *ast.Program, e error) {
 			return imported, nil
 		},
 	)
@@ -190,7 +190,7 @@ func TestCheckImportTypes(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				func(location ast.ImportLocation) (program *ast.Program, e error) {
+				func(location ast.Location) (program *ast.Program, e error) {
 					return checker.Program, nil
 				},
 			)

@@ -4427,7 +4427,7 @@ func TestParseImportWithString(t *testing.T) {
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
-		Location:    StringImportLocation("test.bpl"),
+		Location:    StringLocation("test.bpl"),
 		Range: Range{
 			StartPos: Position{Offset: 9, Line: 2, Column: 8},
 			EndPos:   Position{Offset: 25, Line: 2, Column: 24},
@@ -4441,7 +4441,7 @@ func TestParseImportWithString(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 
-	importLocation := StringImportLocation("test.bpl")
+	importLocation := StringLocation("test.bpl")
 
 	actualImports := actual.ImportedPrograms()
 
@@ -4470,7 +4470,7 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
-		Location:    AddressImportLocation([]byte{18, 52}),
+		Location:    AddressLocation([]byte{18, 52}),
 		Range: Range{
 			StartPos: Position{Offset: 9, Line: 2, Column: 8},
 			EndPos:   Position{Offset: 21, Line: 2, Column: 20},
@@ -4484,7 +4484,7 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 
-	importLocation := AddressImportLocation([]byte{18, 52})
+	importLocation := AddressLocation([]byte{18, 52})
 
 	actualImports := actual.ImportedPrograms()
 
@@ -4522,7 +4522,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 				Pos:        Position{Offset: 19, Line: 2, Column: 18},
 			},
 		},
-		Location: AddressImportLocation([]byte{0}),
+		Location: AddressLocation([]byte{0}),
 		Range: Range{
 			StartPos: Position{Offset: 9, Line: 2, Column: 8},
 			EndPos:   Position{Offset: 28, Line: 2, Column: 27},

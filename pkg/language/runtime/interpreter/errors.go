@@ -83,7 +83,7 @@ type ConditionError struct {
 	LocationRange LocationRange
 }
 
-func (e *ConditionError) ImportLocation() ast.ImportLocation {
+func (e *ConditionError) ImportLocation() ast.Location {
 	return e.LocationRange.ImportLocation
 }
 

@@ -7,6 +7,11 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
+// BuiltinImport is a special location ID sentinel indicating that the object
+// object was imported implicitly into the execution context, for example
+// builtin functions like `createAccount`.
+const BuiltinImport = "flow.builtin"
+
 // Identifier
 
 type Identifier struct {
@@ -31,7 +36,7 @@ func (i Identifier) EndPosition() Position {
 
 type ImportDeclaration struct {
 	Identifiers []Identifier
-	Location    ImportLocation
+	Location    Location
 	LocationPos Position
 	Range
 }
@@ -52,10 +57,10 @@ func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindImport
 }
 
-// ImportLocation
-
-type ImportLocation interface {
-	isImportLocation()
+// Location defines a Cadence script's location in the import tree.
+//
+type Location interface {
+	isLocation()
 	// ID returns the canonical ID for this import location.
 	ID() LocationID
 }
@@ -64,68 +69,82 @@ type ImportLocation interface {
 
 type LocationID string
 
-// StringImportLocation
+// StringLocation
 
-type StringImportLocation string
+type StringLocation string
 
-func (StringImportLocation) isImportLocation() {}
+func (StringLocation) isLocation() {}
 
-func (l StringImportLocation) ID() LocationID {
+func (l StringLocation) ID() LocationID {
 	return LocationID(l)
 }
 
 func init() {
-	gob.Register(StringImportLocation(""))
+	gob.Register(StringLocation(""))
 }
 
-// AddressImportLocation
+// AddressLocation
 
-type AddressImportLocation []byte
+type AddressLocation []byte
 
-func (AddressImportLocation) isImportLocation() {}
+func (AddressLocation) isLocation() {}
 
-func (l AddressImportLocation) ID() LocationID {
+func (l AddressLocation) ID() LocationID {
 	return LocationID(l.String())
 }
 
-func (l AddressImportLocation) String() string {
+func (l AddressLocation) String() string {
 	return hex.EncodeToString([]byte(l))
 }
 
-// TransactionImportLocation
+// TransactionLocation
 
-type TransactionImportLocation []byte
+type TransactionLocation []byte
 
-func (TransactionImportLocation) isImportLocation() {}
+func (TransactionLocation) isLocation() {}
 
-func (l TransactionImportLocation) ID() LocationID {
+func (l TransactionLocation) ID() LocationID {
 	return LocationID(l.String())
 }
 
-func (l TransactionImportLocation) String() string {
+func (l TransactionLocation) String() string {
 	return hex.EncodeToString([]byte(l))
 }
 
-// ScriptImportLocation
+// ScriptLocation
 
-type ScriptImportLocation []byte
+type ScriptLocation []byte
 
-func (ScriptImportLocation) isImportLocation() {}
+func (ScriptLocation) isLocation() {}
 
-func (l ScriptImportLocation) ID() LocationID {
+func (l ScriptLocation) ID() LocationID {
 	return LocationID(l.String())
 }
 
-func (l ScriptImportLocation) String() string {
+func (l ScriptLocation) String() string {
 	return hex.EncodeToString([]byte(l))
 }
 
 func init() {
-	gob.Register(AddressImportLocation([]byte{}))
+	gob.Register(AddressLocation([]byte{}))
+}
+
+// FileLocation
+
+type FileLocation string
+
+func (FileLocation) isLocation() {}
+
+func (l FileLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l FileLocation) String() string {
+	return string(l)
 }
 
 // HasImportLocation
 
 type HasImportLocation interface {
-	ImportLocation() ImportLocation
+	ImportLocation() Location
 }

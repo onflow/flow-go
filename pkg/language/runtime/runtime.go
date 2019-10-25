@@ -22,11 +22,11 @@ type ImportLocation interface {
 	isImportLocation()
 }
 
-type StringImportLocation ast.StringImportLocation
+type StringImportLocation ast.StringLocation
 
 func (StringImportLocation) isImportLocation() {}
 
-type AddressImportLocation ast.AddressImportLocation
+type AddressImportLocation ast.AddressLocation
 
 func (AddressImportLocation) isImportLocation() {}
 
@@ -359,15 +359,15 @@ func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (p
 	return
 }
 
-type ImportResolver = func(astLocation ast.ImportLocation) (program *ast.Program, e error)
+type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
 
 func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
-	return func(astLocation ast.ImportLocation) (program *ast.Program, e error) {
+	return func(astLocation ast.Location) (program *ast.Program, e error) {
 		var location ImportLocation
 		switch astLocation := astLocation.(type) {
-		case ast.StringImportLocation:
+		case ast.StringLocation:
 			location = StringImportLocation(astLocation)
-		case ast.AddressImportLocation:
+		case ast.AddressLocation:
 			location = AddressImportLocation(astLocation)
 		default:
 			panic(runtimeErrors.UnreachableError{})
@@ -392,11 +392,11 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 	var eventID string
 
 	switch location := eventValue.ImportLocation.(type) {
-	case ast.AddressImportLocation:
+	case ast.AddressLocation:
 		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
-	case ast.TransactionImportLocation:
+	case ast.TransactionLocation:
 		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
-	case ast.ScriptImportLocation:
+	case ast.ScriptLocation:
 		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
@@ -433,18 +433,18 @@ func (r *interpreterRuntime) emitAccountEvent(
 }
 
 func (r *interpreterRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
-	_, err := r.executeScript(script, runtimeInterface, ast.TransactionImportLocation(txID))
+	_, err := r.executeScript(script, runtimeInterface, ast.TransactionLocation(txID))
 	return err
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
-	return r.executeScript(script, runtimeInterface, ast.ScriptImportLocation(scriptID))
+	return r.executeScript(script, runtimeInterface, ast.ScriptLocation(scriptID))
 }
 
 func (r *interpreterRuntime) executeScript(
 	script []byte,
 	runtimeInterface Interface,
-	location ast.ImportLocation,
+	location ast.Location,
 ) (interface{}, error) {
 	program, err := r.parse(script, runtimeInterface)
 	if err != nil {
@@ -461,12 +461,10 @@ func (r *interpreterRuntime) executeScript(
 
 	valueDeclarations := functions.ToValueDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
+	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
-
-	checker.ImportLocation = location
 
 	if err := checker.Check(); err != nil {
 		return nil, Error{[]error{err}}
@@ -662,7 +660,7 @@ func storageValue(storedValue map[string]interpreter.Value) interpreter.StorageV
 }
 
 func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		owner, controller, key := r.getOwnerControllerKey(arguments)
 
 		// TODO: only integer values supported for now. written in internal byte representation
@@ -682,7 +680,7 @@ func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) int
 }
 
 func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 
 		owner, controller, key := r.getOwnerControllerKey(arguments)
 
@@ -697,7 +695,7 @@ func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) int
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		pkArray, ok := arguments[0].(interpreter.ArrayValue)
 		if !ok {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
@@ -739,7 +737,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 }
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		if len(arguments) != 3 {
 			panic(fmt.Sprintf("addAccountKey requires 3 parameters"))
 		}
@@ -774,7 +772,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 }
 
 func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		if len(arguments) != 2 {
 			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
 		}
@@ -805,7 +803,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 }
 
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		if len(arguments) != 2 {
 			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 		}
@@ -835,7 +833,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 }
 
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		if len(arguments) != 1 {
 			panic(fmt.Sprintf("getAccount requires 1 parameter"))
 		}
@@ -857,7 +855,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 }
 
 func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		runtimeInterface.Log(fmt.Sprint(arguments[0]))
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
