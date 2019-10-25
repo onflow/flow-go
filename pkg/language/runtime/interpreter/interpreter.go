@@ -113,8 +113,8 @@ func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
 //
 func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
 	return LocationRange{
-		ImportLocation: interpreter.Checker.ImportLocation,
-		Range:          ast.NewRangeFromPositioned(hasPosition),
+		Location: interpreter.Checker.Location,
+		Range:    ast.NewRangeFromPositioned(hasPosition),
 	}
 }
 

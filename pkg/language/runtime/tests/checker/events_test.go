@@ -109,18 +109,17 @@ func TestCheckEmitEvent(t *testing.T) {
 		`)
 		assert.Nil(t, err)
 
-		_, err = ParseAndCheckWithExtra(t, `
+		_, err = ParseAndCheckWithOptions(t, `
 			import Transfer from "imported"
 
 			fun test() {
 				emit Transfer(to: 1, from: 2)
 			}
 			`,
-			nil,
-			nil,
-			nil,
-			func(location ast.Location) (program *ast.Program, e error) {
-				return checker.Program, nil
+			ParseAndCheckOptions{
+				ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+					return checker.Program, nil
+				},
 			},
 		)
 		if assert.Error(t, err) {

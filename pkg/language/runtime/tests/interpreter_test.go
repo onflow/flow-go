@@ -3533,9 +3533,9 @@ func TestInterpretImport(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
@@ -3587,9 +3587,9 @@ func TestInterpretImportError(t *testing.T) {
         `,
 		ParseAndCheckOptions{
 			Values: valueDeclarations,
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
@@ -4600,9 +4600,9 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
           }
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
