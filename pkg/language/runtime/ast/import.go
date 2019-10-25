@@ -57,7 +57,8 @@ func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindImport
 }
 
-// Location defines a Cadence script's location in the import tree.
+// Location describes the origin of a Cadence script.
+// This could be a file, a transaction, or a smart contract.
 //
 type Location interface {
 	isLocation()

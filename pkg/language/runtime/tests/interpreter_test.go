@@ -5019,7 +5019,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(2),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"Transfer",
@@ -5033,7 +5033,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(4),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"TransferAmount",
@@ -5051,7 +5051,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(100),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 	}
 

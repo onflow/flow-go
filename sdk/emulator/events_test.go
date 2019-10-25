@@ -98,9 +98,7 @@ func TestEventEmitted(t *testing.T) {
 			event MyEvent(x: Int, y: Int)
 
 			fun emitMyEvent(x: Int, y: Int) {
-				log("1")
 				emit MyEvent(x: x, y: y)
-				log("2")
 			}
 		`)
 

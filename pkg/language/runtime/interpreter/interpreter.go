@@ -588,7 +588,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							ConditionKind: condition.Kind,
 							Message:       message,
 							LocationRange: LocationRange{
-								ImportLocation: interpreter.Checker.Location,
+								Location: interpreter.Checker.Location,
 								Range: ast.Range{
 									StartPos: condition.Test.StartPosition(),
 									EndPos:   condition.Test.EndPosition(),
@@ -1910,9 +1910,6 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			event := result.(EventValue)
-
-			fmt.Println("VisitEmitStatement", event.String())
-			fmt.Println("onEventEmitted", interpreter.onEventEmitted)
 
 			interpreter.onEventEmitted(event)
 

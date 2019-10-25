@@ -84,7 +84,7 @@ type ConditionError struct {
 }
 
 func (e *ConditionError) ImportLocation() ast.Location {
-	return e.LocationRange.ImportLocation
+	return e.LocationRange.Location
 }
 
 func (e *ConditionError) Error() string {

@@ -3,7 +3,7 @@ package interpreter
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 // LocationPosition defines a position in the source of the import tree.
-// The LocationPosition defines the script within the import tree, the Position
+// The Location defines the script within the import tree, the Position
 // defines the row/colum within the source of that script.
 type LocationPosition struct {
 	Location ast.Location
@@ -11,9 +11,9 @@ type LocationPosition struct {
 }
 
 // LocationRange defines a range in the source of the import tree.
-// The LocationPosition defines the script within the import tree, the Range
+// The Position defines the script within the import tree, the Range
 // defines the start/end position within the source of that script.
 type LocationRange struct {
-	ImportLocation ast.Location
+	Location ast.Location
 	ast.Range
 }
