@@ -200,9 +200,9 @@ module FPL-COMMON-SYNTAX
                | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
                | Exp "[" Exp "]" [lval, seqstrict]
                | Exp "." Ident    [lval, strict(1)] // field access
-               | Ident "(" Actuals ")" [strict(2)]
+               | Ident "(" Actuals ")" [strict(2), klabel(call)]
                | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
-               | TypeId "(" Actuals ")"          // struct creation
+               | TypeId "(" Actuals ")" [klabel(call)]          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
                > non-assoc:
                  "-" Exp       [strict]
