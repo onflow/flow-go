@@ -7,11 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
-// BuiltinImport is a special location ID sentinel indicating that the object
-// object was imported implicitly into the execution context, for example
-// builtin functions like `createAccount`.
-const BuiltinImport = "flow.builtin"
-
 // Identifier
 
 type Identifier struct {
