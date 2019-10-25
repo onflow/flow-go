@@ -228,8 +228,8 @@ module FPL-COMMON-SYNTAX
                | Exp ">" Exp   [seqstrict]
                | Exp ">=" Exp  [seqstrict]
                > left:
-                 Exp "&&" Exp  [seqstrict]
-               | Exp "||" Exp  [seqstrict]
+                 Exp "&&" Exp  [strict(1)]
+               | Exp "||" Exp  [strict(1)]
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
