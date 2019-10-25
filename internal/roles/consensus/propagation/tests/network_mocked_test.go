@@ -15,17 +15,24 @@ import (
 	"testing"
 )
 
+// MockPropergationNode is a mocked node instance for testing propagation engine.
 type MockPropergationNode struct {
-	net    *mocks.MockNetwork
-	pool   *mempool.Mempool
+	// the real engine to be tested
 	engine *propagation.Engine
+	// a mocked network layer in order for the MockHub to route events in memory to a targeted node
+	net *mocks.MockNetwork
+	// the state of the engine, exposed in order for tests to assert
+	pool *mempool.Mempool
 }
 
+// NewMockPropgationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
 func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int) (*MockPropergationNode, error) {
 	if nodeIndex >= len(allNodes) {
 		return nil, errors.Errorf("nodeIndex is out of range: %v", nodeIndex)
 	}
+
 	nodeEntry := allNodes[nodeIndex]
+
 	nodeID, err := committee.EntryToId(nodeEntry)
 	if err != nil {
 		return nil, err
@@ -47,15 +54,15 @@ func NewMockPropgationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int)
 		return nil, err
 	}
 
-	prop, err := propagation.NewEngine(log, net, com, pool)
+	engine, err := propagation.NewEngine(log, net, com, pool)
 	if err != nil {
 		return nil, err
 	}
 
 	return &MockPropergationNode{
+		engine: engine,
 		net:    net,
 		pool:   pool,
-		engine: prop,
 	}, nil
 }
 
