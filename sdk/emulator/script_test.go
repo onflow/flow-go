@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestCallScript(t *testing.T) {
@@ -22,7 +23,10 @@ func TestCallScript(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	assert.Nil(t, err)
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	// Sample call (value is 0)
 	value, err := b.CallScript([]byte(sampleCall))

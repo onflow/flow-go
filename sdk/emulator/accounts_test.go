@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/sdk/keys"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -40,7 +40,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -81,7 +84,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -125,7 +131,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -155,7 +164,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -196,7 +208,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -233,7 +248,10 @@ func TestAddAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
@@ -249,7 +267,10 @@ func TestAddAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), privateKey)
+	sig, err = keys.SignTransaction(tx2, privateKey)
+	assert.Nil(t, err)
+
+	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx2)
 	assert.Nil(t, err)
@@ -273,7 +294,10 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
@@ -292,7 +316,10 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
+
+	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx2)
 	assert.Nil(t, err)
@@ -311,7 +338,10 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx3, b.RootKey())
+	assert.Nil(t, err)
+
+	tx3.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx3)
 	assert.NotNil(t, err)
@@ -330,7 +360,10 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx4.AddSignature(b.RootAccountAddress(), privateKey)
+	sig, err = keys.SignTransaction(tx4, privateKey)
+	assert.Nil(t, err)
+
+	tx4.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx4)
 	assert.Nil(t, err)
@@ -368,8 +401,14 @@ func TestUpdateAccountCode(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressB},
 		}
 
-		tx.AddSignature(accountAddressA, privateKeyA)
-		tx.AddSignature(accountAddressB, privateKeyB)
+		sigA, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
+
+		sigB, err := keys.SignTransaction(tx, privateKeyB)
+		assert.Nil(t, err)
+
+		tx.AddSignature(accountAddressA, sigA)
+		tx.AddSignature(accountAddressB, sigB)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -403,7 +442,10 @@ func TestUpdateAccountCode(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressB},
 		}
 
-		tx.AddSignature(accountAddressA, privateKeyA)
+		sig, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
+
+		tx.AddSignature(accountAddressA, sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.NotNil(t, err)
@@ -445,7 +487,10 @@ func TestUpdateAccountCode(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressA},
 		}
 
-		tx.AddSignature(accountAddressA, privateKeyA)
+		sig, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
+
+		tx.AddSignature(accountAddressA, sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.NotNil(t, err)
@@ -492,7 +537,10 @@ func TestImportAccountCode(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	assert.Nil(t, err)
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx)
 	assert.Nil(t, err)

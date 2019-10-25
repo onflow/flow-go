@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestEventEmitted(t *testing.T) {
@@ -41,14 +42,17 @@ func TestEventEmitted(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx)
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash.Hex())
 
 		assert.Equal(t, expectedID, events[0].ID)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -118,7 +122,10 @@ func TestEventEmitted(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)

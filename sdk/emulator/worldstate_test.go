@@ -7,7 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/hash"
 	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -40,7 +42,12 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	hash.SetTransactionHash(tx1)
+
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
@@ -51,7 +58,12 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	hash.SetTransactionHash(tx2)
+
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
+
+	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	tx3 := &types.Transaction{
 		Script:             []byte(addTwoScript),
@@ -62,7 +74,10 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx3, b.RootKey())
+	assert.Nil(t, err)
+
+	tx3.AddSignature(b.RootAccountAddress(), sig)
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: %x\n", ws1)
@@ -71,7 +86,7 @@ func TestWorldStates(t *testing.T) {
 	assert.Len(t, b.txPool, 0)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -140,7 +155,7 @@ func TestWorldStates(t *testing.T) {
 	// World state rollback to ws5 (before tx3)
 	assert.Equal(t, ws5, ws7)
 	// World state does not include tx3
-	assert.False(t, b.pendingWorldState.ContainsTransaction(tx3.Hash()))
+	assert.False(t, b.pendingWorldState.ContainsTransaction(tx3.Hash))
 
 	// Seek to non-committed world state
 	b.SeekToState(ws4)
@@ -163,7 +178,12 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	hash.SetTransactionHash(tx1)
+
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	tx2 := &types.Transaction{
 		Script:             []byte(addTwoScript),
@@ -174,14 +194,19 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	hash.SetTransactionHash(tx2)
+
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
+
+	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	var invalidWorldState crypto.Hash
 
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
 
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -192,27 +217,27 @@ func TestQueryByVersion(t *testing.T) {
 	ws3 := b.pendingWorldState.Hash()
 
 	// Get transaction at invalid world state version (errors)
-	tx, err := b.GetTransactionAtVersion(tx1.Hash(), invalidWorldState)
+	tx, err := b.GetTransactionAtVersion(tx1.Hash, invalidWorldState)
 	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, tx)
 
 	// tx1 does not exist at ws1
-	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
+	tx, err = b.GetTransactionAtVersion(tx1.Hash, ws1)
 	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx1 does exist at ws2
-	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws2)
+	tx, err = b.GetTransactionAtVersion(tx1.Hash, ws2)
 	assert.Nil(t, err)
 	assert.NotNil(t, tx)
 
 	// tx2 does not exist at ws2
-	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
+	tx, err = b.GetTransactionAtVersion(tx2.Hash, ws2)
 	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx2 does exist at ws3
-	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws3)
+	tx, err = b.GetTransactionAtVersion(tx2.Hash, ws3)
 	assert.Nil(t, err)
 	assert.NotNil(t, tx)
 

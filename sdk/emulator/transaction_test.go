@@ -24,16 +24,17 @@ func TestSubmitTransaction(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	sig, _ := keys.SignTransaction(tx1, b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	// tx1 status becomes TransactionFinalized
-	tx, err := b.GetTransaction(tx1.Hash())
+	tx, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
 	assert.Equal(t, types.TransactionFinalized, tx.Status)
 }
@@ -46,10 +47,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		// Create empty transaction (no required fields)
 		tx1 := &types.Transaction{}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		assert.Nil(t, err)
+
+		tx1.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err := b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx1)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -62,10 +66,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		assert.Nil(t, err)
+
+		tx1.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err := b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx1)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -78,10 +85,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		assert.Nil(t, err)
+
+		tx1.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err := b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx1)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -94,10 +104,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		assert.Nil(t, err)
+
+		tx1.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err := b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx1)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -110,10 +123,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 			ComputeLimit:       10,
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx1, b.RootKey())
+		assert.Nil(t, err)
+
+		tx1.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx1
-		err := b.SubmitTransaction(tx1)
+		err = b.SubmitTransaction(tx1)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 }
@@ -130,10 +146,13 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	// Submit tx1 again (errors)
@@ -153,14 +172,17 @@ func TestSubmitTransactionReverted(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit invalid tx1 (errors)
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.NotNil(t, err)
 
 	// tx1 status becomes TransactionReverted
-	tx, err := b.GetTransaction(tx1.Hash())
+	tx, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
 	assert.Equal(t, types.TransactionReverted, tx.Status)
 }
@@ -182,7 +204,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte("fun main(account: Account) {}")
 
 		// create transaction with two accounts
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -191,11 +213,17 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
 		}
 
-		tx1.AddSignature(accountAddressA, privateKeyA)
-		tx1.AddSignature(accountAddressB, privateKeyB)
+		sigA, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
-		assert.NotNil(t, err)
+		sigB, err := keys.SignTransaction(tx, privateKeyB)
+		assert.Nil(t, err)
+
+		tx.AddSignature(accountAddressA, sigA)
+		tx.AddSignature(accountAddressB, sigB)
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 	})
 
 	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
@@ -203,7 +231,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte("fun main(accountA: Account, accountB: Account) {}")
 
 		// create transaction with two accounts
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -212,10 +240,13 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressA},
 		}
 
-		tx1.AddSignature(accountAddressA, privateKeyA)
+		sig, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
-		assert.NotNil(t, err)
+		tx.AddSignature(accountAddressA, sig)
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 	})
 }
 
@@ -225,7 +256,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -234,9 +265,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
@@ -246,7 +280,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -255,9 +289,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 		}
 
-		tx1.AddSignature(invalidAddress, b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
+		tx.AddSignature(invalidAddress, sig)
+
+		err = b.SubmitTransaction(tx)
 
 		assert.IsType(t, err, &emulator.ErrInvalidSignatureAccount{})
 	})
@@ -268,7 +305,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		// use key-pair that does not exist on root account
 		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("invalid key"))
 
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -277,9 +314,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), invalidKey)
+		sig, err := keys.SignTransaction(tx, invalidKey)
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidSignaturePublicKey{})
 	})
 
@@ -293,6 +333,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
 		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
+		assert.Nil(t, err)
 
 		script := []byte("fun main(account: Account) {}")
 
@@ -306,15 +347,24 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		}
 
 		t.Run("InsufficientKeyWeight", func(t *testing.T) {
-			tx.AddSignature(accountAddressA, privateKeyB)
+			sig, err := keys.SignTransaction(tx, privateKeyB)
+			assert.Nil(t, err)
+
+			tx.AddSignature(accountAddressA, sig)
 
 			err = b.SubmitTransaction(tx)
 			assert.IsType(t, err, &emulator.ErrMissingSignature{})
 		})
 
 		t.Run("SufficientKeyWeight", func(t *testing.T) {
-			tx.AddSignature(accountAddressA, privateKeyA)
-			tx.AddSignature(accountAddressA, privateKeyB)
+			sigA, err := keys.SignTransaction(tx, privateKeyA)
+			assert.Nil(t, err)
+
+			sigB, err := keys.SignTransaction(tx, privateKeyB)
+			assert.Nil(t, err)
+
+			tx.AddSignature(accountAddressA, sigA)
+			tx.AddSignature(accountAddressA, sigB)
 
 			err = b.SubmitTransaction(tx)
 			assert.Nil(t, err)
@@ -328,7 +378,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx1 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -337,9 +387,12 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			ScriptAccounts:     []types.Address{addressA},
 		}
 
-		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx1)
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		assert.NotNil(t, err)
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
@@ -369,7 +422,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			}
 		`)
 
-		tx2 := &types.Transaction{
+		tx := &types.Transaction{
 			Script:             multipleAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -378,10 +431,16 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
 		}
 
-		tx2.AddSignature(accountAddressA, privateKeyA)
-		tx2.AddSignature(accountAddressB, privateKeyB)
+		sigA, err := keys.SignTransaction(tx, privateKeyA)
+		assert.Nil(t, err)
 
-		err = b.SubmitTransaction(tx2)
+		sigB, err := keys.SignTransaction(tx, privateKeyB)
+		assert.Nil(t, err)
+
+		tx.AddSignature(accountAddressA, sigA)
+		tx.AddSignature(accountAddressB, sigB)
+
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressA.Bytes()))
