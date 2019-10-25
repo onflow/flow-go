@@ -291,17 +291,18 @@ module FPL-VALUES
   imports BOOL-SYNTAX
   imports INT-SYNTAX
 
+  syntax Type
   syntax Val ::= Int | Bool
-  syntax Exp ::= Val
-  syntax KResult ::= Val
+  syntax TypedVal ::= v(Val, Type)
+  syntax Exp ::= TypedVal
+  syntax KResult ::= TypedVal | Int // for constant expressions
 
 endmodule
 
 module FPL-ENV
-  syntax Val
-  syntax Type
+  syntax TypedVal
   syntax Mutability ::= "let" | "var"
-  syntax EnvEntry ::= env(mut: Mutability, v: Val, t: Type)
+  syntax EnvEntry ::= env(mut: Mutability, v: TypedVal)
 endmodule
 
 module FPL-TYPING
@@ -309,6 +310,8 @@ module FPL-TYPING
   imports FPL-ENV
 
   syntax Type ::= type(Exp) [function]
+                | #type(Exp) [function]
+                | infer(Type) [function]
   syntax Ident ::= "Bool" [token]
                  | "Int8" [token]
                  | "Int16" [token]
@@ -320,30 +323,44 @@ module FPL-TYPING
                  | "UInt64" [token]
                  | "Int" [token]
 
-  rule type(I:Int) => Int
-  rule type(B:Bool) => Bool
-  rule [[ type(X:Ident) => T ]]
-       <env>... X |-> env(... t: T) ...</env>
-  rule type(- E => E)
-  rule type(! _) => Bool
-  rule type(_ * _) => Int
-  rule type(E &* _ => E)
-  rule type(_ / _) => Int
-  rule type(_ % _) => Int
-  rule type(_ + _) => Int
-  rule type(E &+ _ => E)
-  rule type(_ - _) => Int
-  rule type(E &- _ => E)
-  rule type(_ && _) => Bool
-  rule type(_ || _) => Bool
-  rule type(_ == _) => Bool
-  rule type(_ != _) => Bool
-  rule type(_ < _) => Bool
-  rule type(_ <= _) => Bool
-  rule type(_ > _) => Bool
-  rule type(_ >= _) => Bool
-  rule type(_ ? E : _) => E
-  
+  syntax Ident ::= "IntLit" [token]
+
+  rule type(E) => infer(#type(E))
+  rule infer(IntLit) => Int
+  rule infer(T) => T [owise]
+
+  rule #type(I:Int) => IntLit
+  rule #type(B:Bool) => Bool
+  rule [[ #type(X:Ident) => T ]]
+       <env>... X |-> env(... v: v(_, T)) ...</env>
+  rule #type(- E => E)
+  rule #type(! _) => Bool
+  rule #type(E1 * E2) => type(E1, E2)
+  rule #type(E1 &* E2) => type(E1, E2)
+  rule #type(E1 / E2) => type(E1, E2)
+  rule #type(E1 % E2) => type(E1, E2)
+  rule #type(E1 + E2) => type(E1, E2)
+  rule #type(E1 &+ E2) => type(E1, E2)
+  rule #type(E1 - E2) => type(E1, E2)
+  rule #type(E1 &- E2) => type(E1, E2)
+  rule #type(_ && _) => Bool
+  rule #type(_ || _) => Bool
+  rule #type(_ == _) => Bool
+  rule #type(_ != _) => Bool
+  rule #type(_ < _) => Bool
+  rule #type(_ <= _) => Bool
+  rule #type(_ > _) => Bool
+  rule #type(_ >= _) => Bool
+  rule #type(_ ? E1 : E2) => type(E1, E2)
+
+  syntax Type ::= type(Exp, Exp) [function]
+                | #type(Type, Type) [function]
+
+  rule type(E1, E2) => #type(#type(E1), #type(E2))
+  rule #type(IntLit, T) => T
+  rule #type(T, IntLit) => T
+  rule #type(T, T) => T
+
 endmodule
 
 module FPL-CONFIGURATION
@@ -363,12 +380,17 @@ module FPL-VARIABLE-DECLARATION
   imports FPL-TYPING
 
   context let _ : _:Type = HOLE
+    requires notBool isInt(HOLE)
   context var _ : _:Type = HOLE
+    requires notBool isInt(HOLE)
 
-  rule <k> let X : T:Type = V:Val => . ... </k>
-       <env> Rho => Rho [ X <- env(let, V, T) ] </env>
-  rule <k> var X : T:Type = V:Val => . ... </k>
-       <env> Rho => Rho [ X <- env(var, V, T) ] </env>
+  rule <k> let _ : T:Type = (V:Int => v(V, T)) ... </k>
+  rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
+
+  rule <k> let X : T:Type = v(V, T) => . ... </k>
+       <env> Rho => Rho [ X <- env(let, v(V, T)) ] </env>
+  rule <k> var X : T:Type = v(V, T) => . ... </k>
+       <env> Rho => Rho [ X <- env(var, v(V, T)) ] </env>
 
   rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
   rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
@@ -408,7 +430,7 @@ module FPL-TESTING
   imports FPL
   imports FPL-TESTING-COMMON-SYNTAX
 
-  rule <k> assert true => . ... </k>
+  rule <k> assert v(true,Bool) => . ... </k>
 
   rule <k> .Pgm </k>
        <env> E => .Map </env>
