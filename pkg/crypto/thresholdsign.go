@@ -5,15 +5,41 @@ package crypto
 // #include "thresholdsign_include.h"
 import "C"
 
-// TODO: remove -wall after reaching a stable version
-// TDOD: enable QUIET in relic
-
 import (
 	"fmt"
 )
 
+// ThresholdSinger holds the data needed for threshold signaures
+type ThresholdSinger struct {
+	// size of the group
+	size int
+	// the thresold t of the scheme where (t+1) shares are
+	// required to reconstruct a signature
+	threshold int
+	// the current node private key (a DKG output)
+	currentPrivateKey PrivateKey
+	// the group public key (a DKG output)
+	groupPublicKey PublicKey
+	// the group public key shares (a DKG output)
+	nodePublicKeys []PublicKey
+	// the hasher to be used for all signatures
+	hashAlgo Hasher
+	// the message to be signed. Siganture shares and the threshold signature
+	// are verified using this message
+	messageToSign []byte
+	// the valid signature shares received from other nodes
+	shares []byte // simulates an array of Signatures
+	// (or a matrix of by bytes) to accommodate a cgo constraint
+	// the list of signers corresponding to the list of shares
+	signers []uint32
+	// the threshold signature. It is equal to nil if less than (t+1) shares are
+	// received
+	thresholdSignature Signature
+}
+
 // NewThresholdSigner creates a new instance of Threshold siger using BLS
-// The hashing algorithm to be used is passed as a parameter
+// hash is the hashing algorithm to be used
+// size is the number of participants
 func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 	if size < ThresholdMinSize {
 		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
@@ -39,33 +65,8 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 	}, nil
 }
 
-// ThresholdSinger holds the data needed for threshold signaures
-type ThresholdSinger struct {
-	size              int
-	threshold         int
-	currentPrivateKey PrivateKey
-	groupPublicKey    PublicKey
-	nodePublicKeys    []PublicKey
-	hashAlgo          Hasher
-	messageToSign     []byte
-	shares            []byte // simulates an array of Signatures
-	// (or a matrix of by bytes) to solve a cgo issue
-	signers            []uint32
-	thresholdSignature Signature
-}
-
-// Resize sets update the size and the threshold of the group
-func (s *ThresholdSinger) Resize(newSize int) error {
-	if newSize < ThresholdMinSize {
-		return cryptoError{fmt.Sprintf("Size should be larger than 3.")}
-	}
-	s.size = newSize
-	s.threshold = optimalThreshold(newSize)
-	return nil
-}
-
 // SetKeys sets the private and public keys needed by the threshold signature
-// the input keys could be the output keys of a Distributed Key Generator
+// the input keys can be the output keys of a Distributed Key Generator
 func (s *ThresholdSinger) SetKeys(currentPrivateKey PrivateKey,
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey) {
@@ -134,13 +135,11 @@ func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature
 		s.signers = append(s.signers, uint32(orig))
 		// thresholdSignature is only computed once
 		if len(s.signers) == (s.threshold + 1) {
-			fmt.Println(s.signers)
 			thresholdSignature, err := s.reconstructThresholdSignature()
 			if err != nil {
 				return true, nil, err
 			}
 			s.thresholdSignature = thresholdSignature
-			fmt.Println(thresholdSignature)
 		}
 	}
 	return verif, s.thresholdSignature, nil
@@ -160,5 +159,16 @@ func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
 		(*C.uchar)(&s.shares[0]),
 		(*C.uint32_t)(&s.signers[0]), (C.int)(len(s.signers)),
 	)
+
+	// Verify the computed signature
+	verif, err := s.VerifyThresholdSignature(thresholdSignature)
+	if err != nil {
+		return nil, err
+	}
+	if verif == false {
+		return nil, cryptoError{
+			"The constructed threshold signature in incorrect. There might be an issue with the set keys"}
+	}
+
 	return thresholdSignature, nil
 }

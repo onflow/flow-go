@@ -48,12 +48,12 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSinger,
 // It simulates processing incoming messages by a node during TS
 func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 	tsSync chan int, t *testing.T) {
+	// Sign a share and broadcast it
 	sighShare, _ := ts[current].SignShare()
 	broadcast(current, tsType, sighShare, chans)
 	for {
 		select {
 		case newMsg := <-chans[current]:
-			//if current == 1 {
 			log.Debugf("%d Receiving TS from %d:", current, newMsg.orig)
 			verif, thresholdSignature, err := ts[current].ReceiveThresholdSignatureMsg(newMsg.orig, newMsg.msg.(Signature))
 			assert.Nil(t, err)
@@ -63,8 +63,10 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 				verif, err = ts[current].VerifyThresholdSignature(thresholdSignature)
 				assert.Nil(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
+				if verif {
+					log.Infof("%d reconstructed a valid signature: %d\n", current, thresholdSignature)
+				}
 			}
-			//}
 
 		// if timeout, finalize TS
 		case <-time.After(time.Second):
@@ -76,8 +78,8 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 
 // Testing Threshold Signature
 func TestThresholdSignature(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
-	log.Debug("DKG starts")
+	log.SetLevel(log.ErrorLevel)
+	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5
 	lead := 0
@@ -127,6 +129,7 @@ func TestThresholdSignature(t *testing.T) {
 		<-dkgSync
 	}
 
+	// Start TS
 	log.Info("TS starts")
 	for i := 0; i < n; i++ {
 		go tsProcessChan(i, ts, chans, tsSync, t)

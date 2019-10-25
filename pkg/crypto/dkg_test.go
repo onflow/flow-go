@@ -54,7 +54,7 @@ func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) 
 // This is a testing function
 // It simulates processing incoming messages by a node
 func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
-	pkChan chan PublicKey, quit chan int, t *testing.T) {
+	pkChan chan PublicKey, sync chan int, t *testing.T) {
 	for {
 		select {
 		case newMsg := <-chans[current]:
@@ -66,7 +66,7 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 			log.Debugf("%d quit \n", current)
 			_, pk, _, _ := dkg[current].EndDKG()
 			pkChan <- pk
-			quit <- 0
+			sync <- 0
 			return
 		}
 	}
@@ -102,7 +102,7 @@ func TestFeldmanVSS(t *testing.T) {
 	dkg := make([]DKGstate, n)
 	pkChan := make(chan PublicKey)
 	chans := make([]chan *toProcess, n)
-	quit := make(chan int)
+	sync := make(chan int)
 
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
@@ -117,7 +117,7 @@ func TestFeldmanVSS(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, pkChan, quit, t)
+		go dkgProcessChan(i, dkg, chans, pkChan, sync, t)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
@@ -142,6 +142,6 @@ func TestFeldmanVSS(t *testing.T) {
 			pkTemp, _ = (<-pkChan).Encode()
 			assert.Equal(t, groupPK, pkTemp, "2 group public keys are mismatching")
 		}
-		<-quit
+		<-sync
 	}
 }

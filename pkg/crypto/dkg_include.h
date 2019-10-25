@@ -5,8 +5,12 @@
 #include "relic.h"
 #include "misc.h"
 
+// the highest index of a DKG node
 #define MAX_IND         255
 #define MAX_IND_BITS    8
+// the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r 
+// (approximately Fr_bits/MAX_IND_BITS)
+#define MAX_IND_LOOPS   32 
 
 void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const int x);
 void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A);
