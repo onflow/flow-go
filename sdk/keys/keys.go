@@ -3,7 +3,7 @@ package keys
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/encoding/rlp"
+	"github.com/dapperlabs/flow-go/pkg/encoding"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -95,8 +95,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	enc := rlp.NewEncoder()
-	b, err := enc.EncodeCanonicalTransaction(tx)
+	b, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(*tx)
 	if err != nil {
 		return nil, err
 	}
