@@ -1,8 +1,9 @@
 package sema
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOptionalSubtyping(t *testing.T) {

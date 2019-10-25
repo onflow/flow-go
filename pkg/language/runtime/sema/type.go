@@ -17,15 +17,24 @@ type Type interface {
 	String() string
 	Equal(other Type) bool
 	IsResourceType() bool
+	IsInvalidType() bool
 }
 
-// IndexableType
+// ValueIndexableType
 
-type IndexableType interface {
+type ValueIndexableType interface {
 	Type
-	isIndexableType()
+	isValueIndexableType() bool
 	ElementType(isAssignment bool) Type
 	IndexingType() Type
+}
+
+// TypeIndexableType
+
+type TypeIndexableType interface {
+	Type
+	isTypeIndexableType()
+	ElementType(indexingType Type, isAssignment bool) Type
 }
 
 // TypeAnnotation
@@ -81,6 +90,10 @@ func (*AnyType) IsResourceType() bool {
 	return false
 }
 
+func (*AnyType) IsInvalidType() bool {
+	return false
+}
+
 // NeverType represents the bottom type
 type NeverType struct{}
 
@@ -99,6 +112,10 @@ func (*NeverType) IsResourceType() bool {
 	return false
 }
 
+func (*NeverType) IsInvalidType() bool {
+	return false
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -114,6 +131,10 @@ func (*VoidType) Equal(other Type) bool {
 }
 
 func (*VoidType) IsResourceType() bool {
+	return false
+}
+
+func (*VoidType) IsInvalidType() bool {
 	return false
 }
 
@@ -136,6 +157,10 @@ func (*InvalidType) Equal(other Type) bool {
 
 func (*InvalidType) IsResourceType() bool {
 	return false
+}
+
+func (*InvalidType) IsInvalidType() bool {
+	return true
 }
 
 // OptionalType represents the optional variant of another type
@@ -164,6 +189,10 @@ func (t *OptionalType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
+func (t *OptionalType) IsInvalidType() bool {
+	return t.Type.IsInvalidType()
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
@@ -179,6 +208,10 @@ func (*BoolType) Equal(other Type) bool {
 }
 
 func (*BoolType) IsResourceType() bool {
+	return false
+}
+
+func (*BoolType) IsInvalidType() bool {
 	return false
 }
 
@@ -201,6 +234,10 @@ func (*CharacterType) IsResourceType() bool {
 	return false
 }
 
+func (*CharacterType) IsInvalidType() bool {
+	return false
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -217,6 +254,14 @@ func (*StringType) Equal(other Type) bool {
 
 func (*StringType) IsResourceType() bool {
 	return false
+}
+
+func (*StringType) IsInvalidType() bool {
+	return false
+}
+
+func (*StringType) HasMembers() bool {
+	return true
 }
 
 func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
@@ -255,7 +300,9 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 	}
 }
 
-func (t *StringType) isIndexableType() {}
+func (t *StringType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *StringType) ElementType(isAssignment bool) Type {
 	return &CharacterType{}
@@ -290,6 +337,10 @@ func (*IntegerType) IsResourceType() bool {
 	return false
 }
 
+func (*IntegerType) IsInvalidType() bool {
+	return false
+}
+
 func (*IntegerType) Min() *big.Int {
 	return nil
 }
@@ -313,6 +364,10 @@ func (*IntType) Equal(other Type) bool {
 }
 
 func (*IntType) IsResourceType() bool {
+	return false
+}
+
+func (*IntType) IsInvalidType() bool {
 	return false
 }
 
@@ -340,6 +395,10 @@ func (*Int8Type) Equal(other Type) bool {
 }
 
 func (*Int8Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int8Type) IsInvalidType() bool {
 	return false
 }
 
@@ -372,6 +431,10 @@ func (*Int16Type) IsResourceType() bool {
 	return false
 }
 
+func (*Int16Type) IsInvalidType() bool {
+	return false
+}
+
 var Int16TypeMin = big.NewInt(0).SetInt64(math.MinInt16)
 var Int16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
 
@@ -398,6 +461,10 @@ func (*Int32Type) Equal(other Type) bool {
 }
 
 func (*Int32Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int32Type) IsInvalidType() bool {
 	return false
 }
 
@@ -430,6 +497,10 @@ func (*Int64Type) IsResourceType() bool {
 	return false
 }
 
+func (*Int64Type) IsInvalidType() bool {
+	return false
+}
+
 var Int64TypeMin = big.NewInt(0).SetInt64(math.MinInt64)
 var Int64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
 
@@ -456,6 +527,10 @@ func (*UInt8Type) Equal(other Type) bool {
 }
 
 func (*UInt8Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt8Type) IsInvalidType() bool {
 	return false
 }
 
@@ -488,6 +563,10 @@ func (*UInt16Type) IsResourceType() bool {
 	return false
 }
 
+func (*UInt16Type) IsInvalidType() bool {
+	return false
+}
+
 var UInt16TypeMin = big.NewInt(0)
 var UInt16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
 
@@ -514,6 +593,10 @@ func (*UInt32Type) Equal(other Type) bool {
 }
 
 func (*UInt32Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt32Type) IsInvalidType() bool {
 	return false
 }
 
@@ -546,6 +629,10 @@ func (*UInt64Type) IsResourceType() bool {
 	return false
 }
 
+func (*UInt64Type) IsInvalidType() bool {
+	return false
+}
+
 var UInt64TypeMin = big.NewInt(0)
 var UInt64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
 
@@ -560,7 +647,7 @@ func (*UInt64Type) Max() *big.Int {
 // ArrayType
 
 type ArrayType interface {
-	IndexableType
+	ValueIndexableType
 	isArrayType()
 }
 
@@ -775,6 +862,10 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
+func (t *VariableSizedType) HasMembers() bool {
+	return true
+}
+
 func (t *VariableSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	return getArrayMember(t, identifier, targetRange, report)
 }
@@ -783,7 +874,13 @@ func (t *VariableSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
-func (t *VariableSizedType) isIndexableType() {}
+func (t *VariableSizedType) IsInvalidType() bool {
+	return t.Type.IsInvalidType()
+}
+
+func (t *VariableSizedType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *VariableSizedType) ElementType(isAssignment bool) Type {
 	return t.Type
@@ -816,6 +913,10 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 		t.Size == otherArray.Size
 }
 
+func (t *ConstantSizedType) HasMembers() bool {
+	return true
+}
+
 func (t *ConstantSizedType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	return getArrayMember(t, identifier, targetRange, report)
 }
@@ -824,7 +925,13 @@ func (t *ConstantSizedType) IsResourceType() bool {
 	return t.Type.IsResourceType()
 }
 
-func (t *ConstantSizedType) isIndexableType() {}
+func (t *ConstantSizedType) IsInvalidType() bool {
+	return t.Type.IsInvalidType()
+}
+
+func (t *ConstantSizedType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *ConstantSizedType) ElementType(isAssignment bool) Type {
 	return t.Type
@@ -893,6 +1000,20 @@ func (t *FunctionType) Equal(other Type) bool {
 }
 
 func (*FunctionType) IsResourceType() bool {
+	return false
+}
+
+func (t *FunctionType) IsInvalidType() bool {
+	if t.ReturnTypeAnnotation.Type.IsInvalidType() {
+		return true
+	}
+
+	for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		if parameterTypeAnnotation.Type.IsInvalidType() {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -970,12 +1091,21 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
+func (t *CompositeType) HasMembers() bool {
+	return true
+}
+
 func (t *CompositeType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
 
 func (t *CompositeType) IsResourceType() bool {
 	return t.Kind == common.CompositeKindResource
+}
+
+func (t *CompositeType) IsInvalidType() bool {
+	// TODO: maybe if any member has an invalid type?
+	return false
 }
 
 // Member
@@ -1014,7 +1144,9 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 	return &member
 }
 
-type HasMembers interface {
+type MemberAccessibleType interface {
+	Type
+	HasMembers() bool
 	GetMember(field string, targetRange ast.Range, report func(error)) *Member
 }
 
@@ -1044,12 +1176,21 @@ func (t *InterfaceType) Equal(other Type) bool {
 		otherInterface.Identifier == t.Identifier
 }
 
+func (t *InterfaceType) HasMembers() bool {
+	return true
+}
+
 func (t *InterfaceType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
 
 func (t *InterfaceType) IsResourceType() bool {
 	return t.CompositeKind == common.CompositeKindResource
+}
+
+func (t *InterfaceType) IsInvalidType() bool {
+	// TODO: maybe if any member has an invalid type?
+	return false
 }
 
 // DictionaryType
@@ -1078,6 +1219,15 @@ func (t *DictionaryType) Equal(other Type) bool {
 func (t *DictionaryType) IsResourceType() bool {
 	return t.KeyType.IsResourceType() ||
 		t.ValueType.IsResourceType()
+}
+
+func (t *DictionaryType) IsInvalidType() bool {
+	return t.KeyType.IsInvalidType() ||
+		t.ValueType.IsInvalidType()
+}
+
+func (t *DictionaryType) HasMembers() bool {
+	return true
 }
 
 func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
@@ -1126,7 +1276,9 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 	}
 }
 
-func (t *DictionaryType) isIndexableType() {}
+func (t *DictionaryType) isValueIndexableType() bool {
+	return true
+}
 
 func (t *DictionaryType) ElementType(isAssignment bool) Type {
 	return &OptionalType{Type: t.ValueType}
@@ -1145,21 +1297,32 @@ type DictionaryEntryType struct {
 
 type StorageType struct{}
 
-func (h StorageType) isType() {}
+func (t *StorageType) isType() {}
 
-func (h StorageType) String() string {
+func (t *StorageType) String() string {
 	return "Storage"
 }
 
-func (h StorageType) Equal(other Type) bool {
+func (t *StorageType) Equal(other Type) bool {
 	_, ok := other.(*StorageType)
 	return ok
 }
 
-func (h StorageType) IsResourceType() bool {
+func (t *StorageType) IsResourceType() bool {
 	// NOTE: even though storage may contain resources,
 	//   we define it to not behave like a resource
 	return false
+}
+
+func (t *StorageType) IsInvalidType() bool {
+	return false
+}
+
+func (t *StorageType) isTypeIndexableType() {}
+
+func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
+	// NOTE: like dictionary
+	return &OptionalType{Type: indexingType}
 }
 
 // EventType
@@ -1220,6 +1383,10 @@ func (*EventType) IsResourceType() bool {
 	return false
 }
 
+func (*EventType) IsInvalidType() bool {
+	return false
+}
+
 type EventFieldType struct {
 	Identifier string
 	Type       Type
@@ -1258,6 +1425,51 @@ func (t *ReferenceType) Equal(other Type) bool {
 
 func (t *ReferenceType) IsResourceType() bool {
 	return false
+}
+
+func (t *ReferenceType) IsInvalidType() bool {
+	return false
+}
+
+func (t *ReferenceType) HasMembers() bool {
+	referencedType, ok := t.Type.(MemberAccessibleType)
+	if !ok {
+		return false
+	}
+	return referencedType.HasMembers()
+}
+
+func (t *ReferenceType) GetMember(field string, targetRange ast.Range, report func(error)) *Member {
+	// forward to referenced type, if it has members
+	referencedTypeWithMember, ok := t.Type.(MemberAccessibleType)
+	if !ok {
+		return nil
+	}
+	return referencedTypeWithMember.GetMember(field, targetRange, report)
+}
+
+func (t *ReferenceType) isValueIndexableType() bool {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return false
+	}
+	return referencedType.isValueIndexableType()
+}
+
+func (t *ReferenceType) ElementType(isAssignment bool) Type {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return nil
+	}
+	return referencedType.ElementType(isAssignment)
+}
+
+func (t *ReferenceType) IndexingType() Type {
+	referencedType, ok := t.Type.(ValueIndexableType)
+	if !ok {
+		return nil
+	}
+	return referencedType.IndexingType()
 }
 
 ////
@@ -1362,11 +1574,6 @@ func IsEquatableType(ty Type) bool {
 	return IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
 		IsSubType(ty, &IntType{})
-}
-
-func IsInvalidType(ty Type) bool {
-	_, ok := ty.(*InvalidType)
-	return ok
 }
 
 // UnwrapOptionalType returns the type if it is not an optional type,

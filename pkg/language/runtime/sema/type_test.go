@@ -1,9 +1,11 @@
 package sema
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
 func TestConstantSizedType_String(t *testing.T) {

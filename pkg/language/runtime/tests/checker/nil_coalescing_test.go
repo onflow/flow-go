@@ -1,11 +1,13 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckNilCoalescingNilIntToOptional(t *testing.T) {
@@ -166,17 +168,16 @@ func TestCheckNilCoalescingBothOptional(t *testing.T) {
 
 func TestCheckNilCoalescingWithNever(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           let x: Int? = nil
           let y = x ?? panic("nope")
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.PanicFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)

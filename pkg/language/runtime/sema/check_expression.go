@@ -113,10 +113,7 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 
 		checker.report(
 			&ResourceLossError{
-				Range: ast.Range{
-					StartPos: statement.Expression.StartPosition(),
-					EndPos:   statement.Expression.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(statement.Expression),
 			},
 		)
 	}
@@ -144,41 +141,54 @@ func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) 
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression, false)
+	elementType, _ := checker.visitIndexExpression(expression, false)
+	return elementType
 }
 
-// visitIndexingExpression checks if the indexed expression is indexable,
+// visitIndexExpression checks if the indexed expression is indexable,
 // checks if the indexing expression can be used to index into the indexed expression,
 // and returns the expected element type
 //
-func (checker *Checker) visitIndexingExpression(
+func (checker *Checker) visitIndexExpression(
 	indexExpression *ast.IndexExpression,
 	isAssignment bool,
-) (result Type) {
+) (elementType Type, targetType Type) {
 
 	targetExpression := indexExpression.TargetExpression
-	indexedType := targetExpression.Accept(checker).(Type)
+	targetType = targetExpression.Accept(checker).(Type)
 
 	// NOTE: check indexed type first for UX reasons
 
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if IsInvalidType(indexedType) {
-		return &InvalidType{}
+	if targetType.IsInvalidType() {
+		elementType = &InvalidType{}
+		return
 	}
 
 	defer func() {
-		checker.checkAccessResourceLoss(result, targetExpression)
+		checker.checkAccessResourceLoss(elementType, targetExpression)
 	}()
 
-	// TODO: generalize to e.g. `TypeIndexable`
-	_, isStorage := indexedType.(*StorageType)
-	if isStorage {
+	reportNotIndexableType := func() {
+		checker.report(
+			&NotIndexableTypeError{
+				Type:  targetType,
+				Range: ast.NewRangeFromPositioned(targetExpression),
+			},
+		)
+
+		// set the return value properly
+		elementType = &InvalidType{}
+	}
+
+	switch indexedType := targetType.(type) {
+	case TypeIndexableType:
 
 		indexingType := indexExpression.IndexingType
 
-		// indexing into storage using expression?
+		// indexing into type-indexable using expression?
 		if indexExpression.IndexingExpression != nil {
 
 			// The parser may have parsed a type as an expression,
@@ -189,85 +199,82 @@ func (checker *Checker) visitIndexingExpression(
 			indexingType = ast.ExpressionAsType(indexExpression.IndexingExpression)
 			if indexingType == nil {
 				checker.report(
-					&InvalidStorageIndexingError{
-						Range: ast.Range{
-							StartPos: indexExpression.IndexingExpression.StartPosition(),
-							EndPos:   indexExpression.IndexingExpression.EndPosition(),
-						},
+					&InvalidTypeIndexingError{
+						Range: ast.NewRangeFromPositioned(indexExpression.IndexingExpression),
 					},
 				)
 
-				return &InvalidType{}
+				elementType = &InvalidType{}
+				return
 			}
 		}
 
-		return checker.visitTypeIndexingExpression(
+		elementType = checker.visitTypeIndexingExpression(
+			indexedType,
 			indexExpression,
 			indexingType,
 			isAssignment,
 		)
-	} else {
-		// indexing into non-storage value using type?
+		return
+
+	case ValueIndexableType:
+
+		// Check if the type instance is actually indexable. For most types (e.g. arrays and dictionaries)
+		// this is known statically (in the sense of this host language (Go), not the implemented language),
+		// i.e. a Go type switch would be sufficient.
+		// However, for some types (e.g. reference types) this depends on what type is referenced
+
+		if !indexedType.isValueIndexableType() {
+			reportNotIndexableType()
+			return
+		}
+
+		// indexing into value-indexable value using type?
 		if indexExpression.IndexingType != nil {
 			checker.report(
 				&InvalidIndexingError{
-					Range: ast.Range{
-						StartPos: indexExpression.IndexingType.StartPosition(),
-						EndPos:   indexExpression.IndexingType.EndPosition(),
-					},
+					Range: ast.NewRangeFromPositioned(indexExpression.IndexingType),
 				},
 			)
 
-			return &InvalidType{}
+			elementType = &InvalidType{}
+			return
 		}
 
-		return checker.visitValueIndexingExpression(
+		elementType = checker.visitValueIndexingExpression(
 			targetExpression,
 			indexedType,
 			indexExpression.IndexingExpression,
 			isAssignment,
 		)
+		return
+
+	default:
+		reportNotIndexableType()
+		return
 	}
 }
 
 func (checker *Checker) visitValueIndexingExpression(
 	indexedExpression ast.Expression,
-	indexedType Type,
+	indexedType ValueIndexableType,
 	indexingExpression ast.Expression,
 	isAssignment bool,
 ) Type {
 	indexingType := indexingExpression.Accept(checker).(Type)
 
-	indexableType, isIndexableType := indexedType.(IndexableType)
-	if !isIndexableType {
-		checker.report(
-			&NotIndexableTypeError{
-				Type: indexedType,
-				Range: ast.Range{
-					StartPos: indexedExpression.StartPosition(),
-					EndPos:   indexedExpression.EndPosition(),
-				},
-			},
-		)
-
-		return &InvalidType{}
-	}
-
-	elementType := indexableType.ElementType(isAssignment)
+	elementType := indexedType.ElementType(isAssignment)
 
 	// check indexing expression's type can be used to index
 	// into indexed expression's type
 
-	if !IsInvalidType(indexingType) &&
-		!IsSubType(indexingType, indexableType.IndexingType()) {
+	if !indexingType.IsInvalidType() &&
+		!IsSubType(indexingType, indexedType.IndexingType()) {
 
 		checker.report(
 			&NotIndexingTypeError{
-				Type: indexingType,
-				Range: ast.Range{
-					StartPos: indexingExpression.StartPosition(),
-					EndPos:   indexingExpression.EndPosition(),
-				},
+				Type:  indexingType,
+				Range: ast.NewRangeFromPositioned(indexingExpression),
 			},
 		)
 	}
@@ -276,21 +283,18 @@ func (checker *Checker) visitValueIndexingExpression(
 }
 
 func (checker *Checker) visitTypeIndexingExpression(
+	indexedType TypeIndexableType,
 	indexExpression *ast.IndexExpression,
 	indexingType ast.Type,
 	isAssignment bool,
 ) Type {
 
 	keyType := checker.ConvertType(indexingType)
-	if IsInvalidType(keyType) {
+	if keyType.IsInvalidType() {
 		return &InvalidType{}
 	}
 
 	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
 
-	if isAssignment {
-		return keyType
-	} else {
-		return &OptionalType{Type: keyType}
-	}
+	return indexedType.ElementType(keyType, isAssignment)
 }

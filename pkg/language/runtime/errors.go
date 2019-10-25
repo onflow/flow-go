@@ -2,10 +2,11 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 	"github.com/logrusorgru/aurora"
 

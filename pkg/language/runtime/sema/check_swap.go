@@ -23,14 +23,11 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	if _, leftIsTarget := swap.Left.(ast.TargetExpression); !leftIsTarget {
 		checker.report(
 			&InvalidSwapExpressionError{
-				Side: common.OperandSideLeft,
-				Range: ast.Range{
-					StartPos: swap.Left.StartPosition(),
-					EndPos:   swap.Left.EndPosition(),
-				},
+				Side:  common.OperandSideLeft,
+				Range: ast.NewRangeFromPositioned(swap.Left),
 			},
 		)
-	} else if !IsInvalidType(leftType) {
+	} else if !leftType.IsInvalidType() {
 		// Only check the right-hand side if checking the left-hand side
 		// doesn't produce errors. This prevents potentially confusing
 		// duplicate errors
@@ -48,14 +45,11 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	if _, rightIsTarget := swap.Right.(ast.TargetExpression); !rightIsTarget {
 		checker.report(
 			&InvalidSwapExpressionError{
-				Side: common.OperandSideRight,
-				Range: ast.Range{
-					StartPos: swap.Right.StartPosition(),
-					EndPos:   swap.Right.EndPosition(),
-				},
+				Side:  common.OperandSideRight,
+				Range: ast.NewRangeFromPositioned(swap.Right),
 			},
 		)
-	} else if !IsInvalidType(rightType) {
+	} else if !rightType.IsInvalidType() {
 		// Only check the right-hand side if checking the left-hand side
 		// doesn't produce errors. This prevents potentially confusing
 		// duplicate errors

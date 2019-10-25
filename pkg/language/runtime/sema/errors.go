@@ -1245,17 +1245,17 @@ func (e *InvalidResourceFieldError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidStorageIndexingError
+// InvalidTypeIndexingError
 
-type InvalidStorageIndexingError struct {
+type InvalidTypeIndexingError struct {
 	ast.Range
 }
 
-func (e *InvalidStorageIndexingError) Error() string {
-	return "invalid index into storage: expected type"
+func (e *InvalidTypeIndexingError) Error() string {
+	return "invalid index: expected type"
 }
 
-func (*InvalidStorageIndexingError) isSemanticError() {}
+func (*InvalidTypeIndexingError) isSemanticError() {}
 
 // InvalidIndexingError
 
@@ -1516,3 +1516,31 @@ func (e *InvalidResourceArrayMemberError) Error() string {
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// NonResourceReferenceError
+
+type NonResourceReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected resource or resource interface, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceReferenceError) isSemanticError() {}
+
+// NonStorageReferenceError
+
+type NonStorageReferenceError struct {
+	ast.Range
+}
+
+func (e *NonStorageReferenceError) Error() string {
+	return "cannot create reference which is not into storage"
+}
+
+func (*NonStorageReferenceError) isSemanticError() {}

@@ -7,7 +7,7 @@ import (
 func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	typ := checker.checkInvocationExpression(statement.InvocationExpression)
 
-	if IsInvalidType(typ) {
+	if typ.IsInvalidType() {
 		return nil
 	}
 
@@ -15,11 +15,8 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 	eventType, isEventType := typ.(*EventType)
 	if !isEventType {
 		checker.report(&EmitNonEventError{
-			Type: typ,
-			Range: ast.Range{
-				StartPos: statement.StartPosition(),
-				EndPos:   statement.EndPosition(),
-			},
+			Type:  typ,
+			Range: ast.NewRangeFromPositioned(statement),
 		})
 		return nil
 	}

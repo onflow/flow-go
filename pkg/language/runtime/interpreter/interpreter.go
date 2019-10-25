@@ -104,8 +104,18 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, op
 }
 
 // SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+//
 func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
 	interpreter.onEventEmitted = callback
+}
+
+// locationRange returns a new location range for the given positioned element.
+//
+func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
+	return LocationRange{
+		ImportLocation: interpreter.Checker.ImportLocation,
+		Range:          ast.NewRangeFromPositioned(hasPosition),
+	}
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -806,17 +816,18 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
-			case IndexableValue:
+			case ValueIndexableValue:
 				return target.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						typedResult.Set(indexingValue, value)
+						locationRange := interpreter.locationRange(target)
+						typedResult.Set(locationRange, indexingValue, value)
 
 						// NOTE: no result, so it does *not* act like a return-statement
 						return Done{}
 					})
 
-			case StorageValue:
+			case TypeIndexableValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
 				typedResult.Set(indexingType, value)
 				return Done{}
@@ -830,9 +841,9 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(CompositeValue)
-
-			structure.SetMember(interpreter, target.Identifier.Identifier, value)
+			structure := result.(MemberAccessibleValue)
+			locationRange := interpreter.locationRange(target)
+			structure.SetMember(interpreter, locationRange, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -1177,12 +1188,15 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 					dictionaryType.ValueType,
 				)
 
+				// TODO: improve: should be just for current entry
+				locationRange := interpreter.locationRange(expression)
+
 				// TODO: panic for duplicate keys?
 
 				// NOTE: important to box in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(key, SomeValue{value})
+				newDictionary.Set(locationRange, key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1192,8 +1206,9 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			value := result.(ValueWithMembers)
-			return value.GetMember(interpreter, expression.Identifier.Identifier)
+			value := result.(MemberAccessibleValue)
+			locationRange := interpreter.locationRange(expression)
+			return value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 		})
 }
 
@@ -1201,25 +1216,18 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
-			case IndexableValue:
+			case ValueIndexableValue:
 				return expression.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						value := typedResult.Get(indexingValue)
+						locationRange := interpreter.locationRange(expression)
+						value := typedResult.Get(locationRange, indexingValue)
 						return Done{Result: value}
 					})
 
-			case StorageValue:
+			case TypeIndexableValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-
-				var result Value
-				value := typedResult.Get(indexingType)
-				if value == nil {
-					result = NilValue{}
-				} else {
-					result = SomeValue{Value: value}
-				}
-
+				result := typedResult.Get(indexingType)
 				return Done{Result: result}
 
 			default:
@@ -1950,5 +1958,21 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			}
 
 			return value.(DestroyableValue).Destroy(interpreter, location)
+		})
+}
+
+func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
+	indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
+	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			storage := result.(StorageValue)
+
+			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+
+			referenceValue := ReferenceValue{
+				Storage:      storage,
+				IndexingType: indexingType,
+			}
+			return Done{Result: referenceValue}
 		})
 }

@@ -291,10 +291,7 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 				ExpectedType:     integerType,
 				ExpectedRangeMin: rangeMin,
 				ExpectedRangeMax: rangeMax,
-				Range: ast.Range{
-					StartPos: expression.StartPosition(),
-					EndPos:   expression.EndPosition(),
-				},
+				Range:            ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -749,10 +746,7 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 
 	checker.report(
 		&ResourceLossError{
-			Range: ast.Range{
-				StartPos: expression.StartPosition(),
-				EndPos:   expression.EndPosition(),
-			},
+			Range: ast.NewRangeFromPositioned(expression),
 		},
 	)
 }

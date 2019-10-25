@@ -650,7 +650,7 @@ func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
 	} else if isPostCondition {
 		kind = ast.ConditionKindPost
 	} else {
-		panic(errors.UnreachableError{})
+		panic(&errors.UnreachableError{})
 	}
 
 	test := ctx.test.Accept(v).(ast.Expression)
@@ -822,10 +822,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 			if ifStatement, ok := ifStatementContext.Accept(v).(*ast.IfStatement); ok {
 				elseBlock = &ast.Block{
 					Statements: []ast.Statement{ifStatement},
-					Range: ast.Range{
-						StartPos: ifStatement.StartPosition(),
-						EndPos:   ifStatement.EndPosition(),
-					},
+					Range:      ast.NewRangeFromPositioned(ifStatement),
 				}
 			}
 		}
@@ -1215,10 +1212,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			TargetExpression:   wrapped,
 			IndexingExpression: partialAccessExpression.IndexingExpression,
 			IndexingType:       partialAccessExpression.IndexingType,
-			Range: ast.Range{
-				StartPos: partialAccessExpression.StartPos,
-				EndPos:   partialAccessExpression.EndPos,
-			},
+			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{
@@ -1299,6 +1293,19 @@ func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) i
 
 	return &ast.DestroyExpression{
 		Expression: expression,
+		StartPos:   startPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	ty := ctx.FullType().Accept(v).(ast.Type)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.ReferenceExpression{
+		Expression: expression,
+		Type:       ty,
 		StartPos:   startPosition,
 	}
 }
@@ -1565,7 +1572,7 @@ func parseHex(b byte) rune {
 		return c - 'A' + 10
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

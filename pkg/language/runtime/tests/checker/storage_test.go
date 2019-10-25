@@ -1,11 +1,14 @@
 package checker
 
 import (
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
+
 	"testing"
 )
 
@@ -20,20 +23,19 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 
 func TestCheckStorageIndexing(t *testing.T) {
 
-	checker, err := ParseAndCheckWithExtra(t,
+	checker, err := ParseAndCheckWithOptions(t,
 		`
           let a = storage[Int]
           let b = storage[Bool]
           let c = storage[[Int]]
           let d = storage[{String: Int}]
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{
@@ -71,17 +73,16 @@ func TestCheckStorageIndexing(t *testing.T) {
 
 func TestCheckStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage[Int] = 1
               storage[Bool] = true
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	assert.Nil(t, err)
@@ -89,17 +90,16 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage[Int] = "1"
               storage[Bool] = 1
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
@@ -110,36 +110,34 @@ func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           fun test() {
               storage["1"] = "1"
           }
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidStorageIndexingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
 }
 
 func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
           let x = storage["1"]
         `,
-		storageValueDeclaration,
-		nil,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidStorageIndexingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
 }
