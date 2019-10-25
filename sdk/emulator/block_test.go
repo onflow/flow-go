@@ -1,11 +1,11 @@
 package emulator_test
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/hash"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/pkg/hash"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
