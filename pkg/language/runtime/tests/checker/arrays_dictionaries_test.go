@@ -2,11 +2,13 @@ package checker
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckDictionary(t *testing.T) {
@@ -91,7 +93,10 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.OptionalType{Type: &sema.IntType{}})
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.IntType{}},
+		checker.GlobalValues["y"].Type,
+	)
 }
 
 func TestCheckDictionaryIndexingBool(t *testing.T) {
@@ -147,7 +152,7 @@ func TestCheckDictionaryRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(key: "abc")
+          let old: Int? = x.remove(key: "abc")
       }
     `)
 
@@ -159,7 +164,33 @@ func TestCheckInvalidDictionaryRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test() {
           let x = {"abc": 1, "def": 2}
-          x.remove(key: true)
+          let old: Int? = x.remove(key: true)
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckDictionaryInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          let old: Int? = x.insert(key: "abc", 3)
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidDictionaryInsert(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x = {"abc": 1, "def": 2}
+          let old: Int? = x.insert(key: true, 3)
       }
     `)
 
@@ -220,6 +251,21 @@ func TestCheckArrayAppendBound(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckInvalidArrayAppendToConstantSize(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(): [Int; 3] {
+          let x: [Int; 3] = [1, 2, 3]
+          x.append(4)
+          return x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+}
+
 func TestCheckArrayConcat(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -248,6 +294,22 @@ func TestCheckInvalidArrayConcat(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidArrayConcatOfConstantSized(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+	  fun test(): [Int] {
+	 	  let a: [Int; 2] = [1, 2]
+		  let b: [Int; 2] = [3, 4]
+          let c = a.concat(b)
+          return c
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 }
 
 func TestCheckArrayConcatBound(t *testing.T) {
@@ -292,12 +354,27 @@ func TestCheckInvalidArrayInsert(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
+func TestCheckInvalidArrayInsertIntoConstantSized(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(): [Int; 3] {
+          let x: [Int; 3] = [1, 2, 3]
+          x.insert(at: 1, 4)
+          return x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+}
+
 func TestCheckArrayRemove(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.remove(at: 1)
+          let old: Int? = x.remove(at: 1)
           return x
       }
     `)
@@ -310,7 +387,7 @@ func TestCheckInvalidArrayRemove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.remove(at: "1")
+          let old: Int? = x.remove(at: "1")
           return x
       }
     `)
@@ -320,12 +397,27 @@ func TestCheckInvalidArrayRemove(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
+func TestCheckInvalidArrayRemoveFromConstantSized(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(): [Int; 3] {
+          let x: [Int; 3] = [1, 2, 3]
+          let old: Int? = x.remove(at: 1)
+          return x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+}
+
 func TestCheckArrayRemoveFirst(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeFirst()
+          let old: Int? = x.removeFirst()
           return x
       }
     `)
@@ -338,7 +430,7 @@ func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeFirst(1)
+          let old: Int? = x.removeFirst(1)
           return x
       }
 	`)
@@ -348,17 +440,47 @@ func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
 	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
 }
 
+func TestCheckInvalidArrayRemoveFirstFromConstantSized(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(): [Int; 3] {
+          let x: [Int; 3] = [1, 2, 3]
+          let old: Int? = x.removeFirst()
+          return x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+}
+
 func TestCheckArrayRemoveLast(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test(): [Int] {
           let x = [1, 2, 3]
-          x.removeLast()
+          let old: Int? = x.removeLast()
           return x
       }
     `)
 
 	assert.Nil(t, err)
+}
+
+func TestCheckInvalidArrayRemoveLastFromConstantSized(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(): [Int; 3] {
+          let x: [Int; 3] = [1, 2, 3]
+          let old: Int? = x.removeLast()
+          return x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 }
 
 func TestCheckArrayContains(t *testing.T) {
@@ -458,15 +580,16 @@ func TestCheckArraySubtyping(t *testing.T) {
 				kind.TransferOperator(),
 			))
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 			}
 		})
@@ -502,11 +625,13 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 				kind.TransferOperator(),
 			))
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
@@ -534,6 +659,100 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       let z = [0, true]
 	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          let x = ["xyz"][String?]
+	    `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          fun test() {
+              let stuff = ["abc"]
+              stuff[String?] = "xyz"
+          }
+	    `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          let x = {"a": 1}[String?]
+	    `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          fun test() {
+              let stuff = {"a": 1}
+              stuff[String?] = "xyz"
+          }
+	    `,
+		ParseAndCheckOptions{
+			Values: storageValueDeclaration,
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidIndexingError{}, errs[0])
+}
+
+func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x: [Int; 3] = [1, 2, 3]
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          let x: [Int; 2] = [1, 2, 3]
+      }
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

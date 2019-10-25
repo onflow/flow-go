@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckFunctionConditions(t *testing.T) {
@@ -18,7 +20,7 @@ func TestCheckFunctionConditions(t *testing.T) {
               x == 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -34,15 +36,21 @@ func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
               z == 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "y")
+	assert.Equal(t,
+		"y",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).Name, "z")
+	assert.Equal(t,
+		"z",
+		errs[1].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
@@ -56,7 +64,7 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
               2
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -73,7 +81,7 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
               before(x) != 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -86,7 +94,7 @@ func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) 
               before() != 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -104,12 +112,15 @@ func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
               before(x) != 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "before")
+	assert.Equal(t,
+		"before",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *testing.T) {
@@ -121,7 +132,7 @@ func TestCheckInvalidFunctionWithBeforeVariableAndPostConditionWithBefore(t *tes
           }
           let before = 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -134,7 +145,7 @@ func TestCheckFunctionWithBeforeVariable(t *testing.T) {
       fun test(x: Int) {
           let before = 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -149,7 +160,7 @@ func TestCheckFunctionPostCondition(t *testing.T) {
           let y = x
           return y
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -163,12 +174,15 @@ func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "result")
+	assert.Equal(t,
+		"result",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
@@ -180,7 +194,7 @@ func TestCheckInvalidFunctionPostConditionWithResultWrongType(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -196,7 +210,7 @@ func TestCheckFunctionPostConditionWithResult(t *testing.T) {
           }
           return 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -209,12 +223,15 @@ func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
               result == 0
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "result")
+	assert.Equal(t,
+		"result",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
 }
 
 func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
@@ -226,7 +243,7 @@ func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(
           }
           let result = 0
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -239,7 +256,7 @@ func TestCheckFunctionWithoutReturnTypeAndResultParameterAndPostConditionWithRes
               result == 0
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -254,7 +271,7 @@ func TestCheckInvalidFunctionWithReturnTypeAndLocalResultAndPostConditionWithRes
           let result = 1
           return result * 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -271,7 +288,7 @@ func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult
           }
           return result * 2
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -284,7 +301,7 @@ func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
               (fun (): Int { return 2 })() == 2
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -299,7 +316,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
              1 == 2: "nope"
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -312,7 +329,7 @@ func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *test
              1 == 2: true
           }
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -328,7 +345,7 @@ func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
           }
           return ""
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -341,7 +358,7 @@ func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
              1 == 2: before(x)
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -354,7 +371,7 @@ func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
              1 == 2: x
           }
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }

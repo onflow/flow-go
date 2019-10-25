@@ -1,7 +1,9 @@
 package ast
 
 import (
-	"fmt"
+	"encoding/gob"
+	"encoding/hex"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 )
 
@@ -30,17 +32,8 @@ func (i Identifier) EndPosition() Position {
 type ImportDeclaration struct {
 	Identifiers []Identifier
 	Location    ImportLocation
-	StartPos    Position
-	EndPos      Position
 	LocationPos Position
-}
-
-func (v *ImportDeclaration) StartPosition() Position {
-	return v.StartPos
-}
-
-func (v *ImportDeclaration) EndPosition() Position {
-	return v.EndPos
+	Range
 }
 
 func (*ImportDeclaration) isDeclaration() {}
@@ -63,7 +56,13 @@ func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 
 type ImportLocation interface {
 	isImportLocation()
+	// ID returns the canonical ID for this import location.
+	ID() LocationID
 }
+
+// LocationID
+
+type LocationID string
 
 // StringImportLocation
 
@@ -71,14 +70,58 @@ type StringImportLocation string
 
 func (StringImportLocation) isImportLocation() {}
 
+func (l StringImportLocation) ID() LocationID {
+	return LocationID(l)
+}
+
+func init() {
+	gob.Register(StringImportLocation(""))
+}
+
 // AddressImportLocation
 
-type AddressImportLocation string
+type AddressImportLocation []byte
 
 func (AddressImportLocation) isImportLocation() {}
 
+func (l AddressImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
 func (l AddressImportLocation) String() string {
-	return fmt.Sprintf("%#x", []byte(l))
+	return hex.EncodeToString([]byte(l))
+}
+
+// TransactionImportLocation
+
+type TransactionImportLocation []byte
+
+func (TransactionImportLocation) isImportLocation() {}
+
+func (l TransactionImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l TransactionImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+// ScriptImportLocation
+
+type ScriptImportLocation []byte
+
+func (ScriptImportLocation) isImportLocation() {}
+
+func (l ScriptImportLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l ScriptImportLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+func init() {
+	gob.Register(AddressImportLocation([]byte{}))
 }
 
 // HasImportLocation

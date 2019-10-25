@@ -9,7 +9,9 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 
 	var keyType, valueType Type
 
-	for _, entry := range expression.Entries {
+	entryTypes := make([]DictionaryEntryType, len(expression.Entries))
+
+	for i, entry := range expression.Entries {
 		// NOTE: important to check move after each type check,
 		// not combined after both type checks!
 
@@ -18,6 +20,11 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 
 		entryValueType := entry.Value.Accept(checker).(Type)
 		checker.checkResourceMoveOperation(entry.Value, entryValueType)
+
+		entryTypes[i] = DictionaryEntryType{
+			KeyType:   entryKeyType,
+			ValueType: entryValueType,
+		}
 
 		// infer key type from first entry's key
 		// TODO: find common super type?
@@ -28,8 +35,7 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 				&TypeMismatchError{
 					ExpectedType: keyType,
 					ActualType:   entryKeyType,
-					StartPos:     entry.Key.StartPosition(),
-					EndPos:       entry.Key.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(entry.Key),
 				},
 			)
 		}
@@ -43,8 +49,7 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 				&TypeMismatchError{
 					ExpectedType: valueType,
 					ActualType:   entryValueType,
-					StartPos:     entry.Value.StartPosition(),
-					EndPos:       entry.Value.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(entry.Value),
 				},
 			)
 		}
@@ -53,12 +58,18 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 	if keyType == nil {
 		keyType = &NeverType{}
 	}
+
 	if valueType == nil {
 		valueType = &NeverType{}
 	}
 
-	return &DictionaryType{
+	dictionaryType := &DictionaryType{
 		KeyType:   keyType,
 		ValueType: valueType,
 	}
+
+	checker.Elaboration.DictionaryExpressionEntryTypes[expression] = entryTypes
+	checker.Elaboration.DictionaryExpressionType[expression] = dictionaryType
+
+	return dictionaryType
 }

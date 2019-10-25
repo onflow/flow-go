@@ -2,8 +2,10 @@ package proto
 
 import (
 	"errors"
+
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 
+	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
@@ -142,5 +144,21 @@ func AccountKeyToMessage(a types.AccountKey) *shared.AccountKey {
 	return &shared.AccountKey{
 		PublicKey: a.PublicKey,
 		Weight:    uint32(a.Weight),
+	}
+}
+
+func MessageToEventQuery(m *observe.GetEventsRequest) types.EventQuery {
+	return types.EventQuery{
+		ID:         m.GetEventId(),
+		StartBlock: m.GetStartBlock(),
+		EndBlock:   m.GetEndBlock(),
+	}
+}
+
+func EventQueryToMessage(q *types.EventQuery) *observe.GetEventsRequest {
+	return &observe.GetEventsRequest{
+		EventId:    q.ID,
+		StartBlock: q.StartBlock,
+		EndBlock:   q.EndBlock,
 	}
 }

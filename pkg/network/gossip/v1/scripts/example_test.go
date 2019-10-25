@@ -19,8 +19,8 @@ func Example_generateCodeFromFile() {
 	}
 
 	// save generated code to file
-	tmpfile, err := ioutil.TempFile("", "*_registry.gen.go")
-	tmpfile.WriteString(generetedCode)
+	tmpfile, _ := ioutil.TempFile("", "*_registry.gen.go")
+	_, _ = tmpfile.WriteString(generetedCode)
 
 	// You can also print it to standard out
 	fmt.Print(generetedCode)
@@ -85,10 +85,17 @@ func Example_generateCodeFromFile() {
 	// 	return respByte, respErr
 	// }
 	//
-	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	// 	return map[string]gnode.HandleFunc{
-	// 		"Ping":                   vssr.Ping,
-	// 		"SubmitExecutionReceipt": vssr.SubmitExecutionReceipt,
+	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	// 	return map[uint64]gnode.HandleFunc{
+	// 		0: vssr.Ping,
+	// 		1: vssr.SubmitExecutionReceipt,
+	// 	}
+	// }
+	//
+	// func (vssr *VerifyServiceServerRegistry) NameMapping() map[string]uint64 {
+	// 	return map[string]uint64{
+	// 		"Ping":                   0,
+	// 		"SubmitExecutionReceipt": 1,
 	// 	}
 	// }
 }
@@ -204,10 +211,17 @@ func Example_parseCode_fromRegistry() {
 	// 	return respByte, respErr
 	// }
 	//
-	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	// 	return map[string]gnode.HandleFunc{
-	// 		"Ping":                   vssr.Ping,
-	// 		"SubmitExecutionReceipt": vssr.SubmitExecutionReceipt,
+	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	// 	return map[uint64]gnode.HandleFunc{
+	// 		0: vssr.Ping,
+	// 		1: vssr.SubmitExecutionReceipt,
+	// 	}
+	// }
+	//
+	// func (vssr *VerifyServiceServerRegistry) NameMapping() map[string]uint64 {
+	// 	return map[string]uint64{
+	// 		"Ping":                   0,
+	// 		"SubmitExecutionReceipt": 1,
 	// 	}
 	// }
 	//

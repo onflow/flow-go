@@ -1,10 +1,11 @@
 package sema
 
 import (
+	"github.com/raviqqe/hamt"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/activations"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
-	"github.com/raviqqe/hamt"
 )
 
 type ValueActivations struct {
@@ -71,13 +72,13 @@ func (a *ValueActivations) Declare(
 
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
-		Identifier:     identifier,
-		Kind:           kind,
-		IsConstant:     isConstant,
-		Depth:          depth,
-		Type:           ty,
-		Pos:            &pos,
-		ArgumentLabels: argumentLabels,
+		Identifier:      identifier,
+		DeclarationKind: kind,
+		IsConstant:      isConstant,
+		Depth:           depth,
+		Type:            ty,
+		Pos:             &pos,
+		ArgumentLabels:  argumentLabels,
 	}
 	a.activations.Set(identifier, variable)
 	return variable, err
@@ -98,7 +99,11 @@ func (a *ValueActivations) DeclareFunction(
 	)
 }
 
-func (a *ValueActivations) DeclareImplicitConstant(identifier string, ty Type, kind common.DeclarationKind) (*Variable, error) {
+func (a *ValueActivations) DeclareImplicitConstant(
+	identifier string,
+	ty Type,
+	kind common.DeclarationKind,
+) (*Variable, error) {
 	return a.Declare(
 		identifier,
 		ty,

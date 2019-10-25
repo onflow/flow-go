@@ -6,33 +6,34 @@ import (
 )
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	imports := checker.Program.ImportedPrograms()
 
-	imports := checker.Program.Imports()
-	imported := imports[declaration.Location]
+	imported := imports[declaration.Location.ID()]
 	if imported == nil {
 		checker.report(
 			&UnresolvedImportError{
 				ImportLocation: declaration.Location,
-				StartPos:       declaration.LocationPos,
-				EndPos:         declaration.LocationPos,
+				Range:          ast.NewRangeFromPositioned(declaration),
 			},
 		)
 		return nil
 	}
 
-	if checker.seenImports[declaration.Location] {
+	if checker.seenImports[declaration.Location.ID()] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
-				StartPos:       declaration.LocationPos,
-				EndPos:         declaration.LocationPos,
+				Range: ast.Range{
+					StartPos: declaration.LocationPos,
+					EndPos:   declaration.LocationPos,
+				},
 			},
 		)
 		return nil
 	}
-	checker.seenImports[declaration.Location] = true
+	checker.seenImports[declaration.Location.ID()] = true
 
-	importChecker, ok := checker.ImportCheckers[declaration.Location]
+	importChecker, ok := checker.ImportCheckers[declaration.Location.ID()]
 	var checkerErr *CheckerError
 	if !ok || importChecker == nil {
 		var err error
@@ -42,7 +43,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			checker.PredeclaredTypes,
 		)
 		if err == nil {
-			checker.ImportCheckers[declaration.Location] = importChecker
+			checker.ImportCheckers[declaration.Location.ID()] = importChecker
 		}
 	}
 
@@ -69,7 +70,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 	checker.importValues(declaration, importChecker, missing)
 	checker.importTypes(declaration, importChecker, missing)
 
-	for identifier, _ := range missing {
+	for identifier := range missing {
 		checker.report(
 			&NotExportedError{
 				Name:           identifier.Identifier,
@@ -137,7 +138,7 @@ func (checker *Checker) importValues(
 		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
-			variable.Kind,
+			variable.DeclarationKind,
 			declaration.LocationPos,
 			true,
 			variable.ArgumentLabels,

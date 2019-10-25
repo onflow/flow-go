@@ -12,7 +12,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	checker.Elaboration.VariableDeclarationValueTypes[declaration] = valueType
 
-	valueIsInvalid := IsInvalidType(valueType)
+	valueIsInvalid := valueType.IsInvalidType()
 
 	// if the variable declaration is a optional binding, the value must be optional
 
@@ -26,8 +26,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				&TypeMismatchError{
 					ExpectedType: &OptionalType{},
 					ActualType:   valueType,
-					StartPos:     declaration.Value.StartPosition(),
-					EndPos:       declaration.Value.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(declaration.Value),
 				},
 			)
 		}
@@ -43,7 +42,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation.StartPos)
 
 		// check the value type is a subtype of the declaration type
-		if declarationType != nil && valueType != nil && !valueIsInvalid && !IsInvalidType(declarationType) {
+		if declarationType != nil && valueType != nil && !valueIsInvalid && !declarationType.IsInvalidType() {
 
 			if isOptionalBinding {
 				if optionalValueType != nil &&
@@ -54,8 +53,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 						&TypeMismatchError{
 							ExpectedType: declarationType,
 							ActualType:   optionalValueType.Type,
-							StartPos:     declaration.Value.StartPosition(),
-							EndPos:       declaration.Value.EndPosition(),
+							Range:        ast.NewRangeFromPositioned(declaration.Value),
 						},
 					)
 				}
@@ -66,8 +64,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 						&TypeMismatchError{
 							ExpectedType: declarationType,
 							ActualType:   valueType,
-							StartPos:     declaration.Value.StartPosition(),
-							EndPos:       declaration.Value.EndPosition(),
+							Range:        ast.NewRangeFromPositioned(declaration.Value),
 						},
 					)
 				}

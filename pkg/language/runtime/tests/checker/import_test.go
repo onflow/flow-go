@@ -2,13 +2,15 @@ package checker
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidImport(t *testing.T) {
@@ -24,15 +26,15 @@ func TestCheckInvalidImport(t *testing.T) {
 
 func TestCheckInvalidRepeatedImport(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
            import "unknown"
            import "unknown"
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return &ast.Program{}, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return &ast.Program{}, nil
+			},
 		},
 	)
 
@@ -44,23 +46,23 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 func TestCheckImportAll(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-	   fun answer(): Int {
-	       return 42
-		}
-	`)
+       fun answer(): Int {
+           return 42
+        }
+    `)
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -71,20 +73,20 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
        let x = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import answer from "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -96,25 +98,25 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 func TestCheckImportSome(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-	   fun answer(): Int {
-	       return 42
+       fun answer(): Int {
+           return 42
        }
 
        let x = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import answer from "imported"
 
            let x = answer()
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return checker.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
 		},
 	)
 
@@ -128,18 +130,18 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 	imported, _, err := parser.ParseProgram(`
        let x: Bool = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
-	_, err = ParseAndCheckWithExtra(t,
+	_, err = ParseAndCheckWithOptions(t,
 		`
            import x from "imported"
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			return imported, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+				return imported, nil
+			},
 		},
 	)
 
@@ -154,37 +156,46 @@ func TestCheckImportTypes(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-	           %s Test {}
-	        `, kind.Keyword()))
+               %s Test {}
+            `, kind.Keyword()))
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 			}
 
-			_, err = ParseAndCheckWithExtra(t,
-				`
-                 import "imported"
+			_, err = ParseAndCheckWithOptions(t,
+				fmt.Sprintf(
+					`
+                      import "imported"
 
-                 let x: Test = Test()
-              `,
-				nil,
-				nil,
-				func(location ast.ImportLocation) (program *ast.Program, e error) {
-					return checker.Program, nil
+                      let x: %[1]sTest %[2]s %[3]s Test()
+                    `,
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+				ParseAndCheckOptions{
+					ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+						return checker.Program, nil
+					},
 				},
 			)
 
-			// TODO: add support for non-structure declarations
+			// TODO: add support for non-structure / non-resource declarations
 
-			if kind == common.CompositeKindStructure {
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
 				assert.Nil(t, err)
-			} else {
+
+			default:
 				errs := ExpectCheckerErrors(t, err, 3)
 
 				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])

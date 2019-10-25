@@ -2,8 +2,9 @@ package ast
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestProgram_ResolveImports(t *testing.T) {
@@ -35,12 +36,16 @@ func TestProgram_ResolveImports(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	actual := a.Imports()[StringImportLocation("b")]
+	importsA := a.ImportedPrograms()
+
+	actual := importsA[StringImportLocation("b").ID()]
 	if actual != b {
 		assert.Fail(t, "not b", actual)
 	}
 
-	actual = b.Imports()[StringImportLocation("c")]
+	importsB := b.ImportedPrograms()
+
+	actual = importsB[StringImportLocation("c").ID()]
 	if actual != c {
 		assert.Fail(t, "not c", actual)
 	}

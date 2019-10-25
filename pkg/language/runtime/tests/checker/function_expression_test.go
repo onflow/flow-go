@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
@@ -13,7 +15,7 @@ func TestCheckInvalidFunctionExpressionReturnValue(t *testing.T) {
       let test = fun (): Int {
           return true
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -27,7 +29,7 @@ func TestCheckFunctionExpressionsAndScope(t *testing.T) {
 
        // check first-class functions and scope inside them
        let y = (fun (x: Int): Int { return x })(42)
-	`)
+    `)
 
 	assert.Nil(t, err)
 }

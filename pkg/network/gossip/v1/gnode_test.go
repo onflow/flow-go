@@ -3,16 +3,25 @@ package gnode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/order"
+	"github.com/rs/zerolog"
+)
+
+var (
+	defaultLogger  = zerolog.New(ioutil.Discard)
+	defaultAddress = "127.0.0.1:50000"
 )
 
 func TestAsyncQueue(t *testing.T) {
-	a := NewNode(nil)
-	go a.sweeper()
+	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
+	gn := NewNode(config)
+	go gn.sweeper()
 
-	//To test the error returned when a context provided is expired
+	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
 	//expiring the context
 	cancel()
@@ -31,7 +40,7 @@ func TestAsyncQueue(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		_, gotErr := a.AsyncQueue(tc.ctx, nil)
+		_, gotErr := gn.AsyncQueue(tc.ctx, &shared.GossipMessage{})
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
@@ -51,12 +60,13 @@ func TestAsyncQueue(t *testing.T) {
 }
 
 func TestSyncQueue(t *testing.T) {
-	a := NewNode(nil)
+	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
+	gn := NewNode(config)
 	//to handle the queue
-	go a.sweeper()
+	go gn.sweeper()
 
-	// registering a function
-	err := a.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
+	// registering gn function
+	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
 
@@ -64,12 +74,12 @@ func TestSyncQueue(t *testing.T) {
 		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
 	}
 
-	genMsg := func(payload []byte, recipients []string, msgType string) *shared.GossipMessage {
+	genMsg := func(payload []byte, recipients []string, msgType uint64) *shared.GossipMessage {
 		msg, _ := generateGossipMessage(payload, recipients, msgType)
 		return msg
 	}
 
-	//To test the error returned when a context provided is expired
+	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
 	// cancelling the context
 	cancel()
@@ -81,22 +91,23 @@ func TestSyncQueue(t *testing.T) {
 	}{
 		{ //Working example
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, "exists"),
+			msg: genMsg([]byte("msg"), nil, 3), //3 is the index of the first registered function (functions 0-2 are reserved)
 			err: nil,
 		},
 		{ // Expired context
 			ctx: expiredContext,
-			msg: genMsg([]byte("msg"), nil, "exists"),
+			msg: genMsg([]byte("msg"), nil, 3),
 			err: fmt.Errorf("non nil"),
 		},
 		{ //Invalid function
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, "doesntExist"),
+			msg: genMsg([]byte("msg"), nil, 5), //5 is the index of an inexistant function
 			err: fmt.Errorf("non nil"),
 		},
 	}
+
 	for _, tc := range tt {
-		_, gotErr := a.SyncQueue(tc.ctx, tc.msg)
+		_, gotErr := gn.SyncQueue(tc.ctx, tc.msg)
 
 		if tc.err == nil && gotErr == nil {
 			continue
@@ -117,10 +128,18 @@ func TestSyncQueue(t *testing.T) {
 }
 
 func TestMessageHandler(t *testing.T) {
-	a := NewNode(nil)
+	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
+	gn := NewNode(config)
+	getMsgID := func(msgType string) uint64 {
+		id, err := gn.regMngr.MsgTypeToID(msgType)
+		if err != nil {
+			return 1000
+		}
+		return id
+	}
 
-	//add a function for testing
-	err := a.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
+	//add gn function for testing
+	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
 
@@ -128,38 +147,37 @@ func TestMessageHandler(t *testing.T) {
 		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
 	}
 
-	go a.sweeper()
+	go gn.sweeper()
 
 	genMsg := func(payload []byte, recipients []string, msgType string) *shared.GossipMessage {
-		msg, _ := generateGossipMessage(payload, recipients, msgType)
+		msg, _ := generateGossipMessage(payload, recipients, getMsgID(msgType))
 		return msg
 	}
 
 	tt := []struct {
-		e   *entry
+		e   *order.Order
 		err error
 	}{
-		{
-			//nil entry
+		{ //nil entry
 			e:   nil,
 			err: fmt.Errorf("non nil"),
 		},
 		{ //entry with existing function
-			e:   &entry{ctx: context.Background(), msg: genMsg([]byte("msg"), nil, "exists")},
+			e:   order.NewSync(context.Background(), genMsg([]byte("msg"), nil, "exists")),
 			err: nil,
 		},
 		{ //entry with non-existing function
-			e:   &entry{ctx: context.Background(), msg: genMsg([]byte("msg"), nil, "doesntexist")},
+			e:   order.NewSync(context.Background(), genMsg([]byte("msg"), nil, "doesntexist")),
 			err: fmt.Errorf("non nil"),
 		},
 		{ //entry with nil message
-			e:   &entry{ctx: context.Background()},
+			e:   order.NewSync(context.Background(), nil),
 			err: fmt.Errorf("non nil"),
 		},
 	}
 
 	for _, tc := range tt {
-		gotErr := a.messageHandler(tc.e)
+		gotErr := gn.messageHandler(tc.e)
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
@@ -175,5 +193,71 @@ func TestMessageHandler(t *testing.T) {
 		if tc.err != nil && gotErr != nil {
 			continue
 		}
+	}
+}
+
+func TestTryStore(t *testing.T) {
+
+	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
+	gn := NewNode(config)
+
+	//generating two messages with different script
+	msg1, _ := generateGossipMessage([]byte("hello"), []string{}, 3)
+	msg2, _ := generateGossipMessage([]byte("hi"), []string{}, 4)
+
+	// pretending that the node received msg2
+	h2, _ := computeHash(msg2)
+	gn.hashCache.receive(string(h2))
+
+	tt := []struct {
+		msg          *shared.GossipMessage
+		expectedBool bool
+	}{
+		{ // msg1 is not stored in the store
+			msg:          msg1,
+			expectedBool: false,
+		},
+		{ // msg1 is in the store
+			msg:          msg2,
+			expectedBool: true,
+		},
+	}
+
+	// test if storage reports the correct state of the message
+	for _, tc := range tt {
+		rep, _ := gn.tryStore(tc.msg)
+		if rep != tc.expectedBool {
+			t.Errorf("tryStore: Expected: %v, Got: %v", tc.expectedBool, rep)
+		}
+	}
+}
+
+func TestPickRandom(t *testing.T) {
+	n := &Node{}
+	n.peers = []string{
+		"Wyatt",
+		"Jayden",
+		"John",
+		"Owen",
+		"Dylan",
+		"Luke",
+		"Gabriel",
+		"Anthony",
+		"Isaac",
+		"Grayson",
+		"Jack",
+		"Julian",
+		"Levi",
+		"Christopher",
+		"Joshua",
+		"Andrew",
+		"Lincoln",
+	}
+
+	n.staticFanoutNum = 2
+	n.pickGossipPartners()
+
+	if size := len(n.fanoutSet); size != 2 {
+		t.Errorf("expected a new fanout set of size 2, received fanout set of size: %v", size)
 	}
 }

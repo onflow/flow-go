@@ -28,20 +28,28 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	checker.memberOrigins[interfaceType] = origins
 
-	checker.checkMemberIdentifiers(
-		declaration.Members.Fields,
-		declaration.Members.Functions,
-	)
-
 	checker.checkInitializers(
-		declaration.Members.Initializers,
+		declaration.Members.Initializers(),
 		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
-		initializerKindInterface,
+		ContainerKindInterface,
+		nil,
 	)
+
+	checker.checkDestructors(
+		declaration.Members.Destructors(),
+		declaration.Members.FieldsByIdentifier(),
+		interfaceType.Members,
+		interfaceType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		ContainerKindInterface,
+	)
+
+	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
 
 	checker.checkInterfaceFunctions(
 		declaration.Members.Functions,
@@ -49,14 +57,21 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 	)
 
-	// TODO: support non-structure interfaces, such as contracts and resources
+	checker.checkResourceFieldNesting(
+		declaration.Members.FieldsByIdentifier(),
+		interfaceType.Members,
+		interfaceType.CompositeKind,
+	)
 
-	if declaration.CompositeKind != common.CompositeKindStructure {
+	// TODO: support non-structure / non-resource interfaces, such as contract interfaces
+
+	if declaration.CompositeKind != common.CompositeKindStructure &&
+		declaration.CompositeKind != common.CompositeKindResource {
+
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				StartPos:        declaration.Identifier.StartPosition(),
-				EndPos:          declaration.Identifier.EndPosition(),
+				Range:           ast.NewRangeFromPositioned(declaration.Identifier),
 			},
 		)
 	}
@@ -70,8 +85,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				StartPos:        firstNestedCompositeDeclaration.Identifier.StartPosition(),
-				EndPos:          firstNestedCompositeDeclaration.Identifier.EndPosition(),
+				Range:           ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
 			},
 		)
 	}
@@ -93,10 +107,16 @@ func (checker *Checker) checkInterfaceFunctions(
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
-			checker.visitFunctionDeclaration(function, false)
+			checker.visitFunctionDeclaration(
+				function,
+				functionDeclarationOptions{
+					mustExit:        false,
+					declareFunction: false,
+				},
+			)
 
 			if function.FunctionBlock != nil {
-				checker.checkInterfaceFunctionBlock(
+				checker.checkInterfaceSpecialFunctionBlock(
 					function.FunctionBlock,
 					declarationKind,
 					common.DeclarationKindFunction,
@@ -108,65 +128,40 @@ func (checker *Checker) checkInterfaceFunctions(
 
 func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDeclaration) {
 
+	identifier := declaration.Identifier
+
 	// NOTE: fields and functions might already refer to interface itself.
 	// insert a dummy type for now, so lookup succeeds during conversion,
 	// then fix up the type reference
 
-	interfaceType := &InterfaceType{}
-
-	identifier := declaration.Identifier
+	interfaceType := &InterfaceType{
+		CompositeKind: declaration.CompositeKind,
+		Identifier:    identifier.Identifier,
+	}
 
 	err := checker.typeActivations.Declare(identifier, interfaceType)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.DeclarationKind(),
-			IsConstant: true,
-			Type:       interfaceType,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.DeclarationKind(),
+			IsConstant:      true,
+			Type:            interfaceType,
+			Pos:             &identifier.Pos,
 		},
 	)
 
 	// NOTE: members are added in `VisitInterfaceDeclaration` –
 	//   left out for now, as field and function requirements could refer to e.g. composites
-	*interfaceType = InterfaceType{
-		CompositeKind: declaration.CompositeKind,
-		Identifier:    identifier.Identifier,
-	}
 
-	// TODO: support multiple overloaded initializers
-
-	var parameterTypeAnnotations []*TypeAnnotation
-	initializerCount := len(declaration.Members.Initializers)
-	if initializerCount > 0 {
-		firstInitializer := declaration.Members.Initializers[0]
-		parameterTypeAnnotations = checker.parameterTypeAnnotations(firstInitializer.Parameters)
-
-		if initializerCount > 1 {
-			secondInitializer := declaration.Members.Initializers[1]
-
-			checker.report(
-				&UnsupportedOverloadingError{
-					DeclarationKind: common.DeclarationKindInitializer,
-					StartPos:        secondInitializer.StartPosition(),
-					EndPos:          secondInitializer.EndPosition(),
-				},
-			)
-		}
-	}
-
-	interfaceType.InitializerParameterTypeAnnotations = parameterTypeAnnotations
+	interfaceType.InitializerParameterTypeAnnotations =
+		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
 	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
-
-	// declare value
-
-	checker.declareInterfaceMetaType(declaration, interfaceType)
 }
 
-func (checker *Checker) checkInterfaceFunctionBlock(
+func (checker *Checker) checkInterfaceSpecialFunctionBlock(
 	block *ast.FunctionBlock,
 	containerKind common.DeclarationKind,
 	implementedKind common.DeclarationKind,
@@ -191,24 +186,4 @@ func (checker *Checker) checkInterfaceFunctionBlock(
 			},
 		)
 	}
-}
-
-func (checker *Checker) declareInterfaceMetaType(
-	declaration *ast.InterfaceDeclaration,
-	interfaceType *InterfaceType,
-) {
-	metaType := &InterfaceMetaType{
-		InterfaceType: interfaceType,
-	}
-
-	_, err := checker.valueActivations.Declare(
-		declaration.Identifier.Identifier,
-		metaType,
-		// TODO: check
-		declaration.DeclarationKind(),
-		declaration.Identifier.Pos,
-		true,
-		nil,
-	)
-	checker.report(err)
 }

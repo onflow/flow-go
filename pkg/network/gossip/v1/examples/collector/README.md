@@ -21,7 +21,7 @@ Run up to three instances of the server
 
 In another terminal, run the client
 ```
-./cli -key test check # Checks if a key "test" has been submitted before
-./cli -key test put # submits the key "test
-./cli -key test check # Checks if a key "test" has been submitted successfully
+./cli -key exists put # submits the key "test
+./cli -key exists check # Checks if a key "test" has been submitted successfully
+./cli -key deosnotexist check # Checks if a key "test" has been submitted before
 ```

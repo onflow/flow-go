@@ -1,11 +1,13 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckConstantAndVariableDeclarations(t *testing.T) {
@@ -13,13 +15,19 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 	checker, err := ParseAndCheck(t, `
         let x = 1
         var y = 1
-	`)
+    `)
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.IntType{})
+	assert.Equal(t,
+		&sema.IntType{},
+		checker.GlobalValues["x"].Type,
+	)
 
-	assert.Equal(t, checker.GlobalValues["y"].Type, &sema.IntType{})
+	assert.Equal(t,
+		&sema.IntType{},
+		checker.GlobalValues["y"].Type,
+	)
 }
 
 func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
@@ -29,7 +37,7 @@ func TestCheckInvalidGlobalConstantRedeclaration(t *testing.T) {
 
         let y = true
         let y = false
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -43,7 +51,7 @@ func TestCheckInvalidGlobalFunctionRedeclaration(t *testing.T) {
 
         fun y() {}
         fun y() {}
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -57,7 +65,7 @@ func TestCheckInvalidLocalRedeclaration(t *testing.T) {
             let x = true
             let x = false
         }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -73,7 +81,7 @@ func TestCheckInvalidLocalFunctionRedeclaration(t *testing.T) {
             fun y() {}
             fun y() {}
         }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -86,7 +94,7 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
        fun test() {
            return x
        }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -99,7 +107,7 @@ func TestCheckInvalidUnknownDeclarationInGlobal(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x = y
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -110,24 +118,36 @@ func TestCheckInvalidUnknownDeclarationInGlobalAndUnknownType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x: X = y
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).Name, "y")
-	assert.Equal(t, errs[0].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindVariable)
+	assert.Equal(t,
+		"y",
+		errs[0].(*sema.NotDeclaredError).Name,
+	)
+	assert.Equal(t,
+		common.DeclarationKindVariable,
+		errs[0].(*sema.NotDeclaredError).ExpectedKind,
+	)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).Name, "X")
-	assert.Equal(t, errs[1].(*sema.NotDeclaredError).ExpectedKind, common.DeclarationKindType)
+	assert.Equal(t,
+		"X",
+		errs[1].(*sema.NotDeclaredError).Name,
+	)
+	assert.Equal(t,
+		common.DeclarationKindType,
+		errs[1].(*sema.NotDeclaredError).ExpectedKind,
+	)
 }
 
 func TestCheckInvalidUnknownDeclarationCallInGlobal(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        let x = y()
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -141,7 +161,7 @@ func TestCheckInvalidRedeclarations(t *testing.T) {
         let x = 1
         let x = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
@@ -154,7 +174,7 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: Bool = 1
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -167,7 +187,7 @@ func TestCheckInvalidReference(t *testing.T) {
       fun test() {
           testX
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

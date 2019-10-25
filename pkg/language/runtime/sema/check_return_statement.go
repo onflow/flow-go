@@ -3,9 +3,13 @@ package sema
 import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast.Repr {
+	functionActivation := checker.functionActivations.Current()
+
 	defer func() {
 		checker.checkResourceLossForFunction()
 		checker.resources.Returns = true
+		functionActivation.ReturnInfo.MaybeReturned = true
+		functionActivation.ReturnInfo.DefinitelyReturned = true
 	}()
 
 	// check value type matches enclosing function's return type
@@ -15,9 +19,9 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	valueIsInvalid := IsInvalidType(valueType)
+	valueIsInvalid := valueType.IsInvalidType()
 
-	returnType := checker.functionActivations.Current().ReturnType
+	returnType := functionActivation.ReturnType
 
 	checker.Elaboration.ReturnStatementValueTypes[statement] = valueType
 	checker.Elaboration.ReturnStatementReturnTypes[statement] = returnType
@@ -29,22 +33,20 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 		if _, ok := returnType.(*VoidType); ok {
 			checker.report(
 				&InvalidReturnValueError{
-					StartPos: statement.Expression.StartPosition(),
-					EndPos:   statement.Expression.EndPosition(),
+					Range: ast.NewRangeFromPositioned(statement.Expression),
 				},
 			)
 		}
 	} else {
 
-		if !IsInvalidType(returnType) &&
+		if !returnType.IsInvalidType() &&
 			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
 
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: returnType,
 					ActualType:   valueType,
-					StartPos:     statement.Expression.StartPosition(),
-					EndPos:       statement.Expression.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(statement.Expression),
 				},
 			)
 		}

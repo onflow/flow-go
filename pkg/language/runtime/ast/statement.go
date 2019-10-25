@@ -9,16 +9,7 @@ type Statement interface {
 
 type ReturnStatement struct {
 	Expression Expression
-	StartPos   Position
-	EndPos     Position
-}
-
-func (s *ReturnStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *ReturnStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*ReturnStatement) isStatement() {}
@@ -30,16 +21,7 @@ func (s *ReturnStatement) Accept(visitor Visitor) Repr {
 // BreakStatement
 
 type BreakStatement struct {
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *BreakStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *BreakStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*BreakStatement) isStatement() {}
@@ -51,16 +33,7 @@ func (s *BreakStatement) Accept(visitor Visitor) Repr {
 // ContinueStatement
 
 type ContinueStatement struct {
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *ContinueStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *ContinueStatement) EndPosition() Position {
-	return s.EndPos
+	Range
 }
 
 func (*ContinueStatement) isStatement() {}
@@ -105,24 +78,36 @@ func (s *IfStatement) Accept(visitor Visitor) Repr {
 // WhileStatement
 
 type WhileStatement struct {
-	Test     Expression
-	Block    *Block
-	StartPos Position
-	EndPos   Position
-}
-
-func (s *WhileStatement) StartPosition() Position {
-	return s.StartPos
-}
-
-func (s *WhileStatement) EndPosition() Position {
-	return s.EndPos
+	Test  Expression
+	Block *Block
+	Range
 }
 
 func (*WhileStatement) isStatement() {}
 
 func (s *WhileStatement) Accept(visitor Visitor) Repr {
 	return visitor.VisitWhileStatement(s)
+}
+
+// EmitStatement
+
+type EmitStatement struct {
+	InvocationExpression *InvocationExpression
+	StartPos             Position
+}
+
+func (s *EmitStatement) StartPosition() Position {
+	return s.StartPos
+}
+
+func (s *EmitStatement) EndPosition() Position {
+	return s.InvocationExpression.EndPosition()
+}
+
+func (*EmitStatement) isStatement() {}
+
+func (s *EmitStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitEmitStatement(s)
 }
 
 // AssignmentStatement
@@ -144,7 +129,28 @@ func (s *AssignmentStatement) EndPosition() Position {
 func (*AssignmentStatement) isStatement() {}
 
 func (s *AssignmentStatement) Accept(visitor Visitor) Repr {
-	return visitor.VisitAssignment(s)
+	return visitor.VisitAssignmentStatement(s)
+}
+
+// SwapStatement
+
+type SwapStatement struct {
+	Left  Expression
+	Right Expression
+}
+
+func (s *SwapStatement) StartPosition() Position {
+	return s.Left.StartPosition()
+}
+
+func (s *SwapStatement) EndPosition() Position {
+	return s.Right.EndPosition()
+}
+
+func (*SwapStatement) isStatement() {}
+
+func (s *SwapStatement) Accept(visitor Visitor) Repr {
+	return visitor.VisitSwapStatement(s)
 }
 
 // ExpressionStatement

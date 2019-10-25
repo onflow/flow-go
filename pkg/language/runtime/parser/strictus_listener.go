@@ -46,11 +46,14 @@ type StrictusListener interface {
 	// EnterCompositeKind is called when entering the compositeKind production.
 	EnterCompositeKind(c *CompositeKindContext)
 
-	// EnterInitializer is called when entering the initializer production.
-	EnterInitializer(c *InitializerContext)
+	// EnterSpecialFunctionDeclaration is called when entering the specialFunctionDeclaration production.
+	EnterSpecialFunctionDeclaration(c *SpecialFunctionDeclarationContext)
 
 	// EnterFunctionDeclaration is called when entering the functionDeclaration production.
 	EnterFunctionDeclaration(c *FunctionDeclarationContext)
+
+	// EnterEventDeclaration is called when entering the eventDeclaration production.
+	EnterEventDeclaration(c *EventDeclarationContext)
 
 	// EnterParameterList is called when entering the parameterList production.
 	EnterParameterList(c *ParameterListContext)
@@ -121,11 +124,17 @@ type StrictusListener interface {
 	// EnterWhileStatement is called when entering the whileStatement production.
 	EnterWhileStatement(c *WhileStatementContext)
 
+	// EnterEmitStatement is called when entering the emitStatement production.
+	EnterEmitStatement(c *EmitStatementContext)
+
 	// EnterVariableDeclaration is called when entering the variableDeclaration production.
 	EnterVariableDeclaration(c *VariableDeclarationContext)
 
 	// EnterAssignment is called when entering the assignment production.
 	EnterAssignment(c *AssignmentContext)
+
+	// EnterSwap is called when entering the swap production.
+	EnterSwap(c *SwapContext)
 
 	// EnterTransfer is called when entering the transfer production.
 	EnterTransfer(c *TransferContext)
@@ -198,6 +207,9 @@ type StrictusListener interface {
 
 	// EnterDestroyExpression is called when entering the destroyExpression production.
 	EnterDestroyExpression(c *DestroyExpressionContext)
+
+	// EnterReferenceExpression is called when entering the referenceExpression production.
+	EnterReferenceExpression(c *ReferenceExpressionContext)
 
 	// EnterIdentifierExpression is called when entering the identifierExpression production.
 	EnterIdentifierExpression(c *IdentifierExpressionContext)
@@ -310,11 +322,14 @@ type StrictusListener interface {
 	// ExitCompositeKind is called when exiting the compositeKind production.
 	ExitCompositeKind(c *CompositeKindContext)
 
-	// ExitInitializer is called when exiting the initializer production.
-	ExitInitializer(c *InitializerContext)
+	// ExitSpecialFunctionDeclaration is called when exiting the specialFunctionDeclaration production.
+	ExitSpecialFunctionDeclaration(c *SpecialFunctionDeclarationContext)
 
 	// ExitFunctionDeclaration is called when exiting the functionDeclaration production.
 	ExitFunctionDeclaration(c *FunctionDeclarationContext)
+
+	// ExitEventDeclaration is called when exiting the eventDeclaration production.
+	ExitEventDeclaration(c *EventDeclarationContext)
 
 	// ExitParameterList is called when exiting the parameterList production.
 	ExitParameterList(c *ParameterListContext)
@@ -385,11 +400,17 @@ type StrictusListener interface {
 	// ExitWhileStatement is called when exiting the whileStatement production.
 	ExitWhileStatement(c *WhileStatementContext)
 
+	// ExitEmitStatement is called when exiting the emitStatement production.
+	ExitEmitStatement(c *EmitStatementContext)
+
 	// ExitVariableDeclaration is called when exiting the variableDeclaration production.
 	ExitVariableDeclaration(c *VariableDeclarationContext)
 
 	// ExitAssignment is called when exiting the assignment production.
 	ExitAssignment(c *AssignmentContext)
+
+	// ExitSwap is called when exiting the swap production.
+	ExitSwap(c *SwapContext)
 
 	// ExitTransfer is called when exiting the transfer production.
 	ExitTransfer(c *TransferContext)
@@ -462,6 +483,9 @@ type StrictusListener interface {
 
 	// ExitDestroyExpression is called when exiting the destroyExpression production.
 	ExitDestroyExpression(c *DestroyExpressionContext)
+
+	// ExitReferenceExpression is called when exiting the referenceExpression production.
+	ExitReferenceExpression(c *ReferenceExpressionContext)
 
 	// ExitIdentifierExpression is called when exiting the identifierExpression production.
 	ExitIdentifierExpression(c *IdentifierExpressionContext)

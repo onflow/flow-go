@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckArrayIndexingWithInteger(t *testing.T) {
@@ -14,7 +16,7 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
           let z = [0, 3]
           z[0]
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -26,7 +28,7 @@ func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
           let z = [[0, 1], [2, 3]]
           z[0][1]
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -38,7 +40,7 @@ func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
           let z = [0, 3]
           z[true]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -51,7 +53,7 @@ func TestCheckInvalidArrayIndexingIntoBool(t *testing.T) {
       fun test(): Int {
           return true[0]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -64,7 +66,7 @@ func TestCheckInvalidArrayIndexingIntoInteger(t *testing.T) {
       fun test(): Int {
           return 2[0]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -78,7 +80,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithBool(t *testing.T) {
           let z = [0, 3]
           z[true] = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -92,7 +94,7 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
           let z = [0, 3]
           z[0] = 2
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -104,7 +106,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {
           let z = [0, 3]
           z[0] = true
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -118,7 +120,7 @@ func TestCheckInvalidStringIndexingWithBool(t *testing.T) {
           let z = "abc"
           z[true]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -131,7 +133,7 @@ func TestCheckInvalidUnknownDeclarationIndexing(t *testing.T) {
       fun test() {
           x[0]
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -144,7 +146,7 @@ func TestCheckInvalidUnknownDeclarationIndexingAssignment(t *testing.T) {
       fun test() {
           x[0] = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

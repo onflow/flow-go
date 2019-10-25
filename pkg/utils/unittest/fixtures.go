@@ -7,7 +7,7 @@ import (
 )
 
 func AddressFixture() types.Address {
-	return types.ZeroAddress()
+	return types.ZeroAddress
 }
 
 func AccountSignatureFixture() types.AccountSignature {

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"

@@ -98,17 +98,25 @@ func (s *BaseStrictusListener) EnterCompositeKind(ctx *CompositeKindContext) {}
 // ExitCompositeKind is called when production compositeKind is exited.
 func (s *BaseStrictusListener) ExitCompositeKind(ctx *CompositeKindContext) {}
 
-// EnterInitializer is called when production initializer is entered.
-func (s *BaseStrictusListener) EnterInitializer(ctx *InitializerContext) {}
+// EnterSpecialFunctionDeclaration is called when production specialFunctionDeclaration is entered.
+func (s *BaseStrictusListener) EnterSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {
+}
 
-// ExitInitializer is called when production initializer is exited.
-func (s *BaseStrictusListener) ExitInitializer(ctx *InitializerContext) {}
+// ExitSpecialFunctionDeclaration is called when production specialFunctionDeclaration is exited.
+func (s *BaseStrictusListener) ExitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {
+}
 
 // EnterFunctionDeclaration is called when production functionDeclaration is entered.
 func (s *BaseStrictusListener) EnterFunctionDeclaration(ctx *FunctionDeclarationContext) {}
 
 // ExitFunctionDeclaration is called when production functionDeclaration is exited.
 func (s *BaseStrictusListener) ExitFunctionDeclaration(ctx *FunctionDeclarationContext) {}
+
+// EnterEventDeclaration is called when production eventDeclaration is entered.
+func (s *BaseStrictusListener) EnterEventDeclaration(ctx *EventDeclarationContext) {}
+
+// ExitEventDeclaration is called when production eventDeclaration is exited.
+func (s *BaseStrictusListener) ExitEventDeclaration(ctx *EventDeclarationContext) {}
 
 // EnterParameterList is called when production parameterList is entered.
 func (s *BaseStrictusListener) EnterParameterList(ctx *ParameterListContext) {}
@@ -248,6 +256,12 @@ func (s *BaseStrictusListener) EnterWhileStatement(ctx *WhileStatementContext) {
 // ExitWhileStatement is called when production whileStatement is exited.
 func (s *BaseStrictusListener) ExitWhileStatement(ctx *WhileStatementContext) {}
 
+// EnterEmitStatement is called when production emitStatement is entered.
+func (s *BaseStrictusListener) EnterEmitStatement(ctx *EmitStatementContext) {}
+
+// ExitEmitStatement is called when production emitStatement is exited.
+func (s *BaseStrictusListener) ExitEmitStatement(ctx *EmitStatementContext) {}
+
 // EnterVariableDeclaration is called when production variableDeclaration is entered.
 func (s *BaseStrictusListener) EnterVariableDeclaration(ctx *VariableDeclarationContext) {}
 
@@ -259,6 +273,12 @@ func (s *BaseStrictusListener) EnterAssignment(ctx *AssignmentContext) {}
 
 // ExitAssignment is called when production assignment is exited.
 func (s *BaseStrictusListener) ExitAssignment(ctx *AssignmentContext) {}
+
+// EnterSwap is called when production swap is entered.
+func (s *BaseStrictusListener) EnterSwap(ctx *SwapContext) {}
+
+// ExitSwap is called when production swap is exited.
+func (s *BaseStrictusListener) ExitSwap(ctx *SwapContext) {}
 
 // EnterTransfer is called when production transfer is entered.
 func (s *BaseStrictusListener) EnterTransfer(ctx *TransferContext) {}
@@ -405,6 +425,12 @@ func (s *BaseStrictusListener) EnterDestroyExpression(ctx *DestroyExpressionCont
 
 // ExitDestroyExpression is called when production destroyExpression is exited.
 func (s *BaseStrictusListener) ExitDestroyExpression(ctx *DestroyExpressionContext) {}
+
+// EnterReferenceExpression is called when production referenceExpression is entered.
+func (s *BaseStrictusListener) EnterReferenceExpression(ctx *ReferenceExpressionContext) {}
+
+// ExitReferenceExpression is called when production referenceExpression is exited.
+func (s *BaseStrictusListener) ExitReferenceExpression(ctx *ReferenceExpressionContext) {}
 
 // EnterIdentifierExpression is called when production identifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}

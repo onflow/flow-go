@@ -211,17 +211,32 @@ func (cssr *ConsensusServiceServerRegistry) ProcessStateTransitionCommitVote(ctx
 	return respByte, respErr
 }
 
-func (cssr *ConsensusServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-		"Ping":                              cssr.Ping,
-		"SubmitCollection":                  cssr.SubmitCollection,
-		"ProposeBlock":                      cssr.ProposeBlock,
-		"UpdateProposedBlock":               cssr.UpdateProposedBlock,
-		"GetBlockByHash":                    cssr.GetBlockByHash,
-		"GetBlockByHeight":                  cssr.GetBlockByHeight,
-		"GetFinalizedStateTransitions":      cssr.GetFinalizedStateTransitions,
-		"ProcessStateTransitionProposal":    cssr.ProcessStateTransitionProposal,
-		"ProcessStateTransitionPrepareVote": cssr.ProcessStateTransitionPrepareVote,
-		"ProcessStateTransitionCommitVote":  cssr.ProcessStateTransitionCommitVote,
+func (cssr *ConsensusServiceServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+		0: cssr.Ping,
+		1: cssr.SubmitCollection,
+		2: cssr.ProposeBlock,
+		3: cssr.UpdateProposedBlock,
+		4: cssr.GetBlockByHash,
+		5: cssr.GetBlockByHeight,
+		6: cssr.GetFinalizedStateTransitions,
+		7: cssr.ProcessStateTransitionProposal,
+		8: cssr.ProcessStateTransitionPrepareVote,
+		9: cssr.ProcessStateTransitionCommitVote,
+	}
+}
+
+func (cssr *ConsensusServiceServerRegistry) NameMapping() map[string]uint64 {
+	return map[string]uint64{
+		"Ping":                              0,
+		"SubmitCollection":                  1,
+		"ProposeBlock":                      2,
+		"UpdateProposedBlock":               3,
+		"GetBlockByHash":                    4,
+		"GetBlockByHeight":                  5,
+		"GetFinalizedStateTransitions":      6,
+		"ProcessStateTransitionProposal":    7,
+		"ProcessStateTransitionPrepareVote": 8,
+		"ProcessStateTransitionCommitVote":  9,
 	}
 }

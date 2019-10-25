@@ -65,6 +65,7 @@ declaration
     | functionDeclaration[true]
     | variableDeclaration
     | importDeclaration
+    | eventDeclaration
     ;
 
 importDeclaration
@@ -104,7 +105,7 @@ members[bool functionBlockRequired]
 
 member[bool functionBlockRequired]
     : field
-    | initializer[functionBlockRequired]
+    | specialFunctionDeclaration[functionBlockRequired]
     | functionDeclaration[functionBlockRequired]
     | interfaceDeclaration
     | compositeDeclaration
@@ -116,10 +117,14 @@ compositeKind
     | Contract
     ;
 
-// NOTE: allow any identifier in parser, then check identifier
-// is `init` in semantic analysis to provide better error
+// specialFunctionDeclaration is the rule for special function declarations,
+// i.e., those that don't require a `fun` keyword and don't have a return type,
+// e.g. initializers (`init`) and destructors (`destroy`).
 //
-initializer[bool functionBlockRequired]
+// NOTE: allow any identifier in parser, then check identifier is one of
+// the valid identifiers in the semantic analysis to provide better error
+//
+specialFunctionDeclaration[bool functionBlockRequired]
     : identifier parameterList
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
@@ -129,6 +134,10 @@ functionDeclaration[bool functionBlockRequired]
     : access Fun identifier parameterList (':' returnType=typeAnnotation)?
       // only optional if parameter functionBlockRequired is false
       b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+    ;
+
+eventDeclaration
+    : Event identifier parameterList
     ;
 
 parameterList
@@ -143,8 +152,11 @@ typeAnnotation
     : Move? fullType
     ;
 
+// NOTE: only allow reference or optionals – prevent ambiguous
+// and not particular useful types like `&R?`
 fullType
-    : baseType ({p.noWhitespace()}? optionals+=Optional)*
+    : reference=Ampersand {p.noWhitespace()}? baseType
+    | baseType ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
@@ -213,11 +225,13 @@ statement
     | continueStatement
     | ifStatement
     | whileStatement
+    | emitStatement
     // NOTE: allow all declarations, even structures, in parser,
     // then check identifier declaration is variable/constant or function
     // in semantic analysis to provide better error
     | declaration
     | assignment
+    | swap
     | expression
     ;
 
@@ -249,12 +263,29 @@ whileStatement
     : While expression block
     ;
 
+emitStatement
+    : Emit identifier invocation
+    ;
+
 variableDeclaration
     : variableKind identifier (':' typeAnnotation)? transfer expression
     ;
 
+// NOTE: we allow any kind of transfer, i.e. moves, but ensure
+//   that move is not used in the semantic analysis (as assignment
+//   to resource type will cause a loss of the old value).
+//   Being unrestritive here allows us to provide better error messages
+//   in the semantic analysis.
 assignment
     : identifier expressionAccess* transfer expression
+    ;
+
+
+// NOTE: we allow expressions on both sides when parsing, but ensure
+//   that both sides are targets (identifier, member access, or index access)
+//   in the semantic analysis. This allows us to provide better error messages
+swap
+    : left=expression '<->' right=expression
     ;
 
 transfer
@@ -302,7 +333,7 @@ failableDowncastingExpression
 
 concatenatingExpression
     : additiveExpression
-    | concatenatingExpression Concat additiveExpression
+    | concatenatingExpression Ampersand additiveExpression
     ;
 
 additiveExpression
@@ -325,6 +356,7 @@ unaryExpression
 primaryExpression
     : createExpression
     | destroyExpression
+    | referenceExpression
     | composedExpression
     ;
 
@@ -375,7 +407,7 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
-Concat : '&';
+Ampersand : '&';
 
 unaryOp
     : Minus
@@ -389,6 +421,8 @@ Move : '<-' ;
 Optional : '?' ;
 
 NilCoalescing : WS '??';
+
+Downcasting : 'as' ;
 
 FailableDowncasting : 'as?' ;
 
@@ -405,6 +439,10 @@ createExpression
 
 destroyExpression
     : Destroy expression
+    ;
+
+referenceExpression
+    : Ampersand expression Downcasting fullType
     ;
 
 identifierExpression
@@ -433,7 +471,8 @@ memberAccess
     ;
 
 bracketExpression
-    : '[' expression ']'
+    // storage is accessed using types
+    : '[' (expression | fullType) ']'
     ;
 
 invocation
@@ -502,6 +541,9 @@ Contract : 'contract' ;
 Interface : 'interface' ;
 
 Fun : 'fun' ;
+
+Event : 'event' ;
+Emit : 'emit' ;
 
 Pre : 'pre' ;
 Post : 'post' ;

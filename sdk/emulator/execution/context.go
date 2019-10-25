@@ -10,50 +10,75 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
+// RuntimeContext implements host functionality required by the Cadence runtime.
+//
+// A context is short-lived and is intended to be used when executing a single transaction.
+//
+// The logic in this runtime context is specific to the emulator and is designed to be
+// used with an EmulatedBlockchain instance.
 type RuntimeContext struct {
-	registers        *types.RegistersView
-	signingAccounts  []types.Address
-	onLog            func(string)
-	onAccountCreated func(account types.Account)
+	registers       *types.RegistersView
+	signingAccounts []types.Address
+	onLogMessage    func(string)
+	events          []types.Event
 }
 
+// NewRuntimeContext returns a new RuntimeContext instance.
 func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers:        registers,
-		onLog:            func(string) {},
-		onAccountCreated: func(types.Account) {},
+		registers:    registers,
+		onLogMessage: func(string) {},
+		events:       make([]types.Event, 0),
 	}
 }
 
+// SetSigningAccounts sets the signing accounts for this context.
+//
+// Signing accounts are the accounts that signed the transaction executing
+// inside this context.
 func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
 	r.signingAccounts = accounts
 }
 
+// GetSigningAccounts gets the signing accounts for this context.
+//
+// Signing accounts are the accounts that signed the transaction executing
+// inside this context.
 func (r *RuntimeContext) GetSigningAccounts() []types.Address {
 	return r.signingAccounts
 }
 
-func (r *RuntimeContext) SetLogger(callback func(string)) {
-	r.onLog = callback
+// SetOnLogMessage sets the logging function for this context.
+func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
+	r.onLogMessage = callback
 }
 
-func (r *RuntimeContext) SetOnAccountCreated(callback func(account types.Account)) {
-	r.onAccountCreated = callback
+// Events returns all events emitted by the runtime to this context.
+func (r *RuntimeContext) Events() []types.Event {
+	return r.events
 }
 
+// GetValue gets a register value from the world state.
 func (r *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := r.registers.Get(fullKey(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
+// SetValue sets a register value in the world state.
 func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 	r.registers.Set(fullKey(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) ([]byte, error) {
+// CreateAccount creates a new account and inserts it into the world state.
+//
+// This function returns an error if the input is invalid.
+//
+// After creating the account, this function calls the onAccountCreated callback registered
+// with this context.
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (types.Address, error) {
 	if len(publicKeys) != len(keyWeights) {
-		return nil, fmt.Errorf(
+		return types.Address{}, fmt.Errorf(
 			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
 			len(publicKeys),
 			len(keyWeights),
@@ -80,12 +105,13 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.Log(fmt.Sprintf("Address: %s", accountAddress.Hex()))
 	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
-	account := r.GetAccount(accountAddress)
-	r.onAccountCreated(*account)
-
-	return accountID, nil
+	return accountAddress, nil
 }
 
+// AddAccountKey adds a public key to an existing account.
+//
+// This function returns an error if the specified account does not exist or
+// if the key insertion fails.
 func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
 	accountID := address.Bytes()
 
@@ -102,34 +128,41 @@ func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, 
 	publicKeys = append(publicKeys, publicKey)
 	keyWeights = append(keyWeights, keyWeight)
 
-	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
-
-	return nil
+	return r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
 }
 
-func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) error {
+// RemoveAccountKey removes a public key by index from an existing account.
+//
+// This function returns an error if the specified account does not exist, the
+// provided key is invalid, or if key deletion fails.
+func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
+		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if index < 0 || index > len(publicKeys)-1 {
-		return fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
+		return nil, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
 	}
+
+	removedKey := publicKeys[index]
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 	keyWeights = append(keyWeights[:index], keyWeights[index+1:]...)
 
-	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	err = r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	return removedKey, nil
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {
@@ -207,6 +240,10 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 	return nil
 }
 
+// UpdateAccountCode updates the deployed code on an existing account.
+//
+// This function returns an error if the specified account does not exist or is
+// not a valid signing account.
 func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
 	accountID := address.Bytes()
 
@@ -224,6 +261,9 @@ func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (
 	return nil
 }
 
+// GetAccount gets an account by address.
+//
+// The function returns nil if the specified account does not exist.
 func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 	accountID := address.Bytes()
 
@@ -254,6 +294,10 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 	}
 }
 
+// ResolveImport imports code for the provided import location.
+//
+// This function returns an error if the import location is not an account address,
+// or if there is no code deployed at the specified address.
 func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressImportLocation)
 	if !ok {
@@ -270,8 +314,16 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 	return code, nil
 }
 
+// Log logs a message from the runtime.
+//
+// This functions calls the onLog callback registered with this context.
 func (r *RuntimeContext) Log(message string) {
-	r.onLog(message)
+	r.onLogMessage(message)
+}
+
+// EmitEvent is called when an event is emitted by the runtime.
+func (r *RuntimeContext) EmitEvent(event types.Event) {
+	r.events = append(r.events, event)
 }
 
 func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {

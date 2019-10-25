@@ -1,11 +1,13 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 // TODO: implement occurrences for type references
@@ -265,13 +267,6 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 			EndPos:          sema.Position{Line: 8, Column: 19},
 			OriginStartPos:  &sema.Position{Line: 10, Column: 12},
 			OriginEndPos:    &sema.Position{Line: 10, Column: 15},
-			DeclarationKind: common.DeclarationKindFunction,
-		},
-		{
-			StartPos:        sema.Position{Line: 10, Column: 12},
-			EndPos:          sema.Position{Line: 10, Column: 15},
-			OriginStartPos:  &sema.Position{Line: 10, Column: 12},
-			OriginEndPos:    &sema.Position{Line: 10, Column: 12},
 			DeclarationKind: common.DeclarationKindFunction,
 		},
 		// TODO: why the duplicate?

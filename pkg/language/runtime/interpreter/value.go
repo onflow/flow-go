@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+
 	"github.com/rivo/uniseg"
 	"golang.org/x/text/unicode/norm"
 
@@ -25,18 +27,30 @@ type ExportableValue interface {
 	ToGoValue() interface{}
 }
 
-// IndexableValue
+// ValueIndexableValue
 
-type IndexableValue interface {
-	isIndexableValue()
-	Get(key Value) Value
-	Set(key Value, value Value)
+type ValueIndexableValue interface {
+	Get(locationRange LocationRange, key Value) Value
+	Set(locationRange LocationRange, key Value, value Value)
+}
+
+// TypeIndexableValue
+
+type TypeIndexableValue interface {
+	Get(key sema.Type) Value
+	Set(key sema.Type, value Value)
+}
+
+// MemberAccessibleValue
+
+type MemberAccessibleValue interface {
+	GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value
+	SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value)
 }
 
 // ConcatenatableValue
 
 type ConcatenatableValue interface {
-	isConcatenatableValue()
 	Concat(other ConcatenatableValue) Value
 }
 
@@ -44,6 +58,12 @@ type ConcatenatableValue interface {
 
 type EquatableValue interface {
 	Equal(other Value) BoolValue
+}
+
+// DestroyableValue
+
+type DestroyableValue interface {
+	Destroy(*Interpreter, Location) trampoline.Trampoline
 }
 
 // VoidValue
@@ -96,9 +116,7 @@ func NewStringValue(str string) StringValue {
 	return StringValue{&str}
 }
 
-func (StringValue) isValue()               {}
-func (StringValue) isIndexableValue()      {}
-func (StringValue) isConcatenatableValue() {}
+func (StringValue) isValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
@@ -144,7 +162,7 @@ func (v StringValue) Slice(from IntValue, to IntValue) Value {
 	return NewStringValue(str[fromInt:toInt])
 }
 
-func (v StringValue) Get(key Value) Value {
+func (v StringValue) Get(_ LocationRange, key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
@@ -160,7 +178,7 @@ func (v StringValue) Get(key Value) Value {
 	return NewStringValue(char)
 }
 
-func (v StringValue) Set(key Value, value Value) {
+func (v StringValue) Set(_ LocationRange, key Value, value Value) {
 	i := key.(IntegerValue).IntValue()
 	char := value.(StringValue).StrValue()
 
@@ -185,7 +203,7 @@ func (v StringValue) Set(key Value, value Value) {
 	*v.Str = sb.String()
 }
 
-func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		count := uniseg.GraphemeClusterCount(v.StrValue())
@@ -212,7 +230,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	}
 }
 
-func (v StringValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -222,9 +240,13 @@ type ArrayValue struct {
 	Values *[]Value
 }
 
-func (ArrayValue) isValue()               {}
-func (ArrayValue) isIndexableValue()      {}
-func (ArrayValue) isConcatenatableValue() {}
+func NewArrayValue(values ...Value) ArrayValue {
+	return ArrayValue{
+		Values: &values,
+	}
+}
+
+func (ArrayValue) isValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -232,7 +254,17 @@ func (v ArrayValue) Copy() Value {
 	for i, value := range *v.Values {
 		copies[i] = value.Copy()
 	}
-	return ArrayValue{Values: &copies}
+	return NewArrayValue(copies...)
+}
+
+func (v ArrayValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+	for _, value := range *v.Values {
+		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
+			return value.(DestroyableValue).Destroy(interpreter, location)
+		})
+	}
+	return result
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -248,14 +280,14 @@ func (v ArrayValue) ToGoValue() interface{} {
 func (v ArrayValue) Concat(other ConcatenatableValue) Value {
 	otherArray := other.(ArrayValue)
 	values := append(*v.Values, *otherArray.Values...)
-	return ArrayValue{Values: &values}
+	return NewArrayValue(values...)
 }
 
-func (v ArrayValue) Get(key Value) Value {
+func (v ArrayValue) Get(_ LocationRange, key Value) Value {
 	return (*v.Values)[key.(IntegerValue).IntValue()]
 }
 
-func (v ArrayValue) Set(key Value, value Value) {
+func (v ArrayValue) Set(_ LocationRange, key Value, value Value) {
 	(*v.Values)[key.(IntegerValue).IntValue()] = value
 }
 
@@ -327,7 +359,7 @@ func (v ArrayValue) Contains(x Value) BoolValue {
 	return BoolValue(false)
 }
 
-func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(*v.Values)))
@@ -389,7 +421,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	}
 }
 
-func (v ArrayValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -996,9 +1028,26 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 // CompositeValue
 
 type CompositeValue struct {
-	Identifier string
-	Fields     *map[string]Value
-	Functions  *map[string]FunctionValue
+	ImportLocation ast.ImportLocation
+	Identifier     string
+	Fields         *map[string]Value
+	Functions      *map[string]FunctionValue
+	Destructor     *InterpretedFunctionValue
+}
+
+func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	// if composite was deserialized, dynamically link in the destructor
+	if v.Destructor == nil {
+		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
+	}
+
+	destructor := v.Destructor
+	if destructor == nil {
+		return trampoline.Done{Result: VoidValue{}}
+	}
+
+	return interpreter.bindSelf(*destructor, v).
+		invoke(nil, location)
 }
 
 func (CompositeValue) isValue() {}
@@ -1009,12 +1058,14 @@ func (v CompositeValue) Copy() Value {
 		newFields[field] = value.Copy()
 	}
 
-	// NOTE: not copying functions – linked in
+	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
-		Identifier: v.Identifier,
-		Fields:     &newFields,
-		Functions:  v.Functions,
+		ImportLocation: v.ImportLocation,
+		Identifier:     v.Identifier,
+		Fields:         &newFields,
+		Functions:      v.Functions,
+		Destructor:     v.Destructor,
 	}
 }
 
@@ -1023,13 +1074,21 @@ func (v CompositeValue) ToGoValue() interface{} {
 	return *v.Fields
 }
 
-func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	value, ok := (*v.Fields)[name]
 	if ok {
 		return value
 	}
 
-	// if structure was deserialized, dynamically link in the functions
+	// get correct interpreter
+	if v.ImportLocation != nil {
+		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
+		if ok {
+			interpreter = subInterpreter
+		}
+	}
+
+	// if composite was deserialized, dynamically link in the functions
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = &functions
@@ -1046,14 +1105,20 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 	return nil
 }
 
-func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
 	(*v.Fields)[name] = value
 }
 
 func (v CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
-	err := encoder.Encode(v.Identifier)
+	// NOTE: important: decode as pointer, so gob sees
+	// the interface, not the concrete type
+	err := encoder.Encode(&v.ImportLocation)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1061,14 +1126,18 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: *not* encoding functions – linked in on-demand
+	// NOTE: *not* encoding functions and destructor – linked in on-demand
 	return w.Bytes(), nil
 }
 
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.Identifier)
+	err := decoder.Decode(&v.ImportLocation)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Identifier)
 	if err != nil {
 		return err
 	}
@@ -1094,14 +1163,34 @@ func (v DictionaryValue) Copy() Value {
 	return newDictionary
 }
 
+func (v DictionaryValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	var result trampoline.Trampoline = trampoline.Done{}
+
+	maybeDestroy := func(value interface{}) {
+		destroyableValue, ok := value.(DestroyableValue)
+		if !ok {
+			return
+		}
+
+		result = result.
+			FlatMap(func(_ interface{}) trampoline.Trampoline {
+				return destroyableValue.Destroy(interpreter, location)
+			})
+	}
+
+	for key, value := range v {
+		maybeDestroy(key)
+		maybeDestroy(value)
+	}
+	return result
+}
+
 func (v DictionaryValue) ToGoValue() interface{} {
 	// TODO: convert values to Go values?
 	return v
 }
 
-func (v DictionaryValue) isIndexableValue() {}
-
-func (v DictionaryValue) Get(keyValue Value) Value {
+func (v DictionaryValue) Get(_ LocationRange, keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
@@ -1121,8 +1210,18 @@ type HasKeyString interface {
 	KeyString() string
 }
 
-func (v DictionaryValue) Set(keyValue Value, value Value) {
-	v[dictionaryKey(keyValue)] = value
+func (v DictionaryValue) Set(_ LocationRange, keyValue Value, value Value) {
+	key := dictionaryKey(keyValue)
+	switch typedValue := value.(type) {
+	case SomeValue:
+		v[key] = typedValue.Value
+		return
+	case NilValue:
+		delete(v, key)
+		return
+	default:
+		panic(&errors.UnreachableError{})
+	}
 }
 
 func (v DictionaryValue) String() string {
@@ -1142,29 +1241,115 @@ func (v DictionaryValue) String() string {
 	return builder.String()
 }
 
-func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(v)))
+
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location Location) trampoline.Trampoline {
-				key := dictionaryKey(arguments[0])
-				value, ok := v[key]
-				if !ok {
-					return trampoline.Done{Result: NilValue{}}
-				}
+				keyValue := arguments[0]
+
+				key := dictionaryKey(keyValue)
+				value, hadValue := v[key]
+
 				delete(v, key)
-				return trampoline.Done{Result: SomeValue{Value: value}}
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: value},
+				}
 			},
 		)
+
+	case "insert":
+		return NewHostFunctionValue(
+			func(arguments []Value, location Location) trampoline.Trampoline {
+				keyValue := arguments[0]
+				newValue := arguments[1]
+
+				key := dictionaryKey(keyValue)
+				oldValue, hadValue := v[key]
+				v[key] = newValue
+
+				if !hadValue {
+					return trampoline.Done{
+						Result: NilValue{},
+					}
+				}
+
+				return trampoline.Done{
+					Result: SomeValue{Value: oldValue},
+				}
+			},
+		)
+
 	default:
 		panic(&errors.UnreachableError{})
 	}
 }
 
-func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
+}
+
+type DictionaryEntryValues struct {
+	Key   Value
+	Value Value
+}
+
+// EventValue
+
+type EventValue struct {
+	ID             string
+	Fields         []EventField
+	ImportLocation ast.ImportLocation
+}
+
+func (EventValue) isValue() {}
+
+func (v EventValue) Copy() Value {
+	fields := make([]EventField, len(v.Fields))
+	for i, field := range v.Fields {
+		fields[i] = EventField{
+			Identifier: field.Identifier,
+			Value:      field.Value.Copy(),
+		}
+	}
+
+	return EventValue{
+		ID:     v.ID,
+		Fields: fields,
+	}
+}
+
+func (v EventValue) String() string {
+	var fields strings.Builder
+	for i, field := range v.Fields {
+		if i > 0 {
+			fields.WriteString(", ")
+		}
+		fields.WriteString(field.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
+}
+
+// EventField
+
+type EventField struct {
+	Identifier string
+	Value      Value
+}
+
+func (f EventField) String() string {
+	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
 
 // ToValue
@@ -1221,14 +1406,27 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
+// OptionalValue
+
+type OptionalValue interface {
+	Value
+	isOptionalValue()
+}
+
 // NilValue
 
 type NilValue struct{}
 
 func (NilValue) isValue() {}
 
+func (NilValue) isOptionalValue() {}
+
 func (v NilValue) Copy() Value {
 	return v
+}
+
+func (v NilValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return trampoline.Done{}
 }
 
 func (NilValue) String() string {
@@ -1247,26 +1445,20 @@ type SomeValue struct {
 
 func (SomeValue) isValue() {}
 
+func (SomeValue) isOptionalValue() {}
+
 func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
 }
 
+func (v SomeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+	return v.Value.(DestroyableValue).Destroy(interpreter, location)
+}
+
 func (v SomeValue) String() string {
 	return fmt.Sprint(v.Value)
-}
-
-// MetaTypeValue
-
-type MetaTypeValue struct {
-	Type sema.Type
-}
-
-func (MetaTypeValue) isValue() {}
-
-func (v MetaTypeValue) Copy() Value {
-	return v
 }
 
 // AnyValue
@@ -1289,14 +1481,75 @@ func (v AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// ValueWithMembers
+// StorageValue
 
-type ValueWithMembers interface {
-	GetMember(interpreter *Interpreter, name string) Value
-	SetMember(interpreter *Interpreter, name string, value Value)
+type StorageValue struct {
+	Getter func(key sema.Type) OptionalValue
+	Setter func(key sema.Type, value OptionalValue)
 }
 
-//
+func (StorageValue) isValue() {}
+
+func (v StorageValue) Copy() Value {
+	return StorageValue{
+		Getter: v.Getter,
+		Setter: v.Setter,
+	}
+}
+
+func (v StorageValue) Get(key sema.Type) Value {
+	return v.Getter(key)
+}
+
+func (v StorageValue) Set(key sema.Type, value Value) {
+	v.Setter(key, value.(OptionalValue))
+}
+
+// ReferenceValue
+
+type ReferenceValue struct {
+	Storage      StorageValue
+	IndexingType sema.Type
+}
+
+func (ReferenceValue) isValue() {}
+
+func (v ReferenceValue) Copy() Value {
+	return v
+}
+
+func (v ReferenceValue) referencedValue(locationRange LocationRange) Value {
+	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+	case SomeValue:
+		return referenced.Value
+	case NilValue:
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	default:
+		panic(errors.UnreachableError{})
+	}
+}
+
+func (v ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+	return v.referencedValue(locationRange).(MemberAccessibleValue).
+		GetMember(interpreter, locationRange, name)
+}
+
+func (v ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	v.referencedValue(locationRange).(MemberAccessibleValue).
+		SetMember(interpreter, locationRange, name, value)
+}
+
+func (v ReferenceValue) Get(locationRange LocationRange, key Value) Value {
+	return v.referencedValue(locationRange).(ValueIndexableValue).
+		Get(locationRange, key)
+}
+
+func (v ReferenceValue) Set(locationRange LocationRange, key Value, value Value) {
+	v.referencedValue(locationRange).(ValueIndexableValue).
+		Set(locationRange, key, value)
+}
 
 func init() {
 	gob.Register(VoidValue{})
@@ -1316,6 +1569,6 @@ func init() {
 	gob.Register(DictionaryValue{})
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
-	gob.Register(MetaTypeValue{})
 	gob.Register(AnyValue{})
+	gob.Register(ReferenceValue{})
 }

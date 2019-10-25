@@ -102,8 +102,9 @@ function attacher(options) {
             const language = node.lang.split(',')[0]
 
             const grammar = await highlighter.getLanguageGrammar(language)
-            if (!grammar)
-                return
+            if (!grammar) {
+                throw new Error('Failed to load language grammar')
+            }
 
             const highlighted =
                 highlighter.highlight(node.value, grammar)

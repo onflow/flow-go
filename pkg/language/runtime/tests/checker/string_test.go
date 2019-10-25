@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckCharacter(t *testing.T) {
@@ -15,7 +17,10 @@ func TestCheckCharacter(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.CharacterType{})
+	assert.Equal(t,
+		&sema.CharacterType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckCharacterUnicodeScalar(t *testing.T) {
@@ -26,7 +31,10 @@ func TestCheckCharacterUnicodeScalar(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.CharacterType{})
+	assert.Equal(t,
+		&sema.CharacterType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckString(t *testing.T) {
@@ -37,7 +45,10 @@ func TestCheckString(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t, checker.GlobalValues["x"].Type, &sema.StringType{})
+	assert.Equal(t,
+		&sema.StringType{},
+		checker.GlobalValues["x"].Type,
+	)
 }
 
 func TestCheckStringConcat(t *testing.T) {

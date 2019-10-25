@@ -28,13 +28,14 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 	testType := condition.Test.Accept(checker).(Type)
 
-	if !IsInvalidType(testType) && !IsSubType(testType, &BoolType{}) {
+	if !testType.IsInvalidType() &&
+		!IsSubType(testType, &BoolType{}) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},
 				ActualType:   testType,
-				StartPos:     condition.Test.StartPosition(),
-				EndPos:       condition.Test.EndPosition(),
+				Range:        ast.NewRangeFromPositioned(condition.Test),
 			},
 		)
 	}
@@ -45,15 +46,14 @@ func (checker *Checker) VisitCondition(condition *ast.Condition) ast.Repr {
 
 		messageType := condition.Message.Accept(checker).(Type)
 
-		if !IsInvalidType(messageType) &&
+		if !messageType.IsInvalidType() &&
 			!IsSubType(messageType, &StringType{}) {
 
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: &StringType{},
 					ActualType:   testType,
-					StartPos:     condition.Message.StartPosition(),
-					EndPos:       condition.Message.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(condition.Message),
 				},
 			)
 		}

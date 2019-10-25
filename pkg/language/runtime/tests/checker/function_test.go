@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckReferenceInFunction(t *testing.T) {
@@ -153,6 +155,19 @@ func TestCheckParameterRedeclaration(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckInvalidParameterAssignment(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test(a: Int) {
+          a = 1
+      }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+}
+
 func TestCheckInvalidArgumentLabelRedeclaration(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -184,4 +199,93 @@ func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {}
+
+      fun makeKittyCloner(): ((): <-Kitty) {
+          let kitty <- create Kitty()
+          return fun (): <-Kitty {
+              return <-kitty
+          }
+      }
+
+      let test = makeKittyCloner()
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
+
+func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {}
+
+      fun makeKittyCloner(kitty: <-Kitty): ((): <-Kitty) {
+          return fun (): <-Kitty {
+              return <-kitty
+          }
+      }
+
+      let test = makeKittyCloner(kitty: <-create Kitty())
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
+
+func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {
+          fun makeCloner(): ((): <-Kitty) {
+              return fun (): <-Kitty {
+                  return <-self
+              }
+          }
+      }
+
+      let kitty <- create Kitty()
+      let test = kitty.makeCloner()
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
+
+func TestCheckInvalidResourceCapturingJustMemberAccess(t *testing.T) {
+	// Resource capturing even just for read access (e.g. reading a member) is invalid
+
+	_, err := ParseAndCheck(t, `
+      resource Kitty {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun makeKittyIdGetter(): ((): Int) {
+          let kitty <- create Kitty(id: 1)
+          let getId = fun (): Int {
+              return kitty.id
+          }
+          destroy kitty
+          return getId
+      }
+
+      let test = makeKittyIdGetter()
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }

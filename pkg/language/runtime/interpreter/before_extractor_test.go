@@ -1,8 +1,9 @@
 package interpreter
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
@@ -12,7 +13,7 @@ func TestBeforeExtractor(t *testing.T) {
 
 	expression, inputIsComplete, err := parser.ParseExpression(`
         before(x + before(y)) + z
-	`)
+    `)
 
 	assert.True(t, inputIsComplete)
 

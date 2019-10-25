@@ -116,12 +116,22 @@ func (cssr *CollectServiceServerRegistry) GetCollection(ctx context.Context, pay
 	return respByte, respErr
 }
 
-func (cssr *CollectServiceServerRegistry) MessageTypes() map[string]gnode.HandleFunc {
-	return map[string]gnode.HandleFunc{
-		"Ping":              cssr.Ping,
-		"SubmitTransaction": cssr.SubmitTransaction,
-		"SubmitCollection":  cssr.SubmitCollection,
-		"GetTransaction":    cssr.GetTransaction,
-		"GetCollection":     cssr.GetCollection,
+func (cssr *CollectServiceServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
+	return map[uint64]gnode.HandleFunc{
+		0: cssr.Ping,
+		1: cssr.SubmitTransaction,
+		2: cssr.SubmitCollection,
+		3: cssr.GetTransaction,
+		4: cssr.GetCollection,
+	}
+}
+
+func (cssr *CollectServiceServerRegistry) NameMapping() map[string]uint64 {
+	return map[string]uint64{
+		"Ping":              0,
+		"SubmitTransaction": 1,
+		"SubmitCollection":  2,
+		"GetTransaction":    3,
+		"GetCollection":     4,
 	}
 }

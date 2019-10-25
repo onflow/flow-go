@@ -4,24 +4,18 @@ type Parameter struct {
 	Label          string
 	Identifier     Identifier
 	TypeAnnotation *TypeAnnotation
-	StartPos       Position
-	EndPos         Position
+	Range
 }
 
-func (p *Parameter) StartPosition() Position {
-	return p.StartPos
+type ParameterList struct {
+	Parameters []*Parameter
+	Range
 }
 
-func (p *Parameter) EndPosition() Position {
-	return p.EndPos
-}
+func (l *ParameterList) ArgumentLabels() []string {
+	argumentLabels := make([]string, len(l.Parameters))
 
-type Parameters []*Parameter
-
-func (parameters Parameters) ArgumentLabels() []string {
-	argumentLabels := make([]string, len(parameters))
-
-	for i, parameter := range parameters {
+	for i, parameter := range l.Parameters {
 		argumentLabel := parameter.Label
 		// if no argument label is given, the parameter name
 		// is used as the argument labels and is required

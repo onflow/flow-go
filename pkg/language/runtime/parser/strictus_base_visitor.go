@@ -59,11 +59,15 @@ func (v *BaseStrictusVisitor) VisitCompositeKind(ctx *CompositeKindContext) inte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseStrictusVisitor) VisitInitializer(ctx *InitializerContext) interface{} {
+func (v *BaseStrictusVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseStrictusVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -159,11 +163,19 @@ func (v *BaseStrictusVisitor) VisitWhileStatement(ctx *WhileStatementContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseStrictusVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseStrictusVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseStrictusVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitSwap(ctx *SwapContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -260,6 +272,10 @@ func (v *BaseStrictusVisitor) VisitCreateExpression(ctx *CreateExpressionContext
 }
 
 func (v *BaseStrictusVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseStrictusVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

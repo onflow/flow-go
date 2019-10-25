@@ -1,6 +1,9 @@
 package sema
 
-import "github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+import (
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
+)
 
 func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
 	identifier := expression.Identifier
@@ -10,22 +13,96 @@ func (checker *Checker) VisitIdentifierExpression(expression *ast.IdentifierExpr
 	}
 
 	if variable.Type.IsResourceType() {
-		resourceInfo := checker.resources.Get(variable)
-
-		if resourceInfo.Invalidations.Size() > 0 {
-			checker.report(
-				&ResourceUseAfterInvalidationError{
-					Name:          expression.Identifier.Identifier,
-					Pos:           expression.Identifier.Pos,
-					Invalidations: resourceInfo.Invalidations.All(),
-				},
-			)
-		}
-
+		checker.checkResourceVariableCapturingInFunction(variable, expression.Identifier)
+		checker.checkResourceUseAfterInvalidation(variable, expression.Identifier)
 		checker.resources.AddUse(variable, expression.Pos)
 	}
 
+	checker.checkSelfVariableUseInInitializer(variable, expression.Pos)
+
 	return variable.Type
+}
+
+// checkSelfVariableUseInInitializer checks uses of `self` in the initializer
+// and ensures it is properly initialized
+//
+func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, position ast.Position) {
+
+	// Is this a use of `self`?
+
+	if variable.DeclarationKind != common.DeclarationKindSelf {
+		return
+	}
+
+	// Is this use of `self` in an initializer?
+
+	initializationInfo := checker.functionActivations.Current().InitializationInfo
+	if initializationInfo == nil {
+		return
+	}
+
+	// The use of `self` is inside the initializer
+
+	checkInitializationComplete := func() {
+		if initializationInfo.InitializationComplete() {
+			return
+		}
+
+		checker.report(
+			&UninitializedUseError{
+				Name: variable.Identifier,
+				Pos:  position,
+			},
+		)
+	}
+
+	if checker.currentMemberExpression != nil {
+
+		// The use of `self` is inside a member access
+
+		// If the member expression refers to a field that must be initialized,
+		// it must be initialized. This check is handled in `VisitMemberExpression`
+
+		// Otherwise, the member access is to a non-field, e.g. a function,
+		// in which case *all* fields must have been initialized
+
+		selfFieldMember := checker.selfFieldAccessMember(checker.currentMemberExpression)
+		field := initializationInfo.FieldMembers[selfFieldMember]
+
+		if field == nil {
+			checkInitializationComplete()
+		}
+
+	} else {
+		// The use of `self` is *not* inside a member access, i.e. `self` is used
+		// as a standalone expression, e.g. to pass it as an argument to a function.
+		// Ensure that *all* fields were initialized
+
+		checkInitializationComplete()
+	}
+}
+
+// checkResourceVariableCapturingInFunction checks if a resource variable is captured in a function
+//
+func (checker *Checker) checkResourceVariableCapturingInFunction(variable *Variable, useIdentifier ast.Identifier) {
+	currentFunctionDepth := -1
+	currentFunctionActivation := checker.functionActivations.Current()
+	if currentFunctionActivation != nil {
+		currentFunctionDepth = currentFunctionActivation.ValueActivationDepth
+	}
+
+	if currentFunctionDepth == -1 ||
+		variable.Depth > currentFunctionDepth {
+
+		return
+	}
+
+	checker.report(
+		&ResourceCapturingError{
+			Name: useIdentifier.Identifier,
+			Pos:  useIdentifier.Pos,
+		},
+	)
 }
 
 func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
@@ -36,8 +113,7 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 
 		checker.report(
 			&ResourceLossError{
-				StartPos: statement.Expression.StartPosition(),
-				EndPos:   statement.Expression.EndPosition(),
+				Range: ast.NewRangeFromPositioned(statement.Expression),
 			},
 		)
 	}
@@ -65,59 +141,160 @@ func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) 
 }
 
 func (checker *Checker) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
-	return checker.visitIndexingExpression(expression.Expression, expression.Index, false)
+	elementType, _ := checker.visitIndexExpression(expression, false)
+	return elementType
 }
 
-// visitIndexingExpression checks if the indexed expression is indexable,
+// visitIndexExpression checks if the indexed expression is indexable,
 // checks if the indexing expression can be used to index into the indexed expression,
 // and returns the expected element type
 //
-func (checker *Checker) visitIndexingExpression(
-	indexedExpression ast.Expression,
-	indexingExpression ast.Expression,
+func (checker *Checker) visitIndexExpression(
+	indexExpression *ast.IndexExpression,
 	isAssignment bool,
-) Type {
+) (elementType Type, targetType Type) {
 
-	indexedType := indexedExpression.Accept(checker).(Type)
-	indexingType := indexingExpression.Accept(checker).(Type)
+	targetExpression := indexExpression.TargetExpression
+	targetType = targetExpression.Accept(checker).(Type)
 
 	// NOTE: check indexed type first for UX reasons
 
 	// check indexed expression's type is indexable
 	// by getting the expected element
 
-	if IsInvalidType(indexedType) {
-		return &InvalidType{}
+	if targetType.IsInvalidType() {
+		elementType = &InvalidType{}
+		return
 	}
 
-	elementType := IndexableElementType(indexedType, isAssignment)
-	if elementType == nil {
-		elementType = &InvalidType{}
+	defer func() {
+		checker.checkAccessResourceLoss(elementType, targetExpression)
+	}()
 
+	reportNotIndexableType := func() {
 		checker.report(
 			&NotIndexableTypeError{
-				Type:     indexedType,
-				StartPos: indexedExpression.StartPosition(),
-				EndPos:   indexedExpression.EndPosition(),
+				Type:  targetType,
+				Range: ast.NewRangeFromPositioned(targetExpression),
 			},
 		)
-	} else {
 
-		// check indexing expression's type can be used to index
-		// into indexed expression's type
+		// set the return value properly
+		elementType = &InvalidType{}
+	}
 
-		if !IsInvalidType(indexingType) &&
-			!IsIndexingType(indexingType, indexedType) {
+	switch indexedType := targetType.(type) {
+	case TypeIndexableType:
 
+		indexingType := indexExpression.IndexingType
+
+		// indexing into type-indexable using expression?
+		if indexExpression.IndexingExpression != nil {
+
+			// The parser may have parsed a type as an expression,
+			// because some type forms are also valid expression forms,
+			// and the parser can't disambiguate them.
+			// Attempt to convert the expression to a type
+
+			indexingType = ast.ExpressionAsType(indexExpression.IndexingExpression)
+			if indexingType == nil {
+				checker.report(
+					&InvalidTypeIndexingError{
+						Range: ast.NewRangeFromPositioned(indexExpression.IndexingExpression),
+					},
+				)
+
+				elementType = &InvalidType{}
+				return
+			}
+		}
+
+		elementType = checker.visitTypeIndexingExpression(
+			indexedType,
+			indexExpression,
+			indexingType,
+			isAssignment,
+		)
+		return
+
+	case ValueIndexableType:
+
+		// Check if the type instance is actually indexable. For most types (e.g. arrays and dictionaries)
+		// this is known statically (in the sense of this host language (Go), not the implemented language),
+		// i.e. a Go type switch would be sufficient.
+		// However, for some types (e.g. reference types) this depends on what type is referenced
+
+		if !indexedType.isValueIndexableType() {
+			reportNotIndexableType()
+			return
+		}
+
+		// indexing into value-indexable value using type?
+		if indexExpression.IndexingType != nil {
 			checker.report(
-				&NotIndexingTypeError{
-					Type:     indexingType,
-					StartPos: indexingExpression.StartPosition(),
-					EndPos:   indexingExpression.EndPosition(),
+				&InvalidIndexingError{
+					Range: ast.NewRangeFromPositioned(indexExpression.IndexingType),
 				},
 			)
+
+			elementType = &InvalidType{}
+			return
 		}
+
+		elementType = checker.visitValueIndexingExpression(
+			targetExpression,
+			indexedType,
+			indexExpression.IndexingExpression,
+			isAssignment,
+		)
+		return
+
+	default:
+		reportNotIndexableType()
+		return
+	}
+}
+
+func (checker *Checker) visitValueIndexingExpression(
+	indexedExpression ast.Expression,
+	indexedType ValueIndexableType,
+	indexingExpression ast.Expression,
+	isAssignment bool,
+) Type {
+	indexingType := indexingExpression.Accept(checker).(Type)
+
+	elementType := indexedType.ElementType(isAssignment)
+
+	// check indexing expression's type can be used to index
+	// into indexed expression's type
+
+	if !indexingType.IsInvalidType() &&
+		!IsSubType(indexingType, indexedType.IndexingType()) {
+
+		checker.report(
+			&NotIndexingTypeError{
+				Type:  indexingType,
+				Range: ast.NewRangeFromPositioned(indexingExpression),
+			},
+		)
 	}
 
 	return elementType
+}
+
+func (checker *Checker) visitTypeIndexingExpression(
+	indexedType TypeIndexableType,
+	indexExpression *ast.IndexExpression,
+	indexingType ast.Type,
+	isAssignment bool,
+) Type {
+
+	keyType := checker.ConvertType(indexingType)
+	if keyType.IsInvalidType() {
+		return &InvalidType{}
+	}
+
+	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
+
+	return indexedType.ElementType(keyType, isAssignment)
 }

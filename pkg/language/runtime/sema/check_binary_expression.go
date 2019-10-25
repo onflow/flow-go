@@ -6,75 +6,109 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 )
 
-func (checker *Checker) visitBinaryOperation(expr *ast.BinaryExpression) (left, right Type) {
-	left = expr.Left.Accept(checker).(Type)
-	right = expr.Right.Accept(checker).(Type)
-	return
-}
-
 func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) ast.Repr {
 
-	leftType, rightType := checker.visitBinaryOperation(expression)
+	// The left-hand side is always evaluated.
+	// However, the right-hand side might not necessarily be evaluated,
+	// e.g. in boolean logic or in nil-coalescing
 
-	leftIsInvalid := IsInvalidType(leftType)
-	rightIsInvalid := IsInvalidType(rightType)
-	anyInvalid := leftIsInvalid || rightIsInvalid
+	leftType := expression.Left.Accept(checker).(Type)
+	leftIsInvalid := leftType.IsInvalidType()
 
 	operation := expression.Operation
 	operationKind := binaryOperationKind(operation)
 
-	switch operationKind {
-	case BinaryOperationKindIntegerArithmetic,
-		BinaryOperationKindIntegerComparison:
-
-		return checker.checkBinaryExpressionIntegerArithmeticOrComparison(
-			expression, operation, operationKind,
-			leftType, rightType,
-			leftIsInvalid, rightIsInvalid, anyInvalid,
-		)
-
-	case BinaryOperationKindEquality:
-
-		return checker.checkBinaryExpressionEquality(
-			expression, operation, operationKind,
-			leftType, rightType,
-			leftIsInvalid, rightIsInvalid, anyInvalid,
-		)
-
-	case BinaryOperationKindBooleanLogic:
-
-		return checker.checkBinaryExpressionBooleanLogic(
-			expression, operation, operationKind,
-			leftType, rightType,
-			leftIsInvalid, rightIsInvalid, anyInvalid,
-		)
-
-	case BinaryOperationKindNilCoalescing:
-		resultType := checker.checkBinaryExpressionNilCoalescing(
-			expression, operation, operationKind,
-			leftType, rightType,
-			leftIsInvalid, rightIsInvalid, anyInvalid,
-		)
-
-		checker.Elaboration.BinaryExpressionResultTypes[expression] = resultType
-		checker.Elaboration.BinaryExpressionRightTypes[expression] = rightType
-
-		return resultType
-
-	case BinaryOperationKindConcatenation:
-		return checker.checkBinaryExpressionConcatenation(
-			expression, operation, operationKind,
-			leftType, rightType,
-			leftIsInvalid, rightIsInvalid, anyInvalid,
-		)
+	unsupportedOperation := func() Type {
+		panic(&unsupportedOperation{
+			kind:      common.OperationKindBinary,
+			operation: operation,
+			Range:     ast.NewRangeFromPositioned(expression),
+		})
 	}
 
-	panic(&unsupportedOperation{
-		kind:      common.OperationKindBinary,
-		operation: operation,
-		startPos:  expression.StartPosition(),
-		endPos:    expression.EndPosition(),
-	})
+	switch operationKind {
+	case BinaryOperationKindIntegerArithmetic,
+		BinaryOperationKindIntegerComparison,
+		BinaryOperationKindEquality,
+		BinaryOperationKindConcatenation:
+
+		// Right hand side will always be evaluated
+
+		rightType := expression.Right.Accept(checker).(Type)
+		rightIsInvalid := rightType.IsInvalidType()
+
+		anyInvalid := leftIsInvalid || rightIsInvalid
+
+		switch operationKind {
+		case BinaryOperationKindIntegerArithmetic,
+			BinaryOperationKindIntegerComparison:
+
+			return checker.checkBinaryExpressionIntegerArithmeticOrComparison(
+				expression, operation, operationKind,
+				leftType, rightType,
+				leftIsInvalid, rightIsInvalid, anyInvalid,
+			)
+
+		case BinaryOperationKindEquality:
+
+			return checker.checkBinaryExpressionEquality(
+				expression, operation, operationKind,
+				leftType, rightType,
+				leftIsInvalid, rightIsInvalid, anyInvalid,
+			)
+
+		case BinaryOperationKindConcatenation:
+			return checker.checkBinaryExpressionConcatenation(
+				expression, operation, operationKind,
+				leftType, rightType,
+				leftIsInvalid, rightIsInvalid, anyInvalid,
+			)
+
+		default:
+			return unsupportedOperation()
+		}
+
+	case BinaryOperationKindBooleanLogic,
+		BinaryOperationKindNilCoalescing:
+
+		// Right hand side will maybe be evaluated. That means that
+		// resource invalidation and returns are not definite, but only potential
+
+		rightType := checker.checkPotentiallyUnevaluated(func() Type {
+			return expression.Right.Accept(checker).(Type)
+		})
+
+		rightIsInvalid := rightType.IsInvalidType()
+
+		anyInvalid := leftIsInvalid || rightIsInvalid
+
+		switch operationKind {
+		case BinaryOperationKindBooleanLogic:
+
+			return checker.checkBinaryExpressionBooleanLogic(
+				expression, operation, operationKind,
+				leftType, rightType,
+				leftIsInvalid, rightIsInvalid, anyInvalid,
+			)
+
+		case BinaryOperationKindNilCoalescing:
+			resultType := checker.checkBinaryExpressionNilCoalescing(
+				expression, operation, operationKind,
+				leftType, rightType,
+				leftIsInvalid, rightIsInvalid, anyInvalid,
+			)
+
+			checker.Elaboration.BinaryExpressionResultTypes[expression] = resultType
+			checker.Elaboration.BinaryExpressionRightTypes[expression] = rightType
+
+			return resultType
+
+		default:
+			return unsupportedOperation()
+		}
+	default:
+		return unsupportedOperation()
+	}
 }
 
 func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
@@ -96,8 +130,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -109,8 +142,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &IntegerType{},
 					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -122,8 +154,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 					Side:         common.OperandSideRight,
 					ExpectedType: &IntegerType{},
 					ActualType:   rightType,
-					StartPos:     expression.Right.StartPosition(),
-					EndPos:       expression.Right.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -136,8 +167,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -173,8 +203,7 @@ func (checker *Checker) checkBinaryExpressionEquality(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -201,8 +230,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -214,8 +242,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &BoolType{},
 					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -227,8 +254,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 					Side:         common.OperandSideRight,
 					ExpectedType: &BoolType{},
 					ActualType:   rightType,
-					StartPos:     expression.Right.StartPosition(),
-					EndPos:       expression.Right.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -254,8 +280,7 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 					Side:         common.OperandSideLeft,
 					ExpectedType: &OptionalType{},
 					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -280,8 +305,7 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 						Side:         common.OperandSideRight,
 						ExpectedType: leftOptional,
 						ActualType:   rightType,
-						StartPos:     expression.Right.StartPosition(),
-						EndPos:       expression.Right.EndPosition(),
+						Range:        ast.NewRangeFromPositioned(expression.Right),
 					},
 				)
 			} else {
@@ -315,8 +339,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Operation: operation,
 					LeftType:  leftType,
 					RightType: rightType,
-					StartPos:  expression.StartPosition(),
-					EndPos:    expression.EndPosition(),
+					Range:     ast.NewRangeFromPositioned(expression),
 				},
 			)
 		}
@@ -328,8 +351,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Side:         common.OperandSideLeft,
 					ExpectedType: rightType,
 					ActualType:   leftType,
-					StartPos:     expression.Left.StartPosition(),
-					EndPos:       expression.Left.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
@@ -341,8 +363,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 					Side:         common.OperandSideRight,
 					ExpectedType: leftType,
 					ActualType:   rightType,
-					StartPos:     expression.Right.StartPosition(),
-					EndPos:       expression.Right.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
 			)
 		}
@@ -355,8 +376,7 @@ func (checker *Checker) checkBinaryExpressionConcatenation(
 				Operation: operation,
 				LeftType:  leftType,
 				RightType: rightType,
-				StartPos:  expression.StartPosition(),
-				EndPos:    expression.EndPosition(),
+				Range:     ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}

@@ -30,9 +30,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	peers := make([]string, 0)
+	for _, port := range portPool {
+		if port != servePort {
+			peers = append(peers, port)
+		}
+	}
+
 	// step 2: registering the grpc services if any
 	// Note: this example is not built upon any grpc service, hence we pass nil
-	node := gnode.NewNode(nil)
+
+	config := gnode.NewNodeConfig(nil, servePort, peers, 0, 10)
+	node := gnode.NewNode(config)
 
 	// step 3: passing the listener to the instance of gnode
 	go node.Serve(listener)
@@ -53,15 +62,6 @@ func main() {
 	// add the Time function to the node's registry
 	node.RegisterFunc("Time", Time)
 
-
-
-	peers := make([]string, 0)
-	for _, port := range portPool {
-		if port != servePort {
-			peers = append(peers, port)
-		}
-	}
-
 	t := time.Tick(5 * time.Second)
 
 	for {
@@ -69,7 +69,7 @@ func main() {
 		case <-t:
 			go func() {
 				log.Println("Gossiping")
-				payload := &Message{Text: []byte("Ping")}
+				payload := &Message{Text: []byte(time.Now().String())}
 				bytes, err := proto.Marshal(payload)
 				if err != nil {
 					log.Fatalf("could not marshal message: %v", err)
@@ -78,7 +78,7 @@ func main() {
 				// so you will notice that the responses returned to you will be empty
 				// (that is because AsyncGossip does not wait for the sent messages to be
 				// processed)
-				rep, err := node.SyncGossip(context.Background(), bytes, peers, "Time")
+				rep, err := node.AsyncGossip(context.Background(), bytes, peers, "Time")
 				if err != nil {
 					log.Println(err)
 				}

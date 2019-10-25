@@ -2,7 +2,6 @@ package create
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -13,8 +12,8 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/sdk/accounts"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 type Config struct {
@@ -35,20 +34,20 @@ var Cmd = &cobra.Command{
 		signerAddr := types.HexToAddress(signer.Address)
 		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
 		if err != nil {
-			utils.Exit("Failed to load signer key", 1)
+			utils.Exit(1, "Failed to load signer key")
 		}
 
 		accountKeys := make([]types.AccountKey, len(conf.Keys))
 
-		for i, privateKeyBytes := range conf.Keys {
-			privateKey, err := utils.DecodePrivateKey(privateKeyBytes)
+		for i, privateKeyStr := range conf.Keys {
+			privateKey, err := utils.DecodePrivateKey(privateKeyStr)
 			if err != nil {
-				utils.Exit("Failed to decode private key", 1)
+				utils.Exit(1, "Failed to decode private key")
 			}
 
 			publicKey, err := utils.EncodePublicKey(privateKey.Publickey())
 			if err != nil {
-				utils.Exit("Failed to encode public key", 1)
+				utils.Exit(1, "Failed to encode public key")
 			}
 
 			accountKeys[i] = types.AccountKey{
@@ -62,31 +61,32 @@ var Cmd = &cobra.Command{
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
-				utils.Exit(fmt.Sprintf("Failed to parse Cadence code from %s", conf.Code), 1)
+				utils.Exitf(1, "Failed to parse Cadence code from %s", conf.Code)
 			}
 		}
 
-		script := accounts.CreateAccount(accountKeys, code)
+		script := templates.CreateAccount(accountKeys, code)
 
 		tx := types.Transaction{
 			Script:       script,
+			Nonce:        1,
 			ComputeLimit: 10,
 			PayerAccount: signerAddr,
 		}
 
 		err = tx.AddSignature(signerAddr, signerKey)
 		if err != nil {
-			utils.Exit("Failed to sign transaction", 1)
+			utils.Exit(1, "Failed to sign transaction")
 		}
 
 		client, err := client.New("localhost:5000")
 		if err != nil {
-			utils.Exit("Failed to connect to emulator", 1)
+			utils.Exit(1, "Failed to connect to emulator")
 		}
 
 		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
-			utils.Exit("Failed to send account creation transaction", 1)
+			utils.Exit(1, "Failed to send account creation transaction")
 		}
 	},
 }

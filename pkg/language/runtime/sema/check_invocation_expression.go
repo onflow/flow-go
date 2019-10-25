@@ -6,6 +6,22 @@ import (
 )
 
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
+	typ := checker.checkInvocationExpression(invocationExpression)
+
+	// events cannot be invoked without an emit statement
+	if _, isEventType := typ.(*EventType); isEventType {
+		checker.report(
+			&InvalidEventUsageError{
+				Range: ast.NewRangeFromPositioned(invocationExpression),
+			},
+		)
+		return &InvalidType{}
+	}
+
+	return typ
+}
+
+func (checker *Checker) checkInvocationExpression(invocationExpression *ast.InvocationExpression) Type {
 	inCreate := checker.inCreate
 	checker.inCreate = false
 	defer func() {
@@ -19,27 +35,26 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	invokableType, ok := expressionType.(InvokableType)
 	if !ok {
-		if !IsInvalidType(expressionType) {
+		if !expressionType.IsInvalidType() {
 			checker.report(
 				&NotCallableError{
-					Type:     expressionType,
-					StartPos: invokedExpression.StartPosition(),
-					EndPos:   invokedExpression.EndPosition(),
+					Type:  expressionType,
+					Range: ast.NewRangeFromPositioned(invokedExpression),
 				},
 			)
 		}
 		return &InvalidType{}
 	}
 
+	// invoked expression has function type
+
 	functionType := invokableType.InvocationFunctionType()
 
 	var returnType Type = &InvalidType{}
 
-	// invoked expression has function type
-
 	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
 
-	// if the invocation refers directly to the name of the function as stated in the declaration,
+	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
 	// check that the correct argument labels are supplied in the invocation
 
@@ -66,9 +81,9 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 
 	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
-	var parameterTypes []Type
-	for _, parameterTypeAnnotation := range parameterTypeAnnotations {
-		parameterTypes = append(parameterTypes, parameterTypeAnnotation.Type)
+	parameterTypes := make([]Type, len(parameterTypeAnnotations))
+	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
+		parameterTypes[i] = parameterTypeAnnotation.Type
 	}
 	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
@@ -79,6 +94,14 @@ func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.Invo
 		inCreate,
 	)
 
+	// Update the return info for invocations that do not return (i.e. have a `Never` return type)
+
+	if returnType.Equal(&NeverType{}) {
+		functionActivation := checker.functionActivations.Current()
+		functionActivation.ReturnInfo.MaybeReturned = true
+		functionActivation.ReturnInfo.DefinitelyReturned = true
+	}
+
 	return returnType
 }
 
@@ -88,7 +111,7 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 	returnType Type,
 	inCreate bool,
 ) {
-	if _, ok := invokableType.(*ConstructorFunctionType); !ok {
+	if _, ok := invokableType.(*SpecialFunctionType); !ok {
 		return
 	}
 
@@ -107,8 +130,7 @@ func (checker *Checker) checkConstructorInvocationWithResourceResult(
 
 	checker.report(
 		&MissingCreateError{
-			StartPos: invocationExpression.StartPosition(),
-			EndPos:   invocationExpression.EndPosition(),
+			Range: ast.NewRangeFromPositioned(invocationExpression),
 		},
 	)
 }
@@ -167,8 +189,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: "",
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -179,8 +203,7 @@ func (checker *Checker) checkInvocationArgumentLabels(
 				checker.report(
 					&MissingArgumentLabelError{
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              argument.Expression.StartPosition(),
-						EndPos:                argument.Expression.EndPosition(),
+						Range:                 ast.NewRangeFromPositioned(argument.Expression),
 					},
 				)
 			} else if providedLabel != argumentLabel {
@@ -188,8 +211,10 @@ func (checker *Checker) checkInvocationArgumentLabels(
 					&IncorrectArgumentLabelError{
 						ActualArgumentLabel:   providedLabel,
 						ExpectedArgumentLabel: argumentLabel,
-						StartPos:              *argument.LabelStartPos,
-						EndPos:                *argument.LabelEndPos,
+						Range: ast.Range{
+							StartPos: *argument.LabelStartPos,
+							EndPos:   *argument.LabelEndPos,
+						},
 					},
 				)
 			}
@@ -217,8 +242,7 @@ func (checker *Checker) checkInvocationArguments(
 				&ArgumentCountError{
 					ParameterCount: parameterCount,
 					ArgumentCount:  argumentCount,
-					StartPos:       invocationExpression.StartPosition(),
-					EndPos:         invocationExpression.EndPosition(),
+					Range:          ast.NewRangeFromPositioned(invocationExpression),
 				},
 			)
 		}
@@ -229,6 +253,8 @@ func (checker *Checker) checkInvocationArguments(
 		minCount = parameterCount
 	}
 
+	argumentTypes = make([]Type, minCount)
+
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
 
@@ -237,17 +263,16 @@ func (checker *Checker) checkInvocationArguments(
 
 		argumentType := argument.Expression.Accept(checker).(Type)
 
-		argumentTypes = append(argumentTypes, argumentType)
+		argumentTypes[i] = argumentType
 
-		if !IsInvalidType(parameterType) &&
+		if !parameterType.IsInvalidType() &&
 			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: parameterType,
 					ActualType:   argumentType,
-					StartPos:     argument.Expression.StartPosition(),
-					EndPos:       argument.Expression.EndPosition(),
+					Range:        ast.NewRangeFromPositioned(argument.Expression),
 				},
 			)
 		}

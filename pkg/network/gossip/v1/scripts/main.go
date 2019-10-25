@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
 	"go/format"
+
+	"github.com/rs/zerolog"
 )
 
 func genUsage() {
@@ -17,7 +18,8 @@ func genUsage() {
 }
 
 var (
-	save = flag.Bool("w", false, "saves generated code into file")
+	save   = flag.Bool("w", false, "saves generated code into file")
+	logger = zerolog.New(os.Stdout)
 )
 
 func main() {
@@ -33,7 +35,8 @@ func main() {
 
 	generatedCode, err := generateCodeFromFile(filepath)
 	if err != nil {
-		log.Fatalf("could not generate code from given file: %v", err)
+		logger.Panic().Err(err).Msg("could not generate code from given file")
+		os.Exit(1)
 	}
 
 	if *save {
@@ -41,12 +44,14 @@ func main() {
 		file, err := os.Create(newfilename)
 
 		if err != nil {
-			log.Fatalf("could not open file %v for saving: %v", newfilename, err)
+			logger.Panic().Err(err).Msgf("could not open file %v for saving", newfilename)
+			os.Exit(1)
 		}
 
 		_, err = file.WriteString(generatedCode)
 		if err != nil {
-			log.Fatalf("could not write generated code to file %v: %v", newfilename, err)
+			logger.Panic().Err(err).Msgf("could not write generated code to file %v", newfilename)
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
@@ -71,12 +76,14 @@ type registryInfo struct {
 // generateCodeFromFile generates a gossip registry code from the given generated
 // protobuf file containing a grpc server
 func generateCodeFromFile(filepath string) (string, error) {
-	var genRegistry = ""
-	var err error = nil
+	var genRegistry string
+	var err error
 
 	file, err := os.Open(filepath)
 	if err != nil {
-		return genRegistry, fmt.Errorf("could not open file %v: %v", filepath, err)
+		err := fmt.Errorf("could not open file %v: %v", filepath, err)
+		logger.Debug().Err(err).Send()
+		return "", fmt.Errorf("could not open file %v: %v", filepath, err)
 	}
 
 	defer func() {
@@ -85,11 +92,13 @@ func generateCodeFromFile(filepath string) (string, error) {
 
 	infos, err := parseCode(file)
 	if err != nil {
+		logger.Debug().Err(err).Msgf("could not parse file %v", filepath)
 		return "", fmt.Errorf("could not parse file %v: %v", filepath, err)
 	}
 
 	genRegistry, err = generateRegistry(infos)
 	if err != nil {
+		logger.Debug().Err(err).Msgf("could not generate registry file")
 		return "", fmt.Errorf("could not generate registry: %v", err)
 	}
 
@@ -105,11 +114,13 @@ func generateRegistry(infos *fileInfo) (string, error) {
 
 	// Execute template
 	if err := registryTemplate.Execute(codeBuffWriter, infos); err != nil {
+		logger.Debug().Err(err).Send()
 		return "", fmt.Errorf("could not execute registry template: %v", err)
 	}
 
 	// Flush writer's contents
 	if err := codeBuffWriter.Flush(); err != nil {
+		logger.Debug().Err(err).Send()
 		return "", fmt.Errorf("could not flush the registry's code buffer writer : %v", err)
 	}
 
@@ -117,6 +128,7 @@ func generateRegistry(infos *fileInfo) (string, error) {
 	//	equivalent of running gofmt on generated code
 	formatedRegistry, err := format.Source(codeBuffer.Bytes())
 	if err != nil {
+		logger.Debug().Err(err).Send()
 		return "", fmt.Errorf("could not format generated registry code: %v", err)
 	}
 

@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
@@ -13,7 +15,7 @@ func TestCheckInvalidUnknownDeclarationAssignment(t *testing.T) {
       fun test() {
           x = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -27,7 +29,7 @@ func TestCheckInvalidConstantAssignment(t *testing.T) {
           let x = 2
           x = 3
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -41,7 +43,7 @@ func TestCheckAssignment(t *testing.T) {
           var x = 2
           x = 3
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -54,7 +56,7 @@ func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
       fun test() {
           x = 3
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
@@ -70,7 +72,7 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
           x = 3
           return x
       }
-	`)
+    `)
 
 	assert.Nil(t, err)
 }
@@ -81,7 +83,7 @@ func TestCheckInvalidAssignmentToParameter(t *testing.T) {
       fun test(x: Int8) {
            x = 2
       }
-	`)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
 

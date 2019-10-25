@@ -60,7 +60,33 @@ func EndPosition(startPosition Position, end int) Position {
 	return startPosition.Shifted(length)
 }
 
+// HasPosition
+
 type HasPosition interface {
 	StartPosition() Position
 	EndPosition() Position
+}
+
+// Range
+
+type Range struct {
+	StartPos Position
+	EndPos   Position
+}
+
+func (e *Range) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *Range) EndPosition() Position {
+	return e.EndPos
+}
+
+// NewRangeFromPositioned
+
+func NewRangeFromPositioned(hasPosition HasPosition) Range {
+	return Range{
+		StartPos: hasPosition.StartPosition(),
+		EndPos:   hasPosition.EndPosition(),
+	}
 }

@@ -6,7 +6,6 @@ import (
 )
 
 const ArgumentLabelNotRequired = "_"
-const InitializerIdentifier = "init"
 const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
@@ -28,25 +27,27 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program             *ast.Program
-	PredeclaredValues   map[string]ValueDeclaration
-	PredeclaredTypes    map[string]TypeDeclaration
-	ImportCheckers      map[ast.ImportLocation]*Checker
-	errors              []error
-	valueActivations    *ValueActivations
-	resources           *Resources
-	typeActivations     *TypeActivations
-	functionActivations *FunctionActivations
-	GlobalValues        map[string]*Variable
-	GlobalTypes         map[string]Type
-	inCondition         bool
-	Occurrences         *Occurrences
-	variableOrigins     map[*Variable]*Origin
-	memberOrigins       map[Type]map[string]*Origin
-	seenImports         map[ast.ImportLocation]bool
-	isChecked           bool
-	inCreate            bool
-	Elaboration         *Elaboration
+	Program                 *ast.Program
+	PredeclaredValues       map[string]ValueDeclaration
+	PredeclaredTypes        map[string]TypeDeclaration
+	ImportLocation          ast.ImportLocation
+	ImportCheckers          map[ast.LocationID]*Checker
+	errors                  []error
+	valueActivations        *ValueActivations
+	resources               *Resources
+	typeActivations         *TypeActivations
+	functionActivations     *FunctionActivations
+	GlobalValues            map[string]*Variable
+	GlobalTypes             map[string]Type
+	inCondition             bool
+	Occurrences             *Occurrences
+	variableOrigins         map[*Variable]*Origin
+	memberOrigins           map[Type]map[string]*Origin
+	seenImports             map[ast.LocationID]bool
+	isChecked               bool
+	inCreate                bool
+	Elaboration             *Elaboration
+	currentMemberExpression *ast.MemberExpression
 }
 
 func NewChecker(
@@ -55,21 +56,27 @@ func NewChecker(
 	predeclaredTypes map[string]TypeDeclaration,
 ) (*Checker, error) {
 
+	functionActivations := &FunctionActivations{}
+	functionActivations.EnterFunction(&FunctionType{
+		ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{})},
+		0,
+	)
+
 	checker := &Checker{
 		Program:             program,
 		PredeclaredValues:   predeclaredValues,
 		PredeclaredTypes:    predeclaredTypes,
-		ImportCheckers:      map[ast.ImportLocation]*Checker{},
+		ImportCheckers:      map[ast.LocationID]*Checker{},
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
-		functionActivations: &FunctionActivations{},
+		functionActivations: functionActivations,
 		GlobalValues:        map[string]*Variable{},
 		GlobalTypes:         map[string]Type{},
 		Occurrences:         NewOccurrences(),
 		variableOrigins:     map[*Variable]*Origin{},
 		memberOrigins:       map[Type]map[string]*Origin{},
-		seenImports:         map[ast.ImportLocation]bool{},
+		seenImports:         map[ast.LocationID]bool{},
 		Elaboration:         NewElaboration(),
 	}
 
@@ -115,11 +122,11 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier: identifier.Identifier,
-			Kind:       declaration.TypeDeclarationKind(),
-			IsConstant: true,
-			Type:       ty,
-			Pos:        &identifier.Pos,
+			Identifier:      identifier.Identifier,
+			DeclarationKind: declaration.TypeDeclarationKind(),
+			IsConstant:      true,
+			Type:            ty,
+			Pos:             &identifier.Pos,
 		},
 	)
 }
@@ -154,13 +161,11 @@ func (checker *Checker) checkerError() *CheckerError {
 	return nil
 }
 
-func (checker *Checker) report(errs ...error) {
-	for _, err := range errs {
-		if err == nil {
-			continue
-		}
-		checker.errors = append(checker.errors, errs...)
+func (checker *Checker) report(err error) {
+	if err == nil {
+		return
 	}
+	checker.errors = append(checker.errors, err)
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
@@ -176,7 +181,11 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
-		checker.declareFunctionDeclaration(declaration)
+		checker.declareGlobalFunctionDeclaration(declaration)
+	}
+
+	for _, declaration := range program.EventDeclarations() {
+		checker.declareEventDeclaration(declaration)
 	}
 
 	// check all declarations
@@ -187,6 +196,12 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	return nil
+}
+
+func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
+	functionType := checker.functionType(declaration.ParameterList, declaration.ReturnTypeAnnotation)
+	checker.Elaboration.FunctionDeclarationFunctionTypes[declaration] = functionType
+	checker.declareFunctionDeclaration(declaration, functionType)
 }
 
 func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
@@ -227,6 +242,32 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 
 			return true
 		}
+
+	case *ast.ArrayExpression:
+
+		// Variable sized array literals are compatible with constant sized target types
+		// if their element type matches and the element count matches
+
+		if variableSizedValueType, isVariableSizedValue :=
+			valueType.(*VariableSizedType); isVariableSizedValue {
+
+			if constantSizedTargetType, isConstantSizedTarget :=
+				targetType.(*ConstantSizedType); isConstantSizedTarget {
+
+				valueElementType := variableSizedValueType.ElementType(false)
+				targetElementType := constantSizedTargetType.ElementType(false)
+
+				// TODO: report helpful error when counts mismatch
+
+				literalCount := len(typedExpression.Values)
+
+				if IsSubType(valueElementType, targetElementType) &&
+					literalCount == constantSizedTargetType.Size {
+
+					return true
+				}
+			}
+		}
 	}
 
 	return IsSubType(valueType, targetType)
@@ -248,8 +289,7 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 				ExpectedType:     integerType,
 				ExpectedRangeMin: rangeMin,
 				ExpectedRangeMax: rangeMax,
-				StartPos:         expression.StartPosition(),
-				EndPos:           expression.EndPosition(),
+				Range:            ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
@@ -281,9 +321,15 @@ func (checker *Checker) declareGlobalType(name string) {
 }
 
 func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expression, valueType Type) {
+	// The check is only necessary for resources.
+	// Bail out early if the value is not a resource
+
 	if !valueType.IsResourceType() {
 		return
 	}
+
+	// Check the moved expression is wrapped in a unary expression with the move operation (<-).
+	// Report an error if not and bail out if it is missing or another unary operator is used
 
 	unaryExpression, ok := valueExpression.(*ast.UnaryExpression)
 	if !ok || unaryExpression.Operation != ast.OperationMove {
@@ -300,24 +346,6 @@ func (checker *Checker) checkResourceMoveOperation(valueExpression ast.Expressio
 		valueType,
 		ResourceInvalidationKindMove,
 	)
-}
-
-func (checker *Checker) resourceVariable(exp ast.Expression, valueType Type) (variable *Variable, pos ast.Position) {
-	if !valueType.IsResourceType() {
-		return
-	}
-
-	identifierExpression, ok := exp.(*ast.IdentifierExpression)
-	if !ok {
-		return
-	}
-
-	variable = checker.findAndCheckVariable(identifierExpression.Identifier, false)
-	if variable == nil {
-		return
-	}
-
-	return variable, identifierExpression.Pos
 }
 
 func (checker *Checker) inLoop() bool {
@@ -396,8 +424,8 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 		}
 
 	case *ast.OptionalType:
-		result := checker.ConvertType(t.Type)
-		return &OptionalType{result}
+		ty := checker.ConvertType(t.Type)
+		return &OptionalType{ty}
 
 	case *ast.DictionaryType:
 		keyType := checker.ConvertType(t.KeyType)
@@ -407,6 +435,10 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 			KeyType:   keyType,
 			ValueType: valueType,
 		}
+
+	case *ast.ReferenceType:
+		ty := checker.ConvertType(t.Type)
+		return &ReferenceType{ty}
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
@@ -424,11 +456,11 @@ func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation
 }
 
 func (checker *Checker) functionType(
-	parameters ast.Parameters,
+	parameterList *ast.ParameterList,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
 	convertedParameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(parameters)
+		checker.parameterTypeAnnotations(parameterList)
 
 	convertedReturnTypeAnnotation :=
 		checker.ConvertTypeAnnotation(returnTypeAnnotation)
@@ -439,11 +471,11 @@ func (checker *Checker) functionType(
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameters ast.Parameters) []*TypeAnnotation {
+func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterList) []*TypeAnnotation {
 
-	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameters))
+	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameterList.Parameters))
 
-	for i, parameter := range parameters {
+	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,
@@ -459,7 +491,7 @@ func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.P
 	if !ok {
 		origin = &Origin{
 			Type:            variable.Type,
-			DeclarationKind: variable.Kind,
+			DeclarationKind: variable.DeclarationKind,
 			StartPos:        variable.Pos,
 			// TODO:
 			EndPos: variable.Pos,
@@ -546,14 +578,16 @@ func (checker *Checker) checkResourceLoss(depth int) {
 		// TODO: handle `self` and `result` properly
 
 		if variable.Type.IsResourceType() &&
-			variable.Kind != common.DeclarationKindSelf &&
-			variable.Kind != common.DeclarationKindResult &&
+			variable.DeclarationKind != common.DeclarationKindSelf &&
+			variable.DeclarationKind != common.DeclarationKindResult &&
 			!checker.resources.Get(variable).DefinitivelyInvalidated {
 
 			checker.report(
 				&ResourceLossError{
-					StartPos: *variable.Pos,
-					EndPos:   variable.Pos.Shifted(len(name) - 1),
+					Range: ast.Range{
+						StartPos: *variable.Pos,
+						EndPos:   variable.Pos.Shifted(len(name) - 1),
+					},
 				},
 			)
 
@@ -567,21 +601,66 @@ func (checker *Checker) withValueScope(f func()) {
 	f()
 }
 
-func (checker *Checker) recordResourceInvalidation(exp ast.Expression, valueType Type, kind ResourceInvalidationKind) {
-	variable, pos := checker.resourceVariable(exp, valueType)
+func (checker *Checker) recordResourceInvalidation(
+	expression ast.Expression,
+	valueType Type,
+	kind ResourceInvalidationKind,
+) {
+	if !valueType.IsResourceType() {
+		return
+	}
+
+	reportInvalidNestedMove := func() {
+		checker.report(
+			&InvalidNestedMoveError{
+				StartPos: expression.StartPosition(),
+				EndPos:   expression.EndPosition(),
+			},
+		)
+	}
+
+	// TODO: improve handling of `self`: only allow invalidation once
+
+	selfFieldMember := checker.selfFieldAccessMember(expression)
+
+	switch expression.(type) {
+	case *ast.MemberExpression:
+		if selfFieldMember == nil {
+			reportInvalidNestedMove()
+			return
+		}
+
+	case *ast.IndexExpression:
+		reportInvalidNestedMove()
+		return
+	}
+
+	invalidation := ResourceInvalidation{
+		Kind:     kind,
+		StartPos: expression.StartPosition(),
+		EndPos:   expression.EndPosition(),
+	}
+
+	if selfFieldMember != nil {
+		checker.resources.AddInvalidation(selfFieldMember, invalidation)
+		return
+	}
+
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
+	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
 	}
-	checker.resources.AddInvalidation(variable,
-		ResourceInvalidation{
-			Kind: kind,
-			Pos:  pos,
-		},
-	)
+
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(
-	check func() Type,
+	check TypeCheckFunc,
 	temporaryResources *Resources,
 ) Type {
 	originalResources := checker.resources
@@ -591,4 +670,147 @@ func (checker *Checker) checkWithResources(
 	}()
 
 	return check()
+}
+
+func (checker *Checker) checkWithReturnInfo(
+	check TypeCheckFunc,
+	temporaryReturnInfo *ReturnInfo,
+) Type {
+	functionActivation := checker.functionActivations.Current()
+	initialReturnInfo := functionActivation.ReturnInfo
+	functionActivation.ReturnInfo = temporaryReturnInfo
+	defer func() {
+		functionActivation.ReturnInfo = initialReturnInfo
+	}()
+
+	return check()
+}
+
+func (checker *Checker) checkWithInitializedMembers(
+	check TypeCheckFunc,
+	temporaryInitializedMembers *MemberSet,
+) Type {
+	if temporaryInitializedMembers != nil {
+		functionActivation := checker.functionActivations.Current()
+		initializationInfo := functionActivation.InitializationInfo
+		initialInitializedMembers := initializationInfo.InitializedFieldMembers
+		initializationInfo.InitializedFieldMembers = temporaryInitializedMembers
+		defer func() {
+			initializationInfo.InitializedFieldMembers = initialInitializedMembers
+		}()
+	}
+
+	return check()
+}
+
+// checkAccessResourceLoss checks for a resource loss caused by an expression which is accessed
+// (indexed or member). This is basically any expression that does not have an identifier
+// as its "base" expression.
+//
+// For example, function invocations, array literals, or dictionary literals will cause a resource loss
+// if the expression is accessed immediately: e.g.
+//   - `returnResource()[0]`
+//   - `[<-create R(), <-create R()][0]`,
+//   - `{"resource": <-create R()}.length`
+//
+// Safe expressions are identifier expressions, an indexing expression into a safe expression,
+// or a member access on a safe expression.
+//
+func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression ast.Expression) {
+	if !expressionType.IsResourceType() {
+		return
+	}
+
+	// Get the base expression of the given expression, i.e. get the accessed expression
+	// as long as there is one.
+	//
+	// For example, in the expression `foo[0].bar`, both the wrapping member access
+	// expression `bar` and the wrapping indexing expression `[0]` are removed,
+	// leaving the base expression `foo`
+
+	baseExpression := expression
+
+	for {
+		accessExpression, isAccess := baseExpression.(ast.AccessExpression)
+		if !isAccess {
+			break
+		}
+		baseExpression = accessExpression.AccessedExpression()
+	}
+
+	if _, isIdentifier := baseExpression.(*ast.IdentifierExpression); isIdentifier {
+		return
+	}
+
+	checker.report(
+		&ResourceLossError{
+			Range: ast.NewRangeFromPositioned(expression),
+		},
+	)
+}
+
+// checkResourceFieldNesting checks if any resource fields are nested
+// in non resource composites (concrete or interface)
+//
+func (checker *Checker) checkResourceFieldNesting(
+	fields map[string]*ast.FieldDeclaration,
+	members map[string]*Member,
+	compositeKind common.CompositeKind,
+) {
+	if compositeKind == common.CompositeKindResource {
+		return
+	}
+
+	for name, member := range members {
+		if !member.Type.IsResourceType() {
+			continue
+		}
+
+		field := fields[name]
+
+		checker.report(
+			&InvalidResourceFieldError{
+				Name: name,
+				Pos:  field.Identifier.Pos,
+			},
+		)
+	}
+}
+
+// checkPotentiallyUnevaluated runs the given type checking function
+// under the assumption that the checked expression might not be evaluated.
+// That means that resource invalidation and returns are not definite,
+// but only potential
+//
+func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
+	functionActivation := checker.functionActivations.Current()
+
+	initialReturnInfo := functionActivation.ReturnInfo
+	temporaryReturnInfo := initialReturnInfo.Clone()
+
+	var temporaryInitializedMembers *MemberSet
+	if functionActivation.InitializationInfo != nil {
+		initialInitializedMembers := functionActivation.InitializationInfo.InitializedFieldMembers
+		temporaryInitializedMembers = initialInitializedMembers.Clone()
+	}
+
+	initialResources := checker.resources
+	temporaryResources := initialResources.Clone()
+
+	result := checker.checkBranch(
+		check,
+		temporaryReturnInfo,
+		temporaryInitializedMembers,
+		temporaryResources,
+	)
+
+	functionActivation.ReturnInfo.MaybeReturned =
+		functionActivation.ReturnInfo.MaybeReturned ||
+			temporaryReturnInfo.MaybeReturned
+
+	// NOTE: the definitive return state does not change
+
+	checker.resources.MergeBranches(temporaryResources, nil)
+
+	return result
 }

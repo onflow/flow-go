@@ -50,11 +50,14 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#compositeKind.
 	VisitCompositeKind(ctx *CompositeKindContext) interface{}
 
-	// Visit a parse tree produced by StrictusParser#initializer.
-	VisitInitializer(ctx *InitializerContext) interface{}
+	// Visit a parse tree produced by StrictusParser#specialFunctionDeclaration.
+	VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#functionDeclaration.
 	VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#eventDeclaration.
+	VisitEventDeclaration(ctx *EventDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#parameterList.
 	VisitParameterList(ctx *ParameterListContext) interface{}
@@ -125,11 +128,17 @@ type StrictusVisitor interface {
 	// Visit a parse tree produced by StrictusParser#whileStatement.
 	VisitWhileStatement(ctx *WhileStatementContext) interface{}
 
+	// Visit a parse tree produced by StrictusParser#emitStatement.
+	VisitEmitStatement(ctx *EmitStatementContext) interface{}
+
 	// Visit a parse tree produced by StrictusParser#variableDeclaration.
 	VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#assignment.
 	VisitAssignment(ctx *AssignmentContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#swap.
+	VisitSwap(ctx *SwapContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#transfer.
 	VisitTransfer(ctx *TransferContext) interface{}
@@ -202,6 +211,9 @@ type StrictusVisitor interface {
 
 	// Visit a parse tree produced by StrictusParser#destroyExpression.
 	VisitDestroyExpression(ctx *DestroyExpressionContext) interface{}
+
+	// Visit a parse tree produced by StrictusParser#referenceExpression.
+	VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{}
 
 	// Visit a parse tree produced by StrictusParser#identifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
