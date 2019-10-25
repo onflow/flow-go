@@ -11,10 +11,35 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/module/model"
 )
 
+var (
+	idParser = regexp.MustCompile(`^(\w+)-(\w+)@([\w\.]+:\d{1,5})$`)
+)
+
 // Committee represents the table of staked nodes in the flow system.
 type Committee struct {
 	me    *model.Node
 	nodes map[string]*model.Node
+}
+
+// EntryToFields takes the a committee entry and returns the node identity.
+// > EntryToId("consensus-consensus1@localhost:7297")
+// "consensus", "consensus1", "localhost:7297", nil
+func EntryToFields(entry string) (string, string, string, error) {
+	// try to parse the nodes
+	fields := idParser.FindStringSubmatch(entry)
+	if fields == nil {
+		return "", "", "", errors.Errorf("invalid node entry (%s)", entry)
+	}
+
+	role := fields[1]
+	id := fields[2]
+	address := fields[3]
+	return role, id, address, nil
+}
+
+func EntryToId(entry string) (string, error) {
+	_, id, _, err := EntryToFields(entry)
+	return id, err
 }
 
 // New generates a new committee of consensus nodes.
@@ -26,17 +51,15 @@ func New(entries []string, identity string) (*Committee, error) {
 	}
 
 	// try to parse the nodes
-	rx := regexp.MustCompile(`^(\w+)-(\w+)@([\w\.]+:\d{1,5})$`)
 	for _, entry := range entries {
 
 		// try to parse the expression
-		fields := rx.FindStringSubmatch(entry)
-		if fields == nil {
+		role, id, address, err := EntryToFields(entry)
+		if err != nil {
 			return nil, errors.Errorf("invalid node entry (%s)", entry)
 		}
 
 		// check for duplicates
-		id := fields[2]
 		_, ok := c.nodes[id]
 		if ok {
 			return nil, errors.Errorf("duplicate node identity (%s)", id)
@@ -44,9 +67,9 @@ func New(entries []string, identity string) (*Committee, error) {
 
 		// add entry to identity table
 		node := &model.Node{
-			ID:      fields[2],
-			Role:    fields[1],
-			Address: fields[3],
+			ID:      id,
+			Role:    role,
+			Address: address,
 		}
 		c.nodes[id] = node
 	}
