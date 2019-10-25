@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -68,24 +69,26 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to generate transaction script")
 		}
 
-		tx := types.Transaction{
+		tx := &types.Transaction{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,
 			PayerAccount: signerAddr,
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		sig, err := keys.SignTransaction(tx, signerKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}
+
+		tx.AddSignature(signerAddr, sig)
 
 		client, err := client.New("localhost:5000")
 		if err != nil {
 			utils.Exit(1, "Failed to connect to emulator")
 		}
 
-		err = client.SendTransaction(context.Background(), tx)
+		err = client.SendTransaction(context.Background(), *tx)
 		if err != nil {
 			utils.Exit(1, "Failed to send account creation transaction")
 		}

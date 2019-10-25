@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := types.Transaction{
+		tx := &types.Transaction{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
@@ -51,17 +52,19 @@ var Cmd = &cobra.Command{
 			ScriptAccounts: []types.Address{signerAddr},
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		sig, err := keys.SignTransaction(tx, signerKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}
+
+		tx.AddSignature(signerAddr, sig)
 
 		client, err := client.New("localhost:5000")
 		if err != nil {
 			utils.Exit(1, "Failed to connect to emulator")
 		}
 
-		err = client.SendTransaction(context.Background(), tx)
+		err = client.SendTransaction(context.Background(), *tx)
 		if err != nil {
 			utils.Exitf(1, "Failed to send transaction: %v", err)
 		}
