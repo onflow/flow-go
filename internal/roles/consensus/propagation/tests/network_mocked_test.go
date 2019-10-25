@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/model/collection"
 	"github.com/dapperlabs/flow-go/pkg/module/committee"
 	"github.com/dapperlabs/flow-go/pkg/module/mempool"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/mocks"
+	"github.com/dapperlabs/flow-go/pkg/network/mock"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -18,14 +18,14 @@ import (
 type mockPropagationNode struct {
 	// the real engine to be tested
 	engine *propagation.Engine
-	// a mocked network layer in order for the MockHub to route events in memory to a targeted node
-	net *mocks.MockNetwork
+	// a mocked network layer in order for the Hub to route events in memory to a targeted node
+	net *mock.Network
 	// the state of the engine, exposed in order for tests to assert
 	pool *mempool.Mempool
 }
 
 // newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
-func newMockPropagationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int) (*mockPropagationNode, error) {
+func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*mockPropagationNode, error) {
 	if nodeIndex >= len(allNodes) {
 		return nil, errors.Errorf("nodeIndex is out of range: %v", nodeIndex)
 	}
@@ -49,7 +49,7 @@ func newMockPropagationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int
 		return nil, err
 	}
 
-	net, err := mocks.NewNetwork(com, hub)
+	net, err := mock.NewNetwork(com, hub)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +66,12 @@ func newMockPropagationNode(hub *mocks.MockHub, allNodes []string, nodeIndex int
 	}, nil
 }
 
-func createConnectedNodes(nodeEntries []string) (*mocks.MockHub, []*mockPropagationNode, error) {
+func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
 	if len(nodeEntries) == 0 {
 		return nil, nil, errors.New("NodeEntries must not be empty")
 	}
 
-	hub := mocks.NewNetworkHub()
+	hub := mock.NewNetworkHub()
 
 	nodes := make([]*mockPropagationNode, 0)
 	for i := range nodeEntries {

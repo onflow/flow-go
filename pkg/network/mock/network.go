@@ -1,4 +1,4 @@
-package mocks
+package mock
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/module"
@@ -6,12 +6,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MockNetwork is a mocked network layer made for testing Engine's behavior.
-// When an Engine is installed on a MockNetwork, the mocked network will deliver
+// Network is a mocked network layer made for testing Engine's behavior.
+// When an Engine is installed on a Network, the mocked network will deliver
 // all Engine's events synchronously in memory to another Engine, so that tests can run
 // fast and easy to assert errors.
-type MockNetwork struct {
-	hub     *MockHub
+type Network struct {
+	hub     *Hub
 	com     module.Committee
 	engines map[uint8]network.Engine
 }
@@ -19,8 +19,8 @@ type MockNetwork struct {
 // NewNetwork create a mocked network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
-func NewNetwork(com module.Committee, hub *MockHub) (*MockNetwork, error) {
-	o := &MockNetwork{
+func NewNetwork(com module.Committee, hub *Hub) (*Network, error) {
+	o := &Network{
 		com:     com,
 		hub:     hub,
 		engines: make(map[uint8]network.Engine),
@@ -31,18 +31,18 @@ func NewNetwork(com module.Committee, hub *MockHub) (*MockNetwork, error) {
 }
 
 // submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *MockNetwork) submit(engineID uint8, event interface{}, targetIDs ...string) error {
+func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string) error {
 	var err error
 	for _, nodeID := range targetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, ok := mn.hub.Networks[nodeID]
 		if !ok || receiverNetwork == nil {
-			return errors.Errorf("MockNetwork can not find a node by ID %v", nodeID)
+			return errors.Errorf("Network can not find a node by ID %v", nodeID)
 		}
 		// Find the engine of the targeted network
 		receiverEngine, ok := receiverNetwork.engines[engineID]
 		if !ok {
-			return errors.Errorf("MockNetwork can not find engine ID: %v for node: %v", engineID, nodeID)
+			return errors.Errorf("Network can not find engine ID: %v for node: %v", engineID, nodeID)
 		}
 		// Call `Process` to let receiver engine receive the event directly.
 		err = receiverEngine.Process(mn.GetID(), event)
@@ -54,18 +54,18 @@ func (mn *MockNetwork) submit(engineID uint8, event interface{}, targetIDs ...st
 }
 
 // GetID returns the identity of the Engine
-func (mn *MockNetwork) GetID() string {
+func (mn *Network) GetID() string {
 	me := mn.com.Me()
 	return me.ID
 }
 
 // Register implements pkg/module/Network's interface
-func (mn *MockNetwork) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
+func (mn *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
 	_, ok := mn.engines[engineID]
 	if ok {
 		return nil, errors.Errorf("engine code already taken (%d)", engineID)
 	}
-	conduit := &MockConduit{
+	conduit := &Conduit{
 		engineID: engineID,
 		send:     mn.submit,
 	}
