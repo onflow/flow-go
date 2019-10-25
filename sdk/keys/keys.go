@@ -3,6 +3,7 @@ package keys
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/encoding/rlp"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -82,4 +83,23 @@ func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublic
 		HashAlgo:  keyType.HashingAlgorithm(),
 		Weight:    weight,
 	}, nil
+}
+
+// SignTransaction signs a transaction with a private key.
+func SignTransaction(
+	tx *types.Transaction,
+	privateKey types.AccountPrivateKey,
+) (crypto.Signature, error) {
+	hasher, err := crypto.NewHasher(privateKey.HashAlgo)
+	if err != nil {
+		return nil, err
+	}
+
+	enc := rlp.NewEncoder()
+	b, err := enc.EncodeCanonicalTransaction(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return privateKey.PrivateKey.Sign(b, hasher)
 }

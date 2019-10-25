@@ -2,7 +2,6 @@ package types
 
 import (
 	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -42,6 +41,7 @@ func (f TransactionField) String() string {
 
 // Transaction is a transaction that contains a script and optional signatures.
 type Transaction struct {
+	Hash               crypto.Hash
 	Script             []byte
 	ReferenceBlockHash []byte
 	Nonce              uint64
@@ -52,67 +52,15 @@ type Transaction struct {
 	Status             TransactionStatus
 }
 
-// Hash computes the hash over the necessary transaction data.
-func (tx *Transaction) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	return hasher.ComputeHash(tx.CanonicalEncoding())
-}
-
-// CanonicalEncoding returns the encoded canonical transaction as bytes.
-func (tx *Transaction) CanonicalEncoding() []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		tx.Script,
-		tx.ReferenceBlockHash,
-		tx.Nonce,
-		tx.ComputeLimit,
-		tx.PayerAccount,
-		tx.ScriptAccounts,
-	})
-
-	return b
-}
-
-// FullEncoding returns the encoded full transaction (including signatures) as bytes.
-func (tx *Transaction) FullEncoding() []byte {
-	sigs := make([][]byte, len(tx.ScriptAccounts))
-	for i, sig := range tx.Signatures {
-		sigs[i] = EncodeAccountSignature(sig)
-	}
-
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		tx.Script,
-		tx.ReferenceBlockHash,
-		tx.Nonce,
-		tx.ComputeLimit,
-		tx.PayerAccount,
-		tx.ScriptAccounts,
-		sigs,
-	})
-
-	return b
-}
-
 // AddSignature signs the transaction with the given account and private key, then adds the signature to the list
 // of signatures.
-func (tx *Transaction) AddSignature(account Address, key AccountPrivateKey) error {
-	hasher, err := crypto.NewHasher(key.HashAlgo)
-	if err != nil {
-		return err
-	}
-
-	sig, err := key.PrivateKey.Sign(tx.CanonicalEncoding(), hasher)
-	if err != nil {
-		return err
-	}
-
+func (tx *Transaction) AddSignature(account Address, sig crypto.Signature) {
 	accountSig := AccountSignature{
 		Account:   account,
 		Signature: sig.Bytes(),
 	}
 
 	tx.Signatures = append(tx.Signatures, accountSig)
-
-	return nil
 }
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.

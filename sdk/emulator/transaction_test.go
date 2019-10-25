@@ -24,7 +24,9 @@ func TestSubmitTransaction(t *testing.T) {
 		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, _ := keys.SignTransaction(tx1, b.RootKey())
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)
