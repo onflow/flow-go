@@ -1,6 +1,10 @@
-package types
+// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-import "github.com/dapperlabs/flow-go/crypto"
+package flow
+
+import (
+	"github.com/dapperlabs/flow-go/crypto"
+)
 
 // Registers is a map of register values.
 type Registers map[string][]byte

@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Config struct {
@@ -50,7 +50,7 @@ func InitializeProject() *project.Config {
 		panic(err)
 	}
 	prKeyHex := hex.EncodeToString(prKeyBytes)
-	address := types.HexToAddress("01").Hex()
+	address := flow.HexToAddress("01").Hex()
 
 	conf := &project.Config{
 		Accounts: map[string]*project.AccountConfig{

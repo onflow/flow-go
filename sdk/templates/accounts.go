@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
+func CreateAccount(accountKeys []flow.AccountKey, code []byte) []byte {
 	publicKeys := make([][]byte, len(accountKeys))
 	keyWeights := make([]int, len(accountKeys))
 
@@ -48,7 +48,7 @@ func UpdateAccountCode(code []byte) []byte {
 }
 
 // AddAccountKey generates a script that adds a key to an account.
-func AddAccountKey(accountKey types.AccountKey) []byte {
+func AddAccountKey(accountKey flow.AccountKey) []byte {
 	publicKeyStr := languageEncodeBytes(accountKey.PublicKey)
 
 	script := fmt.Sprintf(`

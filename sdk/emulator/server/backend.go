@@ -12,7 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
@@ -96,7 +96,7 @@ func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 	block := b.blockchain.GetLatestBlock()
 
 	// create block header for block
-	blockHeader := types.BlockHeader{
+	blockHeader := flow.BlockHeader{
 		Hash:              block.Hash(),
 		PreviousBlockHash: block.PreviousBlockHash,
 		Number:            block.Number,
@@ -143,7 +143,7 @@ func (b *Backend) GetTransaction(ctx context.Context, req *observation.GetTransa
 
 // GetAccount returns the info associated with an address.
 func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	address := types.BytesToAddress(req.GetAddress())
+	address := flow.BytesToAddress(req.GetAddress())
 	account, err := b.blockchain.GetAccount(address)
 	if err != nil {
 		switch err.(type) {
@@ -183,7 +183,7 @@ func (b *Backend) CallScript(ctx context.Context, req *observation.CallScriptReq
 	valueBytes, _ := json.Marshal(value)
 
 	response := &observation.CallScriptResponse{
-		// TODO: standardize types to be language-agnostic
+		// TODO: standardize flow to be language-agnostic
 		Type:  reflect.TypeOf(value).String(),
 		Value: valueBytes,
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 )
 
@@ -52,7 +52,7 @@ func (c *Client) Close() error {
 }
 
 // SendTransaction submits a transaction to the network.
-func (c *Client) SendTransaction(ctx context.Context, tx types.Transaction) error {
+func (c *Client) SendTransaction(ctx context.Context, tx flow.Transaction) error {
 	txMsg := convert.TransactionToMessage(tx)
 
 	_, err := c.rpcClient.SendTransaction(
@@ -64,7 +64,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx types.Transaction) erro
 }
 
 // GetLatestBlock gets the header of the latest sealed or unsealed block.
-func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*types.BlockHeader, error) {
+func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.BlockHeader, error) {
 	res, err := c.rpcClient.GetLatestBlock(
 		ctx,
 		&observation.GetLatestBlockRequest{IsSealed: isSealed},
@@ -96,7 +96,7 @@ func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, er
 }
 
 // GetTransaction fetches a transaction by hash.
-func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Transaction, error) {
+func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*flow.Transaction, error) {
 	res, err := c.rpcClient.GetTransaction(
 		ctx,
 		&observation.GetTransactionRequest{Hash: h},
@@ -114,7 +114,7 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Tran
 }
 
 // GetAccount fetches an account by address.
-func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.Account, error) {
+func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	res, err := c.rpcClient.GetAccount(
 		ctx,
 		&observation.GetAccountRequest{Address: address.Bytes()},
@@ -132,7 +132,7 @@ func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.
 }
 
 // GetEvents queries the Observation API for events and returns the results.
-func (c *Client) GetEvents(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
+func (c *Client) GetEvents(ctx context.Context, query *flow.EventQuery) ([]*flow.Event, error) {
 	res, err := c.rpcClient.GetEvents(
 		ctx,
 		convert.EventQueryToMessage(query),
@@ -142,7 +142,7 @@ func (c *Client) GetEvents(ctx context.Context, query *types.EventQuery) ([]*typ
 	}
 
 	// Events are sent over the wire JSON-encoded.
-	var events []*types.Event
+	var events []*flow.Event
 	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
 		return nil, err
 	}

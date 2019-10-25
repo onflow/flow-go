@@ -7,13 +7,6 @@ package network
 // the necessary interface to process, identify and retrieve engine events.
 type Engine interface {
 
-	// Process will submit the given event to the engine for processing. It
-	// returns an error so a node which has the given engine registered will not
-	// propagate an event unless it was succcessfully processed by the engine.
-	// The origin ID indicates the node which originally submitted the event to
-	// the peer-to-peer network.
-	Process(originID string, event interface{}) error
-
 	// Identify allows a node to identify a given event uniquely while remaining
 	// agnostic of event types. It will usually return the canonical hash of the
 	// entity that the event is communicating about. In cases where no such hash
@@ -26,4 +19,11 @@ type Engine interface {
 	// identified by the engine; events that used the internal network layer hash
 	// can not (and do not need) to be retrieved from the engine.
 	Retrieve(eventID []byte) (interface{}, error)
+
+	// Process will submit the given event to the engine for processing. It
+	// returns an error so a node which has the given engine registered will not
+	// propagate an event unless it was succcessfully processed by the engine.
+	// The origin ID indicates the node which originally submitted the event to
+	// the peer-to-peer network.
+	Process(originID string, event interface{}) error
 }

@@ -9,20 +9,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type testRuntimeInterface struct {
 	resolveImport      func(ImportLocation) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
-	addAccountKey      func(address types.Address, publicKey []byte, keyWeight int) error
-	removeAccountKey   func(address types.Address, index int) (publicKey []byte, err error)
-	updateAccountCode  func(address types.Address, code []byte) (err error)
-	getSigningAccounts func() []types.Address
+	createAccount      func(publicKeys [][]byte, keyWeights []int, code []byte) (address flow.Address, err error)
+	addAccountKey      func(address flow.Address, publicKey []byte, keyWeight int) error
+	removeAccountKey   func(address flow.Address, index int) (publicKey []byte, err error)
+	updateAccountCode  func(address flow.Address, code []byte) (err error)
+	getSigningAccounts func() []flow.Address
 	log                func(string)
-	emitEvent          func(types.Event)
+	emitEvent          func(flow.Event)
 }
 
 func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
@@ -37,23 +37,23 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address flow.Address, err error) {
 	return i.createAccount(publicKeys, keyWeights, code)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+func (i *testRuntimeInterface) AddAccountKey(address flow.Address, publicKey []byte, keyWeight int) error {
 	return i.addAccountKey(address, publicKey, keyWeight)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
+func (i *testRuntimeInterface) RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error) {
 	return i.removeAccountKey(address, index)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(address types.Address, code []byte) (err error) {
+func (i *testRuntimeInterface) UpdateAccountCode(address flow.Address, code []byte) (err error) {
 	return i.updateAccountCode(address, code)
 }
 
-func (i *testRuntimeInterface) GetSigningAccounts() []types.Address {
+func (i *testRuntimeInterface) GetSigningAccounts() []flow.Address {
 	if i.getSigningAccounts == nil {
 		return nil
 	}
@@ -64,7 +64,7 @@ func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
 }
 
-func (i *testRuntimeInterface) EmitEvent(event types.Event) {
+func (i *testRuntimeInterface) EmitEvent(event flow.Event) {
 	i.emitEvent(event)
 }
 
@@ -93,10 +93,10 @@ func TestRuntimeGetAndSetValue(t *testing.T) {
 			state.SetBytes(value)
 			return nil
 		},
-		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error) {
-			return types.Address{}, nil
+		createAccount: func(publicKeys [][]byte, keyWeights []int, code []byte) (address flow.Address, err error) {
+			return flow.Address{}, nil
 		},
-		updateAccountCode: func(address types.Address, code []byte) (err error) {
+		updateAccountCode: func(address flow.Address, code []byte) (err error) {
 			return nil
 		},
 	}
@@ -157,8 +157,8 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 	}
 
@@ -186,8 +186,8 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 		setValue: func(controller, owner, key, value []byte) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessage = message
@@ -229,8 +229,8 @@ func TestRuntimeStorage(t *testing.T) {
 		setValue: func(controller, owner, key, value []byte) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -266,8 +266,8 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 			storedValue = value
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -339,8 +339,8 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 			storedValue = value
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -382,8 +382,8 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 			storedValue = value
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -453,8 +453,8 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 			storedValue = value
 			return nil
 		},
-		getSigningAccounts: func() []types.Address {
-			return []types.Address{[20]byte{42}}
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
 		},
 	}
 

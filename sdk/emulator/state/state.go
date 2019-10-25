@@ -4,19 +4,19 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/types"
-	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/model/flow"
+	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
-	Blocks            map[string]*etypes.Block
+	Blocks            map[string]*eflow.Block
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
-	Transactions      map[string]*types.Transaction
+	Transactions      map[string]*flow.Transaction
 	transactionsMutex sync.RWMutex
-	Registers         types.Registers
+	Registers         flow.Registers
 	registersMutex    sync.RWMutex
 	LatestState       crypto.Hash
 	latestStateMutex  sync.RWMutex
@@ -24,12 +24,12 @@ type WorldState struct {
 
 // NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
-	blocks := make(map[string]*etypes.Block)
+	blocks := make(map[string]*eflow.Block)
 	blockchain := make([]crypto.Hash, 0)
-	transactions := make(map[string]*types.Transaction)
-	registers := make(types.Registers)
+	transactions := make(map[string]*flow.Transaction)
+	registers := make(flow.Registers)
 
-	genesis := etypes.GenesisBlock()
+	genesis := eflow.GenesisBlock()
 	blocks[string(genesis.Hash())] = genesis
 	blockchain = append(blockchain, genesis.Hash())
 
@@ -48,7 +48,7 @@ func (ws *WorldState) Hash() crypto.Hash {
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.
-func (ws *WorldState) GetLatestBlock() *etypes.Block {
+func (ws *WorldState) GetLatestBlock() *eflow.Block {
 	ws.blockchainMutex.RLock()
 	defer ws.blockchainMutex.RUnlock()
 
@@ -59,7 +59,7 @@ func (ws *WorldState) GetLatestBlock() *etypes.Block {
 }
 
 // GetBlockByHash gets a block by hash.
-func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
+func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *eflow.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
@@ -71,7 +71,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *etypes.Block {
 }
 
 // GetBlockByNumber gets a block by number.
-func (ws *WorldState) GetBlockByNumber(number uint64) *etypes.Block {
+func (ws *WorldState) GetBlockByNumber(number uint64) *eflow.Block {
 	ws.blockchainMutex.RLock()
 	defer ws.blockchainMutex.RUnlock()
 
@@ -85,7 +85,7 @@ func (ws *WorldState) GetBlockByNumber(number uint64) *etypes.Block {
 }
 
 // GetTransaction gets a transaction by hash.
-func (ws *WorldState) GetTransaction(hash crypto.Hash) *types.Transaction {
+func (ws *WorldState) GetTransaction(hash crypto.Hash) *flow.Transaction {
 	ws.transactionsMutex.RLock()
 	defer ws.transactionsMutex.RUnlock()
 
@@ -103,7 +103,7 @@ func (ws *WorldState) ContainsTransaction(hash crypto.Hash) bool {
 }
 
 // SetRegisters commits a set of registers to the state.
-func (ws *WorldState) SetRegisters(registers types.Registers) {
+func (ws *WorldState) SetRegisters(registers flow.Registers) {
 	ws.registersMutex.Lock()
 	defer ws.registersMutex.Unlock()
 
@@ -111,7 +111,7 @@ func (ws *WorldState) SetRegisters(registers types.Registers) {
 }
 
 // InsertBlock adds a new block to the blockchain.
-func (ws *WorldState) InsertBlock(block *etypes.Block) {
+func (ws *WorldState) InsertBlock(block *eflow.Block) {
 	ws.blockchainMutex.Lock()
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
@@ -132,7 +132,7 @@ func (ws *WorldState) InsertBlock(block *etypes.Block) {
 }
 
 // InsertTransaction inserts a new transaction into the state.
-func (ws *WorldState) InsertTransaction(tx *types.Transaction) {
+func (ws *WorldState) InsertTransaction(tx *flow.Transaction) {
 	ws.transactionsMutex.Lock()
 	defer ws.transactionsMutex.Unlock()
 
@@ -149,7 +149,7 @@ func (ws *WorldState) InsertTransaction(tx *types.Transaction) {
 }
 
 // UpdateTransactionStatus updates the transaction status of an existing transaction.
-func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status types.TransactionStatus) {
+func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status flow.TransactionStatus) {
 	tx := ws.GetTransaction(h)
 	if tx == nil {
 		return

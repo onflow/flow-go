@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/client/mocks"
 	"github.com/dapperlabs/flow-go/sdk/convert"
@@ -163,15 +163,15 @@ func TestGetEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up a mock event response
-	mockEvent := types.Event{
+	mockEvent := flow.Event{
 		ID: "Transfer",
 		Values: map[string]interface{}{
-			"to":   types.ZeroAddress,
-			"from": types.ZeroAddress,
+			"to":   flow.ZeroAddress,
+			"from": flow.ZeroAddress,
 			"id":   1,
 		},
 	}
-	events := []*types.Event{&mockEvent}
+	events := []*flow.Event{&mockEvent}
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(events)
@@ -185,7 +185,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass the response to the client
-		res, err := c.GetEvents(ctx, &types.EventQuery{})
+		res, err := c.GetEvents(ctx, &flow.EventQuery{})
 		assert.Nil(t, err)
 		assert.Equal(t, len(res), 1)
 		assert.Equal(t, res[0].ID, mockEvent.ID)
@@ -199,7 +199,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetEvents(ctx, &types.EventQuery{})
+		_, err = c.GetEvents(ctx, &flow.EventQuery{})
 		assert.Error(t, err)
 	})
 
@@ -211,7 +211,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should return an error because it should fail to decode
-		_, err = c.GetEvents(ctx, &types.EventQuery{})
+		_, err = c.GetEvents(ctx, &flow.EventQuery{})
 		assert.Error(t, err)
 	})
 }

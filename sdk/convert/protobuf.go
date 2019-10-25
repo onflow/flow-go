@@ -6,13 +6,13 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
 
-func MessageToBlockHeader(m *entities.BlockHeader) types.BlockHeader {
-	return types.BlockHeader{
+func MessageToBlockHeader(m *entities.BlockHeader) flow.BlockHeader {
+	return flow.BlockHeader{
 		Hash:              crypto.BytesToHash(m.GetHash()),
 		PreviousBlockHash: crypto.BytesToHash(m.GetPreviousBlockHash()),
 		Number:            m.GetNumber(),
@@ -20,7 +20,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) types.BlockHeader {
 	}
 }
 
-func BlockHeaderToMessage(b types.BlockHeader) *entities.BlockHeader {
+func BlockHeaderToMessage(b flow.BlockHeader) *entities.BlockHeader {
 	return &entities.BlockHeader{
 		Hash:              b.Hash,
 		PreviousBlockHash: b.PreviousBlockHash,
@@ -29,47 +29,47 @@ func BlockHeaderToMessage(b types.BlockHeader) *entities.BlockHeader {
 	}
 }
 
-func MessageToAccountSignature(m *entities.AccountSignature) types.AccountSignature {
-	return types.AccountSignature{
-		Account:   types.BytesToAddress(m.GetAccount()),
+func MessageToAccountSignature(m *entities.AccountSignature) flow.AccountSignature {
+	return flow.AccountSignature{
+		Account:   flow.BytesToAddress(m.GetAccount()),
 		Signature: m.GetSignature(),
 	}
 }
 
-func AccountSignatureToMessage(a types.AccountSignature) *entities.AccountSignature {
+func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignature {
 	return &entities.AccountSignature{
 		Account:   a.Account.Bytes(),
 		Signature: a.Signature,
 	}
 }
 
-func MessageToTransaction(m *entities.Transaction) (types.Transaction, error) {
+func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 	if m == nil {
-		return types.Transaction{}, ErrEmptyMessage
+		return flow.Transaction{}, ErrEmptyMessage
 	}
 
-	scriptAccounts := make([]types.Address, len(m.ScriptAccounts))
+	scriptAccounts := make([]flow.Address, len(m.ScriptAccounts))
 	for i, account := range m.ScriptAccounts {
-		scriptAccounts[i] = types.BytesToAddress(account)
+		scriptAccounts[i] = flow.BytesToAddress(account)
 	}
 
-	signatures := make([]types.AccountSignature, len(m.Signatures))
+	signatures := make([]flow.AccountSignature, len(m.Signatures))
 	for i, accountSig := range m.Signatures {
 		signatures[i] = MessageToAccountSignature(accountSig)
 	}
 
-	return types.Transaction{
+	return flow.Transaction{
 		Script:             m.GetScript(),
 		ReferenceBlockHash: m.ReferenceBlockHash,
 		Nonce:              m.GetNonce(),
 		ComputeLimit:       m.GetComputeLimit(),
-		PayerAccount:       types.BytesToAddress(m.PayerAccount),
+		PayerAccount:       flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:     scriptAccounts,
 		Signatures:         signatures,
 	}, nil
 }
 
-func TransactionToMessage(t types.Transaction) *entities.Transaction {
+func TransactionToMessage(t flow.Transaction) *entities.Transaction {
 	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
 	for i, account := range t.ScriptAccounts {
 		scriptAccounts[i] = account.Bytes()
@@ -91,30 +91,30 @@ func TransactionToMessage(t types.Transaction) *entities.Transaction {
 	}
 }
 
-func MessageToAccount(m *entities.Account) (types.Account, error) {
+func MessageToAccount(m *entities.Account) (flow.Account, error) {
 	if m == nil {
-		return types.Account{}, ErrEmptyMessage
+		return flow.Account{}, ErrEmptyMessage
 	}
 
-	accountKeys := make([]types.AccountKey, len(m.Keys))
+	accountKeys := make([]flow.AccountKey, len(m.Keys))
 	for i, key := range m.Keys {
 		accountKey, err := MessageToAccountKey(key)
 		if err != nil {
-			return types.Account{}, err
+			return flow.Account{}, err
 		}
 
 		accountKeys[i] = accountKey
 	}
 
-	return types.Account{
-		Address: types.BytesToAddress(m.Address),
+	return flow.Account{
+		Address: flow.BytesToAddress(m.Address),
 		Balance: m.Balance,
 		Code:    m.Code,
 		Keys:    accountKeys,
 	}, nil
 }
 
-func AccountToMessage(a types.Account) *entities.Account {
+func AccountToMessage(a flow.Account) *entities.Account {
 	accountKeys := make([]*entities.AccountKey, len(a.Keys))
 	for i, key := range a.Keys {
 		accountKeys[i] = AccountKeyToMessage(key)
@@ -128,33 +128,33 @@ func AccountToMessage(a types.Account) *entities.Account {
 	}
 }
 
-func MessageToAccountKey(m *entities.AccountKey) (types.AccountKey, error) {
+func MessageToAccountKey(m *entities.AccountKey) (flow.AccountKey, error) {
 	if m == nil {
-		return types.AccountKey{}, ErrEmptyMessage
+		return flow.AccountKey{}, ErrEmptyMessage
 	}
 
-	return types.AccountKey{
+	return flow.AccountKey{
 		PublicKey: m.PublicKey,
 		Weight:    int(m.Weight),
 	}, nil
 }
 
-func AccountKeyToMessage(a types.AccountKey) *entities.AccountKey {
+func AccountKeyToMessage(a flow.AccountKey) *entities.AccountKey {
 	return &entities.AccountKey{
 		PublicKey: a.PublicKey,
 		Weight:    uint32(a.Weight),
 	}
 }
 
-func MessageToEventQuery(m *observation.GetEventsRequest) types.EventQuery {
-	return types.EventQuery{
+func MessageToEventQuery(m *observation.GetEventsRequest) flow.EventQuery {
+	return flow.EventQuery{
 		ID:         m.GetEventId(),
 		StartBlock: m.GetStartBlock(),
 		EndBlock:   m.GetEndBlock(),
 	}
 }
 
-func EventQueryToMessage(q *types.EventQuery) *observation.GetEventsRequest {
+func EventQueryToMessage(q *flow.EventQuery) *observation.GetEventsRequest {
 	return &observation.GetEventsRequest{
 		EventId:    q.ID,
 		StartBlock: q.StartBlock,

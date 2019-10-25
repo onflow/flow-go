@@ -394,16 +394,16 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
 
 	// select all the collection nodes on the network as our targets
-	nodes, err := e.com.Select(
+	identities, err := e.com.Select(
 		filter.Role("consensus"),
-		filter.Not(filter.ID(e.com.Me().ID)),
+		filter.Not(filter.NodeID(e.com.Me().NodeID)),
 	)
 	if err != nil {
-		return errors.Wrap(err, "could not select nodes")
+		return errors.Wrap(err, "could not select identities")
 	}
 
-	// send the guaranteed collection to all consensus nodes
-	targetIDs := nodes.IDs()
+	// send the guaranteed collection to all consensus identities
+	targetIDs := identities.NodeIDs()
 	err = e.con.Submit(coll, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not push guaranteed collection")
@@ -422,9 +422,9 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 func (e *Engine) propagateSnapshotRequest() error {
 
 	// select all the consensus nodes on the network to request snapshot
-	nodes, err := e.com.Select(
+	identities, err := e.com.Select(
 		filter.Role("consensus"),
-		filter.Not(filter.ID(e.com.Me().ID)),
+		filter.Not(filter.NodeID(e.com.Me().NodeID)),
 	)
 	if err != nil {
 		return errors.Wrap(err, "could not find consensus nodes")
@@ -432,7 +432,7 @@ func (e *Engine) propagateSnapshotRequest() error {
 
 	// send the snapshot request to the selected nodes
 	hash := e.pool.Hash()
-	targetIDs := nodes.IDs()
+	targetIDs := identities.NodeIDs()
 	req := &consensus.SnapshotRequest{
 		Nonce:       rand.Uint64(),
 		MempoolHash: hash,

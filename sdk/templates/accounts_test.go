@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
@@ -13,13 +13,13 @@ import (
 func TestCreateAccount(t *testing.T) {
 	publicKey := []byte{4, 136, 178, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 111, 117, 56, 107, 245, 122, 184, 40, 127, 172, 19, 175, 225, 131, 184, 22, 122, 23, 90, 172, 214, 144, 150, 92, 69, 119, 218, 11, 191, 120, 226, 74, 2, 217, 156, 75, 44, 44, 121, 152, 143, 47, 180, 169, 205, 18, 77, 47, 135, 146, 34, 34, 157, 69, 149, 177, 141, 80, 99, 66, 186, 33, 25, 73, 179, 224, 166, 205, 172}
 
-	accountKey := types.AccountKey{
+	accountKey := flow.AccountKey{
 		PublicKey: publicKey,
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 
 	// create account with no code
-	scriptA := templates.CreateAccount([]types.AccountKey{accountKey}, []byte{})
+	scriptA := templates.CreateAccount([]flow.AccountKey{accountKey}, []byte{})
 
 	expectedScriptA := []byte(`
 		fun main() {
@@ -33,7 +33,7 @@ func TestCreateAccount(t *testing.T) {
 	assert.Equal(t, expectedScriptA, scriptA)
 
 	// create account with code
-	scriptB := templates.CreateAccount([]types.AccountKey{accountKey}, []byte("fun main() {}"))
+	scriptB := templates.CreateAccount([]flow.AccountKey{accountKey}, []byte("fun main() {}"))
 
 	expectedScriptB := []byte(`
 		fun main() {

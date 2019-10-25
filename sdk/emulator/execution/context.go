@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // RuntimeContext implements host functionality required by the Cadence runtime.
@@ -17,18 +17,18 @@ import (
 // The logic in this runtime context is specific to the emulator and is designed to be
 // used with an EmulatedBlockchain instance.
 type RuntimeContext struct {
-	registers       *types.RegistersView
-	signingAccounts []types.Address
+	registers       *flow.RegistersView
+	signingAccounts []flow.Address
 	onLogMessage    func(string)
-	events          []types.Event
+	events          []flow.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
-func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
+func NewRuntimeContext(registers *flow.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
 		registers:    registers,
 		onLogMessage: func(string) {},
-		events:       make([]types.Event, 0),
+		events:       make([]flow.Event, 0),
 	}
 }
 
@@ -36,7 +36,7 @@ func NewRuntimeContext(registers *types.RegistersView) *RuntimeContext {
 //
 // Signing accounts are the accounts that signed the transaction executing
 // inside this context.
-func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
+func (r *RuntimeContext) SetSigningAccounts(accounts []flow.Address) {
 	r.signingAccounts = accounts
 }
 
@@ -44,7 +44,7 @@ func (r *RuntimeContext) SetSigningAccounts(accounts []types.Address) {
 //
 // Signing accounts are the accounts that signed the transaction executing
 // inside this context.
-func (r *RuntimeContext) GetSigningAccounts() []types.Address {
+func (r *RuntimeContext) GetSigningAccounts() []flow.Address {
 	return r.signingAccounts
 }
 
@@ -54,7 +54,7 @@ func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
 }
 
 // Events returns all events emitted by the runtime to this context.
-func (r *RuntimeContext) Events() []types.Event {
+func (r *RuntimeContext) Events() []flow.Event {
 	return r.events
 }
 
@@ -76,9 +76,9 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (types.Address, error) {
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (flow.Address, error) {
 	if len(publicKeys) != len(keyWeights) {
-		return types.Address{}, fmt.Errorf(
+		return flow.Address{}, fmt.Errorf(
 			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
 			len(publicKeys),
 			len(keyWeights),
@@ -90,7 +90,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
 
-	accountAddress := types.BytesToAddress(accountIDBytes)
+	accountAddress := flow.BytesToAddress(accountIDBytes)
 
 	accountID := accountAddress.Bytes()
 
@@ -112,7 +112,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+func (r *RuntimeContext) AddAccountKey(address flow.Address, publicKey []byte, keyWeight int) error {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
@@ -135,7 +135,7 @@ func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, 
 //
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
-func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error) {
+func (r *RuntimeContext) RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error) {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
@@ -244,7 +244,7 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (err error) {
+func (r *RuntimeContext) UpdateAccountCode(address flow.Address, code []byte) (err error) {
 	accountID := address.Bytes()
 
 	if !r.isValidSigningAccount(address) {
@@ -264,7 +264,7 @@ func (r *RuntimeContext) UpdateAccountCode(address types.Address, code []byte) (
 // GetAccount gets an account by address.
 //
 // The function returns nil if the specified account does not exist.
-func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
+func (r *RuntimeContext) GetAccount(address flow.Address) *flow.Account {
 	accountID := address.Bytes()
 
 	balanceBytes, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
@@ -278,15 +278,15 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
 	publicKeys, keyWeights, _ := r.getAccountPublicKeys(accountID)
 
-	accountKeys := make([]types.AccountKey, len(publicKeys))
+	accountKeys := make([]flow.AccountKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountKeys[i] = types.AccountKey{
+		accountKeys[i] = flow.AccountKey{
 			PublicKey: publicKey,
 			Weight:    keyWeights[i],
 		}
 	}
 
-	return &types.Account{
+	return &flow.Account{
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
@@ -322,11 +322,11 @@ func (r *RuntimeContext) Log(message string) {
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
-func (r *RuntimeContext) EmitEvent(event types.Event) {
+func (r *RuntimeContext) EmitEvent(event flow.Event) {
 	r.events = append(r.events, event)
 }
 
-func (r *RuntimeContext) isValidSigningAccount(address types.Address) bool {
+func (r *RuntimeContext) isValidSigningAccount(address flow.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
 		if accountAddress == address {
 			return true

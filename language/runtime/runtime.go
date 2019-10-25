@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type ImportLocation interface {
@@ -38,19 +38,19 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address types.Address, err error)
+	CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (address flow.Address, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error
+	AddAccountKey(address flow.Address, publicKey []byte, keyWeight int) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(address types.Address, index int) (publicKey []byte, err error)
+	RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address types.Address, code []byte) (err error)
+	UpdateAccountCode(address flow.Address, code []byte) (err error)
 	// GetSigningAccounts returns the signing accounts.
-	GetSigningAccounts() []types.Address
+	GetSigningAccounts() []flow.Address
 	// Log logs a string.
 	Log(string)
 	// EmitEvent is called when an event is emitted by the runtime.
-	EmitEvent(types.Event)
+	EmitEvent(flow.Event)
 }
 
 type Error struct {
@@ -402,7 +402,7 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
 
-	event := types.Event{
+	event := flow.Event{
 		ID:     eventID,
 		Values: values,
 	}
@@ -424,7 +424,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 		valueMap[field.Identifier] = value
 	}
 
-	event := types.Event{
+	event := flow.Event{
 		ID:     eventID,
 		Values: valueMap,
 	}
@@ -619,7 +619,7 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 	)
 }
 
-func loadAccount(runtimeInterface Interface, address types.Address) (
+func loadAccount(runtimeInterface Interface, address flow.Address) (
 	interface{},
 	map[string]interpreter.Value,
 	error,
@@ -775,7 +775,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the third parameter to be an integer"))
 		}
 
-		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 
 		err = runtimeInterface.AddAccountKey(accountAddress, publicKey, keyWeight.IntValue())
 		if err != nil {
@@ -806,7 +806,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		}
 
-		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 
 		publicKey, err := runtimeInterface.RemoveAccountKey(accountAddress, index.IntValue())
 		if err != nil {
@@ -836,7 +836,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
-		accountAddress := types.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 
 		err = runtimeInterface.UpdateAccountCode(accountAddress, code)
 		if err != nil {
@@ -861,7 +861,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
 		}
 
-		address := types.HexToAddress(stringValue.StrValue())
+		address := flow.HexToAddress(stringValue.StrValue())
 
 		account, _, err := loadAccount(runtimeInterface, address)
 		if err != nil {

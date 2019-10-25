@@ -14,7 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
@@ -51,7 +51,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	eventStore := events.NewMemStore()
 
-	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
 			WithField("eventID", event.ID).
 			Infof("🔔  Event emitted: %s", event)

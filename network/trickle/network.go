@@ -106,8 +106,8 @@ func (n *Network) Address() (string, error) {
 
 	// get a list of other nodes that are not us, and we are not connected to
 	nodeIDs := n.state.Peers().IDs()
-	nodeIDs = append(nodeIDs, n.com.Me().ID)
-	nodes, err := n.com.Select(filter.Not(filter.ID(nodeIDs...)))
+	nodeIDs = append(nodeIDs, n.com.Me().NodeID)
+	nodes, err := n.com.Select(filter.Not(filter.NodeID(nodeIDs...)))
 	if err != nil {
 		return "", errors.Wrap(err, "could not get nodes")
 	}
@@ -129,7 +129,7 @@ func (n *Network) Handshake(conn Connection) (string, error) {
 
 	// initialize our own authentication message
 	out := &trickle.Auth{
-		NodeID: n.com.Me().ID,
+		NodeID: n.com.Me().NodeID,
 	}
 	err := conn.Send(out)
 	if err != nil {
@@ -149,7 +149,7 @@ func (n *Network) Handshake(conn Connection) (string, error) {
 	}
 
 	// check if this node is ourselves
-	if in.NodeID == n.com.Me().ID {
+	if in.NodeID == n.com.Me().NodeID {
 		return "", errors.New("connections to self forbidden")
 	}
 
@@ -258,7 +258,7 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 	res := &trickle.Response{
 		EngineID:  engineID,
 		EventID:   eventID,
-		OriginID:  n.com.Me().ID,
+		OriginID:  n.com.Me().NodeID,
 		TargetIDs: targetIDs,
 		Payload:   payload,
 	}
@@ -359,7 +359,7 @@ func (n *Network) processEvent(res *trickle.Response) error {
 
 	// if we are not an intended recipient of the message, don't worry about it
 	// either
-	ok = n.isfor(n.com.Me().ID, res)
+	ok = n.isfor(n.com.Me().NodeID, res)
 	if !ok {
 		return nil
 	}
