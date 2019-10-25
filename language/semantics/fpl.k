@@ -57,17 +57,17 @@ module FPL-COMMON-SYNTAX
   syntax FileName ::= FPLString
   syntax ImportSource ::= IntLit | FPLString
 
-  syntax FunDef ::= "fun" Ident "(" Formals ")"           "{" FunBody "}"
-                  | "fun" Ident "(" Formals ")" ":" Annot "{" FunBody "}"
+  syntax FunDef ::= "fun" Ident "(" Formals ")"           FunBody
+                  | "fun" Ident "(" Formals ")" ":" Annot FunBody
 
-  rule fun Ident ( Formals ) { Body::FunBody } => fun Ident ( Formals ) : noAnnot() { Body } [macro]
+  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : noAnnot() Body [macro]
 
   syntax CompositeItems ::= List{CompositeItemAccess,""}
   syntax CompositeItemAccess ::= Access CompositeItem
                                | CompositeItem
   syntax CompositeItem ::= Definition
                          | FieldDecl
-                         | "init" "(" Formals ")" "{" FunBody "}"
+                         | "init" "(" Formals ")" FunBody
   syntax Access ::= "pub" "(" "set" ")"
                   | "pub"
 
@@ -115,8 +115,8 @@ module FPL-COMMON-SYNTAX
    | "var" Ident ":" Type
    | "synthetic" Ident "{" AccessorDefs "}"
   syntax AccessorDefs ::= List{AccessorDef,""}
-  syntax AccessorDef ::= "get"               "{" FunBody "}"
-                       | "set" "(" Ident ")" "{" FunBody "}"
+  syntax AccessorDef ::= "get"               FunBody
+                       | "set" "(" Ident ")" FunBody
   // Nesting left out for now
 
   syntax VarDef ::=
@@ -136,15 +136,18 @@ module FPL-COMMON-SYNTAX
 
   syntax Formal ::= Ident Ident ":" Type
                   |       Ident ":" Type
-  syntax Formals ::= List{Formal,","}
+  rule (I : T)::Formal => I I : T [macro]
+  syntax Formals ::= List{Formal,","} [klabel(formals)]
 
-  syntax FunBody ::= Block
-                   | Contract Block
+  syntax FunBody ::= "{" Block "}"
+                   | "{" Contract Block "}"
   syntax Contract ::= "pre" "{" Conditions "}"
                     | "post" "{" Conditions "}"
                     | "pre" "{" Conditions "}" "post" "{" Conditions "}"
   syntax ContractBlock ::= "{" Contract "}"
                          | "{" "}"
+
+  rule { B } ::FunBody => { pre { .Conditions } post { .Conditions } B } ::FunBody [macro]
 
   rule {} => { pre { .Conditions } post { .Conditions } } [macro]
   rule pre { Cond } => pre { Cond } post { .Conditions } [macro]
@@ -166,7 +169,7 @@ module FPL-COMMON-SYNTAX
                 | "continue"
                 | "break"
                 | "return"
-                | "return" Exp
+                | "return" Exp [strict]
 
   syntax IfStmt ::= "if" IfCond "{" Block "}"
                   | "if" IfCond "{" Block "}" "else" "{" Block "}"
@@ -196,8 +199,8 @@ module FPL-COMMON-SYNTAX
                | "[" Exps "]"        [strict(1)]
                | "[" Type "]"               // type-indexed collections
                | "{" DictEntries "}" [strict(1)]
-               | "fun" "(" Formals ")" "{" FunBody "}"
-               | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
+               | "fun" "(" Formals ")" FunBody
+               | "fun" "(" Formals ")" ":" Annot FunBody
                | Exp "[" Exp "]" [lval, seqstrict]
                | Exp "." Ident    [lval, strict(1)] // field access
                | Ident "(" Actuals ")" [strict(2), klabel(call)]
@@ -238,9 +241,11 @@ module FPL-COMMON-SYNTAX
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
 
-  syntax Actual ::= Ident ":" Exp [strict(2)]
+  syntax KResult
+  syntax Actual ::= Ident ":" Exp [hybrid, strict(2)]
                   | Exp
-  syntax Actuals ::= List{Actual,","}
+  syntax Actuals ::= List{Actual,","} [seqstrict, klabel(actuals), hybrid]
+  rule isKResult(.Actuals) => true
 
   syntax TypeId ::= Ident // plus fully qualified names
   syntax TypeIds ::= List{TypeId,","}
@@ -307,9 +312,21 @@ module FPL-ENV
   syntax EnvEntry ::= env(mut: Mutability, v: TypedVal)
 endmodule
 
+module FPL-STACK
+  imports DOMAINS
+  imports FPL-ENV
+  syntax Frame ::= frame(code:K, env: Map)
+endmodule
+
+module FPL-FUN-ENV
+  imports FPL-COMMON-SYNTAX
+  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block)
+endmodule
+
 module FPL-TYPING
   imports FPL-CONFIGURATION
   imports FPL-ENV
+  imports FPL-FUN-ENV
 
   syntax Type ::= type(Exp) [function]
                 | #type(Exp) [function]
@@ -335,6 +352,8 @@ module FPL-TYPING
   rule #type(B:Bool) => Bool
   rule [[ #type(X:Ident) => T ]]
        <env>... X |-> env(... v: v(_, T)) ...</env>
+  rule [[ #type(Fun:Ident(Provided:Actuals)) => R ]]
+       <funs>... Fun |-> funDef(... args: Expected, result: R) ...</funs>
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -390,7 +409,6 @@ module FPL-TYPING
   rule chop(v(I, Int16)) => v((I -Int min16) modInt pow16 +Int min16, Int16)
   rule chop(v(I, Int32)) => v((I -Int min32) modInt pow32 +Int min32, Int32)
   rule chop(v(I, Int64)) => v((I -Int min64) modInt pow64 +Int min64, Int64)
-
 endmodule
 
 module FPL-CONFIGURATION
@@ -398,11 +416,14 @@ module FPL-CONFIGURATION
   imports FPL-COMMON-SYNTAX
   imports FPL-SCOPES
   imports FPL-VALUES
+  imports FPL-STACK
 
   configuration
     <k>$PGM:Pgm</k>
     <scope> global </scope>
     <env> .Map </env>
+    <stack> .List </stack>
+    <funs> .Map </funs>
 endmodule
 
 module FPL-VARIABLE-DECLARATION
@@ -427,6 +448,50 @@ module FPL-VARIABLE-DECLARATION
 
   rule <k> X:Ident => V ... </k>
        <env>... X |-> env(... v: V) ...</env>
+endmodule
+
+module FPL-STMTS
+  imports FPL-CONFIGURATION
+
+  rule .Block => .K
+  rule S; B::Block => S ~> B
+endmodule
+
+module FPL-FUNCTIONS
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
+       <funs> Rho => Rho [ F <- funDef(Fs, T, C, B) ] </funs>
+
+  syntax Bool ::= checkLabels(Formals,Actuals) [function]
+  rule checkLabels(.Formals, .Actuals) => true
+  rule checkLabels(((Lbl _ : _), FS), ((ArgLbl : _), AS)) => checkLabels(FS,AS)
+     when Lbl ==K ArgLbl
+  rule checkLabels(((Lbl _ : _), FS), (_::Exp, AS)) => checkLabels(FS,AS)
+     when Lbl ==K #token("_","Ident")
+  rule checkLabels(_,_) => false [owise]
+
+  syntax Map ::= initArgs(Formals,Actuals) [function]
+               | initArg(Formal,Actual) [function]
+  rule initArgs(.Formals, .Actuals) => .Map
+  rule initArgs((F, FS), (A, AS)) => initArg(F,A) initArgs(FS,AS)
+
+  rule initArg((Lbl Name : T), (ArgLbl : X)) =>
+       Name |-> env(let, X)
+     when Lbl ==K ArgLbl
+  rule initArg((NoLbl Name : T), X:TypedVal) =>
+       Name |-> env(let, X)
+     when NoLbl ==K #token("_","Ident")
+
+  rule <k>((F:Ident)(Args) ~> K) => B:Block</k>
+       <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
+       <env>Env => initArgs(Params, Args) </env>
+       <stack> .List => ListItem(frame(K, Env)) ...</stack>
+  rule <k>return X:TypedVal ~> _ => X ~> K</k>
+       <env>_ => Env</env>
+       <stack> ListItem(frame(K,Env)) => .List ...</stack>
+
 endmodule
 
 module FPL-ARITHMETIC
@@ -531,6 +596,8 @@ endmodule
 module FPL
   imports FPL-CONFIGURATION
   imports FPL-VARIABLE-DECLARATION
+  imports FPL-STMTS
+  imports FPL-FUNCTIONS
   imports FPL-ARITHMETIC
 
   rule T::TopDefinition ; Ts::Pgm => T ~> Ts
@@ -554,5 +621,6 @@ module FPL-TESTING
 
   rule <k> .Pgm </k>
        <env> E => .Map </env>
+       <funs> _ => .Map </funs>
     requires E =/=K .Map
 endmodule
