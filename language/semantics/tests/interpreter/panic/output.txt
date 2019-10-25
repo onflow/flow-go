@@ -8,10 +8,10 @@
   <env>
     .Map
   </env>
+  <store>
+    .Map
+  </store>
   <stack>
     .List
   </stack>
-  <funs>
-    .Map
-  </funs>
 </generatedTop>

@@ -60,7 +60,9 @@ module FPL-COMMON-SYNTAX
   syntax FunDef ::= "fun" Ident "(" Formals ")"           FunBody
                   | "fun" Ident "(" Formals ")" ":" Annot FunBody
 
-  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : noAnnot() Body [macro]
+  syntax Ident ::= "Void" [token]
+
+  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : Void Body [macro]
 
   syntax CompositeItems ::= List{CompositeItemAccess,""}
   syntax CompositeItemAccess ::= Access CompositeItem
@@ -94,8 +96,8 @@ module FPL-COMMON-SYNTAX
                             | "fun" Ident "(" Formals ")" ":" Annot
                             | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
 
-  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : noAnnot() {} [macro]
-  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : noAnnot() Block [macro]
+  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : Void {} [macro]
+  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : Void Block [macro]
   rule fun Ident ( Formals ) : Annot              => fun Ident ( Formals ) : Annot {} [macro]
 
   syntax AccessorContracts ::= List{AccessorContract,""}
@@ -236,7 +238,7 @@ module FPL-COMMON-SYNTAX
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
-  rule fun ( Formals ) { Body } => fun ( Formals ) : noAnnot() { Body } [macro]
+  rule fun ( Formals ) { Body } => fun ( Formals ) : Void { Body } [macro]
 
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
@@ -288,8 +290,9 @@ module FPL-SYNTAX
 endmodule
 
 module FPL-SCOPES
-    syntax Ident
-    syntax Scope ::= "global" | local(Ident)
+    imports INT-SYNTAX
+
+    syntax Scope ::= "global" | local(Int)
 endmodule
 
 module FPL-VALUES
@@ -307,20 +310,25 @@ module FPL-VALUES
 endmodule
 
 module FPL-ENV
-  syntax TypedVal
+  imports INT-SYNTAX
+
+  syntax Type
   syntax Mutability ::= "let" | "var"
-  syntax EnvEntry ::= env(mut: Mutability, v: TypedVal)
+  syntax EnvEntry ::= env(mut: Mutability, t: Type, loc: Int)
 endmodule
 
 module FPL-STACK
-  imports DOMAINS
-  imports FPL-ENV
-  syntax Frame ::= frame(code:K, env: Map)
+  imports MAP
+
+  syntax Scope
+  syntax Frame ::= frame(code:K, env: Map, scope: Scope)
 endmodule
 
 module FPL-FUN-ENV
   imports FPL-COMMON-SYNTAX
-  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block)
+  imports MAP
+
+  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
 endmodule
 
 module FPL-PANIC
@@ -360,9 +368,10 @@ module FPL-TYPING
   rule #type(I:Int) => IntLit
   rule #type(B:Bool) => Bool
   rule [[ #type(X:Ident) => T ]]
-       <env>... X |-> env(... v: v(_, T)) ...</env>
-  rule [[ #type(Fun:Ident(Provided:Actuals)) => R ]]
-       <funs>... Fun |-> funDef(... args: Expected, result: R) ...</funs>
+       <env>... X |-> env(... t: T) ...</env>
+  rule [[ #type(X:Ident(_)) => R ]]
+       <env>... X |-> env(... loc: L) ...</env>
+       <store>... L |-> funDef(... result: R) ...</store>
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -429,8 +438,8 @@ module FPL-CONFIGURATION
     <k>$PGM:Pgm</k>
     <scope> global </scope>
     <env> .Map </env>
+    <store> .Map </store>
     <stack> .List </stack>
-    <funs> .Map </funs>
 endmodule
 
 module FPL-VARIABLE-DECLARATION
@@ -446,15 +455,18 @@ module FPL-VARIABLE-DECLARATION
   rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
 
   rule <k> let X : T:Type = v(V, T) => . ... </k>
-       <env> Rho => Rho [ X <- env(let, v(V, T)) ] </env>
+       <env> Rho => Rho [ X <- env(let, T, !L:Int) ] </env>
+       <store>... .Map => !L |-> V ...</store>
   rule <k> var X : T:Type = v(V, T) => . ... </k>
-       <env> Rho => Rho [ X <- env(var, v(V, T)) ] </env>
+       <env> Rho => Rho [ X <- env(var, T, !L:Int) ] </env>
+       <store>... .Map => !L |-> V ...</store>
 
   rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
   rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
 
-  rule <k> X:Ident => V ... </k>
-       <env>... X |-> env(... v: V) ...</env>
+  rule <k> X:Ident => v(V, T) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
 endmodule
 
 module FPL-STMTS
@@ -469,7 +481,12 @@ module FPL-FUNCTIONS
   imports FPL-TYPING
 
   rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
-       <funs> Rho => Rho [ F <- funDef(Fs, T, C, B) ] </funs>
+       <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
+       <store>... .Map => !L |-> funDef(Fs, T, C, B, Rho [ F <- env(let, ((types(Fs)): T), !L) ]) ...</store>
+
+  syntax Types ::= types(Formals) [function]
+  rule types(.Formals) => .Types
+  rule types(_ _ : T, Fs) => T, types(Fs)
 
   syntax Bool ::= checkLabels(Formals,Actuals) [function]
   rule checkLabels(.Formals, .Actuals) => true
@@ -489,12 +506,21 @@ module FPL-FUNCTIONS
     requires NoLbl ==K #token("_","Ident")
 
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
-       <funs>... F |-> funDef(... args: Params, body: B) ...</funs>
-       <env> Env </env>
-       <stack> .List => ListItem(frame(K, Env)) ...</stack>
-  rule <k>return X:TypedVal ~> _ => X ~> K</k>
-       <env>_ => Env</env>
-       <stack> ListItem(frame(K,Env)) => .List ...</stack>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
+       <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
+       <scope> Scope => local(L) </scope>
+       <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
+  rule <k> return ~> _ => K </k>
+       <env> _ => Rho </env>
+       <scope> _ => Scope </scope>
+       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+  rule <k> return X:TypedVal ~> _ => X ~> K </k>
+       <env> _ => Rho </env>
+       <scope> _ => Scope </scope>
+       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+  rule <k> return I:Int => return v(I, T) ... </k>
+       <scope> local(L) </scope>
+       <store>... L |-> funDef(... result: T) ...</store>
 
 endmodule
 
@@ -625,8 +651,8 @@ module FPL-TESTING
 
   rule <k> .Pgm #Or panic(_) </k>
        <env> E => .Map </env>
-       <funs> _ => .Map </funs>
-    requires E =/=K .Map
+       <store> S => .Map </store>
+    requires E =/=K .Map orBool S =/=K .Map
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
