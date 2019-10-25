@@ -60,7 +60,9 @@ module FPL-COMMON-SYNTAX
   syntax FunDef ::= "fun" Ident "(" Formals ")"           FunBody
                   | "fun" Ident "(" Formals ")" ":" Annot FunBody
 
-  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : noAnnot() Body [macro]
+  syntax Ident ::= "Void" [token]
+
+  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : Void Body [macro]
 
   syntax CompositeItems ::= List{CompositeItemAccess,""}
   syntax CompositeItemAccess ::= Access CompositeItem
@@ -94,8 +96,8 @@ module FPL-COMMON-SYNTAX
                             | "fun" Ident "(" Formals ")" ":" Annot
                             | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
 
-  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : noAnnot() {} [macro]
-  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : noAnnot() Block [macro]
+  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : Void {} [macro]
+  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : Void Block [macro]
   rule fun Ident ( Formals ) : Annot              => fun Ident ( Formals ) : Annot {} [macro]
 
   syntax AccessorContracts ::= List{AccessorContract,""}
@@ -236,7 +238,7 @@ module FPL-COMMON-SYNTAX
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
-  rule fun ( Formals ) { Body } => fun ( Formals ) : noAnnot() { Body } [macro]
+  rule fun ( Formals ) { Body } => fun ( Formals ) : Void { Body } [macro]
 
   syntax DictEntries ::= List{DictEntry,","} [seqstrict]
   syntax DictEntry ::= Exp ":" Exp [seqstrict]
