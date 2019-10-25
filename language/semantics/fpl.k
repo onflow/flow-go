@@ -510,10 +510,17 @@ module FPL-FUNCTIONS
        <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
        <scope> Scope => local(L) </scope>
        <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
+  rule <k> return ~> _ => K </k>
+       <env> _ => Rho </env>
+       <scope> _ => Scope </scope>
+       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
   rule <k> return X:TypedVal ~> _ => X ~> K </k>
        <env> _ => Rho </env>
        <scope> _ => Scope </scope>
        <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+  rule <k> return I:Int => return v(I, T) ... </k>
+       <scope> local(L) </scope>
+       <store>... L |-> funDef(... result: T) ...</store>
 
 endmodule
 
