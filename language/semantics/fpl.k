@@ -169,7 +169,7 @@ module FPL-COMMON-SYNTAX
                 | "continue"
                 | "break"
                 | "return"
-                | "return" Exp
+                | "return" Exp [strict]
 
   syntax IfStmt ::= "if" IfCond "{" Block "}"
                   | "if" IfCond "{" Block "}" "else" "{" Block "}"
@@ -393,6 +393,13 @@ module FPL-VARIABLE-DECLARATION
        <env>... X |-> env(... v: V) ...</env>
 endmodule
 
+module FPL-STMTS
+  imports FPL-CONFIGURATION
+
+  rule .Block => .K
+  rule S; B::Block => S ~> B
+endmodule
+
 module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
@@ -436,6 +443,7 @@ endmodule
 module FPL
   imports FPL-CONFIGURATION
   imports FPL-VARIABLE-DECLARATION
+  imports FPL-STMTS
   imports FPL-FUNCTIONS
   imports FPL-ARITHMETIC
 
