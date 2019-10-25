@@ -95,7 +95,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(tx)
+	b, err := encoding.DefaultEncoder.EncodeTransaction(tx)
 	if err != nil {
 		return nil, err
 	}

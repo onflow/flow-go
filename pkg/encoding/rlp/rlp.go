@@ -14,36 +14,7 @@ func NewEncoder() *Encoder {
 }
 
 func (e *Encoder) EncodeTransaction(tx types.Transaction) ([]byte, error) {
-	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
-	for i, scriptAccount := range tx.ScriptAccounts {
-		scriptAccounts[i] = scriptAccount.Bytes()
-	}
-
-	signatures := make([]accountSignatureWrapper, len(tx.Signatures))
-	for i, signature := range tx.Signatures {
-		signatures[i] = accountSignatureWrapper{
-			Account:   signature.Account.Bytes(),
-			Signature: signature.Signature,
-		}
-	}
-
-	w := transactionWrapper{
-		Script:             tx.Script,
-		ReferenceBlockHash: tx.ReferenceBlockHash,
-		Nonce:              tx.Nonce,
-		ComputeLimit:       tx.ComputeLimit,
-		PayerAccount:       tx.PayerAccount.Bytes(),
-		ScriptAccounts:     scriptAccounts,
-		Signatures:         signatures,
-		Status:             uint8(tx.Status),
-	}
-
-	return rlp.EncodeToBytes(&w)
-}
-
-func (e *Encoder) EncodeCanonicalTransaction(tx types.Transaction) ([]byte, error) {
-	w := wrapTransactionCanonical(tx)
-
+	w := wrapTransaction(tx)
 	return rlp.EncodeToBytes(&w)
 }
 
@@ -126,10 +97,10 @@ func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a types.AccountPrivateKey, 
 }
 
 func (e *Encoder) EncodeChunk(c types.Chunk) ([]byte, error) {
-	transactions := make([]transactionCanonicalWrapper, 0, len(c.Transactions))
+	transactions := make([]transactionWrapper, 0, len(c.Transactions))
 
 	for i, tx := range c.Transactions {
-		transactions[i] = wrapTransactionCanonical(*tx)
+		transactions[i] = wrapTransaction(*tx)
 	}
 
 	w := chunkWrapper{
@@ -141,10 +112,10 @@ func (e *Encoder) EncodeChunk(c types.Chunk) ([]byte, error) {
 }
 
 func (e *Encoder) EncodeCollection(c types.Collection) ([]byte, error) {
-	transactions := make([]transactionCanonicalWrapper, 0, len(c.Transactions))
+	transactions := make([]transactionWrapper, 0, len(c.Transactions))
 
 	for i, tx := range c.Transactions {
-		transactions[i] = wrapTransactionCanonical(*tx)
+		transactions[i] = wrapTransaction(*tx)
 	}
 
 	w := collectionWrapper{

@@ -363,7 +363,7 @@ func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 func (b *EmulatedBlockchain) verifySignatures(tx types.Transaction) error {
 	accountWeights := make(map[types.Address]int)
 
-	encodedTx, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(tx)
+	encodedTx, err := encoding.DefaultEncoder.EncodeTransaction(tx)
 	if err != nil {
 		return err
 	}

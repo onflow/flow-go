@@ -9,26 +9,15 @@ type transactionWrapper struct {
 	ComputeLimit       uint64
 	PayerAccount       []byte
 	ScriptAccounts     [][]byte
-	Signatures         []accountSignatureWrapper
-	Status             uint8
 }
 
-type transactionCanonicalWrapper struct {
-	Script             []byte
-	ReferenceBlockHash []byte
-	Nonce              uint64
-	ComputeLimit       uint64
-	PayerAccount       []byte
-	ScriptAccounts     [][]byte
-}
-
-func wrapTransactionCanonical(tx types.Transaction) transactionCanonicalWrapper {
+func wrapTransaction(tx types.Transaction) transactionWrapper {
 	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
 	for i, scriptAccount := range tx.ScriptAccounts {
 		scriptAccounts[i] = scriptAccount.Bytes()
 	}
 
-	w := transactionCanonicalWrapper{
+	w := transactionWrapper{
 		Script:             tx.Script,
 		ReferenceBlockHash: tx.ReferenceBlockHash,
 		Nonce:              tx.Nonce,
@@ -59,10 +48,10 @@ type accountSignatureWrapper struct {
 }
 
 type chunkWrapper struct {
-	Transactions          []transactionCanonicalWrapper
+	Transactions          []transactionWrapper
 	TotalComputationLimit uint64
 }
 
 type collectionWrapper struct {
-	Transactions []transactionCanonicalWrapper
+	Transactions []transactionWrapper
 }

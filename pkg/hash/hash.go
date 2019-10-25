@@ -9,7 +9,7 @@ import (
 var DefaultHasher, _ = crypto.NewHasher(crypto.SHA3_256)
 
 func SetTransactionHash(tx *types.Transaction) error {
-	b, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(*tx)
+	b, err := encoding.DefaultEncoder.EncodeTransaction(*tx)
 	if err != nil {
 		return err
 	}
