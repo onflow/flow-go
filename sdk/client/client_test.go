@@ -34,7 +34,7 @@ func TestSendTransaction(t *testing.T) {
 		// client should return non-error if RPC call succeeds
 		mockRPC.EXPECT().
 			SendTransaction(ctx, gomock.Any()).
-			Return(&observe.SendTransactionResponse{Hash: tx.Hash()}, nil).
+			Return(&observe.SendTransactionResponse{Hash: tx.Hash}, nil).
 			Times(1)
 
 		err := c.SendTransaction(ctx, tx)

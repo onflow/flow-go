@@ -21,7 +21,7 @@ func NewMockStorage() Storage {
 
 // InsertTransaction inserts a signed transaction into storage.
 func (d *MockStorage) InsertTransaction(tx types.Transaction) error {
-	d.transactions[string(tx.Hash())] = tx
+	d.transactions[string(tx.Hash)] = tx
 	return nil
 }
 

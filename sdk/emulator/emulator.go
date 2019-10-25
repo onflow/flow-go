@@ -6,6 +6,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/constants"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/pkg/encoding"
+	"github.com/dapperlabs/flow-go/pkg/hash"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime"
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -194,49 +196,50 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	missingFields := tx.MissingFields()
+	hash.SetTransactionHash(tx)
 
 	// TODO: add more invalid transaction checks
+	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
+		return &ErrInvalidTransaction{TxHash: tx.Hash, MissingFields: missingFields}
 	}
 
-	if _, exists := b.txPool[string(tx.Hash())]; exists {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	if _, exists := b.txPool[string(tx.Hash)]; exists {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash}
 	}
 
-	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	if b.pendingWorldState.ContainsTransaction(tx.Hash) {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash}
 	}
 
-	if err := b.verifySignatures(tx); err != nil {
+	if err := b.verifySignatures(*tx); err != nil {
 		return err
 	}
 
-	b.txPool[string(tx.Hash())] = tx
+	b.txPool[string(tx.Hash)] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
 
-	events, err := b.computer.ExecuteTransaction(registers, tx)
+	events, err := b.computer.ExecuteTransaction(registers, *tx)
 	if err != nil {
-		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+		b.pendingWorldState.UpdateTransactionStatus(tx.Hash, types.TransactionReverted)
 
-		b.updatePendingWorldStates(tx.Hash())
+		b.updatePendingWorldStates(tx.Hash)
 
-		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+		return &ErrTransactionReverted{TxHash: tx.Hash, Err: err}
 	}
 
 	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
-	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
+	b.pendingWorldState.UpdateTransactionStatus(tx.Hash, types.TransactionFinalized)
 
-	b.updatePendingWorldStates(tx.Hash())
+	b.updatePendingWorldStates(tx.Hash)
 
 	// TODO: improve the pending block, provide all block information
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	blockNumber := prevBlock.Number + 1
 
-	b.emitTransactionEvents(events, blockNumber, tx.Hash())
+	b.emitTransactionEvents(events, blockNumber, tx.Hash)
 
 	return nil
 }
@@ -292,9 +295,9 @@ func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
-		txHashes = append(txHashes, tx.Hash())
-		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != types.TransactionReverted {
-			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+		txHashes = append(txHashes, tx.Hash)
+		if b.pendingWorldState.GetTransaction(tx.Hash).Status != types.TransactionReverted {
+			b.pendingWorldState.UpdateTransactionStatus(tx.Hash, types.TransactionSealed)
 		}
 	}
 	b.txPool = make(map[string]*types.Transaction)
@@ -357,11 +360,16 @@ func (b *EmulatedBlockchain) LastCreatedAccount() types.Account {
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
-func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
+func (b *EmulatedBlockchain) verifySignatures(tx types.Transaction) error {
 	accountWeights := make(map[types.Address]int)
 
+	encodedTx, err := encoding.DefaultEncoder.EncodeCanonicalTransaction(tx)
+	if err != nil {
+		return err
+	}
+
 	for _, accountSig := range tx.Signatures {
-		accountPublicKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountPublicKey, err := b.verifyAccountSignature(accountSig, encodedTx)
 		if err != nil {
 			return err
 		}
@@ -384,8 +392,8 @@ func (b *EmulatedBlockchain) verifySignatures(tx *types.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(keys []types.AccountPublicKey, code []byte, nonce uint64) (types.Address, error) {
-	createAccountScript, err := templates.CreateAccount(keys, code)
+func (b *EmulatedBlockchain) CreateAccount(publicKeys []types.AccountPublicKey, code []byte, nonce uint64) (types.Address, error) {
+	createAccountScript, err := templates.CreateAccount(publicKeys, code)
 	if err != nil {
 		return types.Address{}, nil
 	}
@@ -398,7 +406,12 @@ func (b *EmulatedBlockchain) CreateAccount(keys []types.AccountPublicKey, code [
 		PayerAccount:       b.RootAccountAddress(),
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	if err != nil {
+		return types.Address{}, nil
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx)
 	if err != nil {

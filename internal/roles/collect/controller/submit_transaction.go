@@ -41,7 +41,7 @@ func (c *Controller) SubmitTransaction(
 		return nil, status.Error(codes.InvalidArgument, msgFailedTransactionDecode)
 	}
 
-	if c.storage.ContainsTransaction(tx.Hash()) {
+	if c.storage.ContainsTransaction(tx.Hash) {
 		return &svc.SubmitTransactionResponse{}, nil
 	}
 

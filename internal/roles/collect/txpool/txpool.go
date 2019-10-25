@@ -27,7 +27,7 @@ func (tp *TxPool) Insert(tx types.Transaction) {
 	tp.mutex.Lock()
 	defer tp.mutex.Unlock()
 
-	tp.transactions[string(tx.Hash())] = tx
+	tp.transactions[string(tx.Hash)] = tx
 }
 
 // Get returns the transaction with the provided hash or nil if it does not exist

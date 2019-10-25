@@ -30,13 +30,13 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) ([]types.Event, error) {
+func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx types.Transaction) ([]types.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
 
-	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash())
+	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash)
 	if err != nil {
 		return nil, err
 	}

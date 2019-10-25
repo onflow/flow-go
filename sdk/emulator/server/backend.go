@@ -53,12 +53,12 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = b.blockchain.SubmitTransaction(&tx)
+	err = b.blockchain.SubmitTransaction(tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
 			b.logger.
-				WithField("txHash", tx.Hash().Hex()).
+				WithField("txHash", tx.Hash.Hex()).
 				Infof("💸  Transaction #%d mined", tx.Nonce)
 			b.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *emulator.ErrDuplicateTransaction:
@@ -72,7 +72,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 		}
 	} else {
 		b.logger.
-			WithField("txHash", tx.Hash().Hex()).
+			WithField("txHash", tx.Hash.Hex()).
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
@@ -85,7 +85,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 	}).Infof("⛏  Block #%d mined", block.Number)
 
 	response := &observe.SendTransactionResponse{
-		Hash: tx.Hash(),
+		Hash: tx.Hash,
 	}
 
 	return response, nil

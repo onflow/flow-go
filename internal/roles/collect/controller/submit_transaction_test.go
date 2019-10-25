@@ -93,12 +93,12 @@ func TestSubmitTransactionStorage(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	// stored transaction should be identical to submitted transaction
-	txB, err := store.GetTransaction(txA.Hash())
+	txB, err := store.GetTransaction(txA.Hash)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(txA).To(Equal(txB))
 
 	// pending transaction should be identical to submitted transaction
-	txC := txPool.Get(txA.Hash())
+	txC := txPool.Get(txA.Hash)
 	Expect(txA).To(Equal(txC))
 }
 
@@ -121,7 +121,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	// manually remove the transaction from the pending pool
-	txPool.Remove(txA.Hash())
+	txPool.Remove(txA.Hash)
 
 	// resubmit transaction
 	_, err = c.SubmitTransaction(
@@ -131,6 +131,6 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	Expect(err).ToNot(HaveOccurred())
 
 	// transaction should not be added back to pool on 2nd submission
-	containsTx := txPool.Contains(txA.Hash())
+	containsTx := txPool.Contains(txA.Hash)
 	Expect(containsTx).To(BeFalse())
 }
