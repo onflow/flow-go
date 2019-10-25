@@ -13,7 +13,7 @@ func NewEncoder() *Encoder {
 	return &Encoder{}
 }
 
-func (e *Encoder) EncodeTransaction(tx *types.Transaction) ([]byte, error) {
+func (e *Encoder) EncodeTransaction(tx types.Transaction) ([]byte, error) {
 	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
 	for i, scriptAccount := range tx.ScriptAccounts {
 		scriptAccounts[i] = scriptAccount.Bytes()
@@ -41,25 +41,13 @@ func (e *Encoder) EncodeTransaction(tx *types.Transaction) ([]byte, error) {
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) EncodeCanonicalTransaction(tx *types.Transaction) ([]byte, error) {
-	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
-	for i, scriptAccount := range tx.ScriptAccounts {
-		scriptAccounts[i] = scriptAccount.Bytes()
-	}
-
-	w := transactionCanonicalWrapper{
-		Script:             tx.Script,
-		ReferenceBlockHash: tx.ReferenceBlockHash,
-		Nonce:              tx.Nonce,
-		ComputeLimit:       tx.ComputeLimit,
-		PayerAccount:       tx.PayerAccount.Bytes(),
-		ScriptAccounts:     scriptAccounts,
-	}
+func (e *Encoder) EncodeCanonicalTransaction(tx types.Transaction) ([]byte, error) {
+	w := wrapTransactionCanonical(tx)
 
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) EncodeAccountPublicKey(a *types.AccountPublicKey) ([]byte, error) {
+func (e *Encoder) EncodeAccountPublicKey(a types.AccountPublicKey) ([]byte, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
 		return nil, err
@@ -75,12 +63,12 @@ func (e *Encoder) EncodeAccountPublicKey(a *types.AccountPublicKey) ([]byte, err
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) DecodeAccountPublicKey(b []byte) (*types.AccountPublicKey, error) {
+func (e *Encoder) DecodeAccountPublicKey(b []byte) (a types.AccountPublicKey, err error) {
 	var w accountPublicKeyWrapper
 
-	err := rlp.DecodeBytes(b, &w)
+	err = rlp.DecodeBytes(b, &w)
 	if err != nil {
-		return nil, err
+		return a, err
 	}
 
 	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
@@ -88,10 +76,10 @@ func (e *Encoder) DecodeAccountPublicKey(b []byte) (*types.AccountPublicKey, err
 
 	publicKey, err := crypto.DecodePublicKey(signAlgo, w.PublicKey)
 	if err != nil {
-		return nil, err
+		return a, err
 	}
 
-	return &types.AccountPublicKey{
+	return types.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
@@ -114,12 +102,12 @@ func (e *Encoder) EncodeAccountPrivateKey(a *types.AccountPrivateKey) ([]byte, e
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) DecodeAccountPrivateKey(b []byte) (*types.AccountPrivateKey, error) {
+func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a types.AccountPrivateKey, err error) {
 	var w accountPrivateKeyWrapper
 
-	err := rlp.DecodeBytes(b, &w)
+	err = rlp.DecodeBytes(b, &w)
 	if err != nil {
-		return nil, err
+		return a, err
 	}
 
 	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
@@ -127,12 +115,41 @@ func (e *Encoder) DecodeAccountPrivateKey(b []byte) (*types.AccountPrivateKey, e
 
 	privateKey, err := crypto.DecodePrivateKey(signAlgo, w.PrivateKey)
 	if err != nil {
-		return nil, err
+		return a, err
 	}
 
-	return &types.AccountPrivateKey{
+	return types.AccountPrivateKey{
 		PrivateKey: privateKey,
 		SignAlgo:   signAlgo,
 		HashAlgo:   hashAlgo,
 	}, nil
+}
+
+func (e *Encoder) EncodeChunk(c types.Chunk) ([]byte, error) {
+	transactions := make([]transactionCanonicalWrapper, 0, len(c.Transactions))
+
+	for i, tx := range c.Transactions {
+		transactions[i] = wrapTransactionCanonical(*tx)
+	}
+
+	w := chunkWrapper{
+		Transactions:          transactions,
+		TotalComputationLimit: c.TotalComputationLimit,
+	}
+
+	return rlp.EncodeToBytes(&w)
+}
+
+func (e *Encoder) EncodeCollection(c types.Collection) ([]byte, error) {
+	transactions := make([]transactionCanonicalWrapper, 0, len(c.Transactions))
+
+	for i, tx := range c.Transactions {
+		transactions[i] = wrapTransactionCanonical(*tx)
+	}
+
+	w := collectionWrapper{
+		Transactions: transactions,
+	}
+
+	return rlp.EncodeToBytes(&w)
 }
