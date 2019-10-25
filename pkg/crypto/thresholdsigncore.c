@@ -36,11 +36,11 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint32_t
     // loops is the maximum number of loops that takes the accumulator to 
     // overflow modulo r. Mainly the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r
     const int loops = MAX_IND_LOOPS;
-    for (int k = 0; k < len; ){
-        int j;
+    int k,j = 0;
+    while (j<len) {
         bn_set_dig(&base, 1);
         bn_set_dig(&numerator, 1);
-        for (j = k; j < MIN(len, k+loops); j++){
+        for (k = j; j < MIN(len, k+loops); j++){
             if (signers[j]==i) 
                 continue;
             if (signers[j]<i) 
@@ -48,7 +48,6 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint32_t
             bn_mul_dig(&base, &base, abs((int)signers[j]-i));
             bn_mul_dig(&numerator, &numerator, signers[j]+1);
         }
-        k = j;
         // compute the inverse using little Fernat theorem
         bn_mxp_slide(&inv, &base, &r_2, &r);
         bn_mul(&acc, &acc, &inv);
