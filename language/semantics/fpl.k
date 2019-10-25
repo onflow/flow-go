@@ -184,6 +184,8 @@ module FPL-COMMON-SYNTAX
                 | Path "[" Exp "]"
                 | Path "." Ident
 
+  syntax left lval
+
   syntax Exp ::= IntLit
                | FPLString
                | Ident
@@ -196,32 +198,38 @@ module FPL-COMMON-SYNTAX
                | "{" DictEntries "}" [strict(1)]
                | "fun" "(" Formals ")" "{" FunBody "}"
                | "fun" "(" Formals ")" ":" Annot "{" FunBody "}"
-               | Exp "[" Exp "]" [left, seqstrict]
-               | Exp "." Ident    [left, strict(1)] // field access
+               | Exp "[" Exp "]" [lval, seqstrict]
+               | Exp "." Ident    [lval, strict(1)] // field access
                | Ident "(" Actuals ")" [strict(2)]
                | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
                | TypeId "(" Actuals ")"          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
-               > "-" Exp       [      strict]
-               | "!" Exp       [      strict]
-               > Exp "*" Exp   [left, seqstrict]
-               | Exp "&*" Exp  [left, seqstrict]
-               | Exp "/" Exp   [left, seqstrict]
-               | Exp "%" Exp   [left, seqstrict]
-               > Exp "+" Exp   [left, seqstrict]
-               | Exp "&+" Exp  [left, seqstrict]
-               | Exp "-" Exp   [left, seqstrict]
-               | Exp "&-" Exp  [left, seqstrict]
-               > Exp "?" "?" Exp  [left, strict(1)]
-               | Exp "as?" Exp [      seqstrict]
-               > Exp "==" Exp  [      seqstrict]
-               | Exp "!=" Exp  [      seqstrict]
-               | Exp "<" Exp   [      seqstrict]
-               | Exp "<=" Exp  [      seqstrict]
-               | Exp ">" Exp   [      seqstrict]
-               | Exp ">=" Exp  [      seqstrict]
-               > Exp "&&" Exp  [left, seqstrict]
-               | Exp "||" Exp  [left, seqstrict]
+               > non-assoc:
+                 "-" Exp       [strict]
+               | "!" Exp       [strict]
+               > left:
+                 Exp "*" Exp   [seqstrict]
+               | Exp "&*" Exp  [seqstrict]
+               | Exp "/" Exp   [seqstrict]
+               | Exp "&/" Exp  [seqstrict]
+               | Exp "%" Exp   [seqstrict]
+               > left: Exp "+" Exp   [seqstrict]
+               | Exp "&+" Exp  [seqstrict]
+               | Exp "-" Exp   [seqstrict]
+               | Exp "&-" Exp  [seqstrict]
+               > left:
+                 Exp "?" "?" Exp  [strict(1)]
+               | Exp "as?" Exp [seqstrict]
+               > left:
+                 Exp "==" Exp  [seqstrict]
+               | Exp "!=" Exp  [seqstrict]
+               | Exp "<" Exp   [seqstrict]
+               | Exp "<=" Exp  [seqstrict]
+               | Exp ">" Exp   [seqstrict]
+               | Exp ">=" Exp  [seqstrict]
+               > left:
+                 Exp "&&" Exp  [seqstrict]
+               | Exp "||" Exp  [seqstrict]
                > Exp "?" Exp ":" Exp [right,strict(1)]
   syntax Exps ::= List{Exp,","}      [strict]
 
