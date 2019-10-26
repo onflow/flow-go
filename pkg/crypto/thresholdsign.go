@@ -9,8 +9,8 @@ import (
 	"fmt"
 )
 
-// ThresholdSinger holds the data needed for threshold signaures
-type ThresholdSinger struct {
+// ThresholdSigner holds the data needed for threshold signaures
+type ThresholdSigner struct {
 	// size of the group
 	size int
 	// the thresold t of the scheme where (t+1) shares are
@@ -37,12 +37,12 @@ type ThresholdSinger struct {
 	thresholdSignature Signature
 }
 
-// NewThresholdSigner creates a new instance of Threshold siger using BLS
+// NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
+func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
+		return nil, cryptoError{fmt.Sprintf("Size should be larger than %d.",ThresholdMinSize)}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -55,7 +55,7 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 	shares := make([]byte, 0, size*signatureLengthBLS_BLS12381)
 	signers := make([]uint32, 0, size)
 
-	return &ThresholdSinger{
+	return &ThresholdSigner{
 		size:               size,
 		threshold:          threshold,
 		hashAlgo:           hasher,
@@ -67,7 +67,7 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSinger, error) {
 
 // SetKeys sets the private and public keys needed by the threshold signature
 // the input keys can be the output keys of a Distributed Key Generator
-func (s *ThresholdSinger) SetKeys(currentPrivateKey PrivateKey,
+func (s *ThresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey) {
 
@@ -78,22 +78,22 @@ func (s *ThresholdSinger) SetKeys(currentPrivateKey PrivateKey,
 
 // SetMessageToSign sets the next message to be signed
 // all received signatures of a different message are ignored
-func (s *ThresholdSinger) SetMessageToSign(message []byte) {
+func (s *ThresholdSigner) SetMessageToSign(message []byte) {
 	s.ClearShares()
 	s.messageToSign = message
 }
 
 // SignShare generates a signature share using the current private key share
-func (s *ThresholdSinger) SignShare() (Signature, error) {
+func (s *ThresholdSigner) SignShare() (Signature, error) {
 	if s.currentPrivateKey == nil {
 		return nil, cryptoError{"The private key of the current node is not set"}
 	}
-	// call receiveshare?
+	// TOD0: should ReceiveThresholdSignatureMsg be called ?
 	return s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 }
 
 // VerifyShare verifies a signature share using the signer's public key
-func (s *ThresholdSinger) verifyShare(share Signature, signerIndex int) (bool, error) {
+func (s *ThresholdSigner) verifyShare(share Signature, signerIndex int) (bool, error) {
 	if s.size-1 < signerIndex {
 		return false, cryptoError{"The signer index is larger than the group size"}
 	}
@@ -105,7 +105,7 @@ func (s *ThresholdSinger) verifyShare(share Signature, signerIndex int) (bool, e
 }
 
 // VerifyThresholdSignature verifies a threshold signature using the group public key
-func (s *ThresholdSinger) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
+func (s *ThresholdSigner) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
 	if s.groupPublicKey == nil {
 		return false, cryptoError{"The group public key is not set"}
 	}
@@ -113,14 +113,14 @@ func (s *ThresholdSinger) VerifyThresholdSignature(thresholdSignature Signature)
 }
 
 // ClearShares clears the shares and signers lists
-func (s *ThresholdSinger) ClearShares() {
+func (s *ThresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
 
 // ReceiveThresholdSignatureMsg processes a new TS message received by the current node
-func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature) (bool, Signature, error) {
+func (s *ThresholdSigner) ReceiveThresholdSignatureMsg(orig int, share Signature) (bool, Signature, error) {
 	// if origin is disqualified, ignore the message
 	if s.nodePublicKeys[orig] == nil {
 		return false, nil, nil
@@ -146,7 +146,7 @@ func (s *ThresholdSinger) ReceiveThresholdSignatureMsg(orig int, share Signature
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
-func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
+func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if len(s.shares) != len(s.signers)*signatureLengthBLS_BLS12381 {
 		s.ClearShares()
@@ -165,7 +165,7 @@ func (s *ThresholdSinger) reconstructThresholdSignature() (Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	if verif == false {
+	if !verif {
 		return nil, cryptoError{
 			"The constructed threshold signature in incorrect. There might be an issue with the set keys"}
 	}

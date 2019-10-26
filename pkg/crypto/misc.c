@@ -71,6 +71,7 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
     }
  
     if (ep_is_infty(a)) {
+            // set the infinity bit
             bin[0] = (SERIALIZATION << 7) | 0x40;
             memset(bin+1, 0, G1size-1);
             return;
@@ -105,7 +106,9 @@ void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
         THROW(ERR_NO_BUFFER);
         return;
     }
+    // check if the point is infinity
     if (bin[0] & 0x40) {
+        // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
             return;
@@ -168,6 +171,7 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
     }
  
     if (ep2_is_infty((ep2_st *)a)) {
+            // set the infinity bit
             bin[0] = (SERIALIZATION << 7) | 0x40;
             memset(bin+1, 0, G2size-1);
             return;
@@ -200,7 +204,9 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
         return;
     }
 
+    // check if the point in infinity
     if (bin[0] & 0x40) {
+        // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
             return;
@@ -229,6 +235,7 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
         return;
     }
     memcpy(temp, bin, 2*Fp_BYTES);
+    // clear the header bits
     temp[0] &= 0x1F;
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);

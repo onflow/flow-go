@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ var messageToSign = []byte{1, 2, 3}
 
 // This is a testing function
 // It simulates processing incoming messages by a node during DKG
-func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSinger, chans []chan *toProcess,
+func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSigner, chans []chan *toProcess,
 	pkChan chan PublicKey, dkgSync chan int, t *testing.T) {
 	for {
 		select {
@@ -46,7 +45,7 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSinger,
 
 // This is a testing function
 // It simulates processing incoming messages by a node during TS
-func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
+func tsProcessChan(current int, ts []*ThresholdSigner, chans []chan *toProcess,
 	tsSync chan int, t *testing.T) {
 	// Sign a share and broadcast it
 	sighShare, _ := ts[current].SignShare()
@@ -58,7 +57,7 @@ func tsProcessChan(current int, ts []*ThresholdSinger, chans []chan *toProcess,
 			verif, thresholdSignature, err := ts[current].ReceiveThresholdSignatureMsg(newMsg.orig, newMsg.msg.(Signature))
 			assert.Nil(t, err)
 			assert.True(t, verif,
-				fmt.Sprintf("the signature share sent from %d to %d is not correct", newMsg.orig, current))
+				"the signature share sent from %d to %d is not correct", newMsg.orig, current)
 			if thresholdSignature != nil {
 				verif, err = ts[current].VerifyThresholdSignature(thresholdSignature)
 				assert.Nil(t, err)
@@ -84,7 +83,7 @@ func TestThresholdSignature(t *testing.T) {
 	n := 5
 	lead := 0
 	dkg := make([]DKGstate, n)
-	ts := make([]*ThresholdSinger, n)
+	ts := make([]*ThresholdSigner, n)
 	pkChan := make(chan PublicKey)
 	dkgSync := make(chan int)
 	tsSync := make(chan int)

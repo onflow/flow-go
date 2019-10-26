@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -81,7 +80,7 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 		log.Error("DKG output error: " + out.err.Error())
 	}
 
-	assert.Equal(t, out.result, valid, fmt.Sprintf("Result computed by %d is not correct", current))
+	assert.Equal(t, out.result, valid, "Result computed by %d is not correct", current)
 
 	for _, msg := range out.action {
 		if msg.broadcast {
