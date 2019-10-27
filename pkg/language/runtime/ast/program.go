@@ -11,6 +11,7 @@ type Program struct {
 	eventDeclarations     []*EventDeclaration
 	importedPrograms      map[LocationID]*Program
 	importLocations       []ImportLocation
+	Range
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {

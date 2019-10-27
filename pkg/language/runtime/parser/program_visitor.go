@@ -34,8 +34,14 @@ func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 		allDeclarations = append(allDeclarations, declaration)
 	}
 
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
 	return &ast.Program{
 		Declarations: allDeclarations,
+		Range: ast.Range{
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		},
 	}
 }
 
