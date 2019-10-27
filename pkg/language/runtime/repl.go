@@ -58,6 +58,11 @@ func (r *REPL) execute(element ast.Element) {
 	r.onResult(expStatementRes.Value)
 }
 
+func (r *REPL) check(element ast.Element, code string) bool {
+	element.Accept(r.checker)
+	return !r.handleCheckerError(code)
+}
+
 func (r *REPL) Accept(code string) (inputIsComplete bool) {
 	var result interface{}
 	var err error
@@ -76,8 +81,7 @@ func (r *REPL) Accept(code string) (inputIsComplete bool) {
 
 	switch typedResult := result.(type) {
 	case *ast.Program:
-		typedResult.Accept(r.checker)
-		if !r.handleCheckerError(code) {
+		if !r.check(typedResult, code) {
 			return
 		}
 
@@ -89,8 +93,7 @@ func (r *REPL) Accept(code string) (inputIsComplete bool) {
 		r.checker.Program = nil
 
 		for _, statement := range typedResult {
-			statement.Accept(r.checker)
-			if !r.handleCheckerError(code) {
+			if !r.check(statement, code) {
 				return
 			}
 
