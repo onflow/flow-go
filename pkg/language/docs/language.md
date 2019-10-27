@@ -8,7 +8,7 @@ The Bamboo Programming Language is a new high-level programming language intende
 
 The language's goals are, in order of importance:
 
-- **Safety and security**: Focus on safety, e.g. by providing a strong static type system, design by contract, and linear types; and security, by providing a capability system, and design by contract.
+- **Safety and security**: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).
 - **Auditability**: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
 - **Simplicity**: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
 
@@ -16,16 +16,19 @@ The language's goals are, in order of importance:
 
 In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
 
-- `Invalid` means that the invalid program will not even be allowed to run.  The error is detected and reported statically by the type checker.
+- `Invalid` means that the invalid program will not even be allowed to run.
+  The program error is detected and reported statically by the type checker.
 
-- `Run-time error` refers to bad behavior that will result in the execution of the program being aborted
+- `Run-time error` means that the erroneous program will run,
+  but bad behavior will result in the execution of the program being aborted.
 
 ## Syntax and Behavior
 
-The programming language's syntax and behavior is inspired by Swift, Rust, Kotlin, TypeScript, and Solidity.
+Much of the language's syntax is inspired by Swift, Kotlin, and TypeScript.
 
-Much of the syntax, types, and standard library is inspired by Swift, which popularized e.g. optionals, argument labels,
-and provides safe handling of integer and string types.
+Much of the syntax, types, and standard library is inspired by Swift,
+which popularized e.g. optionals, argument labels,
+and provides safe handling of integers and strings.
 
 Resources are based on liner types which were popularized by Rust.
 
@@ -33,9 +36,11 @@ Events are inspired by Solidity.
 
 ## Comments
 
-Comments can be used to document code. A comment is text that is not executed.
+Comments can be used to document code.
+A comment is text that is not executed.
 
-*Single-line comments* start with two slashes (`//`).  These comments can go on a line by themselves or they can go directly after a line of code.
+*Single-line comments* start with two slashes (`//`).
+These comments can go on a line by themselves or they can go directly after a line of code.
 
 ```bamboo,file=single-line-comment.bpl
 // This is a comment on a single line.
@@ -44,7 +49,8 @@ Comments can be used to document code. A comment is text that is not executed.
 let x = 1  // Here is another comment after a line of code.
 ```
 
-*Multi-line comments* start with a slash and an asterisk (`/*`) and end with an asterisk and a slash (`*/`):
+*Multi-line comments* start with a slash and an asterisk (`/*`)
+and end with an asterisk and a slash (`*/`):
 
 ```bamboo,file=multi-line-comment.bpl
 /* This is a comment which
@@ -65,11 +71,16 @@ Mutli-line comments are balanced.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.
+Constants and variables are declarations that bind a value to a name.
+Constants can only be initialized with a value and cannot be reassigned afterwards.
+Variables can be initialized with a value and can be reassigned later.
+Declarations are valid in any scope, including the global scope.
 
-Constant means that the *name* is constant, not the *value* – the value may still be changed if it allows it, i.e. is mutable.
+Constant means that the *name* is constant, not the *value* –
+the value may still be changed if it allows it, i.e. is mutable.
 
-Constants are declared using the `let` keyword. Variables are declared using the `var` keyword. The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
+Constants are declared using the `let` keyword. Variables are declared using the `var` keyword.
+The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```bamboo,file=constants-and-variables.bpl
 // Declare a constant named `a`.
@@ -97,7 +108,9 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type,
+Once a constant or variable is declared,
+it cannot be redeclared with the same name,
+with a different type,
 or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
 
 ```bamboo
@@ -153,7 +166,8 @@ let a = a
 
 ## Type Annotations
 
-When declaring a constant or variable, an optional *type annotation* can be provided, to make it explicit what type the declaration has.
+When declaring a constant or variable, an optional *type annotation* can be provided,
+to make it explicit what type the declaration has.
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
@@ -181,7 +195,8 @@ let smallIntegerWithAnnotation: Int8 = 1
 ```
 
 If a type annotation is provided, the initial value must be of this type,
-and new values assigned to variables must match the declaration's explicit type or the type that was inferred when the variable was declared.
+and new values assigned to variables must match the declaration's explicit type
+or the type that was inferred when the variable was declared.
 This type safety is explained in more detail in a [separate section](#type-safety).
 
 ```bamboo
@@ -239,12 +254,14 @@ _#1
 
 ### Conventions
 
-By convention, variables, constants, and functions have lowercase names; and types have title-case names.
+By convention, variables, constants, and functions have lowercase names;
+and types have title-case names.
 
 ## Semicolons
 
 Semicolons (;) are used as statement separators.
-A semicolon can be placed after any statement, but can be omitted if only one statement appears on the line.
+A semicolon can be placed after any statement,
+but can be omitted if only one statement appears on the line.
 Semicolons must be used to separate multiple statements if they appear on the same line –
 exactly one semicolon between each pair of statements.
 
@@ -267,7 +284,8 @@ let f = 1;; let g = 2
 
 ## Values and Types
 
-Values are objects, like for example booleans, integers, or arrays. Values are typed.
+Values are objects, like for example booleans, integers, or arrays.
+Values are typed.
 
 ### Booleans
 
@@ -275,7 +293,8 @@ The two boolean values `true` and `false` have the type `Bool`.
 
 ### Numeric Literals
 
-Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.
+Numbers can be written in various bases. Numbers are assumed to be decimal by default.
+Non-decimal literals have a specific prefix.
 
 | Numeral system  | Prefix | Characters                                                            |
 |:----------------|:-------|:----------------------------------------------------------------------|
@@ -330,7 +349,8 @@ let binaryNumber = 0b10_11_01
 ### Integers
 
 Integers are whole numbers without a fractional part.
-They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero)
+and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
 The names for the integer types follow this naming convention:
 Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix,
@@ -399,7 +419,8 @@ let b = x + 1000000000000000000000000
 
 There is **no** support for floating point numbers.
 
-Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here.
+Contracts are not intended to work with values with error margins
+and therefore floating point arithmetic is not appropriate here.
 Fixed point numbers should be simulated using integers and a scale factor for now.
 
 ### Addresses
@@ -449,7 +470,8 @@ someValue = true
 ```
 
 However, using `Any` does not opt-out of type checking.
-It is invalid to access fields and call functions on `Any` typed values, as it has no fields and functions.
+It is invalid to access fields and call functions on `Any` typed values,
+as it has no fields and functions.
 
 ```bamboo
 // Declare a variable that has the type `Any`. The initial value is an integer,
@@ -485,10 +507,12 @@ let anything: Any = y
 
 ### Optionals
 
-Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.
+Optionals are values which can represent the absence of a value. Optionals have two cases:
+either there is a value, or there is nothing.
 
 An optional type is declared using the `?` suffix for another type.
-For example, `Int` is a non-optional integer, and `Int?` is an optional integer, i.e. either nothing, or an integer.
+For example, `Int` is a non-optional integer, and `Int?` is an optional integer,
+i.e. either nothing, or an integer.
 
 The value representing nothing is `nil`.
 
@@ -644,7 +668,9 @@ let boolean = something as? Bool
 // `boolean` is `nil` and has type `Bool?`
 ```
 
-Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.
+Downcasting works for nested types (e.g. arrays),
+interfaces (if a [resource](#resources) interface not to a concrete resource),
+and optionals.
 
 ```bamboo,file=conditional-downcasting-any-array.bpl
 // Declare a constant named `values` which has type `[Any]`,
@@ -710,7 +736,9 @@ String literals may contain escape sequences. An escape sequence starts with a b
 - `\r`: Carriage return
 - `\"`: Double quotation mark
 - `\'`: Single quotation mark
-- `\u`: A Unicode scalar value, written as `\u{x}`, where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+- `\u`: A Unicode scalar value, written as `\u{x}`,
+  where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value,
+  i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
 
 ```bamboo
 // Declare a constant which contains two lines of text
@@ -723,7 +751,14 @@ let thumbsUpText =
 
 The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
 
-For example, the single character `ü` can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value `ü` ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: `u` ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a `u` into a `ü`.
+For example, the single character `ü` can be represented in several ways in Unicode.
+First, it can be represented by a single Unicode scalar value `ü`
+("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC).
+Second, the same single character can be represented by two Unicode scalar values:
+`u` ("LATIN SMALL LETTER U", code point U+0075),
+and "COMBINING DIAERESIS" (code point U+0308).
+The combining Unicode scalar value is applied to the scalar before it,
+which turns a `u` into a `ü`.
 
 Still, both variants represent the same human-readable character `ü`.
 
@@ -734,7 +769,9 @@ let twoScalars: Character = "\u{75}\u{308}"
 // `twoScalars` is `ü`
 ```
 
-Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
+Another example where multiple Unicode scalar values are rendered as a single,
+human-readable character is a flag emoji.
+These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
 
 ```bamboo
 // Declare a constant for a string with a single character, the emoji
@@ -760,7 +797,11 @@ Strings have multiple built-in functions you can use.
     // `length` is `5`
     ```
 
-- `concat(_ other: String): String`:  Concatenates the string `other` to the end of the original string, but does not modify the original string.  This function creates a new string whose length is the sum of the lengths of the two parameter strings.
+- `concat(_ other: String): String`:
+  Concatenates the string `other` to the end of the original string,
+  but does not modify the original string.
+  This function creates a new string whose length is the sum of the lengths
+  of the string the function is called on and the string given as a parameter.
 
     ```bamboo,file=string-concat.bpl
     let example = "hello"
@@ -771,7 +812,12 @@ Strings have multiple built-in functions you can use.
     // `helloWorld` is now `"helloworld"`
     ```
 
-- `slice(from: Int, upTo: Int): String`:  Returns a string slice of the characters in the given string from start index `from` up to, but not including, the end index `upTo`.  This function creates a new string whose length is `upto - from`.  It does not modify the original string.  If either of the parameters are out of the bounds of the string, the function will fail.
+- `slice(from: Int, upTo: Int): String`:
+  Returns a string slice of the characters in the given string from start index `from` up to,
+  but not including, the end index `upTo`.
+  This function creates a new string whose length is `upto - from`.
+  It does not modify the original string.
+  If either of the parameters are out of the bounds of the string, the function will fail.
 
     ```bamboo,file=string-slice.bpl
     let example = "helloworld"
@@ -796,7 +842,10 @@ TODO
 
 ### Arrays
 
-Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
+Arrays are mutable, ordered collections of values.
+All values in an array must have the same type.
+Arrays may contain a value multiple times.
+Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
 ```bamboo,file=arrays.bpl
 // An empty array
@@ -816,21 +865,26 @@ Arrays are mutable, ordered collections of values. All values in an array must h
 
 Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
 
-Fixed-size arrays have the form `[T; N]`, where `T` is the element type, and `N` is the size of the array.
+Fixed-size arrays have the form `[T; N]`, where `T` is the element type,
+and `N` is the size of the array.
 For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
 
 Variable-size arrays have the form `[T]`, where `T` is the element type.
 For example, the type `[Int16]` specifies a variable-size array of elements that have type `Int16`.
 
-It is important to understand that arrays are value types and are only ever copied when used as an initial value for a constant or variable, when assigning to a variable, as function parameter, or returned from a function call.
+It is important to understand that arrays are value types and are only ever copied
+when used as an initial value for a constant or variable,
+when assigning to a variable,
+when used as function argument,
+or when returned from a function call.
 
 ```bamboo,file=array-types.bpl
-// Declare a constant-sized array of integers
+// Declare a fixed-sized array of integers
 // which always contains exactly two elements.
 //
 let array: [Int8; 2] = [1, 2]
 
-// Declare a constant-sized array of constant-sized arrays of integers.
+// Declare a fixed-sized array of fixed-sized arrays of integers.
 // The inner arrays always contain exactly three elements,
 // the outer array always contains two elements.
 //
@@ -840,7 +894,8 @@ let arrays: [[Int16; 3]; 2] = [
 ]
 ```
 
-Array types are covariant in their element types. For example, `[Int]` is a subtype of `[Any]`.
+Array types are covariant in their element types.
+For example, `[Int]` is a subtype of `[Any]`.
 This is safe because arrays are value types and not reference types.
 
 #### Array Indexing
@@ -897,9 +952,14 @@ numbers[1] = 2
 
 #### Array Fields and Functions
 
-Arrays have multiple built-in functions you can use to manipulate the elements. `length`, `concat`, and `contains` apply to all array types whether they are statically sized or dynamic.
+Arrays have multiple built-in fields and functions
+that can be used to get information about and manipulate the contents of the array.
 
-- `length: Int`: Returns the number of elements in the array.
+The field `length`, and the functions `concat`, and `contains`
+are available for both variable-sized and fixed-sized or variable-sized arrays.
+
+- `length: Int`:
+  Returns the number of elements in the array.
 
     ```bamboo,file=array-length-field.bpl
     // Declare an array of integers.
@@ -911,7 +971,14 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // `length` is `4`
     ```
 
-- `concat(_ array: T): T`: Concatenates the parameter `array` to the end of the original array, but does not modify the original array. Both arrays must be the same type `T`. This function creates a new array whose length is the sum of the lengths of the two arrays.
+- `concat(_ array: T): T`:
+  Concatenates the parameter `array` to the end of the array the function is called on,
+  but does not modify that array.
+
+  Both arrays must be the same type `T`.
+
+  This function creates a new array whose length is the sum of the length of the array
+  the function is called on and the length of the array given as the parameter.
 
     ```bamboo,file=array-concat.bpl
     // Declare two arrays of integers.
@@ -928,7 +995,8 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
     // `moreNumbers` is still `[11, 27]`
     ```
 
-- `contains(_ element: T): Bool`: Indicates whether the given element of type `T` is in the array
+- `contains(_ element: T): Bool`:
+  Indicates whether the given element of type `T` is in the array.
 
     ```bamboo,file=array-contains.bpl
     // Declare an array of integers.
@@ -950,9 +1018,13 @@ Arrays have multiple built-in functions you can use to manipulate the elements. 
 
 ##### Variable-size Array Functions
 
-The following functions can only be used on variable-sized arrays.  It is invalid to use one of these functions on a statically sized array.
+The following functions can only be used on variable-sized arrays.
+It is invalid to use one of these functions on a fixed-sized array.
 
-- `append(_ element: T): Void`: Adds an element of type `T` to the array.  The element is added to the end of the array.  The given value must be the same type as all the other elements in the array.
+- `append(_ element: T): Void`:
+  Adds the new element `element` of type `T` to the end of the array.
+
+  The new element must be the same type as all the other elements in the array.
 
     ```bamboo,file=array-append.bpl
     // Declare an array of integers.
@@ -966,7 +1038,17 @@ The following functions can only be used on variable-sized arrays.  It is invali
     numbers.append("SneakyString")
     ```
 
-- `insert(at index: Int, _ element: T): Void`: Inserts an element of type `T` at the given index of the array.  The value must be of the same type as the array and the index must be less than the length of the array.  The existing element at the supplied index is not overwritten.  All the elements after the new inserted element are simply shifted to the right by one.
+- `insert(at index: Int, _ element: T): Void`:
+  Inserts the new element `element` of type `T` at the given `index` of the array.
+
+  The new element must be of the same type as all the other elements in the array.
+
+  The `index` must be within the bounds of the array.
+  If the index is outside the bounds, the program aborts.
+
+  The existing element at the supplied index is not overwritten.
+
+  All the elements after the new inserted element are shifted to the right by one.
 
     ```bamboo,file=array-insert.bpl
     // Declare an array of integers.
@@ -980,31 +1062,71 @@ The following functions can only be used on variable-sized arrays.  It is invali
     numbers.insert(at: 12, 39)
     ```
 
-- `remove(at index: Int): T`: Removes the element at the given index from the array and returns it.  `index` must be within the bounds of the array.
-- `removeFirst(): T`: Removes the first element from the array and returns it.
-- `removeLast(): T`: Removes the last element from the array and returns it.
+- `remove(at index: Int): T`:
+  Removes the element at the given `index` from the array and returns it.
+
+  The `index` must be within the bounds of the array.
+  If the index is outside the bounds, the program aborts.
 
     ```bamboo,file=array-remove.bpl
     // Declare an array of integers.
-    let numbers = [42, 23, 31, 12]
+    let numbers = [42, 23, 31]
 
     // Remove element at position 1 of the array.
     let twentyThree = numbers.remove(at: 1)
-    // `numbers` is now `[42, 31, 12]`
+    // `numbers` is now `[42, 31]`
     // `twentyThree` is `23`
 
     // Run-time error: Out of bounds index, the program aborts.
     numbers.remove(at: 19)
+    ```
+
+- `removeFirst(): T`:
+  Removes the first element from the array and returns it.
+
+  The array must not be empty.
+  If the array is empty, the program aborts.
+
+    ```bamboo,file=array-remove-first.bpl
+    // Declare an array of integers.
+    let numbers = [42, 23]
 
     // Remove the first element of the array.
     let fortytwo = numbers.removeFirst()
-    // `numbers` is now `[31, 12]`
+    // `numbers` is now `[23]`
     // `fortywo` is `42`
 
+    // Remove the first element of the array.
+    let twentyThree = numbers.removeFirst()
+    // `numbers` is now `[]`
+    // `twentyThree` is `23`
+
+    // Run-time error: The array is empty, the program aborts.
+    numbers.removeFirst()
+    ```
+
+- `removeLast(): T`:
+  Removes the last element from the array and returns it.
+
+  The array must not be empty.
+  If the array is empty, the program aborts.
+
+    ```bamboo,file=array-remove.bpl
+    // Declare an array of integers.
+    let numbers = [42, 23]
+
     // Remove the last element of the array.
-    let twelve = numbers.removeLast()
-    // `numbers` is now `[31]`
-    // `twelve` is `12`
+    let twentyThree = numbers.removeLast()
+    // `numbers` is now `[42]`
+    // `twentyThree` is `23`
+
+    // Remove the last element of the array.
+    let fortyTwo = numbers.removeLast()
+    // `numbers` is now `[]`
+    // `fortyTwo` is `42`
+
+    // Run-time error: The array is empty, the program aborts.
+    numbers.removeLast()
     ```
 
 <!--
@@ -1018,9 +1140,12 @@ TODO
 
 ### Dictionaries
 
-Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.
+Dictionaries are mutable, unordered collections of key-value associations.
+In a dictionary, all keys must have the same type, and all values must have the same type.
+Dictionaries may contain a key only once and may contain a value multiple times.
 
-Dictionary literals start with an opening brace `{` and end with a closing brace `}`. Keys are separated from values by a colon, and key-value associations are separated by commas.
+Dictionary literals start with an opening brace `{` and end with a closing brace `}`.
+Keys are separated from values by a colon, and key-value associations are separated by commas.
 
 ```bamboo,file=dictionaries.bpl
 // An empty dictionary
@@ -1044,7 +1169,9 @@ Dictionary literals start with an opening brace `{` and end with a closing brace
 
 #### Dictionary Types
 
-Dictionaries have the form `{K: V}`, where `K` is the type of the key, and `V` is the type of the value.
+Dictionaries have the form `{K: V}`,
+where `K` is the type of the key,
+and `V` is the type of the value.
 For example, a dictionary with `Int` keys and `Bool` values has type `{Int: Bool}`.
 
 ```bamboo,file=dictionary-types.bpl
@@ -1064,6 +1191,10 @@ let integers = {
     false: 0
 }
 ```
+
+Dictionary types are covariant in their key and value types.
+For example, `[Int: String]` is a subtype of `[Any: String]` and also a subtype of `[Int: Any]`.
+This is safe because dictionaries are value types and not reference types.
 
 #### Dictionary Access
 
@@ -1128,9 +1259,46 @@ booleans[0] = true
 
 #### Dictionary Fields and Functions
 
-- `length: Int`: Returns the number of elements in the dictionary.
-- `remove(key: K): V?`: Removes the value for the given key of type `K` from the dictionary.
-    Returns the value of type `V` if the dictionary contained the key as an optional, otherwise `nil`.
+- `length: Int`:
+  Returns the number of entries in the dictionary.
+
+    ```bamboo,file=dictionary-length-field.bpl
+    // Declare a dictionary mapping strings to integers.
+    let numbers = {"fortyTwo": 42, "twentyThree": 23}
+
+    // Find the number of entries of the dictionary.
+    let length = numbers.length
+
+    // `length` is `2`
+    ```
+
+- `remove(key: K): V?`:
+  Removes the value for the given `key` of type `K` from the dictionary.
+
+  Returns the value of type `V` as an optional if the dictionary contained the key,
+  otherwise `nil`.
+
+    ```bamboo,file=dictionary-remove.bpl
+    // Declare a dictionary mapping strings to integers.
+    let numbers = {"fortyTwo": 42, "twentyThree": 23}
+
+    // Remove the key `"fortyTwo"` from the dictionary.
+    // The key exists in the dictionary,
+    // so the value associated with the key is returned.
+    //
+    let fortyTwo = numbers.remove(key: "fortyTwo")
+
+    // `fortyTwo` is `42`
+    // `numbers` is `{"twentyThree": 23}`
+
+    // Remove the key `"oneHundred"` from the dictionary.
+    // The key does not exist in the dictionary, so `nil` is returned.
+    //
+    let oneHundred = numbers.remove(key: "oneHundred")
+
+    // `oneHundred` is `nil`
+    // `numbers` is `{"twentyThree": 23}`
+    ```
 
 #### Dictionary Keys
 
@@ -1829,7 +1997,31 @@ someFoo = foo2
 someFoo(4)
 ```
 
-<!-- TODO: Function Closures -->
+### Closures
+
+A function may refer to variables and constants of its outer scopes in which it is defined.
+It is called a closure, because it is closing over those variables and constants.
+A closure can can read from the variables and constants and assign to the variables it refers to.
+
+```bamboo,file=closures-counter.bpl
+// Declare a function named `makeCounter` which returns a function that
+// each time when called, returns the next integer, starting at 1.
+//
+fun makeCounter(): ((): Int) {
+    var count = 0
+    return fun (): Int {
+        // NOTE: read from and assign to the non-local variable
+        // `count`, which is declared in the outer function.
+        //
+        count = count + 1
+        return count
+    }
+}
+
+let test = makeCounter()
+test()  // is `1`
+test()  // is `2`
+```
 
 ### Argument Passing Behavior
 
@@ -2337,6 +2529,7 @@ when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
 - [**Structures**](#structures) are **copied**, i.e. they are value types.
+
     Structures are useful when copies with independent state are desired.
 
 - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
@@ -2348,7 +2541,9 @@ and when the value is returned from a function:
 
     Structures are not an ideal way to represent this ownership because they are copied.
     This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.
+
     A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.
+
     A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
 Resources can only be nested in other resource types,
@@ -2399,7 +2594,8 @@ Having to provide intitial values in the initializer simplifies might seem restr
 however, this ensures that all fields are always initialized in one location, the initializer,
 and the initialization order is clear.
 
-The initialization of all fields is checked statically and it is invalid to not initialize all fields in the initializer.
+The initialization of all fields is checked statically
+and it is invalid to not initialize all fields in the initializer.
 Also, it is statically checked that a field is definitely initialized before it is used.
 
 The initializer's main purpose is to initialize fields, though it may also contain other code.
@@ -2773,7 +2969,7 @@ struct Rectangle {
 }
 ```
 
-## Composite Data Type Subtyping
+### Composite Data Type Subtyping
 
 Two composite data types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
@@ -2857,19 +3053,31 @@ b.increment()
 
 Resources are types that can only exist in **one** location at a time and **must** be used **exactly once**.
 
+Resources **must** be created (instantiated) by using the `create` keyword.
+
+At the end of a function which has resources (variables, constants, parameters) in scope,
+the resources **must** be either **moved** or **destroyed**.
+
 They are **moved** when used as an initial value for a constant or variable,
 when assigned to a different variable,
 when passed as an argument to a function,
 and when returned from a function.
 
+Resources are **destroyed** using the `destroy` keyword.
+
+Accessing a field or calling a function of a resource does not move or destroy it.
+
 When the resource was moved, the constant or variable that referred to the resource before the move becomes **invalid**.
+An **invalid** resource cannot be used again.
 
-Accessing a field or calling a function of a resource does not destroy it.
+To make the behaviour of resource types explicit, the move prefix `<-` must be used
+in type annotations of variable or constant declarations, parameters, and return types.
 
-To make the move explicit, the move operator `<-` must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, when it is moved to a function, and when it is returned from a function.
-
-Resource must be created (instantiated) by using the `create` keyword.
-To destroy a resource, the `destroy` keyword must be used.
+To make moves of resources explicit, the move operator `<-` must be used
+when the resource is the initial value of a constant or variable,
+when it is moved to a different variable,
+when it is moved to a function as an argument,
+and when it is returned from a function.
 
 ```bamboo,file=resource-behavior.bpl
 // Declare a resource named `SomeResource`, with a variable integer field.
@@ -2884,7 +3092,7 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`.
 //
-let a <- SomeResource(value: 0)
+let a: <-SomeResource <- SomeResource(value: 0)
 
 // *Move* the resource value to a new constant.
 //
@@ -2967,7 +3175,11 @@ fun get(): <-SomeResource {
     let newResource <- create SomeResource()
     return <-newResource
 }
+```
 
+Resources **must** be used exactly once.
+
+```bamboo,file=resource-must-use.bpl
 // Declare a function which consumes a resource but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
@@ -2976,42 +3188,364 @@ fun forgetToUse(resource: <-SomeResource) {
 }
 ```
 
+```bamboo,file=resource-use-after-move.bpl
+// Declare a constant named `res` which has the resource type `SomeResource`.
+let res <- create SomeResource()
+
+// Call the function `use` and move the resource `res` into it.
+use(resource: <-res)
+
+// Invalid: The resource constant `res` cannot be used again,
+// as it was moved in the previous function call.
+//
+use(resource: <-res)
+
+// Invalid: The resource constant `res` cannot be used again,
+// as it was moved in the previous function call.
+//
+res.value
+```
+
+```bamboo,file=resource-not-used.bpl
+// Declare a function which has a resource parameter but does not use it.
+// This function is invalid, because it would cause a loss of the resource.
+//
+fun forgetToUse(resource: <-SomeResource) {
+    // Invalid: The resource parameter `resource` is not used, but must be.
+}
+```
+
+```bamboo,file=resource-not-definitely-destroyed.bpl
+// Declare a function which has a resource parameter.
+// This function is invalid, because it does not always use the resource parameter,
+// which would cause a loss of the resource.
+//
+fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
+    if destroyResource {
+        destroy resource
+    }
+    // Invalid: The resource parameter `resource` is not always used, but must be.
+    // The destroy statement is not always executed, so at the end of this function
+    // it might have been destroyed or not.
+}
+```
+
+```bamboo,file=resource-always-invalidated.bpl
+// Declare a function which has a resource parameter.
+// This function is valid, as it always uses the resource parameter,
+// and does not cause a loss of the resource.
+//
+fun alwaysUse(resource: <-SomeResource, destroyResource: Bool) {
+    if destroyResource {
+        destroy resource
+    } else {
+        use(resource: <-resource)
+    }
+    // At the end of the function the resource parameter was definitely used:
+    // It was either destroyed or moved in the call of function `use`.
+}
+```
+
+```bamboo,file=resource-loss-return.bpl
+// Declare a function which has a resource parameter.
+// This function is invalid, because it does not always use the resource parameter,
+// which would cause a loss of the resource.
+//
+fun returnBeforeDestroy(: Bool) {
+    let res <- create SomeResource(value: 1)
+    if move {
+        use(resource: <-res)
+        return
+    } else {
+        // Invalid: When this function returns here, the resource variable
+        // `res` was not used, but must be.
+        return
+    }
+    // Invalid: the resource variable `res` was potentially moved in the
+    // previous if-statement, and both branches definitely return,
+    // so this statement is unreachable.
+    destroy res
+}
+```
+
+#### Resource variables
+
+Resource variables cannot be assigned to as that would lead to the loss of the variable's current resource value.
+
+Instead, use a swap statement (`<->`) to replace the resource variable with another resource.
+
+```bamboo,file=resource-variable-invalid-assignment.bpl
+resource R {}
+
+var x <- create R()
+var y <- create R()
+
+// Invalid: Cannot assign to resource variable `x`,
+// as its current resource would be lost
+//
+x <- y
+
+// Instead, use a swap statement.
+//
+var replacement <- create R()
+x <-> replacement
+// `x` is the new resource.
+// `replacement` is the old resource.
+```
+
+#### Resource Destructors
+
+Resource may have a destructor, which is executed when the resource is destroyed.
+Destructors have no parameters and no return value and are declared using the `destroy` name.
+A resource may have only one destructor.
+
+```bamboo,file=resource-destructor.bpl
+var destructorCalled = false
+
+resource Resource {
+
+    // Declare a destructor for the resource, which is executed
+    // when the resource is destroyed.
+    //
+    destroy() {
+        destructorCalled = true
+    }
+}
+
+let res <- create Resource()
+destroy res
+// `destructorCalled` is `true`
+```
+
+#### Nested Resources
+
+Fields in composite data types behave diffently when they have a resource type.
+
+If a resource type has fields that have a resource type it **must** declare a destructor,
+which **must** invalidate all resource fields, i.e. move or destroy them.
+
+```bamboo,file=resource-nested-field.bpl
+resource Child {
+    let name: String
+
+    init(name: String)
+        self.name = name
+    }
+}
+
+// Declare a resource with a resource field named `child`.
+// The resource *must* declare a destructor
+// and the destructor *must* invalidate the resource field.
+//
+resource Parent {
+    let name: String
+    var child: <-Child
+
+    init(name: String, child: <-Child) {
+        self.name = name
+        self.child <- child
+    }
+
+    // Declare a destructor which invalidates the resource field
+    // `child` by destroying it.
+    //
+    destroy() {
+        destroy self.child
+    }
+}
+```
+
+Accessing a field or calling function on a resource field is valid,
+however moving a resource out of a variable resource field is **not** allowed.
+Instead, use a swap statement to replace the resource with another resource.
+
+```bamboo,file=resource-field-swap.bpl
+let child <- create Child(name: "Child 1")
+let parent <- create Parent(name: "Parent", child: <-child)
+
+child.name  // is "Child"
+parent.child.name  // is "Child"
+
+// Invalid: Cannot move resource out of variable resource field.
+let childAgain <- parent.child
+
+// Instead, use a swap statement.
+//
+var otherChild <- create Child(name: "Child 2")
+parent.child <-> otherChild
+// `parent.child` is the second child, Child 2.
+// `otherChild` is the first child, Child 1.
+```
+
+#### Resources in Closures
+
+Resources can not be captured in closures, as that could potentially result in duplications.
+
+```bamboo,file=resource-capturing
+resource R {}
+
+// Invalid: Declare a function which returns a closure which refers to
+// the resource parameter `resource`. Each call to the returned function
+// would return the resource, which should not be possible.
+//
+fun makeCloner(resource: <-R): ((): <-R) {
+    return fun (): <-R {
+        return <-resource
+    }
+}
+
+let test = makeCloner(resource: <-create R())
+```
+
 #### Resources in Arrays and Dictionaries
 
 Arrays and dictionaries behave differently when they contain resources:
-When a resource is **read** from the array at a certain index,
-or it is **read** from a dictionary by accessing a certain key,
-the resource is **moved** out of the array or dictionary.
+Indexing into an array to read an element at a certain index or assign to it,
+or indexing into a dictionary to read a value for a certain key or set a value for the key is **not** allowed.
+
+Instead, use a swap statement to replace the accessed resource with another resource.
 
 ```bamboo,file=resource-in-array.bpl
+resource R {}
+
+// Declare a constant for an array of resources.
+// Create two resources and move them into the array.
+//
 let resources <- [
-    SomeResource(value: 1),
-    SomeResource(value: 2),
-    SomeResource(value: 3)
+    <-create R(),
+    <-create R()
 ]
 
-// **Move** the first resource into a new constant.
+// Invalid: Reading an element from a resource array is not allowed.
 //
 let firstResource <- resources[0]
 
-// **Move** the second resource into a new constant.
+// Invalid: Setting an element in a resource array is not allowed,
+// as it would result in the loss of the current value.
 //
-let secondResource <- resources[0]
+resources[0] <- create R()
 
-// `resources` only contains one element,
-// the initial third resource!
+// Instead, when attempting to either read an element or update an element
+// in a resource array, use a swap statement with a variable to replace
+// the accessed element.
 //
-// The first two resources were moved out of the array when
-// they were read, i.e., the were removed from the array.
-//
-// Accessing a field of a resource does not move the resource.
-//
-resource[0].value  // is `3`
+var res <- create R()
+resources[0] <-> res
+// `resources[0]` now contains the new resource.
+// `res` now contains the old resource.
+```
 
-// Run-time error: The second element of the constant `resources`
-// is out-of-bounds, the program aborts.
+The same applies to dictionaries.
+
+```bamboo,file=resource-in-dictionary.bpl
+// Declare a constant for a dictionary of resources.
+// Create three resources and move them into the dictionary.
 //
-resource[1]
+let resources <- {
+    "r1": <-create R(),
+    "r2": <-create R()
+}
+
+// Invalid: Reading an element from a resource dictionary is not allowed.
+//
+let firstResource <- resources["r1"]
+
+// Invalid: Setting an element in a resource dictionary is not allowed,
+// as it would result in the loss of the current value.
+//
+resources["r1"] <- create R()
+
+// Instead, when attempting to either read an element or update an element
+// in a resource dictionary, use a swap statement with a variable to replace
+// the accessed element.
+//
+var res <- create R()
+resources["r1"] <-> res
+// `resources["r1"]` now contains the new resource.
+// `res` now contains the old resource.
+```
+
+Resources cannot be moved into arrays and dictionaries multiple times,
+as that would cause a duplication.
+
+```bamboo,file=resource-array-duplication.bpl
+let resource <- create R()
+// Invalid: The resource variable `resource` can only be moved into the array once.
+//
+let resources <- [
+    <-resource,
+    <-resource
+]
+
+let resourc2 <- create R()
+// Invalid: The resource variable `resource` can only be moved into the dictionary once.
+let resources2 <- {
+    "res1": <-resource,
+    "res2": <-resource
+}
+```
+
+Resource arrays and dictionaries can be destroyed.
+
+```bamboo,file=resource-array-destroy.bpl
+let resources <- [
+    <-create R(),
+    <-create R()
+]
+destroy resources
+```
+
+The variable array functions like `append`, `insert`, and `remove` behave like for non-resource arrays.
+Note however, that the result of the `remove` functions must be used.
+
+```bamboo,file-resource-array-mutating-functions.bpl
+let resources <- [<-create R()]
+// `resources.length` is `1`
+
+resources.append(<-create R())
+// `resources.length` is `2`
+
+let first <- resource.remove(at: 0)
+// `resources.length` is `1`
+destroy first
+
+resources.insert(at: 0, <-create R())
+// `resources.length` is `2`
+
+// Invalid: The statement ignores the result of the call to `remove`,
+// which would result in a loss.
+resource.remove(at: 0)
+
+destroy resources
+```
+
+The variable array function `contains` is not available, as it is impossible:
+If the resource can be passed to the `contains` function, it is by definition not in the array.
+
+The variable array function `concat` is not available, as it would result in the duplication of resources.
+
+The dictionary functions like `insert` and `remove` behave like for non-resource dictionaries.
+Note however, that the result of these functions must be used.
+
+```bamboo,file-resource-dictionary-mutating-functions.bpl
+let resources <- {"r1": <-create R()}
+// `resources.length` is `1`
+
+let first <- resource.remove(key: "r1")
+// `resources.length` is `0`
+destroy first
+
+let old <- resources.insert(key: "r1", <-create R())
+// `old` is nil, as there was no value for the key "r1"
+// `resources.length` is `1`
+
+let old2 <- resources.insert(key: "r1", <-create R())
+// `old2` is the old value for the key "r1"
+// `resources.length` is `2`
+
+destroy old
+destroy old2
+destroy resources
 ```
 
 ### Unbound References / Nulls
@@ -3032,11 +3566,17 @@ Instead, consider using [interfaces](#interfaces).
 
 > 🚧 Status: Access control is not implemented yet.
 
-Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
+Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
+Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
-- **Private** means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.
+- **Private** means the declaration is only accessible/visible in the current and inner scopes.
+  For example, a private field can only be accessed by functions of the type is part of,
+  not by code that uses an instance of the type in an outer scope.
 
-- **Public** means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.  This does not allow the declaration to be publicly writable though.
+- **Public** means the declaration is accessible/visible in all scopes.
+  This includes the current and inner scopes like for private, and the outer scopes.
+  For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
+  This does not allow the declaration to be publicly writable though.
 
 **By default, everything is private.**
 
@@ -3947,7 +4487,7 @@ transaction {
 
 ### Deployment
 
-Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that will be deployed to an account.  Imagine it is in a file called `FungibleToken.bpl`.
+Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that will be deployed to an account.  Imagine it is in a file named `FungibleToken.bpl`.
 
 ```bamboo,file=fungible-token-interface.bpl
 // Declare a resource interface for a fungible token.

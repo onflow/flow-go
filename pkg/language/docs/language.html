@@ -125,6 +125,7 @@
               <li><a href="#function-expressions">Function Expressions</a></li>
               <li><a href="#function-calls">Function Calls</a></li>
               <li><a href="#function-types">Function Types</a></li>
+              <li><a href="#closures">Closures</a></li>
               <li><a href="#argument-passing-behavior">Argument Passing Behavior</a></li>
               <li><a href="#function-preconditions-and-postconditions">Function Preconditions and Postconditions</a></li>
             </ul>
@@ -150,21 +151,33 @@
           <li>
             <p><a href="#composite-data-types">Composite Data Types</a></p>
             <ul>
-              <li><a href="#composite-data-type-declaration-and-creation">Composite Data Type Declaration and Creation</a></li>
-              <li><a href="#composite-data-type-fields">Composite Data Type Fields</a></li>
-              <li><a href="#composite-data-type-field-getters-and-setters">Composite Data Type Field Getters and Setters</a></li>
-              <li><a href="#synthetic-composite-data-type-fields">Synthetic Composite Data Type Fields</a></li>
-              <li><a href="#composite-data-type-functions">Composite Data Type Functions</a></li>
-            </ul>
-          </li>
-          <li>
-            <p><a href="#composite-data-type-subtyping">Composite Data Type Subtyping</a></p>
-            <ul>
+              <li>
+                <p><a href="#composite-data-type-declaration-and-creation">Composite Data Type Declaration and Creation</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-data-type-fields">Composite Data Type Fields</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-data-type-field-getters-and-setters">Composite Data Type Field Getters and Setters</a></p>
+              </li>
+              <li>
+                <p><a href="#synthetic-composite-data-type-fields">Synthetic Composite Data Type Fields</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-data-type-functions">Composite Data Type Functions</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-data-type-subtyping">Composite Data Type Subtyping</a></p>
+              </li>
               <li>
                 <p><a href="#composite-data-type-behaviour">Composite Data Type Behaviour</a></p>
                 <ul>
                   <li><a href="#structures">Structures</a></li>
                   <li><a href="#resources">Resources</a></li>
+                  <li><a href="#resource-variables">Resource variables</a></li>
+                  <li><a href="#resource-destructors">Resource Destructors</a></li>
+                  <li><a href="#nested-resources">Nested Resources</a></li>
+                  <li><a href="#resources-in-closures">Resources in Closures</a></li>
                   <li><a href="#resources-in-arrays-and-dictionaries">Resources in Arrays and Dictionaries</a></li>
                 </ul>
               </li>
@@ -232,7 +245,7 @@
         <p>The Bamboo Programming Language is a new high-level programming language intended for smart contract development.</p>
         <p>The language's goals are, in order of importance:</p>
         <ul>
-          <li><strong>Safety and security</strong>: Focus on safety, e.g. by providing a strong static type system, design by contract, and linear types; and security, by providing a capability system, and design by contract.</li>
+          <li><strong>Safety and security</strong>: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).</li>
           <li><strong>Auditability</strong>: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.</li>
           <li><strong>Simplicity</strong>: Focus on developer productivity and usability: make it easy to write code, provide good tooling.</li>
         </ul>
@@ -242,33 +255,49 @@
         <p>In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:</p>
         <ul>
           <li>
-            <p><code>Invalid</code> means that the invalid program will not even be allowed to run. The error is detected and reported statically by the type checker.</p>
+            <p>
+              <code>Invalid</code> means that the invalid program will not even be allowed to run.
+              The program error is detected and reported statically by the type checker.
+            </p>
           </li>
           <li>
-            <p><code>Run-time error</code> refers to bad behavior that will result in the execution of the program being aborted</p>
+            <p>
+              <code>Run-time error</code> means that the erroneous program will run,
+              but bad behavior will result in the execution of the program being aborted.
+            </p>
           </li>
         </ul>
       </section>
       <section>
         <h2 id="syntax-and-behavior"><a href="#syntax-and-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Syntax and Behavior</h2>
-        <p>The programming language's syntax and behavior is inspired by Swift, Rust, Kotlin, TypeScript, and Solidity.</p>
+        <p>Much of the language's syntax is inspired by Swift, Kotlin, and TypeScript.</p>
         <p>
-          Much of the syntax, types, and standard library is inspired by Swift, which popularized e.g. optionals, argument labels,
-          and provides safe handling of integer and string types.
+          Much of the syntax, types, and standard library is inspired by Swift,
+          which popularized e.g. optionals, argument labels,
+          and provides safe handling of integers and strings.
         </p>
         <p>Resources are based on liner types which were popularized by Rust.</p>
         <p>Events are inspired by Solidity.</p>
       </section>
       <section>
         <h2 id="comments"><a href="#comments" aria-hidden="true"><span class="icon icon-link"></span></a>Comments</h2>
-        <p>Comments can be used to document code. A comment is text that is not executed.</p>
-        <p><em>Single-line comments</em> start with two slashes (<code>//</code>). These comments can go on a line by themselves or they can go directly after a line of code.</p>
+        <p>
+          Comments can be used to document code.
+          A comment is text that is not executed.
+        </p>
+        <p>
+          <em>Single-line comments</em> start with two slashes (<code>//</code>).
+          These comments can go on a line by themselves or they can go directly after a line of code.
+        </p>
         <pre><code class="language-bamboo,file=single-line-comment.bpl"><span style="color: #008000">// This is a comment on a single line.</span><span>
 </span><span style="color: #008000">// Another comment line that is not executed.</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// Here is another comment after a line of code.</span><span>
 </span></code></pre>
-        <p><em>Multi-line comments</em> start with a slash and an asterisk (<code>/*</code>) and end with an asterisk and a slash (<code>*/</code>):</p>
+        <p>
+          <em>Multi-line comments</em> start with a slash and an asterisk (<code>/*</code>)
+          and end with an asterisk and a slash (<code>*/</code>):
+        </p>
         <pre><code class="language-bamboo,file=multi-line-comment.bpl"><span style="color: #008000">/* This is a comment which</span><span>
 </span><span style="color: #008000">spans multiple lines. */</span><span>
 </span></code></pre>
@@ -281,9 +310,20 @@
       </section>
       <section>
         <h2 id="constants-and-variable-declarations"><a href="#constants-and-variable-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Constants and Variable Declarations</h2>
-        <p>Constants and variables are declarations that bind a value to a name. Constants can only be initialized with a value and cannot be reassigned afterwards. Variables can be initialized with a value and can be reassigned later. Declarations are valid in any scope, including the global scope.</p>
-        <p>Constant means that the <em>name</em> is constant, not the <em>value</em> – the value may still be changed if it allows it, i.e. is mutable.</p>
-        <p>Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword. The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.</p>
+        <p>
+          Constants and variables are declarations that bind a value to a name.
+          Constants can only be initialized with a value and cannot be reassigned afterwards.
+          Variables can be initialized with a value and can be reassigned later.
+          Declarations are valid in any scope, including the global scope.
+        </p>
+        <p>
+          Constant means that the <em>name</em> is constant, not the <em>value</em> –
+          the value may still be changed if it allows it, i.e. is mutable.
+        </p>
+        <p>
+          Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword.
+          The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
+        </p>
         <pre><code class="language-bamboo,file=constants-and-variables.bpl"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -306,7 +346,9 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
 </span></code></pre>
         <p>
-          Once a constant or variable is declared, it cannot be redeclared with the same name, with a different type,
+          Once a constant or variable is declared,
+          it cannot be redeclared with the same name,
+          with a different type,
           or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant named `a`.</span><span>
@@ -355,7 +397,10 @@
       </section>
       <section>
         <h2 id="type-annotations"><a href="#type-annotations" aria-hidden="true"><span class="icon icon-link"></span></a>Type Annotations</h2>
-        <p>When declaring a constant or variable, an optional <em>type annotation</em> can be provided, to make it explicit what type the declaration has.</p>
+        <p>
+          When declaring a constant or variable, an optional <em>type annotation</em> can be provided,
+          to make it explicit what type the declaration has.
+        </p>
         <p>If no type annotation is provided, the type of the declaration is <a href="#type-inference">inferred from the initial value</a>.</p>
         <pre><code class="language-bamboo,file=type-annotations.bpl"><span style="color: #008000">// Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -380,7 +425,8 @@
 </span></code></pre>
         <p>
           If a type annotation is provided, the initial value must be of this type,
-          and new values assigned to variables must match the declaration's explicit type or the type that was inferred when the variable was declared.
+          and new values assigned to variables must match the declaration's explicit type
+          or the type that was inferred when the variable was declared.
           This type safety is explained in more detail in a <a href="#type-safety">separate section</a>.
         </p>
         <pre><code class="language-bamboo"><span style="color: #008000">// Invalid: declare a variable with an explicit type `Bool`,</span><span>
@@ -436,14 +482,18 @@
 </span></code></pre>
         <section>
           <h3 id="conventions"><a href="#conventions" aria-hidden="true"><span class="icon icon-link"></span></a>Conventions</h3>
-          <p>By convention, variables, constants, and functions have lowercase names; and types have title-case names.</p>
+          <p>
+            By convention, variables, constants, and functions have lowercase names;
+            and types have title-case names.
+          </p>
         </section>
       </section>
       <section>
         <h2 id="semicolons"><a href="#semicolons" aria-hidden="true"><span class="icon icon-link"></span></a>Semicolons</h2>
         <p>
           Semicolons (;) are used as statement separators.
-          A semicolon can be placed after any statement, but can be omitted if only one statement appears on the line.
+          A semicolon can be placed after any statement,
+          but can be omitted if only one statement appears on the line.
           Semicolons must be used to separate multiple statements if they appear on the same line –
           exactly one semicolon between each pair of statements.
         </p>
@@ -465,14 +515,20 @@
       </section>
       <section>
         <h2 id="values-and-types"><a href="#values-and-types" aria-hidden="true"><span class="icon icon-link"></span></a>Values and Types</h2>
-        <p>Values are objects, like for example booleans, integers, or arrays. Values are typed.</p>
+        <p>
+          Values are objects, like for example booleans, integers, or arrays.
+          Values are typed.
+        </p>
         <section>
           <h3 id="booleans"><a href="#booleans" aria-hidden="true"><span class="icon icon-link"></span></a>Booleans</h3>
           <p>The two boolean values <code>true</code> and <code>false</code> have the type <code>Bool</code>.</p>
         </section>
         <section>
           <h3 id="numeric-literals"><a href="#numeric-literals" aria-hidden="true"><span class="icon icon-link"></span></a>Numeric Literals</h3>
-          <p>Numbers can be written in various bases. Numbers are assumed to be decimal by default. Non-decimal literals have a specific prefix.</p>
+          <p>
+            Numbers can be written in various bases. Numbers are assumed to be decimal by default.
+            Non-decimal literals have a specific prefix.
+          </p>
           <table>
             <thead>
               <tr>
@@ -544,7 +600,8 @@
           <h3 id="integers"><a href="#integers" aria-hidden="true"><span class="icon icon-link"></span></a>Integers</h3>
           <p>
             Integers are whole numbers without a fractional part.
-            They are either <em>signed</em> (positive, zero, or negative) or <em>unsigned</em> (positive or zero) and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+            They are either <em>signed</em> (positive, zero, or negative) or <em>unsigned</em> (positive or zero)
+            and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
           </p>
           <p>
             The names for the integer types follow this naming convention:
@@ -606,7 +663,8 @@
           <h3 id="floating-point-numbers"><a href="#floating-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Floating-Point Numbers</h3>
           <p>There is <strong>no</strong> support for floating point numbers.</p>
           <p>
-            Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here.
+            Contracts are not intended to work with values with error margins
+            and therefore floating point arithmetic is not appropriate here.
             Fixed point numbers should be simulated using integers and a scale factor for now.
           </p>
         </section>
@@ -652,7 +710,8 @@
 </span></code></pre>
           <p>
             However, using <code>Any</code> does not opt-out of type checking.
-            It is invalid to access fields and call functions on <code>Any</code> typed values, as it has no fields and functions.
+            It is invalid to access fields and call functions on <code>Any</code> typed values,
+            as it has no fields and functions.
           </p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
 </span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
@@ -683,10 +742,14 @@
         </section>
         <section>
           <h3 id="optionals"><a href="#optionals" aria-hidden="true"><span class="icon icon-link"></span></a>Optionals</h3>
-          <p>Optionals are values which can represent the absence of a value. Optionals have two cases: either there is a value, or there is nothing.</p>
+          <p>
+            Optionals are values which can represent the absence of a value. Optionals have two cases:
+            either there is a value, or there is nothing.
+          </p>
           <p>
             An optional type is declared using the <code>?</code> suffix for another type.
-            For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer, i.e. either nothing, or an integer.
+            For example, <code>Int</code> is a non-optional integer, and <code>Int?</code> is an optional integer,
+            i.e. either nothing, or an integer.
           </p>
           <p>The value representing nothing is <code>nil</code>.</p>
           <pre><code class="language-bamboo,file=optional.bpl"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
@@ -826,7 +889,11 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
 </span><span style="color: #008000">// `boolean` is `nil` and has type `Bool?`</span><span>
 </span></code></pre>
-            <p>Downcasting works for nested types (e.g. arrays), interfaces (if a resource interface not to a concrete resource), and optionals.</p>
+            <p>
+              Downcasting works for nested types (e.g. arrays),
+              interfaces (if a <a href="#resources">resource</a> interface not to a concrete resource),
+              and optionals.
+            </p>
             <pre><code class="language-bamboo,file=conditional-downcasting-any-array.bpl"><span style="color: #008000">// Declare a constant named `values` which has type `[Any]`,</span><span>
 </span><span style="color: #008000">// i.e. an array of arbitrarily typed values.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -890,7 +957,11 @@
             <li><code>\r</code>: Carriage return</li>
             <li><code>\"</code>: Double quotation mark</li>
             <li><code>\'</code>: Single quotation mark</li>
-            <li><code>\u</code>: A Unicode scalar value, written as <code>\u{x}</code>, where <code>x</code> is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value, i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive</li>
+            <li>
+              <code>\u</code>: A Unicode scalar value, written as <code>\u{x}</code>,
+              where <code>x</code> is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value,
+              i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+            </li>
           </ul>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant which contains two lines of text</span><span>
 </span><span style="color: #008000">// (separated by the line feed character `\n`), and ends</span><span>
@@ -900,14 +971,27 @@
 </span><span style="color: #000000">    </span><span style="color: #A31515">"This is the first line.\nThis is the second line with an emoji: \u{1F44D}"</span><span>
 </span></code></pre>
           <p>The type <code>Character</code> represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.</p>
-          <p>For example, the single character <code>ü</code> can be represented in several ways in Unicode. First, it can be represented by a single Unicode scalar value <code>ü</code> ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC). Second, the same single character can be represented by two Unicode scalar values: <code>u</code> ("LATIN SMALL LETTER U", code point U+0075), and "COMBINING DIAERESIS" (code point U+0308). The combining Unicode scalar value is applied to the scalar before it, which turns a <code>u</code> into a <code>ü</code>.</p>
+          <p>
+            For example, the single character <code>ü</code> can be represented in several ways in Unicode.
+            First, it can be represented by a single Unicode scalar value <code>ü</code>
+            ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC).
+            Second, the same single character can be represented by two Unicode scalar values:
+            <code>u</code> ("LATIN SMALL LETTER U", code point U+0075),
+            and "COMBINING DIAERESIS" (code point U+0308).
+            The combining Unicode scalar value is applied to the scalar before it,
+            which turns a <code>u</code> into a <code>ü</code>.
+          </p>
           <p>Still, both variants represent the same human-readable character <code>ü</code>.</p>
           <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> singleScalar: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{FC}"</span><span>
 </span><span style="color: #008000">// `singleScalar` is `ü`</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> twoScalars: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{75}\u{308}"</span><span>
 </span><span style="color: #008000">// `twoScalars` is `ü`</span><span>
 </span></code></pre>
-          <p>Another example where multiple Unicode scalar values are rendered as a single, human-readable character is a flag emoji. These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.</p>
+          <p>
+            Another example where multiple Unicode scalar values are rendered as a single,
+            human-readable character is a flag emoji.
+            These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
+          </p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant for a string with a single character, the emoji</span><span>
 </span><span style="color: #008000">// for the Canadian flag, which consists of two Unicode scalar values:</span><span>
 </span><span style="color: #008000">// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)</span><span>
@@ -930,7 +1014,13 @@
 </span></code></pre>
               </li>
               <li>
-                <p><code>concat(_ other: String): String</code>: Concatenates the string <code>other</code> to the end of the original string, but does not modify the original string. This function creates a new string whose length is the sum of the lengths of the two parameter strings.</p>
+                <p>
+                  <code>concat(_ other: String): String</code>:
+                  Concatenates the string <code>other</code> to the end of the original string,
+                  but does not modify the original string.
+                  This function creates a new string whose length is the sum of the lengths
+                  of the string the function is called on and the string given as a parameter.
+                </p>
                 <pre><code class="language-bamboo,file=string-concat.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> new = </span><span style="color: #A31515">"world"</span><span>
 </span><span>
@@ -940,7 +1030,14 @@
 </span></code></pre>
               </li>
               <li>
-                <p><code>slice(from: Int, upTo: Int): String</code>: Returns a string slice of the characters in the given string from start index <code>from</code> up to, but not including, the end index <code>upTo</code>. This function creates a new string whose length is <code>upto - from</code>. It does not modify the original string. If either of the parameters are out of the bounds of the string, the function will fail.</p>
+                <p>
+                  <code>slice(from: Int, upTo: Int): String</code>:
+                  Returns a string slice of the characters in the given string from start index <code>from</code> up to,
+                  but not including, the end index <code>upTo</code>.
+                  This function creates a new string whose length is <code>upto - from</code>.
+                  It does not modify the original string.
+                  If either of the parameters are out of the bounds of the string, the function will fail.
+                </p>
                 <pre><code class="language-bamboo,file=string-slice.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"helloworld"</span><span>
 </span><span>
 </span><span style="color: #008000">// Create a new slice of part of the original string.</span><span>
@@ -956,7 +1053,12 @@
         </section>
         <section>
           <h3 id="arrays"><a href="#arrays" aria-hidden="true"><span class="icon icon-link"></span></a>Arrays</h3>
-          <p>Arrays are mutable, ordered collections of values. All values in an array must have the same type. Arrays may contain a value multiple times. Array literals start with an opening square bracket <code>[</code> and end with a closing square bracket <code>]</code>.</p>
+          <p>
+            Arrays are mutable, ordered collections of values.
+            All values in an array must have the same type.
+            Arrays may contain a value multiple times.
+            Array literals start with an opening square bracket <code>[</code> and end with a closing square bracket <code>]</code>.
+          </p>
           <pre><code class="language-bamboo,file=arrays.bpl"><span style="color: #008000">// An empty array</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">[]</span><span>
@@ -973,20 +1075,27 @@
             <h4 id="array-types"><a href="#array-types" aria-hidden="true"><span class="icon icon-link"></span></a>Array Types</h4>
             <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
             <p>
-              Fixed-size arrays have the form <code>[T; N]</code>, where <code>T</code> is the element type, and <code>N</code> is the size of the array.
+              Fixed-size arrays have the form <code>[T; N]</code>, where <code>T</code> is the element type,
+              and <code>N</code> is the size of the array.
               For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>[Int8; 3]</code>.
             </p>
             <p>
               Variable-size arrays have the form <code>[T]</code>, where <code>T</code> is the element type.
               For example, the type <code>[Int16]</code> specifies a variable-size array of elements that have type <code>Int16</code>.
             </p>
-            <p>It is important to understand that arrays are value types and are only ever copied when used as an initial value for a constant or variable, when assigning to a variable, as function parameter, or returned from a function call.</p>
-            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #008000">// Declare a constant-sized array of integers</span><span>
+            <p>
+              It is important to understand that arrays are value types and are only ever copied
+              when used as an initial value for a constant or variable,
+              when assigning to a variable,
+              when used as function argument,
+              or when returned from a function call.
+            </p>
+            <pre><code class="language-bamboo,file=array-types.bpl"><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
 </span><span style="color: #008000">// which always contains exactly two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a constant-sized array of constant-sized arrays of integers.</span><span>
+</span><span style="color: #008000">// Declare a fixed-sized array of fixed-sized arrays of integers.</span><span>
 </span><span style="color: #008000">// The inner arrays always contain exactly three elements,</span><span>
 </span><span style="color: #008000">// the outer array always contains two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -996,7 +1105,8 @@
 </span><span style="color: #000000">]</span><span>
 </span></code></pre>
             <p>
-              Array types are covariant in their element types. For example, <code>[Int]</code> is a subtype of <code>[Any]</code>.
+              Array types are covariant in their element types.
+              For example, <code>[Int]</code> is a subtype of <code>[Any]</code>.
               This is safe because arrays are value types and not reference types.
             </p>
           </section>
@@ -1047,10 +1157,20 @@
           </section>
           <section>
             <h4 id="array-fields-and-functions"><a href="#array-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Array Fields and Functions</h4>
-            <p>Arrays have multiple built-in functions you can use to manipulate the elements. <code>length</code>, <code>concat</code>, and <code>contains</code> apply to all array types whether they are statically sized or dynamic.</p>
+            <p>
+              Arrays have multiple built-in fields and functions
+              that can be used to get information about and manipulate the contents of the array.
+            </p>
+            <p>
+              The field <code>length</code>, and the functions <code>concat</code>, and <code>contains</code>
+              are available for both variable-sized and fixed-sized or variable-sized arrays.
+            </p>
             <ul>
               <li>
-                <p><code>length: Int</code>: Returns the number of elements in the array.</p>
+                <p>
+                  <code>length: Int</code>:
+                  Returns the number of elements in the array.
+                </p>
                 <pre><code class="language-bamboo,file=array-length-field.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1061,7 +1181,16 @@
 </span></code></pre>
               </li>
               <li>
-                <p><code>concat(_ array: T): T</code>: Concatenates the parameter <code>array</code> to the end of the original array, but does not modify the original array. Both arrays must be the same type <code>T</code>. This function creates a new array whose length is the sum of the lengths of the two arrays.</p>
+                <p>
+                  <code>concat(_ array: T): T</code>:
+                  Concatenates the parameter <code>array</code> to the end of the array the function is called on,
+                  but does not modify that array.
+                </p>
+                <p>Both arrays must be the same type <code>T</code>.</p>
+                <p>
+                  This function creates a new array whose length is the sum of the length of the array
+                  the function is called on and the length of the array given as the parameter.
+                </p>
                 <pre><code class="language-bamboo,file=array-concat.bpl"><span style="color: #008000">// Declare two arrays of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> moreNumbers = [</span><span style="color: #09885A">11</span><span style="color: #000000">, </span><span style="color: #09885A">27</span><span style="color: #000000">]</span><span>
@@ -1077,7 +1206,10 @@
 </span></code></pre>
               </li>
               <li>
-                <p><code>contains(_ element: T): Bool</code>: Indicates whether the given element of type <code>T</code> is in the array</p>
+                <p>
+                  <code>contains(_ element: T): Bool</code>:
+                  Indicates whether the given element of type <code>T</code> is in the array.
+                </p>
                 <pre><code class="language-bamboo,file=array-contains.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1098,10 +1230,17 @@
             </ul>
             <section>
               <h5 id="variable-size-array-functions"><a href="#variable-size-array-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Variable-size Array Functions</h5>
-              <p>The following functions can only be used on variable-sized arrays. It is invalid to use one of these functions on a statically sized array.</p>
+              <p>
+                The following functions can only be used on variable-sized arrays.
+                It is invalid to use one of these functions on a fixed-sized array.
+              </p>
               <ul>
                 <li>
-                  <p><code>append(_ element: T): Void</code>: Adds an element of type <code>T</code> to the array. The element is added to the end of the array. The given value must be the same type as all the other elements in the array.</p>
+                  <p>
+                    <code>append(_ element: T): Void</code>:
+                    Adds the new element <code>element</code> of type <code>T</code> to the end of the array.
+                  </p>
+                  <p>The new element must be the same type as all the other elements in the array.</p>
                   <pre><code class="language-bamboo,file=array-append.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1114,7 +1253,17 @@
 </span></code></pre>
                 </li>
                 <li>
-                  <p><code>insert(at index: Int, _ element: T): Void</code>: Inserts an element of type <code>T</code> at the given index of the array. The value must be of the same type as the array and the index must be less than the length of the array. The existing element at the supplied index is not overwritten. All the elements after the new inserted element are simply shifted to the right by one.</p>
+                  <p>
+                    <code>insert(at index: Int, _ element: T): Void</code>:
+                    Inserts the new element <code>element</code> of type <code>T</code> at the given <code>index</code> of the array.
+                  </p>
+                  <p>The new element must be of the same type as all the other elements in the array.</p>
+                  <p>
+                    The <code>index</code> must be within the bounds of the array.
+                    If the index is outside the bounds, the program aborts.
+                  </p>
+                  <p>The existing element at the supplied index is not overwritten.</p>
+                  <p>All the elements after the new inserted element are shifted to the right by one.</p>
                   <pre><code class="language-bamboo,file=array-insert.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1127,33 +1276,76 @@
 </span></code></pre>
                 </li>
                 <li>
-                  <p><code>remove(at index: Int): T</code>: Removes the element at the given index from the array and returns it. <code>index</code> must be within the bounds of the array.</p>
-                </li>
-                <li>
-                  <p><code>removeFirst(): T</code>: Removes the first element from the array and returns it.</p>
-                </li>
-                <li>
-                  <p><code>removeLast(): T</code>: Removes the last element from the array and returns it.</p>
+                  <p>
+                    <code>remove(at index: Int): T</code>:
+                    Removes the element at the given <code>index</code> from the array and returns it.
+                  </p>
+                  <p>
+                    The <code>index</code> must be within the bounds of the array.
+                    If the index is outside the bounds, the program aborts.
+                  </p>
                   <pre><code class="language-bamboo,file=array-remove.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove element at position 1 of the array.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.remove(at: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
-</span><span style="color: #008000">// `numbers` is now `[42, 31, 12]`</span><span>
+</span><span style="color: #008000">// `numbers` is now `[42, 31]`</span><span>
 </span><span style="color: #008000">// `twentyThree` is `23`</span><span>
 </span><span>
 </span><span style="color: #008000">// Run-time error: Out of bounds index, the program aborts.</span><span>
 </span><span style="color: #000000">numbers.remove(at: </span><span style="color: #09885A">19</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+                </li>
+                <li>
+                  <p>
+                    <code>removeFirst(): T</code>:
+                    Removes the first element from the array and returns it.
+                  </p>
+                  <p>
+                    The array must not be empty.
+                    If the array is empty, the program aborts.
+                  </p>
+                  <pre><code class="language-bamboo,file=array-remove-first.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove the first element of the array.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> fortytwo = numbers.removeFirst()</span><span>
-</span><span style="color: #008000">// `numbers` is now `[31, 12]`</span><span>
+</span><span style="color: #008000">// `numbers` is now `[23]`</span><span>
 </span><span style="color: #008000">// `fortywo` is `42`</span><span>
 </span><span>
+</span><span style="color: #008000">// Remove the first element of the array.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.removeFirst()</span><span>
+</span><span style="color: #008000">// `numbers` is now `[]`</span><span>
+</span><span style="color: #008000">// `twentyThree` is `23`</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: The array is empty, the program aborts.</span><span>
+</span><span style="color: #000000">numbers.removeFirst()</span><span>
+</span></code></pre>
+                </li>
+                <li>
+                  <p>
+                    <code>removeLast(): T</code>:
+                    Removes the last element from the array and returns it.
+                  </p>
+                  <p>
+                    The array must not be empty.
+                    If the array is empty, the program aborts.
+                  </p>
+                  <pre><code class="language-bamboo,file=array-remove.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+</span><span>
 </span><span style="color: #008000">// Remove the last element of the array.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> twelve = numbers.removeLast()</span><span>
-</span><span style="color: #008000">// `numbers` is now `[31]`</span><span>
-</span><span style="color: #008000">// `twelve` is `12`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.removeLast()</span><span>
+</span><span style="color: #008000">// `numbers` is now `[42]`</span><span>
+</span><span style="color: #008000">// `twentyThree` is `23`</span><span>
+</span><span>
+</span><span style="color: #008000">// Remove the last element of the array.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> fortyTwo = numbers.removeLast()</span><span>
+</span><span style="color: #008000">// `numbers` is now `[]`</span><span>
+</span><span style="color: #008000">// `fortyTwo` is `42`</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: The array is empty, the program aborts.</span><span>
+</span><span style="color: #000000">numbers.removeLast()</span><span>
 </span></code></pre>
                 </li>
               </ul>
@@ -1162,8 +1354,15 @@
         </section>
         <section>
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
-          <p>Dictionaries are mutable, unordered collections of key-value associations. In a dictionary, all keys must have the same type, and all values must have the same type. Dictionaries may contain a key only once and may contain a value multiple times.</p>
-          <p>Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>. Keys are separated from values by a colon, and key-value associations are separated by commas.</p>
+          <p>
+            Dictionaries are mutable, unordered collections of key-value associations.
+            In a dictionary, all keys must have the same type, and all values must have the same type.
+            Dictionaries may contain a key only once and may contain a value multiple times.
+          </p>
+          <p>
+            Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>.
+            Keys are separated from values by a colon, and key-value associations are separated by commas.
+          </p>
           <pre><code class="language-bamboo,file=dictionaries.bpl"><span style="color: #008000">// An empty dictionary</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">{}</span><span>
@@ -1185,7 +1384,9 @@
           <section>
             <h4 id="dictionary-types"><a href="#dictionary-types" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Types</h4>
             <p>
-              Dictionaries have the form <code>{K: V}</code>, where <code>K</code> is the type of the key, and <code>V</code> is the type of the value.
+              Dictionaries have the form <code>{K: V}</code>,
+              where <code>K</code> is the type of the key,
+              and <code>V</code> is the type of the value.
               For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>{Int: Bool}</code>.
             </p>
             <pre><code class="language-bamboo,file=dictionary-types.bpl"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
@@ -1204,6 +1405,11 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
+            <p>
+              Dictionary types are covariant in their key and value types.
+              For example, <code>[Int: String]</code> is a subtype of <code>[Any: String]</code> and also a subtype of <code>[Int: Any]</code>.
+              This is safe because dictionaries are value types and not reference types.
+            </p>
           </section>
           <section>
             <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
@@ -1263,10 +1469,49 @@
           <section>
             <h4 id="dictionary-fields-and-functions"><a href="#dictionary-fields-and-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Fields and Functions</h4>
             <ul>
-              <li><code>length: Int</code>: Returns the number of elements in the dictionary.</li>
               <li>
-                <code>remove(key: K): V?</code>: Removes the value for the given key of type <code>K</code> from the dictionary.
-                Returns the value of type <code>V</code> if the dictionary contained the key as an optional, otherwise <code>nil</code>.
+                <p>
+                  <code>length: Int</code>:
+                  Returns the number of entries in the dictionary.
+                </p>
+                <pre><code class="language-bamboo,file=dictionary-length-field.bpl"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Find the number of entries of the dictionary.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> length = numbers.length</span><span>
+</span><span>
+</span><span style="color: #008000">// `length` is `2`</span><span>
+</span></code></pre>
+              </li>
+              <li>
+                <p>
+                  <code>remove(key: K): V?</code>:
+                  Removes the value for the given <code>key</code> of type <code>K</code> from the dictionary.
+                </p>
+                <p>
+                  Returns the value of type <code>V</code> as an optional if the dictionary contained the key,
+                  otherwise <code>nil</code>.
+                </p>
+                <pre><code class="language-bamboo,file=dictionary-remove.bpl"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Remove the key `"fortyTwo"` from the dictionary.</span><span>
+</span><span style="color: #008000">// The key exists in the dictionary,</span><span>
+</span><span style="color: #008000">// so the value associated with the key is returned.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> fortyTwo = numbers.remove(key: </span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// `fortyTwo` is `42`</span><span>
+</span><span style="color: #008000">// `numbers` is `{"twentyThree": 23}`</span><span>
+</span><span>
+</span><span style="color: #008000">// Remove the key `"oneHundred"` from the dictionary.</span><span>
+</span><span style="color: #008000">// The key does not exist in the dictionary, so `nil` is returned.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> oneHundred = numbers.remove(key: </span><span style="color: #A31515">"oneHundred"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// `oneHundred` is `nil`</span><span>
+</span><span style="color: #008000">// `numbers` is `{"twentyThree": 23}`</span><span>
+</span></code></pre>
               </li>
             </ul>
           </section>
@@ -1904,6 +2149,32 @@
 </span></code></pre>
         </section>
         <section>
+          <h3 id="closures"><a href="#closures" aria-hidden="true"><span class="icon icon-link"></span></a>Closures</h3>
+          <p>
+            A function may refer to variables and constants of its outer scopes in which it is defined.
+            It is called a closure, because it is closing over those variables and constants.
+            A closure can can read from the variables and constants and assign to the variables it refers to.
+          </p>
+          <pre><code class="language-bamboo,file=closures-counter.bpl"><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
+</span><span style="color: #008000">// each time when called, returns the next integer, starting at 1.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCounter(): ((): Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> count = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: read from and assign to the non-local variable</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `count`, which is declared in the outer function.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        count = count + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> count</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> test = makeCounter()</span><span>
+</span><span style="color: #000000">test()  </span><span style="color: #008000">// is `1`</span><span>
+</span><span style="color: #000000">test()  </span><span style="color: #008000">// is `2`</span><span>
+</span></code></pre>
+        </section>
+        <section>
           <h3 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h3>
           <p>
             When arguments are passed to a function, they are copied.
@@ -2334,10 +2605,8 @@
         </p>
         <ul>
           <li>
-            <p>
-              <a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types.
-              Structures are useful when copies with independent state are desired.
-            </p>
+            <p><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types.</p>
+            <p>Structures are useful when copies with independent state are desired.</p>
           </li>
           <li>
             <p><a href="#resources"><strong>Resources</strong></a> are <strong>moved</strong>, they are linear types and <strong>must</strong> be used <strong>exactly once</strong>.</p>
@@ -2349,9 +2618,9 @@
             <p>
               Structures are not an ideal way to represent this ownership because they are copied.
               This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.
-              A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.
-              A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
             </p>
+            <p>A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.</p>
+            <p>A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.</p>
           </li>
         </ul>
         <p>
@@ -2397,7 +2666,8 @@
             and the initialization order is clear.
           </p>
           <p>
-            The initialization of all fields is checked statically and it is invalid to not initialize all fields in the initializer.
+            The initialization of all fields is checked statically
+            and it is invalid to not initialize all fields in the initializer.
             Also, it is statically checked that a field is definitely initialized before it is used.
           </p>
           <p>
@@ -2767,18 +3037,17 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         </section>
-      </section>
-      <section>
-        <h2 id="composite-data-type-subtyping"><a href="#composite-data-type-subtyping" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Subtyping</h2>
-        <p>
-          Two composite data types are compatible if and only if they refer to the same declaration by name,
-          i.e., nominal typing applies instead of structural typing.
-        </p>
-        <p>
-          Even if two composite data types declare the same fields and functions,
-          the types are only compatible if their names match.
-        </p>
-        <pre><code class="language-bamboo,file=composite-data-type.bpl"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
+        <section>
+          <h3 id="composite-data-type-subtyping"><a href="#composite-data-type-subtyping" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Subtyping</h3>
+          <p>
+            Two composite data types are compatible if and only if they refer to the same declaration by name,
+            i.e., nominal typing applies instead of structural typing.
+          </p>
+          <p>
+            Even if two composite data types declare the same fields and functions,
+            the types are only compatible if their names match.
+          </p>
+          <pre><code class="language-bamboo,file=composite-data-type.bpl"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
 </span><span style="color: #008000">// which has type `((): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> A {</span><span>
@@ -2807,6 +3076,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">something = A()</span><span>
 </span></code></pre>
+        </section>
         <section>
           <h3 id="composite-data-type-behaviour"><a href="#composite-data-type-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Behaviour</h3>
           <section>
@@ -2850,18 +3120,33 @@
           <section>
             <h4 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h4>
             <p>Resources are types that can only exist in <strong>one</strong> location at a time and <strong>must</strong> be used <strong>exactly once</strong>.</p>
+            <p>Resources <strong>must</strong> be created (instantiated) by using the <code>create</code> keyword.</p>
+            <p>
+              At the end of a function which has resources (variables, constants, parameters) in scope,
+              the resources <strong>must</strong> be either <strong>moved</strong> or <strong>destroyed</strong>.
+            </p>
             <p>
               They are <strong>moved</strong> when used as an initial value for a constant or variable,
               when assigned to a different variable,
               when passed as an argument to a function,
               and when returned from a function.
             </p>
-            <p>When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.</p>
-            <p>Accessing a field or calling a function of a resource does not destroy it.</p>
-            <p>To make the move explicit, the move operator <code>&#x3C;-</code> must be used when the resource is the initial value of a constant or variable, when it is moved to a different variable, when it is moved to a function, and when it is returned from a function.</p>
+            <p>Resources are <strong>destroyed</strong> using the <code>destroy</code> keyword.</p>
+            <p>Accessing a field or calling a function of a resource does not move or destroy it.</p>
             <p>
-              Resource must be created (instantiated) by using the <code>create</code> keyword.
-              To destroy a resource, the <code>destroy</code> keyword must be used.
+              When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.
+              An <strong>invalid</strong> resource cannot be used again.
+            </p>
+            <p>
+              To make the behaviour of resource types explicit, the move prefix <code>&#x3C;-</code> must be used
+              in type annotations of variable or constant declarations, parameters, and return types.
+            </p>
+            <p>
+              To make moves of resources explicit, the move operator <code>&#x3C;-</code> must be used
+              when the resource is the initial value of a constant or variable,
+              when it is moved to a different variable,
+              when it is moved to a function as an argument,
+              and when it is returned from a function.
             </p>
             <pre><code class="language-bamboo,file=resource-behavior.bpl"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2875,7 +3160,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a &#x3C;- SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Move* the resource value to a new constant.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2953,51 +3238,347 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> newResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-newResource</span><span>
 </span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
+</span></code></pre>
+            <p>Resources <strong>must</strong> be used exactly once.</p>
+            <pre><code class="language-bamboo,file=resource-must-use.bpl"><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
+            <pre><code class="language-bamboo,file=resource-use-after-move.bpl"><span style="color: #008000">// Declare a constant named `res` which has the resource type `SomeResource`.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function `use` and move the resource `res` into it.</span><span>
+</span><span style="color: #000000">use(resource: &#x3C;-res)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource constant `res` cannot be used again,</span><span>
+</span><span style="color: #008000">// as it was moved in the previous function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">use(resource: &#x3C;-res)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource constant `res` cannot be used again,</span><span>
+</span><span style="color: #008000">// as it was moved in the previous function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">res.value</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-not-used.bpl"><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-not-definitely-destroyed.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
+</span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not always used, but must be.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The destroy statement is not always executed, so at the end of this function</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// it might have been destroyed or not.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-always-invalidated.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is valid, as it always uses the resource parameter,</span><span>
+</span><span style="color: #008000">// and does not cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
+</span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        use(resource: &#x3C;-resource)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// At the end of the function the resource parameter was definitely used:</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// It was either destroyed or moved in the call of function `use`.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-loss-return.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
+</span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> returnBeforeDestroy(: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> move {</span><span>
+</span><span style="color: #000000">        use(resource: &#x3C;-res)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span>
+</span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Invalid: When this function returns here, the resource variable</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `res` was not used, but must be.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: the resource variable `res` was potentially moved in the</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// previous if-statement, and both branches definitely return,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so this statement is unreachable.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> res</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="resource-variables"><a href="#resource-variables" aria-hidden="true"><span class="icon icon-link"></span></a>Resource variables</h4>
+            <p>Resource variables cannot be assigned to as that would lead to the loss of the variable's current resource value.</p>
+            <p>Instead, use a swap statement (<code>&#x3C;-></code>) to replace the resource variable with another resource.</p>
+            <pre><code class="language-bamboo,file=resource-variable-invalid-assignment.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> y &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot assign to resource variable `x`,</span><span>
+</span><span style="color: #008000">// as its current resource would be lost</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">x &#x3C;- y</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, use a swap statement.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> replacement &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">x &#x3C;-> replacement</span><span>
+</span><span style="color: #008000">// `x` is the new resource.</span><span>
+</span><span style="color: #008000">// `replacement` is the old resource.</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="resource-destructors"><a href="#resource-destructors" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Destructors</h4>
+            <p>
+              Resource may have a destructor, which is executed when the resource is destroyed.
+              Destructors have no parameters and no return value and are declared using the <code>destroy</code> name.
+              A resource may have only one destructor.
+            </p>
+            <pre><code class="language-bamboo,file=resource-destructor.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> destructorCalled = </span><span style="color: #0000FF">false</span><span>
+</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Resource {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a destructor for the resource, which is executed</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// when the resource is destroyed.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    destroy() {</span><span>
+</span><span style="color: #000000">        destructorCalled = </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Resource()</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> res</span><span>
+</span><span style="color: #008000">// `destructorCalled` is `true`</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="nested-resources"><a href="#nested-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Nested Resources</h4>
+            <p>Fields in composite data types behave diffently when they have a resource type.</p>
+            <p>
+              If a resource type has fields that have a resource type it <strong>must</strong> declare a destructor,
+              which <strong>must</strong> invalidate all resource fields, i.e. move or destroy them.
+            </p>
+            <pre><code class="language-bamboo,file=resource-nested-field.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> Child {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource with a resource field named `child`.</span><span>
+</span><span style="color: #008000">// The resource *must* declare a destructor</span><span>
+</span><span style="color: #008000">// and the destructor *must* invalidate the resource field.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Parent {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: &#x3C;-Child</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: &#x3C;-</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.child &#x3C;- child</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a destructor which invalidates the resource field</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `child` by destroying it.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    destroy() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.child</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+            <p>
+              Accessing a field or calling function on a resource field is valid,
+              however moving a resource out of a variable resource field is <strong>not</strong> allowed.
+              Instead, use a swap statement to replace the resource with another resource.
+            </p>
+            <pre><code class="language-bamboo,file=resource-field-swap.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> child &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 1"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> parent &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Parent(name: </span><span style="color: #A31515">"Parent"</span><span style="color: #000000">, child: &#x3C;-child)</span><span>
+</span><span>
+</span><span style="color: #000000">child.name  </span><span style="color: #008000">// is "Child"</span><span>
+</span><span style="color: #000000">parent.child.name  </span><span style="color: #008000">// is "Child"</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot move resource out of variable resource field.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> childAgain &#x3C;- parent.child</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, use a swap statement.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> otherChild &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 2"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">parent.child &#x3C;-> otherChild</span><span>
+</span><span style="color: #008000">// `parent.child` is the second child, Child 2.</span><span>
+</span><span style="color: #008000">// `otherChild` is the first child, Child 1.</span><span>
+</span></code></pre>
+          </section>
+          <section>
+            <h4 id="resources-in-closures"><a href="#resources-in-closures" aria-hidden="true"><span class="icon icon-link"></span></a>Resources in Closures</h4>
+            <p>Resources can not be captured in closures, as that could potentially result in duplications.</p>
+            <pre><code class="language-bamboo,file=resource-capturing"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Declare a function which returns a closure which refers to</span><span>
+</span><span style="color: #008000">// the resource parameter `resource`. Each call to the returned function</span><span>
+</span><span style="color: #008000">// would return the resource, which should not be possible.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): &#x3C;-R {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-resource</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> test = makeCloner(resource: &#x3C;-create R())</span><span>
+</span></code></pre>
           </section>
           <section>
             <h4 id="resources-in-arrays-and-dictionaries"><a href="#resources-in-arrays-and-dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Resources in Arrays and Dictionaries</h4>
             <p>
               Arrays and dictionaries behave differently when they contain resources:
-              When a resource is <strong>read</strong> from the array at a certain index,
-              or it is <strong>read</strong> from a dictionary by accessing a certain key,
-              the resource is <strong>moved</strong> out of the array or dictionary.
+              Indexing into an array to read an element at a certain index or assign to it,
+              or indexing into a dictionary to read a value for a certain key or set a value for the key is <strong>not</strong> allowed.
             </p>
-            <pre><code class="language-bamboo,file=resource-in-array.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
-</span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">1</span><span style="color: #000000">),</span><span>
-</span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">2</span><span style="color: #000000">),</span><span>
-</span><span style="color: #000000">    SomeResource(value: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+            <p>Instead, use a swap statement to replace the accessed resource with another resource.</p>
+            <pre><code class="language-bamboo,file=resource-in-array.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant for an array of resources.</span><span>
+</span><span style="color: #008000">// Create two resources and move them into the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #008000">// **Move** the first resource into a new constant.</span><span>
+</span><span style="color: #008000">// Invalid: Reading an element from a resource array is not allowed.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources[</span><span style="color: #09885A">0</span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #008000">// **Move** the second resource into a new constant.</span><span>
+</span><span style="color: #008000">// Invalid: Setting an element in a resource array is not allowed,</span><span>
+</span><span style="color: #008000">// as it would result in the loss of the current value.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> secondResource &#x3C;- resources[</span><span style="color: #09885A">0</span><span style="color: #000000">]</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #09885A">0</span><span style="color: #000000">] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span>
-</span><span style="color: #008000">// `resources` only contains one element,</span><span>
-</span><span style="color: #008000">// the initial third resource!</span><span>
+</span><span style="color: #008000">// Instead, when attempting to either read an element or update an element</span><span>
+</span><span style="color: #008000">// in a resource array, use a swap statement with a variable to replace</span><span>
+</span><span style="color: #008000">// the accessed element.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The first two resources were moved out of the array when</span><span>
-</span><span style="color: #008000">// they were read, i.e., the were removed from the array.</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #09885A">0</span><span style="color: #000000">] &#x3C;-> res</span><span>
+</span><span style="color: #008000">// `resources[0]` now contains the new resource.</span><span>
+</span><span style="color: #008000">// `res` now contains the old resource.</span><span>
+</span></code></pre>
+            <p>The same applies to dictionaries.</p>
+            <pre><code class="language-bamboo,file=resource-in-dictionary.bpl"><span style="color: #008000">// Declare a constant for a dictionary of resources.</span><span>
+</span><span style="color: #008000">// Create three resources and move them into the dictionary.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// Accessing a field of a resource does not move the resource.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">resource[</span><span style="color: #09885A">0</span><span style="color: #000000">].value  </span><span style="color: #008000">// is `3`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r2"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Run-time error: The second element of the constant `resources`</span><span>
-</span><span style="color: #008000">// is out-of-bounds, the program aborts.</span><span>
+</span><span style="color: #008000">// Invalid: Reading an element from a resource dictionary is not allowed.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">resource[</span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Setting an element in a resource dictionary is not allowed,</span><span>
+</span><span style="color: #008000">// as it would result in the loss of the current value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, when attempting to either read an element or update an element</span><span>
+</span><span style="color: #008000">// in a resource dictionary, use a swap statement with a variable to replace</span><span>
+</span><span style="color: #008000">// the accessed element.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">] &#x3C;-> res</span><span>
+</span><span style="color: #008000">// `resources["r1"]` now contains the new resource.</span><span>
+</span><span style="color: #008000">// `res` now contains the old resource.</span><span>
+</span></code></pre>
+            <p>
+              Resources cannot be moved into arrays and dictionaries multiple times,
+              as that would cause a duplication.
+            </p>
+            <pre><code class="language-bamboo,file=resource-array-duplication.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the array once.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-resource,</span><span>
+</span><span style="color: #000000">    &#x3C;-resource</span><span>
+</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resourc2 &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the dictionary once.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources2 &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"res1"</span><span style="color: #000000">: &#x3C;-resource,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"res2"</span><span style="color: #000000">: &#x3C;-resource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+            <p>Resource arrays and dictionaries can be destroyed.</p>
+            <pre><code class="language-bamboo,file=resource-array-destroy.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></code></pre>
+            <p>
+              The variable array functions like <code>append</code>, <code>insert</code>, and <code>remove</code> behave like for non-resource arrays.
+              Note however, that the result of the <code>remove</code> functions must be used.
+            </p>
+            <pre><code class="language-bamboo,file-resource-array-mutating-functions.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [&#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()]</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #000000">resources.append(&#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first &#x3C;- resource.remove(at: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> first</span><span>
+</span><span>
+</span><span style="color: #000000">resources.insert(at: </span><span style="color: #09885A">0</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The statement ignores the result of the call to `remove`,</span><span>
+</span><span style="color: #008000">// which would result in a loss.</span><span>
+</span><span style="color: #000000">resource.remove(at: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></code></pre>
+            <p>
+              The variable array function <code>contains</code> is not available, as it is impossible:
+              If the resource can be passed to the <code>contains</code> function, it is by definition not in the array.
+            </p>
+            <p>The variable array function <code>concat</code> is not available, as it would result in the duplication of resources.</p>
+            <p>
+              The dictionary functions like <code>insert</code> and <code>remove</code> behave like for non-resource dictionaries.
+              Note however, that the result of these functions must be used.
+            </p>
+            <pre><code class="language-bamboo,file-resource-dictionary-mutating-functions.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()}</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first &#x3C;- resource.remove(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `resources.length` is `0`</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> first</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> old &#x3C;- resources.insert(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `old` is nil, as there was no value for the key "r1"</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> old2 &#x3C;- resources.insert(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `old2` is the old value for the key "r1"</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> old</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> old2</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
 </span></code></pre>
           </section>
         </section>
@@ -3018,13 +3599,25 @@
         <blockquote>
           <p>🚧 Status: Access control is not implemented yet.</p>
         </blockquote>
-        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible. Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
+        <p>
+          Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
+          Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
+        </p>
         <ul>
           <li>
-            <p><strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes. For example, a private field can only be accessed by functions of the type is part of, not by code that uses an instance of the type in an outer scope.</p>
+            <p>
+              <strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes.
+              For example, a private field can only be accessed by functions of the type is part of,
+              not by code that uses an instance of the type in an outer scope.
+            </p>
           </li>
           <li>
-            <p><strong>Public</strong> means the declaration is accessible/visible in all scopes. This includes the current and inner scopes like for private, and the outer scopes. For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope. This does not allow the declaration to be publicly writable though.</p>
+            <p>
+              <strong>Public</strong> means the declaration is accessible/visible in all scopes.
+              This includes the current and inner scopes like for private, and the outer scopes.
+              For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
+              This does not allow the declaration to be publicly writable though.
+            </p>
           </li>
         </ul>
         <p><strong>By default, everything is private.</strong></p>
@@ -3978,7 +4571,7 @@
 </span></code></pre>
         <section>
           <h3 id="deployment"><a href="#deployment" aria-hidden="true"><span class="icon icon-link"></span></a>Deployment</h3>
-          <p>Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts. Here is an example of a resource interface that will be deployed to an account. Imagine it is in a file called <code>FungibleToken.bpl</code>.</p>
+          <p>Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts. Here is an example of a resource interface that will be deployed to an account. Imagine it is in a file named <code>FungibleToken.bpl</code>.</p>
           <pre><code class="language-bamboo,file=fungible-token-interface.bpl"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// It requires implementing types to provide a resource implementation named `Vault`,</span><span>
