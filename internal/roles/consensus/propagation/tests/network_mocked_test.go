@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"sync"
@@ -106,6 +107,12 @@ func randCollectionHash() (*collection.GuaranteedCollection, error) {
 	}, nil
 }
 
+// send different collection to different nodes concurrently
+func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+	node.engine.SubmitGuaranteedCollection(gc)
+	wg.Done()
+}
+
 func TestSubmitCollection(t *testing.T) {
 	// If a consensus node receives a collection hash, then another connected node should receive it as well.
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
@@ -208,11 +215,6 @@ func TestSubmitCollection(t *testing.T) {
 		gc3, err := randCollectionHash()
 		require.Nil(t, err)
 
-		// send different collection to different nodes concurrently
-		sendOne := func(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
-			node.engine.SubmitGuaranteedCollection(gc)
-			wg.Done()
-		}
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go sendOne(node1, gc1, &wg)
@@ -230,5 +232,55 @@ func TestSubmitCollection(t *testing.T) {
 		// check mempool hash are the same
 		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 		require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
+	})
+
+	testConcrrencyOnce := func(t *testing.T) {
+		N := rand.Intn(100) + 1 // at least 1 node, at most 100 nodes
+		M := rand.Intn(200) + 1 // at least 1 collection, at most 200 collections
+		t.Logf("preparing %v nodes to send %v messages concurrently", N, M)
+
+		// prepare N connected nodes
+		entries := make([]string, N)
+		for e := 0; e < N; e++ {
+			entries[e] = fmt.Sprintf("consensus-consensus%v@localhost:10%v", e, e)
+		}
+		_, nodes, err := createConnectedNodes(entries)
+		require.Nil(t, err)
+
+		// prepare M distinct collection hashes
+		gcs := make([]*collection.GuaranteedCollection, M)
+		for m := 0; m < M; m++ {
+			gc, err := randCollectionHash()
+			require.Nil(t, err)
+			gcs[m] = gc
+		}
+
+		// send each collection concurrently to a random node
+		var wg sync.WaitGroup
+		for _, gc := range gcs {
+			wg.Add(1)
+			randNodeIndex := rand.Intn(N)
+			go sendOne(nodes[randNodeIndex], gc, &wg)
+		}
+		wg.Wait()
+
+		// now check all nodes should have received M collections in their mempool
+		// and the Hash are the same
+		sameHash := nodes[0].pool.Hash()
+		for _, node := range nodes {
+			require.Equal(t, M, int(node.pool.Size()))
+			require.Equal(t, sameHash, node.pool.Hash())
+		}
+	}
+
+	// N or M could be arbitarily big.
+	t.Run("should produce the same hash for N nodes to send M messages concurrently to eath other",
+		testConcrrencyOnce)
+
+	// will take roughly 15 seconds
+	t.Run("run the above tests for 100 times", func(t *testing.T) {
+		for i := 0; i < 100; i++ {
+			testConcrrencyOnce(t)
+		}
 	})
 }
