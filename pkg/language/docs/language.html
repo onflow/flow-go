@@ -663,7 +663,7 @@
           <h3 id="floating-point-numbers"><a href="#floating-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Floating-Point Numbers</h3>
           <p>There is <strong>no</strong> support for floating point numbers.</p>
           <p>
-            Contracts are not intended to work with values with error margins
+            Smart Contracts are not intended to work with values with error margins
             and therefore floating point arithmetic is not appropriate here.
             Fixed point numbers should be simulated using integers and a scale factor for now.
           </p>
@@ -672,7 +672,7 @@
           <h3 id="addresses"><a href="#addresses" aria-hidden="true"><span class="icon icon-link"></span></a>Addresses</h3>
           <p>
             The type <code>Address</code> represents an address.
-            Addresses are unsigned integers with a size of 160 bits.
+            Addresses are unsigned integers with a size of 160 bits (20 bytes).
             Hexadecimal integer literals can be used to create address values.
           </p>
           <pre><code class="language-bamboo"><span style="color: #008000">// Declare a constant that has type `Address`.</span><span>
@@ -733,7 +733,11 @@
 </span><span>
 </span><span style="color: #008000">// Declare a variable that has the type `Any?`, i.e. an optional type of any type.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> maybeSomething: Any? = </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> maybeSomething: Any? = </span><span style="color: #09885A">42</span><span>
+</span><span>
+</span><span style="color: #000000">maybeSomething = </span><span style="color: #A31515">"twenty-four"</span><span>
+</span><span>
+</span><span style="color: #000000">maybeSomething = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
           <p><code>Any</code> is also the super-type of optional types.</p>
           <pre><code class="language-bamboo"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeInt: Int? = </span><span style="color: #09885A">1</span><span>
@@ -2215,7 +2219,7 @@
           <p>Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for <a href="#semicolons">statements</a>.</p>
           <p>
             Following each condition, an optional description can be provided after a colon.
-            The conditiondescription is used as an error message when the condition fails.
+            The condition description is used as an error message when the condition fails.
           </p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
           <pre><code class="language-bamboo,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
@@ -2624,7 +2628,7 @@
           </li>
         </ul>
         <p>
-          Resources can only be nested in other resource types,
+          Nesting of resources is only allowed within other resource types,
           or in data structures like arrays and dictionaries,
           but not in structures, as that would allow resources to be copied.
         </p>
@@ -3515,7 +3519,6 @@
 </span><span style="color: #000000">    &#x3C;-resource</span><span>
 </span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> resourc2 &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the dictionary once.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> resources2 &#x3C;- {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"res1"</span><span style="color: #000000">: &#x3C;-resource,</span><span>
@@ -4208,7 +4211,7 @@
 </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a structure interface named `Polygon`.</span><span>
-</span><span style="color: #008000">// Require implementing types to also implemenr the structure interface `Shape`.</span><span>
+</span><span style="color: #008000">// Require implementing types to also implement the structure interface `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Polygon: Shape {}</span><span>
 </span><span>
@@ -4595,7 +4598,7 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(vault: &#x3C;-</span><span style="color: #0000FF">Vault</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #008000">// Vault is an interface that implements both Provider and Receiver.</span><span>
+</span><span style="color: #008000">// `Vault` is an interface that implements both `Provider` and `Receiver`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Vault: Provider, Receiver {</span><span>
 </span><span>
