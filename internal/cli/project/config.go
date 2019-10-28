@@ -19,7 +19,7 @@ type Account struct {
 }
 
 // An internal utility struct that defines how Account is converted to JSON.
-type accountConfigJSON struct {
+type accountJSON struct {
 	Address    string `json:"address"`
 	PrivateKey string `json:"privateKey"`
 }
@@ -30,14 +30,14 @@ func (acct *Account) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	return json.Marshal(accountConfigJSON{
+	return json.Marshal(accountJSON{
 		Address:    acct.Address.Hex(),
 		PrivateKey: prKeyHex,
 	})
 }
 
 func (acct *Account) UnmarshalJSON(data []byte) (err error) {
-	var alias accountConfigJSON
+	var alias accountJSON
 	if err = json.Unmarshal(data, &alias); err != nil {
 		return
 	}
