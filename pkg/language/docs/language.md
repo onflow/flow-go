@@ -3474,15 +3474,20 @@ as that would cause a duplication.
 
 ```bamboo,file=resource-array-duplication.bpl
 let resource <- create R()
+
 // Invalid: The resource variable `resource` can only be moved into the array once.
 //
 let resources <- [
     <-resource,
     <-resource
 ]
+```
+
+```bamboo,file=resource-dictionary-duplication.bpl
+let resource <- create R()
 
 // Invalid: The resource variable `resource` can only be moved into the dictionary once.
-let resources2 <- {
+let resources <- {
     "res1": <-resource,
     "res2": <-resource
 }
@@ -3495,6 +3500,14 @@ let resources <- [
     <-create R(),
     <-create R()
 ]
+destroy resources
+```
+
+```bamboo,file=resource-dictionary-destroy.bpl
+let resources <- {
+    "r1": <-create R(),
+    "r2": <-create R()
+}
 destroy resources
 ```
 

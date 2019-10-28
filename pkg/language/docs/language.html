@@ -3512,15 +3512,18 @@
               as that would cause a duplication.
             </p>
             <pre><code class="language-bamboo,file=resource-array-duplication.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
 </span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the array once.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
 </span><span style="color: #000000">    &#x3C;-resource,</span><span>
 </span><span style="color: #000000">    &#x3C;-resource</span><span>
 </span><span style="color: #000000">]</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-dictionary-duplication.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the dictionary once.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources2 &#x3C;- {</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"res1"</span><span style="color: #000000">: &#x3C;-resource,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"res2"</span><span style="color: #000000">: &#x3C;-resource</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3530,6 +3533,12 @@
 </span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
 </span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></code></pre>
+            <pre><code class="language-bamboo,file=resource-dictionary-destroy.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r2"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">}</span><span>
 </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
 </span></code></pre>
             <p>
