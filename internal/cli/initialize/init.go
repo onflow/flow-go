@@ -1,7 +1,6 @@
 package initialize
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -45,18 +44,13 @@ func InitializeProject() *project.Config {
 	if err != nil {
 		panic(err)
 	}
-	prKeyBytes, err := prKey.Encode()
-	if err != nil {
-		panic(err)
-	}
-	prKeyHex := hex.EncodeToString(prKeyBytes)
-	address := types.HexToAddress("01").Hex()
+	address := types.HexToAddress("01")
 
 	conf := &project.Config{
-		Accounts: map[string]*project.AccountConfig{
-			"root": &project.AccountConfig{
+		Accounts: map[string]*project.Account{
+			"root": &project.Account{
 				Address:    address,
-				PrivateKey: prKeyHex,
+				PrivateKey: prKey,
 			},
 		},
 	}

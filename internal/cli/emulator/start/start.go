@@ -72,15 +72,9 @@ func getRootKey(projectConf *project.Config) crypto.PrivateKey {
 	} else if projectConf != nil {
 		rootAccount := projectConf.Accounts["root"]
 
-		prKey, err := utils.DecodePrivateKey(rootAccount.PrivateKey)
-		if err != nil {
-			fmt.Printf("Failed to decode private key")
-			os.Exit(1)
-		}
-
 		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)
 
-		return prKey
+		return rootAccount.PrivateKey
 	}
 
 	log.Warnf("⚙️   No project configured, generating new root account key")
