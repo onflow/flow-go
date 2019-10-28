@@ -1892,7 +1892,7 @@ See https://github.com/dapperlabs/bamboo-runtime/issues/84
 Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
 
 Following each condition, an optional description can be provided after a colon.
-The conditiondescription is used as an error message when the condition fails.
+The condition description is used as an error message when the condition fails.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
