@@ -8,7 +8,7 @@ const (
 	SHA2_256 AlgoName = "SHA2_256"
 	SHA2_384 AlgoName = "SHA2_384"
 	SHA3_256 AlgoName = "SHA3_256"
-	SHA3_384 AlgoName = "SHA3_384"
+	SHA3_384          = "SHA3_384"
 
 	// Supported Signing algorithms
 	BLS_BLS12381    = "BLS_BLS12381"
@@ -44,6 +44,9 @@ const (
 	SignatureLengthECDSA_SECp256k1 = 64
 	PrKeyLengthECDSA_SECp256k1     = 32
 	PubKeyLengthECDSA_SECp256k1    = 64
+
+	DKGMinSize int = 3
+	ThresholdMinSize
 )
 
 // Signature is a generic type, regardless of the signature scheme
