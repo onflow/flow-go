@@ -52,6 +52,10 @@ type Config struct {
 	Accounts map[string]*Account `json:"accounts"`
 }
 
+func (c *Config) RootAccount() *Account {
+	return c.Accounts["root"]
+}
+
 func SaveConfig(conf *Config) error {
 	data, err := json.MarshalIndent(conf, "", "\t")
 	if err != nil {

@@ -26,7 +26,7 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
 			pconf := InitializeProject()
-			rootAcct := pconf.Accounts["root"]
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)

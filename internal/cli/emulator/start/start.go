@@ -37,7 +37,7 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if conf.Init {
 			pconf := initialize.InitializeProject()
-			rootAcct := pconf.Accounts["root"]
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
@@ -70,7 +70,7 @@ func getRootKey(projectConf *project.Config) crypto.PrivateKey {
 
 		return prKey
 	} else if projectConf != nil {
-		rootAccount := projectConf.Accounts["root"]
+		rootAccount := projectConf.RootAccount()
 
 		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)
 
