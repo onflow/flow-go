@@ -41,7 +41,9 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		return nil, err
 	}
 
-	log := zerolog.New(os.Stderr).With().Logger()
+	// only log error logs
+	// (but still printed some INFO logs, why?)
+	log := zerolog.New(os.Stderr).With().Logger().Level(zerolog.ErrorLevel)
 
 	pool, err := mempool.New()
 	if err != nil {
