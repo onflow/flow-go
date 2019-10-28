@@ -6,27 +6,26 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestCollector_SubmitTransaction tests the function SubmitTransaction
 func TestCollector_SubmitTransaction(t *testing.T) {
 	collector := NewCollector()
-
-	if _, ok := collector.Data["Hello"]; ok == true {
-		t.Error("collector node should not contain key before insertion")
-	}
+	assert := assert.New(t)
+	_, ok := collector.Data["Hello"]
+	assert.NotEqual(ok, true)
 
 	collector.SubmitTransaction(context.Background(), generateSubmitTransactionRequest("Hello"))
 
-	if _, ok := collector.Data["Hello"]; ok != true {
-		t.Error("collector node should contain key: Key not found")
-	}
+	_, ok = collector.Data["Hello"]
+	assert.Equal(ok, true)
 }
 
 // TestCollector_GetTransaction tests the function GetTransaction
 func TestCollector_GetTransaction(t *testing.T) {
 	collector := NewCollector()
-
+	assert := assert.New(t)
 	tt := []struct {
 		data   map[string]bool
 		text   string
@@ -64,15 +63,15 @@ func TestCollector_GetTransaction(t *testing.T) {
 		collector.Data = tc.data
 		resp, err := collector.GetTransaction(context.Background(), &collect.GetTransactionRequest{TransactionHash: []byte(tc.text)})
 
-		if err != nil && tc.status == true {
-			t.Errorf("GetTransaction: Expected: nil, Got: %v", err)
+		if tc.status == true {
+			assert.Nil(err)
 		}
 
-		if err == nil && tc.status == false {
-			t.Errorf("GetTransaction: Expected %v, Got: %v", errNotFound, err)
+		if tc.status == false {
+			assert.NotNil(err)
 		}
-		if tc.status == true && string(resp.Transaction.Script) != tc.text {
-			t.Errorf("expected Script to be: %v returned: %v", tc.text, string(resp.Transaction.Script))
+		if tc.status == true {
+			assert.Equal(tc.text, string(resp.Transaction.Script))
 		}
 	}
 }

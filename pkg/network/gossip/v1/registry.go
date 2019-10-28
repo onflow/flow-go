@@ -4,6 +4,7 @@ package gnode
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // HandleFunc is the function signature expected from all registered functions
@@ -21,10 +22,15 @@ type Registry interface {
 type registryManager struct {
 	msgTypes  map[uint64]HandleFunc
 	msgTypeID map[string]uint64
+	idMsgType map[uint64]string
+	mu        sync.RWMutex
 }
 
 // MsgTypeToID returns the numerical value mapped to the given message type
 func (r *registryManager) MsgTypeToID(msgType string) (uint64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	val, ok := r.msgTypeID[msgType]
 	if !ok {
 		return 0, fmt.Errorf("msgType %v was not found", msgType)
@@ -33,23 +39,58 @@ func (r *registryManager) MsgTypeToID(msgType string) (uint64, error) {
 	return val, nil
 }
 
+
+// IDtoMsgType takes a message id and returns the message corresponding to it.
+func (r *registryManager) IDtoMsgType(ID uint64) (string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	val, ok := r.idMsgType[ID]
+
+	if !ok {
+		return "", fmt.Errorf("message ID %v cannot be resolved, not type is found", ID)
+	}
+	return val, nil
+}
+
+
 // newRegistryManager initializes a registry manager which manges a given registry
 func newRegistryManager(registry Registry) *registryManager {
 	if registry == nil {
 		return &registryManager{
 			msgTypes:  make(map[uint64]HandleFunc),
 			msgTypeID: make(map[string]uint64),
+			idMsgType: make(map[uint64]string),
 		}
 	}
 
 	return &registryManager{
 		msgTypes:  registry.MessageTypes(),
 		msgTypeID: registry.NameMapping(),
+		idMsgType: getIDMappings(registry.NameMapping()),
 	}
 }
 
+// getIDMappings takes a mapping from string (message types) to uint64 (message ids) and returns the inverse of this mapping,
+// i.e., from uint64 to string.
+func getIDMappings(msgTypeMap map[string]uint64) map[uint64]string {
+
+	mp := make(map[uint64]string)
+
+	for k, v := range msgTypeMap {
+		mp[v] = k
+	}
+
+	return mp
+}
+
+
+
 // Invoke passes input parameters to given msgType name in the registry
 func (r *registryManager) Invoke(ctx context.Context, msgType uint64, payloadBytes []byte) (*invokeResponse, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	if _, ok := r.msgTypes[msgType]; !ok {
 		return nil, fmt.Errorf("could not run msgType %v: msgType does not exist", msgType)
 	}
@@ -61,6 +102,8 @@ func (r *registryManager) Invoke(ctx context.Context, msgType uint64, payloadByt
 
 // AddMessageType allows a registryManager of adding a msgType to registries inside of it
 func (r *registryManager) AddMessageType(msgType string, f HandleFunc) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	if msgType == "" {
 		return fmt.Errorf("msgType name cannot be an empty string")
@@ -77,13 +120,15 @@ func (r *registryManager) AddMessageType(msgType string, f HandleFunc) error {
 	// one
 	n := len(r.msgTypes)
 
-	if _, ok := r.msgTypes[uint64(n)]; ok {
+	msgID := uint64(n)
+
+	if _, ok := r.msgTypes[msgID]; ok {
 		return fmt.Errorf("could not add msgType: registry does not comply with the expected protocol")
 	}
 
-	r.msgTypeID[msgType] = uint64(n)
-	r.msgTypes[uint64(n)] = f
-
+	r.msgTypeID[msgType] = msgID
+	r.msgTypes[msgID] = f
+	r.idMsgType[msgID] = msgType
 	return nil
 }
 

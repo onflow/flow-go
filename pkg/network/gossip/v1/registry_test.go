@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 //// TestAddMessageType tests adding new msgTypes to the registry
 func TestAddMessageType(t *testing.T) {
+	assert := assert.New(t)
 	r := newRegistryManager(nil)
+
 
 	defaultFunction := func(ctx context.Context, payload []byte) ([]byte, error) {
 		return []byte("Response"), nil
@@ -44,23 +48,14 @@ func TestAddMessageType(t *testing.T) {
 
 	for _, tc := range tt {
 		err := r.AddMessageType(tc.msgType, defaultFunction)
-		if err != nil && tc.err != nil {
-			continue
-		}
-		if err == nil && tc.err == nil {
-			continue
-		}
-		if err == nil && tc.err != nil {
-			t.Errorf("AddMessageType: Expected an error, Got no error")
+		if tc.err != nil {
+			assert.NotNil(err)
 		}
 		if err != nil && tc.err == nil {
-			t.Errorf("AddMessageType: Expected no error, Got an error")
+			assert.Nil(err)
 		}
 	}
-
-	if (len(r.msgTypes)) != 3 {
-		t.Errorf("AddMessageType: Registry size mismatch, Expected 3, Got %v", len(r.msgTypes))
-	}
+	assert.Equal(3, len(r.msgTypes))
 
 	for i := 0; i < len(r.msgTypes); i++ {
 		if _, ok := r.msgTypes[uint64(i)]; !ok {
@@ -72,6 +67,7 @@ func TestAddMessageType(t *testing.T) {
 
 // TestInvokeMessageType tests invoking added msgTypes to the registry
 func TestInvokeMessageType(t *testing.T) {
+	assert := assert.New(t)
 	r := newRegistryManager(nil)
 
 	r.AddMessageType("exists", func(ctx context.Context, payloadBytes []byte) ([]byte, error) {
@@ -118,12 +114,12 @@ func TestInvokeMessageType(t *testing.T) {
 
 	for _, tc := range tt {
 		msgID, err := r.MsgTypeToID(tc.msgType)
-		if err == nil && tc.err != nil {
-			t.Error("MsgTypeToID: Expected an error, Got no error")
+		if tc.err != nil {
+			assert.NotNil(err)
 		}
 
-		if err != nil && tc.err == nil {
-			t.Error("MsgTypeToID: Expected no error, Got an error")
+		if tc.err == nil {
+			assert.Nil(err)
 		}
 
 		if err != nil && tc.err != nil {
@@ -132,26 +128,19 @@ func TestInvokeMessageType(t *testing.T) {
 
 		resp, err := r.Invoke(context.Background(), msgID, tc.input)
 
-		if err != nil && tc.err != nil {
-			continue
+		if tc.err != nil {
+			assert.NotNil(err)
 		}
-		if err == nil && tc.err != nil {
-			t.Error("AddMessageType: Expected an error, Got no error ", msgID, " ", tc.msgType)
-		}
-		if err != nil && tc.err == nil {
-			t.Errorf("AddMessageType: Expected no error, Got an error")
+		if tc.err == nil {
+			assert.Nil(err)
 		}
 		if err == nil && tc.err == nil {
-			if tc.resp.Err != nil && resp.Err == nil {
-				t.Errorf("Invoke: Expected an error, Got no error")
+			if tc.resp.Err != nil {
+				assert.NotNil(resp.Err)
 			}
 
-			if tc.resp.Err == nil && resp.Err != nil {
-				t.Errorf("Invoke: Expected no error, Got an error")
-			}
-
-			if tc.resp.Err != nil && resp.Err != nil {
-				continue
+			if tc.resp.Err == nil {
+				assert.Nil(resp.Err)
 			}
 
 			if !reflect.DeepEqual(resp.Resp, tc.resp.Resp) {

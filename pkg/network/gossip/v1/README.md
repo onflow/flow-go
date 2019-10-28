@@ -20,7 +20,7 @@
   * [func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.AsyncGossip)
   * [func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.AsyncQueue)
   * [func (n *Node) RegisterFunc(msgType string, f HandleFunc) error](#Node.RegisterFunc)
-  * [func (n *Node) Serve(listener net.Listener)](#Node.Serve)
+  * [func (n *Node) Serve(listener net.Listener) error](#Node.Serve)
   * [func (n *Node) SetProtocol(s ServePlacer)](#Node.SetProtocol)
   * [func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)](#Node.SyncGossip)
   * [func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)](#Node.SyncQueue)
@@ -44,14 +44,17 @@ DefaultQueueSize is the default size of node queue
 ## <a name="pkg-variables">Variables</a>
 ``` go
 var (
+    // ErrTimedOut is an error that happens when a context expired before finishing a certain task
     ErrTimedOut = errors.New("request timed out")
+
+    // ErrInternal represents an internal gnode error
     ErrInternal = errors.New("gnode internal error")
 )
 ```
 
 
 
-## <a name="HandleFunc">type</a> [HandleFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=254:315#L10)
+## <a name="HandleFunc">type</a> [HandleFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=262:323#L11)
 ``` go
 type HandleFunc func(context.Context, []byte) ([]byte, error)
 ```
@@ -66,7 +69,7 @@ HandleFunc is the function signature expected from all registered functions
 
 
 
-## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=528:973#L21)
+## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=528:1036#L21)
 ``` go
 type Node struct {
     // contains filtered or unexported fields
@@ -81,7 +84,7 @@ Node is holding the required information for a functioning async gossip node
 
 
 
-### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1152:1190#L43)
+### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1215:1253#L44)
 ``` go
 func NewNode(config *NodeConfig) *Node
 ```
@@ -92,17 +95,20 @@ and a staticFanoutNum indicating the size of the static fanout
 
 
 
-### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=8638:8769#L270)
+### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=9530:9661#L286)
 ``` go
 func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
 AsyncGossip synchronizes over the delivery
 i.e., sends a message to all recipients, and only blocks for delivery without blocking for their response
+payload:    represents the payload of the message
+recipients: the list of nodes designated to receive the message
+msgType:    represents the type of message to be gossiped (e.g., the engine type, the method type to be invoked over the payload, etc)
 
 
 
 
-### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=10735:10837#L329)
+### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=11414:11516#L340)
 ``` go
 func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```
@@ -110,29 +116,32 @@ AsyncQueue is invoked remotely using the gRPC stub,
 it receives a message from a remote node and places it inside the local nodes queue
 it is synchronized with the remote node on the message reception (and NOT reply), i.e., blocks the remote node until either
 a timeout or placement of the message into the queue
+msg: the message to be placed in the queue
 
 
 
 
-### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=14501:14564#L450)
+### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=16351:16414#L491)
 ``` go
 func (n *Node) RegisterFunc(msgType string, f HandleFunc) error
 ```
 RegisterFunc allows the addition of new message types to the node's registry
+msgType:   type of message to be registered
+handlFunc: the signature of the registered function
 
 
 
 
-### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=13962:14005#L435)
+### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=15596:15645#L468)
 ``` go
-func (n *Node) Serve(listener net.Listener)
+func (n *Node) Serve(listener net.Listener) error
 ```
 Serve starts an async node grpc server, and its sweeper as well
 
 
 
 
-### <a name="Node.SetProtocol">func</a> (\*Node) [SetProtocol](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1774:1815#L62)
+### <a name="Node.SetProtocol">func</a> (\*Node) [SetProtocol](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1839:1880#L63)
 ``` go
 func (n *Node) SetProtocol(s ServePlacer)
 ```
@@ -142,17 +151,20 @@ implement ServePlacer
 
 
 
-### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=6193:6323#L198)
+### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=6756:6886#L207)
 ``` go
 func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
 SyncGossip synchronizes over the reply of recipients
 i.e., it sends a message to all recipients and blocks for their reply
+payload:    represents the payload of the message
+recipients: the list of nodes designated to recieve the message
+msgType:    represents the type of message to be gossiped
 
 
 
 
-### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=12208:12309#L375)
+### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=12956:13057#L388)
 ``` go
 func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```
@@ -160,6 +172,7 @@ SyncQueue is invoked remotely using the gRPC stub,
 it receives a message from a remote node and places it inside the local nodes queue
 it is synchronized with the remote node on the message reply, i.e., blocks the remote node until either
 a timeout or a reply is getting prepared
+msg: the message to be placed in the queue
 
 
 
@@ -198,7 +211,7 @@ qSize is the buffer size of the node on processing the gossip messages, a typica
 
 
 
-## <a name="Registry">type</a> [Registry](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=488:586#L14)
+## <a name="Registry">type</a> [Registry](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/registry.go?s=496:594#L15)
 ``` go
 type Registry interface {
     MessageTypes() map[uint64]HandleFunc

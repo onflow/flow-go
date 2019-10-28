@@ -8,25 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//TestDatabase covers several storage and retrieval of data to and from database considering different scenarios
+// TestDatabase covers several storage and retrieval of data to and from database considering different scenarios
 func TestDatabase(t *testing.T) {
+	assert := assert.New(t)
 	mmd := newMemMsgDatabase()
 
 	initKeys := []string{
 		"exists",
 		"found",
 	}
-
-	//Filling out the test table with:
-	//keys from initKeys slice
-	//value for each key is a GossipMessage with payload as byte representation of the key, and
-	//type as the key
 	for _, key := range initKeys {
 		err := mmd.Put(key, &shared.GossipMessage{})
-		if err != nil {
-			t.Errorf("error putting: %v. expected: nil error, got: non nil error", key)
-		}
-		assert.Nil(t, err)
+		assert.Nil(err)
 	}
 
 	tt := []struct {
@@ -56,18 +49,17 @@ func TestDatabase(t *testing.T) {
 		if err == tc.err {
 			continue
 		}
-		if err != nil && tc.err == nil {
-			t.Errorf("error in get. Expected: nil error, Got: non nil error")
+		if tc.err == nil {
+			assert.Nil(err)
 		}
-
-		if err == nil && tc.err != nil {
-			t.Errorf("error in get. Expected: non nil error, Got: nil error")
+		if tc.err != nil {
+			assert.NotNil(err)
+		}
+		if message != nil {
+			assert.Equal(string(message.MessageType), tc.item)
 		}
 		if message != nil && string(message.Payload) != tc.item {
-			t.Errorf("error in get over message type. Expected: %v, Got: %v", tc.item, message.MessageType)
-		}
-		if message != nil && string(message.Payload) != tc.item {
-			t.Errorf("error in get over message type. Expected: %v, Got: %v", tc.item, string(message.Payload))
+			assert.Equal(string(message.MessageType), tc.item)
 		}
 	}
 }

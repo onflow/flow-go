@@ -25,7 +25,7 @@ type messageReceiver struct{}
 func (mr *messageReceiver) DisplayMessage(ctx context.Context, msg *Message) (*Void, error) {
 	fmt.Printf("\n%v: %v", msg.Sender, string(msg.Content))
 	fmt.Printf("Enter Message: ")
-	return nil, nil
+	return &Void{}, nil
 }
 
 func main() {
@@ -69,7 +69,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not create message payload: %v", err)
 		}
-		//recipients are set to nil meaning that the message is targeted for all, i.e., ONE_TO_ALL gossip
 		_, err = node.AsyncGossip(context.Background(), payloadBytes, nil, "DisplayMessage")
 		if err != nil {
 			log.Println(err)

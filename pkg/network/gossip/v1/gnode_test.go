@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/order"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -16,10 +17,13 @@ var (
 	defaultAddress = "127.0.0.1:50000"
 )
 
+// TestAsyncQueue tests the performance of AsyncQueue function
 func TestAsyncQueue(t *testing.T) {
+	assert := assert.New(t)
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	go gn.sweeper()
+
 
 	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
@@ -45,23 +49,25 @@ func TestAsyncQueue(t *testing.T) {
 			continue
 		}
 
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("AsyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
 
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("AsyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 
-		if tc.err != nil && gotErr != nil {
-			continue
-		}
 	}
 }
 
+// TestSyncQueue tests the performance of SyncQueue function
 func TestSyncQueue(t *testing.T) {
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
+
+	assert := assert.New(t)
+
+
 	//to handle the queue
 	go gn.sweeper()
 
@@ -69,19 +75,17 @@ func TestSyncQueue(t *testing.T) {
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
+	assert.Nil(err)
 
-	if err != nil {
-		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
-	}
 
 	genMsg := func(payload []byte, recipients []string, msgType uint64) *shared.GossipMessage {
-		msg, _ := generateGossipMessage(payload, recipients, msgType)
+		msg := generateGossipMessage(payload, recipients, msgType)
 		return msg
 	}
 
 	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
-	// cancelling the context
+	// // cancelling the context
 	cancel()
 
 	tt := []struct {
@@ -91,19 +95,20 @@ func TestSyncQueue(t *testing.T) {
 	}{
 		{ //Working example
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, 3), //3 is the index of the first registered function (functions 0-2 are reserved)
+			msg: genMsg([]byte("msg1"), nil, 3), //3 is the index of the first registered function (functions 0-2 are reserved)
 			err: nil,
 		},
 		{ // Expired context
 			ctx: expiredContext,
-			msg: genMsg([]byte("msg"), nil, 3),
+			msg: genMsg([]byte("msg2"), nil, 3),
 			err: fmt.Errorf("non nil"),
 		},
 		{ //Invalid function
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, 5), //5 is the index of an inexistant function
+			msg: genMsg([]byte("msg3"), nil, 5), //5 is the index of an non-existing function
 			err: fmt.Errorf("non nil"),
 		},
+
 	}
 
 	for _, tc := range tt {
@@ -112,22 +117,18 @@ func TestSyncQueue(t *testing.T) {
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
-
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("SyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
-
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("SyncQueue: Expected %v, Got: %v", tc.err, gotErr)
-		}
-
-		if tc.err != nil && gotErr != nil {
-			continue
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 	}
 }
 
+// TestMessageHandler tests the performance of messageHandler function
 func TestMessageHandler(t *testing.T) {
+	assert := assert.New(t)
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	getMsgID := func(msgType string) uint64 {
@@ -138,19 +139,18 @@ func TestMessageHandler(t *testing.T) {
 		return id
 	}
 
+
+
 	//add gn function for testing
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
-
-	if err != nil {
-		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
-	}
+	assert.Nil(err)
 
 	go gn.sweeper()
 
 	genMsg := func(payload []byte, recipients []string, msgType string) *shared.GossipMessage {
-		msg, _ := generateGossipMessage(payload, recipients, getMsgID(msgType))
+		msg := generateGossipMessage(payload, recipients, getMsgID(msgType))
 		return msg
 	}
 
@@ -181,29 +181,28 @@ func TestMessageHandler(t *testing.T) {
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
-
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("MessageHandler: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
 
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("MessageHandler: Expected %v, Got: %v", tc.err, gotErr)
-		}
-
-		if tc.err != nil && gotErr != nil {
-			continue
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 	}
 }
 
+// TestTryStore tests the performance of tryStore function
 func TestTryStore(t *testing.T) {
+	assert := assert.New(t)
 
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 
+
+
 	//generating two messages with different script
-	msg1, _ := generateGossipMessage([]byte("hello"), []string{}, 3)
-	msg2, _ := generateGossipMessage([]byte("hi"), []string{}, 4)
+	msg1 := generateGossipMessage([]byte("hello"), []string{}, 3)
+	msg2 := generateGossipMessage([]byte("hi"), []string{}, 4)
 
 	// pretending that the node received msg2
 	h2, _ := computeHash(msg2)
@@ -226,12 +225,12 @@ func TestTryStore(t *testing.T) {
 	// test if storage reports the correct state of the message
 	for _, tc := range tt {
 		rep, _ := gn.tryStore(tc.msg)
-		if rep != tc.expectedBool {
-			t.Errorf("tryStore: Expected: %v, Got: %v", tc.expectedBool, rep)
-		}
+		assert.Equal(tc.expectedBool, rep)
+
 	}
 }
 
+// TestPickRandom tests the performance of pickGossipPartners function
 func TestPickRandom(t *testing.T) {
 	n := &Node{}
 	n.peers = []string{
@@ -256,8 +255,5 @@ func TestPickRandom(t *testing.T) {
 
 	n.staticFanoutNum = 2
 	n.pickGossipPartners()
-
-	if size := len(n.fanoutSet); size != 2 {
-		t.Errorf("expected a new fanout set of size 2, received fanout set of size: %v", size)
-	}
+	assert.Equal(t, 2, len(n.fanoutSet))
 }

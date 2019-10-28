@@ -17,36 +17,42 @@ type messageDatabase interface {
 	Put(string, *shared.GossipMessage) error
 }
 
+// memoryMsgDatabase implements a thread safe on memory database
 type memoryMsgDatabase struct {
 	mu    sync.RWMutex
 	store map[string]*shared.GossipMessage
 }
 
-// NewDatabase returns an empty data base
+// newMemMsgDatabase returns an empty data base
 func newMemMsgDatabase() *memoryMsgDatabase {
 	return &memoryMsgDatabase{
 		store: make(map[string]*shared.GossipMessage),
 	}
 }
 
-// put adds a message to the database with its hash as a key
+// Put adds a message to the database with its hash as the key
+// hash: hash of the message to be stored in the database
+// msg : the message to be stored in the database
 func (mdb *memoryMsgDatabase) Put(hash string, msg *shared.GossipMessage) error {
-	mdb.mu.RLock()
-	defer mdb.mu.RUnlock()
+	mdb.mu.Lock()
+	defer mdb.mu.Unlock()
 
 	mdb.store[hash] = msg
 
 	return nil
 }
 
-// get returns a GossipMessage corresponding to the given hash
+// Get returns a GossipMessage corresponding to the given hash
+// hash: the hash whose message is requested.
 func (mdb *memoryMsgDatabase) Get(hash string) (*shared.GossipMessage, error) {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
-	if mdb.store[hash] == nil {
+	msg, exists := mdb.store[hash]
+
+	if !exists {
 		return nil, fmt.Errorf("no message for the given hash")
 	}
 
-	return mdb.store[hash], nil
+	return msg, nil
 }

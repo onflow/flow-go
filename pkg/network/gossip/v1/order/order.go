@@ -51,25 +51,24 @@ func (o *Order) Done() <-chan struct{} {
 	if o.isSync() {
 		return o.done
 	}
+
 	return make(chan struct{})
 }
 
-// Result returns the result of execution of the gossip message
+// Result returns the current variables which represent the response of the
+// Order's gossip msg
 func (o *Order) Result() ([]byte, error) {
 	return o.resp, o.err
 }
 
-// Fill updates the order with the result of the execution of the gossip message,
-// it also signals the done channel notifying that the execution is done
+// Fill fills the Order's response of the Order's gossip  msg
 func (o *Order) Fill(resp []byte, err error) {
 	if !o.isSync() {
-		//an async message should not being tracked and hence does not have a result
 		return
 	}
-	//updating results of the order ticket
+
 	o.resp = resp
 	o.err = err
-	//notifying done channel
 	o.done <- struct{}{}
 }
 
@@ -88,5 +87,5 @@ func (o *Order) String() string {
 
 // Valid checks if the order is valid. Currently valid is defined as having a non-nil message
 func Valid(o *Order) bool {
-	return o != nil && o.Msg != nil
+	return (o != nil && o.Msg != nil)
 }

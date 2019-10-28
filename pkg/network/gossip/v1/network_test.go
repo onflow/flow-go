@@ -5,9 +5,13 @@ import (
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSocket(t *testing.T) {
+	assert := assert.New(t)
+
 	tt := []struct {
 		address string
 		ip      []byte
@@ -48,13 +52,12 @@ func TestNewSocket(t *testing.T) {
 
 	for _, tc := range tt {
 		socket, err := newSocket(tc.address)
-
-		if err != nil && tc.err == nil {
-			t.Errorf("expected: nil error, got: non nil error: %v", err)
+		if tc.err == nil {
+			assert.Nil(err)
 		}
 
-		if err == nil && tc.err != nil {
-			t.Errorf("expected error: %v, got: nil error", tc.err)
+		if tc.err != nil {
+			assert.NotNil(err)
 		}
 
 		if err != nil && tc.err != nil {
@@ -66,14 +69,13 @@ func TestNewSocket(t *testing.T) {
 			t.Log(socketToString(socket))
 			t.Errorf("address mismatch. expected: %v, got: %v", tc.ip, socket.Ip)
 		}
-
-		if tc.port != socket.Port {
-			t.Errorf("port mismatch. expected: %v, got: %v", tc.port, socket.Port)
-		}
+		assert.Equal(tc.port, socket.Port)
 	}
 }
 
 func TestSplit(t *testing.T) {
+	assert := assert.New(t)
+
 	tt := []struct {
 		address string
 		ip      string
@@ -114,14 +116,12 @@ func TestSplit(t *testing.T) {
 
 	for _, tc := range tt {
 		ip, port, err := splitAddress(tc.address)
-
-		if err != nil && tc.err == nil {
-			t.Errorf("expected: nil error, got: non nil error")
+		if tc.err == nil {
+			assert.Nil(err)
 		}
 
-		if err == nil && tc.err != nil {
-			t.Logf(tc.address)
-			t.Errorf("expected: non nil error, got: nil error")
+		if tc.err != nil {
+			assert.NotNil(err)
 		}
 
 		if err != nil && tc.err != nil {
@@ -129,13 +129,8 @@ func TestSplit(t *testing.T) {
 		}
 
 		if err == nil && tc.err == nil {
-			if ip != tc.ip {
-				t.Errorf("address mismatch. expected: %v, got: %v", tc.ip, ip)
-			}
-
-			if tc.port != port {
-				t.Errorf("port mismatch. expected: %v, got: %v", tc.port, port)
-			}
+			assert.Equal(tc.ip, ip)
+			assert.Equal(tc.port, port)
 		}
 	}
 }
@@ -143,6 +138,8 @@ func TestSplit(t *testing.T) {
 // Testing whether to ip returns the same IP we used to create the socket or not. In case of ipv6
 // it returns the shortest IP which maps to the same address
 func TestToString(t *testing.T) {
+	assert := assert.New(t)
+
 	tt := []struct {
 		address  string
 		expected string
@@ -167,14 +164,8 @@ func TestToString(t *testing.T) {
 
 	for _, tc := range tt {
 		socket, err := newSocket(tc.address)
-
-		if err != nil {
-			t.Errorf("unexpected error. expected: nil, got: %v", err)
-		}
-
+		assert.Nil(err)
 		socketString := socketToString(socket)
-		if socketString != tc.expected {
-			t.Errorf("address mismatch. expected: %v, got: %v", tc.address, socketString)
-		}
+		assert.Equal(tc.expected, socketString)
 	}
 }

@@ -172,7 +172,7 @@ func (gs *Gserver) place(ctx context.Context, addr string, msg *shared.GossipMes
 }
 
 // placeStream is used to send messages using streams
-//todo we need to elaborate on this in comming issues
+// Todo we need to elaborate on this in comming issues
 func (gs *Gserver) placeStream(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool, mode gossip.Mode) (*shared.GossipReply, error) {
 	var stream clientStream
 	gs.mu.Lock()

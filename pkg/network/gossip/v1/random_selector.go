@@ -14,6 +14,7 @@ type uniqueRand struct {
 
 // newUniqSelector returns a new instance of uniqueRand, which is set to return unique random variables
 // in the range [0,n-1]
+// n: range of numbers from which the selector returns unique numbers
 func newUniqSelector(n int) *uniqueRand {
 	return &uniqueRand{generated: make(map[int]bool), n: n}
 }

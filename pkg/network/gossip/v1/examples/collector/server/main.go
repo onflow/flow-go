@@ -5,9 +5,10 @@ import (
 	"log"
 	"net"
 
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
+
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
 )
 
 var (
@@ -35,7 +36,6 @@ func main() {
 	// step 2: registering the grpc services if any
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
-
 	colReg := collect.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gnode.NewNodeConfig(colReg, myPort, othersPort, 0, 10)
 	collector := gnode.NewNode(config)

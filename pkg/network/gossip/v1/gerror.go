@@ -25,6 +25,9 @@ func (g *gossipError) Error() string {
 }
 
 var (
+	// ErrTimedOut is an error that happens when a context expired before finishing a certain task
 	ErrTimedOut = errors.New("request timed out")
+
+	// ErrInternal represents an internal gnode error
 	ErrInternal = errors.New("gnode internal error")
 )

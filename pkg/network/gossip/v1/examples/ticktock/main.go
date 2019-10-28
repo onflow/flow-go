@@ -8,7 +8,7 @@ import (
 	"time"
 
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	"github.com/gogo/protobuf/proto"
+	proto "github.com/golang/protobuf/proto"
 )
 
 // Demo of for the gossip node implementation
@@ -39,7 +39,6 @@ func main() {
 
 	// step 2: registering the grpc services if any
 	// Note: this example is not built upon any grpc service, hence we pass nil
-
 	config := gnode.NewNodeConfig(nil, servePort, peers, 0, 10)
 	node := gnode.NewNode(config)
 

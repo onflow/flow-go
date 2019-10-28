@@ -5,20 +5,18 @@ import (
 
 	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
-	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/assert"
 )
 
 //TestComputeHash tests the computeHash helper function
 func TestComputeHash(t *testing.T) {
-
-	msg1, _ := generateGossipMessage([]byte("hi"), []string{}, 0)
-	msg1Bytes, _ := proto.Marshal(msg1)
+	assert := assert.New(t)
+	msg1 := generateGossipMessage([]byte("hi"), []string{}, 0)
 	alg, _ := crypto.NewHasher(crypto.SHA3_256)
-	h1 := alg.ComputeHash(msg1Bytes)
+	h1 := alg.ComputeHash(msg1.GetPayload())
 
-	msg2, _ := generateGossipMessage([]byte("nohi"), []string{}, 0)
-	msg2Bytes, _ := proto.Marshal(msg2)
-	h2 := alg.ComputeHash(msg2Bytes)
+	msg2 := generateGossipMessage([]byte("nohi"), []string{}, 0)
+	h2 := alg.ComputeHash(msg2.GetPayload())
 
 	tt := []struct {
 		msg          *shared.GossipMessage
@@ -40,14 +38,10 @@ func TestComputeHash(t *testing.T) {
 	for _, tc := range tt {
 		res1, _ := computeHash(tc.msg)
 		// testing if hash generated properly
-		if string(res1) != string(tc.expectedHash) {
-			t.Errorf("computHash: Expected: %v, Got: %v", tc.expectedHash, res1)
-		}
+		assert.Equal(string(tc.expectedHash), string(res1))
 		tc.msg.Payload = tc.modification
 		// testing if hash changes after modifying payload
 		res2, _ := computeHash(tc.msg)
-		if string(res2) == string(res1) {
-			t.Errorf("computeHash: Expected: not equal after modifying, Got: Equal after modifying")
-		}
+		assert.NotEqual(string(res2), string(res1))
 	}
 }

@@ -32,7 +32,6 @@ func newSocket(address string) (*shared.Socket, error) {
 	ipbytes := net.ParseIP(ip)
 
 	if ipbytes == nil {
-		fmt.Printf("invalid ip")
 		return &shared.Socket{}, fmt.Errorf("invalid ip")
 	}
 
@@ -40,14 +39,13 @@ func newSocket(address string) (*shared.Socket, error) {
 	portNum, err := strconv.Atoi(port)
 
 	if portNum < 0 || err != nil {
-		fmt.Printf("invalid port")
 		return &shared.Socket{}, fmt.Errorf("invalid port")
 	}
 
 	return &shared.Socket{Ip: ipbytes, Port: uint32(portNum)}, nil
 }
 
-// split takes an address and splits it into ip and port
+// splitAddress takes an address and splits it into ip and port
 func splitAddress(address string) (string, string, error) {
 	//index of the last colon in the address
 	colonPos := strings.LastIndexByte(address, ':')
@@ -61,6 +59,7 @@ func splitAddress(address string) (string, string, error) {
 	return ip, port, nil
 }
 
+// socketToString extracts an address from a given socket
 //TODO: IPV6 support
 func socketToString(s *shared.Socket) string {
 	return fmt.Sprintf("%v:%v", net.IP(s.Ip), s.Port)
