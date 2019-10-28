@@ -3477,7 +3477,6 @@ let resources <- [
     <-resource
 ]
 
-let resourc2 <- create R()
 // Invalid: The resource variable `resource` can only be moved into the dictionary once.
 let resources2 <- {
     "res1": <-resource,
