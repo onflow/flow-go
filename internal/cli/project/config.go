@@ -7,9 +7,7 @@ import (
 	"os"
 
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
-
 	"github.com/dapperlabs/flow-go/pkg/crypto"
-
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
