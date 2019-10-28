@@ -418,7 +418,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant named `smallIntegerWithAnnotation`, which has an explicit type annotation.</span><span>
 </span><span style="color: #008000">// Because of the explicit type annotation, the type is not inferred.</span><span>
-</span><span style="color: #008000">// This declaration is valid becauset the integer literal `1` fits into the range of the type `Int8`,</span><span>
+</span><span style="color: #008000">// This declaration is valid because the integer literal `1` fits into the range of the type `Int8`,</span><span>
 </span><span style="color: #008000">// the type of 8-bit signed integers.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> smallIntegerWithAnnotation: Int8 = </span><span style="color: #09885A">1</span><span>
@@ -2650,7 +2650,10 @@
           <p>Resource must be created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
           <pre><code class="language-bamboo,file=resource-instantiation.bpl"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span></code></pre>
-          <p>The constructor function may require parameters if the <a href="#composite-data-type-fields">initializer</a> of the composote data ty[e requires them.</p>
+          <p>
+            The constructor function may require parameters
+            if the <a href="#composite-data-type-fields">initializer</a> of the composite data type requires them.
+          </p>
           <p>
             Composite data types can only be declared globally and not locally in functions.
             They can also not be nested.
@@ -2665,8 +2668,8 @@
             All fields <strong>must</strong> be initialized in the initializer, exactly once.
           </p>
           <p>
-            Having to provide intitial values in the initializer simplifies might seem restrictive,
-            however, this ensures that all fields are always initialized in one location, the initializer,
+            Having to provide intitial values in the initializer might seem restrictive,
+            but this ensures that all fields are always initialized in one location, the initializer,
             and the initialization order is clear.
           </p>
           <p>
@@ -3953,8 +3956,9 @@
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
           <p>
-            Declaring that a type implementats (conforms) to an interface is done in the type declaration of the composite data type (e.g., structure, resource):
-            The kind of and the name of the composite data type is followed by a colon (<code>:</code>)
+            Declaring that a type implements (conforms) to an interface
+            is done in the type declaration of the composite data type (e.g., structure, resource):
+            The kind and the name of the composite data type is followed by a colon (<code>:</code>)
             and the name of one or more interfaces that the composite data type implements.
           </p>
           <p>This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.</p>

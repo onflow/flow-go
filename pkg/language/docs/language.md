@@ -188,7 +188,7 @@ let integerWithoutAnnotation = 1
 
 // Declare a constant named `smallIntegerWithAnnotation`, which has an explicit type annotation.
 // Because of the explicit type annotation, the type is not inferred.
-// This declaration is valid becauset the integer literal `1` fits into the range of the type `Int8`,
+// This declaration is valid because the integer literal `1` fits into the range of the type `Int8`,
 // the type of 8-bit signed integers.
 //
 let smallIntegerWithAnnotation: Int8 = 1
@@ -2582,7 +2582,8 @@ Resource must be created (instantiated) by using the `create` keyword and callin
 create SomeResource()
 ```
 
-The constructor function may require parameters if the [initializer](#composite-data-type-fields) of the composote data ty[e requires them.
+The constructor function may require parameters
+if the [initializer](#composite-data-type-fields) of the composite data type requires them.
 
 Composite data types can only be declared globally and not locally in functions.
 They can also not be nested.
@@ -2594,8 +2595,8 @@ However, the initial values for fields are set in the initializer,
 **not** in the field declaration.
 All fields **must** be initialized in the initializer, exactly once.
 
-Having to provide intitial values in the initializer simplifies might seem restrictive,
-however, this ensures that all fields are always initialized in one location, the initializer,
+Having to provide intitial values in the initializer might seem restrictive,
+but this ensures that all fields are always initialized in one location, the initializer,
 and the initialization order is clear.
 
 The initialization of all fields is checked statically
@@ -3870,8 +3871,9 @@ Interfaces can only be declared globally, i.e. not inside of functions.
 
 ### Interface Implementation
 
-Declaring that a type implementats (conforms) to an interface is done in the type declaration of the composite data type (e.g., structure, resource):
-The kind of and the name of the composite data type is followed by a colon (`:`)
+Declaring that a type implements (conforms) to an interface
+is done in the type declaration of the composite data type (e.g., structure, resource):
+The kind and the name of the composite data type is followed by a colon (`:`)
 and the name of one or more interfaces that the composite data type implements.
 
 This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.
