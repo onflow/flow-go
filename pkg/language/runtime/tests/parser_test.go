@@ -2637,7 +2637,7 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 	)
 }
 
-func TestParseDecimmalIntegerLiteralWithLeadingZeros(t *testing.T) {
+func TestParseDecimalIntegerLiteralWithLeadingZeros(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
 		let decimal = 00123
