@@ -63,14 +63,14 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	return out
 }
 
-func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, error) {
+func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, []DKGToSend, error) {
 	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
 	log.Debugf("the share is %d\n", data)
 	if s.xReceived {
-		return invalid, nil
+		return invalid, nil, nil
 	}
 	if (len(data)) != PrKeyLengthBLS_BLS12381 {
-		return invalid, nil
+		return invalid, nil,nil
 	}
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
@@ -82,17 +82,17 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, erro
 	if s.AReceived {
 		return s.verifyShare(), nil
 	}
-	return valid, nil
+	return valid, nil,nil
 }
 
-func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult, error) {
+func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult, []DKGToSend, error) {
 	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
 	log.Debugf("the vector is %d\n", data)
 	if s.AReceived {
-		return invalid, nil
+		return invalid, nil, nil
 	}
 	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
-		return invalid, nil
+		return invalid, nil, nil
 	}
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
@@ -105,7 +105,15 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult
 	if s.xReceived {
 		return s.verifyShare(), nil
 	}
-	return valid, nil
+	return valid, nil, nil
+}
+
+func (s *feldmanVSSstate) receiveComplaint(origin int, data []byte) (DKGresult, error) {
+	return nil, nil
+}
+
+func (s *feldmanVSSstate) receiveComplaintAnswer(origin int, data []byte) (DKGresult, error) {
+	return nil, nil
 }
 
 // ZrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
@@ -139,7 +147,7 @@ func readVerifVector(A []pointG2, src []byte) {
 }
 
 
-func (s *feldmanVSSstate) verifyShare() DKGresult {
+func (s *feldmanVSSstate) verifyShare() (DKGresult, []DKGToSend) {
 	// check y[current] == x.G2
 	if C.verifyshare((*C.bn_st)(&s.x),
 		(*C.ep2_st)(&s.y[s.currentIndex])) == 1 {

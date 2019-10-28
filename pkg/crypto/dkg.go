@@ -94,6 +94,8 @@ type dkgMsgTag byte
 const (
 	FeldmanVSSshare dkgMsgTag = iota
 	FeldmanVSSVerifVec
+	FeldmanVSSReceiveComplaint
+	FeldmanVSSReceiveComplaintAnswer
 )
 
 type DKGToSend struct {
