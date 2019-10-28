@@ -293,6 +293,9 @@ module FPL-SCOPES
     imports INT-SYNTAX
 
     syntax Scope ::= "global" | local(Int)
+
+    syntax Pgm
+    syntax KItem ::= declare(Pgm) | initialize(Pgm)
 endmodule
 
 module FPL-VALUES
@@ -370,8 +373,7 @@ module FPL-TYPING
   rule [[ #type(X:Ident) => T ]]
        <env>... X |-> env(... t: T) ...</env>
   rule [[ #type(X:Ident(_)) => R ]]
-       <env>... X |-> env(... loc: L) ...</env>
-       <store>... L |-> funDef(... result: R) ...</store>
+       <env>... X |-> env(... t: ((_): R)) ...</env>
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -435,7 +437,7 @@ module FPL-CONFIGURATION
   imports FPL-STACK
 
   configuration
-    <k>$PGM:Pgm</k>
+    <k> declare($PGM:Pgm) ~> initialize($PGM:Pgm) </k>
     <scope> global </scope>
     <env> .Map </env>
     <store> .Map </store>
@@ -446,27 +448,47 @@ module FPL-VARIABLE-DECLARATION
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  context let _ : _:Type = HOLE
+  context initialize(let _ : _ = HOLE)
     requires notBool isInt(HOLE)
-  context var _ : _:Type = HOLE
+  context initialize(var _ : _ = HOLE)
     requires notBool isInt(HOLE)
 
-  rule <k> let _ : T:Type = (V:Int => v(V, T)) ... </k>
-  rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
+  rule <k> initialize(let X : _ = (V:Int => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+  rule <k> initialize(var X : _ = (V:Int => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
 
-  rule <k> let X : T:Type = v(V, T) => . ... </k>
+  rule <k> declare(let X : T:Type = E) => . ... </k>
        <env> Rho => Rho [ X <- env(let, T, !L:Int) ] </env>
-       <store>... .Map => !L |-> V ...</store>
-  rule <k> var X : T:Type = v(V, T) => . ... </k>
+  rule <k> declare(var X : T:Type = E) => . ... </k>
        <env> Rho => Rho [ X <- env(var, T, !L:Int) ] </env>
-       <store>... .Map => !L |-> V ...</store>
 
-  rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
-  rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
+  rule <k> initialize(let X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+  rule <k> initialize(var X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+
+  rule <k> declare(let _ : (noAnnot() => type(E)) = E) ... </k>
+  rule <k> declare(var _ : (noAnnot() => type(E)) = E) ... </k>
 
   rule <k> X:Ident => v(V, T) ... </k>
        <env>... X |-> env(... t: T, loc: L) ...</env>
        <store>... L |-> V ...</store>
+
+  rule <k> X:Ident => panic("Declaration not initialized yet") ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
+
+  rule <k> declare(X ; Y ; Z) => declare(X) ~> declare(Y ; Z) ... </k>
+  rule <k> declare(.Pgm) => . ... </k>
+  rule <k> initialize(X ; Y ; Z) => initialize(X) ~> initialize(Y ; Z) ... </k>
+  rule <k> initialize(.Pgm) => . ... </k>
+
+  rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+  rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
 endmodule
 
 module FPL-STMTS
@@ -480,9 +502,12 @@ module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
+  rule <k> declare(fun F:Ident ( Fs ) : T { _ _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
-       <store>... .Map => !L |-> funDef(Fs, T, C, B, Rho [ F <- env(let, ((types(Fs)): T), !L) ]) ...</store>
+
+  rule <k> initialize(fun F:Ident ( Fs ) : T { C B }) => . ... </k>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho </env>
+       <store>... .Map => L |-> funDef(Fs, T, C, B, Rho) ...</store>
 
   syntax Types ::= types(Formals) [function]
   rule types(.Formals) => .Types
@@ -504,6 +529,11 @@ module FPL-FUNCTIONS
   rule initArg((Lbl Name : T), (ArgLbl : X)) => let Name : T = X
   rule initArg((NoLbl Name : T), X) => let Name : T = X
     requires NoLbl ==K #token("_","Ident")
+
+  rule <k> (F:Ident)(_::Actuals) => panic("Declaration not initialized yet") ... </k>
+       <env>... F |-> env(... loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
 
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
        <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
@@ -647,12 +677,16 @@ module FPL-TESTING
   imports FPL
   imports FPL-TESTING-COMMON-SYNTAX
 
-  rule <k> assert v(true,Bool) => . ... </k>
+  rule <k> initialize(assert E) => assert E ... </k>
+  rule <k> assert v(true, Bool) => . ... </k>
+  rule <k> declare(assert _) => . ... </k>
 
-  rule <k> .Pgm #Or panic(_) </k>
+  rule <k> .K #Or panic(_) </k>
+       <scope> Scope => global </scope>
        <env> E => .Map </env>
-       <store> S => .Map </store>
-    requires E =/=K .Map orBool S =/=K .Map
+       <store> State => .Map </store>
+       <stack> Stack => .List </stack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool Stack =/=K .List
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
