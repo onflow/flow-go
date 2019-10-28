@@ -293,6 +293,9 @@ module FPL-SCOPES
     imports INT-SYNTAX
 
     syntax Scope ::= "global" | local(Int)
+
+    syntax Pgm
+    syntax KItem ::= declare(Pgm) | initialize(Pgm)
 endmodule
 
 module FPL-VALUES
@@ -434,7 +437,7 @@ module FPL-CONFIGURATION
   imports FPL-STACK
 
   configuration
-    <k>$PGM:Pgm</k>
+    <k> declare($PGM:Pgm) ~> initialize($PGM:Pgm) </k>
     <scope> global </scope>
     <env> .Map </env>
     <store> .Map </store>
@@ -445,27 +448,42 @@ module FPL-VARIABLE-DECLARATION
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  context let _ : _:Type = HOLE
+  context initialize(let _ : _ = HOLE)
     requires notBool isInt(HOLE)
-  context var _ : _:Type = HOLE
+  context initialize(var _ : _ = HOLE)
     requires notBool isInt(HOLE)
 
-  rule <k> let _ : T:Type = (V:Int => v(V, T)) ... </k>
-  rule <k> var _ : T:Type = (V:Int => v(V, T)) ... </k>
+  rule <k> initialize(let X : _ = (V:Int => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+  rule <k> initialize(var X : _ = (V:Int => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
 
-  rule <k> let X : T:Type = v(V, T) => . ... </k>
+  rule <k> declare(let X : T:Type = E) => . ... </k>
        <env> Rho => Rho [ X <- env(let, T, !L:Int) ] </env>
-       <store>... .Map => !L |-> V ...</store>
-  rule <k> var X : T:Type = v(V, T) => . ... </k>
+  rule <k> declare(var X : T:Type = E) => . ... </k>
        <env> Rho => Rho [ X <- env(var, T, !L:Int) ] </env>
-       <store>... .Map => !L |-> V ...</store>
 
-  rule <k> let _ : (noAnnot() => type(E)) = E ... </k>
-  rule <k> var _ : (noAnnot() => type(E)) = E ... </k>
+  rule <k> initialize(let X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+  rule <k> initialize(var X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+
+  rule <k> declare(let _ : (noAnnot() => type(E)) = E) ... </k>
+  rule <k> declare(var _ : (noAnnot() => type(E)) = E) ... </k>
 
   rule <k> X:Ident => v(V, T) ... </k>
        <env>... X |-> env(... t: T, loc: L) ...</env>
        <store>... L |-> V ...</store>
+
+  rule <k> declare(X ; Y ; Z) => declare(X) ~> declare(Y ; Z) ... </k>
+  rule <k> declare(.Pgm) => . ... </k>
+  rule <k> initialize(X ; Y ; Z) => initialize(X) ~> initialize(Y ; Z) ... </k>
+  rule <k> initialize(.Pgm) => . ... </k>
+
+  rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+  rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
 endmodule
 
 module FPL-STMTS
@@ -479,9 +497,12 @@ module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  rule <k> fun F:Ident ( Fs ) : T { C B } => . ...</k>
+  rule <k> declare(fun F:Ident ( Fs ) : T { _ _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
-       <store>... .Map => !L |-> funDef(Fs, T, C, B, Rho [ F <- env(let, ((types(Fs)): T), !L) ]) ...</store>
+
+  rule <k> initialize(fun F:Ident ( Fs ) : T { C B }) => . ... </k>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho </env>
+       <store>... .Map => L |-> funDef(Fs, T, C, B, Rho) ...</store>
 
   syntax Types ::= types(Formals) [function]
   rule types(.Formals) => .Types
@@ -646,7 +667,9 @@ module FPL-TESTING
   imports FPL
   imports FPL-TESTING-COMMON-SYNTAX
 
-  rule <k> assert v(true,Bool) => . ... </k>
+  rule <k> initialize(assert E) => assert E ... </k>
+  rule <k> assert v(true, Bool) => . ... </k>
+  rule <k> declare(assert _) => . ... </k>
 
   rule <k> .Pgm #Or panic(_) </k>
        <env> E => .Map </env>
