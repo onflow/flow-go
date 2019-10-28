@@ -87,10 +87,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				Range: ast.Range{
-					StartPos: declaration.Identifier.StartPosition(),
-					EndPos:   declaration.Identifier.EndPosition(),
-				},
+				Range:           ast.NewRangeFromPositioned(declaration.Identifier),
 			},
 		)
 	}
@@ -104,10 +101,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				Range: ast.Range{
-					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
-					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
-				},
+				Range:           ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
 			},
 		)
 	}
@@ -181,10 +175,7 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 			checker.report(
 				&UnsupportedOverloadingError{
 					DeclarationKind: common.DeclarationKindInitializer,
-					Range: ast.Range{
-						StartPos: secondInitializer.StartPosition(),
-						EndPos:   secondInitializer.EndPosition(),
-					},
+					Range:           ast.NewRangeFromPositioned(secondInitializer),
 				},
 			)
 		}
@@ -205,7 +196,7 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
 			interfaceTypes = append(interfaceTypes, interfaceType)
 
-		} else if !IsInvalidType(convertedType) {
+		} else if !convertedType.IsInvalidType() {
 			checker.report(
 				&InvalidConformanceError{
 					Type: convertedType,
@@ -248,10 +239,7 @@ func (checker *Checker) checkCompositeConformance(
 			&CompositeKindMismatchError{
 				ExpectedKind: compositeType.Kind,
 				ActualKind:   interfaceType.CompositeKind,
-				Range: ast.Range{
-					StartPos: interfaceIdentifier.StartPosition(),
-					EndPos:   interfaceIdentifier.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(interfaceIdentifier),
 			},
 		)
 	}
@@ -684,10 +672,7 @@ func (checker *Checker) checkDestructors(
 
 			checker.report(
 				&InvalidDestructorError{
-					Range: ast.Range{
-						StartPos: firstDestructor.Identifier.StartPosition(),
-						EndPos:   firstDestructor.Identifier.EndPosition(),
-					},
+					Range: ast.NewRangeFromPositioned(firstDestructor.Identifier),
 				},
 			)
 		}
@@ -717,10 +702,7 @@ func (checker *Checker) checkDestructors(
 		checker.report(
 			&UnsupportedOverloadingError{
 				DeclarationKind: common.DeclarationKindDestructor,
-				Range: ast.Range{
-					StartPos: secondDestructor.StartPosition(),
-					EndPos:   secondDestructor.EndPosition(),
-				},
+				Range:           ast.NewRangeFromPositioned(secondDestructor),
 			},
 		)
 	}
@@ -769,10 +751,7 @@ func (checker *Checker) checkDestructor(
 	if len(destructor.ParameterList.Parameters) != 0 {
 		checker.report(
 			&InvalidDestructorParametersError{
-				Range: ast.Range{
-					StartPos: destructor.ParameterList.StartPosition(),
-					EndPos:   destructor.ParameterList.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(destructor.ParameterList),
 			},
 		)
 	}

@@ -49,10 +49,10 @@ void _bn_randZr(bn_t x) {
     if (x)
         bn_rand_mod(x,r);
     bn_free(r);
-    bn_set_dig(x, 5);
 }
 
-// ep_write_bin_compact exports a point to a buffer in a compressed or uncompressed form.
+// ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
+// len is the allocated size of the buffer bin for sanity check
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
@@ -60,13 +60,20 @@ void _bn_randZr(bn_t x) {
 // The second-most significant bit indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
 // The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
-void _ep_write_bin_compact(byte *bin, const ep_st *a) {
+void _ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
     ep_t t;
     ep_null(t);
+    const int G1size = (G1_BYTES/(SERIALIZATION+1));
+
+    if (len!=G1size) {
+        THROW(ERR_NO_BUFFER);
+        return;
+    }
  
     if (ep_is_infty(a)) {
+            // set the infinity bit
             bin[0] = (SERIALIZATION << 7) | 0x40;
-            memset(bin+1, 0, SIGNATURE_LEN-1);
+            memset(bin+1, 0, G1size-1);
             return;
     }
 
@@ -90,15 +97,23 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a) {
 
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// len is the size of the input buffer
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
-void _ep_read_bin_compact(ep_st* a, byte *bin) {
+void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
+    const int G1size = (G1_BYTES/(SERIALIZATION+1));
+    if (len!=G1size) {
+        THROW(ERR_NO_BUFFER);
+        return;
+    }
+    // check if the point is infinity
     if (bin[0] & 0x40) {
+        // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
             return;
         }
-        for (int i=1; i<SIGNATURE_LEN; i++) {
+        for (int i=1; i<G1size-1; i++) {
             if (bin[i]) {
                 THROW(ERR_NO_VALID);
                 return;
@@ -108,9 +123,8 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
 		return;
 	} 
 
-    byte temp = bin[0];
-    int compressed = temp >> 7;
-    int y_is_odd = (temp >> 5) & 1;
+    int compressed = bin[0] >> 7;
+    int y_is_odd = (bin[0] >> 5) & 1;
 
     if (y_is_odd && (!compressed)) {
         THROW(ERR_NO_VALID);
@@ -119,9 +133,15 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
 
 	a->norm = 1;
 	fp_set_dig(a->z, 1);
-    bin[0] &= 0x1F;
-	fp_read_bin(a->x, bin, Fp_BYTES);
-    bin[0] = temp;
+    byte* temp = (byte*)malloc(Fp_BYTES);
+    if (!temp) {
+        THROW(ERR_NO_MEMORY);
+        return;
+    }
+    memcpy(temp, bin, Fp_BYTES);
+    temp[0] &= 0x1F;
+	fp_read_bin(a->x, temp, Fp_BYTES);
+    free(temp);
 
     if (SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
@@ -130,6 +150,105 @@ void _ep_read_bin_compact(ep_st* a, byte *bin) {
         fp_zero(a->y);
         fp_set_bit(a->y, 0, y_is_odd);
         ep_upk(a, a);
+    }
+}
+
+// _ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
+// The code is a modified version of Relic ep2_write_bin
+// The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
+// Otherwise, the point is in uncompressed form.
+// The second-most significant bit indicates that the point is at infinity. 
+// If this bit is set, the remaining bits of the group element's encoding should be set to zero.
+// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
+    ep2_t t;
+    ep2_null(t);
+    const int G2size = (G2_BYTES/(SERIALIZATION+1));
+
+    if (len!=G2size) {
+        THROW(ERR_NO_BUFFER);
+        return;
+    }
+ 
+    if (ep2_is_infty((ep2_st *)a)) {
+            // set the infinity bit
+            bin[0] = (SERIALIZATION << 7) | 0x40;
+            memset(bin+1, 0, G2size-1);
+            return;
+    }
+
+    TRY {
+        ep2_new(t);
+        ep2_norm(t, (ep2_st *)a);
+        fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
+
+        if (SERIALIZATION == COMPRESSED) {
+            bin[0] |= (fp_get_bit(t->y[0], 0) << 5);
+        } else {
+            fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
+        }
+    } CATCH_ANY {
+        THROW(ERR_CAUGHT);
+    }
+
+    bin[0] |= (SERIALIZATION << 7);
+    ep_free(t);
+}
+
+// _ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// The code is a modified version of Relic ep_write_bin
+void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
+    const int G2size = (G2_BYTES/(SERIALIZATION+1));
+    if (len!=G2size) {
+        THROW(ERR_NO_BUFFER);
+        return;
+    }
+
+    // check if the point in infinity
+    if (bin[0] & 0x40) {
+        // the remaining bits need to be cleared
+        if (bin[0] & 0x3F) {
+            THROW(ERR_NO_VALID);
+            return;
+        }
+        for (int i=1; i<G2size-1; i++) {
+            if (bin[i]) {
+                THROW(ERR_NO_VALID);
+                return;
+            } 
+        }
+		ep2_set_infty(a);
+		return;
+	} 
+    byte compressed = bin[0] >> 7;
+    byte y_is_odd = (bin[0] >> 5) & 1;
+    if (y_is_odd && (!compressed)) {
+        THROW(ERR_NO_VALID);
+        return;
+    } 
+	a->norm = 1;
+	fp_set_dig(a->z[0], 1);
+	fp_zero(a->z[1]);
+    byte* temp = (byte*)malloc(2*Fp_BYTES);
+    if (!temp) {
+        THROW(ERR_NO_MEMORY);
+        return;
+    }
+    memcpy(temp, bin, 2*Fp_BYTES);
+    // clear the header bits
+    temp[0] &= 0x1F;
+    fp2_read_bin(a->x, temp, 2*Fp_BYTES);
+    free(temp);
+
+
+    if (SERIALIZATION == UNCOMPRESSED) {
+        fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
+    }
+    else {
+        fp2_zero(a->y);
+        fp_set_bit(a->y[0], 0, y_is_odd);
+		fp_zero(a->y[1]);
+        ep2_upk(a, a);
     }
 }
 
@@ -195,7 +314,7 @@ void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
 
 // computes hashing to G1 
 // DEBUG/test function
-ep_st* _hashToG1(byte* data, int len) {
+ep_st* _hashToG1(const byte* data, const int len) {
     ep_st* h = (ep_st*) malloc(sizeof(ep_st));
     ep_new(h);
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)

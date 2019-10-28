@@ -1,25 +1,27 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckNever(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
             fun test(): Int {
                 return panic("XXX")
             }
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.PanicFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)

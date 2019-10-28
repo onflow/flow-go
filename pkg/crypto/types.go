@@ -13,7 +13,7 @@ const (
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
 }
 
 // HashingAlgorithm is an identifier for a hashing algorithm.
@@ -30,7 +30,7 @@ const (
 
 // String returns the string representation of this hashing algorithm.
 func (f HashingAlgorithm) String() string {
-	return [...]string{"SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384"}[f]
+	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384"}[f]
 }
 
 const (
@@ -61,6 +61,9 @@ const (
 	SignatureLengthECDSA_SECp256k1 = 64
 	PrKeyLengthECDSA_SECp256k1     = 32
 	PubKeyLengthECDSA_SECp256k1    = 64
+
+	DKGMinSize int = 3
+	ThresholdMinSize
 )
 
 // Signature is a generic type, regardless of the signature scheme

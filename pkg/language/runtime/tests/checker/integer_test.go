@@ -2,11 +2,13 @@ package checker
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
-	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 )
 
 func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {

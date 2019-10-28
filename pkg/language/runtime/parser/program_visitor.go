@@ -120,7 +120,7 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	var location ast.ImportLocation
+	var location ast.Location
 	var locationPos ast.Position
 	var endPos ast.Position
 
@@ -128,7 +128,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	stringLiteralContext := ctx.StringLiteral()
 	if stringLiteralContext != nil {
 		stringExpression := stringLiteralContext.Accept(v).(*ast.StringExpression)
-		location = ast.StringImportLocation(stringExpression.Value)
+		location = ast.StringLocation(stringExpression.Value)
 		locationPos = stringExpression.StartPos
 		endPos = stringExpression.EndPos
 	} else {
@@ -150,7 +150,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 			// unreachable, hex literal should always be valid
 			panic(err)
 		}
-		location = ast.AddressImportLocation(address)
+		location = ast.AddressLocation(address)
 		symbol := hexadecimalLiteralNode.GetSymbol()
 		locationPos = ast.PositionFromToken(symbol)
 		endPos = ast.EndPosition(locationPos, symbol.GetStop())
@@ -650,7 +650,7 @@ func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
 	} else if isPostCondition {
 		kind = ast.ConditionKindPost
 	} else {
-		panic(errors.UnreachableError{})
+		panic(&errors.UnreachableError{})
 	}
 
 	test := ctx.test.Accept(v).(ast.Expression)
@@ -822,10 +822,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 			if ifStatement, ok := ifStatementContext.Accept(v).(*ast.IfStatement); ok {
 				elseBlock = &ast.Block{
 					Statements: []ast.Statement{ifStatement},
-					Range: ast.Range{
-						StartPos: ifStatement.StartPosition(),
-						EndPos:   ifStatement.EndPosition(),
-					},
+					Range:      ast.NewRangeFromPositioned(ifStatement),
 				}
 			}
 		}
@@ -1215,10 +1212,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			TargetExpression:   wrapped,
 			IndexingExpression: partialAccessExpression.IndexingExpression,
 			IndexingType:       partialAccessExpression.IndexingType,
-			Range: ast.Range{
-				StartPos: partialAccessExpression.StartPos,
-				EndPos:   partialAccessExpression.EndPos,
-			},
+			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{
@@ -1299,6 +1293,19 @@ func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) i
 
 	return &ast.DestroyExpression{
 		Expression: expression,
+		StartPos:   startPosition,
+	}
+}
+
+func (v *ProgramVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{} {
+	expression := ctx.Expression().Accept(v).(ast.Expression)
+	ty := ctx.FullType().Accept(v).(ast.Type)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.ReferenceExpression{
+		Expression: expression,
+		Type:       ty,
 		StartPos:   startPosition,
 	}
 }
@@ -1565,7 +1572,7 @@ func parseHex(b byte) rune {
 		return c - 'A' + 10
 	}
 
-	panic(errors.UnreachableError{})
+	panic(&errors.UnreachableError{})
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {

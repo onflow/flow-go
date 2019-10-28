@@ -5,10 +5,17 @@
 #include "relic.h"
 #include "misc.h"
 
-void Zr_polynomialImage(byte* out, bn_st* a, const int a_size, const int x, ep2_st* y);
-void G2_polynomialImages(ep2_st* y, int len_y, ep2_st* A, int len_A);
-void write_ep2st_vector(byte* out, ep2_st* A, const int len);
-void read_ep2st_vector(ep2_st* A, byte* src, const int len);
-int verifyshare(bn_st* x, ep2_st* y);
+// the highest index of a DKG node
+#define MAX_IND         255
+#define MAX_IND_BITS    8
+// the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r 
+// (approximately Fr_bits/MAX_IND_BITS)
+#define MAX_IND_LOOPS   32 
+
+void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const int x);
+void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A);
+void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len);
+void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len);
+int verifyshare(const bn_st* x, const ep2_st* y);
 
 #endif

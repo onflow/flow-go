@@ -356,6 +356,7 @@ unaryExpression
 primaryExpression
     : createExpression
     | destroyExpression
+    | referenceExpression
     | composedExpression
     ;
 
@@ -421,6 +422,8 @@ Optional : '?' ;
 
 NilCoalescing : WS '??';
 
+Downcasting : 'as' ;
+
 FailableDowncasting : 'as?' ;
 
 primaryExpressionStart
@@ -436,6 +439,10 @@ createExpression
 
 destroyExpression
     : Destroy expression
+    ;
+
+referenceExpression
+    : Ampersand expression Downcasting fullType
     ;
 
 identifierExpression

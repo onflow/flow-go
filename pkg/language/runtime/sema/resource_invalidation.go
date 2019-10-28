@@ -1,9 +1,10 @@
 package sema
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/raviqqe/hamt"
 	"github.com/segmentio/fasthash/fnv1"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 )
 
 type ResourceInvalidation struct {

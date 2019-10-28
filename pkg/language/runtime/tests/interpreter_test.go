@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
@@ -20,27 +21,39 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
-func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithExtra(t, code, nil, nil, nil)
+type ParseCheckAndInterpretOptions struct {
+	PredefinedValueTypes map[string]sema.ValueDeclaration
+	PredefinedValues     map[string]interpreter.Value
+	HandleCheckerError   func(error)
 }
 
-func parseCheckAndInterpretWithExtra(
+func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
+	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{})
+}
+
+func parseCheckAndInterpretWithOptions(
 	t *testing.T,
 	code string,
-	predefinedValueTypes map[string]sema.ValueDeclaration,
-	predefinedValues map[string]interpreter.Value,
-	handleCheckerError func(error),
+	options ParseCheckAndInterpretOptions,
 ) *interpreter.Interpreter {
 
-	checker, err := ParseAndCheckWithExtra(t, code, predefinedValueTypes, nil, nil)
+	checker, err := ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			Values: options.PredefinedValueTypes,
+		},
+	)
 
-	if handleCheckerError != nil {
-		handleCheckerError(err)
+	if options.HandleCheckerError != nil {
+		options.HandleCheckerError(err)
 	} else {
-		require.Nil(t, err)
+		if !assert.Nil(t, err) {
+			assert.FailNow(t, errors.UnrollChildErrors(err))
+			return nil
+		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, predefinedValues)
+	inter, err := interpreter.NewInterpreter(checker, options.PredefinedValues)
 
 	require.Nil(t, err)
 
@@ -542,19 +555,19 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
 
 func TestInterpretReturns(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
            fun returnEarly(): Int {
                return 2
                return 1
            }
         `,
-		nil,
-		nil,
-		func(err error) {
-			errs := ExpectCheckerErrors(t, err, 1)
+		ParseCheckAndInterpretOptions{
+			HandleCheckerError: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+			},
 		},
 	)
 
@@ -1257,7 +1270,7 @@ func TestInterpretAndOperatorShortCircuitLeftFailure(t *testing.T) {
 
 func TestInterpretIfStatement(t *testing.T) {
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
            fun testTrue(): Int {
                if true {
@@ -1293,13 +1306,13 @@ func TestInterpretIfStatement(t *testing.T) {
                return 4
            }
         `,
-		nil,
-		nil,
-		func(err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
+		ParseCheckAndInterpretOptions{
+			HandleCheckerError: func(err error) {
+				errs := ExpectCheckerErrors(t, err, 2)
 
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
-			assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[0])
+				assert.IsType(t, &sema.UnreachableStatementError{}, errs[1])
+			},
 		},
 	)
 
@@ -1605,7 +1618,7 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -1621,6 +1634,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			testFunction,
 		}.ToValueDeclarations(),
 		nil,
+		ast.StringLocation(""),
 	)
 	assert.Nil(t, err)
 
@@ -1913,7 +1927,8 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
 		actual,
@@ -1926,7 +1941,8 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 		value,
 	)
 
-	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
 		actual,
@@ -1947,7 +1963,8 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
       let test = Test()
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).GetMember(inter, "foo")
+	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
 		actual,
@@ -3507,7 +3524,7 @@ func TestInterpretImport(t *testing.T) {
     `)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import answer from "imported"
 
@@ -3515,14 +3532,14 @@ func TestInterpretImport(t *testing.T) {
               return answer()
           }
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -3548,19 +3565,19 @@ func TestInterpretImportError(t *testing.T) {
 			stdlib.PanicFunction,
 		}.ToValueDeclarations()
 
-	checkerImported, err := ParseAndCheckWithExtra(t,
+	checkerImported, err := ParseAndCheckWithOptions(t,
 		`
           fun answer(): Int {
               return panic("?!")
           }
         `,
-		valueDeclarations,
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: valueDeclarations,
+		},
 	)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import answer from "imported"
 
@@ -3568,14 +3585,15 @@ func TestInterpretImportError(t *testing.T) {
               return answer()
           }
         `,
-		valueDeclarations,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			Values: valueDeclarations,
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -3729,7 +3747,8 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
-		inter.Globals["x"].Value.(interpreter.DictionaryValue).Get(interpreter.NewStringValue("abc")),
+		inter.Globals["x"].Value.(interpreter.DictionaryValue).
+			Get(interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
 	)
 }
 
@@ -4571,7 +4590,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
     `)
 	require.Nil(t, err)
 
-	checkerImporting, err := ParseAndCheckWithExtra(t,
+	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
           import Y from "imported"
 
@@ -4580,14 +4599,14 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
               Y().x()
           }
         `,
-		nil,
-		nil,
-		func(location ast.ImportLocation) (program *ast.Program, e error) {
-			assert.Equal(t,
-				ast.StringImportLocation("imported"),
-				location,
-			)
-			return checkerImported.Program, nil
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -4613,27 +4632,35 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 
 func TestInterpretStorage(t *testing.T) {
 
-	storedValues := map[sema.Type]interpreter.Value{}
+	storedValues := map[string]interpreter.OptionalValue{}
 
-	inter := parseCheckAndInterpretWithExtra(t,
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(key sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[key.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(key sema.Type, value interpreter.OptionalValue) {
+			storedValues[key.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
           fun test(): Int? {
               storage[Int] = 42
               return storage[Int]
           }
         `,
-		storageValueDeclaration,
-		map[string]interpreter.Value{
-			"storage": interpreter.StorageValue{
-				Getter: func(key sema.Type) interpreter.Value {
-					return storedValues[key]
-				},
-				Setter: func(key sema.Type, value interpreter.Value) {
-					storedValues[key] = value
-				},
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
 			},
 		},
-		nil,
 	)
 
 	value, err := inter.Invoke("test")
@@ -5008,7 +5035,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(2),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"Transfer",
@@ -5022,7 +5049,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(4),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"TransferAmount",
@@ -5040,7 +5067,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(100),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 	}
 
@@ -5124,4 +5151,236 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 		interpreter.CompositeValue{},
 		value.(interpreter.SomeValue).Value,
 	)
+}
+
+func TestInterpretReferenceExpression(t *testing.T) {
+
+	storageValue := interpreter.StorageValue{}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          resource R {}
+
+          fun test(): &R {
+              return &storage[R] as R
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
+		},
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	require.IsType(t,
+		interpreter.ReferenceValue{},
+		value,
+	)
+
+	rType := inter.Checker.GlobalTypes["R"]
+
+	require.Equal(t,
+		interpreter.ReferenceValue{
+			Storage:      storageValue,
+			IndexingType: rType,
+		},
+		value,
+	)
+}
+
+func TestInterpretReferenceUse(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
+              fun setX(_ newX: Int) {
+                  self.x = newX
+              }
+          }
+
+          fun test(): [Int] {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+
+              let ref = &storage[R] as R
+              ref.x = 1
+              let x1 = ref.x
+              ref.setX(2)
+              let x2 = ref.x
+              return [x1, x2]
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
+		},
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretReferenceUseAccess(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          resource R {
+              var x: Int
+
+              init() {
+                  self.x = 0
+              }
+
+              fun setX(_ newX: Int) {
+                  self.x = newX
+              }
+          }
+
+          fun test(): [Int] {
+              var rs: <-[R]? <- [<-create R()]
+              storage[[R]] <-> rs
+              // there was no old value, but it must be discarded
+              destroy rs
+
+              let ref = &storage[[R]] as [R]
+              let x0 = ref[0].x
+              ref[0].x = 1
+              let x1 = ref[0].x
+              ref[0].setX(2)
+              let x2 = ref[0].x
+              return [x0, x1, x2]
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
+		},
+	)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(0),
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
+		),
+		value,
+	)
+}
+
+func TestInterpretReferenceDereferenceFailure(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	storageValue := interpreter.StorageValue{
+		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+		Getter: func(keyType sema.Type) interpreter.OptionalValue {
+			value, ok := storedValues[keyType.String()]
+			if !ok {
+				return interpreter.NilValue{}
+			}
+			return value
+		},
+		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
+			storedValues[keyType.String()] = value
+		},
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          resource R {
+              fun foo() {}
+          }
+
+          fun test() {
+              let ref = &storage[R] as R
+              ref.foo()
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			PredefinedValueTypes: storageValueDeclaration,
+			PredefinedValues: map[string]interpreter.Value{
+				"storage": storageValue,
+			},
+		},
+	)
+
+	_, err := inter.Invoke("test")
+	assert.IsType(t, &interpreter.DereferenceError{}, err)
+}
+
+func TestInterpretInvalidForwardReferenceCall(t *testing.T) {
+
+	// TODO: improve:
+	//   - call to `g` should succeed, but access to `y` should fail with error
+	//   - maybe make this a static error
+
+	assert.Panics(t, func() {
+		_ = parseCheckAndInterpret(t, `
+          fun f(): Int {
+             return g()
+          }
+
+          let x = f()
+          let y = 0
+
+          fun g(): Int {
+              return y
+          }
+        `)
+	})
 }

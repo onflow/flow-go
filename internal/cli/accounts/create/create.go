@@ -20,7 +20,7 @@ import (
 type Config struct {
 	Signer string   `default:"root" flag:"signer,s"`
 	Keys   []string `flag:"key,k"`
-	Code   string   `flag:"code,c"`
+	Code   string   `flag:"code,c" info:"path to a file containing code for the account"`
 }
 
 var conf Config
@@ -32,11 +32,6 @@ var Cmd = &cobra.Command{
 		projectConf := project.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
-		signerAddr := types.HexToAddress(signer.Address)
-		signerKey, err := signer.PrivateKey()
-		if err != nil {
-			utils.Exit(1, "Failed to load signer key")
-		}
 
 		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
 
@@ -54,7 +49,10 @@ var Cmd = &cobra.Command{
 			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 
-		var code []byte
+		var (
+			code []byte
+			err  error
+		)
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -72,10 +70,10 @@ var Cmd = &cobra.Command{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,
-			PayerAccount: signerAddr,
+			PayerAccount: signer.Address,
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		err = tx.AddSignature(signer.Address, signer.PrivateKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}

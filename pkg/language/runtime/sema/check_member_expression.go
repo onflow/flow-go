@@ -89,16 +89,18 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	identifierStartPosition := expression.Identifier.StartPosition()
 	identifierEndPosition := expression.Identifier.EndPosition()
 
-	if ty, ok := expressionType.(HasMembers); ok {
-		targetRange := ast.Range{
-			StartPos: expression.Expression.StartPosition(),
-			EndPos:   expression.Expression.EndPosition(),
-		}
+	// Check if the type instance actually has members. For most types (e.g. composite types)
+	// this is known statically (in the sense of this host language (Go), not the implemented language),
+	// i.e. a Go type switch would be sufficient.
+	// However, for some types (e.g. reference types) this depends on what type is referenced
+
+	if ty, ok := expressionType.(MemberAccessibleType); ok && ty.HasMembers() {
+		targetRange := ast.NewRangeFromPositioned(expression.Expression)
 		member = ty.GetMember(identifier, targetRange, checker.report)
 	}
 
 	if member == nil {
-		if !IsInvalidType(expressionType) {
+		if !expressionType.IsInvalidType() {
 			checker.report(
 				&NotDeclaredMemberError{
 					Type: expressionType,

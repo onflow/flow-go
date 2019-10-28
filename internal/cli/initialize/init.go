@@ -1,7 +1,6 @@
 package initialize
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -28,11 +27,10 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
 			pconf := InitProject()
-			rootAcct := pconf.Accounts["root"]
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
-			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
-			fmt.Printf("🔑  PrivateKey: %s\n\n", rootAcct.PrivateKeyHex)
+			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address)
 			fmt.Printf("ℹ️   Start the emulator with this root account by running: flow emulator start\n")
 		} else {
 			fmt.Printf("⚠️   Flow configuration file already exists! Begin by running: flow emulator start\n")
@@ -47,19 +45,13 @@ func InitProject() *project.Config {
 		utils.Exitf(1, "Failed to generate private key: %v", err)
 	}
 
-	privateKeyBytes, err := types.EncodeAccountPrivateKey(privateKey)
-	if err != nil {
-		utils.Exitf(1, "Failed to encode private key: %v", err)
-	}
-
-	privateKeyHex := hex.EncodeToString(privateKeyBytes)
-	address := types.HexToAddress("01").Hex()
+	address := types.HexToAddress("01")
 
 	conf := &project.Config{
-		Accounts: map[string]*project.AccountConfig{
+		Accounts: map[string]*project.Account{
 			"root": {
-				Address:       address,
-				PrivateKeyHex: privateKeyHex,
+				Address:    address,
+				PrivateKey: privateKey,
 			},
 		},
 	}

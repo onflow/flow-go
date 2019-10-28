@@ -28,13 +28,11 @@ var Cmd = &cobra.Command{
 		projectConf := project.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
-		signerAddr := types.HexToAddress(signer.Address)
-		signerKey, err := signer.PrivateKey()
-		if err != nil {
-			utils.Exit(1, "Failed to load signer key")
-		}
 
-		var code []byte
+		var (
+			code []byte
+			err  error
+		)
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -47,11 +45,11 @@ var Cmd = &cobra.Command{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
-			PayerAccount:   signerAddr,
-			ScriptAccounts: []types.Address{signerAddr},
+			PayerAccount:   signer.Address,
+			ScriptAccounts: []types.Address{signer.Address},
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		err = tx.AddSignature(signer.Address, signer.PrivateKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}

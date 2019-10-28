@@ -19,8 +19,8 @@ func Example_generateCodeFromFile() {
 	}
 
 	// save generated code to file
-	tmpfile, err := ioutil.TempFile("", "*_registry.gen.go")
-	tmpfile.WriteString(generetedCode)
+	tmpfile, _ := ioutil.TempFile("", "*_registry.gen.go")
+	_, _ = tmpfile.WriteString(generetedCode)
 
 	// You can also print it to standard out
 	fmt.Print(generetedCode)

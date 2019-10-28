@@ -1,13 +1,19 @@
+/cmd/consensus/consensus
+
 # Test binary, build with `go test -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Since we have tooling that uses node
+node_modules
+
 .DS_Store
 
 flow.json
- 
+
 # IDE related files
 .idea
 .vscode
+git

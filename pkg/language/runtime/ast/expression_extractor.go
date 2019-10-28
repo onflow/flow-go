@@ -74,6 +74,10 @@ type DestroyExtractor interface {
 	ExtractDestroy(extractor *ExpressionExtractor, expression *DestroyExpression) ExpressionExtraction
 }
 
+type ReferenceExtractor interface {
+	ExtractReference(extractor *ExpressionExtractor, expression *ReferenceExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
 	nextIdentifier            int
 	BoolExtractor             BoolExtractor
@@ -93,6 +97,7 @@ type ExpressionExtractor struct {
 	FailableDowncastExtractor FailableDowncastExtractor
 	CreateExtractor           CreateExtractor
 	DestroyExtractor          DestroyExtractor
+	ReferenceExtractor        ReferenceExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -647,6 +652,34 @@ func (extractor *ExpressionExtractor) VisitDestroyExpression(expression *Destroy
 }
 
 func (extractor *ExpressionExtractor) ExtractDestroy(expression *DestroyExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitReferenceExpression(expression *ReferenceExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.ReferenceExtractor != nil {
+		return extractor.ReferenceExtractor.ExtractReference(extractor, expression)
+	} else {
+		return extractor.ExtractReference(expression)
+	}
+}
+
+func (extractor *ExpressionExtractor) ExtractReference(expression *ReferenceExpression) ExpressionExtraction {
 
 	// copy the expression
 	newExpression := *expression

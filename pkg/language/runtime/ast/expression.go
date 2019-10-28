@@ -322,7 +322,7 @@ func (e *MemberExpression) EndPosition() Position {
 	return e.Identifier.EndPosition()
 }
 
-// IndexingExpression
+// IndexExpression
 
 type IndexExpression struct {
 	TargetExpression Expression
@@ -551,7 +551,7 @@ func (e *CreateExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 func (e *CreateExpression) String() string {
 	return fmt.Sprintf(
 		"(create %s)",
-		e.InvocationExpression.String(),
+		e.InvocationExpression,
 	)
 }
 
@@ -585,7 +585,7 @@ func (e *DestroyExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 func (e *DestroyExpression) String() string {
 	return fmt.Sprintf(
 		"(destroy %s)",
-		e.Expression.String(),
+		e.Expression,
 	)
 }
 
@@ -595,4 +595,40 @@ func (e *DestroyExpression) StartPosition() Position {
 
 func (e *DestroyExpression) EndPosition() Position {
 	return e.Expression.EndPosition()
+}
+
+// ReferenceExpression
+
+type ReferenceExpression struct {
+	Expression Expression
+	Type       Type
+	StartPos   Position
+}
+
+func (*ReferenceExpression) isExpression() {}
+
+func (*ReferenceExpression) isIfStatementTest() {}
+
+func (e *ReferenceExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *ReferenceExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitReferenceExpression(e)
+}
+
+func (e *ReferenceExpression) String() string {
+	return fmt.Sprintf(
+		"(&%s as %s)",
+		e.Expression,
+		e.Type,
+	)
+}
+
+func (e *ReferenceExpression) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *ReferenceExpression) EndPosition() Position {
+	return e.Type.EndPosition()
 }

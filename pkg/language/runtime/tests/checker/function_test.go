@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckReferenceInFunction(t *testing.T) {
@@ -44,6 +46,24 @@ func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
               return false
           }
           return isEven(n - 1)
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckMutuallyRecursiveScoping(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun f(): Int {
+         return g()
+      }
+
+      let x = f()
+      let y = 0
+
+      fun g(): Int {
+          return y
       }
     `)
 
