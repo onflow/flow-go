@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/dapperlabs/flow-go/internal/cli/utils"
+
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
 type Config struct {
-	Reset bool `default:"false" flag:"reset" info:"reset flow.json config file"`
+	RootKey string `flag:"root-key" info:"root account key"`
+	Reset   bool   `default:"false" flag:"reset" info:"reset flow.json config file"`
 }
 
 var (
@@ -25,7 +27,16 @@ var Cmd = &cobra.Command{
 	Short: "Initialize a new account profile",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
-			pconf := InitializeProject()
+			var pconf *project.Config
+			if len(conf.RootKey) > 0 {
+				prKey, err := utils.DecodePrivateKey(conf.RootKey)
+				if err != nil {
+					utils.Exitf(1, "Failed to decode root key err: %v", err)
+				}
+				pconf = InitializeProjectWithRootKey(prKey)
+			} else {
+				pconf = InitializeProject()
+			}
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
@@ -42,22 +53,19 @@ var Cmd = &cobra.Command{
 func InitializeProject() *project.Config {
 	prKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
 	if err != nil {
-		panic(err)
-	}
-	address := types.HexToAddress("01")
-
-	conf := &project.Config{
-		Accounts: map[string]*project.Account{
-			"root": &project.Account{
-				Address:    address,
-				PrivateKey: prKey,
-			},
-		},
+		utils.Exitf(1, "Failed to generate private key err: %v", err)
 	}
 
-	project.SaveConfig(conf)
+	return InitializeProjectWithRootKey(prKey)
+}
 
-	return conf
+// InitializeProjectWithRootKey creates and saves a new project config
+// using the specified root key.
+func InitializeProjectWithRootKey(rootKey crypto.PrivateKey) *project.Config {
+	pconf := project.NewConfig()
+	pconf.SetRootAccount(rootKey)
+	project.MustSaveConfig(pconf)
+	return pconf
 }
 
 func init() {

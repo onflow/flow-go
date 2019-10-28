@@ -11,7 +11,14 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
-const ConfigPath = "flow.json"
+const (
+	ConfigPath = "flow.json"
+)
+
+var (
+	RootName    = "root"
+	RootAddress = types.HexToAddress("01")
+)
 
 type Account struct {
 	Address    types.Address
@@ -50,8 +57,21 @@ type Config struct {
 	Accounts map[string]*Account `json:"accounts"`
 }
 
+func NewConfig() *Config {
+	return &Config{
+		Accounts: make(map[string]*Account),
+	}
+}
+
 func (c *Config) RootAccount() *Account {
 	return c.Accounts["root"]
+}
+
+func (c *Config) SetRootAccount(prKey crypto.PrivateKey) {
+	c.Accounts[RootName] = &Account{
+		Address:    RootAddress,
+		PrivateKey: prKey,
+	}
 }
 
 func SaveConfig(conf *Config) error {
@@ -61,6 +81,12 @@ func SaveConfig(conf *Config) error {
 	}
 
 	return ioutil.WriteFile(ConfigPath, data, 0777)
+}
+
+func MustSaveConfig(conf *Config) {
+	if err := SaveConfig(conf); err != nil {
+		utils.Exitf(1, "Failed to save config err: ", err)
+	}
 }
 
 func LoadConfig() *Config {
