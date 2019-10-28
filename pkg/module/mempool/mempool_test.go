@@ -49,4 +49,20 @@ func TestHash(t *testing.T) {
 		// check pool1 and pool2 should have the different hash
 		require.NotEqual(t, pool1.Hash(), pool2.Hash())
 	})
+
+	t.Run("insert duplicated items should not impact hash", func(t *testing.T) {
+		// create the first mempool with gc1 and gc2
+		pool, err := mempool.New()
+		require.Nil(t, err)
+		pool.Add(gc1)
+		pool.Add(gc2)
+
+		hash1 := pool.Hash()
+
+		// add gc2 again
+		pool.Add(gc2)
+
+		// check hash should not change
+		require.Equal(t, hash1, pool.Hash())
+	})
 }

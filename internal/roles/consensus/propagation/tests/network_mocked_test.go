@@ -3,6 +3,7 @@ package tests
 import (
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -132,10 +133,9 @@ func TestSubmitCollection(t *testing.T) {
 		require.Equal(t, coll.Hash, gc.Hash)
 	})
 
-	// The propagation engine has a behavior property:
-	// If 3 nodes are connected together, then sending M1 to A, M2 to B, M3 to C will result
-	// the 3 nodes having all 3 messages in their mempool, and their mempool should produce
-	// the same hash
+	// Verify the behavior property:
+	// If N nodes are connected together, then sending any distinct collection hash to any node will
+	// result all nodes receive all hashes, and their mempools should all produce the same hash.
 	t.Run("all nodes should have the same mempool state after exchanging received collections",
 		func(t *testing.T) {
 			_, nodes, err := createConnectedNodes([]string{
@@ -184,4 +184,51 @@ func TestSubmitCollection(t *testing.T) {
 			require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 			require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
 		})
+
+	t.Run("should produce the same hash with concurrent calls", func(t *testing.T) {
+		_, nodes, err := createConnectedNodes([]string{
+			"consensus-consensus1@localhost:7297",
+			"consensus-consensus2@localhost:7298",
+			"consensus-consensus3@localhost:7299",
+		})
+		require.Nil(t, err)
+
+		// prepare 3 nodes that are connected to each other
+		node1 := nodes[0]
+		node2 := nodes[1]
+		node3 := nodes[2]
+
+		// prepare 3 different GuaranteedCollections: gc1, gc2, gc3
+		gc1, err := randCollectionHash()
+		require.Nil(t, err)
+
+		gc2, err := randCollectionHash()
+		require.Nil(t, err)
+
+		gc3, err := randCollectionHash()
+		require.Nil(t, err)
+
+		// send different collection to different nodes concurrently
+		sendOne := func(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+			node.engine.SubmitGuaranteedCollection(gc)
+			wg.Done()
+		}
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go sendOne(node1, gc1, &wg)
+		wg.Add(1)
+		go sendOne(node2, gc2, &wg)
+		wg.Add(1)
+		go sendOne(node3, gc3, &wg)
+		wg.Wait()
+
+		// now, check that all 3 nodes should have the same mempool state
+
+		// check mempool should have all 3 collection hashes
+		require.Equal(t, 3, int(node1.pool.Size()))
+
+		// check mempool hash are the same
+		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
+		require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
+	})
 }
