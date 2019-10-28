@@ -107,7 +107,8 @@ func randCollectionHash() (*collection.GuaranteedCollection, error) {
 	}, nil
 }
 
-// send different collection to different nodes concurrently
+// send one collection to one node.
+// extracted in order to be reused in different tests
 func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
 	node.engine.SubmitGuaranteedCollection(gc)
 	wg.Done()
@@ -215,6 +216,7 @@ func TestSubmitCollection(t *testing.T) {
 		gc3, err := randCollectionHash()
 		require.Nil(t, err)
 
+		// send different collection to different nodes concurrently
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go sendOne(node1, gc1, &wg)
