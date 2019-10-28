@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
@@ -107,7 +108,7 @@ func TestCheckEmitEvent(t *testing.T) {
 		checker, err := ParseAndCheck(t, `
 			event Transfer(to: Int, from: Int)
 		`)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		_, err = ParseAndCheckWithOptions(t, `
 			import Transfer from "imported"
