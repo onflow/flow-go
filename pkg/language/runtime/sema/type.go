@@ -1329,8 +1329,10 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 
 type EventType struct {
 	Identifier                          string
+	Location                            ast.Location
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
+	ast.Range
 }
 
 func (*EventType) isType() {}

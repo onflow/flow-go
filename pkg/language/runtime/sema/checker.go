@@ -30,7 +30,7 @@ type Checker struct {
 	Program                 *ast.Program
 	PredeclaredValues       map[string]ValueDeclaration
 	PredeclaredTypes        map[string]TypeDeclaration
-	ImportLocation          ast.ImportLocation
+	Location                ast.Location
 	ImportCheckers          map[ast.LocationID]*Checker
 	errors                  []error
 	valueActivations        *ValueActivations
@@ -54,6 +54,7 @@ func NewChecker(
 	program *ast.Program,
 	predeclaredValues map[string]ValueDeclaration,
 	predeclaredTypes map[string]TypeDeclaration,
+	location ast.Location,
 ) (*Checker, error) {
 
 	functionActivations := &FunctionActivations{}
@@ -67,6 +68,7 @@ func NewChecker(
 		PredeclaredValues:   predeclaredValues,
 		PredeclaredTypes:    predeclaredTypes,
 		ImportCheckers:      map[ast.LocationID]*Checker{},
+		Location:            location,
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
@@ -89,7 +91,7 @@ func NewChecker(
 		checker.declareTypeDeclaration(name, declaration)
 	}
 
-	err := checker.checkerError()
+	err := checker.CheckerError()
 	if err != nil {
 		return nil, err
 	}
@@ -145,14 +147,14 @@ func (checker *Checker) Check() error {
 		checker.Program.Accept(checker)
 		checker.isChecked = true
 	}
-	err := checker.checkerError()
+	err := checker.CheckerError()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (checker *Checker) checkerError() *CheckerError {
+func (checker *Checker) CheckerError() *CheckerError {
 	if len(checker.errors) > 0 {
 		return &CheckerError{
 			Errors: checker.errors,
@@ -813,4 +815,8 @@ func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
 	checker.resources.MergeBranches(temporaryResources, nil)
 
 	return result
+}
+
+func (checker *Checker) ResetErrors() {
+	checker.errors = nil
 }

@@ -1618,7 +1618,7 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 			a := arguments[0].(interpreter.IntValue).Int
 			b := arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
@@ -1634,6 +1634,7 @@ func TestInterpretHostFunction(t *testing.T) {
 			testFunction,
 		}.ToValueDeclarations(),
 		nil,
+		ast.StringLocation(""),
 	)
 	assert.Nil(t, err)
 
@@ -3532,9 +3533,9 @@ func TestInterpretImport(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
@@ -3586,9 +3587,9 @@ func TestInterpretImportError(t *testing.T) {
         `,
 		ParseAndCheckOptions{
 			Values: valueDeclarations,
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
@@ -4599,9 +4600,9 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
           }
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringImportLocation("imported"),
+					ast.StringLocation("imported"),
 					location,
 				)
 				return checkerImported.Program, nil
@@ -5034,7 +5035,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(2),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"Transfer",
@@ -5048,7 +5049,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(4),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 		{
 			"TransferAmount",
@@ -5066,7 +5067,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 					Value:      interpreter.NewIntValue(100),
 				},
 			},
-			nil,
+			TestLocation,
 		},
 	}
 
@@ -5360,4 +5361,26 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	assert.IsType(t, &interpreter.DereferenceError{}, err)
+}
+
+func TestInterpretInvalidForwardReferenceCall(t *testing.T) {
+
+	// TODO: improve:
+	//   - call to `g` should succeed, but access to `y` should fail with error
+	//   - maybe make this a static error
+
+	assert.Panics(t, func() {
+		_ = parseCheckAndInterpret(t, `
+          fun f(): Int {
+             return g()
+          }
+
+          let x = f()
+          let y = 0
+
+          fun g(): Int {
+              return y
+          }
+        `)
+	})
 }

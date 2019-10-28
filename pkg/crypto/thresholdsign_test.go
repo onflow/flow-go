@@ -28,10 +28,7 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSigner,
 			assert.NotNil(t, sk)
 			assert.NotNil(t, groupPK)
 			assert.NotNil(t, nodesPK)
-			assert.Nil(t, err)
-			if err != nil {
-				log.Errorf("End dkg failed: %s\n", err.Error())
-			}
+			assert.Nil(t, err, "End dkg failed: %v\n", err)
 			pkChan <- groupPK
 			ts[current], err = NewThresholdSigner(n, SHA3_384)
 			assert.Nil(t, err)

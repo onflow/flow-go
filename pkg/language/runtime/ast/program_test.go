@@ -13,7 +13,7 @@ func TestProgram_ResolveImports(t *testing.T) {
 		return &Program{
 			Declarations: []Declaration{
 				&ImportDeclaration{
-					Location: StringImportLocation(imported),
+					Location: StringLocation(imported),
 				},
 			},
 		}
@@ -23,11 +23,11 @@ func TestProgram_ResolveImports(t *testing.T) {
 	b := makeImportingProgram("c")
 	c := &Program{}
 
-	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
+	err := a.ResolveImports(func(location Location) (*Program, error) {
 		switch location {
-		case StringImportLocation("b"):
+		case StringLocation("b"):
 			return b, nil
-		case StringImportLocation("c"):
+		case StringLocation("c"):
 			return c, nil
 		default:
 			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
@@ -38,14 +38,14 @@ func TestProgram_ResolveImports(t *testing.T) {
 
 	importsA := a.ImportedPrograms()
 
-	actual := importsA[StringImportLocation("b").ID()]
+	actual := importsA[StringLocation("b").ID()]
 	if actual != b {
 		assert.Fail(t, "not b", actual)
 	}
 
 	importsB := b.ImportedPrograms()
 
-	actual = importsB[StringImportLocation("c").ID()]
+	actual = importsB[StringLocation("c").ID()]
 	if actual != c {
 		assert.Fail(t, "not c", actual)
 	}
@@ -57,7 +57,7 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 		return &Program{
 			Declarations: []Declaration{
 				&ImportDeclaration{
-					Location: StringImportLocation(imported),
+					Location: StringLocation(imported),
 				},
 			},
 		}
@@ -67,13 +67,13 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 	b := makeImportingProgram("c")
 	c := makeImportingProgram("a")
 
-	err := a.ResolveImports(func(location ImportLocation) (*Program, error) {
+	err := a.ResolveImports(func(location Location) (*Program, error) {
 		switch location {
-		case StringImportLocation("a"):
+		case StringLocation("a"):
 			return a, nil
-		case StringImportLocation("b"):
+		case StringLocation("b"):
 			return b, nil
-		case StringImportLocation("c"):
+		case StringLocation("c"):
 			return c, nil
 		default:
 			return nil, fmt.Errorf("tried to resolve unknown import location: %s", location)
@@ -83,7 +83,7 @@ func TestProgram_ResolveImportsCycle(t *testing.T) {
 	assert.Equal(t,
 		err,
 		CyclicImportsError{
-			Location: StringImportLocation("b"),
+			Location: StringLocation("b"),
 		},
 	)
 }
