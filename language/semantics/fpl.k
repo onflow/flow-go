@@ -477,6 +477,11 @@ module FPL-VARIABLE-DECLARATION
        <env>... X |-> env(... t: T, loc: L) ...</env>
        <store>... L |-> V ...</store>
 
+  rule <k> X:Ident => panic("Declaration not initialized yet") ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
+
   rule <k> declare(X ; Y ; Z) => declare(X) ~> declare(Y ; Z) ... </k>
   rule <k> declare(.Pgm) => . ... </k>
   rule <k> initialize(X ; Y ; Z) => initialize(X) ~> initialize(Y ; Z) ... </k>
@@ -524,6 +529,11 @@ module FPL-FUNCTIONS
   rule initArg((Lbl Name : T), (ArgLbl : X)) => let Name : T = X
   rule initArg((NoLbl Name : T), X) => let Name : T = X
     requires NoLbl ==K #token("_","Ident")
+
+  rule <k> (F:Ident)(_::Actuals) => panic("Declaration not initialized yet") ... </k>
+       <env>... F |-> env(... loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
 
   rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
        <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
