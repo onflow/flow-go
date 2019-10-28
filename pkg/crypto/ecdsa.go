@@ -110,9 +110,9 @@ type PrKeyECDSA struct {
 	goPrKey *goecdsa.PrivateKey
 }
 
-// AlgoName returns the name of the algo related to the private key
-func (sk *PrKeyECDSA) AlgoName() AlgoName {
-	return sk.alg.name
+// Algorithm returns the name of the algo related to the private key
+func (sk *PrKeyECDSA) Algorithm() SigningAlgorithm {
+	return sk.alg.algo
 }
 
 // KeySize returns the length of the private key
@@ -120,8 +120,8 @@ func (sk *PrKeyECDSA) KeySize() int {
 	return bitsToBytes((sk.alg.curve.Params().N).BitLen())
 }
 
-// Pubkey returns the public key associated to the private key
-func (sk *PrKeyECDSA) Publickey() PublicKey {
+// PublicKey returns the public key associated to the private key
+func (sk *PrKeyECDSA) PublicKey() PublicKey {
 	return &PubKeyECDSA{
 		alg:      sk.alg,
 		goPubKey: &sk.goPrKey.PublicKey,
@@ -141,8 +141,8 @@ type PubKeyECDSA struct {
 }
 
 // AlgoName returns the name of the algo related to the private key
-func (pk *PubKeyECDSA) AlgoName() AlgoName {
-	return pk.alg.name
+func (pk *PubKeyECDSA) Algorithm() SigningAlgorithm {
+	return pk.alg.algo
 }
 
 // KeySize returns the length of the public key
