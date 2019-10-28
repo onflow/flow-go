@@ -68,7 +68,7 @@ install-cli: build-relic
 
 .PHONY: lint
 lint:
-	GO111MODULE=on golint ./sdk/...
+	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint test
