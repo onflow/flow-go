@@ -69,14 +69,11 @@ func (m *Mempool) Hash() []byte {
 	m.Lock()
 	defer m.Unlock()
 	hash := siphash.New([]byte("flowcollmempoolx"))
-	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
-	for _, coll := range m.collections {
-		collections = append(collections, coll)
-	}
+	collections := m.all()
 	sort.Slice(collections, func(i int, j int) bool {
 		return bytes.Compare(collections[i].Hash, collections[j].Hash) < 0
 	})
-	for _, coll := range m.collections {
+	for _, coll := range collections {
 		_, _ = hash.Write(coll.Hash)
 	}
 	return hash.Sum(nil)
@@ -93,6 +90,10 @@ func (m *Mempool) Size() uint {
 func (m *Mempool) All() []*collection.GuaranteedCollection {
 	m.Lock()
 	defer m.Unlock()
+	return m.all()
+}
+
+func (m *Mempool) all() []*collection.GuaranteedCollection {
 	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
 	for _, coll := range m.collections {
 		collections = append(collections, coll)
