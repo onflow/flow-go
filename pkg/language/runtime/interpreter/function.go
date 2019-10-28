@@ -13,7 +13,7 @@ import (
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(arguments []Value, location Location) Trampoline
+	invoke(arguments []Value, location LocationPosition) Trampoline
 }
 
 // InterpretedFunctionValue
@@ -47,13 +47,13 @@ func newInterpretedFunction(
 	}
 }
 
-func (f InterpretedFunctionValue) invoke(arguments []Value, _ Location) Trampoline {
+func (f InterpretedFunctionValue) invoke(arguments []Value, _ LocationPosition) Trampoline {
 	return f.Interpreter.invokeInterpretedFunction(f, arguments)
 }
 
 // HostFunctionValue
 
-type HostFunction func(arguments []Value, location Location) Trampoline
+type HostFunction func(arguments []Value, location LocationPosition) Trampoline
 
 type HostFunctionValue struct {
 	Function HostFunction
@@ -67,7 +67,7 @@ func (f HostFunctionValue) Copy() Value {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(arguments []Value, location Location) Trampoline {
+func (f HostFunctionValue) invoke(arguments []Value, location LocationPosition) Trampoline {
 	return f.Function(arguments, location)
 }
 

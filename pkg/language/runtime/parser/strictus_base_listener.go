@@ -426,6 +426,12 @@ func (s *BaseStrictusListener) EnterDestroyExpression(ctx *DestroyExpressionCont
 // ExitDestroyExpression is called when production destroyExpression is exited.
 func (s *BaseStrictusListener) ExitDestroyExpression(ctx *DestroyExpressionContext) {}
 
+// EnterReferenceExpression is called when production referenceExpression is entered.
+func (s *BaseStrictusListener) EnterReferenceExpression(ctx *ReferenceExpressionContext) {}
+
+// ExitReferenceExpression is called when production referenceExpression is exited.
+func (s *BaseStrictusListener) ExitReferenceExpression(ctx *ReferenceExpressionContext) {}
+
 // EnterIdentifierExpression is called when production identifierExpression is entered.
 func (s *BaseStrictusListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
 

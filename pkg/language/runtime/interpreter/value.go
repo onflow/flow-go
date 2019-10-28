@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 
 	"github.com/rivo/uniseg"
 	"golang.org/x/text/unicode/norm"
@@ -26,18 +27,30 @@ type ExportableValue interface {
 	ToGoValue() interface{}
 }
 
-// IndexableValue
+// ValueIndexableValue
 
-type IndexableValue interface {
-	isIndexableValue()
-	Get(key Value) Value
-	Set(key Value, value Value)
+type ValueIndexableValue interface {
+	Get(locationRange LocationRange, key Value) Value
+	Set(locationRange LocationRange, key Value, value Value)
+}
+
+// TypeIndexableValue
+
+type TypeIndexableValue interface {
+	Get(key sema.Type) Value
+	Set(key sema.Type, value Value)
+}
+
+// MemberAccessibleValue
+
+type MemberAccessibleValue interface {
+	GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value
+	SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value)
 }
 
 // ConcatenatableValue
 
 type ConcatenatableValue interface {
-	isConcatenatableValue()
 	Concat(other ConcatenatableValue) Value
 }
 
@@ -50,7 +63,7 @@ type EquatableValue interface {
 // DestroyableValue
 
 type DestroyableValue interface {
-	Destroy(*Interpreter, Location) trampoline.Trampoline
+	Destroy(*Interpreter, LocationPosition) trampoline.Trampoline
 }
 
 // VoidValue
@@ -93,6 +106,10 @@ func (v BoolValue) Equal(other Value) BoolValue {
 	return bool(v) == bool(other.(BoolValue))
 }
 
+func (v BoolValue) String() string {
+	return strconv.FormatBool(bool(v))
+}
+
 // StringValue
 
 type StringValue struct {
@@ -103,9 +120,7 @@ func NewStringValue(str string) StringValue {
 	return StringValue{&str}
 }
 
-func (StringValue) isValue()               {}
-func (StringValue) isIndexableValue()      {}
-func (StringValue) isConcatenatableValue() {}
+func (StringValue) isValue() {}
 
 func (v StringValue) Copy() Value {
 	return v
@@ -151,7 +166,7 @@ func (v StringValue) Slice(from IntValue, to IntValue) Value {
 	return NewStringValue(str[fromInt:toInt])
 }
 
-func (v StringValue) Get(key Value) Value {
+func (v StringValue) Get(_ LocationRange, key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
@@ -167,7 +182,7 @@ func (v StringValue) Get(key Value) Value {
 	return NewStringValue(char)
 }
 
-func (v StringValue) Set(key Value, value Value) {
+func (v StringValue) Set(_ LocationRange, key Value, value Value) {
 	i := key.(IntegerValue).IntValue()
 	char := value.(StringValue).StrValue()
 
@@ -192,14 +207,14 @@ func (v StringValue) Set(key Value, value Value) {
 	*v.Str = sb.String()
 }
 
-func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		count := uniseg.GraphemeClusterCount(v.StrValue())
 		return NewIntValue(int64(count))
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				otherValue := arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherValue)
 				return trampoline.Done{Result: result}
@@ -207,7 +222,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 		)
 	case "slice":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				from := arguments[0].(IntValue)
 				to := arguments[1].(IntValue)
 				result := v.Slice(from, to)
@@ -219,7 +234,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, name string) Value {
 	}
 }
 
-func (v StringValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -235,9 +250,7 @@ func NewArrayValue(values ...Value) ArrayValue {
 	}
 }
 
-func (ArrayValue) isValue()               {}
-func (ArrayValue) isIndexableValue()      {}
-func (ArrayValue) isConcatenatableValue() {}
+func (ArrayValue) isValue() {}
 
 func (v ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -248,7 +261,7 @@ func (v ArrayValue) Copy() Value {
 	return NewArrayValue(copies...)
 }
 
-func (v ArrayValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 	for _, value := range *v.Values {
 		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
@@ -274,11 +287,11 @@ func (v ArrayValue) Concat(other ConcatenatableValue) Value {
 	return NewArrayValue(values...)
 }
 
-func (v ArrayValue) Get(key Value) Value {
+func (v ArrayValue) Get(_ LocationRange, key Value) Value {
 	return (*v.Values)[key.(IntegerValue).IntValue()]
 }
 
-func (v ArrayValue) Set(key Value, value Value) {
+func (v ArrayValue) Set(_ LocationRange, key Value, value Value) {
 	(*v.Values)[key.(IntegerValue).IntValue()] = value
 }
 
@@ -350,20 +363,20 @@ func (v ArrayValue) Contains(x Value) BoolValue {
 	return BoolValue(false)
 }
 
-func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(*v.Values)))
 	case "append":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				v.Append(arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				x := arguments[0].(ConcatenatableValue)
 				result := v.Concat(x)
 				return trampoline.Done{Result: result}
@@ -371,7 +384,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 		)
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				x := arguments[1]
 				v.Insert(i, x)
@@ -380,7 +393,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 		)
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				result := v.Remove(i)
 				return trampoline.Done{Result: result}
@@ -388,21 +401,21 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 		)
 	case "removeFirst":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.RemoveFirst()
 				return trampoline.Done{Result: result}
 			},
 		)
 	case "removeLast":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.RemoveLast()
 				return trampoline.Done{Result: result}
 			},
 		)
 	case "contains":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.Contains(arguments[0])
 				return trampoline.Done{Result: result}
 			},
@@ -412,7 +425,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, name string) Value {
 	}
 }
 
-func (v ArrayValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -1019,14 +1032,14 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 // CompositeValue
 
 type CompositeValue struct {
-	ImportLocation ast.ImportLocation
-	Identifier     string
-	Fields         *map[string]Value
-	Functions      *map[string]FunctionValue
-	Destructor     *InterpretedFunctionValue
+	Location   ast.Location
+	Identifier string
+	Fields     *map[string]Value
+	Functions  *map[string]FunctionValue
+	Destructor *InterpretedFunctionValue
 }
 
-func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
 		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
@@ -1052,11 +1065,11 @@ func (v CompositeValue) Copy() Value {
 	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
-		ImportLocation: v.ImportLocation,
-		Identifier:     v.Identifier,
-		Fields:         &newFields,
-		Functions:      v.Functions,
-		Destructor:     v.Destructor,
+		Location:   v.Location,
+		Identifier: v.Identifier,
+		Fields:     &newFields,
+		Functions:  v.Functions,
+		Destructor: v.Destructor,
 	}
 }
 
@@ -1065,15 +1078,15 @@ func (v CompositeValue) ToGoValue() interface{} {
 	return *v.Fields
 }
 
-func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	value, ok := (*v.Fields)[name]
 	if ok {
 		return value
 	}
 
 	// get correct interpreter
-	if v.ImportLocation != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
+	if v.Location != nil {
+		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
 		if ok {
 			interpreter = subInterpreter
 		}
@@ -1096,7 +1109,7 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, name string) Value {
 	return nil
 }
 
-func (v CompositeValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
 	(*v.Fields)[name] = value
 }
 
@@ -1105,7 +1118,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	encoder := gob.NewEncoder(w)
 	// NOTE: important: decode as pointer, so gob sees
 	// the interface, not the concrete type
-	err := encoder.Encode(&v.ImportLocation)
+	err := encoder.Encode(&v.Location)
 	if err != nil {
 		return nil, err
 	}
@@ -1124,7 +1137,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.ImportLocation)
+	err := decoder.Decode(&v.Location)
 	if err != nil {
 		return err
 	}
@@ -1154,7 +1167,7 @@ func (v DictionaryValue) Copy() Value {
 	return newDictionary
 }
 
-func (v DictionaryValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 
 	maybeDestroy := func(value interface{}) {
@@ -1181,9 +1194,7 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (DictionaryValue) isIndexableValue() {}
-
-func (v DictionaryValue) Get(keyValue Value) Value {
+func (v DictionaryValue) Get(_ LocationRange, keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
@@ -1203,7 +1214,7 @@ type HasKeyString interface {
 	KeyString() string
 }
 
-func (v DictionaryValue) Set(keyValue Value, value Value) {
+func (v DictionaryValue) Set(_ LocationRange, keyValue Value, value Value) {
 	key := dictionaryKey(keyValue)
 	switch typedValue := value.(type) {
 	case SomeValue:
@@ -1234,14 +1245,14 @@ func (v DictionaryValue) String() string {
 	return builder.String()
 }
 
-func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value {
+func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(len(v)))
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 
 				key := dictionaryKey(keyValue)
@@ -1263,7 +1274,7 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 				newValue := arguments[1]
 
@@ -1288,7 +1299,7 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, name string) Value 
 	}
 }
 
-func (v DictionaryValue) SetMember(interpreter *Interpreter, name string, value Value) {
+func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(&errors.UnreachableError{})
 }
 
@@ -1300,9 +1311,9 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID             string
-	Fields         []EventField
-	ImportLocation ast.ImportLocation
+	ID       string
+	Fields   []EventField
+	Location ast.Location
 }
 
 func (EventValue) isValue() {}
@@ -1399,17 +1410,26 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 	return values, nil
 }
 
+// OptionalValue
+
+type OptionalValue interface {
+	Value
+	isOptionalValue()
+}
+
 // NilValue
 
 type NilValue struct{}
 
 func (NilValue) isValue() {}
 
+func (NilValue) isOptionalValue() {}
+
 func (v NilValue) Copy() Value {
 	return v
 }
 
-func (v NilValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v NilValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return trampoline.Done{}
 }
 
@@ -1429,13 +1449,15 @@ type SomeValue struct {
 
 func (SomeValue) isValue() {}
 
+func (SomeValue) isOptionalValue() {}
+
 func (v SomeValue) Copy() Value {
 	return SomeValue{
 		Value: v.Value.Copy(),
 	}
 }
 
-func (v SomeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 
@@ -1463,18 +1485,11 @@ func (v AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// ValueWithMembers
-
-type ValueWithMembers interface {
-	GetMember(interpreter *Interpreter, name string) Value
-	SetMember(interpreter *Interpreter, name string, value Value)
-}
-
 // StorageValue
 
 type StorageValue struct {
-	Getter func(key sema.Type) Value
-	Setter func(key sema.Type, value Value)
+	Getter func(key sema.Type) OptionalValue
+	Setter func(key sema.Type, value OptionalValue)
 }
 
 func (StorageValue) isValue() {}
@@ -1486,17 +1501,59 @@ func (v StorageValue) Copy() Value {
 	}
 }
 
-func (StorageValue) isIndexableValue() {}
-
 func (v StorageValue) Get(key sema.Type) Value {
 	return v.Getter(key)
 }
 
 func (v StorageValue) Set(key sema.Type, value Value) {
-	v.Setter(key, value)
+	v.Setter(key, value.(OptionalValue))
 }
 
-//
+// ReferenceValue
+
+type ReferenceValue struct {
+	Storage      StorageValue
+	IndexingType sema.Type
+}
+
+func (ReferenceValue) isValue() {}
+
+func (v ReferenceValue) Copy() Value {
+	return v
+}
+
+func (v ReferenceValue) referencedValue(locationRange LocationRange) Value {
+	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+	case SomeValue:
+		return referenced.Value
+	case NilValue:
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	default:
+		panic(errors.UnreachableError{})
+	}
+}
+
+func (v ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+	return v.referencedValue(locationRange).(MemberAccessibleValue).
+		GetMember(interpreter, locationRange, name)
+}
+
+func (v ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	v.referencedValue(locationRange).(MemberAccessibleValue).
+		SetMember(interpreter, locationRange, name, value)
+}
+
+func (v ReferenceValue) Get(locationRange LocationRange, key Value) Value {
+	return v.referencedValue(locationRange).(ValueIndexableValue).
+		Get(locationRange, key)
+}
+
+func (v ReferenceValue) Set(locationRange LocationRange, key Value, value Value) {
+	v.referencedValue(locationRange).(ValueIndexableValue).
+		Set(locationRange, key, value)
+}
 
 func init() {
 	gob.Register(VoidValue{})
@@ -1517,4 +1574,5 @@ func init() {
 	gob.Register(NilValue{})
 	gob.Register(SomeValue{})
 	gob.Register(AnyValue{})
+	gob.Register(ReferenceValue{})
 }

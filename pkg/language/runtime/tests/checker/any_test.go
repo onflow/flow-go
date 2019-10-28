@@ -1,9 +1,11 @@
 package checker
 
 import (
-	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 )
 
 func TestCheckAny(t *testing.T) {

@@ -1,3 +1,5 @@
+REVISION := $(shell git rev-parse --short HEAD)
+
 .PHONY: build-relic
 build-relic:
 	./pkg/crypto/relic_build.sh
@@ -24,7 +26,6 @@ generate-godoc:
 	godoc2md github.com/dapperlabs/flow-go/internal/roles/collect/controller > internal/roles/collect/controller/README.md
 	godoc2md github.com/dapperlabs/flow-go/internal/roles/verify/processor > internal/roles/verify/processor/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/data/keyvalue > pkg/data/keyvalue/README.md
-	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip > pkg/network/gossip/README.md
 	godoc2md github.com/dapperlabs/flow-go/pkg/network/gossip/v1 > pkg/network/gossip/v1/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
 	godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
@@ -52,9 +53,10 @@ generate-registries:
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-wire generate-mocks
+
 .PHONY: check-generated-code
 check-generated-code:
-	./scripts/check-generated-code.sh
+	./check-generated-code.sh
 
 .PHONY: build-cli
 build-cli:
@@ -73,4 +75,24 @@ ci: install-tools generate check-generated-code lint test
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(git rev-parse --short HEAD)" .
+	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t gcr.io/dl-flow/emulator:$(REVISION) .
+
+.PHONY: docker-build-collect
+docker-build-collect:
+	docker build -f cmd/collect/Dockerfile -t gcr.io/dl-flow/collect:latest -t gcr.io/dl-flow/collect:$(REVISION) .
+
+.PHONY: docker-build-consensus
+docker-build-consensus:
+	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t gcr.io/dl-flow/consensus:$(REVISION)" .
+
+.PHONY: docker-build-execute
+docker-build-execute:
+	docker build -f cmd/execute/Dockerfile -t gcr.io/dl-flow/execute:latest -t gcr.io/dl-flow/execute:$(REVISION)" .
+
+.PHONY: docker-build-observe
+docker-build-observe:
+	docker build -f cmd/observe/Dockerfile -t gcr.io/dl-flow/observe:latest -t gcr.io/dl-flow/observe:$(REVISION)" .
+
+.PHONY: docker-build-verify
+docker-build-verify:
+	docker build -f cmd/verify/Dockerfile -t gcr.io/dl-flow/verify:latest -t gcr.io/dl-flow/verify:$(REVISION)" .

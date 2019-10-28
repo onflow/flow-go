@@ -50,6 +50,7 @@ func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
 
 func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	s.running = false
+	errorString := ""
 	// private key of the current node
 	var x PrivateKey
 	if s.xReceived {
@@ -57,6 +58,8 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 			alg:    s.blsContext, // signer algo
 			scalar: s.x,          // the private share
 		}
+	} else {
+		errorString += "The private key is missing\n"
 	}
 
 	// Group public key
@@ -65,6 +68,8 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 		Y = &PubKeyBLS_BLS12381{
 			point: s.A[0],
 		}
+	} else {
+		errorString += "The group public key is missing\n"
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
@@ -74,11 +79,16 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 				point: p,
 			}
 		}
+	} else {
+		errorString += "The nodes public keys are missing\n"
+	}
+	if errorString != "" {
+		return x, Y, y, cryptoError{errorString}
 	}
 	return x, Y, y, nil
 }
 
-func (s *feldmanVSSstate) ProcessDKGmsg(orig int, msg DKGmsg) *DKGoutput {
+func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	out := &DKGoutput{
 		action: []DKGToSend{},
 		err:    nil,

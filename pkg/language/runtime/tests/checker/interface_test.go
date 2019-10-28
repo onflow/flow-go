@@ -2,12 +2,14 @@ package checker
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckInvalidLocalInterface(t *testing.T) {
@@ -238,7 +240,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheckWithExtra(t,
+			_, err := ParseAndCheckWithOptions(t,
 				fmt.Sprintf(`
                   %[1]s interface Test {}
 
@@ -248,11 +250,11 @@ func TestCheckInterfaceUse(t *testing.T) {
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
-				stdlib.StandardLibraryFunctions{
-					stdlib.PanicFunction,
-				}.ToValueDeclarations(),
-				nil,
-				nil,
+				ParseAndCheckOptions{
+					Values: stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				},
 			)
 
 			// TODO: add support for non-structure / non-resource declarations

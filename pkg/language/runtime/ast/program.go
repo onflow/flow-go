@@ -10,7 +10,24 @@ type Program struct {
 	functionDeclarations  []*FunctionDeclaration
 	eventDeclarations     []*EventDeclaration
 	importedPrograms      map[LocationID]*Program
-	importLocations       []ImportLocation
+	importLocations       []Location
+}
+
+func (p *Program) StartPosition() Position {
+	if len(p.Declarations) == 0 {
+		return Position{}
+	}
+	firstDeclaration := p.Declarations[0]
+	return firstDeclaration.StartPosition()
+}
+
+func (p *Program) EndPosition() Position {
+	count := len(p.Declarations)
+	if count == 0 {
+		return Position{}
+	}
+	lastDeclaration := p.Declarations[count-1]
+	return lastDeclaration.EndPosition()
 }
 
 func (p *Program) Accept(visitor Visitor) Repr {
@@ -75,9 +92,9 @@ func (p *Program) ImportedPrograms() map[LocationID]*Program {
 }
 
 // ImportLocations returns the import locations declared by this program.
-func (p *Program) ImportLocations() []ImportLocation {
+func (p *Program) ImportLocations() []Location {
 	if p.importLocations == nil {
-		p.importLocations = make([]ImportLocation, 0)
+		p.importLocations = make([]Location, 0)
 
 		for _, declaration := range p.Declarations {
 			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
@@ -89,7 +106,7 @@ func (p *Program) ImportLocations() []ImportLocation {
 	return p.importLocations
 }
 
-type ImportResolver func(location ImportLocation) (*Program, error)
+type ImportResolver func(location Location) (*Program, error)
 
 func (p *Program) ResolveImports(resolver ImportResolver) error {
 	return p.resolveImports(
@@ -100,7 +117,7 @@ func (p *Program) ResolveImports(resolver ImportResolver) error {
 }
 
 type CyclicImportsError struct {
-	Location ImportLocation
+	Location Location
 }
 
 func (e CyclicImportsError) Error() string {

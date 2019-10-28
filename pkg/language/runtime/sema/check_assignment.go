@@ -38,10 +38,7 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		} else {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					Range: ast.Range{
-						StartPos: assignment.StartPosition(),
-						EndPos:   assignment.EndPosition(),
-					},
+					Range: ast.NewRangeFromPositioned(assignment),
 				},
 			)
 		}
@@ -111,27 +108,21 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	if variable.IsConstant {
 		checker.report(
 			&AssignmentToConstantError{
-				Name: identifier,
-				Range: ast.Range{
-					StartPos: target.StartPosition(),
-					EndPos:   target.EndPosition(),
-				},
+				Name:  identifier,
+				Range: ast.NewRangeFromPositioned(target),
 			},
 		)
 	}
 
 	// check value type is subtype of variable type
-	if !IsInvalidType(valueType) &&
+	if !valueType.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: variable.Type,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -145,23 +136,20 @@ func (checker *Checker) visitIndexExpressionAssignment(
 	valueType Type,
 ) (elementType Type) {
 
-	elementType = checker.visitIndexingExpression(target, true)
+	elementType, _ = checker.visitIndexExpression(target, true)
 
 	if elementType == nil {
 		return &InvalidType{}
 	}
 
-	if !IsInvalidType(elementType) &&
+	if !elementType.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: elementType,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -183,17 +171,14 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	// If the value type is valid, check that the value can be assigned to the member type
 
-	if !IsInvalidType(valueType) &&
+	if !valueType.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, member.Type) {
 
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: member.Type,
 				ActualType:   valueType,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}
@@ -201,11 +186,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	reportAssignmentToConstant := func() {
 		checker.report(
 			&AssignmentToConstantMemberError{
-				Name: target.Identifier.Identifier,
-				Range: ast.Range{
-					StartPos: valueExpression.StartPosition(),
-					EndPos:   valueExpression.EndPosition(),
-				},
+				Name:  target.Identifier.Identifier,
+				Range: ast.NewRangeFromPositioned(valueExpression),
 			},
 		)
 	}

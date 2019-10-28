@@ -21,10 +21,7 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 
 		checker.report(
 			&InvalidConstructionError{
-				Range: ast.Range{
-					StartPos: expression.InvocationExpression.StartPosition(),
-					EndPos:   expression.InvocationExpression.EndPosition(),
-				},
+				Range: ast.NewRangeFromPositioned(expression.InvocationExpression),
 			},
 		)
 	}

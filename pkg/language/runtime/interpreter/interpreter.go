@@ -14,11 +14,29 @@ import (
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
+type controlReturn interface {
+	isControlReturn()
+}
+
 type loopBreak struct{}
+
+func (loopBreak) isControlReturn() {}
+
 type loopContinue struct{}
+
+func (loopContinue) isControlReturn() {}
+
 type functionReturn struct {
 	Value
 }
+
+func (functionReturn) isControlReturn() {}
+
+type ExpressionStatementResult struct {
+	Value
+}
+
+//
 
 var emptyFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: &sema.TypeAnnotation{
@@ -62,14 +80,21 @@ type Interpreter struct {
 	activations         *activations.Activations
 	Globals             map[string]*Variable
 	interfaces          map[string]*ast.InterfaceDeclaration
-	ImportLocation      ast.ImportLocation
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
 	onEventEmitted      func(EventValue)
 }
 
-func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+type InterpreterOpt func(*Interpreter)
+
+func WithOnEventEmittedHandler(handler func(EventValue)) InterpreterOpt {
+	return func(inter *Interpreter) {
+		inter.onEventEmitted = handler
+	}
+}
+
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, opts ...InterpreterOpt) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
 		PredefinedValues:    predefinedValues,
@@ -89,12 +114,26 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		}
 	}
 
+	for _, opt := range opts {
+		opt(interpreter)
+	}
+
 	return interpreter, nil
 }
 
 // SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+//
 func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
 	interpreter.onEventEmitted = callback
+}
+
+// locationRange returns a new location range for the given positioned element.
+//
+func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
+	return LocationRange{
+		Location: interpreter.Checker.Location,
+		Range:    ast.NewRangeFromPositioned(hasPosition),
+	}
 }
 
 func (interpreter *Interpreter) findVariable(name string) *Variable {
@@ -316,7 +355,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(boxedArguments, Location{})
+	trampoline = function.invoke(boxedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
@@ -441,7 +480,7 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 		},
 		Line: line,
 	}.FlatMap(func(returnValue interface{}) Trampoline {
-		if returnValue != nil {
+		if _, isReturn := returnValue.(controlReturn); isReturn {
 			return Done{Result: returnValue}
 		}
 		return interpreter.visitStatements(statements[1:])
@@ -472,10 +511,10 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 				FlatMap(func(blockResult interface{}) Trampoline {
 
 					var resultValue Value
-					if blockResult == nil {
-						resultValue = VoidValue{}
-					} else {
+					if _, ok := blockResult.(functionReturn); ok {
 						resultValue = blockResult.(functionReturn).Value
+					} else {
+						resultValue = VoidValue{}
 					}
 
 					// if there is a return type, declare the constant `result`
@@ -577,7 +616,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							ConditionKind: condition.Kind,
 							Message:       message,
 							LocationRange: LocationRange{
-								ImportLocation: interpreter.ImportLocation,
+								Location: interpreter.Checker.Location,
 								Range: ast.Range{
 									StartPos: condition.Test.StartPosition(),
 									EndPos:   condition.Test.EndPosition(),
@@ -795,17 +834,18 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
-			case IndexableValue:
+			case ValueIndexableValue:
 				return target.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						typedResult.Set(indexingValue, value)
+						locationRange := interpreter.locationRange(target)
+						typedResult.Set(locationRange, indexingValue, value)
 
 						// NOTE: no result, so it does *not* act like a return-statement
 						return Done{}
 					})
 
-			case StorageValue:
+			case TypeIndexableValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
 				typedResult.Set(indexingType, value)
 				return Done{}
@@ -819,9 +859,9 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			structure := result.(CompositeValue)
-
-			structure.SetMember(interpreter, target.Identifier.Identifier, value)
+			structure := result.(MemberAccessibleValue)
+			locationRange := interpreter.locationRange(target)
+			structure.SetMember(interpreter, locationRange, target.Identifier.Identifier, value)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -1096,9 +1136,14 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 
 func (interpreter *Interpreter) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
 	return statement.Expression.Accept(interpreter).(Trampoline).
-		Map(func(_ interface{}) interface{} {
-			// NOTE: ignore result, so it does *not* act like a return-statement
-			return nil
+		Map(func(result interface{}) interface{} {
+			var value Value
+			var ok bool
+			value, ok = result.(Value)
+			if !ok {
+				value = nil
+			}
+			return ExpressionStatementResult{value}
 		})
 }
 
@@ -1166,12 +1211,15 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 					dictionaryType.ValueType,
 				)
 
+				// TODO: improve: should be just for current entry
+				locationRange := interpreter.locationRange(expression)
+
 				// TODO: panic for duplicate keys?
 
 				// NOTE: important to box in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(key, SomeValue{value})
+				newDictionary.Set(locationRange, key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1181,8 +1229,9 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
-			value := result.(ValueWithMembers)
-			return value.GetMember(interpreter, expression.Identifier.Identifier)
+			value := result.(MemberAccessibleValue)
+			locationRange := interpreter.locationRange(expression)
+			return value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 		})
 }
 
@@ -1190,25 +1239,18 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
-			case IndexableValue:
+			case ValueIndexableValue:
 				return expression.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						value := typedResult.Get(indexingValue)
+						locationRange := interpreter.locationRange(expression)
+						value := typedResult.Get(locationRange, indexingValue)
 						return Done{Result: value}
 					})
 
-			case StorageValue:
+			case TypeIndexableValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-
-				var result Value
-				value := typedResult.Get(indexingType)
-				if value == nil {
-					result = NilValue{}
-				} else {
-					result = SomeValue{Value: value}
-				}
-
+				result := typedResult.Get(indexingType)
 				return Done{Result: result}
 
 			default:
@@ -1259,9 +1301,9 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					}
 
 					// TODO: optimize: only potentially used by host-functions
-					location := Location{
-						Position:       invocationExpression.StartPosition(),
-						ImportLocation: interpreter.ImportLocation,
+					location := LocationPosition{
+						Position: invocationExpression.StartPosition(),
+						Location: interpreter.Checker.Location,
 					}
 					return function.invoke(argumentCopies, location)
 				})
@@ -1429,14 +1471,14 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	interpreter.CompositeFunctions[identifier] = functions
 
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := CompositeValue{
-				ImportLocation: interpreter.ImportLocation,
-				Identifier:     identifier,
-				Fields:         &map[string]Value{},
-				Functions:      &functions,
-				Destructor:     destructorFunction,
+				Location:   interpreter.Checker.Location,
+				Identifier: identifier,
+				Fields:     &map[string]Value{},
+				Functions:  &functions,
+				Destructor: destructorFunction,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1462,7 +1504,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
+	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1796,12 +1838,18 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
-	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	subInterpreter, err := NewInterpreter(
+		importedChecker,
+		interpreter.PredefinedValues,
+		WithOnEventEmittedHandler(interpreter.onEventEmitted),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	subInterpreter.ImportLocation = declaration.Location
+	if subInterpreter.Checker.Location == nil {
+		subInterpreter.Checker.Location = declaration.Location
+	}
 
 	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
 
@@ -1869,7 +1917,7 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
@@ -1879,9 +1927,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				ID:             eventType.Identifier,
-				Fields:         fields,
-				ImportLocation: interpreter.ImportLocation,
+				ID:       eventType.Identifier,
+				Fields:   fields,
+				Location: interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}
@@ -1927,11 +1975,27 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			value := result.(Value)
 
 			// TODO: optimize: only potentially used by host-functions
-			location := Location{
-				Position:       expression.StartPosition(),
-				ImportLocation: interpreter.ImportLocation,
+			location := LocationPosition{
+				Position: expression.StartPosition(),
+				Location: interpreter.Checker.Location,
 			}
 
 			return value.(DestroyableValue).Destroy(interpreter, location)
+		})
+}
+
+func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
+	indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
+	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
+		FlatMap(func(result interface{}) Trampoline {
+			storage := result.(StorageValue)
+
+			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+
+			referenceValue := ReferenceValue{
+				Storage:      storage,
+				IndexingType: indexingType,
+			}
+			return Done{Result: referenceValue}
 		})
 }

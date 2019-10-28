@@ -5,6 +5,7 @@ import (
 	"github.com/segmentio/fasthash/fnv1"
 )
 
+// Position defines a row/column within a Cadence script.
 type Position struct {
 	// offset, starting at 0
 	Offset int
@@ -80,4 +81,13 @@ func (e *Range) StartPosition() Position {
 
 func (e *Range) EndPosition() Position {
 	return e.EndPos
+}
+
+// NewRangeFromPositioned
+
+func NewRangeFromPositioned(hasPosition HasPosition) Range {
+	return Range{
+		StartPos: hasPosition.StartPosition(),
+		EndPos:   hasPosition.EndPosition(),
+	}
 }

@@ -71,10 +71,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: declaration.DeclarationKind(),
-				Range: ast.Range{
-					StartPos: declaration.Identifier.StartPosition(),
-					EndPos:   declaration.Identifier.EndPosition(),
-				},
+				Range:           ast.NewRangeFromPositioned(declaration.Identifier),
 			},
 		)
 	}
@@ -88,10 +85,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		checker.report(
 			&UnsupportedDeclarationError{
 				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				Range: ast.Range{
-					StartPos: firstNestedCompositeDeclaration.Identifier.StartPosition(),
-					EndPos:   firstNestedCompositeDeclaration.Identifier.EndPosition(),
-				},
+				Range:           ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
 			},
 		)
 	}

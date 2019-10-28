@@ -1,25 +1,27 @@
 package checker
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCheckAssertWithoutMessage(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
             fun test() {
                 assert(1 == 2)
             }
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.AssertFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.AssertFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)
@@ -27,17 +29,17 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 
 func TestCheckAssertWithMessage(t *testing.T) {
 
-	_, err := ParseAndCheckWithExtra(t,
+	_, err := ParseAndCheckWithOptions(t,
 		`
             fun test() {
                 assert(1 == 2, message: "test message")
             }
         `,
-		stdlib.StandardLibraryFunctions{
-			stdlib.AssertFunction,
-		}.ToValueDeclarations(),
-		nil,
-		nil,
+		ParseAndCheckOptions{
+			Values: stdlib.StandardLibraryFunctions{
+				stdlib.AssertFunction,
+			}.ToValueDeclarations(),
+		},
 	)
 
 	assert.Nil(t, err)

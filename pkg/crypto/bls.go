@@ -55,9 +55,12 @@ func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePublicKey([]byte) (PublicKey, error) {
-	// TODO: implement DecodePubKey
-	return nil, nil
+func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
+	pk := &PubKeyBLS_BLS12381{
+		alg: a,
+	}
+	readPointG2(&pk.point, publicKeyBytes)
+	return pk, nil
 }
 
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
@@ -117,6 +120,7 @@ func (pk *PubKeyBLS_BLS12381) KeySize() int {
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
-	// TODO: implement EncodePubKey
-	return nil, nil
+	dest := make([]byte, pubKeyLengthBLS_BLS12381)
+	writePointG2(dest, &a.point)
+	return dest, nil
 }

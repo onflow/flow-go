@@ -40,7 +40,10 @@ func (l *errorListener) SyntaxError(
 }
 
 func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException, offendingToken antlr.Token) bool {
-	if _, ok := e.(*antlr.InputMisMatchException); !ok {
+	switch e.(type) {
+	case *antlr.InputMisMatchException, *antlr.NoViableAltException:
+		break
+	default:
 		return false
 	}
 
@@ -89,6 +92,21 @@ func ParseExpression(code string) (expression ast.Expression, inputIsComplete bo
 	}
 
 	return program, inputIsComplete, err
+}
+
+func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, err error) {
+	result, inputIsComplete, errors := parse(
+		code,
+		func(parser *StrictusParser) antlr.ParserRuleContext {
+			return parser.ReplInput()
+		},
+	)
+
+	if len(errors) > 0 {
+		err = Error{errors}
+	}
+
+	return result, inputIsComplete, err
 }
 
 func parse(

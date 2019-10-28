@@ -2,8 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"math/big"
+
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/common"
@@ -699,7 +700,7 @@ func (e *DuplicateConformanceError) EndPosition() ast.Position {
 // UnresolvedImportError
 
 type UnresolvedImportError struct {
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	ast.Range
 }
 
@@ -717,7 +718,7 @@ func (*UnresolvedImportError) isSemanticError() {}
 // TODO: make warning?
 
 type RepeatedImportError struct {
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	ast.Range
 }
 
@@ -734,7 +735,7 @@ func (*RepeatedImportError) isSemanticError() {}
 
 type NotExportedError struct {
 	Name           string
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	Pos            ast.Position
 }
 
@@ -757,7 +758,7 @@ func (e *NotExportedError) EndPosition() ast.Position {
 
 type ImportedProgramError struct {
 	CheckerError   *CheckerError
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	Pos            ast.Position
 }
 
@@ -1244,17 +1245,17 @@ func (e *InvalidResourceFieldError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidStorageIndexingError
+// InvalidTypeIndexingError
 
-type InvalidStorageIndexingError struct {
+type InvalidTypeIndexingError struct {
 	ast.Range
 }
 
-func (e *InvalidStorageIndexingError) Error() string {
-	return "invalid index into storage: expected type"
+func (e *InvalidTypeIndexingError) Error() string {
+	return "invalid index: expected type"
 }
 
-func (*InvalidStorageIndexingError) isSemanticError() {}
+func (*InvalidTypeIndexingError) isSemanticError() {}
 
 // InvalidIndexingError
 
@@ -1327,6 +1328,19 @@ func (e *EmitNonEventError) Error() string {
 }
 
 func (*EmitNonEventError) isSemanticError() {}
+
+// EmitImportedEventError
+
+type EmitImportedEventError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *EmitImportedEventError) Error() string {
+	return fmt.Sprintf("cannot emit imported event type: `%s`", e.Type)
+}
+
+func (*EmitImportedEventError) isSemanticError() {}
 
 // InvalidResourceAssignmentError
 
@@ -1502,3 +1516,31 @@ func (e *InvalidResourceArrayMemberError) Error() string {
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// NonResourceReferenceError
+
+type NonResourceReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected resource or resource interface, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceReferenceError) isSemanticError() {}
+
+// NonStorageReferenceError
+
+type NonStorageReferenceError struct {
+	ast.Range
+}
+
+func (e *NonStorageReferenceError) Error() string {
+	return "cannot create reference which is not into storage"
+}
+
+func (*NonStorageReferenceError) isSemanticError() {}

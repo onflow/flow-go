@@ -61,6 +61,9 @@ const (
 	SignatureLengthECDSA_SECp256k1 = 64
 	PrKeyLengthECDSA_SECp256k1     = 32
 	PubKeyLengthECDSA_SECp256k1    = 64
+
+	DKGMinSize int = 3
+	ThresholdMinSize
 )
 
 // Signature is a generic type, regardless of the signature scheme

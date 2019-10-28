@@ -41,11 +41,8 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 		if compositeDeclaration, ok := statement.(*ast.CompositeDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind: compositeDeclaration.DeclarationKind(),
-					Range: ast.Range{
-						StartPos: statement.StartPosition(),
-						EndPos:   statement.EndPosition(),
-					},
+					Kind:  compositeDeclaration.DeclarationKind(),
+					Range: ast.NewRangeFromPositioned(statement),
 				},
 			)
 
@@ -55,11 +52,8 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 		if interfaceDeclaration, ok := statement.(*ast.InterfaceDeclaration); ok {
 			checker.report(
 				&InvalidDeclarationError{
-					Kind: interfaceDeclaration.DeclarationKind(),
-					Range: ast.Range{
-						StartPos: statement.StartPosition(),
-						EndPos:   statement.EndPosition(),
-					},
+					Kind:  interfaceDeclaration.DeclarationKind(),
+					Range: ast.NewRangeFromPositioned(statement),
 				},
 			)
 
