@@ -399,13 +399,13 @@ let b = x + 1000000000000000000000000
 
 There is **no** support for floating point numbers.
 
-Contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here.
+Smart contracts are not intended to work with values with error margins and therefore floating point arithmetic is not appropriate here.
 Fixed point numbers should be simulated using integers and a scale factor for now.
 
 ### Addresses
 
 The type `Address` represents an address.
-Addresses are unsigned integers with a size of 160 bits.
+Addresses are unsigned integers with a size of 160 bits (20 bytes).
 Hexadecimal integer literals can be used to create address values.
 
 ```bamboo
@@ -473,7 +473,11 @@ let anyValues: [Any] = [1, "2", true]
 
 // Declare a variable that has the type `Any?`, i.e. an optional type of any type.
 //
-let maybeSomething: Any? = 42
+var maybeSomething: Any? = 42
+
+maybeSomething = "twenty-four"
+
+maybeSomething = nil
 ```
 
 `Any` is also the super-type of optional types.
@@ -2351,7 +2355,7 @@ and when the value is returned from a function:
     A structure is much more useful for representing information that can be grouped together in a logical way, but doesn't have value or a need to be able to be owned or transferred.
     A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
 
-Resources can only be nested in other resource types,
+Nesting of resources is only allowed within other resource types,
 or in data structures like arrays and dictionaries,
 but not in structures, as that would allow resources to be copied.
 
@@ -3587,7 +3591,7 @@ and one or more names of interfaces of the same kind, separated by commas.
 struct interface Shape {}
 
 // Declare a structure interface named `Polygon`.
-// Require implementing types to also implemenr the structure interface `Shape`.
+// Require implementing types to also implement the structure interface `Shape`.
 //
 struct interface Polygon: Shape {}
 
@@ -3973,7 +3977,7 @@ pub resource interface Receiver {
     pub fun deposit(vault: <-Vault)
 }
 
-// Vault is an interface that implements both Provider and Receiver.
+// `Vault` is an interface that implements both `Provider` and `Receiver`.
 //
 pub resource interface Vault: Provider, Receiver {
 
