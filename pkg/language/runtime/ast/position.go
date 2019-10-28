@@ -5,6 +5,7 @@ import (
 	"github.com/segmentio/fasthash/fnv1"
 )
 
+// Position defines a row/column within a Cadence script.
 type Position struct {
 	// offset, starting at 0
 	Offset int

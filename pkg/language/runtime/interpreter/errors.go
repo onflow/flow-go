@@ -83,8 +83,8 @@ type ConditionError struct {
 	LocationRange LocationRange
 }
 
-func (e *ConditionError) ImportLocation() ast.ImportLocation {
-	return e.LocationRange.ImportLocation
+func (e *ConditionError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
 }
 
 func (e *ConditionError) Error() string {
@@ -118,8 +118,8 @@ type DereferenceError struct {
 	LocationRange LocationRange
 }
 
-func (e *DereferenceError) ImportLocation() ast.ImportLocation {
-	return e.LocationRange.ImportLocation
+func (e *DereferenceError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
 }
 
 func (e *DereferenceError) Error() string {

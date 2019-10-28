@@ -12,6 +12,9 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
 
+// TestLocation used as the default location for scripts executed in tests.
+const TestLocation = ast.StringLocation("test")
+
 func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
 	return ParseAndCheckWithOptions(t, code, ParseAndCheckOptions{})
 }
@@ -19,7 +22,7 @@ func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
 type ParseAndCheckOptions struct {
 	Values         map[string]sema.ValueDeclaration
 	Types          map[string]sema.TypeDeclaration
-	ImportLocation ast.ImportLocation
+	Location       ast.Location
 	ImportResolver ast.ImportResolver
 }
 
@@ -42,11 +45,13 @@ func ParseAndCheckWithOptions(
 		}
 	}
 
-	checker, err := sema.NewChecker(program, options.Values, options.Types)
+	if options.Location == nil {
+		options.Location = TestLocation
+	}
+	checker, err := sema.NewChecker(program, options.Values, options.Types, options.Location)
 	if err != nil {
 		return checker, err
 	}
-	checker.ImportLocation = options.ImportLocation
 
 	err = checker.Check()
 	return checker, err

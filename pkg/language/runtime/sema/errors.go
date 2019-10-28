@@ -700,7 +700,7 @@ func (e *DuplicateConformanceError) EndPosition() ast.Position {
 // UnresolvedImportError
 
 type UnresolvedImportError struct {
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	ast.Range
 }
 
@@ -718,7 +718,7 @@ func (*UnresolvedImportError) isSemanticError() {}
 // TODO: make warning?
 
 type RepeatedImportError struct {
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	ast.Range
 }
 
@@ -735,7 +735,7 @@ func (*RepeatedImportError) isSemanticError() {}
 
 type NotExportedError struct {
 	Name           string
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	Pos            ast.Position
 }
 
@@ -758,7 +758,7 @@ func (e *NotExportedError) EndPosition() ast.Position {
 
 type ImportedProgramError struct {
 	CheckerError   *CheckerError
-	ImportLocation ast.ImportLocation
+	ImportLocation ast.Location
 	Pos            ast.Position
 }
 
@@ -1328,6 +1328,19 @@ func (e *EmitNonEventError) Error() string {
 }
 
 func (*EmitNonEventError) isSemanticError() {}
+
+// EmitImportedEventError
+
+type EmitImportedEventError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *EmitImportedEventError) Error() string {
+	return fmt.Sprintf("cannot emit imported event type: `%s`", e.Type)
+}
+
+func (*EmitImportedEventError) isSemanticError() {}
 
 // InvalidResourceAssignmentError
 

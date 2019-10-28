@@ -86,7 +86,15 @@ type Interpreter struct {
 	onEventEmitted      func(EventValue)
 }
 
-func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*Interpreter, error) {
+type InterpreterOpt func(*Interpreter)
+
+func WithOnEventEmittedHandler(handler func(EventValue)) InterpreterOpt {
+	return func(inter *Interpreter) {
+		inter.onEventEmitted = handler
+	}
+}
+
+func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, opts ...InterpreterOpt) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
 		PredefinedValues:    predefinedValues,
@@ -106,6 +114,10 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value) (*
 		}
 	}
 
+	for _, opt := range opts {
+		opt(interpreter)
+	}
+
 	return interpreter, nil
 }
 
@@ -119,8 +131,8 @@ func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
 //
 func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
 	return LocationRange{
-		ImportLocation: interpreter.Checker.ImportLocation,
-		Range:          ast.NewRangeFromPositioned(hasPosition),
+		Location: interpreter.Checker.Location,
+		Range:    ast.NewRangeFromPositioned(hasPosition),
 	}
 }
 
@@ -343,7 +355,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(boxedArguments, Location{})
+	trampoline = function.invoke(boxedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
@@ -604,7 +616,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							ConditionKind: condition.Kind,
 							Message:       message,
 							LocationRange: LocationRange{
-								ImportLocation: interpreter.Checker.ImportLocation,
+								Location: interpreter.Checker.Location,
 								Range: ast.Range{
 									StartPos: condition.Test.StartPosition(),
 									EndPos:   condition.Test.EndPosition(),
@@ -1289,9 +1301,9 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					}
 
 					// TODO: optimize: only potentially used by host-functions
-					location := Location{
-						Position:       invocationExpression.StartPosition(),
-						ImportLocation: interpreter.Checker.ImportLocation,
+					location := LocationPosition{
+						Position: invocationExpression.StartPosition(),
+						Location: interpreter.Checker.Location,
 					}
 					return function.invoke(argumentCopies, location)
 				})
@@ -1459,14 +1471,14 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	interpreter.CompositeFunctions[identifier] = functions
 
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := CompositeValue{
-				ImportLocation: interpreter.Checker.ImportLocation,
-				Identifier:     identifier,
-				Fields:         &map[string]Value{},
-				Functions:      &functions,
-				Destructor:     destructorFunction,
+				Location:   interpreter.Checker.Location,
+				Identifier: identifier,
+				Fields:     &map[string]Value{},
+				Functions:  &functions,
+				Destructor: destructorFunction,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1492,7 +1504,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location Location) Trampoline {
+	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1826,13 +1838,17 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
 
-	subInterpreter, err := NewInterpreter(importedChecker, interpreter.PredefinedValues)
+	subInterpreter, err := NewInterpreter(
+		importedChecker,
+		interpreter.PredefinedValues,
+		WithOnEventEmittedHandler(interpreter.onEventEmitted),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	if subInterpreter.Checker.ImportLocation == nil {
-		subInterpreter.Checker.ImportLocation = declaration.Location
+	if subInterpreter.Checker.Location == nil {
+		subInterpreter.Checker.Location = declaration.Location
 	}
 
 	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
@@ -1901,7 +1917,7 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location Location) Trampoline {
+		func(arguments []Value, location LocationPosition) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
@@ -1911,9 +1927,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				ID:             eventType.Identifier,
-				Fields:         fields,
-				ImportLocation: interpreter.Checker.ImportLocation,
+				ID:       eventType.Identifier,
+				Fields:   fields,
+				Location: interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}
@@ -1959,9 +1975,9 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 			value := result.(Value)
 
 			// TODO: optimize: only potentially used by host-functions
-			location := Location{
-				Position:       expression.StartPosition(),
-				ImportLocation: interpreter.Checker.ImportLocation,
+			location := LocationPosition{
+				Position: expression.StartPosition(),
+				Location: interpreter.Checker.Location,
 			}
 
 			return value.(DestroyableValue).Destroy(interpreter, location)
