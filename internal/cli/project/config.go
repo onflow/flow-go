@@ -12,27 +12,54 @@ import (
 
 const ConfigPath = "flow.json"
 
-type AccountConfig struct {
-	Address       string `json:"address"`
-	PrivateKeyHex string `json:"privateKey"`
+type Account struct {
+	Address    types.Address
+	PrivateKey types.AccountPrivateKey
 }
 
-func (a *AccountConfig) PrivateKey() (types.AccountPrivateKey, error) {
-	privateKeyBytes, err := hex.DecodeString(a.PrivateKeyHex)
+// An internal utility struct that defines how Account is converted to JSON.
+type accountConfigJSON struct {
+	Address    string `json:"address"`
+	PrivateKey string `json:"privateKey"`
+}
+
+func (acct *Account) MarshalJSON() ([]byte, error) {
+	prKeyBytes, err := types.EncodeAccountPrivateKey(acct.PrivateKey)
 	if err != nil {
-		return types.AccountPrivateKey{}, err
+		return nil, err
 	}
 
-	privateKey, _ := types.DecodeAccountPrivateKey(privateKeyBytes)
-	if err != nil {
-		return types.AccountPrivateKey{}, err
+	prKeyHex := hex.EncodeToString(prKeyBytes)
+
+	return json.Marshal(accountConfigJSON{
+		Address:    acct.Address.Hex(),
+		PrivateKey: prKeyHex,
+	})
+}
+
+func (acct *Account) UnmarshalJSON(data []byte) (err error) {
+	var alias accountConfigJSON
+	if err = json.Unmarshal(data, &alias); err != nil {
+		return
 	}
 
-	return privateKey, nil
+	var prKeyBytes []byte
+	prKeyBytes, err = hex.DecodeString(alias.PrivateKey)
+	if err != nil {
+		return
+	}
+
+	acct.Address = types.HexToAddress(alias.Address)
+	acct.PrivateKey, err = types.DecodeAccountPrivateKey(prKeyBytes)
+	return
 }
 
 type Config struct {
-	Accounts map[string]*AccountConfig `json:"accounts"`
+	Accounts map[string]*Account `json:"accounts"`
+}
+
+func (c *Config) RootAccount() *Account {
+	return c.Accounts["root"]
 }
 
 func SaveConfig(conf *Config) error {
