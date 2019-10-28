@@ -126,7 +126,7 @@ func (s *ThresholdSigner) ReceiveThresholdSignatureMsg(orig int, share Signature
 		return false, nil, nil
 	}
 
-	verif, err := s.verifyShare(Signature(share), orig)
+	verif, err := s.verifyShare(share, orig)
 	if err != nil {
 		return false, nil, err
 	}
