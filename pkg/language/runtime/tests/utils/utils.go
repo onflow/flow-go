@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 )
 
-// TestLocation used as a location for scripts executed in tests.
+// TestLocation used as the default location for scripts executed in tests.
 const TestLocation = ast.StringLocation("test")
 
 func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
