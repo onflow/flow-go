@@ -62,7 +62,7 @@ type EquatableValue interface {
 // DestroyableValue
 
 type DestroyableValue interface {
-	Destroy(*Interpreter, Location) trampoline.Trampoline
+	Destroy(*Interpreter, LocationPosition) trampoline.Trampoline
 }
 
 // VoidValue
@@ -103,6 +103,10 @@ func (v BoolValue) Negate() BoolValue {
 
 func (v BoolValue) Equal(other Value) BoolValue {
 	return bool(v) == bool(other.(BoolValue))
+}
+
+func (v BoolValue) String() string {
+	return strconv.FormatBool(bool(v))
 }
 
 // StringValue
@@ -209,7 +213,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 		return NewIntValue(int64(count))
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				otherValue := arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherValue)
 				return trampoline.Done{Result: result}
@@ -217,7 +221,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 		)
 	case "slice":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				from := arguments[0].(IntValue)
 				to := arguments[1].(IntValue)
 				result := v.Slice(from, to)
@@ -256,7 +260,7 @@ func (v ArrayValue) Copy() Value {
 	return NewArrayValue(copies...)
 }
 
-func (v ArrayValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 	for _, value := range *v.Values {
 		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
@@ -364,14 +368,14 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 		return NewIntValue(int64(len(*v.Values)))
 	case "append":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				v.Append(arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				x := arguments[0].(ConcatenatableValue)
 				result := v.Concat(x)
 				return trampoline.Done{Result: result}
@@ -379,7 +383,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 		)
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				x := arguments[1]
 				v.Insert(i, x)
@@ -388,7 +392,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 		)
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
 				result := v.Remove(i)
 				return trampoline.Done{Result: result}
@@ -396,21 +400,21 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 		)
 	case "removeFirst":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.RemoveFirst()
 				return trampoline.Done{Result: result}
 			},
 		)
 	case "removeLast":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.RemoveLast()
 				return trampoline.Done{Result: result}
 			},
 		)
 	case "contains":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				result := v.Contains(arguments[0])
 				return trampoline.Done{Result: result}
 			},
@@ -1027,14 +1031,14 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 // CompositeValue
 
 type CompositeValue struct {
-	ImportLocation ast.ImportLocation
-	Identifier     string
-	Fields         *map[string]Value
-	Functions      *map[string]FunctionValue
-	Destructor     *InterpretedFunctionValue
+	Location   ast.Location
+	Identifier string
+	Fields     *map[string]Value
+	Functions  *map[string]FunctionValue
+	Destructor *InterpretedFunctionValue
 }
 
-func (v CompositeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
 		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
@@ -1060,11 +1064,11 @@ func (v CompositeValue) Copy() Value {
 	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
-		ImportLocation: v.ImportLocation,
-		Identifier:     v.Identifier,
-		Fields:         &newFields,
-		Functions:      v.Functions,
-		Destructor:     v.Destructor,
+		Location:   v.Location,
+		Identifier: v.Identifier,
+		Fields:     &newFields,
+		Functions:  v.Functions,
+		Destructor: v.Destructor,
 	}
 }
 
@@ -1080,8 +1084,8 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 	}
 
 	// get correct interpreter
-	if v.ImportLocation != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
+	if v.Location != nil {
+		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
 		if ok {
 			interpreter = subInterpreter
 		}
@@ -1113,7 +1117,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	encoder := gob.NewEncoder(w)
 	// NOTE: important: decode as pointer, so gob sees
 	// the interface, not the concrete type
-	err := encoder.Encode(&v.ImportLocation)
+	err := encoder.Encode(&v.Location)
 	if err != nil {
 		return nil, err
 	}
@@ -1132,7 +1136,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.ImportLocation)
+	err := decoder.Decode(&v.Location)
 	if err != nil {
 		return err
 	}
@@ -1162,7 +1166,7 @@ func (v DictionaryValue) Copy() Value {
 	return newDictionary
 }
 
-func (v DictionaryValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 
 	maybeDestroy := func(value interface{}) {
@@ -1247,7 +1251,7 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 
 				key := dictionaryKey(keyValue)
@@ -1269,7 +1273,7 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location Location) trampoline.Trampoline {
+			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 				newValue := arguments[1]
 
@@ -1306,9 +1310,9 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID             string
-	Fields         []EventField
-	ImportLocation ast.ImportLocation
+	ID       string
+	Fields   []EventField
+	Location ast.Location
 }
 
 func (EventValue) isValue() {}
@@ -1424,7 +1428,7 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
-func (v NilValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v NilValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return trampoline.Done{}
 }
 
@@ -1452,7 +1456,7 @@ func (v SomeValue) Copy() Value {
 	}
 }
 
-func (v SomeValue) Destroy(interpreter *Interpreter, location Location) trampoline.Trampoline {
+func (v SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 

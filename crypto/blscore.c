@@ -133,7 +133,7 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 // Optimized Shallue–van de Woestijne encoding from Section 3 of
 // "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
 // taken and modified from Relic library
-void mapToG1_swu(ep_t p, const uint8_t *digest, int len) {
+void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	ep_t q;
@@ -191,7 +191,7 @@ void mapToG1_swu(ep_t p, const uint8_t *digest, int len) {
 
 
 // Exponentiation of random p in G1
-void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
+void _G1scalarPointMult(ep_st* res, const ep_st* p, const bn_st *expo) {
     // Using window NAF of size 2
     #if (EP_MUL	== LWNAF)
         g1_mul(res, p, expo);
@@ -202,7 +202,7 @@ void _G1scalarPointMult(ep_st* res, ep_st* p, bn_st *expo) {
 
 // Exponentiation of fixed g1 in G1
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
-void _G1scalarGenMult(ep_st* res, bn_st *expo) {
+void _G1scalarGenMult(ep_st* res, const bn_st *expo) {
 #define GENERIC_POINT 0
 #define FIXED_MULT    (GENERIC_POINT^1)
 
@@ -225,26 +225,26 @@ void _G2scalarPointMult(ep2_st* res, ep2_st* p, bn_st *expo) {
 }
 
 // Exponentiation of fixed g2 in G2
-void _G2scalarGenMult(ep2_st* res, bn_st *expo) {
+void _G2scalarGenMult(ep2_st* res, const bn_st *expo) {
     // Using precomputed table of size 4
-    g2_mul_gen(res, expo);
+    g2_mul_gen(res, (bn_st*)expo);
 }
 
 
 // Computes BLS signature
-void _blsSign(byte* s, bn_st *sk, byte* data, int len) {
+void _blsSign(byte* s, const bn_st *sk, const byte* data, const int len) {
     ep_st h;
     ep_new(&h);
     // hash to G1
     mapToG1_swu(&h, data, len); 
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
-    _ep_write_bin_compact(s, &h);
+    _ep_write_bin_compact(s, &h, SIGNATURE_LEN);
     ep_free(&p);
 }
 
 // Verifies the validity of a BLS signature
-int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) { 
+int _blsVerify(const ep2_st *pk, const byte* sig, const byte* data, const int len) { 
     // TODO : check pk is on curve  (should be done offline)
 	// TODO : check pk is in G2 (should be done offline) 
     ep_t elemsG1[2];
@@ -252,7 +252,7 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 
     // elemsG1[0] = s
     ep_new(elemsG1[0]);
-    _ep_read_bin_compact(elemsG1[0], sig);
+    _ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
 
  #if MEMBERSHIP_CHECK
     // check s is on curve
@@ -280,7 +280,7 @@ int _blsVerify(ep2_st *pk, byte* sig, byte* data, int len) {
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], pk);
+    ep2_copy(elemsG2[1], (ep2_st*)pk);
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2

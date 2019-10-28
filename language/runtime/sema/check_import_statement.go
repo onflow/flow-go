@@ -41,6 +41,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 			imported,
 			checker.PredeclaredValues,
 			checker.PredeclaredTypes,
+			declaration.Location,
 		)
 		if err == nil {
 			checker.ImportCheckers[declaration.Location.ID()] = importChecker
@@ -49,7 +50,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 
 	// NOTE: ignore generic `error` result, get internal *CheckerError
 	_ = importChecker.Check()
-	checkerErr = importChecker.checkerError()
+	checkerErr = importChecker.CheckerError()
 
 	if checkerErr != nil {
 		checker.report(

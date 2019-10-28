@@ -76,7 +76,7 @@ func (functions StandardLibraryFunctions) ToValues() map[string]interpreter.Valu
 
 type AssertionError struct {
 	Message  string
-	Location interpreter.Location
+	Location interpreter.LocationPosition
 }
 
 func (e AssertionError) StartPosition() ast.Position {
@@ -95,8 +95,8 @@ func (e AssertionError) Error() string {
 	return fmt.Sprintf("%s: %s", message, e.Message)
 }
 
-func (e AssertionError) ImportLocation() ast.ImportLocation {
-	return e.Location.ImportLocation
+func (e AssertionError) ImportLocation() ast.Location {
+	return e.Location.Location
 }
 
 // AssertFunction
@@ -115,7 +115,7 @@ var AssertFunction = NewStandardLibraryFunction(
 		),
 		RequiredArgumentCount: &assertRequiredArgumentCount,
 	},
-	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
+	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
 		result := arguments[0].(interpreter.BoolValue)
 		if !result {
 			var message string
@@ -139,7 +139,7 @@ var AssertFunction = NewStandardLibraryFunction(
 
 type PanicError struct {
 	Message  string
-	Location interpreter.Location
+	Location interpreter.LocationPosition
 }
 
 func (e PanicError) StartPosition() ast.Position {
@@ -154,8 +154,8 @@ func (e PanicError) Error() string {
 	return fmt.Sprintf("panic: %s", e.Message)
 }
 
-func (e PanicError) ImportLocation() ast.ImportLocation {
-	return e.Location.ImportLocation
+func (e PanicError) ImportLocation() ast.Location {
+	return e.Location.Location
 }
 
 // PanicFunction
@@ -170,7 +170,7 @@ var PanicFunction = NewStandardLibraryFunction(
 			&sema.NeverType{},
 		),
 	},
-	func(arguments []interpreter.Value, location interpreter.Location) trampoline.Trampoline {
+	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
 		message := arguments[0].(interpreter.StringValue)
 		panic(PanicError{
 			Message:  message.StrValue(),
@@ -200,7 +200,7 @@ var LogFunction = NewStandardLibraryFunction(
 			&sema.VoidType{},
 		),
 	},
-	func(arguments []interpreter.Value, _ interpreter.Location) trampoline.Trampoline {
+	func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		fmt.Printf("%v\n", arguments[0])
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	},
