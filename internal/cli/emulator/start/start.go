@@ -37,7 +37,7 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if conf.Init {
 			pconf := initialize.InitializeProject()
-			rootAcct := pconf.Accounts["root"]
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
@@ -70,17 +70,11 @@ func getRootKey(projectConf *project.Config) crypto.PrivateKey {
 
 		return prKey
 	} else if projectConf != nil {
-		rootAccount := projectConf.Accounts["root"]
-
-		prKey, err := utils.DecodePrivateKey(rootAccount.PrivateKey)
-		if err != nil {
-			fmt.Printf("Failed to decode private key")
-			os.Exit(1)
-		}
+		rootAccount := projectConf.RootAccount()
 
 		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)
 
-		return prKey
+		return rootAccount.PrivateKey
 	}
 
 	log.Warnf("⚙️   No project configured, generating new root account key")
