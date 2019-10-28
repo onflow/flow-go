@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/sdk/keys"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -213,46 +213,111 @@ func TestCreateAccount(t *testing.T) {
 		assert.Equal(t, publicKey, account.Keys[0])
 		assert.Equal(t, code, account.Code)
 	})
+
+	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+		lastAccount := b.LastCreatedAccount()
+
+		publicKey := types.AccountPublicKey{
+			PublicKey: unittest.PublicKeyFixtures()[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			// SHA2_384 is not compatible with ECDSA_P256
+			HashAlgo: crypto.SHA2_384,
+			Weight:   constants.AccountKeyWeightThreshold,
+		}
+
+		createAccountScript, err := templates.CreateAccount([]types.AccountPublicKey{publicKey}, nil)
+		require.Nil(t, err)
+
+		tx := &types.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+
+		newAccount := b.LastCreatedAccount()
+
+		assert.Equal(t, lastAccount, newAccount)
+	})
 }
 
 func TestAddAccountKey(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	t.Run("ValidKey", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
-	addKeyScript, err := templates.AddAccountKey(publicKey)
-	assert.Nil(t, err)
+		addKeyScript, err := templates.AddAccountKey(publicKey)
+		assert.Nil(t, err)
 
-	tx1 := &types.Transaction{
-		Script:             addKeyScript,
-		ReferenceBlockHash: nil,
-		Nonce:              getNonce(),
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
-	}
+		tx1 := &types.Transaction{
+			Script:             addKeyScript,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+		tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err = b.SubmitTransaction(tx1)
-	assert.Nil(t, err)
+		err = b.SubmitTransaction(tx1)
+		assert.Nil(t, err)
 
-	script := []byte("fun main(account: Account) {}")
+		script := []byte("fun main(account: Account) {}")
 
-	tx2 := &types.Transaction{
-		Script:             script,
-		ReferenceBlockHash: nil,
-		Nonce:              getNonce(),
-		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
-	}
+		tx2 := &types.Transaction{
+			Script:             script,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		}
 
-	tx2.AddSignature(b.RootAccountAddress(), privateKey)
+		tx2.AddSignature(b.RootAccountAddress(), privateKey)
 
-	err = b.SubmitTransaction(tx2)
-	assert.Nil(t, err)
+		err = b.SubmitTransaction(tx2)
+		assert.Nil(t, err)
+	})
+
+	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+		publicKey := types.AccountPublicKey{
+			PublicKey: unittest.PublicKeyFixtures()[0],
+			SignAlgo:  crypto.ECDSA_P256,
+			// SHA2_384 is not compatible with ECDSA_P256
+			HashAlgo: crypto.SHA2_384,
+			Weight:   constants.AccountKeyWeightThreshold,
+		}
+
+		addKeyScript, err := templates.AddAccountKey(publicKey)
+		assert.Nil(t, err)
+
+		tx := &types.Transaction{
+			Script:             addKeyScript,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		}
+
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+	})
 }
 
 func TestRemoveAccountKey(t *testing.T) {
