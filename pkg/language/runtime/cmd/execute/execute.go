@@ -29,7 +29,7 @@ func Execute(args []string) {
 		if err == nil {
 			return
 		}
-		prettyPrintError(err, filename, codes)
+		PrettyPrintError(err, filename, codes)
 		os.Exit(1)
 	}
 
@@ -76,7 +76,7 @@ func Execute(args []string) {
 	must(err, filename)
 }
 
-func prettyPrintError(err error, filename string, codes map[string]string) {
+func PrettyPrintError(err error, filename string, codes map[string]string) {
 	i := 0
 	printErr := func(err error, filename string) {
 		if i > 0 {
@@ -96,7 +96,7 @@ func prettyPrintError(err error, filename string, codes map[string]string) {
 			if err, ok := err.(*sema.ImportedProgramError); ok {
 				filename := string(err.ImportLocation.(ast.StringImportLocation))
 				for _, err := range err.CheckerError.Errors {
-					prettyPrintError(err, filename, codes)
+					PrettyPrintError(err, filename, codes)
 				}
 			}
 		}

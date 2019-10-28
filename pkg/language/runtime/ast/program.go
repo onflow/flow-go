@@ -13,6 +13,23 @@ type Program struct {
 	importLocations       []ImportLocation
 }
 
+func (p *Program) StartPosition() Position {
+	if len(p.Declarations) == 0 {
+		return Position{}
+	}
+	firstDeclaration := p.Declarations[0]
+	return firstDeclaration.StartPosition()
+}
+
+func (p *Program) EndPosition() Position {
+	count := len(p.Declarations)
+	if count == 0 {
+		return Position{}
+	}
+	lastDeclaration := p.Declarations[count-1]
+	return lastDeclaration.EndPosition()
+}
+
 func (p *Program) Accept(visitor Visitor) Repr {
 	return visitor.VisitProgram(p)
 }

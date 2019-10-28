@@ -106,6 +106,10 @@ func (v BoolValue) Equal(other Value) BoolValue {
 	return bool(v) == bool(other.(BoolValue))
 }
 
+func (v BoolValue) String() string {
+	return strconv.FormatBool(bool(v))
+}
+
 // StringValue
 
 type StringValue struct {
