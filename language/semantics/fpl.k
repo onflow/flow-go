@@ -681,10 +681,12 @@ module FPL-TESTING
   rule <k> assert v(true, Bool) => . ... </k>
   rule <k> declare(assert _) => . ... </k>
 
-  rule <k> .Pgm #Or panic(_) </k>
+  rule <k> .K #Or panic(_) </k>
+       <scope> Scope => global </scope>
        <env> E => .Map </env>
-       <store> S => .Map </store>
-    requires E =/=K .Map orBool S =/=K .Map
+       <store> State => .Map </store>
+       <stack> Stack => .List </stack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool Stack =/=K .List
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
