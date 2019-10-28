@@ -139,6 +139,18 @@ func (l FileLocation) String() string {
 	return string(l)
 }
 
+type REPLLocation struct{}
+
+func (REPLLocation) isLocation() {}
+
+func (l REPLLocation) ID() LocationID {
+	return LocationID(l.String())
+}
+
+func (l REPLLocation) String() string {
+	return "REPL"
+}
+
 // HasImportLocation
 
 type HasImportLocation interface {
