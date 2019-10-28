@@ -1451,11 +1451,11 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := CompositeValue{
-				ImportLocation: interpreter.Checker.Location,
-				Identifier:     identifier,
-				Fields:         &map[string]Value{},
-				Functions:      &functions,
-				Destructor:     destructorFunction,
+				Location:   interpreter.Checker.Location,
+				Identifier: identifier,
+				Fields:     &map[string]Value{},
+				Functions:  &functions,
+				Destructor: destructorFunction,
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1904,9 +1904,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				ID:             eventType.Identifier,
-				Fields:         fields,
-				ImportLocation: interpreter.Checker.Location,
+				ID:       eventType.Identifier,
+				Fields:   fields,
+				Location: interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}

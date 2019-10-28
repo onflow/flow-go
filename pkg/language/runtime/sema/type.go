@@ -1329,7 +1329,7 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 
 type EventType struct {
 	Identifier                          string
-	ImportLocation                      ast.Location
+	Location                            ast.Location
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }

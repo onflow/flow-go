@@ -41,7 +41,7 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 
 	eventType := &EventType{
 		Identifier:                          identifier.Identifier,
-		ImportLocation:                      checker.Location,
+		Location:                            checker.Location,
 		Fields:                              fields,
 		ConstructorParameterTypeAnnotations: convertedParameterTypeAnnotations,
 	}

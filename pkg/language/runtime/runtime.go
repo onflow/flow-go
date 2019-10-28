@@ -391,7 +391,7 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 
 	var eventID string
 
-	switch location := eventValue.ImportLocation.(type) {
+	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
 		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
 	case ast.TransactionLocation:

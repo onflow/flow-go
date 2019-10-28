@@ -1028,11 +1028,11 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 // CompositeValue
 
 type CompositeValue struct {
-	ImportLocation ast.Location
-	Identifier     string
-	Fields         *map[string]Value
-	Functions      *map[string]FunctionValue
-	Destructor     *InterpretedFunctionValue
+	Location   ast.Location
+	Identifier string
+	Fields     *map[string]Value
+	Functions  *map[string]FunctionValue
+	Destructor *InterpretedFunctionValue
 }
 
 func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -1061,11 +1061,11 @@ func (v CompositeValue) Copy() Value {
 	// NOTE: not copying functions or destructor – they are linked in
 
 	return CompositeValue{
-		ImportLocation: v.ImportLocation,
-		Identifier:     v.Identifier,
-		Fields:         &newFields,
-		Functions:      v.Functions,
-		Destructor:     v.Destructor,
+		Location:   v.Location,
+		Identifier: v.Identifier,
+		Fields:     &newFields,
+		Functions:  v.Functions,
+		Destructor: v.Destructor,
 	}
 }
 
@@ -1081,8 +1081,8 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 	}
 
 	// get correct interpreter
-	if v.ImportLocation != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.ImportLocation.ID()]
+	if v.Location != nil {
+		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
 		if ok {
 			interpreter = subInterpreter
 		}
@@ -1114,7 +1114,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	encoder := gob.NewEncoder(w)
 	// NOTE: important: decode as pointer, so gob sees
 	// the interface, not the concrete type
-	err := encoder.Encode(&v.ImportLocation)
+	err := encoder.Encode(&v.Location)
 	if err != nil {
 		return nil, err
 	}
@@ -1133,7 +1133,7 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 func (v *CompositeValue) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(&v.ImportLocation)
+	err := decoder.Decode(&v.Location)
 	if err != nil {
 		return err
 	}
@@ -1307,9 +1307,9 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID             string
-	Fields         []EventField
-	ImportLocation ast.Location
+	ID       string
+	Fields   []EventField
+	Location ast.Location
 }
 
 func (EventValue) isValue() {}

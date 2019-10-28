@@ -22,7 +22,7 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 	}
 
 	// check the the event isn't imported
-	if eventType.ImportLocation.ID() != checker.Location.ID() {
+	if eventType.Location.ID() != checker.Location.ID() {
 		checker.report(&EmitImportedEventError{
 			Type: typ,
 			Range: ast.Range{
