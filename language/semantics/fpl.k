@@ -370,8 +370,7 @@ module FPL-TYPING
   rule [[ #type(X:Ident) => T ]]
        <env>... X |-> env(... t: T) ...</env>
   rule [[ #type(X:Ident(_)) => R ]]
-       <env>... X |-> env(... loc: L) ...</env>
-       <store>... L |-> funDef(... result: R) ...</store>
+       <env>... X |-> env(... t: ((_): R)) ...</env>
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
