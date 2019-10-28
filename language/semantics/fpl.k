@@ -22,9 +22,9 @@ module FPL-COMMON-SYNTAX
   imports UNSIGNED-INT-SYNTAX
   imports BOOL-SYNTAX
 
-  syntax IntLit ::= Int
   syntax Ident
   syntax FPLString
+  syntax IntLit
 
   syntax Definition ::=
      FunDef
@@ -191,7 +191,7 @@ module FPL-COMMON-SYNTAX
 
   syntax left lval
 
-  syntax Exp ::= IntLit
+  syntax Exp ::= IntLit [klabel(intLit), avoid, symbol, function]
                | FPLString
                | Ident
                | "self"
@@ -277,6 +277,8 @@ module FPL-TOKENS
    | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
    | r"-?0b[01]([_01]*[01])?" [token]
    | r"-?[0-9]+_[_0-9]*[0-9]" [token]
+   | r"-?[0-9]+" [token]
+   | Int [token]
   syntax Ident ::=
      r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
   syntax FPLString ::=
@@ -309,6 +311,7 @@ module FPL-VALUES
   syntax Exp ::= TypedVal
   syntax KResult ::= TypedVal | Int // for constant expressions
   syntax FPLString ::= String
+  syntax Exp ::= Int
 
 endmodule
 
@@ -557,6 +560,19 @@ endmodule
 module FPL-ARITHMETIC
   imports FPL-CONFIGURATION
   imports FPL-TYPING
+
+  rule intLit(I::IntLit) => processIntLit(replaceAll(IntLit2String(I), "_", ""))
+  syntax String ::= IntLit2String(IntLit) [function, hook(STRING.token2string)]
+  syntax Int ::= processIntLit(String) [function]
+  rule processIntLit(Neg::String) => 0 -Int processIntLit(substrString(Neg, 1, lengthString(Neg)))
+    requires substrString(Neg, 0, 1) ==String "-"
+  rule processIntLit(Hex::String) => String2Base(substrString(Hex, 2, lengthString(Hex)), 16)
+    requires lengthString(Hex) >=Int 2 andBool substrString(Hex, 0, 2) ==String "0x"
+  rule processIntLit(Oct::String) => String2Base(substrString(Oct, 2, lengthString(Oct)), 8)
+    requires lengthString(Oct) >=Int 2 andBool substrString(Oct, 0, 2) ==String "0o"
+  rule processIntLit(Bin::String) => String2Base(substrString(Bin, 2, lengthString(Bin)), 2)
+    requires lengthString(Bin) >=Int 2 andBool substrString(Bin, 0, 2) ==String "0b"
+  rule processIntLit(Dec::String) => String2Int(Dec) [owise]
 
   syntax Exp ::= intExp(Exp, Exp)
   rule intExp(L, R)
