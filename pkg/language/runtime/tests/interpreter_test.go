@@ -5361,3 +5361,25 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 	_, err := inter.Invoke("test")
 	assert.IsType(t, &interpreter.DereferenceError{}, err)
 }
+
+func TestInterpretInvalidForwardReferenceCall(t *testing.T) {
+
+	// TODO: improve:
+	//   - call to `g` should succeed, but access to `y` should fail with error
+	//   - maybe make this a static error
+
+	assert.Panics(t, func() {
+		_ = parseCheckAndInterpret(t, `
+          fun f(): Int {
+             return g()
+          }
+
+          let x = f()
+          let y = 0
+
+          fun g(): Int {
+              return y
+          }
+        `)
+	})
+}
