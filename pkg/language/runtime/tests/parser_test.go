@@ -37,6 +37,55 @@ func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 	assert.Contains(t, syntaxError.Message, "extraneous input")
 }
 
+func TestParseNames(t *testing.T) {
+
+	names := map[string]bool{
+		// Valid: title-case
+		//
+		"PersonID": true,
+
+		// Valid: with underscore
+		//
+		"token_name": true,
+
+		// Valid: leading underscore and characters
+		//
+		"_balance": true,
+
+		// Valid: leading underscore and numbers
+		"_8264": true,
+
+		// Valid: characters and number
+		//
+		"account2": true,
+
+		// Invalid: leading number
+		//
+		"1something": false,
+
+		// Invalid: invalid character #
+		"_#1": false,
+
+		// Invalid: various invalid characters
+		//
+		"!@#$%^&*": false,
+	}
+
+	for name, validExpected := range names {
+
+		actual, _, err := parser.ParseProgram(fmt.Sprintf(`let %s = 1`, name))
+
+		if validExpected {
+			assert.NotNil(t, actual)
+			assert.Nil(t, err)
+
+		} else {
+			assert.Nil(t, actual)
+			assert.IsType(t, parser.Error{}, err)
+		}
+	}
+}
+
 func TestParseInvalidIncompleteConstantDeclaration1(t *testing.T) {
 
 	actual, inputIsComplete, err := parser.ParseProgram(`
@@ -2245,6 +2294,25 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestParseInvalidIntegerLiteralPrefixWithout(t *testing.T) {
+
+	for _, prefix := range []string{"o", "b", "x"} {
+
+		_, _, err := parser.ParseProgram(fmt.Sprintf(`let x = 0%s`, prefix))
+
+		assert.IsType(t, parser.Error{}, err)
+
+		errors := err.(parser.Error).Errors
+		assert.Len(t, errors, 1)
+
+		syntaxError := errors[0].(*parser.InvalidIntegerLiteralError)
+		assert.Equal(t,
+			Position{Offset: 8, Line: 1, Column: 8},
+			syntaxError.StartPos,
+		)
+	}
+}
+
 func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -2279,6 +2347,41 @@ func TestParseInvalidOctalIntegerLiteralWithLeadingUnderscore(t *testing.T) {
 		parser.InvalidIntegerLiteralKindLeadingUnderscore,
 		syntaxError.InvalidIntegerLiteralKind,
 	)
+}
+
+func TestParseIntegerLiteralWithLeadingZeros(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        let decimal = 0123
+	`)
+
+	assert.Nil(t, err)
+
+	decimal := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "decimal",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 21, Line: 2, Column: 20},
+		},
+		Value: &IntExpression{
+			Value: big.NewInt(123),
+			Range: Range{
+				StartPos: Position{Offset: 23, Line: 2, Column: 22},
+				EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{decimal},
+	}
+
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2532,6 +2635,76 @@ func TestParseInvalidIntegerLiteral(t *testing.T) {
 		parser.InvalidIntegerLiteralKindUnknownPrefix,
 		syntaxError.InvalidIntegerLiteralKind,
 	)
+}
+
+func TestParseDecimmalIntegerLiteralWithLeadingZeros(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+		let decimal = 00123
+	`)
+
+	assert.Nil(t, err)
+
+	test := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "decimal",
+			Pos:        Position{Offset: 7, Line: 2, Column: 6},
+		},
+		Value: &IntExpression{
+			Value: big.NewInt(123),
+			Range: Range{
+				StartPos: Position{Offset: 17, Line: 2, Column: 16},
+				EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+			},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
+		StartPos: Position{Offset: 3, Line: 2, Column: 2},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+		let binary = 0b001000
+	`)
+
+	assert.Nil(t, err)
+
+	test := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "binary",
+			Pos:        Position{Offset: 7, Line: 2, Column: 6},
+		},
+		Value: &IntExpression{
+			Value: big.NewInt(8),
+			Range: Range{
+				StartPos: Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+			},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 14, Line: 2, Column: 13},
+		},
+		StartPos: Position{Offset: 3, Line: 2, Column: 2},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
 }
 
 func TestParseIntegerTypes(t *testing.T) {
@@ -4574,6 +4747,29 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
 	`)
 
 	assert.Nil(t, err)
+}
+
+func TestParseInvalidMultipleSemicolonsBetweenDeclarations(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        let x = 1;;let y = 2
+	`)
+
+	assert.Nil(t, actual)
+
+	assert.IsType(t, parser.Error{}, err)
+
+	errors := err.(parser.Error).Errors
+	assert.Len(t, errors, 1)
+
+	syntaxError := errors[0].(*parser.SyntaxError)
+
+	assert.Equal(t,
+		Position{Offset: 19, Line: 2, Column: 18},
+		syntaxError.Pos,
+	)
+
+	assert.Contains(t, syntaxError.Message, "extraneous input ';'")
 }
 
 func TestParseInvalidTypeWithWhitespace(t *testing.T) {

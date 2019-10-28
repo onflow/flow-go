@@ -50,7 +50,7 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 
 	// NOTE: ignore generic `error` result, get internal *CheckerError
 	_ = importChecker.Check()
-	checkerErr = importChecker.checkerError()
+	checkerErr = importChecker.CheckerError()
 
 	if checkerErr != nil {
 		checker.report(

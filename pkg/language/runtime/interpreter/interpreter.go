@@ -14,11 +14,29 @@ import (
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
 )
 
+type controlReturn interface {
+	isControlReturn()
+}
+
 type loopBreak struct{}
+
+func (loopBreak) isControlReturn() {}
+
 type loopContinue struct{}
+
+func (loopContinue) isControlReturn() {}
+
 type functionReturn struct {
 	Value
 }
+
+func (functionReturn) isControlReturn() {}
+
+type ExpressionStatementResult struct {
+	Value
+}
+
+//
 
 var emptyFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: &sema.TypeAnnotation{
@@ -462,7 +480,7 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 		},
 		Line: line,
 	}.FlatMap(func(returnValue interface{}) Trampoline {
-		if returnValue != nil {
+		if _, isReturn := returnValue.(controlReturn); isReturn {
 			return Done{Result: returnValue}
 		}
 		return interpreter.visitStatements(statements[1:])
@@ -493,10 +511,10 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 				FlatMap(func(blockResult interface{}) Trampoline {
 
 					var resultValue Value
-					if blockResult == nil {
-						resultValue = VoidValue{}
-					} else {
+					if _, ok := blockResult.(functionReturn); ok {
 						resultValue = blockResult.(functionReturn).Value
+					} else {
+						resultValue = VoidValue{}
 					}
 
 					// if there is a return type, declare the constant `result`
@@ -1118,9 +1136,14 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 
 func (interpreter *Interpreter) VisitExpressionStatement(statement *ast.ExpressionStatement) ast.Repr {
 	return statement.Expression.Accept(interpreter).(Trampoline).
-		Map(func(_ interface{}) interface{} {
-			// NOTE: ignore result, so it does *not* act like a return-statement
-			return nil
+		Map(func(result interface{}) interface{} {
+			var value Value
+			var ok bool
+			value, ok = result.(Value)
+			if !ok {
+				value = nil
+			}
+			return ExpressionStatementResult{value}
 		})
 }
 
