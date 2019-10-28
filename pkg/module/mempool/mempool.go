@@ -93,6 +93,8 @@ func (m *Mempool) All() []*collection.GuaranteedCollection {
 	return m.all()
 }
 
+// It's thread-unsafe to call this function.
+// Remember to acquire the lock by calling m.Lock() before calling this function to avoid race condition.
 func (m *Mempool) all() []*collection.GuaranteedCollection {
 	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
 	for _, coll := range m.collections {
