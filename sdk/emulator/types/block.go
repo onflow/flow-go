@@ -1,4 +1,4 @@
-package flow
+package types
 
 import (
 	"time"

@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/cli/initialize"
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
@@ -60,10 +60,10 @@ var Cmd = &cobra.Command{
 	},
 }
 
-func getRootPrivateKey(projectConf *project.Config) *types.AccountPrivateKey {
+func getRootPrivateKey(projectConf *project.Config) *flow.AccountPrivateKey {
 	if conf.RootKey != "" {
 		prKeyDer, err := hex.DecodeString(conf.RootKey)
-		privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
+		privateKey, err := flow.DecodeAccountPrivateKey(prKeyDer)
 		if err != nil {
 			utils.Exitf(1, "Failed to decode private key: %v", err)
 		}

@@ -1,4 +1,4 @@
-package types
+package flow
 
 // TODO: these functions will be moved to a separate `encoding` package in a future PR
 

@@ -13,8 +13,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
@@ -34,7 +34,7 @@ type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey *types.AccountPrivateKey
+	RootAccountKey *flow.AccountPrivateKey
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
