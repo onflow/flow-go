@@ -97,7 +97,7 @@ func SaveConfig(conf *Config) error {
 
 func MustSaveConfig(conf *Config) {
 	if err := SaveConfig(conf); err != nil {
-		utils.Exitf(1, "Failed to save config err: ", err)
+		utils.Exitf(1, "Failed to save config err: %v", err)
 	}
 }
 
