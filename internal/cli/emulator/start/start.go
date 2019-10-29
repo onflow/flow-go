@@ -1,7 +1,6 @@
 package start
 
 import (
-	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/internal/cli/initialize"
 	"github.com/dapperlabs/flow-go/internal/cli/project"
 	"github.com/dapperlabs/flow-go/internal/cli/utils"
-	"github.com/dapperlabs/flow-go/pkg/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
@@ -36,14 +34,20 @@ var Cmd = &cobra.Command{
 	Short: "Starts the Flow emulator server",
 	Run: func(cmd *cobra.Command, args []string) {
 		if conf.Init {
-			pconf := initialize.InitProject()
+			var pconf *project.Config
+			if len(conf.RootKey) > 0 {
+				prKey := utils.MustDecodeAccountPrivateKeyHex(conf.RootKey)
+				pconf = initialize.InitProjectWithRootKey(prKey)
+			} else {
+				pconf = initialize.InitProject()
+			}
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
 		}
 
-		projectConf := project.LoadConfig()
+		rootAcct := project.LoadConfig().RootAccount()
 
 		if conf.Verbose {
 			log.SetLevel(logrus.DebugLevel)
@@ -53,32 +57,11 @@ var Cmd = &cobra.Command{
 			Port:           conf.Port,
 			HTTPPort:       conf.HTTPPort,
 			BlockInterval:  conf.BlockInterval,
-			RootAccountKey: getRootPrivateKey(projectConf),
+			RootAccountKey: &rootAcct.PrivateKey,
 		}
 
 		server.StartServer(log, serverConf)
 	},
-}
-
-func getRootPrivateKey(projectConf *project.Config) *types.AccountPrivateKey {
-	if conf.RootKey != "" {
-		prKeyDer, err := hex.DecodeString(conf.RootKey)
-		privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
-		if err != nil {
-			utils.Exitf(1, "Failed to decode private key: %v", err)
-		}
-
-		return &privateKey
-	} else if projectConf != nil {
-		rootAccount := projectConf.RootAccount()
-
-		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)
-
-		return &rootAccount.PrivateKey
-	}
-
-	log.Warnf("⚙️   No project configured, generating new root account key")
-	return nil
 }
 
 func init() {

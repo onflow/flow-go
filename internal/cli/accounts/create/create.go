@@ -2,7 +2,6 @@ package create
 
 import (
 	"context"
-	"encoding/hex"
 	"io/ioutil"
 	"log"
 
@@ -36,16 +35,7 @@ var Cmd = &cobra.Command{
 		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
 
 		for i, privateKeyHex := range conf.Keys {
-			prKeyDer, err := hex.DecodeString(privateKeyHex)
-			if err != nil {
-				utils.Exit(1, "Failed to decode private key")
-			}
-
-			privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
-			if err != nil {
-				utils.Exit(1, "Failed to decode private key")
-			}
-
+			privateKey := utils.MustDecodeAccountPrivateKeyHex(privateKeyHex)
 			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 

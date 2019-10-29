@@ -72,7 +72,11 @@ func NewConfig() *Config {
 }
 
 func (c *Config) RootAccount() *Account {
-	return c.Accounts[RootName]
+	rootAcct, ok := c.Accounts[RootName]
+	if !ok {
+		utils.Exit(1, "Missing root account!")
+	}
+	return rootAcct
 }
 
 func (c *Config) SetRootAccount(prKey types.AccountPrivateKey) {

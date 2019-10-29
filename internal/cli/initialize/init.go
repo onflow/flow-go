@@ -1,7 +1,6 @@
 package initialize
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -30,14 +29,7 @@ var Cmd = &cobra.Command{
 		if !project.ConfigExists() || conf.Reset {
 			var pconf *project.Config
 			if len(conf.RootKey) > 0 {
-				prKeyHex, err := hex.DecodeString(conf.RootKey)
-				if err != nil {
-					utils.Exitf(1, "Failed to decode root key hex string err: %v", err)
-				}
-				prKey, err := types.DecodeAccountPrivateKey(prKeyHex)
-				if err != nil {
-					utils.Exitf(1, "Failed to decode root key bytes err: %v", err)
-				}
+				prKey := utils.MustDecodeAccountPrivateKeyHex(conf.RootKey)
 				pconf = InitProjectWithRootKey(prKey)
 			} else {
 				pconf = InitProject()
