@@ -6,6 +6,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
 	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
+	github.com/c-bata/go-prompt v0.2.3
 	github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
@@ -23,9 +24,11 @@ require (
 	github.com/kr/pty v1.1.3 // indirect
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
+	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/pkg/errors v0.8.1
+	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/rivo/uniseg v0.1.0

@@ -2,6 +2,7 @@ package create
 
 import (
 	"context"
+	"encoding/hex"
 	"io/ioutil"
 	"log"
 
@@ -10,16 +11,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
 type Config struct {
 	Signer string   `default:"root" flag:"signer,s"`
 	Keys   []string `flag:"key,k"`
-	Code   string   `flag:"code,c"`
+	Code   string   `flag:"code,c" info:"path to a file containing code for the account"`
 }
 
 var conf Config
@@ -31,32 +32,27 @@ var Cmd = &cobra.Command{
 		projectConf := project.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
-		signerAddr := flow.HexToAddress(signer.Address)
-		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
-		if err != nil {
-			utils.Exit(1, "Failed to load signer key")
-		}
 
-		accountKeys := make([]flow.AccountKey, len(conf.Keys))
+		accountKeys := make([]flow.AccountPublicKey, len(conf.Keys))
 
-		for i, privateKeyStr := range conf.Keys {
-			privateKey, err := utils.DecodePrivateKey(privateKeyStr)
+		for i, privateKeyHex := range conf.Keys {
+			prKeyDer, err := hex.DecodeString(privateKeyHex)
 			if err != nil {
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			publicKey, err := utils.EncodePublicKey(privateKey.Publickey())
+			privateKey, err := flow.DecodeAccountPrivateKey(prKeyDer)
 			if err != nil {
-				utils.Exit(1, "Failed to encode public key")
+				utils.Exit(1, "Failed to decode private key")
 			}
 
-			accountKeys[i] = flow.AccountKey{
-				PublicKey: publicKey,
-				Weight:    constants.AccountKeyWeightThreshold,
-			}
+			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 
-		var code []byte
+		var (
+			code []byte
+			err  error
+		)
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -65,16 +61,19 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := templates.CreateAccount(accountKeys, code)
+		script, err := templates.CreateAccount(accountKeys, code)
+		if err != nil {
+			utils.Exit(1, "Failed to generate transaction script")
+		}
 
 		tx := flow.Transaction{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,
-			PayerAccount: signerAddr,
+			PayerAccount: signer.Address,
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		err = tx.AddSignature(signer.Address, signer.PrivateKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}

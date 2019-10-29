@@ -55,9 +55,12 @@ func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
 	return nil, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePublicKey([]byte) (PublicKey, error) {
-	// TODO: implement DecodePubKey
-	return nil, nil
+func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
+	pk := &PubKeyBLS_BLS12381{
+		alg: a,
+	}
+	readPointG2(&pk.point, publicKeyBytes)
+	return pk, nil
 }
 
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
@@ -70,8 +73,8 @@ type PrKeyBLS_BLS12381 struct {
 	scalar scalar
 }
 
-func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
-	return sk.alg.name
+func (sk *PrKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
+	return sk.alg.algo
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
@@ -87,7 +90,7 @@ func (sk *PrKeyBLS_BLS12381) computePublicKey() {
 	sk.pk = newPk
 }
 
-func (sk *PrKeyBLS_BLS12381) Publickey() PublicKey {
+func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
@@ -108,8 +111,8 @@ type PubKeyBLS_BLS12381 struct {
 	point pointG2
 }
 
-func (pk *PubKeyBLS_BLS12381) AlgoName() AlgoName {
-	return pk.alg.name
+func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
+	return pk.alg.algo
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {
@@ -117,6 +120,7 @@ func (pk *PubKeyBLS_BLS12381) KeySize() int {
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
-	// TODO: implement EncodePubKey
-	return nil, nil
+	dest := make([]byte, pubKeyLengthBLS_BLS12381)
+	writePointG2(dest, &a.point)
+	return dest, nil
 }

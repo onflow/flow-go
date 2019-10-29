@@ -11,10 +11,38 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
+var (
+	idParser = regexp.MustCompile(`^(\w+)-(\w+)@([\w\.]+:\d{1,5})$`)
+)
+
 // Committee represents the identity table for staked nodes in the flow system.
 type Committee struct {
 	me         flow.Identity
 	identities map[string]flow.Identity
+}
+
+// EntryToFields takes the a committee entry and returns the parsed node
+// info fields
+//
+// > EntryToFields("consensus-consensus1@localhost:7297")
+// "consensus", "consensus1", "localhost:7297", nil
+func EntryToFields(entry string) (string, string, string, error) {
+	// try to parse the nodes
+	fields := idParser.FindStringSubmatch(entry)
+	if fields == nil {
+		return "", "", "", errors.Errorf("invalid node entry (%s)", entry)
+	}
+
+	role := fields[1]
+	id := fields[2]
+	address := fields[3]
+	return role, id, address, nil
+}
+
+// EntryToID takes the a committee entry and returns the node identity.
+func EntryToID(entry string) (string, error) {
+	_, id, _, err := EntryToFields(entry)
+	return id, err
 }
 
 // New generates a new committee of node identities.
@@ -25,30 +53,27 @@ func New(entries []string, identity string) (*Committee, error) {
 		identities: make(map[string]flow.Identity),
 	}
 
-	// try to parse the node identities
-	rx := regexp.MustCompile(`^(\w+)-(\w+)@([\w\.]+:\d{1,5})$`)
+	// try to parse the nodes
 	for _, entry := range entries {
-
 		// try to parse the expression
-		fields := rx.FindStringSubmatch(entry)
-		if fields == nil {
+		role, id, address, err := EntryToFields(entry)
+		if err != nil {
 			return nil, errors.Errorf("invalid node entry (%s)", entry)
 		}
 
 		// check for duplicates
-		nodeID := fields[2]
-		_, ok := c.identities[nodeID]
+		_, ok := c.identities[id]
 		if ok {
-			return nil, errors.Errorf("duplicate node identity (%s)", nodeID)
+			return nil, errors.Errorf("duplicate node identity (%s)", id)
 		}
 
 		// add entry to identity table
-		identity := flow.Identity{
-			NodeID:  fields[2],
-			Role:    fields[1],
-			Address: fields[3],
+		node := flow.Identity{
+			NodeID:  id,
+			Role:    role,
+			Address: address,
 		}
-		c.identities[nodeID] = identity
+		c.identities[id] = node
 	}
 
 	// check if we are present in the node identity table

@@ -152,13 +152,13 @@ func (s server) DidChangeTextDocument(
 
 		mainPath := strings.TrimPrefix(string(uri), "file://")
 
-		_ = program.ResolveImports(func(location ast.ImportLocation) (program *ast.Program, err error) {
+		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
 			return s.resolveImport(connection, mainPath, location)
 		})
 
 		// check program
 
-		checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
+		checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, ast.FileLocation(string(uri)))
 		if err != nil {
 			panic(err)
 		}
@@ -269,9 +269,9 @@ func (server) Exit(connection protocol.Connection) error {
 func (s server) resolveImport(
 	connection protocol.Connection,
 	mainPath string,
-	location ast.ImportLocation,
+	location ast.Location,
 ) (*ast.Program, error) {
-	stringLocation, ok := location.(ast.StringImportLocation)
+	stringLocation, ok := location.(ast.StringLocation)
 	// TODO: publish diagnostic type is not supported?
 	if !ok {
 		return nil, nil

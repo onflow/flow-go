@@ -1,19 +1,19 @@
 package start
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
-
-	"github.com/dapperlabs/flow-go/cli/initialize"
 
 	"github.com/psiemens/sconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli/initialize"
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
@@ -36,13 +36,13 @@ var Cmd = &cobra.Command{
 	Short: "Starts the Flow emulator server",
 	Run: func(cmd *cobra.Command, args []string) {
 		if conf.Init {
-			pconf := initialize.InitializeProject()
-			rootAcct := pconf.Accounts["root"]
+			pconf := initialize.InitProject()
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
-			fmt.Printf("🔑  PrivateKey: %s\n\n", rootAcct.PrivateKey)
 		}
+
 		projectConf := project.LoadConfig()
 
 		if conf.Verbose {
@@ -53,34 +53,28 @@ var Cmd = &cobra.Command{
 			Port:           conf.Port,
 			HTTPPort:       conf.HTTPPort,
 			BlockInterval:  conf.BlockInterval,
-			RootAccountKey: getRootKey(projectConf),
+			RootAccountKey: getRootPrivateKey(projectConf),
 		}
 
 		server.StartServer(log, serverConf)
 	},
 }
 
-func getRootKey(projectConf *project.Config) crypto.PrivateKey {
+func getRootPrivateKey(projectConf *project.Config) *types.AccountPrivateKey {
 	if conf.RootKey != "" {
-		prKey, err := utils.DecodePrivateKey(conf.RootKey)
+		prKeyDer, err := hex.DecodeString(conf.RootKey)
+		privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
 		if err != nil {
-			fmt.Printf("Failed to decode private key")
-			os.Exit(1)
+			utils.Exitf(1, "Failed to decode private key: %v", err)
 		}
 
-		return prKey
+		return &privateKey
 	} else if projectConf != nil {
-		rootAccount := projectConf.Accounts["root"]
-
-		prKey, err := utils.DecodePrivateKey(rootAccount.PrivateKey)
-		if err != nil {
-			fmt.Printf("Failed to decode private key")
-			os.Exit(1)
-		}
+		rootAccount := projectConf.RootAccount()
 
 		log.Infof("⚙️   Loaded root account key from %s\n", project.ConfigPath)
 
-		return prKey
+		return &rootAccount.PrivateKey
 	}
 
 	log.Warnf("⚙️   No project configured, generating new root account key")

@@ -4,13 +4,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
-	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -36,14 +37,14 @@ type EmulatedBlockchain struct {
 	mut                sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress flow.Address
-	rootAccountKey     crypto.PrivateKey
+	rootAccountKey     flow.AccountPrivateKey
 	lastCreatedAccount flow.Account
 	onEventEmitted     func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
 type EmulatedBlockchainOptions struct {
-	RootAccountKey crypto.PrivateKey
+	RootAccountKey *flow.AccountPrivateKey
 	OnLogMessage   func(string)
 	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
@@ -93,17 +94,17 @@ func (b *EmulatedBlockchain) RootAccountAddress() flow.Address {
 }
 
 // RootKey returns the root private key for this blockchain.
-func (b *EmulatedBlockchain) RootKey() crypto.PrivateKey {
+func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 	return b.rootAccountKey
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (b *EmulatedBlockchain) GetLatestBlock() *eflow.Block {
+func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
 	return b.pendingWorldState.GetLatestBlock()
 }
 
 // GetBlockByHash gets a block by hash.
-func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*eflow.Block, error) {
+func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, error) {
 	block := b.pendingWorldState.GetBlockByHash(hash)
 	if block == nil {
 		return nil, &ErrBlockNotFound{BlockHash: hash}
@@ -113,7 +114,7 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*eflow.Block, err
 }
 
 // GetBlockByNumber gets a block by number.
-func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*eflow.Block, error) {
+func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
 	block := b.pendingWorldState.GetBlockByNumber(number)
 	if block == nil {
 		return nil, &ErrBlockNotFound{BlockNum: number}
@@ -285,7 +286,7 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 //
 // Note: this clears the pending transaction pool and indexes the committed blockchain
 // state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() *eflow.Block {
+func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
@@ -299,7 +300,7 @@ func (b *EmulatedBlockchain) CommitBlock() *eflow.Block {
 	b.txPool = make(map[string]*flow.Transaction)
 
 	prevBlock := b.pendingWorldState.GetLatestBlock()
-	block := &eflow.Block{
+	block := &types.Block{
 		Number:            prevBlock.Number + 1,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: prevBlock.Hash(),
@@ -348,10 +349,6 @@ func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
 	b.worldStates[string(blockHash)] = bytes
 }
 
-func (b *EmulatedBlockchain) onAccountCreated(account flow.Account) {
-	b.lastCreatedAccount = account
-}
-
 // LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
 	return b.lastCreatedAccount
@@ -364,12 +361,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx *flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
 	for _, accountSig := range tx.Signatures {
-		accountKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountPublicKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
 		if err != nil {
 			return err
 		}
 
-		accountWeights[accountSig.Account] += accountKey.Weight
+		accountWeights[accountSig.Account] += accountPublicKey.Weight
 	}
 
 	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
@@ -387,8 +384,11 @@ func (b *EmulatedBlockchain) verifySignatures(tx *flow.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(accountKeys []flow.AccountKey, code []byte, nonce uint64) (flow.Address, error) {
-	createAccountScript := templates.CreateAccount(accountKeys, code)
+func (b *EmulatedBlockchain) CreateAccount(keys []flow.AccountPublicKey, code []byte, nonce uint64) (flow.Address, error) {
+	createAccountScript, err := templates.CreateAccount(keys, code)
+	if err != nil {
+		return flow.Address{}, nil
+	}
 
 	tx := &flow.Transaction{
 		Script:             createAccountScript,
@@ -400,7 +400,7 @@ func (b *EmulatedBlockchain) CreateAccount(accountKeys []flow.AccountKey, code [
 
 	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	err := b.SubmitTransaction(tx)
+	err = b.SubmitTransaction(tx)
 	if err != nil {
 		return flow.Address{}, err
 	}
@@ -417,35 +417,29 @@ func (b *EmulatedBlockchain) CreateAccount(accountKeys []flow.AccountKey, code [
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig flow.AccountSignature,
 	message []byte,
-) (accountKey flow.AccountKey, err error) {
+) (accountPublicKey flow.AccountPublicKey, err error) {
 	account, err := b.GetAccount(accountSig.Account)
 	if err != nil {
-		return accountKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
+		return accountPublicKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
 	signature := crypto.Signature(accountSig.Signature)
 
 	// TODO: account signatures should specify a public key (possibly by index) to avoid this loop
-	for _, accountKey := range account.Keys {
-		publicKey, err := crypto.DecodePublicKey(crypto.ECDSA_P256, accountKey.PublicKey)
-		if err != nil {
-			continue
-		}
+	for _, accountPublicKey := range account.Keys {
+		hasher, _ := crypto.NewHasher(accountPublicKey.HashAlgo)
 
-		// TODO: replace hard-coded hashing algorithm
-		hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-
-		valid, err := publicKey.Verify(signature, message, hasher)
+		valid, err := accountPublicKey.PublicKey.Verify(signature, message, hasher)
 		if err != nil {
 			continue
 		}
 
 		if valid {
-			return accountKey, nil
+			return accountPublicKey, nil
 		}
 	}
 
-	return accountKey, &ErrInvalidSignaturePublicKey{
+	return accountPublicKey, &ErrInvalidSignaturePublicKey{
 		Account: accountSig.Account,
 	}
 }
@@ -479,19 +473,30 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []flow.Event) {
 }
 
 // createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (flow.Account, crypto.PrivateKey) {
-	registers := ws.Registers.NewView()
+func createRootAccount(
+	ws *state.WorldState,
+	customPrivateKey *flow.AccountPrivateKey,
+) (flow.Account, flow.AccountPrivateKey) {
+	var privateKey flow.AccountPrivateKey
 
-	if prKey == nil {
-		prKey, _ = crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte("elephant ears"))
+	if customPrivateKey == nil {
+		var err error
+		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		privateKey = *customPrivateKey
 	}
 
-	pubKeyBytes, _ := prKey.Publickey().Encode()
+	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKeyBytes, _ := flow.EncodeAccountPublicKey(publicKey)
+
+	registers := ws.Registers.NewView()
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{pubKeyBytes},
-		[]int{constants.AccountKeyWeightThreshold},
+		[][]byte{publicKeyBytes},
 		[]byte{},
 	)
 
@@ -499,7 +504,7 @@ func createRootAccount(ws *state.WorldState, prKey crypto.PrivateKey) (flow.Acco
 
 	account := runtimeContext.GetAccount(accountAddress)
 
-	return *account, prKey
+	return *account, privateKey
 }
 
 // mergeOptions merges the values of two EmulatedBlockchainOptions structs.

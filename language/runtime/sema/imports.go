@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 )
 
-type ImportResolver func(location ast.ImportLocation) (*Checker, error)
+type ImportResolver func(location ast.Location) (*Checker, error)
 
 func (checker *Checker) ResolveImports(resolver ImportResolver) error {
 	return checker.resolveImports(
@@ -17,7 +17,7 @@ func (checker *Checker) ResolveImports(resolver ImportResolver) error {
 }
 
 type CyclicImportsError struct {
-	Location ast.ImportLocation
+	Location ast.Location
 }
 
 func (e CyclicImportsError) Error() string {

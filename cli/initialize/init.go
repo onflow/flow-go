@@ -1,7 +1,6 @@
 package initialize
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -9,8 +8,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cli/project"
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 type Config struct {
@@ -26,12 +26,11 @@ var Cmd = &cobra.Command{
 	Short: "Initialize a new account profile",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
-			pconf := InitializeProject()
-			rootAcct := pconf.Accounts["root"]
+			pconf := InitProject()
+			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
-			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
-			fmt.Printf("🔑  PrivateKey: %s\n\n", rootAcct.PrivateKey)
+			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address)
 			fmt.Printf("ℹ️   Start the emulator with this root account by running: flow emulator start\n")
 		} else {
 			fmt.Printf("⚠️   Flow configuration file already exists! Begin by running: flow emulator start\n")
@@ -39,24 +38,20 @@ var Cmd = &cobra.Command{
 	},
 }
 
-// InitializeProject generates a new root key and saves project config.
-func InitializeProject() *project.Config {
-	prKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
+// InitProject generates a new root key and saves project config.
+func InitProject() *project.Config {
+	privateKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
 	if err != nil {
-		panic(err)
+		utils.Exitf(1, "Failed to generate private key: %v", err)
 	}
-	prKeyBytes, err := prKey.Encode()
-	if err != nil {
-		panic(err)
-	}
-	prKeyHex := hex.EncodeToString(prKeyBytes)
-	address := flow.HexToAddress("01").Hex()
+
+	address := flow.HexToAddress("01")
 
 	conf := &project.Config{
-		Accounts: map[string]*project.AccountConfig{
-			"root": &project.AccountConfig{
+		Accounts: map[string]*project.Account{
+			"root": {
 				Address:    address,
-				PrivateKey: prKeyHex,
+				PrivateKey: privateKey,
 			},
 		},
 	}

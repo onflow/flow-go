@@ -52,6 +52,24 @@ func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckMutuallyRecursiveScoping(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun f(): Int {
+         return g()
+      }
+
+      let x = f()
+      let y = 0
+
+      fun g(): Int {
+          return y
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
 func TestCheckInvalidFunctionDeclarations(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `

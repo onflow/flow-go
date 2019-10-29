@@ -7,5 +7,9 @@ import (
 )
 
 func main() {
-	execute.Execute(os.Args[1:])
+	if len(os.Args) > 1 {
+		execute.Execute(os.Args[1:])
+	} else {
+		execute.RunREPL()
+	}
 }

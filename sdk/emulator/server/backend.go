@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
@@ -158,7 +158,10 @@ func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountReq
 		WithField("address", address).
 		Debugf("👤  GetAccount called")
 
-	accMsg := convert.AccountToMessage(*account)
+	accMsg, err := convert.AccountToMessage(*account)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	return &observation.GetAccountResponse{
 		Account: accMsg,

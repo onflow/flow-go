@@ -5,12 +5,13 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/psiemens/sconfig"
+	"github.com/spf13/cobra"
+
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
-	"github.com/psiemens/sconfig"
-	"github.com/spf13/cobra"
 )
 
 type Config struct {
@@ -28,13 +29,11 @@ var Cmd = &cobra.Command{
 		projectConf := project.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
-		signerAddr := flow.HexToAddress(signer.Address)
-		signerKey, err := utils.DecodePrivateKey(signer.PrivateKey)
-		if err != nil {
-			utils.Exit(1, "Failed to load signer key")
-		}
 
-		var code []byte
+		var (
+			code []byte
+			err  error
+		)
 
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -47,11 +46,11 @@ var Cmd = &cobra.Command{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
-			PayerAccount:   signerAddr,
-			ScriptAccounts: []flow.Address{signerAddr},
+			PayerAccount:   signer.Address,
+			ScriptAccounts: []flow.Address{signer.Address},
 		}
 
-		err = tx.AddSignature(signerAddr, signerKey)
+		err = tx.AddSignature(signer.Address, signer.PrivateKey)
 		if err != nil {
 			utils.Exit(1, "Failed to sign transaction")
 		}

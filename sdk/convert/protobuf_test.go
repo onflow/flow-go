@@ -48,7 +48,8 @@ func TestAccount(t *testing.T) {
 
 	accA := unittest.AccountFixture()
 
-	message := AccountToMessage(accA)
+	message, err := AccountToMessage(accA)
+	Expect(err).ToNot(HaveOccurred())
 
 	accB, err := MessageToAccount(message)
 	Expect(err).ToNot(HaveOccurred())
@@ -59,11 +60,12 @@ func TestAccount(t *testing.T) {
 func TestAccountKey(t *testing.T) {
 	RegisterTestingT(t)
 
-	keyA := unittest.AccountKeyFixture()
+	keyA := unittest.AccountPublicKeyFixture()
 
-	message := AccountKeyToMessage(keyA)
+	message, err := AccountPublicKeyToMessage(keyA)
+	Expect(err).ToNot(HaveOccurred())
 
-	keyB, err := MessageToAccountKey(message)
+	keyB, err := MessageToAccountPublicKey(message)
 	Expect(err).ToNot(HaveOccurred())
 
 	Expect(keyA).To(Equal(keyB))

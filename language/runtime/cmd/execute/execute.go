@@ -29,7 +29,7 @@ func Execute(args []string) {
 		if err == nil {
 			return
 		}
-		prettyPrintError(err, filename, codes)
+		PrettyPrintError(err, filename, codes)
 		os.Exit(1)
 	}
 
@@ -37,9 +37,9 @@ func Execute(args []string) {
 	codes[filename] = code
 	must(err, filename)
 
-	err = program.ResolveImports(func(location ast.ImportLocation) (program *ast.Program, err error) {
+	err = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
 		switch location := location.(type) {
-		case ast.StringImportLocation:
+		case ast.StringLocation:
 			filename := string(location)
 			imported, _, code, err := parser.ParseProgramFromFile(filename)
 			codes[filename] = code
@@ -56,7 +56,8 @@ func Execute(args []string) {
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
 	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations)
+	location := ast.FileLocation(filename)
+	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
 	must(err, filename)
 
 	must(checker.Check(), filename)
@@ -76,7 +77,7 @@ func Execute(args []string) {
 	must(err, filename)
 }
 
-func prettyPrintError(err error, filename string, codes map[string]string) {
+func PrettyPrintError(err error, filename string, codes map[string]string) {
 	i := 0
 	printErr := func(err error, filename string) {
 		if i > 0 {
@@ -94,16 +95,16 @@ func prettyPrintError(err error, filename string, codes map[string]string) {
 		for _, err := range checkerError.Errors {
 			printErr(err, filename)
 			if err, ok := err.(*sema.ImportedProgramError); ok {
-				filename := string(err.ImportLocation.(ast.StringImportLocation))
+				filename := string(err.ImportLocation.(ast.StringLocation))
 				for _, err := range err.CheckerError.Errors {
-					prettyPrintError(err, filename, codes)
+					PrettyPrintError(err, filename, codes)
 				}
 			}
 		}
 	} else if locatedErr, ok := err.(ast.HasImportLocation); ok {
 		location := locatedErr.ImportLocation()
 		if location != nil {
-			filename = string(location.(ast.StringImportLocation))
+			filename = string(location.(ast.StringLocation))
 		}
 		printErr(err, filename)
 	} else {

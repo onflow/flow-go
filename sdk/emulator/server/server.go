@@ -34,7 +34,7 @@ type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey crypto.PrivateKey
+	RootAccountKey *types.AccountPrivateKey
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
@@ -76,7 +76,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	address := server.backend.blockchain.RootAccountAddress()
 	prKey := server.backend.blockchain.RootKey()
-	prKeyBytes, _ := prKey.Encode()
+	prKeyBytes, _ := prKey.PrivateKey.Encode()
 
 	logger.WithFields(log.Fields{
 		"address": address.Hex(),

@@ -32,7 +32,7 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
            import "unknown"
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				return &ast.Program{}, nil
 			},
 		},
@@ -60,7 +60,7 @@ func TestCheckImportAll(t *testing.T) {
            let x = answer()
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				return checker.Program, nil
 			},
 		},
@@ -84,7 +84,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
            let x = answer()
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				return checker.Program, nil
 			},
 		},
@@ -114,7 +114,7 @@ func TestCheckImportSome(t *testing.T) {
            let x = answer()
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				return checker.Program, nil
 			},
 		},
@@ -139,7 +139,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
            import x from "imported"
         `,
 		ParseAndCheckOptions{
-			ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				return imported, nil
 			},
 		},
@@ -183,7 +183,7 @@ func TestCheckImportTypes(t *testing.T) {
 					kind.ConstructionKeyword(),
 				),
 				ParseAndCheckOptions{
-					ImportResolver: func(location ast.ImportLocation) (program *ast.Program, e error) {
+					ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 						return checker.Program, nil
 					},
 				},

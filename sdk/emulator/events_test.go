@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
@@ -91,29 +91,29 @@ func TestEventEmitted(t *testing.T) {
 			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
+			OnLogMessage: func(msg string) { fmt.Println("LOG:", msg) },
 		})
 
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
+
+			fun emitMyEvent(x: Int, y: Int) {
+				emit MyEvent(x: x, y: y)
+			}
 		`)
 
-		publicKeyA, _ := b.RootKey().Publickey().Encode()
+		publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
 
-		accountKeyA := flow.AccountKey{
-			PublicKey: publicKeyA,
-			Weight:    constants.AccountKeyWeightThreshold,
-		}
-
-		addressA, err := b.CreateAccount([]flow.AccountKey{accountKeyA}, accountScript, getNonce())
+		address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
 			fun main() {
-				emit MyEvent(x: 1, y: 2)
+				emitMyEvent(x: 1, y: 2)
 			}
-		`, addressA.Hex()))
+		`, address.Hex()))
 
 		tx := &flow.Transaction{
 			Script:             script,
@@ -133,7 +133,7 @@ func TestEventEmitted(t *testing.T) {
 		// first event is AccountCreated event
 		expectedEvent := events[1]
 
-		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
+		expectedID := fmt.Sprintf("account.%s.MyEvent", address.Hex())
 
 		assert.Equal(t, expectedID, expectedEvent.ID)
 		assert.Equal(t, big.NewInt(1), expectedEvent.Values["x"])
