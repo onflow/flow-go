@@ -73,8 +73,8 @@ type PrKeyBLS_BLS12381 struct {
 	scalar scalar
 }
 
-func (sk *PrKeyBLS_BLS12381) AlgoName() AlgoName {
-	return sk.alg.name
+func (sk *PrKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
+	return sk.alg.algo
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
@@ -90,7 +90,7 @@ func (sk *PrKeyBLS_BLS12381) computePublicKey() {
 	sk.pk = newPk
 }
 
-func (sk *PrKeyBLS_BLS12381) Publickey() PublicKey {
+func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
 	if sk.pk != nil {
 		return sk.pk
 	}
@@ -111,8 +111,8 @@ type PubKeyBLS_BLS12381 struct {
 	point pointG2
 }
 
-func (pk *PubKeyBLS_BLS12381) AlgoName() AlgoName {
-	return pk.alg.name
+func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
+	return pk.alg.algo
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {

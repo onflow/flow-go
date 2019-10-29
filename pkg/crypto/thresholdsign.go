@@ -40,15 +40,15 @@ type ThresholdSigner struct {
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
+func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be larger than %d.",ThresholdMinSize)}
+		return nil, cryptoError{fmt.Sprintf("Size should be larger than %d.", ThresholdMinSize)}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// Hahser to be used
-	hasher, err := NewHasher(hash)
+	hasher, err := NewHasher(hashAlgo)
 	if err != nil {
 		return nil, err
 	}

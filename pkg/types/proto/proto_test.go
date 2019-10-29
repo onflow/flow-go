@@ -49,7 +49,8 @@ func TestAccount(t *testing.T) {
 
 	accA := unittest.AccountFixture()
 
-	message := proto.AccountToMessage(accA)
+	message, err := proto.AccountToMessage(accA)
+	Expect(err).ToNot(HaveOccurred())
 
 	accB, err := proto.MessageToAccount(message)
 	Expect(err).ToNot(HaveOccurred())
@@ -60,9 +61,10 @@ func TestAccount(t *testing.T) {
 func TestAccountKey(t *testing.T) {
 	RegisterTestingT(t)
 
-	keyA := unittest.AccountKeyFixture()
+	keyA := unittest.AccountPublicKeyFixture()
 
-	message := proto.AccountKeyToMessage(keyA)
+	message, err := proto.AccountKeyToMessage(keyA)
+	Expect(err).ToNot(HaveOccurred())
 
 	keyB, err := proto.MessageToAccountKey(message)
 	Expect(err).ToNot(HaveOccurred())

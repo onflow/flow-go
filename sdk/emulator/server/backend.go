@@ -158,7 +158,10 @@ func (b *Backend) GetAccount(ctx context.Context, req *observe.GetAccountRequest
 		WithField("address", address).
 		Debugf("👤  GetAccount called")
 
-	accMsg := proto.AccountToMessage(*account)
+	accMsg, err := proto.AccountToMessage(*account)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	return &observe.GetAccountResponse{
 		Account: accMsg,

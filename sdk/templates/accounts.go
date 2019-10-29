@@ -8,29 +8,30 @@ import (
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(accountKeys []types.AccountKey, code []byte) []byte {
+func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, error) {
 	publicKeys := make([][]byte, len(accountKeys))
-	keyWeights := make([]int, len(accountKeys))
 
 	for i, accountKey := range accountKeys {
-		publicKeys[i] = accountKey.PublicKey
-		keyWeights[i] = accountKey.Weight
+		accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
+		if err != nil {
+			return nil, err
+		}
+
+		publicKeys[i] = accountKeyBytes
 	}
 
 	publicKeysStr := cadenceEncodeBytesArray(publicKeys)
-	keyWeightsStr := cadenceEncodeIntArray(keyWeights)
 	codeStr := cadenceEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main() {
 			let publicKeys: [[Int]] = %s
-			let keyWeights: [Int] = %s
 			let code: [Int]? = %s
-			createAccount(publicKeys, keyWeights, code)
+			createAccount(publicKeys, code)
 		}
-	`, publicKeysStr, keyWeightsStr, codeStr)
+	`, publicKeysStr, codeStr)
 
-	return []byte(script)
+	return []byte(script), nil
 }
 
 // UpdateAccountCode generates a script that updates the code associated with an account.
@@ -48,18 +49,22 @@ func UpdateAccountCode(code []byte) []byte {
 }
 
 // AddAccountKey generates a script that adds a key to an account.
-func AddAccountKey(accountKey types.AccountKey) []byte {
-	publicKeyStr := cadenceEncodeBytes(accountKey.PublicKey)
+func AddAccountKey(accountKey types.AccountPublicKey) ([]byte, error) {
+	accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKeyStr := cadenceEncodeBytes(accountKeyBytes)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
-			let code = %s
-			let weight = %d
-			addAccountKey(account.address, code, weight)
+			let key = %s
+			addAccountKey(account.address, key)
 		}
-	`, publicKeyStr, accountKey.Weight)
+	`, publicKeyStr)
 
-	return []byte(script)
+	return []byte(script), nil
 }
 
 // RemoveAccountKey generates a script that removes a key from an account.

@@ -1,16 +1,17 @@
 package initialize
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
-
-	"github.com/dapperlabs/flow-go/internal/cli/utils"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/internal/cli/project"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/internal/cli/utils"
+	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 type Config struct {
@@ -29,19 +30,22 @@ var Cmd = &cobra.Command{
 		if !project.ConfigExists() || conf.Reset {
 			var pconf *project.Config
 			if len(conf.RootKey) > 0 {
-				prKey, err := utils.DecodePrivateKey(conf.RootKey)
+				prKeyHex, err := hex.DecodeString(conf.RootKey)
 				if err != nil {
-					utils.Exitf(1, "Failed to decode root key err: %v", err)
+					utils.Exitf(1, "Failed to decode root key hex string err: %v", err)
 				}
-				pconf = InitializeProjectWithRootKey(prKey)
+				prKey, err := types.DecodeAccountPrivateKey(prKeyHex)
+				if err != nil {
+					utils.Exitf(1, "Failed to decode root key bytes err: %v", err)
+				}
+				pconf = InitProjectWithRootKey(prKey)
 			} else {
-				pconf = InitializeProject()
+				pconf = InitProject()
 			}
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
-			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
-			fmt.Printf("🔑  PrivateKey: %s\n\n", rootAcct.PrivateKey)
+			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address)
 			fmt.Printf("ℹ️   Start the emulator with this root account by running: flow emulator start\n")
 		} else {
 			fmt.Printf("⚠️   Flow configuration file already exists! Begin by running: flow emulator start\n")
@@ -49,19 +53,19 @@ var Cmd = &cobra.Command{
 	},
 }
 
-// InitializeProject generates a new root key and saves project config.
-func InitializeProject() *project.Config {
-	prKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, []byte{})
+// InitProject generates a new root key and saves project config.
+func InitProject() *project.Config {
+	prKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
 	if err != nil {
 		utils.Exitf(1, "Failed to generate private key err: %v", err)
 	}
 
-	return InitializeProjectWithRootKey(prKey)
+	return InitProjectWithRootKey(prKey)
 }
 
-// InitializeProjectWithRootKey creates and saves a new project config
+// InitProjectWithRootKey creates and saves a new project config
 // using the specified root key.
-func InitializeProjectWithRootKey(rootKey crypto.PrivateKey) *project.Config {
+func InitProjectWithRootKey(rootKey types.AccountPrivateKey) *project.Config {
 	pconf := project.NewConfig()
 	pconf.SetRootAccount(rootKey)
 	project.MustSaveConfig(pconf)
