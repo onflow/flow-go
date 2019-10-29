@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -246,7 +245,7 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
 		require.Nil(t, err)
 
-		tx := &flow.Transaction{
+		tx := flow.Transaction{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -254,7 +253,10 @@ func TestCreateAccount(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
@@ -325,7 +327,7 @@ func TestAddAccountKey(t *testing.T) {
 		addKeyScript, err := templates.AddAccountKey(publicKey)
 		assert.Nil(t, err)
 
-		tx := &flow.Transaction{
+		tx := flow.Transaction{
 			Script:             addKeyScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -334,7 +336,10 @@ func TestAddAccountKey(t *testing.T) {
 			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
@@ -372,7 +377,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 2)
 
-	tx2 := &flow.Transaction{
+	tx2 := flow.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
