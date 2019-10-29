@@ -43,7 +43,7 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 	}
 
 	// only log error logs
-	log := zerolog.New(os.Stderr).With().Logger().Level(zerolog.ErrorLevel)
+	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	pool, err := mempool.New()
 	if err != nil {
@@ -286,7 +286,7 @@ func TestSubmitCollection(t *testing.T) {
 	t.Run("should produce the same hash for N nodes to send M messages concurrently to eath other",
 		testConcrrencyOnce)
 
-	// will take roughly 15 seconds
+	// will take roughly 6 seconds
 	t.Run("run the above tests for 100 times", func(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			testConcrrencyOnce(t)
