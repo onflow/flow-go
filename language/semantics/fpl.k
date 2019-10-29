@@ -131,7 +131,7 @@ module FPL-COMMON-SYNTAX
    | "var" Ident           "<-" Exp
    | "var" Ident ":" Annot "<-" Exp
 
-  rule  let Ident  = Exp          => let Ident : noAnnot()  = Exp [macro]
+  rule (let Ident  = Exp)::VarDef => let Ident : noAnnot()  = Exp [macro]
   rule  let Ident <- Exp          => let Ident : noAnnot() <- Exp [macro]
   rule (var Ident  = Exp)::VarDef => var Ident : noAnnot()  = Exp [macro]
   rule  var Ident <- Exp          => var Ident : noAnnot() <- Exp [macro]
@@ -181,6 +181,7 @@ module FPL-COMMON-SYNTAX
   rule if Cond { Block } else If => if Cond { Block } else { If } [macro]
 
   syntax IfCond ::= Exp
+                  | "let" Ident "=" Exp
                   | "var" Ident "=" Exp
   syntax Block ::= List{Stmt,";"}
 
