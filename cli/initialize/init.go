@@ -52,23 +52,8 @@ func InitProject() *project.Config {
 		utils.Exitf(1, "Failed to generate private key err: %v", err)
 	}
 
-<<<<<<< HEAD:internal/cli/initialize/init.go
 	return InitProjectWithRootKey(prKey)
 }
-=======
-	address := flow.HexToAddress("01")
-
-	conf := &project.Config{
-		Accounts: map[string]*project.Account{
-			"root": {
-				Address:    address,
-				PrivateKey: privateKey,
-			},
-		},
-	}
-
-	project.SaveConfig(conf)
->>>>>>> master:cli/initialize/init.go
 
 // InitProjectWithRootKey creates and saves a new project config
 // using the specified root key.

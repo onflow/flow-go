@@ -21,16 +21,16 @@ func Exitf(code int, msg string, args ...interface{}) {
 func DecodeAccountPrivateKeyHex(prKeyHex string) (flow.AccountPrivateKey, error) {
 	prKeyBytes, err := hex.DecodeString(prKeyHex)
 	if err != nil {
-		return types.AccountPrivateKey{}, err
+		return flow.AccountPrivateKey{}, err
 	}
-	prKey, err := types.DecodeAccountPrivateKey(prKeyBytes)
+	prKey, err := flow.DecodeAccountPrivateKey(prKeyBytes)
 	if err != nil {
-		return types.AccountPrivateKey{}, err
+		return flow.AccountPrivateKey{}, err
 	}
 	return prKey, nil
 }
 
-func MustDecodeAccountPrivateKeyHex(prKeyHex string) types.AccountPrivateKey {
+func MustDecodeAccountPrivateKeyHex(prKeyHex string) flow.AccountPrivateKey {
 	prKey, err := DecodeAccountPrivateKeyHex(prKeyHex)
 	if err != nil {
 		Exitf(1, "Failed to decode account private key err: %v", err)
