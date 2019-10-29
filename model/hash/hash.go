@@ -6,8 +6,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// DefaultHasher is the default hasher used by Flow.
 var DefaultHasher, _ = crypto.NewHasher(crypto.SHA3_256)
 
+// SetTransactionHash computes a hash and saves it on the transaction.
 func SetTransactionHash(tx *flow.Transaction) error {
 	b, err := encoding.DefaultEncoder.EncodeTransaction(*tx)
 	if err != nil {
@@ -21,6 +23,7 @@ func SetTransactionHash(tx *flow.Transaction) error {
 	return nil
 }
 
+// SetChunkHash computes a hash and saves it on the chunk.
 func SetChunkHash(c *flow.Chunk) error {
 	b, err := encoding.DefaultEncoder.EncodeChunk(*c)
 	if err != nil {

@@ -27,5 +27,5 @@ type Encoder interface {
 	EncodeCollection(flow.Collection) ([]byte, error)
 }
 
-// DefaultEncoder is the default model encoder.
+// DefaultEncoder is the default model encoder used by Flow.
 var DefaultEncoder = rlp.NewEncoder()
