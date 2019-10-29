@@ -3,13 +3,14 @@ package testnet
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
+	"github.com/dapperlabs/flow-go/network/gossip"
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // TestHasherNodeAsync initializes hasherNodes and sends messages using async gossip from each node to
@@ -31,7 +32,7 @@ func TestHasherNodeAsync(t *testing.T) {
 
 	// keeping track of hasherNodes and their respective gnodes
 	hasherNodes := make([](*hasherNode), numNodes)
-	gNodes := make([](*gnode.Node), numNodes)
+	gNodes := make([](*gossip.Node), numNodes)
 
 	// create hashedNodes and initialize gNodes with them and add them to the slices
 	for i := 0; i < numNodes; i++ {
@@ -94,13 +95,12 @@ func TestHasherNodeSync(t *testing.T) {
 	hasher, err := crypto.NewHasher(crypto.SHA3_256)
 	assert.Nil(err, "could not create hasher")
 
-
 	// hashes keeps the hash of all the messages sent
 	hashes := make([]string, numNodes)
 
 	// keeping track of hasherNodes and their respective gnodes
 	hasherNodes := make([](*hasherNode), numNodes)
-	gNodes := make([](*gnode.Node), numNodes)
+	gNodes := make([](*gossip.Node), numNodes)
 
 	// create hashNodes and initialize gNodes with them and add them to the slices
 	for i := 0; i < numNodes; i++ {

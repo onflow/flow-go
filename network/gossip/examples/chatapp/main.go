@@ -55,8 +55,6 @@ func main() {
 
 	config := gossip.NewNodeConfig(NewReceiverServerRegistry(&messageReceiver{}), myPort, othersPort, 2, 10)
 	node := gossip.NewNode(config)
-	protocol := protocols.NewGServer(node)
-	node.SetProtocol(protocol)
 
 	sp, err := protocols.NewGServer(node)
 	if err != nil {

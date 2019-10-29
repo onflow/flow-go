@@ -6,9 +6,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
-	"github.com/dapperlabs/flow-go/pkg/network/gossip"
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
 // TestCacheDialerFundamentals tests the fundamental functionality of CacheDialer, such as invalid inputs
@@ -19,8 +18,8 @@ func TestCacheDialerFundamentals(t *testing.T) {
 	}
 
 	// initialize grpc serveplacer in order to dial it
-	config := gnode.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
-	node := gnode.NewNode(config)
+	config := gossip.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
+	node := gossip.NewNode(config)
 
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)
@@ -118,8 +117,8 @@ func TestCacheDialerCaching(t *testing.T) {
 	}
 
 	for i := 0; i < numInstances; i++ {
-		config := gnode.NewNodeConfig(nil, addresses[i], []string{}, 0, 10)
-		node := gnode.NewNode(config)
+		config := gossip.NewNodeConfig(nil, addresses[i], []string{}, 0, 10)
+		node := gossip.NewNode(config)
 		// establishing a new gRPC server for the gNode
 		server, err := NewGServer(node)
 		if err != nil {
@@ -198,8 +197,8 @@ func TestCacheDialerPersistence(t *testing.T) {
 	}
 
 	// initialize grpcServeplacer in order to dial it
-	config := gnode.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
-	node := gnode.NewNode(config)
+	config := gossip.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
+	node := gossip.NewNode(config)
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)
 	if err != nil {
@@ -244,7 +243,7 @@ func TestCacheDialerPersistence(t *testing.T) {
 		}
 
 		// sending the first message
-		if err := stream.Send(&shared.GossipMessage{}); err != nil {
+		if err := stream.Send(&messages.GossipMessage{}); err != nil {
 			t.Errorf("Unexpected error when trying to send a gossip message: %v", err)
 		}
 
@@ -255,7 +254,7 @@ func TestCacheDialerPersistence(t *testing.T) {
 		// sending an empty message to make sure that the connection is kept open after sending a message
 		// this may be a trivial test to pass for gRPC, nevertheless, this is a good pattern of test to
 		// check the durability of the connections
-		err = stream.Send(&shared.GossipMessage{})
+		err = stream.Send(&messages.GossipMessage{})
 		if err == io.EOF {
 			t.Errorf("Unexpected error in send. Expected: nil error, Got: EOF")
 		}
@@ -277,8 +276,8 @@ func TestBadStream(t *testing.T) {
 	}
 	address := "127.0.0.1:55000"
 	// initialize grpcServeplacer in order to dial it as a static fanout
-	config := gnode.NewNodeConfig(nil, address, []string{}, 0, 10)
-	node := gnode.NewNode(config)
+	config := gossip.NewNodeConfig(nil, address, []string{}, 0, 10)
+	node := gossip.NewNode(config)
 
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)

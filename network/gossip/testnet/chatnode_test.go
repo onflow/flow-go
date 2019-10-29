@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
 )
 
 // TestChatNodeAsync initializes chatNodes and sends messages using async gossip from each node to
@@ -21,9 +22,7 @@ func TestChatNodeAsync(t *testing.T) {
 	fanoutSize := 5
 
 	chatNodes := make([](*chatNode), numNodes)
-	gNodes := make([](*gnode.Node), numNodes)
-
-
+	gNodes := make([](*gossip.Node), numNodes)
 
 	// create chatNodes and initialize gNodes with them and add them to the slices
 	for i := 0; i < numNodes; i++ {
@@ -86,8 +85,7 @@ func TestChatNodeSync(t *testing.T) {
 	fanoutSize := 5
 
 	chatNodes := make([](*chatNode), numNodes)
-	gNodes := make([](*gnode.Node), numNodes)
-
+	gNodes := make([](*gossip.Node), numNodes)
 
 	// create chatNodes and initialize gNodes with them and add them to the slices
 	for i := 0; i < numNodes; i++ {

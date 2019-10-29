@@ -4,16 +4,17 @@ package testnet
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
 
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/network/gossip/protocols"
 )
 
 // startNode initializes a hasherNode. As part of the initialization, it creates a gNode, registers the receive method of the
 // hasherNode on it, and returns the gNode instance. Any gossip with the message type of "Receive" for that instance of the gNode
 // is routed to the corresponding instance of its hashNode
-func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNodes int, startPort int) (*gnode.Node, error) {
+func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNodes int, startPort int) (*gossip.Node, error) {
 	// the addresses of the nodes that we will use
 	portPool := make([]string, totalNumNodes)
 
@@ -28,8 +29,8 @@ func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumN
 		return nil, err
 	}
 
-	config := gnode.NewNodeConfig(nil, myPort, othersPort, fanoutSize, 10)
-	node := gnode.NewNode(config)
+	config := gossip.NewNodeConfig(nil, myPort, othersPort, fanoutSize, 10)
+	node := gossip.NewNode(config)
 
 	err = node.RegisterFunc("Receive", hn.receive)
 	if err != nil {
@@ -37,7 +38,7 @@ func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumN
 	}
 
 	sp, err := protocols.NewGServer(node)
-	if err != nil{
+	if err != nil {
 		return nil, errors.New("could not initialize new GServer")
 	}
 

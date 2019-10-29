@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
@@ -151,7 +150,7 @@ func (n *Node) asyncHashProposal(ctx context.Context, hashMsgBytes []byte) ([]by
 	address := []string{socketToString(senderAddr)}
 
 	// send a requestMessage to the sender to make him send the original message
-	_, err = n.gossip(context.Background(), requestMsgBytes, address, id, false, gossip.ModeOneToOne)
+	_, err = n.gossip(context.Background(), requestMsgBytes, address, id, false, ModeOneToOne)
 	if err != nil {
 		log.Debug().Err(err).Send()
 		return nil, errors.Wrap(err, "could not gossip message")
@@ -197,7 +196,7 @@ func (n *Node) requestMessage(ctx context.Context, hashMsgBytes []byte) ([]byte,
 	address := []string{socketToString(senderAddr)}
 
 	// send the original message
-	_, err = n.gossip(ctx, msg.GetPayload(), address, msg.GetMessageType(), false, gossip.ModeOneToOne)
+	_, err = n.gossip(ctx, msg.GetPayload(), address, msg.GetMessageType(), false, ModeOneToOne)
 	if err != nil {
 		log.Debug().Err(err).Send()
 		return nil, errors.Wrap(err, "could not gossip message")
@@ -263,14 +262,14 @@ func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []stri
 		return []*messages.GossipReply{}, err
 	}
 
-	var mode gossip.Mode
+	var mode Mode
 	switch len(recipients) {
 	case 0:
-		mode = gossip.ModeOneToAll
+		mode = ModeOneToAll
 	case 1:
-		mode = gossip.ModeOneToOne
+		mode = ModeOneToOne
 	default:
-		mode = gossip.ModeOneToMany
+		mode = ModeOneToMany
 	}
 
 	// send syncHashProposal
@@ -363,14 +362,14 @@ func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []str
 		return []*messages.GossipReply{}, err
 	}
 
-	var mode gossip.Mode
+	var mode Mode
 	switch len(recipients) {
 	case 0:
-		mode = gossip.ModeOneToAll
+		mode = ModeOneToAll
 	case 1:
-		mode = gossip.ModeOneToOne
+		mode = ModeOneToOne
 	default:
-		mode = gossip.ModeOneToMany
+		mode = ModeOneToMany
 	}
 
 	// send the hash proposal to recipients
@@ -423,14 +422,14 @@ func (n *Node) AsyncQueue(ctx context.Context, msg *messages.GossipMessage) (*me
 	case 0:
 		// In case the recipients list was empty, then this message is one
 		// to all.
-		go n.gossip(ctx, msg.GetPayload(), nil, msg.GetMessageType(), false, gossip.ModeOneToAll)
+		go n.gossip(ctx, msg.GetPayload(), nil, msg.GetMessageType(), false, ModeOneToAll)
 		// If the message is One To One, do nothing
 	case 1:
 		// Do nothing as this connection is one to one and we are the end point
 	default:
 		// In case the recipients list was greater than 1, then this message is one
 		// to many.
-		go n.gossip(ctx, msg.GetPayload(), msg.GetRecipients(), msg.GetMessageType(), false, gossip.ModeOneToMany)
+		go n.gossip(ctx, msg.GetPayload(), msg.GetRecipients(), msg.GetMessageType(), false, ModeOneToMany)
 	}
 
 	// Wait until the context expires, or if the msg got placed on the queue
@@ -571,7 +570,7 @@ func (n *Node) RegisterFunc(msgType string, f HandleFunc) error {
 // recipients:    the list of recipients of the gossip message, a nil represents a gossip to all the network
 // msgType:       represents the type of the message being gossiped
 // isSynchronous: the type of gossiping (Sync,Async)
-func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, msgType uint64, isSynchronous bool, mode gossip.Mode) ([]*messages.GossipReply, error) {
+func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, msgType uint64, isSynchronous bool, mode Mode) ([]*messages.GossipReply, error) {
 	log := n.logger.With().
 		Str("function", "gossip").
 		Logger()
@@ -598,11 +597,11 @@ func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, 
 	// If the recipients list is empty, this signals oneToAll gossip mode,
 	// so we use the fanout set as recipients
 	switch mode {
-	case gossip.ModeOneToAll:
+	case ModeOneToAll:
 		// recipient list is empty, hence this is a gossip to all (i.e., broadcast)
 		gossipMsg.Recipients = nil
 		actualRecipients = n.fanoutSet
-	case gossip.ModeOneToMany:
+	case ModeOneToMany:
 		// TODO tentative debug clue
 		actualRecipients, err = randomSubSet(recipients, n.staticFanoutNum)
 		if err != nil {
@@ -653,7 +652,7 @@ func (n *Node) gossip(ctx context.Context, payload []byte, recipients []string, 
 // placeMessage takes a context, address of target node, the message to send, and
 // whether to use sync or async mode (true for sync, false for async)
 // placeMessage establishes and manages a gRPC client inside
-func (n *Node) placeMessage(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool, mode gossip.Mode) (*messages.GossipReply, error) {
+func (n *Node) placeMessage(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool, mode Mode) (*messages.GossipReply, error) {
 	return n.server.Place(ctx, addr, msg, isSynchronous, mode)
 }
 

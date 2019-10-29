@@ -5,15 +5,17 @@ package testnet
 import (
 	"errors"
 	"fmt"
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
+
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/network/gossip/protocols"
 )
 
 // initializes a gnode with the given chatNode's functions as its registry
 // and makes it serve a listener from the pool. If different functions using the function at the same time
 // provide different startPorts to avoid conflicts
-func (cn *chatNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNodes int, startPort int) (*gnode.Node, error) {
+func (cn *chatNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNodes int, startPort int) (*gossip.Node, error) {
 	// the addresses of the nodes that we will use
 	portPool := make([]string, totalNumNodes)
 
@@ -28,11 +30,11 @@ func (cn *chatNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNod
 		return nil, err
 	}
 
-	config := gnode.NewNodeConfig(NewReceiverServerRegistry(cn), myPort, othersPort, fanoutSize, 10)
-	node := gnode.NewNode(config)
+	config := gossip.NewNodeConfig(NewReceiverServerRegistry(cn), myPort, othersPort, fanoutSize, 10)
+	node := gossip.NewNode(config)
 
 	sp, err := protocols.NewGServer(node)
-	if err != nil{
+	if err != nil {
 		return nil, errors.New("could not initialize new GServer")
 	}
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // hashernode implements a simple node that has a "hash" function which takes the hash of any payload delivered to it and saves it.
@@ -38,4 +38,3 @@ func (hn *hasherNode) store(payload []byte) {
 	hash := hn.hasher.ComputeHash(payload)
 	hn.messages = append(hn.messages, string(hash[:]))
 }
-

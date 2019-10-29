@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
-	"github.com/dapperlabs/flow-go/pkg/network/gossip"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
 // CacheDialer deals with the dynamic fanout of the gossip network. It returns a cached stream, or if not found, creates and
@@ -70,7 +71,7 @@ func (cd *CacheDialer) dial(address string, isSynchronous bool, mode gossip.Mode
 		if err != nil {
 			return nil, fmt.Errorf("could not connect to %s: %v", address, err)
 		}
-		client := shared.NewMessageReceiverClient(conn)
+		client := messages.NewMessageReceiverClient(conn)
 
 		if isSynchronous {
 			stream, err = client.StreamSyncQueue(context.Background(), grpc.UseCompressor(gzip.Name))

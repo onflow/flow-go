@@ -43,7 +43,7 @@ func main() {
 	collector.SetProtocol(sp)
 
 	// step 3: passing the listener to the instance of gnode
-	node.Serve(listener)
+	collector.Serve(listener)
 }
 
 // pickPort chooses an available port from the portPool

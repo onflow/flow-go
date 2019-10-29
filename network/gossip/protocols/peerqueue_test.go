@@ -2,13 +2,14 @@ package protocols
 
 import (
 	"context"
-	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
 // TestAddPeer tests peer adding (makes sure that once a stream is added, it can be
@@ -121,7 +122,7 @@ func TestRemove(t *testing.T) {
 }
 
 // dummyStream implements clientStream and can be used as an argument
-type dummyStream struct{
+type dummyStream struct {
 	cs grpc.ClientStream
 }
 
@@ -149,10 +150,10 @@ func (ds *dummyStream) RecvMsg(m interface{}) error {
 	return nil
 }
 
-func (ds *dummyStream) Recv() (*shared.GossipReply, error){
+func (ds *dummyStream) Recv() (*messages.GossipReply, error) {
 	return nil, nil
 }
 
-func (ds *dummyStream) 	Send(*shared.GossipMessage) error{
+func (ds *dummyStream) Send(*messages.GossipMessage) error {
 	return nil
 }

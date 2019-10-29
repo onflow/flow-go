@@ -4,22 +4,18 @@ go 1.12
 
 require (
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
-	github.com/bluele/gcache v0.0.0-20190518031135-bc40bd653833
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
 	github.com/ethereum/go-ethereum v1.9.2
-	github.com/go-pg/migrations v6.7.3+incompatible
-	github.com/go-pg/pg v8.0.4+incompatible
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
-	github.com/google/wire v0.3.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/improbable-eng/grpc-web v0.11.0
-	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
+	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
@@ -40,12 +36,10 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tinylib/msgp v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
-	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 	golang.org/x/text v0.3.2
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
 	google.golang.org/grpc v1.21.1
-	mellium.im/sasl v0.2.1 // indirect
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )
 

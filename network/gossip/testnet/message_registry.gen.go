@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	proto "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
 )
 
 type ReceiverServerRegistry struct {
 	rs ReceiverServer
 }
 
-// To make sure the class complies with the gnode.Registry interface
-var _ gnode.Registry = (*ReceiverServerRegistry)(nil)
+// To make sure the class complies with the gossip.Registry interface
+var _ gossip.Registry = (*ReceiverServerRegistry)(nil)
 
 func NewReceiverServerRegistry(rs ReceiverServer) *ReceiverServerRegistry {
 	return &ReceiverServerRegistry{
@@ -40,8 +41,8 @@ func (rsr *ReceiverServerRegistry) DisplayMessage(ctx context.Context, payloadBy
 	return respByte, respErr
 }
 
-func (rsr *ReceiverServerRegistry) MessageTypes() map[uint64]gnode.HandleFunc {
-	return map[uint64]gnode.HandleFunc{
+func (rsr *ReceiverServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
+	return map[uint64]gossip.HandleFunc{
 		0: rsr.DisplayMessage,
 	}
 }

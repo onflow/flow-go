@@ -64,8 +64,6 @@ func PutKey(key string) error {
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gossip.NewNodeConfig(colReg, "127.0.0.1:50004", serverAddress, 2, 10)
 	node := gossip.NewNode(config)
-	protocol := protocols.NewGServer(node)
-	node.SetProtocol(protocol)
 
 	sp, err := protocols.NewGServer(node)
 	if err != nil {
