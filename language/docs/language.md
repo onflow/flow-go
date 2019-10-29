@@ -4498,6 +4498,10 @@ The storage location must be a subtype of the given type.
 
 References are **copied**, i.e. they are value types.
 
+References are covariant in their base types.
+For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
+and resource `R` conforms (implements) resource interface `RI`.
+
 ```bamboo,file=storage-reference.bpl
 
 // Declare a resource interface `HasCount`.

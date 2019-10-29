@@ -4576,6 +4576,11 @@
         </p>
         <p>The storage location must be a subtype of the given type.</p>
         <p>References are <strong>copied</strong>, i.e. they are value types.</p>
+        <p>
+          References are covariant in their base types.
+          For example, <code>&#x26;R</code> is a subtype of <code>&#x26;RI</code>, if <code>R</code> is a resource, <code>RI</code> is a resource interface,
+          and resource <code>R</code> conforms (implements) resource interface <code>RI</code>.
+        </p>
         <pre><code class="language-bamboo,file=storage-reference.bpl"><span>
 </span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
