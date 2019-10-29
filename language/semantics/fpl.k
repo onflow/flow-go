@@ -161,8 +161,8 @@ module FPL-COMMON-SYNTAX
 
   syntax Stmt ::= VarDef
                 | FunDef
-                | Path "=" Exp
-                | Path "<-" Exp
+                | Path "=" Exp [strict(2)]
+                | Path "<-" Exp [strict(2)]
                 | Exp
                 // Deploy?
                 // Publish?
