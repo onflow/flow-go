@@ -32,7 +32,7 @@ where it is important that the emulator always uses the same root key (ie.
 unit tests) you can specify a hex-encoded key as an environment variable.
 
 ```bash
-docker run -e BAM_ROOTKEY=<hex-encoded key> gcr.io/dl-flow/emulator
+docker run -e FLOW_ROOTKEY=<hex-encoded key> gcr.io/dl-flow/emulator
 ```
 
 To generate a root key, use the `keys generate` command.
