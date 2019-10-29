@@ -98,6 +98,13 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 		return out
 	}
 
+	// In case a broadcasted message is received by the origin node,
+	// the message is just ignored
+	if s.currentIndex == index(orig) {
+		out.result = valid
+		return out
+	}
+
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
 		out.result, out.err = s.receiveShare(index(orig), msg[1:])

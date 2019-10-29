@@ -96,6 +96,10 @@ func (s *dkgCommon) Threshold() int {
 	return s.threshold
 }
 
+// DKGmsg is the data sent in any DKG communication
+type DKGmsg []byte
+
+// dkgMsgTag is the type used to encode message tags
 type dkgMsgTag byte
 
 const (
@@ -110,9 +114,6 @@ type DKGToSend struct {
 	dest      int    // if broadcast is false, dest is the destination index
 	data      DKGmsg // data to be sent, including a tag
 }
-
-// DKGmsg is the data sent in any DKG communication
-type DKGmsg []byte
 
 // DKGresult is the supported type for the return values
 type DKGresult int
