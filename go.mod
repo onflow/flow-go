@@ -3,14 +3,10 @@ module github.com/dapperlabs/flow-go
 go 1.12
 
 require (
-	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
-	github.com/aristanetworks/goarista v0.0.0-20191023202215-f096da5361bb // indirect
-	github.com/btcsuite/btcd v0.20.0-beta // indirect
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
-	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
@@ -22,6 +18,7 @@ require (
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
+	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
@@ -36,12 +33,11 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.0.0-20190106185902-35a74f039c6a
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
-	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 // indirect
-	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
 	github.com/stretchr/testify v1.4.0
-	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
+	golang.org/x/sys v0.0.0-20190912141932-bc967efca4b8 // indirect
 	golang.org/x/text v0.3.2
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
 	google.golang.org/grpc v1.23.1
