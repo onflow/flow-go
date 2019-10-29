@@ -287,9 +287,9 @@ func TestSubmitCollection(t *testing.T) {
 		testConcrrencyOnce)
 
 	// will take roughly 6 seconds
-	// t.Run("run the above tests for 100 times", func(t *testing.T) {
-	// 	for i := 0; i < 100; i++ {
-	// 		testConcrrencyOnce(t)
-	// 	}
-	// })
+	t.Run("run the above tests for 10 times", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			testConcrrencyOnce(t)
+		}
+	})
 }
