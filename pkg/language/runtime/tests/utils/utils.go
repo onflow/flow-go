@@ -48,7 +48,12 @@ func ParseAndCheckWithOptions(
 	if options.Location == nil {
 		options.Location = TestLocation
 	}
-	checker, err := sema.NewChecker(program, options.Values, options.Types, options.Location)
+	checker, err := sema.NewChecker(
+		program,
+		options.Location,
+		sema.WithPredeclaredValues(options.Values),
+		sema.WithPredeclaredTypes(options.Types),
+	)
 	if err != nil {
 		return checker, err
 	}

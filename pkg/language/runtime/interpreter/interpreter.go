@@ -86,18 +86,39 @@ type Interpreter struct {
 	onEventEmitted      func(EventValue)
 }
 
-type InterpreterOpt func(*Interpreter)
+type Option func(*Interpreter) error
 
-func WithOnEventEmittedHandler(handler func(EventValue)) InterpreterOpt {
-	return func(inter *Interpreter) {
-		inter.onEventEmitted = handler
+// WithOnEventEmittedHandler returns an interpreter option which sets
+// the given function as the event handler.
+//
+func WithOnEventEmittedHandler(handler func(EventValue)) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetOnEventEmitted(handler)
+		return nil
 	}
 }
 
-func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, opts ...InterpreterOpt) (*Interpreter, error) {
+// WithPredefinedValues returns an interpreter option which declares
+// the given the predefined values.
+//
+func WithPredefinedValues(predefinedValues map[string]Value) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.PredefinedValues = predefinedValues
+
+		for name, value := range predefinedValues {
+			err := interpreter.ImportValue(name, value)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
-		PredefinedValues:    predefinedValues,
 		activations:         &activations.Activations{},
 		Globals:             map[string]*Variable{},
 		interfaces:          map[string]*ast.InterfaceDeclaration{},
@@ -107,15 +128,11 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, op
 		onEventEmitted:      func(EventValue) {},
 	}
 
-	for name, value := range predefinedValues {
-		err := interpreter.ImportValue(name, value)
+	for _, option := range options {
+		err := option(interpreter)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	for _, opt := range opts {
-		opt(interpreter)
 	}
 
 	return interpreter, nil

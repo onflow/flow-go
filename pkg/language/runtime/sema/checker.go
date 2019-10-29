@@ -28,9 +28,9 @@ var beforeType = &FunctionType{
 
 type Checker struct {
 	Program                 *ast.Program
+	Location                ast.Location
 	PredeclaredValues       map[string]ValueDeclaration
 	PredeclaredTypes        map[string]TypeDeclaration
-	Location                ast.Location
 	ImportCheckers          map[ast.LocationID]*Checker
 	errors                  []error
 	valueActivations        *ValueActivations
@@ -50,12 +50,34 @@ type Checker struct {
 	currentMemberExpression *ast.MemberExpression
 }
 
-func NewChecker(
-	program *ast.Program,
-	predeclaredValues map[string]ValueDeclaration,
-	predeclaredTypes map[string]TypeDeclaration,
-	location ast.Location,
-) (*Checker, error) {
+type Option func(*Checker) error
+
+func WithPredeclaredValues(predeclaredValues map[string]ValueDeclaration) Option {
+	return func(checker *Checker) error {
+		checker.PredeclaredValues = predeclaredValues
+
+		for name, declaration := range predeclaredValues {
+			checker.declareValue(name, declaration)
+			checker.declareGlobalValue(name)
+		}
+
+		return nil
+	}
+}
+
+func WithPredeclaredTypes(predeclaredTypes map[string]TypeDeclaration) Option {
+	return func(checker *Checker) error {
+		checker.PredeclaredTypes = predeclaredTypes
+
+		for name, declaration := range predeclaredTypes {
+			checker.declareTypeDeclaration(name, declaration)
+		}
+
+		return nil
+	}
+}
+
+func NewChecker(program *ast.Program, location ast.Location, options ...Option) (*Checker, error) {
 
 	functionActivations := &FunctionActivations{}
 	functionActivations.EnterFunction(&FunctionType{
@@ -65,10 +87,8 @@ func NewChecker(
 
 	checker := &Checker{
 		Program:             program,
-		PredeclaredValues:   predeclaredValues,
-		PredeclaredTypes:    predeclaredTypes,
-		ImportCheckers:      map[ast.LocationID]*Checker{},
 		Location:            location,
+		ImportCheckers:      map[ast.LocationID]*Checker{},
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
 		typeActivations:     NewTypeActivations(baseTypes),
@@ -82,13 +102,11 @@ func NewChecker(
 		Elaboration:         NewElaboration(),
 	}
 
-	for name, declaration := range predeclaredValues {
-		checker.declareValue(name, declaration)
-		checker.declareGlobalValue(name)
-	}
-
-	for name, declaration := range predeclaredTypes {
-		checker.declareTypeDeclaration(name, declaration)
+	for _, option := range options {
+		err := option(checker)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err := checker.CheckerError()

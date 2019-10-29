@@ -282,7 +282,8 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
 }
 
-// test function call of stored structure declared in an imported program
+// TestRuntimeStorageMultipleTransactionsStructures tests a function call
+// of a stored structure declared in an imported program
 //
 func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 

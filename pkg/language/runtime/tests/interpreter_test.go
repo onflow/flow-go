@@ -53,7 +53,10 @@ func parseCheckAndInterpretWithOptions(
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, options.PredefinedValues)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(options.PredefinedValues),
+	)
 
 	require.Nil(t, err)
 
@@ -1630,11 +1633,12 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		stdlib.StandardLibraryFunctions{
-			testFunction,
-		}.ToValueDeclarations(),
-		nil,
 		ast.StringLocation(""),
+		sema.WithPredeclaredValues(
+			stdlib.StandardLibraryFunctions{
+				testFunction,
+			}.ToValueDeclarations(),
+		),
 	)
 	assert.Nil(t, err)
 
@@ -1643,9 +1647,11 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter, err := interpreter.NewInterpreter(
 		checker,
-		map[string]interpreter.Value{
-			testFunction.Name: testFunction.Function,
-		},
+		interpreter.WithPredefinedValues(
+			map[string]interpreter.Value{
+				testFunction.Name: testFunction.Function,
+			},
+		),
 	)
 
 	assert.Nil(t, err)
@@ -3544,7 +3550,7 @@ func TestInterpretImport(t *testing.T) {
 	)
 	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+	inter, err := interpreter.NewInterpreter(checkerImporting)
 	require.Nil(t, err)
 
 	err = inter.Interpret()
@@ -3602,7 +3608,10 @@ func TestInterpretImportError(t *testing.T) {
 		stdlib.PanicFunction,
 	}.ToValues()
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, values)
+	inter, err := interpreter.NewInterpreter(
+		checkerImporting,
+		interpreter.WithPredefinedValues(values),
+	)
 	require.Nil(t, err)
 
 	err = inter.Interpret()
@@ -4611,7 +4620,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 	)
 	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+	inter, err := interpreter.NewInterpreter(checkerImporting)
 	require.Nil(t, err)
 
 	err = inter.Interpret()

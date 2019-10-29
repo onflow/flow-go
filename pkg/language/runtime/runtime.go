@@ -455,7 +455,12 @@ func (r *interpreterRuntime) executeScript(
 
 	valueDeclarations := functions.ToValueDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -506,7 +511,10 @@ func (r *interpreterRuntime) executeScript(
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(functions.ToValues()),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
