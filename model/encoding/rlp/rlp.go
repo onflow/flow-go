@@ -3,8 +3,8 @@ package rlp
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Encoder struct{}
@@ -13,12 +13,12 @@ func NewEncoder() *Encoder {
 	return &Encoder{}
 }
 
-func (e *Encoder) EncodeTransaction(tx types.Transaction) ([]byte, error) {
+func (e *Encoder) EncodeTransaction(tx flow.Transaction) ([]byte, error) {
 	w := wrapTransaction(tx)
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) EncodeAccountPublicKey(a types.AccountPublicKey) ([]byte, error) {
+func (e *Encoder) EncodeAccountPublicKey(a flow.AccountPublicKey) ([]byte, error) {
 	publicKey, err := a.PublicKey.Encode()
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (e *Encoder) EncodeAccountPublicKey(a types.AccountPublicKey) ([]byte, erro
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) DecodeAccountPublicKey(b []byte) (a types.AccountPublicKey, err error) {
+func (e *Encoder) DecodeAccountPublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 	var w accountPublicKeyWrapper
 
 	err = rlp.DecodeBytes(b, &w)
@@ -50,7 +50,7 @@ func (e *Encoder) DecodeAccountPublicKey(b []byte) (a types.AccountPublicKey, er
 		return a, err
 	}
 
-	return types.AccountPublicKey{
+	return flow.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
@@ -58,7 +58,7 @@ func (e *Encoder) DecodeAccountPublicKey(b []byte) (a types.AccountPublicKey, er
 	}, nil
 }
 
-func (e *Encoder) EncodeAccountPrivateKey(a types.AccountPrivateKey) ([]byte, error) {
+func (e *Encoder) EncodeAccountPrivateKey(a flow.AccountPrivateKey) ([]byte, error) {
 	privateKey, err := a.PrivateKey.Encode()
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (e *Encoder) EncodeAccountPrivateKey(a types.AccountPrivateKey) ([]byte, er
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a types.AccountPrivateKey, err error) {
+func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a flow.AccountPrivateKey, err error) {
 	var w accountPrivateKeyWrapper
 
 	err = rlp.DecodeBytes(b, &w)
@@ -89,14 +89,14 @@ func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a types.AccountPrivateKey, 
 		return a, err
 	}
 
-	return types.AccountPrivateKey{
+	return flow.AccountPrivateKey{
 		PrivateKey: privateKey,
 		SignAlgo:   signAlgo,
 		HashAlgo:   hashAlgo,
 	}, nil
 }
 
-func (e *Encoder) EncodeChunk(c types.Chunk) ([]byte, error) {
+func (e *Encoder) EncodeChunk(c flow.Chunk) ([]byte, error) {
 	transactions := make([]transactionWrapper, 0, len(c.Transactions))
 
 	for i, tx := range c.Transactions {
@@ -111,7 +111,7 @@ func (e *Encoder) EncodeChunk(c types.Chunk) ([]byte, error) {
 	return rlp.EncodeToBytes(&w)
 }
 
-func (e *Encoder) EncodeCollection(c types.Collection) ([]byte, error) {
+func (e *Encoder) EncodeCollection(c flow.Collection) ([]byte, error) {
 	transactions := make([]transactionWrapper, 0, len(c.Transactions))
 
 	for i, tx := range c.Transactions {

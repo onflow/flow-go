@@ -1,6 +1,8 @@
 package rlp
 
-import "github.com/dapperlabs/flow-go/pkg/types"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type transactionWrapper struct {
 	Script             []byte
@@ -11,7 +13,7 @@ type transactionWrapper struct {
 	ScriptAccounts     [][]byte
 }
 
-func wrapTransaction(tx types.Transaction) transactionWrapper {
+func wrapTransaction(tx flow.Transaction) transactionWrapper {
 	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
 	for i, scriptAccount := range tx.ScriptAccounts {
 		scriptAccounts[i] = scriptAccount.Bytes()
@@ -40,11 +42,6 @@ type accountPrivateKeyWrapper struct {
 	PrivateKey []byte
 	SignAlgo   uint
 	HashAlgo   uint
-}
-
-type accountSignatureWrapper struct {
-	Account   []byte
-	Signature []byte
 }
 
 type chunkWrapper struct {
