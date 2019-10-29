@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // RuntimeContext implements host functionality required by the Cadence runtime.
@@ -76,15 +77,7 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, code []byte) (types.Address, error) {
-	if len(publicKeys) != len(keyWeights) {
-		return types.Address{}, fmt.Errorf(
-			"publicKeys (length: %d) and keyWeights (length: %d) do not match",
-			len(publicKeys),
-			len(keyWeights),
-		)
-	}
-
+func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (types.Address, error) {
 	latestAccountID, _ := r.registers.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -97,7 +90,10 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
-	r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	err := r.setAccountPublicKeys(accountID, publicKeys)
+	if err != nil {
+		return types.Address{}, err
+	}
 
 	r.registers.Set(keyLatestAccount, accountID)
 
@@ -112,7 +108,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, keyWeights []int, co
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, keyWeight int) error {
+func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte) error {
 	accountID := address.Bytes()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
@@ -120,15 +116,14 @@ func (r *RuntimeContext) AddAccountKey(address types.Address, publicKey []byte, 
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
-	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
+	publicKeys, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
 		return err
 	}
 
 	publicKeys = append(publicKeys, publicKey)
-	keyWeights = append(keyWeights, keyWeight)
 
-	return r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	return r.setAccountPublicKeys(accountID, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -143,7 +138,7 @@ func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (pub
 		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
-	publicKeys, keyWeights, err := r.getAccountPublicKeys(accountID)
+	publicKeys, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,9 +150,8 @@ func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (pub
 	removedKey := publicKeys[index]
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
-	keyWeights = append(keyWeights[:index], keyWeights[index+1:]...)
 
-	err = r.setAccountPublicKeys(accountID, publicKeys, keyWeights)
+	err = r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -165,40 +159,33 @@ func (r *RuntimeContext) RemoveAccountKey(address types.Address, index int) (pub
 	return removedKey, nil
 }
 
-func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, keyWeights []int, err error) {
+func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
 	countBytes, exists := r.registers.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if !exists {
-		return [][]byte{}, []int{}, fmt.Errorf("key count not set")
+		return [][]byte{}, fmt.Errorf("key count not set")
 	}
 
 	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
 
 	publicKeys = make([][]byte, count)
-	keyWeights = make([]int, count)
 
 	for i := 0; i < count; i++ {
-		publicKey, publicKeyExists := r.registers.Get(
+		publicKey, exists := r.registers.Get(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 		)
-
-		keyWeightBytes, keyWeightExists := r.registers.Get(
-			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
-		)
-
-		if !publicKeyExists || !keyWeightExists {
-			return nil, nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
+		if !exists {
+			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
 		publicKeys[i] = publicKey
-		keyWeights[i] = int(big.NewInt(0).SetBytes(keyWeightBytes).Int64())
 	}
 
-	return publicKeys, keyWeights, nil
+	return publicKeys, nil
 }
 
-func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte, keyWeights []int) error {
+func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {
 	var existingCount int
 
 	countBytes, exists := r.registers.Get(
@@ -218,23 +205,19 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 	)
 
 	for i, publicKey := range publicKeys {
+		if err := keys.ValidateEncodedPublicKey(publicKey); err != nil {
+			return err
+		}
+
 		r.registers.Set(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
-		)
-
-		weight := big.NewInt(int64(keyWeights[i]))
-
-		r.registers.Set(
-			fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)),
-			weight.Bytes(),
 		)
 	}
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
 		r.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKey(i)))
-		r.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKeyWeight(i)))
 	}
 
 	return nil
@@ -274,23 +257,28 @@ func (r *RuntimeContext) GetAccount(address types.Address) *types.Account {
 
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
-	// TODO: handle errors properly
 	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
-	publicKeys, keyWeights, _ := r.getAccountPublicKeys(accountID)
 
-	accountKeys := make([]types.AccountKey, len(publicKeys))
+	publicKeys, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		panic(err)
+	}
+
+	accountPublicKeys := make([]types.AccountPublicKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountKeys[i] = types.AccountKey{
-			PublicKey: publicKey,
-			Weight:    keyWeights[i],
+		accountPublicKey, err := types.DecodeAccountPublicKey(publicKey)
+		if err != nil {
+			panic(err)
 		}
+
+		accountPublicKeys[i] = accountPublicKey
 	}
 
 	return &types.Account{
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
-		Keys:    accountKeys,
+		Keys:    accountPublicKeys,
 	}
 }
 
@@ -349,8 +337,4 @@ func fullKey(owner, controller, key string) string {
 
 func keyPublicKey(index int) string {
 	return fmt.Sprintf("public_key_%d", index)
-}
-
-func keyPublicKeyWeight(index int) string {
-	return fmt.Sprintf("public_key_weight_%d", index)
 }

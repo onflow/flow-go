@@ -1,13 +1,12 @@
 package project
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/dapperlabs/flow-go/internal/cli/utils"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -15,7 +14,7 @@ const ConfigPath = "flow.json"
 
 type Account struct {
 	Address    types.Address
-	PrivateKey crypto.PrivateKey
+	PrivateKey types.AccountPrivateKey
 }
 
 // An internal utility struct that defines how Account is converted to JSON.
@@ -25,10 +24,12 @@ type accountConfigJSON struct {
 }
 
 func (acct *Account) MarshalJSON() ([]byte, error) {
-	prKeyHex, err := utils.EncodePrivateKey(acct.PrivateKey)
+	prKeyBytes, err := types.EncodeAccountPrivateKey(acct.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
+
+	prKeyHex := hex.EncodeToString(prKeyBytes)
 
 	return json.Marshal(accountConfigJSON{
 		Address:    acct.Address.Hex(),
@@ -41,8 +42,15 @@ func (acct *Account) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &alias); err != nil {
 		return
 	}
+
+	var prKeyBytes []byte
+	prKeyBytes, err = hex.DecodeString(alias.PrivateKey)
+	if err != nil {
+		return
+	}
+
 	acct.Address = types.HexToAddress(alias.Address)
-	acct.PrivateKey, err = utils.DecodePrivateKey(alias.PrivateKey)
+	acct.PrivateKey, err = types.DecodeAccountPrivateKey(prKeyBytes)
 	return
 }
 

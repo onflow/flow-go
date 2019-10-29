@@ -102,14 +102,9 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		publicKeyA, _ := b.RootKey().Publickey().Encode()
+		publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
 
-		accountKeyA := types.AccountKey{
-			PublicKey: publicKeyA,
-			Weight:    constants.AccountKeyWeightThreshold,
-		}
-
-		addressA, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript, getNonce())
+		address, err := b.CreateAccount([]types.AccountPublicKey{publicKey}, accountScript, getNonce())
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`
@@ -118,7 +113,7 @@ func TestEventEmitted(t *testing.T) {
 			fun main() {
 				emitMyEvent(x: 1, y: 2)
 			}
-		`, addressA.Hex()))
+		`, address.Hex()))
 
 		tx := &types.Transaction{
 			Script:             script,
@@ -138,7 +133,7 @@ func TestEventEmitted(t *testing.T) {
 		// first event is AccountCreated event
 		expectedEvent := events[1]
 
-		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
+		expectedID := fmt.Sprintf("account.%s.MyEvent", address.Hex())
 
 		assert.Equal(t, expectedID, expectedEvent.ID)
 		assert.Equal(t, big.NewInt(1), expectedEvent.Values["x"])

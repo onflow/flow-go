@@ -25,6 +25,7 @@ generate-godoc:
 	# godoc2md github.com/dapperlabs/flow-go/network/gossip > network/gossip/README.md
 	# godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
 	# godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
+	# godoc2md github.com/dapperlabs/flow-go/sdk/keys > sdk/keys/README.md
 
 .PHONY: generate-proto
 generate-proto:
@@ -50,7 +51,7 @@ install-cli: build-relic
 
 .PHONY: lint-sdk
 lint-sdk:
-	GO111MODULE=on golint ./sdk
+	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test

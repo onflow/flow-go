@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/types"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/model/types"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -96,9 +96,9 @@ func MessageToAccount(m *entities.Account) (types.Account, error) {
 		return types.Account{}, ErrEmptyMessage
 	}
 
-	accountKeys := make([]types.AccountKey, len(m.Keys))
+	accountKeys := make([]types.AccountPublicKey, len(m.Keys))
 	for i, key := range m.Keys {
-		accountKey, err := MessageToAccountKey(key)
+		accountKey, err := MessageToAccountPublicKey(key)
 		if err != nil {
 			return types.Account{}, err
 		}
@@ -114,10 +114,14 @@ func MessageToAccount(m *entities.Account) (types.Account, error) {
 	}, nil
 }
 
-func AccountToMessage(a types.Account) *entities.Account {
-	accountKeys := make([]*entities.AccountKey, len(a.Keys))
+func AccountToMessage(a types.Account) (*entities.Account, error) {
+	accountKeys := make([]*entities.AccountPublicKey, len(a.Keys))
 	for i, key := range a.Keys {
-		accountKeys[i] = AccountKeyToMessage(key)
+		accountKeyMsg, err := AccountPublicKeyToMessage(key)
+		if err != nil {
+			return nil, err
+		}
+		accountKeys[i] = accountKeyMsg
 	}
 
 	return &entities.Account{
@@ -125,25 +129,42 @@ func AccountToMessage(a types.Account) *entities.Account {
 		Balance: a.Balance,
 		Code:    a.Code,
 		Keys:    accountKeys,
-	}
-}
-
-func MessageToAccountKey(m *entities.AccountKey) (types.AccountKey, error) {
-	if m == nil {
-		return types.AccountKey{}, ErrEmptyMessage
-	}
-
-	return types.AccountKey{
-		PublicKey: m.PublicKey,
-		Weight:    int(m.Weight),
 	}, nil
 }
 
-func AccountKeyToMessage(a types.AccountKey) *entities.AccountKey {
-	return &entities.AccountKey{
-		PublicKey: a.PublicKey,
-		Weight:    uint32(a.Weight),
+func MessageToAccountPublicKey(m *entities.AccountPublicKey) (types.AccountPublicKey, error) {
+	if m == nil {
+		return types.AccountPublicKey{}, ErrEmptyMessage
 	}
+
+	signAlgo := crypto.SigningAlgorithm(m.GetSignAlgo())
+	hashAlgo := crypto.HashingAlgorithm(m.GetHashAlgo())
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, m.GetPublicKey())
+	if err != nil {
+		return types.AccountPublicKey{}, err
+	}
+
+	return types.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(m.GetWeight()),
+	}, nil
+}
+
+func AccountPublicKeyToMessage(a types.AccountPublicKey) (*entities.AccountPublicKey, error) {
+	publicKey, err := a.PublicKey.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &entities.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  uint32(a.SignAlgo),
+		HashAlgo:  uint32(a.HashAlgo),
+		Weight:    uint32(a.Weight),
+	}, nil
 }
 
 func MessageToEventQuery(m *observation.GetEventsRequest) types.EventQuery {

@@ -2,6 +2,7 @@ package create
 
 import (
 	"context"
+	"encoding/hex"
 	"io/ioutil"
 	"log"
 
@@ -31,23 +32,21 @@ var Cmd = &cobra.Command{
 		projectConf := project.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
-		accountKeys := make([]types.AccountKey, len(conf.Keys))
 
-		for i, privateKeyStr := range conf.Keys {
-			privateKey, err := utils.DecodePrivateKey(privateKeyStr)
+		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
+
+		for i, privateKeyHex := range conf.Keys {
+			prKeyDer, err := hex.DecodeString(privateKeyHex)
 			if err != nil {
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			publicKey, err := utils.EncodePublicKey(privateKey.Publickey())
+			privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
 			if err != nil {
-				utils.Exit(1, "Failed to encode public key")
+				utils.Exit(1, "Failed to decode private key")
 			}
 
-			accountKeys[i] = types.AccountKey{
-				PublicKey: publicKey,
-				Weight:    constants.AccountKeyWeightThreshold,
-			}
+			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 
 		var (
@@ -62,7 +61,10 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		script := templates.CreateAccount(accountKeys, code)
+		script, err := templates.CreateAccount(accountKeys, code)
+		if err != nil {
+			utils.Exit(1, "Failed to generate transaction script")
+		}
 
 		tx := types.Transaction{
 			Script:       script,
