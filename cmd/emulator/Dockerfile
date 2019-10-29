@@ -49,4 +49,7 @@ EXPOSE 8000
 EXPOSE 9090
 
 # Start the emulator and initialize project config by generating a root key.
-ENTRYPOINT ["/bin/app", "emulator", "start", "--init"]
+ENTRYPOINT ["/bin/app"]
+# These arguments are separated from the entrypoint to simplify running other
+# commands with this image.
+CMD ["emulator", "start", "--init"]
