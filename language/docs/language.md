@@ -1351,8 +1351,8 @@ a = 2
 // `a` is `2`
 
 
-let b = 3
-let c = 4
+var b = 3
+var c = 4
 
 // Invalid: The assignment operation cannot be used in an expression.
 a = b = c
@@ -1362,7 +1362,16 @@ b = c
 a = b
 ```
 
-The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
+Assignments to constants are invalid.
+
+```bamboo,file=assignment-to-constant.bpl
+let a = 1
+// Invalid: Assignments are only for variables, not constants.
+a = 2
+```
+
+The left-hand side of the assignment opera must be an identifier,
+followed by one or more index or access expressions.
 
 ```bamboo,file=assignment-numbers.bpl
 // Declare an array of integers.
@@ -1399,6 +1408,41 @@ dictionaries[false][3] = 0
 //   false: {3: 0}
 //}`
 ```
+
+### Swapping
+
+The binary swap operator `<->` can be used to exchange the values of two variables.
+It is only allowed in a statement and is not allowed in expressions.
+
+```bamboo,file=swap.bpl
+var a = 1
+var b = 2
+a <-> b
+// `a` is `2`
+// `b` is `1`
+
+var c = 3
+
+// Invalid: The swap operation cannot be used in an expression.
+a <-> b <-> c
+
+// Instead, the intended swap must be written in multiple statements.
+b <-> c
+a <-> b
+```
+
+Both sides of the swap operation must be variable, assignment to constants is invalid.
+
+```bamboo,file=swap-with-constant.bpl
+var a = 1
+let b = 2
+
+// Invalid: Swapping is only possible for variables, not constants.
+a <-> b
+```
+
+Both sides of the swap operation must be an identifier,
+followed by one or more index or access expressions.
 
 ### Arithmetic
 
@@ -4411,7 +4455,7 @@ the value must be a value that has the type `Vault` or is a subtype of `Vault`.
 
 The index operator `[]` is used for both reading and writing stored values.
 
-```bamboo
+```bamboo,file=account-storage.bpl
 // Declare a resource named `Counter`.
 //
 resource Counter {
@@ -4429,7 +4473,86 @@ resource Counter {
 //
 // The type `Counter` is used as the key to refer to the stored value.
 //
+account.storage[Counter] <- create Counter(count: 42)
+
+account.storage[Counter].count  // is `42`
+```
+
+## Storage References
+
+It is possible to create references to **storage locations**.
+References allow access to stored values and restricting the access to the stored value.
+
+For example, a user might want to share a reference to a token stored in their account,
+but limit the access and only allow reads of certain fields and calls to certain functions,
+but not expose all functionality of the token.
+
+Note that references are **not** referencing stored values –
+if the value stored in the references location is moved or removed,
+the reference is not updated and it becomes invalid.
+
+References are created by using the `&` operator, followed by the storage location,
+the `as` keyword, and the type through which the stored location should be accessed.
+
+The storage location must be a subtype of the given type.
+
+References are **copied**, i.e. they are value types.
+
+```bamboo,file=storage-reference.bpl
+
+// Declare a resource interface `HasCount`.
+//
+resource interface HasCount {
+
+    // Require implementations of the interface to provide
+    // a field named `count` which can be publicly read.
+    //
+    pub var count: Int
+}
+
+// Declare a resource named `Counter` that conforms
+// to the resource interface `HasCount`.
+//
+resource Counter: HasCount {
+    pub var count: Int
+
+    pub init(count: Int) {
+        self.count = count
+    }
+
+    pub fun increment() {
+        self.count = self.count + 1
+    }
+}
+
+// Create a new instance of the resource type `Counter` and move it
+// into the storage of the account.
+//
+// In this example the account is available as the constant `account`.
+//
+// The type `Counter` is used as the key to refer to the stored value.
+//
 account.storage[Counter] <- create Counter(count: 0)
+
+account.storage[Counter].increment()
+
+account.storage[Counter].count  // is `1`
+
+// Create a reference to the storage location `account.storage[Counter]`
+// and allow access to it as the type `HasCount`.
+//
+let reference: &HasCount = &account.storage[Counter] as HasCount
+
+// Read the counter's current count.
+// The refeference has all fields
+//
+reference.count  // is `1`
+
+// Invalid: The `increment` function is not accessible for the reference,
+// because the reference has the type `&HasCount`,
+// i.e. only fields and functions of type `HasCount` can be used.
+//
+reference.increment()
 ```
 
 ## Transactions
@@ -4682,12 +4805,6 @@ The next section will show how an account can deploy its own instance of `Fungib
      move explanation for using statement into separate section?
      also see above for version referring to local code with a path
 -->
-
-In addition to storing resources it is also possible to store references to **stored** resources or even other references.
-References can only be keyed by (and therefore accessed through) **resource interfaces**.
-
-References are created by using the `&` operator, followed by the stored resource or reference,
-the `as` operator, and the resource interface type.
 
 ```bamboo,file=setup-transaction.bpl
 // Import the resource type `FungibleToken`, which was "deployed" above,
