@@ -12,14 +12,14 @@ service ObserveService {
 
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
-  // GetLatestBlock gets the latest sealed block.
+  // GetLatestBlock gets the latest sealed or unsealed block.
   rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
   // GetTransactions gets a transaction by hash.
   rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
   // GetAccount gets an account by address.
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
-  // CallScript calls code deployed on the blockchain.
-  rpc CallScript(CallScriptRequest) returns (CallScriptResponse);
+  // ExecuteScript executes a script against the latest sealed world state.
+  rpc ExecuteScript(ExecuteScriptRequest) returns (ExecuteScriptResponse);
   // GetEvents retrieves events matching a given query.
   rpc GetEvents(GetEventsRequest) returns (GetEventsResponse);
 }
@@ -54,11 +54,11 @@ message GetAccountResponse {
   flow.sdk.entities.Account account = 1;
 }
 
-message CallScriptRequest {
+message ExecuteScriptRequest {
   bytes script = 1;
 }
 
-message CallScriptResponse {
+message ExecuteScriptResponse {
   string type = 1;
   bytes value = 2;
 }

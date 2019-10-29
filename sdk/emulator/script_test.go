@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
-func TestCallScript(t *testing.T) {
+func TestExecuteScript(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	tx := &flow.Transaction{
@@ -25,7 +25,7 @@ func TestCallScript(t *testing.T) {
 	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
 
 	// Sample call (value is 0)
-	value, err := b.CallScript([]byte(sampleCall))
+	value, err := b.ExecuteScript([]byte(sampleCall))
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
@@ -34,7 +34,7 @@ func TestCallScript(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.CallScript([]byte(sampleCall))
+	value, err = b.ExecuteScript([]byte(sampleCall))
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 }

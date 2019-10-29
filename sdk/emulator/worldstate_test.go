@@ -217,22 +217,22 @@ func TestQueryByVersion(t *testing.T) {
 	assert.NotNil(t, tx)
 
 	// Call script at invalid world state version (errors)
-	value, err := b.CallScriptAtVersion([]byte(sampleCall), invalidWorldState)
+	value, err := b.ExecuteScriptAtVersion([]byte(sampleCall), invalidWorldState)
 	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, value)
 
 	// Value at ws1 is 0
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
+	value, err = b.ExecuteScriptAtVersion([]byte(sampleCall), ws1)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
+	value, err = b.ExecuteScriptAtVersion([]byte(sampleCall), ws2)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
+	value, err = b.ExecuteScriptAtVersion([]byte(sampleCall), ws3)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(4), value)
 
