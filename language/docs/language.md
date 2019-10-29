@@ -4500,7 +4500,7 @@ References are **copied**, i.e. they are value types.
 
 References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
-and resource `R` conforms (implements) resource interface `RI`.
+and resource `R` conforms to (implements) resource interface `RI`.
 
 ```bamboo,file=storage-reference.bpl
 
