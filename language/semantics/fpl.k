@@ -739,8 +739,9 @@ module FPL-TESTING
        <scope> Scope => global </scope>
        <env> E => .Map </env>
        <store> State => .Map </store>
-       <stack> Stack => .List </stack>
-    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool Stack =/=K .List
+       <fstack> FS => .List </fstack>
+       <lstack> LS => .List </lstack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool FS =/=K .List orBool LS =/=K .List
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
