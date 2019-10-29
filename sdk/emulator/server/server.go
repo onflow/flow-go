@@ -12,9 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
@@ -34,7 +34,7 @@ type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey *types.AccountPrivateKey
+	RootAccountKey *flow.AccountPrivateKey
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
@@ -51,7 +51,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	eventStore := events.NewMemStore()
 
-	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
 			WithField("eventID", event.ID).
 			Infof("🔔  Event emitted: %s", event)
@@ -83,7 +83,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		"prKey":   hex.EncodeToString(prKeyBytes),
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
-	observe.RegisterObserveServiceServer(server.grpcServer, server.backend)
+	observation.RegisterObserveServiceServer(server.grpcServer, server.backend)
 	return server
 }
 
@@ -99,10 +99,11 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 	// Start gRPC server in a separate goroutine to continually listen for requests
 	go b.startGrpcServer()
 
-	tick := time.Tick(b.config.BlockInterval)
+	ticker := time.NewTicker(b.config.BlockInterval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-ticker.C:
 			block := b.backend.blockchain.CommitBlock()
 
 			b.logger.WithFields(log.Fields{
@@ -123,7 +124,10 @@ func (b *EmulatorServer) startGrpcServer() {
 		b.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
-	b.grpcServer.Serve(lis)
+	err = b.grpcServer.Serve(lis)
+	if err != nil {
+		b.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
+	}
 }
 
 // StartServer sets up a wrapped instance of the Flow Emulator server and starts it.

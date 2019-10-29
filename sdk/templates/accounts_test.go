@@ -5,17 +5,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/pkg/utils/unittest"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/templates"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestCreateAccount(t *testing.T) {
 	publicKey := unittest.PublicKeyFixtures()[0]
 
-	accountKey := types.AccountPublicKey{
+	accountKey := flow.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  publicKey.Algorithm(),
 		HashAlgo:  crypto.SHA3_256,
@@ -23,7 +23,7 @@ func TestCreateAccount(t *testing.T) {
 	}
 
 	// create account with no code
-	scriptA, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, []byte{})
+	scriptA, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, []byte{})
 	assert.Nil(t, err)
 
 	expectedScriptA := []byte(`
@@ -37,7 +37,7 @@ func TestCreateAccount(t *testing.T) {
 	assert.Equal(t, expectedScriptA, scriptA)
 
 	// create account with code
-	scriptB, err := templates.CreateAccount([]types.AccountPublicKey{accountKey}, []byte("fun main() {}"))
+	scriptB, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, []byte("fun main() {}"))
 	assert.Nil(t, err)
 
 	expectedScriptB := []byte(`
