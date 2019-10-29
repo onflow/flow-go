@@ -1351,8 +1351,8 @@ a = 2
 // `a` is `2`
 
 
-let b = 3
-let c = 4
+var b = 3
+var c = 4
 
 // Invalid: The assignment operation cannot be used in an expression.
 a = b = c
@@ -1362,7 +1362,16 @@ b = c
 a = b
 ```
 
-The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.
+Assignments to constants are invalid.
+
+```bamboo,file=assignment-to-constant.bpl
+let a = 1
+// Invalid: Assignments are only for variables, not constants.
+a = 2
+```
+
+The left-hand side of the assignment opera must be an identifier,
+followed by one or more index or access expressions.
 
 ```bamboo,file=assignment-numbers.bpl
 // Declare an array of integers.
@@ -1399,6 +1408,41 @@ dictionaries[false][3] = 0
 //   false: {3: 0}
 //}`
 ```
+
+### Swapping
+
+The binary swap operator `<->` can be used to exchange the values of two variables.
+It is only allowed in a statement and is not allowed in expressions.
+
+```bamboo,file=swap.bpl
+var a = 1
+var b = 2
+a <-> b
+// `a` is `2`
+// `b` is `1`
+
+var c = 3
+
+// Invalid: The swap operation cannot be used in an expression.
+a <-> b <-> c
+
+// Instead, the intended swap must be written in multiple statements.
+b <-> c
+a <-> b
+```
+
+Both sides of the swap operation must be variable, assignment to constants is invalid.
+
+```bamboo,file=swap-with-constant.bpl
+var a = 1
+let b = 2
+
+// Invalid: Swapping is only possible for variables, not constants.
+a <-> b
+```
+
+Both sides of the swap operation must be an identifier,
+followed by one or more index or access expressions.
 
 ### Arithmetic
 

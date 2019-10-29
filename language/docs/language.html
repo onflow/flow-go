@@ -110,6 +110,7 @@
             <ul>
               <li><a href="#negation">Negation</a></li>
               <li><a href="#assignment">Assignment</a></li>
+              <li><a href="#swapping">Swapping</a></li>
               <li><a href="#arithmetic">Arithmetic</a></li>
               <li><a href="#logical-operators">Logical Operators</a></li>
               <li><a href="#comparison-operators">Comparison operators</a></li>
@@ -1574,8 +1575,8 @@
 </span><span style="color: #008000">// `a` is `2`</span><span>
 </span><span>
 </span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">3</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">4</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> c = </span><span style="color: #09885A">4</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: The assignment operation cannot be used in an expression.</span><span>
 </span><span style="color: #000000">a = b = c</span><span>
@@ -1584,7 +1585,15 @@
 </span><span style="color: #000000">b = c</span><span>
 </span><span style="color: #000000">a = b</span><span>
 </span></code></pre>
-          <p>The left-hand side of the assignment must be an identifier, followed by one or more index or access expressions.</p>
+          <p>Assignments to constants are invalid.</p>
+          <pre><code class="language-bamboo,file=assignment-to-constant.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// Invalid: Assignments are only for variables, not constants.</span><span>
+</span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
+</span></code></pre>
+          <p>
+            The left-hand side of the assignment opera must be an identifier,
+            followed by one or more index or access expressions.
+          </p>
           <pre><code class="language-bamboo,file=assignment-numbers.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1615,6 +1624,39 @@
 </span><span style="color: #008000">//   false: {3: 0}</span><span>
 </span><span style="color: #008000">//}`</span><span>
 </span></code></pre>
+        </section>
+        <section>
+          <h3 id="swapping"><a href="#swapping" aria-hidden="true"><span class="icon icon-link"></span></a>Swapping</h3>
+          <p>
+            The binary swap operator <code>&#x3C;-></code> can be used to exchange the values of two variables.
+            It is only allowed in a statement and is not allowed in expressions.
+          </p>
+          <pre><code class="language-bamboo,file=swap.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span><span style="color: #008000">// `a` is `2`</span><span>
+</span><span style="color: #008000">// `b` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> c = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The swap operation cannot be used in an expression.</span><span>
+</span><span style="color: #000000">a &#x3C;-> b &#x3C;-> c</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, the intended swap must be written in multiple statements.</span><span>
+</span><span style="color: #000000">b &#x3C;-> c</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span></code></pre>
+          <p>Both sides of the swap operation must be variable, assignment to constants is invalid.</p>
+          <pre><code class="language-bamboo,file=swap-with-constant.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Swapping is only possible for variables, not constants.</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span></code></pre>
+          <p>
+            Both sides of the swap operation must be an identifier,
+            followed by one or more index or access expressions.
+          </p>
         </section>
         <section>
           <h3 id="arithmetic"><a href="#arithmetic" aria-hidden="true"><span class="icon icon-link"></span></a>Arithmetic</h3>
