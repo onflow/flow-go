@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -13,22 +14,20 @@ import (
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
 	fun main(account: Account) {
-		let controller = [1]
-		let owner = [2]
-		let key = [3]
-		let value = getValue(controller, owner, key)
-		setValue(controller, owner, key, value + 2)
+		account.storage[Int] = (account.storage[Int] ?? 0) + 2
 	}
 `
 
 const sampleCall = `
 	fun main(): Int {
-		return getValue([1], [2], [3])
+		return getAccount("%s").storage[Int] ?? 0
 	}
 `
 
 func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
+
+	accountAddress := b.RootAccountAddress()
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
 	tx1 := &flow.Transaction{
@@ -36,33 +35,33 @@ func TestWorldStates(t *testing.T) {
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx1.AddSignature(accountAddress, b.RootKey())
 
 	tx2 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx2.AddSignature(accountAddress, b.RootKey())
 
 	tx3 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx3.AddSignature(accountAddress, b.RootKey())
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: %x\n", ws1)
@@ -154,27 +153,29 @@ func TestWorldStates(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
+	accountAddress := b.RootAccountAddress()
+
 	tx1 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx1.AddSignature(accountAddress, b.RootKey())
 
 	tx2 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx2.AddSignature(accountAddress, b.RootKey())
 
 	var invalidWorldState crypto.Hash
 
@@ -217,22 +218,23 @@ func TestQueryByVersion(t *testing.T) {
 	assert.NotNil(t, tx)
 
 	// Call script at invalid world state version (errors)
-	value, err := b.CallScriptAtVersion([]byte(sampleCall), invalidWorldState)
+	callScript := fmt.Sprintf(sampleCall, accountAddress)
+	value, err := b.CallScriptAtVersion([]byte(callScript), invalidWorldState)
 	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, value)
 
 	// Value at ws1 is 0
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
+	value, err = b.CallScriptAtVersion([]byte(callScript), ws1)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
+	value, err = b.CallScriptAtVersion([]byte(callScript), ws2)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
+	value, err = b.CallScriptAtVersion([]byte(callScript), ws3)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(4), value)
 
