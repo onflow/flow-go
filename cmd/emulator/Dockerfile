@@ -48,5 +48,8 @@ COPY --from=build-app /app/app /bin/app
 EXPOSE 8000
 EXPOSE 9090
 
-# Start the emulator and initialize project config by generating a root key.
-ENTRYPOINT ["/bin/app", "emulator", "start", "--init"]
+# Run the CLI binary as the entrypoint
+ENTRYPOINT ["/bin/app"]
+# These arguments are separated from the entrypoint to simplify running other
+# commands with this image.
+CMD ["emulator", "start", "--init"]
