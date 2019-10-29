@@ -258,8 +258,8 @@ module FPL-COMMON-SYNTAX
                 | "Self"
                 | "(" "(" Types ")" ":" Type ")"
                 | Type "?"
-                | Type "[" "]"
-                | Type "[" IntLit "]"
+                | "[" Type "]"
+                | "[" Type ";" IntLit "]"
                 | Type "[" Type "]"
                 > "@" Type
   syntax Types ::= List{Type,","}
@@ -308,7 +308,7 @@ module FPL-VALUES
   imports STRING-SYNTAX
   imports LIST
 
-  syntax Type ::= Type "[" Int "]"
+  syntax Type ::= "[" Type ";" Int "]"
   syntax Val ::= Int | Bool | unit() | array(List)
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
@@ -375,7 +375,7 @@ module FPL-TYPING
 
   rule type(E) => infer(#type(E))
   rule infer(IntLit) => Int
-  rule infer(IntLit []) => Int []
+  rule infer([IntLit]) => [Int]
   rule infer(T) => T [owise]
 
   rule #type(I:Int) => IntLit
@@ -384,7 +384,7 @@ module FPL-TYPING
        <env>... X |-> env(... t: T) ...</env>
   rule [[ #type(X:Ident(_)) => R ]]
        <env>... X |-> env(... t: ((_): R)) ...</env>
-  rule #type([ E, .Exps ]) => #type(E) []
+  rule #type([ E, .Exps ]) => [ #type(E) ]
   rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
   rule #type(- E => E)
   rule #type(! _) => Bool
@@ -412,8 +412,8 @@ module FPL-TYPING
   rule type(E1, E2) => #type(#type(E1), #type(E2))
   rule #type(IntLit, T) => T
   rule #type(T, IntLit) => T
-  rule #type(IntLit [], T) => T
-  rule #type(T, IntLit []) => T
+  rule #type([IntLit], T) => T
+  rule #type(T, [IntLit]) => T
   rule #type(T, T) => T
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
@@ -650,7 +650,7 @@ module FPL-ARITHMETIC
     requires lengthString(Bin) >=Int 2 andBool substrString(Bin, 0, 2) ==String "0b"
   rule processIntLit(Dec::String) => String2Int(Dec) [owise]
 
-  rule T::Type [ I::IntLit ] => T [ {intLit(I)}:>Int ] [anywhere]
+  rule [ T::Type ; I::IntLit ] => [ T ; {intLit(I)}:>Int ] [anywhere]
 
   syntax Exp ::= intExp(Exp, Exp)
   rule intExp(L, R)
@@ -757,9 +757,9 @@ module FPL-ARRAYS
   rule arrayLit(V, Vs) => ListItem(V) arrayLit(Vs)
 
   rule (_::Exp [ v(I:Int, _) => I ])::Exp
-  rule (v(array(L::List), T []) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+  rule (v(array(L::List), [T]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
     requires I >=Int 0 andBool I <Int size(L)
-  rule (v(array(L::List), T [ _:Int ]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+  rule (v(array(L::List), [T ; _:Int ]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
     requires I >=Int 0 andBool I <Int size(L)
   rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
     requires I <Int 0 orBool I >=Int size(L)
