@@ -10,7 +10,7 @@ import (
 
 func TestInterpreterOptionalBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil, nil)
+	inter, err := NewInterpreter(nil)
 	assert.Nil(t, err)
 
 	value, newType := inter.boxOptional(
@@ -58,7 +58,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 
 func TestInterpreterAnyBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil, nil)
+	inter, err := NewInterpreter(nil)
 	assert.Nil(t, err)
 
 	assert.Equal(t,
@@ -107,7 +107,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 
 func TestInterpreterBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil, nil)
+	inter, err := NewInterpreter(nil)
 	assert.Nil(t, err)
 
 	assert.Equal(t,

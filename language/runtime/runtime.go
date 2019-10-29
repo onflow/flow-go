@@ -18,6 +18,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+func init() {
+	gob.Register(flow.Address{})
+}
+
 type ImportLocation interface {
 	isImportLocation()
 }
@@ -455,7 +459,12 @@ func (r *interpreterRuntime) executeScript(
 
 	valueDeclarations := functions.ToValueDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -506,52 +515,32 @@ func (r *interpreterRuntime) executeScript(
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(functions.ToValues()),
+		interpreter.WithOnEventEmittedHandler(func(eventValue interpreter.EventValue) {
+			r.emitEvent(eventValue, runtimeInterface)
+		}),
+		interpreter.WithOnReadStoredValue(r.storageReadHandler(runtimeInterface)),
+		interpreter.WithOnWriteStoredValue(r.storageWriteHandler(runtimeInterface)),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
-
-	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
-		r.emitEvent(eventValue, runtimeInterface)
-	})
 
 	if err := inter.Interpret(); err != nil {
 		return nil, Error{[]error{err}}
 	}
 
 	signingAccounts := make([]interface{}, signingAccountsCount)
-	storedValues := make([]map[string]interpreter.Value, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccount, storedValue, err := loadAccount(runtimeInterface, address)
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
-
-		signingAccounts[i] = signingAccount
-		storedValues[i] = storedValue
+		signingAccounts[i] = accountValue(address)
 	}
 
 	value, err := inter.InvokeExportable("main", signingAccounts...)
 	if err != nil {
 		return nil, Error{[]error{err}}
-	}
-
-	for i, storedValue := range storedValues {
-		address := signingAccountAddresses[i]
-
-		var newStoredData bytes.Buffer
-		encoder := gob.NewEncoder(&newStoredData)
-		err = encoder.Encode(&storedValue)
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
-
-		// TODO: fix controller and key
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, []byte("storage"), newStoredData.Bytes())
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
 	}
 
 	return value.ToGoValue(), nil
@@ -560,18 +549,6 @@ func (r *interpreterRuntime) executeScript(
 func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.BuiltinFunctions,
-		stdlib.NewStandardLibraryFunction(
-			"getValue",
-			&getValueFunctionType,
-			r.newGetValueFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"setValue",
-			&setValueFunctionType,
-			r.newSetValueFunction(runtimeInterface),
-			nil,
-		),
 		stdlib.NewStandardLibraryFunction(
 			"createAccount",
 			&createAccountFunctionType,
@@ -611,96 +588,71 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 	)
 }
 
-func loadAccount(runtimeInterface Interface, address flow.Address) (
-	interface{},
-	map[string]interpreter.Value,
-	error,
-) {
-	// TODO: fix controller and key
-	storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte("storage"))
-	if err != nil {
-		return nil, nil, Error{[]error{err}}
-	}
-
-	storedValue := map[string]interpreter.Value{}
-	if len(storedData) > 0 {
-		decoder := gob.NewDecoder(bytes.NewReader(storedData))
-		err = decoder.Decode(&storedValue)
-		if err != nil {
-			return nil, nil, Error{[]error{err}}
-		}
-	}
-
-	account := interpreter.CompositeValue{
+func accountValue(address flow.Address) interpreter.Value {
+	return interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(address.String()),
-			"storage": storageValue(storedValue),
-		},
-	}
-
-	return account, storedValue, nil
-}
-
-func storageValue(storedValues map[string]interpreter.Value) interpreter.StorageValue {
-	return interpreter.StorageValue{
-		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			key := keyType.String()
-
-			value, ok := storedValues[key]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return interpreter.SomeValue{Value: value}
-		},
-		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			key := keyType.String()
-			switch typedValue := value.(type) {
-			case interpreter.SomeValue:
-				storedValues[key] = typedValue.Value
-				return
-			case interpreter.NilValue:
-				delete(storedValues, key)
-				return
-			default:
-				panic(&runtimeErrors.UnreachableError{})
-			}
+			"storage": interpreter.StorageValue{Identifier: address},
 		},
 	}
 }
 
-func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		owner, controller, key := r.getOwnerControllerKey(arguments)
+func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.OnReadStoredValueFunc {
+	return func(storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
+		address := storageIdentifier.(flow.Address)
+		key := []byte(keyType.String())
 
-		// TODO: only integer values supported for now. written in internal byte representation
-		intValue, ok := arguments[3].(interpreter.IntValue)
-		if !ok {
-			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
-		}
-		value := intValue.Int.Bytes()
-
-		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
-			panic(err)
-		}
-
-		result := &interpreter.VoidValue{}
-		return trampoline.Done{Result: result}
-	}
-}
-
-func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-
-		owner, controller, key := r.getOwnerControllerKey(arguments)
-
-		value, err := runtimeInterface.GetValue(owner, controller, key)
+		// TODO: fix controller
+		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, key)
 		if err != nil {
 			panic(err)
 		}
 
-		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
-		return trampoline.Done{Result: result}
+		var storedValue interpreter.Value
+		if len(storedData) == 0 {
+			return interpreter.NilValue{}
+		}
+
+		decoder := gob.NewDecoder(bytes.NewReader(storedData))
+		err = decoder.Decode(&storedValue)
+		if err != nil {
+			panic(err)
+		}
+
+		return interpreter.SomeValue{
+			Value: storedValue,
+		}
+	}
+}
+
+func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.OnWriteStoredValueFunc {
+	return func(storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+		address := storageIdentifier.(flow.Address)
+		key := []byte(keyType.String())
+
+		var newData []byte
+		switch typedValue := value.(type) {
+		case interpreter.SomeValue:
+			var newStoredData bytes.Buffer
+			encoder := gob.NewEncoder(&newStoredData)
+			err := encoder.Encode(&typedValue.Value)
+			if err != nil {
+				panic(err)
+			}
+			newData = newStoredData.Bytes()
+			break
+		case interpreter.NilValue:
+			break
+		default:
+			panic(&runtimeErrors.UnreachableError{})
+		}
+
+		// TODO: fix controller
+		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, key, newData)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -844,11 +796,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 		}
 
 		address := flow.HexToAddress(stringValue.StrValue())
-
-		account, _, err := loadAccount(runtimeInterface, address)
-		if err != nil {
-			panic(err)
-		}
+		account := accountValue(address)
 
 		return trampoline.Done{Result: account}
 	}
