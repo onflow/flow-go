@@ -8,6 +8,7 @@ import (
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
@@ -46,6 +47,7 @@ func init() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
+		FromEnvironment(utils.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {

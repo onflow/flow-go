@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+const EnvPrefix = "FLOW"
+
 func Exit(code int, msg string) {
 	fmt.Println(msg)
 	os.Exit(code)

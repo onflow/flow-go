@@ -94,7 +94,7 @@ func initLogger() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
-		FromEnvironment("BAM").
+		FromEnvironment(utils.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {

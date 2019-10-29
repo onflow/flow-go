@@ -73,6 +73,7 @@ func init() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
+		FromEnvironment(utils.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {
