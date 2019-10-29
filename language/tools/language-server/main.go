@@ -158,7 +158,12 @@ func (s server) DidChangeTextDocument(
 
 		// check program
 
-		checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, ast.FileLocation(string(uri)))
+		checker, err := sema.NewChecker(
+			program,
+			ast.FileLocation(string(uri)),
+			sema.WithPredeclaredValues(valueDeclarations),
+			sema.WithPredeclaredTypes(typeDeclarations),
+		)
 		if err != nil {
 			panic(err)
 		}
