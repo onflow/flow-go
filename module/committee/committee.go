@@ -69,7 +69,7 @@ func New(entries []string, identity string) (*Committee, error) {
 		}
 
 		// add entry to identity table
-		node := &flow.Node{
+		node := flow.Node{
 			ID:      id,
 			Role:    role,
 			Address: address,

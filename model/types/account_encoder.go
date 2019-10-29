@@ -5,7 +5,7 @@ package types
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // accountPublicKeyWrapper is used for encoding and decoding.

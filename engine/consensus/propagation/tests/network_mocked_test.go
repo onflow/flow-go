@@ -1,17 +1,20 @@
 package tests
 
 import (
-	"github.com/dapperlabs/flow-go/internal/roles/consensus/propagation"
-	"github.com/dapperlabs/flow-go/pkg/model/collection"
-	"github.com/dapperlabs/flow-go/pkg/module/committee"
-	"github.com/dapperlabs/flow-go/pkg/module/mempool"
-	"github.com/dapperlabs/flow-go/pkg/network/mock"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"math/rand"
 	"os"
 	"testing"
+
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
+	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/network/mock"
 )
 
 // mockPropagationNode is a mocked node instance for testing propagation engine.
@@ -54,7 +57,12 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		return nil, err
 	}
 
-	engine, err := propagation.NewEngine(log, net, com, pool)
+	vol, err := volatile.New()
+	if err != nil {
+		return nil, err
+	}
+
+	engine, err := propagation.NewEngine(log, net, com, pool, vol)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +93,7 @@ func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNo
 	return hub, nodes, nil
 }
 
-// a utiliy func to return a random collection hash
+// a utility func to return a random collection hash
 func randHash() ([]byte, error) {
 	hash := make([]byte, 32)
 	_, err := rand.Read(hash)

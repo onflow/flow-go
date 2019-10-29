@@ -4,8 +4,8 @@ package keys
 import (
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/types"
 )
 
 // KeyType is a key format supported by Flow.

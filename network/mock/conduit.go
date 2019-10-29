@@ -1,14 +1,14 @@
 package mock
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/network/trickle"
+	"github.com/dapperlabs/flow-go/network/trickle"
 )
 
 type Conduit struct {
 	engineID uint8
-	send     trickle.SendFunc
+	submit   trickle.SubmitFunc
 }
 
-func (c *Conduit) Send(event interface{}, targetIDs ...string) error {
-	return c.send(c.engineID, event, targetIDs...)
+func (c *Conduit) Submit(event interface{}, targetIDs ...string) error {
+	return c.submit(c.engineID, event, targetIDs...)
 }

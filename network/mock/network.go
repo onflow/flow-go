@@ -1,9 +1,10 @@
 package mock
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/module"
-	"github.com/dapperlabs/flow-go/pkg/network"
 	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/network"
 )
 
 // Network is a mocked network layer made for testing Engine's behavior.
@@ -67,7 +68,7 @@ func (mn *Network) Register(engineID uint8, engine network.Engine) (network.Cond
 	}
 	conduit := &Conduit{
 		engineID: engineID,
-		send:     mn.submit,
+		submit:   mn.submit,
 	}
 	mn.engines[engineID] = engine
 	return conduit, nil

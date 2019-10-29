@@ -3,7 +3,7 @@ package checker
 import (
 	"testing"
 
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

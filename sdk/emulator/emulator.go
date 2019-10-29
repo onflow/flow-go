@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -482,7 +482,11 @@ func createRootAccount(
 	var privateKey types.AccountPrivateKey
 
 	if customPrivateKey == nil {
-		privateKey, _ = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		var err error
+		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		privateKey = *customPrivateKey
 	}

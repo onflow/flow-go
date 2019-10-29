@@ -1,11 +1,11 @@
 package runtime
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/parser"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 type REPL struct {
