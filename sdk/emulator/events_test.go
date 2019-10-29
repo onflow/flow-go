@@ -8,19 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
 func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		events := make([]types.Event, 0)
+		events := make([]flow.Event, 0)
 
 		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
 		})
@@ -33,7 +33,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		tx := &types.Transaction{
+		tx := &flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -56,10 +56,10 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		events := make([]types.Event, 0)
+		events := make([]flow.Event, 0)
 
 		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
 		})
@@ -85,37 +85,37 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		events := make([]types.Event, 0)
+		events := make([]flow.Event, 0)
 
 		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-			OnEventEmitted: func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
+			OnLogMessage: func(msg string) { fmt.Println("LOG:", msg) },
 		})
 
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
+
+			fun emitMyEvent(x: Int, y: Int) {
+				emit MyEvent(x: x, y: y)
+			}
 		`)
 
-		publicKeyA, _ := b.RootKey().Publickey().Encode()
+		publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
 
-		accountKeyA := types.AccountKey{
-			PublicKey: publicKeyA,
-			Weight:    constants.AccountKeyWeightThreshold,
-		}
-
-		addressA, err := b.CreateAccount([]types.AccountKey{accountKeyA}, accountScript, getNonce())
+		address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
 		assert.Nil(t, err)
 
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
 			fun main() {
-				emit MyEvent(x: 1, y: 2)
+				emitMyEvent(x: 1, y: 2)
 			}
-		`, addressA.Hex()))
+		`, address.Hex()))
 
-		tx := &types.Transaction{
+		tx := &flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -133,7 +133,7 @@ func TestEventEmitted(t *testing.T) {
 		// first event is AccountCreated event
 		expectedEvent := events[1]
 
-		expectedID := fmt.Sprintf("account.%s.MyEvent", addressA.Hex())
+		expectedID := fmt.Sprintf("account.%s.MyEvent", address.Hex())
 
 		assert.Equal(t, expectedID, expectedEvent.ID)
 		assert.Equal(t, big.NewInt(1), expectedEvent.Values["x"])

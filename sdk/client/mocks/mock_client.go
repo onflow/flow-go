@@ -6,7 +6,7 @@ package mocks
 
 import (
 	context "context"
-	observe "github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
+	observation "github.com/dapperlabs/flow-go/proto/services/observation"
 	gomock "github.com/golang/mock/gomock"
 	grpc "google.golang.org/grpc"
 	reflect "reflect"
@@ -36,14 +36,14 @@ func (m *MockRPCClient) EXPECT() *MockRPCClientMockRecorder {
 }
 
 // CallScript mocks base method
-func (m *MockRPCClient) CallScript(arg0 context.Context, arg1 *observe.CallScriptRequest, arg2 ...grpc.CallOption) (*observe.CallScriptResponse, error) {
+func (m *MockRPCClient) CallScript(arg0 context.Context, arg1 *observation.CallScriptRequest, arg2 ...grpc.CallOption) (*observation.CallScriptResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CallScript", varargs...)
-	ret0, _ := ret[0].(*observe.CallScriptResponse)
+	ret0, _ := ret[0].(*observation.CallScriptResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -56,14 +56,14 @@ func (mr *MockRPCClientMockRecorder) CallScript(arg0, arg1 interface{}, arg2 ...
 }
 
 // GetAccount mocks base method
-func (m *MockRPCClient) GetAccount(arg0 context.Context, arg1 *observe.GetAccountRequest, arg2 ...grpc.CallOption) (*observe.GetAccountResponse, error) {
+func (m *MockRPCClient) GetAccount(arg0 context.Context, arg1 *observation.GetAccountRequest, arg2 ...grpc.CallOption) (*observation.GetAccountResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetAccount", varargs...)
-	ret0, _ := ret[0].(*observe.GetAccountResponse)
+	ret0, _ := ret[0].(*observation.GetAccountResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -76,14 +76,14 @@ func (mr *MockRPCClientMockRecorder) GetAccount(arg0, arg1 interface{}, arg2 ...
 }
 
 // GetEvents mocks base method
-func (m *MockRPCClient) GetEvents(arg0 context.Context, arg1 *observe.GetEventsRequest, arg2 ...grpc.CallOption) (*observe.GetEventsResponse, error) {
+func (m *MockRPCClient) GetEvents(arg0 context.Context, arg1 *observation.GetEventsRequest, arg2 ...grpc.CallOption) (*observation.GetEventsResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetEvents", varargs...)
-	ret0, _ := ret[0].(*observe.GetEventsResponse)
+	ret0, _ := ret[0].(*observation.GetEventsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -96,14 +96,14 @@ func (mr *MockRPCClientMockRecorder) GetEvents(arg0, arg1 interface{}, arg2 ...i
 }
 
 // GetLatestBlock mocks base method
-func (m *MockRPCClient) GetLatestBlock(arg0 context.Context, arg1 *observe.GetLatestBlockRequest, arg2 ...grpc.CallOption) (*observe.GetLatestBlockResponse, error) {
+func (m *MockRPCClient) GetLatestBlock(arg0 context.Context, arg1 *observation.GetLatestBlockRequest, arg2 ...grpc.CallOption) (*observation.GetLatestBlockResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetLatestBlock", varargs...)
-	ret0, _ := ret[0].(*observe.GetLatestBlockResponse)
+	ret0, _ := ret[0].(*observation.GetLatestBlockResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -116,14 +116,14 @@ func (mr *MockRPCClientMockRecorder) GetLatestBlock(arg0, arg1 interface{}, arg2
 }
 
 // GetTransaction mocks base method
-func (m *MockRPCClient) GetTransaction(arg0 context.Context, arg1 *observe.GetTransactionRequest, arg2 ...grpc.CallOption) (*observe.GetTransactionResponse, error) {
+func (m *MockRPCClient) GetTransaction(arg0 context.Context, arg1 *observation.GetTransactionRequest, arg2 ...grpc.CallOption) (*observation.GetTransactionResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetTransaction", varargs...)
-	ret0, _ := ret[0].(*observe.GetTransactionResponse)
+	ret0, _ := ret[0].(*observation.GetTransactionResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -136,14 +136,14 @@ func (mr *MockRPCClientMockRecorder) GetTransaction(arg0, arg1 interface{}, arg2
 }
 
 // Ping mocks base method
-func (m *MockRPCClient) Ping(arg0 context.Context, arg1 *observe.PingRequest, arg2 ...grpc.CallOption) (*observe.PingResponse, error) {
+func (m *MockRPCClient) Ping(arg0 context.Context, arg1 *observation.PingRequest, arg2 ...grpc.CallOption) (*observation.PingResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "Ping", varargs...)
-	ret0, _ := ret[0].(*observe.PingResponse)
+	ret0, _ := ret[0].(*observation.PingResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,14 +156,14 @@ func (mr *MockRPCClientMockRecorder) Ping(arg0, arg1 interface{}, arg2 ...interf
 }
 
 // SendTransaction mocks base method
-func (m *MockRPCClient) SendTransaction(arg0 context.Context, arg1 *observe.SendTransactionRequest, arg2 ...grpc.CallOption) (*observe.SendTransactionResponse, error) {
+func (m *MockRPCClient) SendTransaction(arg0 context.Context, arg1 *observation.SendTransactionRequest, arg2 ...grpc.CallOption) (*observation.SendTransactionResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "SendTransaction", varargs...)
-	ret0, _ := ret[0].(*observe.SendTransactionResponse)
+	ret0, _ := ret[0].(*observation.SendTransactionResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
