@@ -4478,7 +4478,7 @@ account.storage[Counter] <- create Counter(count: 42)
 account.storage[Counter].count  // is `42`
 ```
 
-## Account Storage References
+## Storage References
 
 It is possible to create references to **storage locations**.
 References allow access to stored values and restricting the access to the stored value.
@@ -4498,7 +4498,7 @@ The storage location must be a subtype of the given type.
 
 References are **copied**, i.e. they are value types.
 
-```bamboo,file=account-storage-reference.bpl
+```bamboo,file=storage-reference.bpl
 
 // Declare a resource interface `HasCount`.
 //

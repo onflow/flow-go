@@ -216,6 +216,9 @@
             <p><a href="#account-storage">Account Storage</a></p>
           </li>
           <li>
+            <p><a href="#storage-references">Storage References</a></p>
+          </li>
+          <li>
             <p><a href="#transactions">Transactions</a></p>
             <ul>
               <li><a href="#deployment">Deployment</a></li>
@@ -4529,7 +4532,7 @@
           the value must be a value that has the type <code>Vault</code> or is a subtype of <code>Vault</code>.
         </p>
         <p>The index operator <code>[]</code> is used for both reading and writing stored values.</p>
-        <pre><code class="language-bamboo"><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
+        <pre><code class="language-bamboo,file=account-storage.bpl"><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
@@ -4546,7 +4549,87 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The type `Counter` is used as the key to refer to the stored value.</span><span>
 </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account.storage[Counter] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Counter(count: </span><span style="color: #09885A">42</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">account.storage[Counter].count  </span><span style="color: #008000">// is `42`</span><span>
+</span></code></pre>
+      </section>
+      <section>
+        <h2 id="storage-references"><a href="#storage-references" aria-hidden="true"><span class="icon icon-link"></span></a>Storage References</h2>
+        <p>
+          It is possible to create references to <strong>storage locations</strong>.
+          References allow access to stored values and restricting the access to the stored value.
+        </p>
+        <p>
+          For example, a user might want to share a reference to a token stored in their account,
+          but limit the access and only allow reads of certain fields and calls to certain functions,
+          but not expose all functionality of the token.
+        </p>
+        <p>
+          Note that references are <strong>not</strong> referencing stored values –
+          if the value stored in the references location is moved or removed,
+          the reference is not updated and it becomes invalid.
+        </p>
+        <p>
+          References are created by using the <code>&#x26;</code> operator, followed by the storage location,
+          the <code>as</code> keyword, and the type through which the stored location should be accessed.
+        </p>
+        <p>The storage location must be a subtype of the given type.</p>
+        <p>References are <strong>copied</strong>, i.e. they are value types.</p>
+        <pre><code class="language-bamboo,file=storage-reference.bpl"><span>
+</span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `Counter` that conforms</span><span>
+</span><span style="color: #008000">// to the resource interface `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = </span><span style="color: #0000FF">self</span><span style="color: #000000">.count + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a new instance of the resource type `Counter` and move it</span><span>
+</span><span style="color: #008000">// into the storage of the account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// In this example the account is available as the constant `account`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The type `Counter` is used as the key to refer to the stored value.</span><span>
+</span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">account.storage[Counter] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Counter(count: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">account.storage[Counter].increment()</span><span>
+</span><span>
+</span><span style="color: #000000">account.storage[Counter].count  </span><span style="color: #008000">// is `1`</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a reference to the storage location `account.storage[Counter]`</span><span>
+</span><span style="color: #008000">// and allow access to it as the type `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> reference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span>
+</span><span style="color: #008000">// Read the counter's current count.</span><span>
+</span><span style="color: #008000">// The refeference has all fields</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">reference.count  </span><span style="color: #008000">// is `1`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The `increment` function is not accessible for the reference,</span><span>
+</span><span style="color: #008000">// because the reference has the type `&#x26;HasCount`,</span><span>
+</span><span style="color: #008000">// i.e. only fields and functions of type `HasCount` can be used.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">reference.increment()</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -4782,14 +4865,6 @@
         </section>
         <section>
           <h3 id="interacting-with-deployed-resources"><a href="#interacting-with-deployed-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Interacting with Deployed Resources</h3>
-          <p>
-            In addition to storing resources it is also possible to store references to <strong>stored</strong> resources or even other references.
-            References can only be keyed by (and therefore accessed through) <strong>resource interfaces</strong>.
-          </p>
-          <p>
-            References are created by using the <code>&#x26;</code> operator, followed by the stored resource or reference,
-            the <code>as</code> operator, and the resource interface type.
-          </p>
           <pre><code class="language-bamboo,file=setup-transaction.bpl"><span style="color: #008000">// Import the resource type `FungibleToken`, which was "deployed" above,</span><span>
 </span><span style="color: #008000">// from address 0x42.</span><span>
 </span><span style="color: #008000">//</span><span>
