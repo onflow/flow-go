@@ -75,6 +75,9 @@ func (m StatementTrampoline) Continue() Trampoline {
 // are treated like they are returning a value.
 
 type OnEventEmittedFunc func(EventValue)
+type OnReadStoredValueFunc func(storageIdentifier interface{}, indexingType sema.Type) OptionalValue
+type OnWriteStoredValueFunc func(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue)
+
 type Interpreter struct {
 	Checker             *sema.Checker
 	PredefinedValues    map[string]Value
@@ -85,6 +88,8 @@ type Interpreter struct {
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
 	onEventEmitted      OnEventEmittedFunc
+	onReadStoredValue   OnReadStoredValueFunc
+	onWriteStoredValue  OnWriteStoredValueFunc
 }
 
 type Option func(*Interpreter) error
@@ -117,6 +122,26 @@ func WithPredefinedValues(predefinedValues map[string]Value) Option {
 	}
 }
 
+// WithOnReadStoredValue returns an interpreter option which sets the given function
+// as the function that is used when a stored value is read.
+//
+func WithOnReadStoredValue(handler OnReadStoredValueFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetOnReadStoredValue(handler)
+		return nil
+	}
+}
+
+// WithOnWriteStoredValue returns an interpreter option which sets the given function
+// as the function that is used when a stored value is written.
+//
+func WithOnWriteStoredValue(handler OnWriteStoredValueFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetOnWriteStoredValue(handler)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
@@ -144,6 +169,17 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 func (interpreter *Interpreter) SetOnEventEmitted(function OnEventEmittedFunc) {
 	interpreter.onEventEmitted = function
 }
+
+// SetOnReadStoredValue sets the function that is used when a stored value is read.
+//
+func (interpreter *Interpreter) SetOnReadStoredValue(function OnReadStoredValueFunc) {
+	interpreter.onReadStoredValue = function
+}
+
+// SetOnWriteStoredValue sets the function that is used when a stored value is written.
+//
+func (interpreter *Interpreter) SetOnWriteStoredValue(function OnWriteStoredValueFunc) {
+	interpreter.onWriteStoredValue = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -858,15 +894,15 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(target)
-						typedResult.Set(locationRange, indexingValue, value)
+						typedResult.Set(interpreter, locationRange, indexingValue, value)
 
 						// NOTE: no result, so it does *not* act like a return-statement
 						return Done{}
 					})
 
-			case TypeIndexableValue:
+			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
-				typedResult.Set(indexingType, value)
+				interpreter.writeStored(typedResult.Identifier, indexingType, value.(OptionalValue))
 				return Done{}
 
 			default:
@@ -1238,7 +1274,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 				// NOTE: important to box in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(locationRange, key, SomeValue{value})
+				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1263,13 +1299,13 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(expression)
-						value := typedResult.Get(locationRange, indexingValue)
+						value := typedResult.Get(interpreter, locationRange, indexingValue)
 						return Done{Result: value}
 					})
 
-			case TypeIndexableValue:
+			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-				result := typedResult.Get(indexingType)
+				result := interpreter.readStored(typedResult.Identifier, indexingType)
 				return Done{Result: result}
 
 			default:
@@ -1859,7 +1895,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter, err := NewInterpreter(
 		importedChecker,
-		interpreter.PredefinedValues,
+		WithPredefinedValues(interpreter.PredefinedValues),
 		WithOnEventEmittedHandler(interpreter.onEventEmitted),
 	)
 	if err != nil {
@@ -2012,9 +2048,17 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 
 			referenceValue := ReferenceValue{
-				Storage:      storage,
-				IndexingType: indexingType,
+				StorageIdentifier: storage.Identifier,
+				IndexingType:      indexingType,
 			}
 			return Done{Result: referenceValue}
 		})
+}
+
+func (interpreter *Interpreter) readStored(storageIdentifier interface{}, indexingType sema.Type) OptionalValue {
+	return interpreter.onReadStoredValue(storageIdentifier, indexingType)
+}
+
+func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue) {
+	interpreter.onWriteStoredValue(storageIdentifier, indexingType, value)
 }

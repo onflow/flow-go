@@ -67,46 +67,6 @@ func (i *testRuntimeInterface) EmitEvent(event types.Event) {
 	i.emitEvent(event)
 }
 
-func TestRuntimeGetAndSetValue(t *testing.T) {
-
-	runtime := NewInterpreterRuntime()
-	script := []byte(`
-        fun main() {
-            let controller = [1]
-            let owner = [2]
-            let key = [3]
-            let value = getValue(controller, owner, key)
-            setValue(controller, owner, key, value + 2)
-		}
-	`)
-
-	state := big.NewInt(3)
-
-	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			// ignore controller, owner, and key
-			return state.Bytes(), nil
-		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
-			// ignore controller, owner, and key
-			state.SetBytes(value)
-			return nil
-		},
-		createAccount: func(publicKeys [][]byte, code []byte) (address types.Address, err error) {
-			return types.Address{}, nil
-		},
-		updateAccountCode: func(address types.Address, code []byte) (err error) {
-			return nil
-		},
-	}
-
-	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-
-	assert.Nil(t, err)
-
-	assert.Equal(t, int64(5), state.Int64())
-}
-
 func TestRuntimeImport(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
@@ -219,13 +179,16 @@ func TestRuntimeStorage(t *testing.T) {
        }
 	`)
 
+	storedValues := map[string][]byte{}
+
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
 		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			return nil, nil
+			return storedValues[string(key)], nil
 		},
 		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValues[string(key)] = value
 			return nil
 		},
 		getSigningAccounts: func() []types.Address {
