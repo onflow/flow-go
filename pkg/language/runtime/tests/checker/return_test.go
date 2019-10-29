@@ -78,7 +78,9 @@ func testExits(t *testing.T, tests []exitTest) {
 				t,
 				code,
 				ParseAndCheckOptions{
-					Values: test.valueDeclarations,
+					Options: []sema.Option{
+						sema.WithPredeclaredValues(test.valueDeclarations),
+					},
 				},
 			)
 

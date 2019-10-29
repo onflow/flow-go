@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 )
@@ -18,9 +19,13 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
             }
         `,
 		ParseAndCheckOptions{
-			Values: stdlib.StandardLibraryFunctions{
-				stdlib.AssertFunction,
-			}.ToValueDeclarations(),
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.AssertFunction,
+					}.ToValueDeclarations(),
+				),
+			},
 		},
 	)
 
@@ -36,9 +41,13 @@ func TestCheckAssertWithMessage(t *testing.T) {
             }
         `,
 		ParseAndCheckOptions{
-			Values: stdlib.StandardLibraryFunctions{
-				stdlib.AssertFunction,
-			}.ToValueDeclarations(),
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.AssertFunction,
+					}.ToValueDeclarations(),
+				),
+			},
 		},
 	)
 

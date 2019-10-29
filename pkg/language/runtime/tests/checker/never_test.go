@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/pkg/language/runtime/tests/utils"
 )
@@ -18,9 +19,13 @@ func TestCheckNever(t *testing.T) {
             }
         `,
 		ParseAndCheckOptions{
-			Values: stdlib.StandardLibraryFunctions{
-				stdlib.PanicFunction,
-			}.ToValueDeclarations(),
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+			},
 		},
 	)
 

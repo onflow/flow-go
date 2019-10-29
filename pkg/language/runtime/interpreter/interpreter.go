@@ -74,6 +74,7 @@ func (m StatementTrampoline) Continue() Trampoline {
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
+type OnEventEmittedFunc func(EventValue)
 type Interpreter struct {
 	Checker             *sema.Checker
 	PredefinedValues    map[string]Value
@@ -83,7 +84,7 @@ type Interpreter struct {
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
-	onEventEmitted      func(EventValue)
+	onEventEmitted      OnEventEmittedFunc
 }
 
 type Option func(*Interpreter) error
@@ -91,7 +92,7 @@ type Option func(*Interpreter) error
 // WithOnEventEmittedHandler returns an interpreter option which sets
 // the given function as the event handler.
 //
-func WithOnEventEmittedHandler(handler func(EventValue)) Option {
+func WithOnEventEmittedHandler(handler OnEventEmittedFunc) Option {
 	return func(interpreter *Interpreter) error {
 		interpreter.SetOnEventEmitted(handler)
 		return nil
@@ -138,10 +139,11 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 	return interpreter, nil
 }
 
-// SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+// SetOnEventEmitted sets the function that is triggered when an event is emitted by the program.
 //
-func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
-	interpreter.onEventEmitted = callback
+func (interpreter *Interpreter) SetOnEventEmitted(function OnEventEmittedFunc) {
+	interpreter.onEventEmitted = function
+}
 }
 
 // locationRange returns a new location range for the given positioned element.

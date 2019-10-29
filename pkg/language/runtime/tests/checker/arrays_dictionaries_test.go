@@ -667,13 +667,10 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithOptions(t,
+	_, err := ParseAndCheckWithStorage(t,
 		`
           let x = ["xyz"][String?]
 	    `,
-		ParseAndCheckOptions{
-			Values: storageValueDeclaration,
-		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -683,16 +680,13 @@ func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithOptions(t,
+	_, err := ParseAndCheckWithStorage(t,
 		`
           fun test() {
               let stuff = ["abc"]
               stuff[String?] = "xyz"
           }
 	    `,
-		ParseAndCheckOptions{
-			Values: storageValueDeclaration,
-		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -702,13 +696,10 @@ func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithOptions(t,
+	_, err := ParseAndCheckWithStorage(t,
 		`
           let x = {"a": 1}[String?]
 	    `,
-		ParseAndCheckOptions{
-			Values: storageValueDeclaration,
-		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -718,16 +709,13 @@ func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithOptions(t,
+	_, err := ParseAndCheckWithStorage(t,
 		`
           fun test() {
               let stuff = {"a": 1}
               stuff[String?] = "xyz"
           }
 	    `,
-		ParseAndCheckOptions{
-			Values: storageValueDeclaration,
-		},
 	)
 
 	errs := ExpectCheckerErrors(t, err, 1)

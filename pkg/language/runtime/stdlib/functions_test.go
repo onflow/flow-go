@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/pkg/language/runtime/interpreter"
@@ -14,12 +15,18 @@ func TestAssert(t *testing.T) {
 
 	program := &ast.Program{}
 
-	checker, err := sema.NewChecker(program, BuiltinFunctions.ToValueDeclarations(), nil, ast.StringLocation(""))
-	assert.Nil(t, err)
+	checker, err := sema.NewChecker(
+		program,
+		ast.StringLocation(""),
+		sema.WithPredeclaredValues(BuiltinFunctions.ToValueDeclarations()),
+	)
+	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checker, BuiltinFunctions.ToValues())
-
-	assert.Nil(t, err)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(BuiltinFunctions.ToValues()),
+	)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("assert", false, "oops")
 	assert.Equal(t, err, AssertionError{
@@ -42,12 +49,18 @@ func TestAssert(t *testing.T) {
 
 func TestPanic(t *testing.T) {
 
-	checker, err := sema.NewChecker(&ast.Program{}, BuiltinFunctions.ToValueDeclarations(), nil, ast.StringLocation(""))
-	assert.Nil(t, err)
+	checker, err := sema.NewChecker(
+		&ast.Program{},
+		ast.StringLocation(""),
+		sema.WithPredeclaredValues(BuiltinFunctions.ToValueDeclarations()),
+	)
+	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checker, BuiltinFunctions.ToValues())
-
-	assert.Nil(t, err)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(BuiltinFunctions.ToValues()),
+	)
+	require.Nil(t, err)
 
 	_, err = inter.Invoke("panic", "oops")
 	assert.Equal(t, err, PanicError{

@@ -251,9 +251,13 @@ func TestCheckInterfaceUse(t *testing.T) {
 					kind.TransferOperator(),
 				),
 				ParseAndCheckOptions{
-					Values: stdlib.StandardLibraryFunctions{
-						stdlib.PanicFunction,
-					}.ToValueDeclarations(),
+					Options: []sema.Option{
+						sema.WithPredeclaredValues(
+							stdlib.StandardLibraryFunctions{
+								stdlib.PanicFunction,
+							}.ToValueDeclarations(),
+						),
+					},
 				},
 			)
 

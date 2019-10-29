@@ -22,9 +22,9 @@ import (
 )
 
 type ParseCheckAndInterpretOptions struct {
-	PredefinedValueTypes map[string]sema.ValueDeclaration
-	PredefinedValues     map[string]interpreter.Value
-	HandleCheckerError   func(error)
+	Options            []interpreter.Option
+	CheckerOptions     []sema.Option
+	HandleCheckerError func(error)
 }
 
 func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
@@ -40,7 +40,7 @@ func parseCheckAndInterpretWithOptions(
 	checker, err := ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
-			Values: options.PredefinedValueTypes,
+			Options: options.CheckerOptions,
 		},
 	)
 
@@ -55,7 +55,7 @@ func parseCheckAndInterpretWithOptions(
 
 	inter, err := interpreter.NewInterpreter(
 		checker,
-		interpreter.WithPredefinedValues(options.PredefinedValues),
+		options.Options...,
 	)
 
 	require.Nil(t, err)
@@ -3578,7 +3578,9 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			Values: valueDeclarations,
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -3592,7 +3594,9 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			Values: valueDeclarations,
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
 					ast.StringLocation("imported"),
@@ -4665,9 +4669,15 @@ func TestInterpretStorage(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5174,9 +5184,13 @@ func TestInterpretReferenceExpression(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
 			},
 		},
 	)
@@ -5246,9 +5260,15 @@ func TestInterpretReferenceUse(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5312,9 +5332,15 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5361,9 +5387,15 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
