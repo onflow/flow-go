@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
-// To make sure that Node complies with the messages.Service interface
+// To make sure that Node complies with the Service interface
 var _ Service = (*Node)(nil)
 
 // Node is holding the required information for a functioning async gossip node
