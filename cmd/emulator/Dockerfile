@@ -12,8 +12,8 @@ RUN mkdir /build
 WORKDIR /build
 
 # Copy over *only* files necessary for Relic
-COPY pkg/crypto/relic ./relic
-COPY pkg/crypto/relic_build.sh .
+COPY crypto/relic ./relic
+COPY crypto/relic_build.sh .
 
 # Build Relic (this places build artifacts in /build/relic/build)
 # NOTE: The Relic build script uses Bash-specific features, so we explicitly run
@@ -35,7 +35,7 @@ RUN go mod download
 
 COPY . .
 # Copy over Relic build artifacts
-COPY --from=build-relic /build/relic/build ./pkg/crypto/relic/build
+COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
 RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/emulator
 
@@ -48,7 +48,7 @@ COPY --from=build-app /app/app /bin/app
 EXPOSE 8000
 EXPOSE 9090
 
-# Start the emulator and initialize project config by generating a root key.
+# Run the CLI binary as the entrypoint
 ENTRYPOINT ["/bin/app"]
 # These arguments are separated from the entrypoint to simplify running other
 # commands with this image.
