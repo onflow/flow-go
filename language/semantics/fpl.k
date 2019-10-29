@@ -309,10 +309,11 @@ module FPL-VALUES
   imports LIST
 
   syntax Type ::= "[" Type ";" Int "]"
-  syntax Val ::= Int | Bool | unit() | array(List)
+  syntax Array ::= array(List)
+  syntax Val ::= Int | Bool | unit() | Array
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
-  syntax KResult ::= TypedVal | Int // for constant expressions
+  syntax KResult ::= TypedVal | Int | Array // for constant expressions
   syntax FPLString ::= String
   syntax Exp ::= Val
 
