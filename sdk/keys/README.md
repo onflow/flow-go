@@ -13,9 +13,12 @@ Package keys provides utilities for generating, encoding, and decoding Flow acco
 
 
 ## <a name="pkg-index">Index</a>
+* [func CompatibleAlgorithms(signAlgo crypto.SigningAlgorithm, hashAlgo crypto.HashingAlgorithm) bool](#CompatibleAlgorithms)
 * [func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error)](#DecodePrivateKey)
 * [func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error)](#DecodePublicKey)
 * [func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error)](#GeneratePrivateKey)
+* [func ValidateEncodedPublicKey(b []byte) error](#ValidateEncodedPublicKey)
+* [func ValidatePublicKey(publicKey types.AccountPublicKey) error](#ValidatePublicKey)
 * [type KeyType](#KeyType)
   * [func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm](#KeyType.HashingAlgorithm)
   * [func (k KeyType) SigningAlgorithm() crypto.SigningAlgorithm](#KeyType.SigningAlgorithm)
@@ -28,7 +31,15 @@ Package keys provides utilities for generating, encoding, and decoding Flow acco
 
 
 
-## <a name="DecodePrivateKey">func</a> [DecodePrivateKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=1654:1735#L59)
+## <a name="CompatibleAlgorithms">func</a> [CompatibleAlgorithms](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=3297:3395#L113)
+``` go
+func CompatibleAlgorithms(signAlgo crypto.SigningAlgorithm, hashAlgo crypto.HashingAlgorithm) bool
+```
+CompatibleAlgorithms returns true if the given signing and hashing algorithms are compatible.
+
+
+
+## <a name="DecodePrivateKey">func</a> [DecodePrivateKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=1680:1761#L61)
 ``` go
 func DecodePrivateKey(keyType KeyType, b []byte) (types.AccountPrivateKey, error)
 ```
@@ -36,7 +47,7 @@ DecodePrivateKey decodes a private key against a specified key type.
 
 
 
-## <a name="DecodePublicKey">func</a> [DecodePublicKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=2098:2189#L73)
+## <a name="DecodePublicKey">func</a> [DecodePublicKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=2124:2215#L75)
 ``` go
 func DecodePublicKey(keyType KeyType, weight int, b []byte) (types.AccountPublicKey, error)
 ```
@@ -44,7 +55,7 @@ DecodePublicKey decodes a public key against a specified key type.
 
 
 
-## <a name="GeneratePrivateKey">func</a> [GeneratePrivateKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=1198:1284#L45)
+## <a name="GeneratePrivateKey">func</a> [GeneratePrivateKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=1224:1310#L47)
 ``` go
 func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error)
 ```
@@ -52,8 +63,24 @@ GeneratePrivateKey generates a private key of the specified key type.
 
 
 
+## <a name="ValidateEncodedPublicKey">func</a> [ValidateEncodedPublicKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=2616:2661#L90)
+``` go
+func ValidateEncodedPublicKey(b []byte) error
+```
+ValidateEncodedPublicKey returns an error if the bytes do not represent a valid public key.
 
-## <a name="KeyType">type</a> [KeyType](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=252:268#L10)
+
+
+## <a name="ValidatePublicKey">func</a> [ValidatePublicKey](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=2901:2963#L100)
+``` go
+func ValidatePublicKey(publicKey types.AccountPublicKey) error
+```
+ValidatePublicKey returns an error if the public key is invalid.
+
+
+
+
+## <a name="KeyType">type</a> [KeyType](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=278:294#L12)
 ``` go
 type KeyType int
 ```
@@ -78,16 +105,16 @@ const (
 
 
 
-### <a name="KeyType.HashingAlgorithm">func</a> (KeyType) [HashingAlgorithm](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=839:898#L33)
+### <a name="KeyType.HashingAlgorithm">func</a> (KeyType) [HashingAlgorithm](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=865:924#L35)
 ``` go
 func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm
 ```
-SigningAlgorithm returns the hashing algorithm for this key type.
+HashingAlgorithm returns the hashing algorithm for this key type.
 
 
 
 
-### <a name="KeyType.SigningAlgorithm">func</a> (KeyType) [SigningAlgorithm](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=475:534#L21)
+### <a name="KeyType.SigningAlgorithm">func</a> (KeyType) [SigningAlgorithm](https://github.com/dapperlabs/flow-go/tree/master/sdk/keys/keys.go?s=501:560#L23)
 ``` go
 func (k KeyType) SigningAlgorithm() crypto.SigningAlgorithm
 ```

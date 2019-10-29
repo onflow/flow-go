@@ -2,10 +2,12 @@
 package keys
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/encoding"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/encoding"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 )
 
 // KeyType is a key format supported by Flow.
@@ -46,13 +48,13 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 const KeyWeightThreshold = constants.AccountKeyWeightThreshold
 
 // GeneratePrivateKey generates a private key of the specified key type.
-func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, error) {
+func GeneratePrivateKey(keyType KeyType, seed []byte) (flow.AccountPrivateKey, error) {
 	privateKey, err := crypto.GeneratePrivateKey(keyType.SigningAlgorithm(), seed)
 	if err != nil {
-		return types.AccountPrivateKey{}, err
+		return flow.AccountPrivateKey{}, err
 	}
 
-	return types.AccountPrivateKey{
+	return flow.AccountPrivateKey{
 		PrivateKey: privateKey,
 		SignAlgo:   keyType.SigningAlgorithm(),
 		HashAlgo:   keyType.HashingAlgorithm(),
@@ -60,29 +62,29 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (types.AccountPrivateKey, 
 }
 
 // EncodePrivateKey encodes a private key as bytes.
-func EncodePrivateKey(a types.AccountPrivateKey) ([]byte, error) {
+func EncodePrivateKey(a flow.AccountPrivateKey) ([]byte, error) {
 	return encoding.DefaultEncoder.EncodeAccountPrivateKey(a)
 }
 
 // DecodePrivateKey decodes a private key.
-func DecodePrivateKey(b []byte) (types.AccountPrivateKey, error) {
+func DecodePrivateKey(b []byte) (flow.AccountPrivateKey, error) {
 	return encoding.DefaultEncoder.DecodeAccountPrivateKey(b)
 }
 
 // EncodePublicKey encodes a public key as bytes.
-func EncodePublicKey(a types.AccountPublicKey) ([]byte, error) {
+func EncodePublicKey(a flow.AccountPublicKey) ([]byte, error) {
 	return encoding.DefaultEncoder.EncodeAccountPublicKey(a)
 }
 
 // DecodePublicKey decodes a public key.
-func DecodePublicKey(b []byte) (types.AccountPublicKey, error) {
+func DecodePublicKey(b []byte) (flow.AccountPublicKey, error) {
 	return encoding.DefaultEncoder.DecodeAccountPublicKey(b)
 }
 
 // SignTransaction signs a transaction with a private key.
 func SignTransaction(
-	tx types.Transaction,
-	privateKey types.AccountPrivateKey,
+	tx flow.Transaction,
+	privateKey flow.AccountPrivateKey,
 ) (crypto.Signature, error) {
 	hasher, err := crypto.NewHasher(privateKey.HashAlgo)
 	if err != nil {
@@ -95,4 +97,43 @@ func SignTransaction(
 	}
 
 	return privateKey.PrivateKey.Sign(b, hasher)
+}
+
+// ValidateEncodedPublicKey returns an error if the bytes do not represent a valid public key.
+func ValidateEncodedPublicKey(b []byte) error {
+	publicKey, err := flow.DecodeAccountPublicKey(b)
+	if err != nil {
+		return errors.Wrap(err, "invalid public key encoding")
+	}
+
+	return ValidatePublicKey(publicKey)
+}
+
+// ValidatePublicKey returns an error if the public key is invalid.
+func ValidatePublicKey(publicKey flow.AccountPublicKey) error {
+	if !CompatibleAlgorithms(publicKey.SignAlgo, publicKey.HashAlgo) {
+		return errors.Errorf(
+			"signing algorithm (%s) is incompatible with hashing algorithm (%s)",
+			publicKey.SignAlgo,
+			publicKey.HashAlgo,
+		)
+	}
+
+	return nil
+}
+
+// CompatibleAlgorithms returns true if the given signing and hashing algorithms are compatible.
+func CompatibleAlgorithms(signAlgo crypto.SigningAlgorithm, hashAlgo crypto.HashingAlgorithm) bool {
+	t := map[crypto.SigningAlgorithm]map[crypto.HashingAlgorithm]bool{
+		crypto.ECDSA_P256: {
+			crypto.SHA2_256: true,
+			crypto.SHA3_256: true,
+		},
+		crypto.ECDSA_SECp256k1: {
+			crypto.SHA2_256: true,
+			crypto.SHA3_256: true,
+		},
+	}
+
+	return t[signAlgo][hashAlgo]
 }

@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/hash"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/hash"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -14,13 +14,13 @@ import (
 func TestCommitBlock(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx1)
@@ -37,15 +37,15 @@ func TestCommitBlock(t *testing.T) {
 	tx, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
 
-	assert.Equal(t, types.TransactionFinalized, tx.Status)
+	assert.Equal(t, flow.TransactionFinalized, tx.Status)
 
-	tx2 := types.Transaction{
+	tx2 := flow.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx2)
@@ -62,16 +62,16 @@ func TestCommitBlock(t *testing.T) {
 	tx, err = b.GetTransaction(tx2.Hash)
 	assert.Nil(t, err)
 
-	assert.Equal(t, types.TransactionReverted, tx.Status)
+	assert.Equal(t, flow.TransactionReverted, tx.Status)
 
 	// Commit tx1 and tx2 into new block
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
 	tx, _ = b.GetTransaction(tx1.Hash)
-	assert.Equal(t, types.TransactionSealed, tx.Status)
+	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
 	tx, _ = b.GetTransaction(tx2.Hash)
-	assert.Equal(t, types.TransactionReverted, tx.Status)
+	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

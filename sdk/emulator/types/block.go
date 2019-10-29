@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // Block is a naive data structure used to represent blocks in the emulator.

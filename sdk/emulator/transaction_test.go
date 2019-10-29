@@ -6,23 +6,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/constants"
-	"github.com/dapperlabs/flow-go/pkg/hash"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/hash"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestSubmitTransaction(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx1)
@@ -39,7 +39,7 @@ func TestSubmitTransaction(t *testing.T) {
 	// tx1 status becomes TransactionFinalized
 	tx2, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionFinalized, tx2.Status)
+	assert.Equal(t, flow.TransactionFinalized, tx2.Status)
 }
 
 // TODO: Add test case for missing ReferenceBlockHash
@@ -48,7 +48,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("EmptyTransaction", func(t *testing.T) {
 		// Create empty transaction (no required fields)
-		tx := types.Transaction{}
+		tx := flow.Transaction{}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
@@ -62,7 +62,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("MissingScript", func(t *testing.T) {
 		// Create transaction with no Script field
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
@@ -81,7 +81,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("MissingNonce", func(t *testing.T) {
 		// Create transaction with no Nonce field
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			ComputeLimit:       10,
@@ -100,7 +100,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("MissingComputeLimit", func(t *testing.T) {
 		// Create transaction with no ComputeLimit field
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -119,7 +119,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 	t.Run("MissingPayerAccount", func(t *testing.T) {
 		// Create transaction with no PayerAccount field
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -140,13 +140,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx := types.Transaction{
+	tx := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
@@ -166,13 +166,13 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 func TestSubmitTransactionReverted(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	tx1 := types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx1)
@@ -189,7 +189,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	// tx1 status becomes TransactionReverted
 	tx2, err := b.GetTransaction(tx1.Hash)
 	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionReverted, tx2.Status)
+	assert.Equal(t, flow.TransactionReverted, tx2.Status)
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
@@ -201,7 +201,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	accountAddressA := b.RootAccountAddress()
-	accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, nil, getNonce())
+	accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, nil, getNonce())
 	assert.Nil(t, err)
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
@@ -209,13 +209,13 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte("fun main(account: Account) {}")
 
 		// create transaction with two accounts
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
-			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
+			ScriptAccounts:     []flow.Address{accountAddressA, accountAddressB},
 		}
 
 		sigA, err := keys.SignTransaction(tx, privateKeyA)
@@ -236,13 +236,13 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte("fun main(accountA: Account, accountB: Account) {}")
 
 		// create transaction with two accounts
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
-			ScriptAccounts:     []types.Address{accountAddressA},
+			ScriptAccounts:     []flow.Address{accountAddressA},
 		}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
@@ -259,15 +259,15 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
+		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       addressA,
-			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
@@ -283,15 +283,15 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("InvalidAccount", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		invalidAddress := types.HexToAddress("0000000000000000000000000000000000000002")
+		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
@@ -310,13 +310,13 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		// use key-pair that does not exist on root account
 		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("invalid key"))
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err := keys.SignTransaction(tx, invalidKey)
@@ -337,18 +337,18 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("space cowboy"))
 		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold / 2)
 
-		accountAddressA, err := b.CreateAccount([]types.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
+		accountAddressA, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
 		assert.Nil(t, err)
 
 		script := []byte("fun main(account: Account) {}")
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
-			ScriptAccounts:     []types.Address{accountAddressA},
+			ScriptAccounts:     []flow.Address{accountAddressA},
 		}
 
 		t.Run("InsufficientKeyWeight", func(t *testing.T) {
@@ -381,15 +381,15 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MissingScriptSignature", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		addressA := types.HexToAddress("0000000000000000000000000000000000000002")
+		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []types.Address{addressA},
+			ScriptAccounts:     []flow.Address{addressA},
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
@@ -417,7 +417,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]types.AccountPublicKey{publicKeyB}, nil, getNonce())
+		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, nil, getNonce())
 		assert.Nil(t, err)
 
 		multipleAccountScript := []byte(`
@@ -427,13 +427,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 			}
 		`)
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:             multipleAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
-			ScriptAccounts:     []types.Address{accountAddressA, accountAddressB},
+			ScriptAccounts:     []flow.Address{accountAddressA, accountAddressB},
 		}
 
 		sigA, err := keys.SignTransaction(tx, privateKeyA)

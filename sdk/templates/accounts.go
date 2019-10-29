@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // CreateAccount generates a script that creates a new account.
-func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, error) {
+func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, error) {
 	publicKeys := make([][]byte, len(accountKeys))
 
 	for i, accountKey := range accountKeys {
-		accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
+		accountKeyBytes, err := flow.EncodeAccountPublicKey(accountKey)
 		if err != nil {
 			return nil, err
 		}
@@ -20,8 +20,8 @@ func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, e
 		publicKeys[i] = accountKeyBytes
 	}
 
-	publicKeysStr := cadenceEncodeBytesArray(publicKeys)
-	codeStr := cadenceEncodeBytes(code)
+	publicKeysStr := languageEncodeBytesArray(publicKeys)
+	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main() {
@@ -36,7 +36,7 @@ func CreateAccount(accountKeys []types.AccountPublicKey, code []byte) ([]byte, e
 
 // UpdateAccountCode generates a script that updates the code associated with an account.
 func UpdateAccountCode(code []byte) []byte {
-	codeStr := cadenceEncodeBytes(code)
+	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
@@ -49,13 +49,13 @@ func UpdateAccountCode(code []byte) []byte {
 }
 
 // AddAccountKey generates a script that adds a key to an account.
-func AddAccountKey(accountKey types.AccountPublicKey) ([]byte, error) {
-	accountKeyBytes, err := types.EncodeAccountPublicKey(accountKey)
+func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
+	accountKeyBytes, err := flow.EncodeAccountPublicKey(accountKey)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeyStr := cadenceEncodeBytes(accountKeyBytes)
+	publicKeyStr := languageEncodeBytes(accountKeyBytes)
 
 	script := fmt.Sprintf(`
 		fun main(account: Account) {
@@ -79,29 +79,29 @@ func RemoveAccountKey(index int) []byte {
 	return []byte(script)
 }
 
-// cadenceEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
-func cadenceEncodeBytes(b []byte) string {
-	if b == nil || len(b) == 0 {
+// languageEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
+func languageEncodeBytes(b []byte) string {
+	if len(b) == 0 {
 		return "[]"
 	}
 
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-// cadenceEncodeBytesArray converts a slice of byte slices to a comma-separated list of uint8 integers.
+// languageEncodeBytesArray converts a slice of byte slices to a comma-separated list of uint8 integers.
 //
 // Example: [][]byte{[]byte{1}, []byte{2,3}} -> "[[1],[2,3]]"
-func cadenceEncodeBytesArray(b [][]byte) string {
-	if b == nil || len(b) == 0 {
+func languageEncodeBytesArray(b [][]byte) string {
+	if len(b) == 0 {
 		return "[]"
 	}
 
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-// cadenceEncodeIntArray converts a slice of integers to a comma-separated list.
-func cadenceEncodeIntArray(i []int) string {
-	if i == nil || len(i) == 0 {
+// languageEncodeIntArray converts a slice of integers to a comma-separated list.
+func languageEncodeIntArray(i []int) string {
+	if len(i) == 0 {
 		return "[]"
 	}
 

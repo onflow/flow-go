@@ -7,9 +7,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
@@ -20,7 +21,7 @@ func TestPing(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 	server := server.NewBackend(b, events.NewMemStore(), log.New())
 
-	res, err := server.Ping(ctx, &observe.PingRequest{})
+	res, err := server.Ping(ctx, &observation.PingRequest{})
 	assert.Nil(t, err)
 	assert.Equal(t, res.GetAddress(), []byte("pong!"))
 }
@@ -35,13 +36,13 @@ func TestGetEvents(t *testing.T) {
 	var (
 		mintID     = "Mint()"
 		transferID = "Transfer(to: Address)"
-		toAddress  = types.HexToAddress("1234567890123456789012345678901234567890")
+		toAddress  = flow.HexToAddress("1234567890123456789012345678901234567890")
 
-		ev1 = types.Event{
+		ev1 = flow.Event{
 			ID:     mintID,
 			Values: map[string]interface{}{},
 		}
-		ev2 = types.Event{
+		ev2 = flow.Event{
 			ID: transferID,
 			Values: map[string]interface{}{
 				"to": toAddress.String(),
@@ -49,61 +50,68 @@ func TestGetEvents(t *testing.T) {
 		}
 	)
 
-	eventStore.Add(ctx, 1, ev1)
-	eventStore.Add(ctx, 3, ev2)
+	err := eventStore.Add(ctx, 1, ev1)
+	require.Nil(t, err)
+
+	err = eventStore.Add(ctx, 3, ev2)
+	require.Nil(t, err)
 
 	t.Run("should return error for invalid query", func(t *testing.T) {
 		// End block cannot be less than start block
-		_, err := server.GetEvents(ctx, &observe.GetEventsRequest{
+		_, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 2,
 			EndBlock:   1,
 		})
 		assert.Error(t, err)
 	})
+
 	t.Run("should return empty list when there are no results", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
+		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 2,
 			EndBlock:   2,
 		})
 		assert.Nil(t, err)
-		var events []*types.Event
+		var events []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &events)
 		assert.Nil(t, err)
 		assert.Len(t, events, 0)
 	})
+
 	t.Run("should filter by ID", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
+		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			EventId:    transferID,
 			StartBlock: 1,
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 1)
 		assert.Equal(t, resEvents[0].ID, transferID)
 		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
 	})
+
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
+		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 1,
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		// Should get both events
 		assert.Len(t, resEvents, 2)
 	})
+
 	t.Run("should preserve event ordering", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observe.GetEventsRequest{
+		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 1,
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 2)

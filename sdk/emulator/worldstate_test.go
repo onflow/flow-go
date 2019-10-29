@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/hash"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/hash"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -33,13 +33,13 @@ func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
-	tx1 := types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx1)
@@ -49,13 +49,13 @@ func TestWorldStates(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := types.Transaction{
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx2)
@@ -65,13 +65,13 @@ func TestWorldStates(t *testing.T) {
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
-	tx3 := types.Transaction{
+	tx3 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
@@ -169,13 +169,13 @@ func TestWorldStates(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx1)
@@ -185,13 +185,13 @@ func TestQueryByVersion(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := types.Transaction{
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	hash.SetTransactionHash(&tx2)
