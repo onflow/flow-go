@@ -307,7 +307,7 @@ module FPL-VALUES
   imports STRING-SYNTAX
 
   syntax Type
-  syntax Val ::= Int | Bool
+  syntax Val ::= Int | Bool | unit()
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
   syntax KResult ::= TypedVal | Int // for constant expressions
@@ -335,7 +335,7 @@ module FPL-FUN-ENV
   imports FPL-COMMON-SYNTAX
   imports MAP
 
-  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
+  syntax Val ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
 endmodule
 
 module FPL-PANIC
@@ -544,10 +544,7 @@ module FPL-FUNCTIONS
        <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
        <scope> Scope => local(L) </scope>
        <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
-  rule <k> return ~> _ => K </k>
-       <env> _ => Rho </env>
-       <scope> _ => Scope </scope>
-       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+  rule <k> return => return v(unit(), Void) ... </k>
   rule <k> return X:TypedVal ~> _ => X ~> K </k>
        <env> _ => Rho </env>
        <scope> _ => Scope </scope>
