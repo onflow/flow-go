@@ -11,9 +11,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
 
@@ -33,7 +33,7 @@ var Cmd = &cobra.Command{
 
 		signer := projectConf.Accounts[conf.Signer]
 
-		accountKeys := make([]types.AccountPublicKey, len(conf.Keys))
+		accountKeys := make([]flow.AccountPublicKey, len(conf.Keys))
 
 		for i, privateKeyHex := range conf.Keys {
 			prKeyDer, err := hex.DecodeString(privateKeyHex)
@@ -41,7 +41,7 @@ var Cmd = &cobra.Command{
 				utils.Exit(1, "Failed to decode private key")
 			}
 
-			privateKey, err := types.DecodeAccountPrivateKey(prKeyDer)
+			privateKey, err := flow.DecodeAccountPrivateKey(prKeyDer)
 			if err != nil {
 				utils.Exit(1, "Failed to decode private key")
 			}
@@ -66,7 +66,7 @@ var Cmd = &cobra.Command{
 			utils.Exit(1, "Failed to generate transaction script")
 		}
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,

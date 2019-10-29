@@ -1,8 +1,11 @@
-package types
+// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
+
+package flow
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // TransactionStatus represents the status of a Transaction.

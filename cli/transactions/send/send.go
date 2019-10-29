@@ -5,12 +5,13 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/dapperlabs/flow-go/cli/project"
-	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/model/types"
-	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/flow-go/cli/project"
+	"github.com/dapperlabs/flow-go/cli/utils"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/client"
 )
 
 type Config struct {
@@ -41,12 +42,12 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
 			PayerAccount:   signer.Address,
-			ScriptAccounts: []types.Address{signer.Address},
+			ScriptAccounts: []flow.Address{signer.Address},
 		}
 
 		err = tx.AddSignature(signer.Address, signer.PrivateKey)

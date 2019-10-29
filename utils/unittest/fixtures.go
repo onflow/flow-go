@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 )
 
@@ -27,19 +27,19 @@ func PublicKeyFixtures() [PublicKeyFixtureCount]crypto.PublicKey {
 	return keys
 }
 
-func AddressFixture() types.Address {
-	return types.ZeroAddress
+func AddressFixture() flow.Address {
+	return flow.ZeroAddress
 }
 
-func AccountSignatureFixture() types.AccountSignature {
-	return types.AccountSignature{
+func AccountSignatureFixture() flow.AccountSignature {
+	return flow.AccountSignature{
 		Account:   AddressFixture(),
 		Signature: []byte{},
 	}
 }
 
-func BlockHeaderFixture() types.BlockHeader {
-	return types.BlockHeader{
+func BlockHeaderFixture() flow.BlockHeader {
+	return flow.BlockHeader{
 		Hash:              crypto.Hash("abc"),
 		PreviousBlockHash: crypto.Hash("def"),
 		Number:            100,
@@ -47,29 +47,29 @@ func BlockHeaderFixture() types.BlockHeader {
 	}
 }
 
-func TransactionFixture() types.Transaction {
-	return types.Transaction{
+func TransactionFixture() flow.Transaction {
+	return flow.Transaction{
 		Script:             []byte("fun main() {}"),
 		ReferenceBlockHash: nil,
 		Nonce:              0,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
-		ScriptAccounts:     []types.Address{AddressFixture()},
-		Signatures:         []types.AccountSignature{AccountSignatureFixture()},
+		ScriptAccounts:     []flow.Address{AddressFixture()},
+		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
 	}
 }
 
-func AccountFixture() types.Account {
-	return types.Account{
+func AccountFixture() flow.Account {
+	return flow.Account{
 		Address: AddressFixture(),
 		Balance: 10,
 		Code:    []byte("fun main() {}"),
-		Keys:    []types.AccountPublicKey{AccountPublicKeyFixture()},
+		Keys:    []flow.AccountPublicKey{AccountPublicKeyFixture()},
 	}
 }
 
-func AccountPublicKeyFixture() types.AccountPublicKey {
-	return types.AccountPublicKey{
+func AccountPublicKeyFixture() flow.AccountPublicKey {
+	return flow.AccountPublicKey{
 		PublicKey: PublicKeyFixtures()[0],
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,

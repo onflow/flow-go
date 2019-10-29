@@ -3,14 +3,14 @@ package execution
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Computer uses a runtime instance to execute transactions and scripts.
 type Computer struct {
 	runtime        runtime.Runtime
 	onLogMessage   func(string)
-	onEventEmitted func(event types.Event, blockNumber uint64, txHash crypto.Hash)
+	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
@@ -30,7 +30,7 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) ([]types.Event, error) {
+func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx *flow.Transaction) ([]flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
@@ -47,7 +47,7 @@ func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, []types.Event, error) {
+func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (interface{}, []flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 	runtimeContext.SetOnLogMessage(c.onLogMessage)
 

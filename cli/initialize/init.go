@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cli/project"
 	"github.com/dapperlabs/flow-go/cli/utils"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -45,7 +45,7 @@ func InitProject() *project.Config {
 		utils.Exitf(1, "Failed to generate private key: %v", err)
 	}
 
-	address := types.HexToAddress("01")
+	address := flow.HexToAddress("01")
 
 	conf := &project.Config{
 		Accounts: map[string]*project.Account{

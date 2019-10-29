@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -31,35 +31,35 @@ func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
-	tx1 := &types.Transaction{
+	tx1 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	tx2 := &types.Transaction{
+	tx2 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	tx3 := &types.Transaction{
+	tx3 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -154,24 +154,24 @@ func TestWorldStates(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.Transaction{
+	tx1 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
 
-	tx2 := &types.Transaction{
+	tx2 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())

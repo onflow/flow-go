@@ -57,7 +57,7 @@ func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string
 // GetID returns the identity of the Engine
 func (mn *Network) GetID() string {
 	me := mn.com.Me()
-	return me.ID
+	return me.NodeID
 }
 
 // Register implements pkg/module/Network's interface

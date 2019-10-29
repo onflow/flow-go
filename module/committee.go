@@ -8,10 +8,10 @@ import (
 
 // Committee represents an interface to the node identity table.
 type Committee interface {
-	Me() flow.Node
-	Get(nodeID string) (flow.Node, error)
-	Select(filters ...NodeFilter) (flow.NodeList, error)
+	Me() flow.Identity
+	Get(nodeID string) (flow.Identity, error)
+	Select(filters ...IdentityFilter) (flow.IdentityList, error)
 }
 
-// NodeFilter is a function that returns true if we want to include a node.
-type NodeFilter func(flow.Node) bool
+// IdentityFilter is a function that returns true if we want to include a node.
+type IdentityFilter func(flow.Identity) bool

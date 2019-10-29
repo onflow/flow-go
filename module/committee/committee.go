@@ -15,10 +15,10 @@ var (
 	idParser = regexp.MustCompile(`^(\w+)-(\w+)@([\w\.]+:\d{1,5})$`)
 )
 
-// Committee represents the table of staked nodes in the flow system.
+// Committee represents the identity table for staked nodes in the flow system.
 type Committee struct {
-	me    flow.Node
-	nodes map[string]flow.Node
+	me         flow.Identity
+	identities map[string]flow.Identity
 }
 
 // EntryToFields takes the a committee entry and returns the parsed node
@@ -45,17 +45,16 @@ func EntryToID(entry string) (string, error) {
 	return id, err
 }
 
-// New generates a new committee of consensus nodes.
+// New generates a new committee of node identities.
 func New(entries []string, identity string) (*Committee, error) {
 
-	// create committee with node table
+	// create committee with identity table
 	c := &Committee{
-		nodes: make(map[string]flow.Node),
+		identities: make(map[string]flow.Identity),
 	}
 
 	// try to parse the nodes
 	for _, entry := range entries {
-
 		// try to parse the expression
 		role, id, address, err := EntryToFields(entry)
 		if err != nil {
@@ -63,22 +62,22 @@ func New(entries []string, identity string) (*Committee, error) {
 		}
 
 		// check for duplicates
-		_, ok := c.nodes[id]
+		_, ok := c.identities[id]
 		if ok {
 			return nil, errors.Errorf("duplicate node identity (%s)", id)
 		}
 
 		// add entry to identity table
-		node := flow.Node{
-			ID:      id,
+		node := flow.Identity{
+			NodeID:  id,
 			Role:    role,
 			Address: address,
 		}
-		c.nodes[id] = node
+		c.identities[id] = node
 	}
 
 	// check if we are present in the node identity table
-	me, ok := c.nodes[identity]
+	me, ok := c.identities[identity]
 	if !ok {
 		return nil, errors.Errorf("entry for own identity missing (%s)", identity)
 	}
@@ -88,30 +87,30 @@ func New(entries []string, identity string) (*Committee, error) {
 }
 
 // Me returns our own node identity.
-func (c *Committee) Me() flow.Node {
+func (c *Committee) Me() flow.Identity {
 	return c.me
 }
 
 // Get will return the node with the given ID.
-func (c *Committee) Get(id string) (flow.Node, error) {
-	node, ok := c.nodes[id]
+func (c *Committee) Get(id string) (flow.Identity, error) {
+	node, ok := c.identities[id]
 	if !ok {
-		return flow.Node{}, errors.New("node not found")
+		return flow.Identity{}, errors.New("node not found")
 	}
 	return node, nil
 }
 
-// Select will returns the nodes fulfilling the given filters.
-func (c *Committee) Select(filters ...module.NodeFilter) (flow.NodeList, error) {
-	var nodes flow.NodeList
+// Select will returns the identities fulfilling the given filters.
+func (c *Committee) Select(filters ...module.IdentityFilter) (flow.IdentityList, error) {
+	var identities flow.IdentityList
 Outer:
-	for _, node := range c.nodes {
+	for _, node := range c.identities {
 		for _, filter := range filters {
 			if !filter(node) {
 				continue Outer
 			}
 		}
-		nodes = append(nodes, node)
+		identities = append(identities, node)
 	}
-	return nodes, nil
+	return identities, nil
 }

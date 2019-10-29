@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
@@ -36,13 +36,13 @@ func TestGetEvents(t *testing.T) {
 	var (
 		mintID     = "Mint()"
 		transferID = "Transfer(to: Address)"
-		toAddress  = types.HexToAddress("1234567890123456789012345678901234567890")
+		toAddress  = flow.HexToAddress("1234567890123456789012345678901234567890")
 
-		ev1 = types.Event{
+		ev1 = flow.Event{
 			ID:     mintID,
 			Values: map[string]interface{}{},
 		}
-		ev2 = types.Event{
+		ev2 = flow.Event{
 			ID: transferID,
 			Values: map[string]interface{}{
 				"to": toAddress.String(),
@@ -70,7 +70,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   2,
 		})
 		assert.Nil(t, err)
-		var events []*types.Event
+		var events []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &events)
 		assert.Nil(t, err)
 		assert.Len(t, events, 0)
@@ -82,7 +82,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 1)
@@ -95,7 +95,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		// Should get both events
@@ -107,7 +107,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*types.Event
+		var resEvents []*flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 2)

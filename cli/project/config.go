@@ -7,14 +7,14 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/dapperlabs/flow-go/model/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 const ConfigPath = "flow.json"
 
 type Account struct {
-	Address    types.Address
-	PrivateKey types.AccountPrivateKey
+	Address    flow.Address
+	PrivateKey flow.AccountPrivateKey
 }
 
 // An internal utility struct that defines how Account is converted to JSON.
@@ -24,7 +24,7 @@ type accountConfigJSON struct {
 }
 
 func (acct *Account) MarshalJSON() ([]byte, error) {
-	prKeyBytes, err := types.EncodeAccountPrivateKey(acct.PrivateKey)
+	prKeyBytes, err := flow.EncodeAccountPrivateKey(acct.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +49,8 @@ func (acct *Account) UnmarshalJSON(data []byte) (err error) {
 		return
 	}
 
-	acct.Address = types.HexToAddress(alias.Address)
-	acct.PrivateKey, err = types.DecodeAccountPrivateKey(prKeyBytes)
+	acct.Address = flow.HexToAddress(alias.Address)
+	acct.PrivateKey, err = flow.DecodeAccountPrivateKey(prKeyBytes)
 	return
 }
 
