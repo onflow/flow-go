@@ -1,7 +1,7 @@
 package keys
 
 import (
-	generate2 "github.com/dapperlabs/flow-go/cli/flow/keys/generate"
+	generate "github.com/dapperlabs/flow-go/cli/flow/keys/generate"
 	"github.com/spf13/cobra"
 )
 
@@ -12,5 +12,5 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(generate2.Cmd)
+	Cmd.AddCommand(generate.Cmd)
 }

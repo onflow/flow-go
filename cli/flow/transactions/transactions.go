@@ -1,7 +1,7 @@
 package transactions
 
 import (
-	send2 "github.com/dapperlabs/flow-go/cli/flow/transactions/send"
+	send "github.com/dapperlabs/flow-go/cli/flow/transactions/send"
 	"github.com/spf13/cobra"
 )
 
@@ -12,5 +12,5 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(send2.Cmd)
+	Cmd.AddCommand(send.Cmd)
 }
