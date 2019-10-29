@@ -1332,7 +1332,6 @@ type EventType struct {
 	Location                            ast.Location
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
-	ast.Range
 }
 
 func (*EventType) isType() {}
