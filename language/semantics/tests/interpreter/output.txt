@@ -11,7 +11,10 @@
   <store>
     .Map
   </store>
-  <stack>
+  <fstack>
     .List
-  </stack>
+  </fstack>
+  <lstack>
+    .List
+  </lstack>
 </generatedTop>

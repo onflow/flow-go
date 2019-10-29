@@ -131,7 +131,7 @@ module FPL-COMMON-SYNTAX
    | "var" Ident           "<-" Exp
    | "var" Ident ":" Annot "<-" Exp
 
-  rule  let Ident  = Exp          => let Ident : noAnnot()  = Exp [macro]
+  rule (let Ident  = Exp)::VarDef => let Ident : noAnnot()  = Exp [macro]
   rule  let Ident <- Exp          => let Ident : noAnnot() <- Exp [macro]
   rule (var Ident  = Exp)::VarDef => var Ident : noAnnot()  = Exp [macro]
   rule  var Ident <- Exp          => var Ident : noAnnot() <- Exp [macro]
@@ -161,8 +161,8 @@ module FPL-COMMON-SYNTAX
 
   syntax Stmt ::= VarDef
                 | FunDef
-                | Path "=" Exp
-                | Path "<-" Exp
+                | Path "=" Exp [strict(2)]
+                | Path "<-" Exp [strict(2)]
                 | Exp
                 // Deploy?
                 // Publish?
@@ -181,6 +181,7 @@ module FPL-COMMON-SYNTAX
   rule if Cond { Block } else If => if Cond { Block } else { If } [macro]
 
   syntax IfCond ::= Exp
+                  | "let" Ident "=" Exp
                   | "var" Ident "=" Exp
   syntax Block ::= List{Stmt,";"}
 
@@ -306,7 +307,7 @@ module FPL-VALUES
   imports STRING-SYNTAX
 
   syntax Type
-  syntax Val ::= Int | Bool
+  syntax Val ::= Int | Bool | unit()
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
   syntax KResult ::= TypedVal | Int // for constant expressions
@@ -327,14 +328,14 @@ module FPL-STACK
   imports MAP
 
   syntax Scope
-  syntax Frame ::= frame(code:K, env: Map, scope: Scope)
+  syntax Frame ::= frame(code:K, env: Map, scope: Scope, loop: List)
 endmodule
 
 module FPL-FUN-ENV
   imports FPL-COMMON-SYNTAX
   imports MAP
 
-  syntax FunEntry ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
+  syntax Val ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
 endmodule
 
 module FPL-PANIC
@@ -444,7 +445,8 @@ module FPL-CONFIGURATION
     <scope> global </scope>
     <env> .Map </env>
     <store> .Map </store>
-    <stack> .List </stack>
+    <fstack> .List </fstack>
+    <lstack> .List </lstack>
 endmodule
 
 module FPL-VARIABLE-DECLARATION
@@ -492,13 +494,50 @@ module FPL-VARIABLE-DECLARATION
 
   rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
   rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+
+  rule <k> X:Ident = (I:Int => v(I, T)) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+  rule <k> X:Ident = v(V, _) => . ... </k>
+       <env>... X |-> env(... mut: var, loc: L) ...</env>
+       <store>... L |-> (_ => V) ...</store>
+
 endmodule
 
 module FPL-STMTS
   imports FPL-CONFIGURATION
 
   rule .Block => .K
-  rule S; B::Block => S ~> B
+  rule E:Exp ; B::Block => expressionStmt(E) ~> B
+  rule S; B::Block => S ~> B requires notBool isExp(S)
+
+  syntax Stmt ::= expressionStmt(Exp) [strict]
+  rule expressionStmt(_:Int) => .
+  rule expressionStmt(v(...)) => .
+
+  context if HOLE:Exp { _ } else { _ }
+  rule if v(true, _) { B } else { _ } => B
+  rule if v(false, _) { _ } else { B } => B
+
+  rule while E { B } => loop(if E { loopBody(B) } else { break })
+  syntax Stmt ::= loopBody(Block)
+  rule loopBody(B) => B ~> continue
+
+  syntax Stmt ::= loop(Stmt)
+  rule <k> loop(Stmt) ~> K => Stmt </k>
+       <env> Rho </env>
+       <fstack> FS </fstack>
+       <lstack> .List => ListItem(loopState(Rho, K, Stmt, FS)) ... </lstack>
+
+  syntax LoopFrame ::= loopState(Map, K, Stmt, List)
+
+  rule <k> break ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, K, _, FS)) => .List ...</lstack>
+  rule <k> continue ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, _, K, FS)) ...</lstack>
 endmodule
 
 module FPL-FUNCTIONS
@@ -542,15 +581,14 @@ module FPL-FUNCTIONS
        <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
        <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
        <scope> Scope => local(L) </scope>
-       <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
-  rule <k> return ~> _ => K </k>
-       <env> _ => Rho </env>
-       <scope> _ => Scope </scope>
-       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+       <fstack> .List => ListItem(frame(K, Rho, Scope, LS)) ...</fstack>
+       <lstack> LS => .List </lstack>
+  rule <k> return => return v(unit(), Void) ... </k>
   rule <k> return X:TypedVal ~> _ => X ~> K </k>
        <env> _ => Rho </env>
        <scope> _ => Scope </scope>
-       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+       <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
+       <lstack> _ => LS </lstack>
   rule <k> return I:Int => return v(I, T) ... </k>
        <scope> local(L) </scope>
        <store>... L |-> funDef(... result: T) ...</store>
@@ -701,8 +739,9 @@ module FPL-TESTING
        <scope> Scope => global </scope>
        <env> E => .Map </env>
        <store> State => .Map </store>
-       <stack> Stack => .List </stack>
-    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool Stack =/=K .List
+       <fstack> FS => .List </fstack>
+       <lstack> LS => .List </lstack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool FS =/=K .List orBool LS =/=K .List
 
   rule <k> panic(S::String => "") </k>
     requires S =/=String ""
