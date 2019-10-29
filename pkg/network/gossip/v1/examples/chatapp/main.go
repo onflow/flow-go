@@ -55,7 +55,12 @@ func main() {
 	config := gnode.NewNodeConfig(NewReceiverServerRegistry(&messageReceiver{}), myPort, othersPort, 2, 10)
 	node := gnode.NewNode(config)
 
-	node.SetProtocol(protocols.NewGServer(node))
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+
+	node.SetProtocol(sp)
 	fmt.Println("Chat app serves at port: ", myPort)
 
 	// step 3: passing the listener to the instance of gnode
@@ -69,7 +74,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not create message payload: %v", err)
 		}
-		_, err = node.AsyncGossip(context.Background(), payloadBytes, nil, "DisplayMessage")
+
+		// This example is using oneToMany, in order to test OneToAll, replace
+		// othersPort with nil
+		_, err = node.AsyncGossip(context.Background(), payloadBytes, othersPort, "DisplayMessage")
 		if err != nil {
 			log.Println(err)
 		}

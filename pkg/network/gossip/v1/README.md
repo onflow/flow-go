@@ -69,7 +69,7 @@ HandleFunc is the function signature expected from all registered functions
 
 
 
-## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=528:1036#L21)
+## <a name="Node">type</a> [Node](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=488:996#L21)
 ``` go
 type Node struct {
     // contains filtered or unexported fields
@@ -84,7 +84,7 @@ Node is holding the required information for a functioning async gossip node
 
 
 
-### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1215:1253#L44)
+### <a name="NewNode">func</a> [NewNode](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1175:1213#L44)
 ``` go
 func NewNode(config *NodeConfig) *Node
 ```
@@ -95,7 +95,7 @@ and a staticFanoutNum indicating the size of the static fanout
 
 
 
-### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=9530:9661#L286)
+### <a name="Node.AsyncGossip">func</a> (\*Node) [AsyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=10161:10292#L314)
 ``` go
 func (n *Node) AsyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
@@ -108,7 +108,7 @@ msgType:    represents the type of message to be gossiped (e.g., the engine type
 
 
 
-### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=11414:11516#L340)
+### <a name="Node.AsyncQueue">func</a> (\*Node) [AsyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=12571:12673#L392)
 ``` go
 func (n *Node) AsyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```
@@ -121,7 +121,7 @@ msg: the message to be placed in the queue
 
 
 
-### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=16351:16414#L491)
+### <a name="Node.RegisterFunc">func</a> (\*Node) [RegisterFunc](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=18261:18324#L564)
 ``` go
 func (n *Node) RegisterFunc(msgType string, f HandleFunc) error
 ```
@@ -132,7 +132,7 @@ handlFunc: the signature of the registered function
 
 
 
-### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=15596:15645#L468)
+### <a name="Node.Serve">func</a> (\*Node) [Serve](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=17508:17557#L540)
 ``` go
 func (n *Node) Serve(listener net.Listener) error
 ```
@@ -141,7 +141,7 @@ Serve starts an async node grpc server, and its sweeper as well
 
 
 
-### <a name="Node.SetProtocol">func</a> (\*Node) [SetProtocol](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1839:1880#L63)
+### <a name="Node.SetProtocol">func</a> (\*Node) [SetProtocol](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=1757:1798#L62)
 ``` go
 func (n *Node) SetProtocol(s ServePlacer)
 ```
@@ -151,7 +151,7 @@ implement ServePlacer
 
 
 
-### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=6756:6886#L207)
+### <a name="Node.SyncGossip">func</a> (\*Node) [SyncGossip](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=6906:7036#L214)
 ``` go
 func (n *Node) SyncGossip(ctx context.Context, payload []byte, recipients []string, msgType string) ([]*shared.GossipReply, error)
 ```
@@ -164,7 +164,7 @@ msgType:    represents the type of message to be gossiped
 
 
 
-### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=12956:13057#L388)
+### <a name="Node.SyncQueue">func</a> (\*Node) [SyncQueue](https://github.com/dapperlabs/flow-go/tree/master/pkg/network/gossip/v1/gnode.go?s=14542:14643#L450)
 ``` go
 func (n *Node) SyncQueue(ctx context.Context, msg *shared.GossipMessage) (*shared.GossipReply, error)
 ```

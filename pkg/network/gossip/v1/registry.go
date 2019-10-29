@@ -39,7 +39,6 @@ func (r *registryManager) MsgTypeToID(msgType string) (uint64, error) {
 	return val, nil
 }
 
-
 // IDtoMsgType takes a message id and returns the message corresponding to it.
 func (r *registryManager) IDtoMsgType(ID uint64) (string, error) {
 	r.mu.RLock()
@@ -52,7 +51,6 @@ func (r *registryManager) IDtoMsgType(ID uint64) (string, error) {
 	}
 	return val, nil
 }
-
 
 // newRegistryManager initializes a registry manager which manges a given registry
 func newRegistryManager(registry Registry) *registryManager {
@@ -83,8 +81,6 @@ func getIDMappings(msgTypeMap map[string]uint64) map[uint64]string {
 
 	return mp
 }
-
-
 
 // Invoke passes input parameters to given msgType name in the registry
 func (r *registryManager) Invoke(ctx context.Context, msgType uint64, payloadBytes []byte) (*invokeResponse, error) {

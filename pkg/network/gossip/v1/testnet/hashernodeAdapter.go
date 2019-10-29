@@ -2,7 +2,9 @@ package testnet
 
 // hasherNodeAdapter models an adaptor to run a gNode over the hasherNode, and to represent the hasherNode in the network
 import (
+	"errors"
 	"fmt"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
 
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/rs/zerolog"
@@ -33,6 +35,13 @@ func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumN
 	if err != nil {
 		return nil, err
 	}
+
+	sp, err := protocols.NewGServer(node)
+	if err != nil{
+		return nil, errors.New("could not initialize new GServer")
+	}
+
+	node.SetProtocol(sp)
 
 	go node.Serve(listener)
 

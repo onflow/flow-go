@@ -8,7 +8,8 @@ import (
 	"time"
 
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-	proto "github.com/golang/protobuf/proto"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
+	"github.com/gogo/protobuf/proto"
 )
 
 // Demo of for the gossip node implementation
@@ -37,10 +38,16 @@ func main() {
 		}
 	}
 
-	// step 2: registering the grpc services if any
-	// Note: this example is not built upon any grpc service, hence we pass nil
-	config := gnode.NewNodeConfig(nil, servePort, peers, 0, 10)
+
+	config := gnode.NewNodeConfig(nil, servePort, peers, 2, 10)
+
 	node := gnode.NewNode(config)
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+
+	node.SetProtocol(sp)
 
 	// step 3: passing the listener to the instance of gnode
 	go node.Serve(listener)
@@ -59,7 +66,9 @@ func main() {
 	}
 
 	// add the Time function to the node's registry
-	node.RegisterFunc("Time", Time)
+	if err := node.RegisterFunc("Time", Time); err != nil {
+		log.Fatalf("could not register Time func to node: %v", err)
+	}
 
 	t := time.Tick(5 * time.Second)
 

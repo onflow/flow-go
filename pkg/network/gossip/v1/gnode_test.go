@@ -3,7 +3,10 @@ package gnode
 import (
 	"context"
 	"fmt"
+
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
+
 	"testing"
 
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
@@ -23,7 +26,6 @@ func TestAsyncQueue(t *testing.T) {
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	go gn.sweeper()
-
 
 	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
@@ -66,7 +68,7 @@ func TestSyncQueue(t *testing.T) {
 	gn := NewNode(config)
 
 	assert := assert.New(t)
-
+	require := require.New(t)
 
 	//to handle the queue
 	go gn.sweeper()
@@ -77,9 +79,9 @@ func TestSyncQueue(t *testing.T) {
 	})
 	assert.Nil(err)
 
-
 	genMsg := func(payload []byte, recipients []string, msgType uint64) *shared.GossipMessage {
-		msg := generateGossipMessage(payload, recipients, msgType)
+		msg, err := generateGossipMessage(payload, recipients, msgType)
+		require.Nil(err, "non-nil error")
 		return msg
 	}
 
@@ -108,7 +110,6 @@ func TestSyncQueue(t *testing.T) {
 			msg: genMsg([]byte("msg3"), nil, 5), //5 is the index of an non-existing function
 			err: fmt.Errorf("non nil"),
 		},
-
 	}
 
 	for _, tc := range tt {
@@ -129,6 +130,7 @@ func TestSyncQueue(t *testing.T) {
 // TestMessageHandler tests the performance of messageHandler function
 func TestMessageHandler(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	getMsgID := func(msgType string) uint64 {
@@ -139,8 +141,6 @@ func TestMessageHandler(t *testing.T) {
 		return id
 	}
 
-
-
 	//add gn function for testing
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
@@ -150,7 +150,8 @@ func TestMessageHandler(t *testing.T) {
 	go gn.sweeper()
 
 	genMsg := func(payload []byte, recipients []string, msgType string) *shared.GossipMessage {
-		msg := generateGossipMessage(payload, recipients, getMsgID(msgType))
+		msg, err := generateGossipMessage(payload, recipients, getMsgID(msgType))
+		require.Nil(err, "non-nil error")
 		return msg
 	}
 
@@ -176,7 +177,8 @@ func TestMessageHandler(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
+	for i, tc := range tt {
+		t.Logf("Trial number: %d\n", i)
 		gotErr := gn.messageHandler(tc.e)
 		if tc.err == nil && gotErr == nil {
 			continue
@@ -184,7 +186,6 @@ func TestMessageHandler(t *testing.T) {
 		if tc.err == nil {
 			assert.Nil(gotErr)
 		}
-
 		if tc.err != nil {
 			assert.NotNil(gotErr)
 		}
@@ -198,11 +199,9 @@ func TestTryStore(t *testing.T) {
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 
-
-
 	//generating two messages with different script
-	msg1 := generateGossipMessage([]byte("hello"), []string{}, 3)
-	msg2 := generateGossipMessage([]byte("hi"), []string{}, 4)
+	msg1, _ := generateGossipMessage([]byte("hello"), []string{}, 3)
+	msg2, _ := generateGossipMessage([]byte("hi"), []string{}, 4)
 
 	// pretending that the node received msg2
 	h2, _ := computeHash(msg2)
@@ -255,5 +254,34 @@ func TestPickRandom(t *testing.T) {
 
 	n.staticFanoutNum = 2
 	n.pickGossipPartners()
-	assert.Equal(t, 2, len(n.fanoutSet))
+
+	require.Len(t, n.fanoutSet, 2)
+}
+
+func TestRandomSubSet(t *testing.T) {
+	peers := []string{
+		"Wyatt",
+		"Jayden",
+		"John",
+		"Owen",
+		"Dylan",
+		"Luke",
+		"Gabriel",
+		"Anthony",
+		"Isaac",
+		"Grayson",
+		"Jack",
+		"Julian",
+		"Levi",
+		"Christopher",
+		"Joshua",
+		"Andrew",
+		"Lincoln",
+	}
+
+	for i := 1; i < len(peers)/2; i++ {
+		subset, err := randomSubSet(peers, i)
+		require.Nil(t, err)
+		require.Len(t, subset, i)
+	}
 }

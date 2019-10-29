@@ -74,11 +74,7 @@ func (o *Order) Fill(resp []byte, err error) {
 
 // isSync checks if this Order is for a sync or async response
 func (o *Order) isSync() bool {
-	if o.done == nil {
-		return false
-	}
-
-	return true
+	return o.done != nil
 }
 
 func (o *Order) String() string {

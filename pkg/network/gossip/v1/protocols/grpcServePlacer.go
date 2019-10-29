@@ -6,13 +6,14 @@ import (
 	"io"
 	"net"
 	"os"
-	"sync"
 
+	// Initialize the gzip compressor
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
 )
 
 var (
@@ -34,17 +35,24 @@ type clientStream interface {
 
 // Gserver represents a gRPC server and a client
 type Gserver struct {
-	n       Node
-	streams map[string]clientStream
-	mu      sync.Mutex
+	n           Node
+	streams     map[string]clientStream
+	cacheDialer *CacheDialer
 }
 
 // NewGServer returns a new Gserver instance
-func NewGServer(n Node) *Gserver {
-	return &Gserver{
-		streams: make(map[string]clientStream),
-		n:       n,
+func NewGServer(n Node) (*Gserver, error) {
+
+	cd, err := NewCacheDialer(100)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a cachedialer: %v", err)
 	}
+
+	return &Gserver{
+		streams:     make(map[string]clientStream),
+		n:           n,
+		cacheDialer: cd,
+	}, nil
 }
 
 // SyncQueue is invoked remotely using the gRPC stub,
@@ -88,7 +96,10 @@ func (gs *Gserver) StreamAsyncQueue(saq shared.MessageReceiver_StreamAsyncQueueS
 		if err != nil {
 			return err
 		}
-		saq.Send(rep)
+
+		if err := saq.Send(rep); err != nil {
+			return err
+		}
 	}
 }
 
@@ -121,7 +132,10 @@ func (gs *Gserver) StreamSyncQueue(ssq shared.MessageReceiver_StreamSyncQueueSer
 		if err != nil {
 			return err
 		}
-		ssq.Send(rep)
+
+		if err := ssq.Send(rep); err != nil {
+			return err
+		}
 	}
 }
 
@@ -139,9 +153,11 @@ func (gs *Gserver) Place(ctx context.Context, addr string, msg *shared.GossipMes
 
 	switch mode {
 	case gossip.ModeOneToOne:
-		return gs.place(ctx, addr, msg, isSynchronous, mode)
+		return gs.place(ctx, addr, msg, isSynchronous)
+	case gossip.ModeOneToMany:
+		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
 	case gossip.ModeOneToAll:
-		return gs.placeStream(ctx, addr, msg, isSynchronous, mode)
+		return gs.placeStreamToAll(ctx, addr, msg, isSynchronous)
 	default:
 		return &shared.GossipReply{}, fmt.Errorf("Unimplemented mode")
 	}
@@ -149,7 +165,7 @@ func (gs *Gserver) Place(ctx context.Context, addr string, msg *shared.GossipMes
 }
 
 // place is used to send one-to-one direct messages
-func (gs *Gserver) place(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool, mode gossip.Mode) (*shared.GossipReply, error) {
+func (gs *Gserver) place(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool) (*shared.GossipReply, error) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return &shared.GossipReply{}, fmt.Errorf("could not connect to %s: %v", addr, err)
@@ -160,9 +176,9 @@ func (gs *Gserver) place(ctx context.Context, addr string, msg *shared.GossipMes
 
 	client := shared.NewMessageReceiverClient(conn)
 	if isSynchronous {
-		reply, err = client.SyncQueue(ctx, msg)
+		reply, err = client.SyncQueue(ctx, msg, grpc.UseCompressor(gzip.Name))
 	} else {
-		reply, err = client.AsyncQueue(ctx, msg)
+		reply, err = client.AsyncQueue(ctx, msg, grpc.UseCompressor(gzip.Name))
 	}
 	if err != nil {
 		return &shared.GossipReply{}, fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
@@ -171,36 +187,22 @@ func (gs *Gserver) place(ctx context.Context, addr string, msg *shared.GossipMes
 
 }
 
-// placeStream is used to send messages using streams
-// Todo we need to elaborate on this in comming issues
-func (gs *Gserver) placeStream(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool, mode gossip.Mode) (*shared.GossipReply, error) {
-	var stream clientStream
-	gs.mu.Lock()
-	defer gs.mu.Unlock()
 
-	// if there alread exists a stream then use it
-	if val, ok := gs.streams[addr]; ok {
-		stream = val
-	} else {
-		// otherwise create a new stream
-		conn, err := grpc.Dial(addr, grpc.WithInsecure())
-		if err != nil {
-			return &shared.GossipReply{}, fmt.Errorf("could not connect to %s: %v", addr, err)
-		}
-		client := shared.NewMessageReceiverClient(conn)
-		if isSynchronous {
-			stream, err = client.StreamSyncQueue(ctx)
-		} else {
-			stream, err = client.StreamAsyncQueue(ctx)
-		}
-		if err != nil {
-			return &shared.GossipReply{}, fmt.Errorf("could not start grpc stream with server %s: %v", addr, err)
-		}
-		gs.streams[addr] = stream
+func (gs *Gserver) placeStreamToAll(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool) (*shared.GossipReply, error) {
+
+	stream, err := gs.cacheDial(addr, isSynchronous, gossip.ModeOneToAll)
+	if err != nil {
+		return nil, fmt.Errorf("could not dial via cache: %v", err)
 	}
 
 	var reply *shared.GossipReply
-	err := stream.Send(msg)
+	err = stream.Send(msg)
+	if err == io.EOF {
+		gs.cacheDialer.removeStream(addr)
+		fmt.Println("Stream closed. Reoppenining...")
+		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
+	}
+
 	if err != nil {
 		return &shared.GossipReply{}, fmt.Errorf("could not send message with stream %s: %v", addr, err)
 	}
@@ -213,7 +215,40 @@ func (gs *Gserver) placeStream(ctx context.Context, addr string, msg *shared.Gos
 
 }
 
-//closeConnection closes a grpc client connection and prints the errors, if any,
+func (gs *Gserver) cacheDial(addr string, isSynchronous bool, mode gossip.Mode) (clientStream, error) {
+	return gs.cacheDialer.dial(addr, isSynchronous, mode)
+}
+
+func (gs *Gserver) placeStreamToMany(ctx context.Context, addr string, msg *shared.GossipMessage, isSynchronous bool) (*shared.GossipReply, error) {
+
+	stream, err := gs.cacheDial(addr, isSynchronous, gossip.ModeOneToMany)
+	if err != nil {
+		return &shared.GossipReply{}, fmt.Errorf("could not dial server %s: %v", addr, err)
+	}
+
+	var reply *shared.GossipReply
+	err = stream.Send(msg)
+	if err == io.EOF {
+		fmt.Println("Stream closed. Reoppenining...")
+		// we assume a healthy stream would not ever being closed, hence, we mark a bad stream to be subject to a retry.
+		// we also remove a bad stream from the cache to give it just a single more chance of try
+		gs.cacheDialer.removeStream(addr)
+		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
+	}
+
+	if err != nil {
+		return &shared.GossipReply{}, fmt.Errorf("could not send message with stream %s: %v", addr, err)
+	}
+	reply, err = stream.Recv()
+
+	if err != nil {
+		return &shared.GossipReply{}, fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
+	}
+	return reply, nil
+
+}
+
+// closeConnection closes a grpc client connection and prints the errors, if any,
 func closeConnection(conn *grpc.ClientConn) {
 	err := conn.Close()
 	if err != nil {

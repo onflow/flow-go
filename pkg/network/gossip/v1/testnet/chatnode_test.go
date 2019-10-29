@@ -76,8 +76,8 @@ func TestChatNodeAsync(t *testing.T) {
 	}
 }
 
-// TestChatNodeSync initializes chatNodes and sends messages using sync gossip from each node to
-// every other node, checking whether the nodes are correctly received
+//TestChatNodeSync initializes chatNodes and sends messages using sync gossip from each node to
+//every other node, checking whether the nodes are correctly received
 func TestChatNodeSync(t *testing.T) {
 	assert := assert.New(t)
 	// number of nodes to initialize, to add more, increase the size of the portPool in the initializer

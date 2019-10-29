@@ -14,7 +14,6 @@ func TestAddMessageType(t *testing.T) {
 	assert := assert.New(t)
 	r := newRegistryManager(nil)
 
-
 	defaultFunction := func(ctx context.Context, payload []byte) ([]byte, error) {
 		return []byte("Response"), nil
 	}

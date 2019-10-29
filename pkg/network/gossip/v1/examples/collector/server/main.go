@@ -5,14 +5,10 @@ import (
 	"log"
 	"net"
 
-	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
-
 	"github.com/dapperlabs/flow-go/pkg/grpc/services/collect"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
-)
-
-var (
-	collectorPort = ":50000"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
 )
 
 //A step by step on how to use gossip
@@ -39,6 +35,12 @@ func main() {
 	colReg := collect.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gnode.NewNodeConfig(colReg, myPort, othersPort, 0, 10)
 	collector := gnode.NewNode(config)
+
+	sp, err := protocols.NewGServer(collector)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	collector.SetProtocol(sp)
 
 	// step 3: passing the listener to the instance of gnode
 	collector.Serve(listener)

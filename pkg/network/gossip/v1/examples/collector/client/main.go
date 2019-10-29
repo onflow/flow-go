@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/pkg/grpc/shared"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
 	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/examples/collector"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
 	proto "github.com/golang/protobuf/proto"
 )
 
@@ -63,6 +64,12 @@ func PutKey(key string) error {
 	config := gnode.NewNodeConfig(colReg, "127.0.0.1:50004", serverAddress, 2, 10)
 	node := gnode.NewNode(config)
 
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	node.SetProtocol(sp)
+
 	subRequest, err := GenerateSubmitTransactionRequest(key)
 	if err != nil {
 		return err
@@ -82,7 +89,11 @@ func CheckKey(key string) error {
 	colReg := collect.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gnode.NewNodeConfig(colReg, "127.0.0.1:50004", storageAddrs, 2, 10)
 	node := gnode.NewNode(config)
-
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	node.SetProtocol(sp)
 	getRequest, err := GenerateGetTransactionRequest(key)
 	if err != nil {
 		return err

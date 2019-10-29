@@ -3,8 +3,10 @@ package testnet
 // chatNodeAdapter models an adaptor to run a gNode over the hasherNode, and to represent the hasherNode in the network
 
 import (
+	"errors"
 	"fmt"
 	gnode "github.com/dapperlabs/flow-go/pkg/network/gossip/v1"
+	"github.com/dapperlabs/flow-go/pkg/network/gossip/v1/protocols"
 	"github.com/rs/zerolog"
 )
 
@@ -28,6 +30,13 @@ func (cn *chatNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNod
 
 	config := gnode.NewNodeConfig(NewReceiverServerRegistry(cn), myPort, othersPort, fanoutSize, 10)
 	node := gnode.NewNode(config)
+
+	sp, err := protocols.NewGServer(node)
+	if err != nil{
+		return nil, errors.New("could not initialize new GServer")
+	}
+
+	node.SetProtocol(sp)
 
 	go node.Serve(listener)
 
