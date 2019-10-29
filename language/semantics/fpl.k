@@ -752,10 +752,12 @@ module FPL-ARRAYS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  rule [ Vs:Vals ] => array(arrayLit(Vs))
-  syntax List ::= arrayLit(Vals) [function]
+  rule [ Vs ] => array(arrayLit(Vs))
+    requires isKResult(Vs)
+  syntax List ::= arrayLit(Exps) [function]
   rule arrayLit(.Vals) => .List
-  rule arrayLit(V, Vs) => ListItem(V) arrayLit(Vs)
+  rule arrayLit(V:Val, Vs) => ListItem(V) arrayLit(Vs)
+  rule arrayLit(v(V, _), Vs) => ListItem(V) arrayLit(Vs)
 
   rule (_::Exp [ v(I:Int, _) => I ])::Exp
   rule (v(array(L::List), [T]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
