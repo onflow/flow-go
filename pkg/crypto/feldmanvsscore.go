@@ -28,7 +28,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	// s.size-1 DKGToSend to be sent to the other nodes
 	// One DKGToSend to be broadcasted
 	out.action = make([]DKGToSend, s.size)
-	for i := 1; i <= s.size; i++ {
+	for i := index(1); int(i) <= s.size; i++ {
 		shareSize := PrKeyLengthBLS_BLS12381
 		// the leader own share
 		if i-1 == s.currentIndex {
@@ -40,9 +40,10 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 			)
 			continue
 		}
+		// the other node shares
 		toSend := &(out.action[indexOrder(s.currentIndex, i-1)])
 		toSend.broadcast = false
-		toSend.dest = i - 1
+		toSend.dest = int(i - 1)
 
 		data := make([]byte, shareSize+1)
 		data[0] = byte(FeldmanVSSshare)
@@ -63,14 +64,14 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	return out
 }
 
-func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, []DKGToSend, error) {
+func (s *feldmanVSSstate) receiveShare(origin index, data []byte) (DKGresult, error) {
 	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
 	log.Debugf("the share is %d\n", data)
 	if s.xReceived {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 	if (len(data)) != PrKeyLengthBLS_BLS12381 {
-		return invalid, nil,nil
+		return invalid, nil
 	}
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
@@ -82,17 +83,17 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, []DK
 	if s.AReceived {
 		return s.verifyShare(), nil
 	}
-	return valid, nil,nil
+	return valid, nil
 }
 
-func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult, []DKGToSend, error) {
+func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) (DKGresult, error) {
 	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
 	log.Debugf("the vector is %d\n", data)
 	if s.AReceived {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
@@ -105,26 +106,18 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult
 	if s.xReceived {
 		return s.verifyShare(), nil
 	}
-	return valid, nil, nil
-}
-
-func (s *feldmanVSSstate) receiveComplaint(origin int, data []byte) (DKGresult, error) {
-	return nil, nil
-}
-
-func (s *feldmanVSSstate) receiveComplaintAnswer(origin int, data []byte) (DKGresult, error) {
-	return nil, nil
+	return valid, nil
 }
 
 // ZrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func ZrPolynomialImage(dest []byte, a []scalar, x int, y *pointG2) {
+func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 	C.Zr_polynomialImage((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
-		(C.int)(x),
+		(C.uint8_t)(x),
 	)
 }
 
@@ -146,8 +139,7 @@ func readVerifVector(A []pointG2, src []byte) {
 	)
 }
 
-
-func (s *feldmanVSSstate) verifyShare() (DKGresult, []DKGToSend) {
+func (s *feldmanVSSstate) verifyShare() DKGresult {
 	// check y[current] == x.G2
 	if C.verifyshare((*C.bn_st)(&s.x),
 		(*C.ep2_st)(&s.y[s.currentIndex])) == 1 {

@@ -10,12 +10,12 @@ import (
 
 // maps the interval [0..n-1] into [0..c-1,c+1..n] if c>1
 // maps the interval [0..n-1] into [1..n] if c=0
-func index(current int, loop int) int {
+/*func indexExpanded(current int, loop int) int {
 	if loop < current {
 		return loop
 	}
 	return loop + 1
-}
+}*/
 
 const (
 	dkgType int = iota

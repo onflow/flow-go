@@ -31,7 +31,7 @@ type ThresholdSigner struct {
 	shares []byte // simulates an array of Signatures
 	// (or a matrix of by bytes) to accommodate a cgo constraint
 	// the list of signers corresponding to the list of shares
-	signers []uint32
+	signers []index
 	// the threshold signature. It is equal to nil if less than (t+1) shares are
 	// received
 	thresholdSignature Signature
@@ -41,8 +41,8 @@ type ThresholdSigner struct {
 // hash is the hashing algorithm to be used
 // size is the number of participants
 func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
-	if size < ThresholdMinSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be larger than %d.",ThresholdMinSize)}
+	if size < ThresholdMinSize || size > ThresholdMaxSize {
+		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", ThresholdMinSize, ThresholdMaxSize)}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -53,7 +53,7 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
 		return nil, err
 	}
 	shares := make([]byte, 0, size*signatureLengthBLS_BLS12381)
-	signers := make([]uint32, 0, size)
+	signers := make([]index, 0, size)
 
 	return &ThresholdSigner{
 		size:               size,
@@ -93,11 +93,11 @@ func (s *ThresholdSigner) SignShare() (Signature, error) {
 }
 
 // VerifyShare verifies a signature share using the signer's public key
-func (s *ThresholdSigner) verifyShare(share Signature, signerIndex int) (bool, error) {
-	if s.size-1 < signerIndex {
+func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
+	if s.size-1 < int(signerIndex) {
 		return false, cryptoError{"The signer index is larger than the group size"}
 	}
-	if len(s.nodePublicKeys)-1 < signerIndex {
+	if len(s.nodePublicKeys)-1 < int(signerIndex) {
 		return false, cryptoError{"The node public keys are not set"}
 	}
 
@@ -127,13 +127,13 @@ func (s *ThresholdSigner) ReceiveThresholdSignatureMsg(orig int, share Signature
 		return false, nil, nil
 	}
 
-	verif, err := s.verifyShare(share, orig)
+	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
 		return false, nil, err
 	}
 	if verif {
 		s.shares = append(s.shares, share...)
-		s.signers = append(s.signers, uint32(orig))
+		s.signers = append(s.signers, index(orig))
 		// thresholdSignature is only computed once
 		if len(s.signers) == (s.threshold + 1) {
 			thresholdSignature, err := s.reconstructThresholdSignature()
@@ -158,7 +158,7 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&s.shares[0]),
-		(*C.uint32_t)(&s.signers[0]), (C.int)(len(s.signers)),
+		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)),
 	)
 
 	// Verify the computed signature

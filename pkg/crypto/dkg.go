@@ -13,6 +13,8 @@ type DKGType int
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	FeldmanVSS DKGType = iota
+	// FeldmanVSS is Feldman Verifiable Secret Sharing using complaints for disqualification
+	FeldmanVSSQual
 	// Joint Feldman (Pedersen)
 	JointFeldman
 	// Gennaro et.al protocol
@@ -32,6 +34,9 @@ type DKGstate interface {
 	ReceiveDKGMsg(int, DKGmsg) *DKGoutput
 }
 
+// index is the node index type used as participants ID
+type index byte
+
 // optimal threshold (t) to allow the largest number of malicious nodes (m)
 // assuming the protocol requires:
 //   m<=t for unforgeability
@@ -44,23 +49,25 @@ func optimalThreshold(size int) int {
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
 func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
+	if size < DKGMinSize || size > DKGMaxSize {
+		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", DKGMinSize, DKGMaxSize)}
+	}
+
 	if currentIndex >= size || leaderIndex >= size {
 		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}
 	}
-	if size < DKGMinSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be larger than 3.")}
-	}
+
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	if dkg == FeldmanVSS {
 		common := &dkgCommon{
 			size:         size,
 			threshold:    threshold,
-			currentIndex: currentIndex,
+			currentIndex: index(currentIndex),
 		}
 		fvss := &feldmanVSSstate{
 			dkgCommon:   common,
-			leaderIndex: leaderIndex,
+			leaderIndex: index(leaderIndex),
 		}
 		fvss.init()
 		log.Debugf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
@@ -74,7 +81,7 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 type dkgCommon struct {
 	size         int
 	threshold    int
-	currentIndex int
+	currentIndex index
 	// running is true when the DKG protocol is runnig, is false otherwise
 	running bool
 }
@@ -94,8 +101,8 @@ type dkgMsgTag byte
 const (
 	FeldmanVSSshare dkgMsgTag = iota
 	FeldmanVSSVerifVec
-	FeldmanVSSReceiveComplaint
-	FeldmanVSSReceiveComplaintAnswer
+	FeldmanVSSComplaint
+	FeldmanVSSComplaintAnswer
 )
 
 type DKGToSend struct {
@@ -124,7 +131,7 @@ type DKGoutput struct {
 }
 
 // maps the interval [1..c-1,c+1..n] into [1..n-1]
-func indexOrder(current int, loop int) int {
+func indexOrder(current index, loop index) index {
 	if loop < current {
 		return loop
 	}

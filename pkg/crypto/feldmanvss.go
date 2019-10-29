@@ -6,7 +6,7 @@ type feldmanVSSstate struct {
 	// common DKG state
 	*dkgCommon
 	// node leader index
-	leaderIndex int
+	leaderIndex index
 	// internal context of BLS on BLS12381A
 	blsContext *BLS_BLS12381Algo
 	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
@@ -29,7 +29,6 @@ func (s *feldmanVSSstate) init() {
 	blsSigner, _ := NewSigner(BLS_BLS12381)
 	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
 
-	s.A = nil
 	s.y = nil
 	s.xReceived = false
 	s.AReceived = false
@@ -64,7 +63,7 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 
 	// Group public key
 	var Y PublicKey
-	if s.A != nil {
+	if s.AReceived {
 		Y = &PubKeyBLS_BLS12381{
 			point: s.A[0],
 		}
@@ -90,26 +89,22 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 
 func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	out := &DKGoutput{
-		result: invalid,
 		action: []DKGToSend{},
 		err:    nil,
 	}
 
-	if !s.running || len(msg) == 0 {
+	if !s.running || orig >= s.Size() || len(msg) == 0 {
 		out.result = invalid
 		return out
 	}
 
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result, out.action, out.err = s.receiveShare(orig, msg[1:])
+		out.result, out.err = s.receiveShare(index(orig), msg[1:])
 	case FeldmanVSSVerifVec:
-		out.result, out.action, out.err = s.receiveVerifVector(orig, msg[1:])
-	case FeldmanVSSReceiveComplaint:
-		out.result, out.err = s.receiveComplaint(orig, msg[1:])
-	case FeldmanVSSReceiveComplaintAnswer:
-		out.result, out.err = s.receiveComplaintAnswer(orig, msg[1:])
+		out.result, out.err = s.receiveVerifVector(index(orig), msg[1:])
 	default:
+		out.result = invalid
 	}
 	return out
 }

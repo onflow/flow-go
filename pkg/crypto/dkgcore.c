@@ -10,7 +10,7 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y
 // x being a small integer
-void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const int x){
+void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const byte x){
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -59,7 +59,7 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
 // and stores the point in y
 // r is the order of G2, u is the barett constant associated to r
 static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
-         const int x, const bn_st* r, const bn_st* u){
+         const byte x, const bn_st* r, const bn_st* u){
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
     bn_new(&bn_x);
@@ -102,7 +102,7 @@ void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int 
     bn_st u;
     bn_new(&u)
     bn_mod_pre_barrt(&u, &r);
-    for (int i=0; i<len_y; i++) {
+    for (byte i=0; i<len_y; i++) {
         //y[i] = Q(i+1)
         G2_polynomialImage(y+i , A, len_A, i+1, &r, &u);
     }

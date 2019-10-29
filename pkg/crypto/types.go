@@ -5,10 +5,10 @@ type AlgoName string
 
 const (
 	// Supported Hashing algorithms
-	SHA2_256 AlgoName 	= "SHA2_256"
-	SHA2_384			= "SHA2_384"
-	SHA3_256			= "SHA3_256"
-	SHA3_384      	    = "SHA3_384"
+	SHA2_256 AlgoName = "SHA2_256"
+	SHA2_384          = "SHA2_384"
+	SHA3_256          = "SHA3_256"
+	SHA3_384          = "SHA3_384"
 
 	// Supported Signing algorithms
 	BLS_BLS12381    = "BLS_BLS12381"
@@ -47,6 +47,8 @@ const (
 
 	DKGMinSize int = 3
 	ThresholdMinSize
+	DKGMaxSize int = 254
+	ThresholdMaxSize
 )
 
 // Signature is a generic type, regardless of the signature scheme
