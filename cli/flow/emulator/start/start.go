@@ -2,6 +2,7 @@ package start
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/cli"
 	"os"
 	"time"
 
@@ -9,9 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cli/initialize"
-	"github.com/dapperlabs/flow-go/cli/project"
-	"github.com/dapperlabs/flow-go/cli/utils"
+	"github.com/dapperlabs/flow-go/cli/flow/initialize"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
@@ -34,9 +33,9 @@ var Cmd = &cobra.Command{
 	Short: "Starts the Flow emulator server",
 	Run: func(cmd *cobra.Command, args []string) {
 		if conf.Init {
-			var pconf *project.Config
+			var pconf *cli.Config
 			if len(conf.RootKey) > 0 {
-				prKey := utils.MustDecodeAccountPrivateKeyHex(conf.RootKey)
+				prKey := cli.MustDecodeAccountPrivateKeyHex(conf.RootKey)
 				pconf = initialize.InitProjectWithRootKey(prKey)
 			} else {
 				pconf = initialize.InitProject()
@@ -47,7 +46,7 @@ var Cmd = &cobra.Command{
 			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
 		}
 
-		rootAcct := project.LoadConfig().RootAccount()
+		rootAcct := cli.LoadConfig().RootAccount()
 
 		if conf.Verbose {
 			log.SetLevel(logrus.DebugLevel)
@@ -77,7 +76,7 @@ func initLogger() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
-		FromEnvironment(utils.EnvPrefix).
+		FromEnvironment(cli.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {

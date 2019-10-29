@@ -1,9 +1,8 @@
 package accounts
 
 import (
+	create2 "github.com/dapperlabs/flow-go/cli/flow/accounts/create"
 	"github.com/spf13/cobra"
-
-	"github.com/dapperlabs/flow-go/cli/accounts/create"
 )
 
 var Cmd = &cobra.Command{
@@ -13,5 +12,5 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(create.Cmd)
+	Cmd.AddCommand(create2.Cmd)
 }

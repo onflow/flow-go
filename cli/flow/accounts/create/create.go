@@ -2,14 +2,13 @@ package create
 
 import (
 	"context"
+	"github.com/dapperlabs/flow-go/cli"
 	"io/ioutil"
 	"log"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cli/project"
-	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
@@ -28,14 +27,14 @@ var Cmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new account",
 	Run: func(cmd *cobra.Command, args []string) {
-		projectConf := project.LoadConfig()
+		projectConf := cli.LoadConfig()
 
 		signer := projectConf.Accounts[conf.Signer]
 
 		accountKeys := make([]flow.AccountPublicKey, len(conf.Keys))
 
 		for i, privateKeyHex := range conf.Keys {
-			privateKey := utils.MustDecodeAccountPrivateKeyHex(privateKeyHex)
+			privateKey := cli.MustDecodeAccountPrivateKeyHex(privateKeyHex)
 			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 		}
 
@@ -47,13 +46,13 @@ var Cmd = &cobra.Command{
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
-				utils.Exitf(1, "Failed to parse Cadence code from %s", conf.Code)
+				cli.Exitf(1, "Failed to parse Cadence code from %s", conf.Code)
 			}
 		}
 
 		script, err := templates.CreateAccount(accountKeys, code)
 		if err != nil {
-			utils.Exit(1, "Failed to generate transaction script")
+			cli.Exit(1, "Failed to generate transaction script")
 		}
 
 		tx := flow.Transaction{
@@ -65,17 +64,17 @@ var Cmd = &cobra.Command{
 
 		err = tx.AddSignature(signer.Address, signer.PrivateKey)
 		if err != nil {
-			utils.Exit(1, "Failed to sign transaction")
+			cli.Exit(1, "Failed to sign transaction")
 		}
 
 		client, err := client.New("localhost:5000")
 		if err != nil {
-			utils.Exit(1, "Failed to connect to emulator")
+			cli.Exit(1, "Failed to connect to emulator")
 		}
 
 		err = client.SendTransaction(context.Background(), tx)
 		if err != nil {
-			utils.Exit(1, "Failed to send account creation transaction")
+			cli.Exit(1, "Failed to send account creation transaction")
 		}
 	},
 }
@@ -86,7 +85,7 @@ func init() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
-		FromEnvironment(utils.EnvPrefix).
+		FromEnvironment(cli.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {

@@ -3,12 +3,12 @@ package generate
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/dapperlabs/flow-go/cli"
 	"log"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
@@ -47,7 +47,7 @@ func init() {
 
 func initConfig() {
 	err := sconfig.New(&conf).
-		FromEnvironment(utils.EnvPrefix).
+		FromEnvironment(cli.EnvPrefix).
 		BindFlags(Cmd.PersistentFlags()).
 		Parse()
 	if err != nil {
