@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"encoding/gob"
 	"fmt"
 	"math/big"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/pkg/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/pkg/types"
 )
 
@@ -426,4 +428,160 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 
 	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
+}
+
+func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	imported := []byte(`
+      resource R {
+        fun x() {
+          log("x!")
+        }
+      }
+    `)
+
+	script1 := []byte(`
+      import R from "imported"
+
+      fun main(account: Account) {
+          var r: <-R? <- create R()
+	      account.storage[R] <-> r
+          if r != nil {
+             panic("already initialized")
+          }
+          destroy r
+	  }
+    `)
+
+	script2 := []byte(`
+      import R from "imported"
+
+      fun main(account: Account) {
+          let ref = &account.storage[R] as R
+          ref.x()
+      }
+    `)
+
+	storedValues := map[string][]byte{}
+
+	var loggedMessages []string
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
+}
+
+func init() {
+	gob.Register(types.Address{})
+}
+
+func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	imported := []byte(`
+      resource R {
+        fun x() {
+          log("x!")
+        }
+      }
+    `)
+
+	script1 := []byte(`
+      import R from "imported"
+
+      fun main(account: Account) {
+          var r: <-R? <- create R()
+	      account.storage[R] <-> r
+          if r != nil {
+             panic("already initialized")
+          }
+          destroy r
+
+          account.storage[&R] = &account.storage[R] as R
+	  }
+    `)
+
+	script2 := []byte(`
+	 import R from "imported"
+
+	 fun main(account: Account) {
+	     let ref = account.storage[&R] ?? panic("no R ref")
+	     ref.x()
+	 }
+	`)
+
+	storedValues := map[string][]byte{}
+
+	var loggedMessages []string
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []types.Address {
+			return []types.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
