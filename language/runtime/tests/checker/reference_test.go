@@ -10,6 +10,39 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
+func TestCheckReferenceTypeSubTyping(t *testing.T) {
+
+	_, err := ParseAndCheckWithStorage(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ref = &storage[R] as RI
+          let ref2: &RI = ref
+        `,
+	)
+
+	require.Nil(t, err)
+}
+
+func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
+
+	_, err := ParseAndCheckWithStorage(t, `
+          resource interface RI {}
+
+          // NOTE: R does not conform to RI
+          resource R {}
+
+          let ref = &storage[R] as RI
+          let ref2: &RI = ref
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
 func TestCheckReferenceTypeOuter(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
