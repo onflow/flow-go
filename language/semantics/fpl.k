@@ -628,7 +628,7 @@ module FPL-FUNCTIONS
        <scope> _ => Scope </scope>
        <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
        <lstack> _ => LS </lstack>
-  rule <k> return I:Int => return v(I, T) ... </k>
+  rule <k> return V:Val => return v(V, T) ... </k>
        <scope> local(L) </scope>
        <store>... L |-> funDef(... result: T) ...</store>
 
