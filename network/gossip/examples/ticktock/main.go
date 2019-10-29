@@ -39,13 +39,15 @@ func main() {
 		}
 	}
 
-	// step 2: registering the grpc services if any
-	// Note: this example is not built upon any grpc service, hence we pass nil
+	config := gossip.NewNodeConfig(nil, servePort, peers, 2, 10)
 
-	config := gossip.NewNodeConfig(nil, servePort, peers, 0, 10)
 	node := gossip.NewNode(config)
-	protocol := protocols.NewGServer(node)
-	node.SetProtocol(protocol)
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+
+	node.SetProtocol(sp)
 
 	// step 3: passing the listener to the instance of node
 	go node.Serve(listener)
@@ -64,7 +66,9 @@ func main() {
 	}
 
 	// add the Time function to the node's registry
-	node.RegisterFunc("Time", Time)
+	if err := node.RegisterFunc("Time", Time); err != nil {
+		log.Fatalf("could not register Time func to node: %v", err)
+	}
 
 	t := time.Tick(5 * time.Second)
 

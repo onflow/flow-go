@@ -11,12 +11,13 @@ import (
 	"log"
 	"os"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/examples/collector"
 	"github.com/dapperlabs/flow-go/network/gossip/protocols"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/collection"
-	proto "github.com/golang/protobuf/proto"
 )
 
 func main() {
@@ -66,6 +67,12 @@ func PutKey(key string) error {
 	protocol := protocols.NewGServer(node)
 	node.SetProtocol(protocol)
 
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	node.SetProtocol(sp)
+
 	subRequest, err := GenerateSubmitTransactionRequest(key)
 	if err != nil {
 		return err
@@ -82,12 +89,15 @@ func PutKey(key string) error {
 // CheckKey checks whether the key exists in the distributed storage
 func CheckKey(key string) error {
 	storageAddrs := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
+
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gossip.NewNodeConfig(colReg, "127.0.0.1:50004", storageAddrs, 2, 10)
 	node := gossip.NewNode(config)
-	protocol := protocols.NewGServer(node)
-	node.SetProtocol(protocol)
-
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	node.SetProtocol(sp)
 	getRequest, err := GenerateGetTransactionRequest(key)
 	if err != nil {
 		return err
@@ -138,7 +148,7 @@ func GenerateGetTransactionRequest(text string) ([]byte, error) {
 	return byteRequest, nil
 }
 
-// A Good Unmarshaling example
+// A Good Unmarshalling example
 
 // ExtractGetResp decodes a byte response into its original type and returns it
 func ExtractGetResp(byteResponse []byte) (*collection.GetTransactionResponse, error) {

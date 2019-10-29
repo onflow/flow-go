@@ -3,7 +3,12 @@ package gossip
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
@@ -13,7 +18,9 @@ var (
 	defaultAddress = "127.0.0.1:50000"
 )
 
+// TestAsyncQueue tests the performance of AsyncQueue function
 func TestAsyncQueue(t *testing.T) {
+	assert := assert.New(t)
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	go gn.sweeper()
@@ -42,23 +49,25 @@ func TestAsyncQueue(t *testing.T) {
 			continue
 		}
 
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("AsyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
 
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("AsyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 
-		if tc.err != nil && gotErr != nil {
-			continue
-		}
 	}
 }
 
+// TestSyncQueue tests the performance of SyncQueue function
 func TestSyncQueue(t *testing.T) {
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
+
+	assert := assert.New(t)
+	require := require.New(t)
+
 	//to handle the queue
 	go gn.sweeper()
 
@@ -66,19 +75,17 @@ func TestSyncQueue(t *testing.T) {
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
-
-	if err != nil {
-		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
-	}
+	assert.Nil(err)
 
 	genMsg := func(payload []byte, recipients []string, msgType uint64) *messages.GossipMessage {
-		msg, _ := generateGossipMessage(payload, recipients, msgType)
+		msg, err := generateGossipMessage(payload, recipients, msgType)
+		require.Nil(err, "non-nil error")
 		return msg
 	}
 
 	//To test the error returned when gn context provided is expired
 	expiredContext, cancel := context.WithCancel(context.Background())
-	// cancelling the context
+	// // cancelling the context
 	cancel()
 
 	tt := []struct {
@@ -88,17 +95,17 @@ func TestSyncQueue(t *testing.T) {
 	}{
 		{ //Working example
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, 3), //3 is the index of the first registered function (functions 0-2 are reserved)
+			msg: genMsg([]byte("msg1"), nil, 3), //3 is the index of the first registered function (functions 0-2 are reserved)
 			err: nil,
 		},
 		{ // Expired context
 			ctx: expiredContext,
-			msg: genMsg([]byte("msg"), nil, 3),
+			msg: genMsg([]byte("msg2"), nil, 3),
 			err: fmt.Errorf("non nil"),
 		},
 		{ //Invalid function
 			ctx: context.Background(),
-			msg: genMsg([]byte("msg"), nil, 5), //5 is the index of an inexistant function
+			msg: genMsg([]byte("msg3"), nil, 5), //5 is the index of an non-existing function
 			err: fmt.Errorf("non nil"),
 		},
 	}
@@ -109,22 +116,19 @@ func TestSyncQueue(t *testing.T) {
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
-
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("SyncQueue: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
-
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("SyncQueue: Expected %v, Got: %v", tc.err, gotErr)
-		}
-
-		if tc.err != nil && gotErr != nil {
-			continue
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 	}
 }
 
+// TestMessageHandler tests the performance of messageHandler function
 func TestMessageHandler(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
 	getMsgID := func(msgType string) uint64 {
@@ -139,15 +143,13 @@ func TestMessageHandler(t *testing.T) {
 	err := gn.RegisterFunc("exists", func(ctx context.Context, Payload []byte) ([]byte, error) {
 		return Payload, nil
 	})
-
-	if err != nil {
-		t.Errorf("RegisterFunc: Expected nil error, Got: %v", err)
-	}
+	assert.Nil(err)
 
 	go gn.sweeper()
 
 	genMsg := func(payload []byte, recipients []string, msgType string) *messages.GossipMessage {
-		msg, _ := generateGossipMessage(payload, recipients, getMsgID(msgType))
+		msg, err := generateGossipMessage(payload, recipients, getMsgID(msgType))
+		require.Nil(err, "non-nil error")
 		return msg
 	}
 
@@ -173,27 +175,24 @@ func TestMessageHandler(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
+	for i, tc := range tt {
+		t.Logf("Trial number: %d\n", i)
 		gotErr := gn.messageHandler(tc.e)
 		if tc.err == nil && gotErr == nil {
 			continue
 		}
-
-		if tc.err == nil && gotErr != nil {
-			t.Errorf("MessageHandler: Expected %v, Got: %v", tc.err, gotErr)
+		if tc.err == nil {
+			assert.Nil(gotErr)
 		}
-
-		if tc.err != nil && gotErr == nil {
-			t.Errorf("MessageHandler: Expected %v, Got: %v", tc.err, gotErr)
-		}
-
-		if tc.err != nil && gotErr != nil {
-			continue
+		if tc.err != nil {
+			assert.NotNil(gotErr)
 		}
 	}
 }
 
+// TestTryStore tests the performance of tryStore function
 func TestTryStore(t *testing.T) {
+	assert := assert.New(t)
 
 	config := NewNodeConfig(nil, defaultAddress, []string{}, 0, 10)
 	gn := NewNode(config)
@@ -223,12 +222,12 @@ func TestTryStore(t *testing.T) {
 	// test if storage reports the correct state of the message
 	for _, tc := range tt {
 		rep, _ := gn.tryStore(tc.msg)
-		if rep != tc.expectedBool {
-			t.Errorf("tryStore: Expected: %v, Got: %v", tc.expectedBool, rep)
-		}
+		assert.Equal(tc.expectedBool, rep)
+
 	}
 }
 
+// TestPickRandom tests the performance of pickGossipPartners function
 func TestPickRandom(t *testing.T) {
 	n := &Node{}
 	n.peers = []string{
@@ -254,7 +253,33 @@ func TestPickRandom(t *testing.T) {
 	n.staticFanoutNum = 2
 	_ = n.pickGossipPartners()
 
-	if size := len(n.fanoutSet); size != 2 {
-		t.Errorf("expected a new fanout set of size 2, received fanout set of size: %v", size)
+	require.Len(t, n.fanoutSet, 2)
+}
+
+func TestRandomSubSet(t *testing.T) {
+	peers := []string{
+		"Wyatt",
+		"Jayden",
+		"John",
+		"Owen",
+		"Dylan",
+		"Luke",
+		"Gabriel",
+		"Anthony",
+		"Isaac",
+		"Grayson",
+		"Jack",
+		"Julian",
+		"Levi",
+		"Christopher",
+		"Joshua",
+		"Andrew",
+		"Lincoln",
+	}
+
+	for i := 1; i < len(peers)/2; i++ {
+		subset, err := randomSubSet(peers, i)
+		require.Nil(t, err)
+		require.Len(t, subset, i)
 	}
 }

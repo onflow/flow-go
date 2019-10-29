@@ -26,7 +26,7 @@ type messageReceiver struct{}
 func (mr *messageReceiver) DisplayMessage(ctx context.Context, msg *Message) (*Void, error) {
 	fmt.Printf("\n%v: %v", msg.Sender, string(msg.Content))
 	fmt.Printf("Enter Message: ")
-	return nil, nil
+	return &Void{}, nil
 }
 
 func main() {
@@ -58,6 +58,13 @@ func main() {
 	protocol := protocols.NewGServer(node)
 	node.SetProtocol(protocol)
 
+	sp, err := protocols.NewGServer(node)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+
+	node.SetProtocol(sp)
+
 	fmt.Println("Chat app serves at port: ", myPort)
 
 	// step 3: passing the listener to the instance of gnode
@@ -71,8 +78,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not create message payload: %v", err)
 		}
-		//recipients are set to nil meaning that the message is targeted for all, i.e., ONE_TO_ALL gossip
-		_, err = node.AsyncGossip(context.Background(), payloadBytes, nil, "DisplayMessage")
+
+		// This example is using oneToMany, in order to test OneToAll, replace
+		// othersPort with nil
+		_, err = node.AsyncGossip(context.Background(), payloadBytes, othersPort, "DisplayMessage")
 		if err != nil {
 			log.Println(err)
 		}

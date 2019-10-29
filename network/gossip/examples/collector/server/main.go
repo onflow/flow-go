@@ -32,12 +32,15 @@ func main() {
 	// step 2: registering the grpc services if any
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
-
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
 	config := gossip.NewNodeConfig(colReg, myPort, othersPort, 0, 10)
-	node := gossip.NewNode(config)
-	protocol := protocols.NewGServer(node)
-	node.SetProtocol(protocol)
+	collector := gossip.NewNode(config)
+
+	sp, err := protocols.NewGServer(collector)
+	if err != nil {
+		log.Fatalf("could not start network server: %v", err)
+	}
+	collector.SetProtocol(sp)
 
 	// step 3: passing the listener to the instance of gnode
 	node.Serve(listener)

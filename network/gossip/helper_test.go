@@ -3,7 +3,8 @@ package gossip
 import (
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
@@ -11,15 +12,17 @@ import (
 
 //TestComputeHash tests the computeHash helper function
 func TestComputeHash(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	msg1, err := generateGossipMessage([]byte("hi"), []string{}, 0)
+	require.Nil(err, "non-nil error")
+	alg, err := crypto.NewHasher(crypto.SHA3_256)
+	require.Nil(err, "non-nil error")
+	h1 := alg.ComputeHash(msg1.GetPayload())
 
-	msg1, _ := generateGossipMessage([]byte("hi"), []string{}, 0)
-	msg1Bytes, _ := proto.Marshal(msg1)
-	alg, _ := crypto.NewHasher(crypto.SHA3_256)
-	h1 := alg.ComputeHash(msg1Bytes)
-
-	msg2, _ := generateGossipMessage([]byte("nohi"), []string{}, 0)
-	msg2Bytes, _ := proto.Marshal(msg2)
-	h2 := alg.ComputeHash(msg2Bytes)
+	msg2, err := generateGossipMessage([]byte("nohi"), []string{}, 0)
+	require.Nil(err, "non-nil error")
+	h2 := alg.ComputeHash(msg2.GetPayload())
 
 	tt := []struct {
 		msg          *messages.GossipMessage
@@ -39,16 +42,14 @@ func TestComputeHash(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		res1, _ := computeHash(tc.msg)
+		res1, err := computeHash(tc.msg)
+		require.Nil(err, "non-nil error")
 		// testing if hash generated properly
-		if string(res1) != string(tc.expectedHash) {
-			t.Errorf("computHash: Expected: %v, Got: %v", tc.expectedHash, res1)
-		}
+		assert.Equal(string(tc.expectedHash), string(res1))
 		tc.msg.Payload = tc.modification
 		// testing if hash changes after modifying payload
-		res2, _ := computeHash(tc.msg)
-		if string(res2) == string(res1) {
-			t.Errorf("computeHash: Expected: not equal after modifying, Got: Equal after modifying")
-		}
+		res2, err := computeHash(tc.msg)
+		require.Nil(err, "non-nil error")
+		assert.NotEqual(string(res2), string(res1))
 	}
 }

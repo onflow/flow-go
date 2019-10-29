@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
+// mock errors for the purpose of testing
 var (
 	errs = []error{
 		fmt.Errorf("first error"),
@@ -16,19 +19,19 @@ var (
 	}
 )
 
-func TestCollect(t *testing.T) {
+//TestAppend tests if Append method is working properly using mock errors.
+func TestAppend(t *testing.T) {
 	gerr := &gossipError{}
 
 	for _, err := range errs {
 		gerr.Append(err)
 	}
 
-	if len(*gerr) != len(errs) {
-		t.Errorf("number of errors collected mismatch. expected: %v, got: %v", len(errs), len(*gerr))
-	}
-
+	// check if number of collected errors matches original errors array
+	assert.Equal(t, len(*gerr), len(errs))
 }
 
+//TestError tests Error method
 func TestError(t *testing.T) {
 	gerr := gossipError(errs)
 
