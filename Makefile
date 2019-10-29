@@ -1,7 +1,12 @@
 REVISION := $(shell git rev-parse --short HEAD)
 
+.PHONY: clone-submodules
+clone-submodules:
+	rm -rf crypto/relic
+	git submodule update --init --recursive
+
 .PHONY: build-relic
-build-relic:
+build-relic: clone-submodules
 	./crypto/relic_build.sh
 
 .PHONY: install-tools

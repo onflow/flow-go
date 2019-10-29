@@ -14,7 +14,8 @@ import (
 )
 
 type Config struct {
-	Reset bool `default:"false" flag:"reset" info:"reset flow.json config file"`
+	RootKey string `flag:"root-key" info:"root account key"`
+	Reset   bool   `default:"false" flag:"reset" info:"reset flow.json config file"`
 }
 
 var (
@@ -26,7 +27,13 @@ var Cmd = &cobra.Command{
 	Short: "Initialize a new account profile",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !project.ConfigExists() || conf.Reset {
-			pconf := InitProject()
+			var pconf *project.Config
+			if len(conf.RootKey) > 0 {
+				prKey := utils.MustDecodeAccountPrivateKeyHex(conf.RootKey)
+				pconf = InitProjectWithRootKey(prKey)
+			} else {
+				pconf = InitProject()
+			}
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
@@ -40,25 +47,21 @@ var Cmd = &cobra.Command{
 
 // InitProject generates a new root key and saves project config.
 func InitProject() *project.Config {
-	privateKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
+	prKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
 	if err != nil {
-		utils.Exitf(1, "Failed to generate private key: %v", err)
+		utils.Exitf(1, "Failed to generate private key err: %v", err)
 	}
 
-	address := flow.HexToAddress("01")
+	return InitProjectWithRootKey(prKey)
+}
 
-	conf := &project.Config{
-		Accounts: map[string]*project.Account{
-			"root": {
-				Address:    address,
-				PrivateKey: privateKey,
-			},
-		},
-	}
-
-	project.SaveConfig(conf)
-
-	return conf
+// InitProjectWithRootKey creates and saves a new project config
+// using the specified root key.
+func InitProjectWithRootKey(rootKey flow.AccountPrivateKey) *project.Config {
+	pconf := project.NewConfig()
+	pconf.SetRootAccount(rootKey)
+	project.MustSaveConfig(pconf)
+	return pconf
 }
 
 func init() {
