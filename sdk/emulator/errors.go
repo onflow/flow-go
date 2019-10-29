@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // ErrBlockNotFound indicates that a block specified by hash or number cannot be found.
@@ -33,7 +33,7 @@ func (e *ErrTransactionNotFound) Error() string {
 
 // ErrAccountNotFound indicates that an account specified by address cannot be found.
 type ErrAccountNotFound struct {
-	Address types.Address
+	Address flow.Address
 }
 
 func (e *ErrAccountNotFound) Error() string {
@@ -51,7 +51,7 @@ func (e *ErrDuplicateTransaction) Error() string {
 
 // ErrMissingSignature indicates that a transaction is missing a required signature.
 type ErrMissingSignature struct {
-	Account types.Address
+	Account flow.Address
 }
 
 func (e *ErrMissingSignature) Error() string {
@@ -60,7 +60,7 @@ func (e *ErrMissingSignature) Error() string {
 
 // ErrInvalidSignaturePublicKey indicates that signature uses an invalid public key.
 type ErrInvalidSignaturePublicKey struct {
-	Account types.Address
+	Account flow.Address
 }
 
 func (e *ErrInvalidSignaturePublicKey) Error() string {
@@ -69,7 +69,7 @@ func (e *ErrInvalidSignaturePublicKey) Error() string {
 
 // ErrInvalidSignatureAccount indicates that a signature references a nonexistent account.
 type ErrInvalidSignatureAccount struct {
-	Account types.Address
+	Account flow.Address
 }
 
 func (e *ErrInvalidSignatureAccount) Error() string {

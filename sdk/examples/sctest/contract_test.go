@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
@@ -38,7 +38,7 @@ var getNonce = func() func() uint64 {
 // and stores it in memory.
 // Initial ID and special mod are arguments to the GreatNFTMinter constructor.
 // The GreatNFTMinter must have been deployed already.
-func generateCreateMinterScript(nftAddr types.Address, initialID, specialMod int) []byte {
+func generateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int) []byte {
 	template := `
 		import GreatNFTMinter from 0x%s
 
@@ -51,7 +51,7 @@ func generateCreateMinterScript(nftAddr types.Address, initialID, specialMod int
 
 // Creates a script that mints an NFT and put it into storage.
 // The minter must have been instantiated already.
-func generateMintScript(nftCodeAddr types.Address) []byte {
+func generateMintScript(nftCodeAddr flow.Address) []byte {
 	template := `
 		import GreatNFTMinter, GreatNFT from 0x%s
 
@@ -68,7 +68,7 @@ func generateMintScript(nftCodeAddr types.Address) []byte {
 
 // Creates a script that retrieves an NFT from storage and makes assertions
 // about its properties. If these assertions fail, the script panics.
-func generateInspectNFTScript(nftCodeAddr, userAddr types.Address, expectedID int, expectedIsSpecial bool) []byte {
+func generateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int, expectedIsSpecial bool) []byte {
 	template := `
 		import GreatNFT from 0x%s
 
@@ -113,12 +113,12 @@ func TestCreateMinter(t *testing.T) {
 	// GreatNFTMinter must be instantiated with initialID > 0 and
 	// specialMod > 1
 	t.Run("Cannot create minter with negative initial ID", func(t *testing.T) {
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, -1, 2),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
-			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
 		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -130,12 +130,12 @@ func TestCreateMinter(t *testing.T) {
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, 1, 1),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
-			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
 		_ = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -146,12 +146,12 @@ func TestCreateMinter(t *testing.T) {
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
-		tx := types.Transaction{
+		tx := flow.Transaction{
 			Script:         generateCreateMinterScript(contractAddr, 1, 2),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
-			ScriptAccounts: []types.Address{b.RootAccountAddress()},
+			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
 		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -171,12 +171,12 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Next, instantiate the minter
-	createMinterTx := types.Transaction{
+	createMinterTx := flow.Transaction{
 		Script:         generateCreateMinterScript(contractAddr, 1, 2),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   b.RootAccountAddress(),
-		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
 	err = createMinterTx.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -185,12 +185,12 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Mint the first NFT
-	mintTx := types.Transaction{
+	mintTx := flow.Transaction{
 		Script:         generateMintScript(contractAddr),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   b.RootAccountAddress(),
-		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
 	err = mintTx.AddSignature(b.RootAccountAddress(), b.RootKey())
@@ -203,12 +203,12 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Mint a second NFT
-	mintTx2 := types.Transaction{
+	mintTx2 := flow.Transaction{
 		Script:         generateMintScript(contractAddr),
 		Nonce:          getNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   b.RootAccountAddress(),
-		ScriptAccounts: []types.Address{b.RootAccountAddress()},
+		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
 	err = mintTx2.AddSignature(b.RootAccountAddress(), b.RootKey())
