@@ -1067,6 +1067,7 @@ func init() {
 // CompositeType
 
 type CompositeType struct {
+	Location     ast.Location
 	Kind         common.CompositeKind
 	Identifier   string
 	Conformances []*InterfaceType

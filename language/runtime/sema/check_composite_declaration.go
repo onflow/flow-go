@@ -121,6 +121,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	// to the type and check the annotation of the field
 
 	compositeType := &CompositeType{
+		Location:   checker.Location,
 		Kind:       declaration.CompositeKind,
 		Identifier: identifier.Identifier,
 	}
