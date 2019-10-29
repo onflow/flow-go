@@ -328,7 +328,7 @@ module FPL-STACK
   imports MAP
 
   syntax Scope
-  syntax Frame ::= frame(code:K, env: Map, scope: Scope)
+  syntax Frame ::= frame(code:K, env: Map, scope: Scope, loop: List)
 endmodule
 
 module FPL-FUN-ENV
@@ -445,7 +445,8 @@ module FPL-CONFIGURATION
     <scope> global </scope>
     <env> .Map </env>
     <store> .Map </store>
-    <stack> .List </stack>
+    <fstack> .List </fstack>
+    <lstack> .List </lstack>
 endmodule
 
 module FPL-VARIABLE-DECLARATION
@@ -493,13 +494,50 @@ module FPL-VARIABLE-DECLARATION
 
   rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
   rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+
+  rule <k> X:Ident = (I:Int => v(I, T)) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+  rule <k> X:Ident = v(V, _) => . ... </k>
+       <env>... X |-> env(... mut: var, loc: L) ...</env>
+       <store>... L |-> (_ => V) ...</store>
+
 endmodule
 
 module FPL-STMTS
   imports FPL-CONFIGURATION
 
   rule .Block => .K
-  rule S; B::Block => S ~> B
+  rule E:Exp ; B::Block => expressionStmt(E) ~> B
+  rule S; B::Block => S ~> B requires notBool isExp(S)
+
+  syntax Stmt ::= expressionStmt(Exp) [strict]
+  rule expressionStmt(_:Int) => .
+  rule expressionStmt(v(...)) => .
+
+  context if HOLE:Exp { _ } else { _ }
+  rule if v(true, _) { B } else { _ } => B
+  rule if v(false, _) { _ } else { B } => B
+
+  rule while E { B } => loop(if E { loopBody(B) } else { break })
+  syntax Stmt ::= loopBody(Block)
+  rule loopBody(B) => B ~> continue
+
+  syntax Stmt ::= loop(Stmt)
+  rule <k> loop(Stmt) ~> K => Stmt </k>
+       <env> Rho </env>
+       <fstack> FS </fstack>
+       <lstack> .List => ListItem(loopState(Rho, K, Stmt, FS)) ... </lstack>
+
+  syntax LoopFrame ::= loopState(Map, K, Stmt, List)
+
+  rule <k> break ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, K, _, FS)) => .List ...</lstack>
+  rule <k> continue ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, _, K, FS)) ...</lstack>
 endmodule
 
 module FPL-FUNCTIONS
@@ -543,12 +581,14 @@ module FPL-FUNCTIONS
        <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
        <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
        <scope> Scope => local(L) </scope>
-       <stack> .List => ListItem(frame(K, Rho, Scope)) ...</stack>
+       <fstack> .List => ListItem(frame(K, Rho, Scope, LS)) ...</fstack>
+       <lstack> LS => .List </lstack>
   rule <k> return => return v(unit(), Void) ... </k>
   rule <k> return X:TypedVal ~> _ => X ~> K </k>
        <env> _ => Rho </env>
        <scope> _ => Scope </scope>
-       <stack> ListItem(frame(K,Rho,Scope)) => .List ...</stack>
+       <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
+       <lstack> _ => LS </lstack>
   rule <k> return I:Int => return v(I, T) ... </k>
        <scope> local(L) </scope>
        <store>... L |-> funDef(... result: T) ...</store>
