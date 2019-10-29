@@ -4513,7 +4513,7 @@ resource interface HasCount {
 // Declare a resource named `Counter` that conforms
 // to the resource interface `HasCount`.
 //
-resource Counter {
+resource Counter: HasCount {
     pub var count: Int
 
     pub init(count: Int) {
