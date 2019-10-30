@@ -376,7 +376,8 @@ module FPL-TYPING
 
   rule type(E) => infer(#type(E))
   rule infer(IntLit) => Int
-  rule infer([IntLit]) => [Int]
+  rule infer([T]) => [infer(T)::Type]
+  rule infer([T;N::Int]) => [infer(T);N]
   rule infer(T) => T [owise]
 
   rule #type(I:Int) => IntLit
@@ -387,6 +388,7 @@ module FPL-TYPING
        <env>... X |-> env(... t: ((_): R)) ...</env>
   rule #type([ E, .Exps ]) => [ #type(E) ]
   rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
+  rule #type(E1 [ E2 ]) => elementType(#type(E1))
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -409,13 +411,15 @@ module FPL-TYPING
 
   syntax Type ::= type(Exp, Exp) [function]
                 | #type(Type, Type) [function]
+                | elementType(Type) [function]
 
   rule type(E1, E2) => #type(#type(E1), #type(E2))
   rule #type(IntLit, T) => T
   rule #type(T, IntLit) => T
-  rule #type([IntLit], T) => T
-  rule #type(T, [IntLit]) => T
   rule #type(T, T) => T
+
+  rule elementType([T]) => T
+  rule elementType([T;_::Int]) => T
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
   rule pow8 => 256 [macro]
@@ -651,7 +655,7 @@ module FPL-ARITHMETIC
     requires lengthString(Bin) >=Int 2 andBool substrString(Bin, 0, 2) ==String "0b"
   rule processIntLit(Dec::String) => String2Int(Dec) [owise]
 
-  rule [ T::Type ; I::IntLit ] => [ T ; {intLit(I)}:>Int ] [anywhere]
+  rule [ T::Type ; I::IntLit ] => [ T ; {intLit(I)}:>Int ] [macro]
 
   syntax Exp ::= intExp(Exp, Exp)
   rule intExp(L, R)
