@@ -29,6 +29,8 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
+const defaultBlockInterval = 5 * time.Second
+
 // Config is the configuration for an emulator server.
 type Config struct {
 	Port           int
@@ -61,6 +63,10 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
 		}
+	}
+
+	if conf.BlockInterval == 0 {
+		conf.BlockInterval = defaultBlockInterval
 	}
 
 	server := &EmulatorServer{
