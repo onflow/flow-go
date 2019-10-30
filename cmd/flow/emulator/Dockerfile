@@ -37,7 +37,7 @@ COPY . .
 # Copy over Relic build artifacts
 COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
-RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/emulator
+RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/flow
 
 ## (3) Add the binary to a fresh Alpine image
 FROM alpine:3.10
