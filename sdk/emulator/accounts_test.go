@@ -247,6 +247,34 @@ func TestCreateAccount(t *testing.T) {
 
 		assert.Equal(t, lastAccount, newAccount)
 	})
+
+	t.Run("InvalidCode", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+		lastAccount := b.LastCreatedAccount()
+
+		code := []byte("not a valid script")
+
+		createAccountScript, err := templates.CreateAccount(nil, code)
+		assert.Nil(t, err)
+
+		tx := &flow.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+
+		newAccount := b.LastCreatedAccount()
+
+		assert.Equal(t, lastAccount, newAccount)
+	})
 }
 
 func TestAddAccountKey(t *testing.T) {
