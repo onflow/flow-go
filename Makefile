@@ -57,7 +57,7 @@ ci: install-tools generate check-generated-code lint-sdk test
 
 .PHONY: install-cli
 install-cli: crypto/relic/build
-	go install ./cmd/flow
+	GO111MODULE=on install ./cmd/flow
 
 cmd/flow/flow: crypto/relic/build cli cmd crypto model proto sdk
 	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
