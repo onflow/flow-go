@@ -1,4 +1,3 @@
-
 // TODO:
 // - How to get current total supply?
 // - How to "instantiate" `Faucet` and `ApprovableProvider` for `DeteToken`?
