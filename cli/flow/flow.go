@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cli/flow/accounts"
-	"github.com/dapperlabs/flow-go/cli/flow/bpl"
+	"github.com/dapperlabs/flow-go/cli/flow/cadence"
 	"github.com/dapperlabs/flow-go/cli/flow/emulator"
 	"github.com/dapperlabs/flow-go/cli/flow/initialize"
 	"github.com/dapperlabs/flow-go/cli/flow/keys"
@@ -25,7 +25,7 @@ func init() {
 	cmd.AddCommand(accounts.Cmd)
 	cmd.AddCommand(keys.Cmd)
 	cmd.AddCommand(emulator.Cmd)
-	cmd.AddCommand(bpl.Cmd)
+	cmd.AddCommand(cadence.Cmd)
 	cmd.AddCommand(transactions.Cmd)
 }
 
