@@ -271,7 +271,7 @@ func (s Server) SignatureHelp(
 func (Server) Shutdown(connection protocol.Connection) error {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
-		Message: "Bamboo language Server is shutting down",
+		Message: "Cadence language server is shutting down",
 	})
 	return nil
 }
