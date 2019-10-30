@@ -3538,8 +3538,13 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Reading an element from a resource dictionary is not allowed.</span><span>
+</span><span style="color: #008000">// It's not obvious that an access like this would have to remove</span><span>
+</span><span style="color: #008000">// the key from the dictionary.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, make the removal explicit by using the `remove` function.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources.remove(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Setting an element in a resource dictionary is not allowed,</span><span>
 </span><span style="color: #008000">// as it would result in the loss of the current value.</span><span>

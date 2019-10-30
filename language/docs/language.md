@@ -3496,8 +3496,13 @@ let resources <- {
 }
 
 // Invalid: Reading an element from a resource dictionary is not allowed.
+// It's not obvious that an access like this would have to remove
+// the key from the dictionary.
 //
 let firstResource <- resources["r1"]
+
+// Instead, make the removal explicit by using the `remove` function.
+let firstResource <- resources.remove(key: "r1")
 
 // Invalid: Setting an element in a resource dictionary is not allowed,
 // as it would result in the loss of the current value.
