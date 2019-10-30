@@ -34,7 +34,6 @@ func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
           resource R {}
 
           let ref = &storage[R] as RI
-          let ref2: &RI = ref
         `,
 	)
 
