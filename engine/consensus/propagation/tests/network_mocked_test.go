@@ -1,9 +1,8 @@
 package tests
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
+	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/module/committee"
 	"github.com/dapperlabs/flow-go/network/mock"
@@ -40,7 +40,7 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		return nil, err
 	}
 
-	log := zerolog.New(os.Stderr).With().Logger()
+	log := zerolog.New(ioutil.Discard)
 
 	pool, err := mempool.New()
 	if err != nil {
@@ -62,7 +62,7 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		return nil, err
 	}
 
-	engine, err := propagation.NewEngine(log, net, com, pool, vol)
+	engine, err := propagation.New(log, net, com, pool, vol)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func TestSubmitCollection(t *testing.T) {
 			Hash: hash,
 		}
 		// node1's engine receives a collection hash
-		err = node1.engine.SubmitGuaranteedCollection(gc)
+		err = node1.engine.Process(node1.net.GetID(), gc)
 		require.Nil(t, err)
 
 		// inspect node2's mempool to check if node2's engine received the collection hash

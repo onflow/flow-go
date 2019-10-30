@@ -14,6 +14,7 @@ import (
 type Network struct {
 	hub     *Hub
 	com     module.Committee
+	cache   map[string]struct{}
 	engines map[uint8]network.Engine
 }
 
@@ -24,6 +25,7 @@ func NewNetwork(com module.Committee, hub *Hub) (*Network, error) {
 	o := &Network{
 		com:     com,
 		hub:     hub,
+		cache:   make(map[string]struct{}),
 		engines: make(map[uint8]network.Engine),
 	}
 	// Plug the network to a hub so that networks can find each other.
@@ -40,6 +42,13 @@ func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string
 		if !ok || receiverNetwork == nil {
 			return errors.Errorf("Network can not find a node by ID %v", nodeID)
 		}
+		// Check if the given engine already received the event.
+		key := eventKey(engineID, event)
+		_, ok = mn.cache[key]
+		if ok {
+			return nil
+		}
+		mn.cache[key] = struct{}{}
 		// Find the engine of the targeted network
 		receiverEngine, ok := receiverNetwork.engines[engineID]
 		if !ok {
@@ -54,7 +63,7 @@ func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string
 	return nil
 }
 
-// GetID returns the identity of the Engine
+// GetID returns the identity of the Node.
 func (mn *Network) GetID() string {
 	me := mn.com.Me()
 	return me.NodeID

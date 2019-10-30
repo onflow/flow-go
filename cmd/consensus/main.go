@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
+	"github.com/dapperlabs/flow-go/engine/fake/generator"
 	"github.com/dapperlabs/flow-go/module/committee"
 	"github.com/dapperlabs/flow-go/network/codec/captain"
 	"github.com/dapperlabs/flow-go/network/trickle"
@@ -120,16 +121,14 @@ func main() {
 	log.Info().Msg("initializing propagation engine")
 
 	// initialize the propagation engines
-	prop, err := propagation.NewEngine(log, net, com, pool, vol)
+	prop, err := propagation.New(log, net, com, pool, vol)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize propagation engine")
 	}
 
-	go propagation.Generate(prop, 20*time.Second)
-
 	log.Info().Msg("starting propagation engine")
 
-	// wait to have our collection mempool bootstrapped
+	// wait for propagation engine start
 	select {
 	case <-prop.Ready():
 		log.Info().Msg("propagation engine ready")
@@ -140,11 +139,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info().Msg("initializing fake generator engine")
+
+	// initialize the fake collection generation
+	gen, err := generator.New(log, prop, 20*time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize generator engine")
+	}
+
+	// wait for generator engine start
+	select {
+	case <-gen.Ready():
+		log.Info().Msg("generator engine ready")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not start generator engine")
+	case <-sig:
+		log.Warn().Msg("generator engine start aborted")
+		os.Exit(1)
+	}
+
 	log.Info().Msg("flow consensus node startup complete")
 
 	<-sig
 
 	log.Info().Msg("flow consensus node shutting down")
+
+	log.Info().Msg("stopping generator engine")
+
+	select {
+	case <-gen.Done():
+		log.Info().Msg("generator engine shutdown complete")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not stop generator engine")
+	case <-sig:
+		log.Warn().Msg("generator engine stop aborted")
+		os.Exit(1)
+	}
 
 	log.Info().Msg("stopping propagation engine")
 

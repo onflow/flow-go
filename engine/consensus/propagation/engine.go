@@ -39,8 +39,8 @@ type Engine struct {
 	stop    chan struct{}    // used as a signal to indicate engine shutdown
 }
 
-// NewEngine creates a new collection propagation engine.
-func NewEngine(log zerolog.Logger, net module.Network, com module.Committee, pool Mempool, vol Volatile) (*Engine, error) {
+// New creates a new collection propagation engine.
+func New(log zerolog.Logger, net module.Network, com module.Committee, pool Mempool, vol Volatile) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -75,9 +75,6 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.wg.Add(1)
 	go e.pollSnapshots()
 	go func() {
-		for e.pool.Size() < 1 {
-			time.Sleep(100 * time.Millisecond)
-		}
 		close(ready)
 	}()
 	return ready
@@ -121,6 +118,20 @@ func (e *Engine) Retrieve(eventID []byte) (interface{}, error) {
 	return coll, nil
 }
 
+// Submit allows us to submit entities locally to this engine, in a way that
+// doesn't block on engine boundaries. The error is logged internally to the
+// engine in this case.
+func (e *Engine) Submit(event interface{}) {
+
+	// process the event with our own ID to indicate it's local
+	err := e.Process(e.com.Me().NodeID, event)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Msg("could not process local event")
+	}
+}
+
 // Process processes the given propagation engine event. Events that are given
 // to this function originate within the propagation engine on the node with the
 // given origin ID.
@@ -143,26 +154,6 @@ func (e *Engine) Process(originID string, event interface{}) error {
 	if err != nil {
 		return errors.Wrap(err, "could not process event")
 	}
-	return nil
-}
-
-// SubmitGuaranteedCollection is used to submit new guaranteed collections from
-// within the local node business logic. It can be used by other engines to
-// introduce new guaranteed collections to the propagation process.
-func (e *Engine) SubmitGuaranteedCollection(coll *collection.GuaranteedCollection) error {
-
-	// first process the guaranteed collection to make sure it is actually valid
-	err := e.processGuaranteedCollection(coll)
-	if err != nil {
-		return errors.Wrap(err, "could not process collection")
-	}
-
-	// then propagate the guaranteed collections to relevant nodes on the network
-	err = e.propagateGuaranteedCollection(coll)
-	if err != nil {
-		return errors.Wrap(err, "could not broadcast collection")
-	}
-
 	return nil
 }
 
@@ -356,6 +347,12 @@ func (e *Engine) onGuaranteedCollection(originID string, coll *collection.Guaran
 	err := e.processGuaranteedCollection(coll)
 	if err != nil {
 		return errors.Wrap(err, "could not process collection")
+	}
+
+	// then propagate the guaranteed collections to relevant nodes on the network
+	err = e.propagateGuaranteedCollection(coll)
+	if err != nil {
+		return errors.Wrap(err, "could not broadcast collection")
 	}
 
 	e.log.Info().
