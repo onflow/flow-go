@@ -23,7 +23,7 @@ func TestRuntimeLogger(t *testing.T) {
 		}
 	`)
 
-	_, err := b.CallScript(script)
+	_, err := b.ExecuteScript(script)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{`"elephant ears"`}, loggedMessages)
 }
