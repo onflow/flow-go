@@ -525,13 +525,11 @@ module FPL-VARIABLE-DECLARATION
   rule loc(loc(L, Idx) [ I:Int ]) => loc(loc(L, Idx ListItem(I)))
 
   context loc(_, _) = HOLE
-    requires notBool isBool(HOLE)
 
-  rule <k> loc(_, _) = (v(V, _) => V) ... </k>
-  rule <k> loc(L, Idx) = V':Val => . ... </k>
+  rule <k> loc(L, Idx) = (V':Val #Or v(V':Val, _)) => . ... </k>
        <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
     requires isValid(V, Idx)
-  rule <k> loc(L, Idx) = _:Val => panic("Array index out of bounds") ... </k>
+  rule <k> loc(L, Idx) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
        <store>... L |-> V ...</store>
     requires notBool isValid(V, Idx)
 
