@@ -76,14 +76,6 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
-	block := b.blockchain.CommitBlock()
-
-	b.logger.WithFields(log.Fields{
-		"blockNum":  block.Number,
-		"blockHash": block.Hash().Hex(),
-		"blockSize": len(block.TransactionHashes),
-	}).Infof("⛏  Block #%d mined", block.Number)
-
 	response := &observation.SendTransactionResponse{
 		Hash: tx.Hash(),
 	}
