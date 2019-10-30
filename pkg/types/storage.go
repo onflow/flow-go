@@ -6,12 +6,6 @@ type RegisterID [32]byte
 // RegisterValue (value part of Register)
 type RegisterValue [32]byte
 
-// Register (key value pairs)
-type Register struct {
-	ID    *RegisterID
-	Value *RegisterValue
-}
-
 type StorageProof []byte
 type StateCommitment []byte
 
@@ -20,15 +14,15 @@ type StateCommitment []byte
 type Storage interface {
 	// Trusted methods (without proof)
 	// Get registers at specific StateCommitment by a list of register ids
-	GetRegisters(registerIds []RegisterID, stateCommitment StateCommitment) (registers []Register, err error)
+	GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (registers []Register, err error)
 	// Batched atomic updates of a subset of registers at specific state
-	UpdateRegister(registers []Register, stateCommitment StateCommitment) (newStateCommitment StateCommitment, err error)
+	UpdateRegister(registerIDs []RegisterID, values []RegisterValue, stateCommitment StateCommitment) (newStateCommitment StateCommitment, err error)
 
 	// Untrusted methods (providing proofs)
 	// Get registers at specific StateCommitment by a list of register ids with proofs
-	GetRegistersWithProof(registerIds []RegisterID, stateCommitment StateCommitment) (registers []Register, proof StorageProof, err error)
+	GetRegistersWithProof(registerIDs []RegisterID, stateCommitment StateCommitment) (registers []Register, proofs []StorageProof, err error)
 	// Batched atomic updates of a subset of registers at specific state with proofs
-	UpdateRegisterWithProof(registers []Register, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proof StorageProof, err error)
+	UpdateRegisterWithProof(registerIDs []RegisterID, values []RegisterValue, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proofs []StorageProof, err error)
 }
 
 // StorageVerifier should be designed as an standalone package to verify proofs of storage
