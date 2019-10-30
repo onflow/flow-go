@@ -31,7 +31,7 @@ Ensure you have `npm` installed, then run:
 npm install
 npm install -g vsce
 vsce package
-code --install-extension bamboo-*.vsix
+code --install-extension cadence-*.vsix
 ```
 
 ## Configuration
