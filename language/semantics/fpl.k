@@ -161,8 +161,8 @@ module FPL-COMMON-SYNTAX
 
   syntax Stmt ::= VarDef
                 | FunDef
-                | Path "=" Exp [strict(2)]
-                | Path "<-" Exp [strict(2)]
+                | Path "=" Exp
+                | Path "<-" Exp
                 | Exp
                 // Deploy?
                 // Publish?
@@ -237,7 +237,8 @@ module FPL-COMMON-SYNTAX
                  Exp "&&" Exp  [strict(1)]
                | Exp "||" Exp  [strict(1)]
                > Exp "?" Exp ":" Exp [right,strict(1)]
-  syntax Exps ::= List{Exp,","}      [strict]
+  syntax Exps ::= List{Exp,","}      [seqstrict, hybrid, klabel(exps)]
+  rule isKResult(.Exps) => true
 
   rule fun ( Formals ) { Body } => fun ( Formals ) : Void { Body } [macro]
 
@@ -257,8 +258,8 @@ module FPL-COMMON-SYNTAX
                 | "Self"
                 | "(" "(" Types ")" ":" Type ")"
                 | Type "?"
-                | Type "[" "]"
-                | Type "[" IntLit "]"
+                | "[" Type "]"
+                | "[" Type ";" IntLit "]"
                 | Type "[" Type "]"
                 > "@" Type
   syntax Types ::= List{Type,","}
@@ -305,14 +306,19 @@ module FPL-VALUES
   imports BOOL-SYNTAX
   imports INT-SYNTAX
   imports STRING-SYNTAX
+  imports LIST
 
-  syntax Type
-  syntax Val ::= Int | Bool | unit()
+  syntax Type ::= "[" Type ";" Int "]"
+  syntax Array ::= array(List)
+  syntax Val ::= Int | Bool | unit() | Array
   syntax TypedVal ::= v(Val, Type)
   syntax Exp ::= TypedVal
-  syntax KResult ::= TypedVal | Int // for constant expressions
+  syntax KResult ::= TypedVal | Int | Array // for constant expressions
   syntax FPLString ::= String
-  syntax Exp ::= Int
+  syntax Exp ::= Val
+
+  syntax Vals ::= List{Val,","} [klabel(exps)]
+  syntax Exps ::= Vals
 
 endmodule
 
@@ -370,6 +376,8 @@ module FPL-TYPING
 
   rule type(E) => infer(#type(E))
   rule infer(IntLit) => Int
+  rule infer([T]) => [infer(T)::Type]
+  rule infer([T;N::Int]) => [infer(T);N]
   rule infer(T) => T [owise]
 
   rule #type(I:Int) => IntLit
@@ -378,6 +386,9 @@ module FPL-TYPING
        <env>... X |-> env(... t: T) ...</env>
   rule [[ #type(X:Ident(_)) => R ]]
        <env>... X |-> env(... t: ((_): R)) ...</env>
+  rule #type([ E, .Exps ]) => [ #type(E) ]
+  rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
+  rule #type(E1 [ E2 ]) => elementType(#type(E1))
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -400,11 +411,15 @@ module FPL-TYPING
 
   syntax Type ::= type(Exp, Exp) [function]
                 | #type(Type, Type) [function]
+                | elementType(Type) [function]
 
   rule type(E1, E2) => #type(#type(E1), #type(E2))
   rule #type(IntLit, T) => T
   rule #type(T, IntLit) => T
   rule #type(T, T) => T
+
+  rule elementType([T]) => T
+  rule elementType([T;_::Int]) => T
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
   rule pow8 => 256 [macro]
@@ -454,13 +469,13 @@ module FPL-VARIABLE-DECLARATION
   imports FPL-TYPING
 
   context initialize(let _ : _ = HOLE)
-    requires notBool isInt(HOLE)
+    requires notBool isVal(HOLE)
   context initialize(var _ : _ = HOLE)
-    requires notBool isInt(HOLE)
+    requires notBool isVal(HOLE)
 
-  rule <k> initialize(let X : _ = (V:Int => v(V, T))) ... </k>
+  rule <k> initialize(let X : _ = (V:Val => v(V, T))) ... </k>
        <env>... X |-> env(... t: T) ...</env>
-  rule <k> initialize(var X : _ = (V:Int => v(V, T))) ... </k>
+  rule <k> initialize(var X : _ = (V:Val => v(V, T))) ... </k>
        <env>... X |-> env(... t: T) ...</env>
 
   rule <k> declare(let X : T:Type = E) => . ... </k>
@@ -495,11 +510,37 @@ module FPL-VARIABLE-DECLARATION
   rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
   rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
 
-  rule <k> X:Ident = (I:Int => v(I, T)) ... </k>
-       <env>... X |-> env(... t: T) ...</env>
-  rule <k> X:Ident = v(V, _) => . ... </k>
-       <env>... X |-> env(... mut: var, loc: L) ...</env>
-       <store>... L |-> (_ => V) ...</store>
+  syntax Path ::= loc(Path)
+  syntax Path ::= Loc
+  syntax Loc ::= loc(Int, List)
+  syntax KResult ::= Loc
+
+  context (HOLE::Path => loc(HOLE)) = _
+
+  rule <k> loc(X:Ident) => loc(loc(L, .List)) ... </k>
+       <env>... X |-> env(... loc: L) ...</env>
+  context loc((HOLE::Path => loc(HOLE)) [ _ ])
+  context loc(loc(_, _) [ HOLE ] )
+  rule loc(loc(_, _) [ v(I:Int, _) => I ] )
+  rule loc(loc(L, Idx) [ I:Int ]) => loc(loc(L, Idx ListItem(I)))
+
+  context loc(_, _) = HOLE
+
+  rule <k> loc(L, Idx) = (V':Val #Or v(V':Val, _)) => . ... </k>
+       <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
+    requires isValid(V, Idx)
+  rule <k> loc(L, Idx) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
+       <store>... L |-> V ...</store>
+    requires notBool isValid(V, Idx)
+
+  syntax Bool ::= isValid(Val, List) [function]
+  rule isValid(_, .List) => true
+  rule isValid(array(L::List), ListItem(I:Int) Idx) => I >=Int 0 andBool I <Int size(L) andBool isValid({L [ I ]}:>Val, Idx)
+
+  syntax Val ::= updateLoc(List, Val, Val) [function]
+  rule updateLoc(.List, _, V) => V
+  rule updateLoc(ListItem(I:Int) L, array(V:List), V') => array(V [ I <- updateLoc(L, {V [ I ]}:>Val, V') ])
+
 
 endmodule
 
@@ -544,7 +585,7 @@ module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
 
-  rule <k> declare(fun F:Ident ( Fs ) : T { _ _ }) => . ... </k>
+  rule <k> declare(fun F:Ident ( Fs ) : T { _::Contract _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
 
   rule <k> initialize(fun F:Ident ( Fs ) : T { C B }) => . ... </k>
@@ -589,7 +630,7 @@ module FPL-FUNCTIONS
        <scope> _ => Scope </scope>
        <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
        <lstack> _ => LS </lstack>
-  rule <k> return I:Int => return v(I, T) ... </k>
+  rule <k> return V:Val => return v(V, T) ... </k>
        <scope> local(L) </scope>
        <store>... L |-> funDef(... result: T) ...</store>
 
@@ -611,6 +652,8 @@ module FPL-ARITHMETIC
   rule processIntLit(Bin::String) => String2Base(substrString(Bin, 2, lengthString(Bin)), 2)
     requires lengthString(Bin) >=Int 2 andBool substrString(Bin, 0, 2) ==String "0b"
   rule processIntLit(Dec::String) => String2Int(Dec) [owise]
+
+  rule [ T::Type ; I::IntLit ] => [ T ; {intLit(I)}:>Int ] [macro]
 
   syntax Exp ::= intExp(Exp, Exp)
   rule intExp(L, R)
@@ -707,12 +750,36 @@ module FPL-ARITHMETIC
 
 endmodule
 
+module FPL-ARRAYS
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  rule [ Vs ] => array(arrayLit(Vs))
+    requires isKResult(Vs)
+  syntax List ::= arrayLit(Exps) [function]
+  rule arrayLit(.Vals) => .List
+  rule arrayLit(V:Val, Vs) => ListItem(V) arrayLit(Vs)
+  rule arrayLit(v(V, _), Vs) => ListItem(V) arrayLit(Vs)
+
+  rule (_::Exp [ v(I:Int, _) => I ])::Exp
+  rule (v(array(L::List), [T]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+    requires I >=Int 0 andBool I <Int size(L)
+  rule (v(array(L::List), [T ; _:Int ]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+    requires I >=Int 0 andBool I <Int size(L)
+  rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
+    requires I <Int 0 orBool I >=Int size(L)
+
+  syntax Ident ::= "length" [token]
+  rule v(array(L::List), _) . length => v(size(L), Int)
+endmodule
+
 module FPL
   imports FPL-CONFIGURATION
   imports FPL-VARIABLE-DECLARATION
   imports FPL-STMTS
   imports FPL-FUNCTIONS
   imports FPL-ARITHMETIC
+  imports FPL-ARRAYS
 
   rule T::TopDefinition ; Ts::Pgm => T ~> Ts
 endmodule

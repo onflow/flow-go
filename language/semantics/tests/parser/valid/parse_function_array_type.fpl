@@ -1,1 +1,1 @@
-let test: ((Int8): Int16)[2] = []
+let test: [((Int8): Int16);2] = []
