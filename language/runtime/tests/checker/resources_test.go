@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
@@ -892,6 +893,34 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidConstructionError{}, errs[0])
+}
+
+func TestCheckInvalidCreateImportedResource(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+      resource R {}
+	`)
+
+	require.Nil(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		`
+          import R from "imported"
+
+          fun test() {
+              destroy create R()
+          }
+        `,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 }
 
 func TestCheckInvalidResourceLoss(t *testing.T) {

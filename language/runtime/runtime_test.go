@@ -440,13 +440,17 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
           log("x!")
         }
       }
+
+      fun createR(): <-R {
+          return <- create R()
+      }
     `)
 
 	script1 := []byte(`
-      import R from "imported"
+      import R, createR from "imported"
 
       fun main(account: Account) {
-          var r: <-R? <- create R()
+          var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
              panic("already initialized")
@@ -515,13 +519,17 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
           log("x!")
         }
       }
+
+      fun createR(): <-R {
+          return <- create R()
+      }
     `)
 
 	script1 := []byte(`
-      import R from "imported"
+      import R, createR from "imported"
 
       fun main(account: Account) {
-          var r: <-R? <- create R()
+          var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
              panic("already initialized")
