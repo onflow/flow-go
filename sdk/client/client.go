@@ -131,18 +131,31 @@ func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*flow.Ac
 	return &account, nil
 }
 
+// EventQuery defines a query for Flow events.
+type EventQuery struct {
+	// The event type to search for. If empty, no filtering by type is done.
+	Type string
+	// The block to begin looking for events
+	StartBlock uint64
+	// The block to end looking for events (inclusive)
+	EndBlock uint64
+}
+
 // GetEvents queries the Observation API for events and returns the results.
-func (c *Client) GetEvents(ctx context.Context, query *flow.EventQuery) ([]*flow.Event, error) {
-	res, err := c.rpcClient.GetEvents(
-		ctx,
-		convert.EventQueryToMessage(query),
-	)
+func (c *Client) GetEvents(ctx context.Context, query EventQuery) ([]flow.Event, error) {
+	req := &observation.GetEventsRequest{
+		Type:       query.Type,
+		StartBlock: query.StartBlock,
+		EndBlock:   query.EndBlock,
+	}
+
+	res, err := c.rpcClient.GetEvents(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	// Events are sent over the wire JSON-encoded.
-	var events []*flow.Event
+	var events []flow.Event
 	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
 		return nil, err
 	}

@@ -3496,8 +3496,13 @@ let resources <- {
 }
 
 // Invalid: Reading an element from a resource dictionary is not allowed.
+// It's not obvious that an access like this would have to remove
+// the key from the dictionary.
 //
 let firstResource <- resources["r1"]
+
+// Instead, make the removal explicit by using the `remove` function.
+let firstResource <- resources.remove(key: "r1")
 
 // Invalid: Setting an element in a resource dictionary is not allowed,
 // as it would result in the loss of the current value.
@@ -4497,6 +4502,10 @@ the `as` keyword, and the type through which the stored location should be acces
 The storage location must be a subtype of the given type.
 
 References are **copied**, i.e. they are value types.
+
+References are covariant in their base types.
+For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
+and resource `R` conforms to (implements) resource interface `RI`.
 
 ```bamboo,file=storage-reference.bpl
 

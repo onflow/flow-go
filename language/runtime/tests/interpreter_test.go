@@ -1631,7 +1631,7 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		ast.StringLocation(""),
+		TestLocation,
 		sema.WithPredeclaredValues(
 			stdlib.StandardLibraryFunctions{
 				testFunction,
@@ -3539,7 +3539,7 @@ func TestInterpretImport(t *testing.T) {
 		ParseAndCheckOptions{
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringLocation("imported"),
+					ImportedLocation,
 					location,
 				)
 				return checkerImported.Program, nil
@@ -3597,7 +3597,7 @@ func TestInterpretImportError(t *testing.T) {
 			},
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringLocation("imported"),
+					ImportedLocation,
 					location,
 				)
 				return checkerImported.Program, nil
@@ -4613,7 +4613,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 		ParseAndCheckOptions{
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
-					ast.StringLocation("imported"),
+					ImportedLocation,
 					location,
 				)
 				return checkerImported.Program, nil
@@ -4683,8 +4683,8 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
-				interpreter.WithOnReadStoredValue(getter),
-				interpreter.WithOnWriteStoredValue(setter),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
 			},
 		},
 	)
@@ -5283,8 +5283,8 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
-				interpreter.WithOnReadStoredValue(getter),
-				interpreter.WithOnWriteStoredValue(setter),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
 			},
 		},
 	)
@@ -5364,8 +5364,8 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
-				interpreter.WithOnReadStoredValue(getter),
-				interpreter.WithOnWriteStoredValue(setter),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
 			},
 		},
 	)
@@ -5428,8 +5428,8 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
-				interpreter.WithOnReadStoredValue(getter),
-				interpreter.WithOnWriteStoredValue(setter),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
 			},
 		},
 	)
