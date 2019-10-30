@@ -190,6 +190,10 @@ func (checker *Checker) report(err error) {
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
+	for _, declaration := range program.ImportDeclarations() {
+		checker.declareImportDeclaration(declaration)
+	}
+
 	// pre-declare interfaces, composites, and functions (check afterwards)
 
 	for _, declaration := range program.InterfaceDeclarations() {
@@ -211,6 +215,12 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	// check all declarations
 
 	for _, declaration := range program.Declarations {
+
+		// Skip import declarations, they are already handled above
+		if _, isImport := declaration.(*ast.ImportDeclaration); isImport {
+			continue
+		}
+
 		declaration.Accept(checker)
 		checker.declareGlobalDeclaration(declaration)
 	}
