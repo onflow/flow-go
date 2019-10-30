@@ -72,7 +72,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, err := b.CallScript(script)
+		_, err := b.ExecuteScript(script)
 		assert.Nil(t, err)
 
 		require.Len(t, events, 1)

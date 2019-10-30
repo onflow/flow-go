@@ -116,15 +116,15 @@ func (ossr *ObserveServiceServerRegistry) GetAccount(ctx context.Context, payloa
 	return respByte, respErr
 }
 
-func (ossr *ObserveServiceServerRegistry) CallScript(ctx context.Context, payloadByte []byte) ([]byte, error) {
+func (ossr *ObserveServiceServerRegistry) ExecuteScript(ctx context.Context, payloadByte []byte) ([]byte, error) {
 	// Unmarshaling payload
-	payload := &CallScriptRequest{}
+	payload := &ExecuteScriptRequest{}
 	err := proto.Unmarshal(payloadByte, payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal payload: %v", err)
 	}
 
-	resp, respErr := ossr.oss.CallScript(ctx, payload)
+	resp, respErr := ossr.oss.ExecuteScript(ctx, payload)
 
 	// Marshaling response
 	respByte, err := proto.Marshal(resp)
@@ -161,7 +161,7 @@ func (ossr *ObserveServiceServerRegistry) MessageTypes() map[uint64]gossip.Handl
 		2: ossr.GetLatestBlock,
 		3: ossr.GetTransaction,
 		4: ossr.GetAccount,
-		5: ossr.CallScript,
+		5: ossr.ExecuteScript,
 		6: ossr.GetEvents,
 	}
 }
@@ -173,7 +173,7 @@ func (ossr *ObserveServiceServerRegistry) NameMapping() map[string]uint64 {
 		"GetLatestBlock":  2,
 		"GetTransaction":  3,
 		"GetAccount":      4,
-		"CallScript":      5,
+		"ExecuteScript":   5,
 		"GetEvents":       6,
 	}
 }

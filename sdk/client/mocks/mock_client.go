@@ -35,24 +35,24 @@ func (m *MockRPCClient) EXPECT() *MockRPCClientMockRecorder {
 	return m.recorder
 }
 
-// CallScript mocks base method
-func (m *MockRPCClient) CallScript(arg0 context.Context, arg1 *observation.CallScriptRequest, arg2 ...grpc.CallOption) (*observation.CallScriptResponse, error) {
+// ExecuteScript mocks base method
+func (m *MockRPCClient) ExecuteScript(arg0 context.Context, arg1 *observation.ExecuteScriptRequest, arg2 ...grpc.CallOption) (*observation.ExecuteScriptResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "CallScript", varargs...)
-	ret0, _ := ret[0].(*observation.CallScriptResponse)
+	ret := m.ctrl.Call(m, "ExecuteScript", varargs...)
+	ret0, _ := ret[0].(*observation.ExecuteScriptResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CallScript indicates an expected call of CallScript
-func (mr *MockRPCClientMockRecorder) CallScript(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// ExecuteScript indicates an expected call of ExecuteScript
+func (mr *MockRPCClientMockRecorder) ExecuteScript(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallScript", reflect.TypeOf((*MockRPCClient)(nil).CallScript), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteScript", reflect.TypeOf((*MockRPCClient)(nil).ExecuteScript), varargs...)
 }
 
 // GetAccount mocks base method

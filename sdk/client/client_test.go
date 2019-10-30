@@ -93,7 +93,7 @@ func TestGetLatestBlock(t *testing.T) {
 	})
 }
 
-func TestCallScript(t *testing.T) {
+func TestExecuteScript(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -107,11 +107,11 @@ func TestCallScript(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// client should return non-error if RPC call succeeds
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: valueBytes}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
-		value, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		value, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Nil(t, err)
 		assert.Equal(t, value, float64(1))
 	})
@@ -119,36 +119,36 @@ func TestCallScript(t *testing.T) {
 	t.Run("Server error", func(t *testing.T) {
 		// client should return error if RPC call fails
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
+			ExecuteScript(ctx, gomock.Any()).
 			Return(nil, errors.New("dummy error")).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
 	t.Run("Error - empty return value", func(t *testing.T) {
 		// client should return error if value is empty
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: []byte{}}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: []byte{}}, nil).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
 	t.Run("Error - malformed return value", func(t *testing.T) {
 		// client should return error if value is malformed
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: []byte("asdfafa")}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: []byte("asdfafa")}, nil).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 }

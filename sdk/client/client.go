@@ -78,9 +78,9 @@ func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block
 	return &blockHeader, nil
 }
 
-// CallScript executes a script against the current world state.
-func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, error) {
-	res, err := c.rpcClient.CallScript(ctx, &observation.CallScriptRequest{Script: script})
+// ExecuteScript executes a script against the latest sealed world state.
+func (c *Client) ExecuteScript(ctx context.Context, script []byte) (interface{}, error) {
+	res, err := c.rpcClient.ExecuteScript(ctx, &observation.ExecuteScriptRequest{Script: script})
 	if err != nil {
 		return nil, err
 	}

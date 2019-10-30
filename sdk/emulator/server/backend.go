@@ -168,10 +168,10 @@ func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountReq
 	}, nil
 }
 
-// CallScript performs a call.
-func (b *Backend) CallScript(ctx context.Context, req *observation.CallScriptRequest) (*observation.CallScriptResponse, error) {
+// ExecuteScript performs a call.
+func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
 	script := req.GetScript()
-	value, err := b.blockchain.CallScript(script)
+	value, err := b.blockchain.ExecuteScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -185,7 +185,7 @@ func (b *Backend) CallScript(ctx context.Context, req *observation.CallScriptReq
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueBytes, _ := json.Marshal(value)
 
-	response := &observation.CallScriptResponse{
+	response := &observation.ExecuteScriptResponse{
 		// TODO: standardize flow to be language-agnostic
 		Type:  reflect.TypeOf(value).String(),
 		Value: valueBytes,
