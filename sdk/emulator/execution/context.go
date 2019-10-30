@@ -344,6 +344,7 @@ func (r *RuntimeContext) isValidSigningAccount(address flow.Address) bool {
 	return false
 }
 
+// checkProgram checks the given code for syntactic and semantic correctness.
 func (r *RuntimeContext) checkProgram(code []byte, address flow.Address) error {
 	if code == nil {
 		return nil
