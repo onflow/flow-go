@@ -187,15 +187,15 @@ module FPL-COMMON-SYNTAX
 
   syntax Path ::= Ident
                 | "self"
-                | Path "[" Exp "]"
-                | Path "." Ident
+                | Path "[" Exp "]" [klabel(index)]
+                | Path "." Ident [klabel(field)]
+                | "(" Path ")" [bracket]
 
   syntax left lval
 
   syntax Exp ::= IntLit [klabel(intLit), avoid, symbol, function]
                | FPLString
-               | Ident
-               | "self"
+               | Path
                | "nil"
                | Bool
                | "(" Exp ")" [bracket]
@@ -204,10 +204,10 @@ module FPL-COMMON-SYNTAX
                | "{" DictEntries "}" [strict(1)]
                | "fun" "(" Formals ")" FunBody
                | "fun" "(" Formals ")" ":" Annot FunBody
-               | Exp "[" Exp "]" [lval, seqstrict]
-               | Exp "." Ident    [lval, strict(1)] // field access
+               | Exp "[" Exp "]" [lval, seqstrict, klabel(index)]
+               | Exp "." Ident    [lval, klabel(field)] // field access
                | Ident "(" Actuals ")" [strict(2), klabel(call)]
-               | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
+               | Exp "." Ident "(" Actuals ")"
                | TypeId "(" Actuals ")" [klabel(call)]          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
                > non-assoc:
@@ -512,24 +512,24 @@ module FPL-VARIABLE-DECLARATION
 
   syntax Path ::= loc(Path)
   syntax Path ::= Loc
-  syntax Loc ::= loc(Int, List)
+  syntax Loc ::= loc(Int, List, Type)
   syntax KResult ::= Loc
 
   context (HOLE::Path => loc(HOLE)) = _
 
-  rule <k> loc(X:Ident) => loc(loc(L, .List)) ... </k>
-       <env>... X |-> env(... loc: L) ...</env>
+  rule <k> loc(X:Ident) => loc(loc(L, .List, T)) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
   context loc((HOLE::Path => loc(HOLE)) [ _ ])
-  context loc(loc(_, _) [ HOLE ] )
-  rule loc(loc(_, _) [ v(I:Int, _) => I ] )
-  rule loc(loc(L, Idx) [ I:Int ]) => loc(loc(L, Idx ListItem(I)))
+  context loc(loc(_, _, _) [ HOLE ] )
+  rule loc(loc(_, _, _) [ v(I:Int, _) => I ] )
+  rule loc(loc(L, Idx, T) [ I:Int ]) => loc(loc(L, Idx ListItem(I), elementType(T)))
 
-  context loc(_, _) = HOLE
+  context loc(_, _, _) = HOLE
 
-  rule <k> loc(L, Idx) = (V':Val #Or v(V':Val, _)) => . ... </k>
+  rule <k> loc(L, Idx, _) = (V':Val #Or v(V':Val, _)) => . ... </k>
        <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
     requires isValid(V, Idx)
-  rule <k> loc(L, Idx) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
+  rule <k> loc(L, Idx, _) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
        <store>... L |-> V ...</store>
     requires notBool isValid(V, Idx)
 
@@ -541,6 +541,9 @@ module FPL-VARIABLE-DECLARATION
   rule updateLoc(.List, _, V) => V
   rule updateLoc(ListItem(I:Int) L, array(V:List), V') => array(V [ I <- updateLoc(L, {V [ I ]}:>Val, V') ])
 
+  syntax Val ::= getLoc(List, Val) [function]
+  rule getLoc(.List, V) => V
+  rule getLoc(ListItem(I:Int) L, array(V:List)) => getLoc(L, {V [ I ]}:>Val)
 
 endmodule
 
