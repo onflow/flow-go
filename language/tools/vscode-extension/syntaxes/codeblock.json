@@ -9,7 +9,7 @@
     "repository": {
         "superjs-code-block": {
             "name": "markup.fenced_code.block.markdown",
-            "begin": "(^|\\G)(\\s*)(\\`{3,}|~{3,})\\s*(?i:(bamboo)\\b.*$)",
+            "begin": "(^|\\G)(\\s*)(\\`{3,}|~{3,})\\s*(?i:(cadence)\\b.*$)",
             "beginCaptures": {
                 "3": {
                     "name": "punctuation.definition.markdown"
@@ -31,15 +31,15 @@
                 {
                     "begin": "(^|\\G)(\\s*)(.*)",
                     "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
-                    "contentName": "meta.embedded.block.bamboo",
+                    "contentName": "meta.embedded.block.cadence",
                     "patterns": [
                         {
-                            "include": "source.bamboo"
+                            "include": "source.cadence"
                         }
                     ]
                 }
             ]
         }
     },
-    "scopeName": "markdown.bamboo.codeblock"
+    "scopeName": "markdown.cadence.codeblock"
 }
