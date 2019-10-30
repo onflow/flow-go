@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
@@ -137,7 +139,6 @@ func readVerifVector(A []pointG2, src []byte) {
 		(C.int)(len(A)),
 	)
 }
-
 
 func (s *feldmanVSSstate) verifyShare() DKGresult {
 	// check y[current] == x.G2

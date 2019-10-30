@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low

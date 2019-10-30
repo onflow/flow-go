@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // Implements Feldman Verifiable Secret Sharing using BLS G2 group.
