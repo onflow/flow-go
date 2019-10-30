@@ -20,7 +20,7 @@ install-tools: build-relic
 
 .PHONY: test
 test:
-    # enable Relic library for tests
+	# enable Relic library for tests
 	GO111MODULE=on go test --tags relic ./...
 
 .PHONY: generate
