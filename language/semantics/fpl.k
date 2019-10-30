@@ -791,6 +791,7 @@ endmodule
 module FPL-ARRAYS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
 
   rule [ Vs ] => array(arrayLit(Vs))
     requires isKResult(Vs)
@@ -807,8 +808,45 @@ module FPL-ARRAYS
   rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
     requires I <Int 0 orBool I >=Int size(L)
 
-  syntax Ident ::= "length" [token]
+  rule <k> loc(Loc, Idx, [_] #Or [_;_::Int]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V </store>
+  rule loc(L, Idx, ([_] #Or [_;_::Int]) #as T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
+  rule loc(L, Idx, [T] #Or [T;_::Int]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
   rule v(array(L::List), _) . length => v(size(L), Int)
+  rule v(array(L::List), T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, concat, x), .Map), ((T): T))
+  rule v(array(L::List), [T]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, contains, x), .Map), ((T): Bool))
+  rule loc(L, Idx, [T]) . append => v(funDef(#token("_", "Ident") x: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, append, x), .Map), ((T): Void))
+  rule loc(L, Idx, [T]) . insert => v(funDef(at x: Int, #token("_", "Ident") y: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, insert, x, y), .Map), ((Int, T): Void))
+  rule loc(L, Idx, [T]) . remove => v(funDef(at x: Int, T, pre { .Conditions }, return arrayBuiltin(L, Idx, remove, x), .Map), ((Int): T))
+  rule loc(L, Idx, [T]) . removeFirst => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeFirst, .Exps), .Map), ((.Types): T))
+  rule loc(L, Idx, [T]) . removeLast => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeLast, .Exps), .Map), ((.Types): T))
+
+  syntax Exp ::= arrayBuiltin(List, Ident, Exps) [strict(3)]
+  rule arrayBuiltin(L, concat, v(array(L2), _)) => array(L L2)
+  rule arrayBuiltin(L, contains, v(V, _)) => V in L
+
+  syntax Exp ::= arrayBuiltin(Int, List, Ident, Exps) [strict(4)]
+  rule <k> arrayBuiltin(Loc, Idx, concat, v(array(L2), _)) => #fun(array(L) => array(L L2))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, contains, v(V', _)) => #fun(array(L) => V' in L)(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, append, v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(L ListItem(V')))(getLoc(Idx, V)))) ...</store>
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) ListItem(V') range(L, At, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), _) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => getLoc(Idx ListItem(At), V) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) range(L, At +Int 1, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx::List, removeFirst, .Exps) => arrayBuiltin(Loc, Idx, remove, v(0, Int)) ... </k>
+  rule <k> arrayBuiltin(Loc, Idx, removeLast, .Exps) => arrayBuiltin(Loc, Idx, remove, v(#fun(array(L) => size(L) -Int 1)(getLoc(Idx, V)), Int)) ... </k>
+       <store>... Loc |-> V ...</store>
 endmodule
 
 module FPL
