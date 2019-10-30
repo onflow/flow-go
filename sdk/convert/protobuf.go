@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -165,20 +164,4 @@ func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublic
 		HashAlgo:  uint32(a.HashAlgo),
 		Weight:    uint32(a.Weight),
 	}, nil
-}
-
-func MessageToEventQuery(m *observation.GetEventsRequest) flow.EventQuery {
-	return flow.EventQuery{
-		ID:         m.GetEventId(),
-		StartBlock: m.GetStartBlock(),
-		EndBlock:   m.GetEndBlock(),
-	}
-}
-
-func EventQueryToMessage(q *flow.EventQuery) *observation.GetEventsRequest {
-	return &observation.GetEventsRequest{
-		EventId:    q.ID,
-		StartBlock: q.StartBlock,
-		EndBlock:   q.EndBlock,
-	}
 }

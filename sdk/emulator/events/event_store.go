@@ -11,7 +11,7 @@ type Store interface {
 	// Add adds one or events to the store.
 	Add(ctx context.Context, blockNumber uint64, events ...flow.Event) error
 	// Query searches for events in the store matching the given query.
-	Query(ctx context.Context, query flow.EventQuery) ([]flow.Event, error)
+	Query(ctx context.Context, ID string, startBlock, endBlock uint64) ([]flow.Event, error)
 }
 
 // memStore implements an in-memory store for events. Events are indexed by
@@ -37,20 +37,20 @@ func (s *memStore) Add(ctx context.Context, blockNumber uint64, events ...flow.E
 	return nil
 }
 
-func (s *memStore) Query(ctx context.Context, query flow.EventQuery) ([]flow.Event, error) {
+func (s *memStore) Query(ctx context.Context, ID string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	var events []flow.Event
 	// Filter by block number first
-	for i := query.StartBlock; i <= query.EndBlock; i++ {
+	for i := startBlock; i <= endBlock; i++ {
 		if s.byBlock[i] != nil {
 			// Check for empty ID, which indicates no ID filtering
-			if query.ID == "" {
+			if ID == "" {
 				events = append(events, s.byBlock[i]...)
 				continue
 			}
 
 			// Otherwise, only add events with matching ID
 			for _, event := range s.byBlock[i] {
-				if event.ID == query.ID {
+				if event.ID == ID {
 					events = append(events, event)
 				}
 			}

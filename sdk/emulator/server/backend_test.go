@@ -70,7 +70,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   2,
 		})
 		assert.Nil(t, err)
-		var events []*flow.Event
+		var events []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &events)
 		assert.Nil(t, err)
 		assert.Len(t, events, 0)
@@ -82,7 +82,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*flow.Event
+		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 1)
@@ -95,7 +95,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*flow.Event
+		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		// Should get both events
@@ -107,7 +107,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []*flow.Event
+		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 2)
