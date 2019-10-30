@@ -3,6 +3,7 @@ package runtime
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -22,21 +23,53 @@ func init() {
 	gob.Register(flow.Address{})
 }
 
-type ImportLocation interface {
-	isImportLocation()
+type Location ast.Location
+
+type StringLocation string
+
+func (l StringLocation) ID() ast.LocationID {
+	return ast.LocationID(l)
 }
 
-type StringImportLocation ast.StringLocation
+type AddressLocation ast.AddressLocation
 
-func (StringImportLocation) isImportLocation() {}
+func (AddressLocation) isLocation() {}
 
-type AddressImportLocation ast.AddressLocation
+func (l AddressLocation) ID() ast.LocationID {
+	return ast.LocationID(l.String())
+}
 
-func (AddressImportLocation) isImportLocation() {}
+func (l AddressLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+type TransactionLocation []byte
+
+func (TransactionLocation) isLocation() {}
+
+func (l TransactionLocation) ID() ast.LocationID {
+	return ast.LocationID(l.String())
+}
+
+func (l TransactionLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
+
+type ScriptLocation []byte
+
+func (ScriptLocation) isLocation() {}
+
+func (l ScriptLocation) ID() ast.LocationID {
+	return ast.LocationID(l.String())
+}
+
+func (l ScriptLocation) String() string {
+	return hex.EncodeToString([]byte(l))
+}
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
-	ResolveImport(ImportLocation) ([]byte, error)
+	ResolveImport(Location) ([]byte, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
 	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
@@ -74,14 +107,15 @@ func (e Error) Error() string {
 // Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
-	// It returns errors if the program has errors (e.g syntax errors, type errors),
-	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error)
+	//
+	// This function returns an error if the program has errors (e.g syntax errors, type errors),
+	// or if the execution fails.
+	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error)
 
-	// ExecuteTransaction executes the given transaction.
-	// It returns errors if the program has errors (e.g syntax errors, type errors),
-	// and if the execution fails.
-	ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error
+	// ParseAndCheckProgram parses and checks the given code without executing the program.
+	//
+	// This function returns an error if the program contains any syntax or semantic errors.
+	ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error
 }
 
 // mockRuntime is a mocked version of the Flow runtime
@@ -92,11 +126,11 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
 	return nil, nil
 }
 
-func (r *mockRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
+func (r *mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error {
 	return nil
 }
 
@@ -352,7 +386,7 @@ var accountCodeUpdatedEventType = sema.EventType{
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
+func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err error) {
 	program, _, err = parser.ParseProgram(string(script))
 	return
 }
@@ -361,12 +395,12 @@ type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e er
 
 func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
 	return func(astLocation ast.Location) (program *ast.Program, e error) {
-		var location ImportLocation
+		var location Location
 		switch astLocation := astLocation.(type) {
 		case ast.StringLocation:
-			location = StringImportLocation(astLocation)
+			location = StringLocation(astLocation)
 		case ast.AddressLocation:
-			location = AddressImportLocation(astLocation)
+			location = AddressLocation(astLocation)
 		default:
 			panic(&runtimeErrors.UnreachableError{})
 		}
@@ -374,7 +408,7 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		if err != nil {
 			return nil, err
 		}
-		return r.parse(script, runtimeInterface)
+		return r.parse(script)
 	}
 }
 
@@ -392,9 +426,9 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
 		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
-	case ast.TransactionLocation:
+	case TransactionLocation:
 		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
-	case ast.ScriptLocation:
+	case ScriptLocation:
 		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
@@ -430,21 +464,24 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
-	_, err := r.executeScript(script, runtimeInterface, ast.TransactionLocation(txID))
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
+	return r.executeScript(script, runtimeInterface, location)
+}
+
+func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	return err
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
-	return r.executeScript(script, runtimeInterface, ast.ScriptLocation(scriptID))
-}
-
-func (r *interpreterRuntime) executeScript(
+func (r *interpreterRuntime) parseAndCheckProgram(
 	script []byte,
 	runtimeInterface Interface,
-	location ast.Location,
-) (interface{}, error) {
-	program, err := r.parse(script, runtimeInterface)
+	location Location,
+	functions stdlib.StandardLibraryFunctions,
+) (*sema.Checker, error) {
+	program, err := r.parse(script)
 	if err != nil {
 		return nil, err
 	}
@@ -454,8 +491,6 @@ func (r *interpreterRuntime) executeScript(
 	if err != nil {
 		return nil, err
 	}
-
-	functions := r.standardLibraryFunctions(runtimeInterface)
 
 	valueDeclarations := functions.ToValueDeclarations()
 
@@ -471,6 +506,21 @@ func (r *interpreterRuntime) executeScript(
 
 	if err := checker.Check(); err != nil {
 		return nil, Error{[]error{err}}
+	}
+
+	return checker, nil
+}
+
+func (r *interpreterRuntime) executeScript(
+	script []byte,
+	runtimeInterface Interface,
+	location Location,
+) (interface{}, error) {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	if err != nil {
+		return nil, err
 	}
 
 	main, ok := checker.GlobalValues["main"]

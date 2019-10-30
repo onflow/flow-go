@@ -13,7 +13,7 @@ import (
 )
 
 type testRuntimeInterface struct {
-	resolveImport      func(ImportLocation) ([]byte, error)
+	resolveImport      func(Location) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
 	createAccount      func(publicKeys [][]byte, code []byte) (address flow.Address, err error)
@@ -25,7 +25,7 @@ type testRuntimeInterface struct {
 	emitEvent          func(flow.Event)
 }
 
-func (i *testRuntimeInterface) ResolveImport(location ImportLocation) ([]byte, error) {
+func (i *testRuntimeInterface) ResolveImport(location Location) ([]byte, error) {
 	return i.resolveImport(location)
 }
 
@@ -91,9 +91,9 @@ func TestRuntimeImport(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("imported"):
+			case StringLocation("imported"):
 				return importedScript, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)
@@ -288,9 +288,9 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	var storedValue []byte
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("deep-thought"):
+			case StringLocation("deep-thought"):
 				return deepThought, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)
@@ -402,9 +402,9 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 	var storedValue []byte
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("imported"):
+			case StringLocation("imported"):
 				return imported, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)
@@ -472,9 +472,9 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("imported"):
+			case StringLocation("imported"):
 				return imported, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)
@@ -553,9 +553,9 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("imported"):
+			case StringLocation("imported"):
 				return imported, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)

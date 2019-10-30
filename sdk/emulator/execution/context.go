@@ -11,6 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
+type LoggerFunc func(string)
+type CheckerFunc func([]byte, runtime.Location) error
+
 // RuntimeContext implements host functionality required by the Cadence runtime.
 //
 // A context is short-lived and is intended to be used when executing a single transaction.
@@ -20,16 +23,18 @@ import (
 type RuntimeContext struct {
 	registers       *flow.RegistersView
 	signingAccounts []flow.Address
-	onLogMessage    func(string)
+	logger          LoggerFunc
+	checker         CheckerFunc
 	events          []flow.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
 func NewRuntimeContext(registers *flow.RegistersView) *RuntimeContext {
 	return &RuntimeContext{
-		registers:    registers,
-		onLogMessage: func(string) {},
-		events:       make([]flow.Event, 0),
+		registers: registers,
+		logger:    func(string) {},
+		checker:   func([]byte, runtime.Location) error { return nil },
+		events:    make([]flow.Event, 0),
 	}
 }
 
@@ -49,9 +54,14 @@ func (r *RuntimeContext) GetSigningAccounts() []flow.Address {
 	return r.signingAccounts
 }
 
-// SetOnLogMessage sets the logging function for this context.
-func (r *RuntimeContext) SetOnLogMessage(callback func(string)) {
-	r.onLogMessage = callback
+// SetLogger sets the logging function for this context.
+func (r *RuntimeContext) SetLogger(logger LoggerFunc) {
+	r.logger = logger
+}
+
+// SetChecker sets the semantic checker function for this context.
+func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
+	r.checker = checker
 }
 
 // Events returns all events emitted by the runtime to this context.
@@ -86,6 +96,11 @@ func (r *RuntimeContext) CreateAccount(publicKeys [][]byte, code []byte) (flow.A
 	accountAddress := flow.BytesToAddress(accountIDBytes)
 
 	accountID := accountAddress.Bytes()
+
+	// prevent invalid code from being deployed to account
+	if err := r.checkProgram(code, accountAddress); err != nil {
+		return flow.Address{}, err
+	}
 
 	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
@@ -228,6 +243,11 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys [][]b
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *RuntimeContext) UpdateAccountCode(address flow.Address, code []byte) (err error) {
+	// prevent invalid code from being deployed to account
+	if err := r.checkProgram(code, address); err != nil {
+		return err
+	}
+
 	accountID := address.Bytes()
 
 	if !r.isValidSigningAccount(address) {
@@ -286,8 +306,8 @@ func (r *RuntimeContext) GetAccount(address flow.Address) *flow.Account {
 //
 // This function returns an error if the import location is not an account address,
 // or if there is no code deployed at the specified address.
-func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte, error) {
-	addressLocation, ok := location.(runtime.AddressImportLocation)
+func (r *RuntimeContext) ResolveImport(location runtime.Location) ([]byte, error) {
+	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
 		return nil, errors.New("import location must be an account address")
 	}
@@ -306,7 +326,7 @@ func (r *RuntimeContext) ResolveImport(location runtime.ImportLocation) ([]byte,
 //
 // This functions calls the onLog callback registered with this context.
 func (r *RuntimeContext) Log(message string) {
-	r.onLogMessage(message)
+	r.logger(message)
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
@@ -322,6 +342,16 @@ func (r *RuntimeContext) isValidSigningAccount(address flow.Address) bool {
 	}
 
 	return false
+}
+
+func (r *RuntimeContext) checkProgram(code []byte, address flow.Address) error {
+	if code == nil {
+		return nil
+	}
+
+	location := runtime.AddressLocation(address.Bytes())
+
+	return r.checker(code, location)
 }
 
 const (

@@ -33,10 +33,15 @@ func NewComputer(
 func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx *flow.Transaction) ([]flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 
+	runtimeContext.SetLogger(c.onLogMessage)
+	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
+		return c.runtime.ParseAndCheckProgram(code, runtimeContext, location)
+	})
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
-	runtimeContext.SetOnLogMessage(c.onLogMessage)
 
-	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash())
+	location := runtime.TransactionLocation(tx.Hash())
+
+	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext, location)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +54,11 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx *flow.Tr
 // This function initializes a new runtime context using the provided registers view.
 func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (interface{}, []flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
-	runtimeContext.SetOnLogMessage(c.onLogMessage)
+	runtimeContext.SetLogger(c.onLogMessage)
 
-	scriptHash := ScriptHash(script)
+	location := runtime.ScriptLocation(ScriptHash(script))
 
-	value, err := c.runtime.ExecuteScript(script, runtimeContext, scriptHash)
+	value, err := c.runtime.ExecuteScript(script, runtimeContext, location)
 	if err != nil {
 		return nil, nil, err
 	}
