@@ -8,7 +8,7 @@ import (
 )
 
 type Event struct {
-	ID string
+	Type string
 	// Values is a map of all the parameters to the event, keys are parameter
 	// names, values are the parameter values and must be primitive types.
 	Values map[string]interface{}
@@ -28,5 +28,5 @@ func (e Event) String() string {
 		i++
 	}
 
-	return fmt.Sprintf("%s(%s)", e.ID, values.String())
+	return fmt.Sprintf("%s(%s)", e.Type, values.String())
 }

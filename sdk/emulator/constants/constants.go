@@ -6,7 +6,7 @@ const (
 	AccountKeyWeightThreshold int = 1000
 )
 
-// List of account events.
+// List of account event types.
 const (
 	EventAccountCreated string = "flow.AccountCreated"
 	EventAccountUpdated string = "flow.AccountUpdated"

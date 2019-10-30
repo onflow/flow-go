@@ -387,21 +387,21 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 		values[field.Identifier] = value.ToGoValue()
 	}
 
-	var eventID string
+	var eventTypeID string
 
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
-		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
 	case ast.TransactionLocation:
-		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
 	case ast.ScriptLocation:
-		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: values,
 	}
 
@@ -413,7 +413,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	values ...interface{},
 ) {
-	eventID := fmt.Sprintf("flow.%s", eventType.Identifier)
+	eventTypeID := fmt.Sprintf("flow.%s", eventType.Identifier)
 
 	valueMap := make(map[string]interface{})
 
@@ -423,7 +423,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: valueMap,
 	}
 

@@ -164,7 +164,7 @@ func TestGetEvents(t *testing.T) {
 
 	// Set up a mock event response
 	mockEvent := flow.Event{
-		ID: "Transfer",
+		Type: "Transfer",
 		Values: map[string]interface{}{
 			"to":   flow.ZeroAddress,
 			"from": flow.ZeroAddress,
@@ -188,7 +188,7 @@ func TestGetEvents(t *testing.T) {
 		res, err := c.GetEvents(ctx, client.EventQuery{})
 		assert.Nil(t, err)
 		assert.Equal(t, len(res), 1)
-		assert.Equal(t, res[0].ID, mockEvent.ID)
+		assert.Equal(t, res[0].Type, mockEvent.Type)
 	})
 
 	t.Run("Server error", func(t *testing.T) {

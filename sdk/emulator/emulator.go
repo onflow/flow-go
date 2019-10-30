@@ -450,7 +450,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
-		if event.ID == constants.EventAccountCreated {
+		if event.Type == constants.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
 
 			account, err := b.GetAccount(accountAddress)

@@ -201,13 +201,13 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	events, err := b.eventStore.Query(ctx, req.EventId, req.StartBlock, req.EndBlock)
+	events, err := b.eventStore.Query(ctx, req.Type, req.StartBlock, req.EndBlock)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	b.logger.WithFields(log.Fields{
-		"eventID":    req.EventId,
+		"eventType":  req.Type,
 		"startBlock": req.StartBlock,
 		"endBlock":   req.EndBlock,
 		"results":    len(events),

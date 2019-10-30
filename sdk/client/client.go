@@ -133,8 +133,8 @@ func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*flow.Ac
 
 // EventQuery defines a query for Flow events.
 type EventQuery struct {
-	// The event ID to search for. If empty, no filtering by ID is done.
-	ID string
+	// The event type to search for. If empty, no filtering by type is done.
+	Type string
 	// The block to begin looking for events
 	StartBlock uint64
 	// The block to end looking for events (inclusive)
@@ -144,7 +144,7 @@ type EventQuery struct {
 // GetEvents queries the Observation API for events and returns the results.
 func (c *Client) GetEvents(ctx context.Context, query EventQuery) ([]flow.Event, error) {
 	req := &observation.GetEventsRequest{
-		EventId:    query.ID,
+		Type:       query.Type,
 		StartBlock: query.StartBlock,
 		EndBlock:   query.EndBlock,
 	}

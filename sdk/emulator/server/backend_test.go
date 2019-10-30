@@ -34,16 +34,16 @@ func TestGetEvents(t *testing.T) {
 
 	// Add some events
 	var (
-		mintID     = "Mint()"
-		transferID = "Transfer(to: Address)"
-		toAddress  = flow.HexToAddress("1234567890123456789012345678901234567890")
+		mintType     = "Mint()"
+		transferType = "Transfer(to: Address)"
+		toAddress    = flow.HexToAddress("1234567890123456789012345678901234567890")
 
 		ev1 = flow.Event{
-			ID:     mintID,
+			Type:   mintType,
 			Values: map[string]interface{}{},
 		}
 		ev2 = flow.Event{
-			ID: transferID,
+			Type: transferType,
 			Values: map[string]interface{}{
 				"to": toAddress.String(),
 			},
@@ -77,7 +77,7 @@ func TestGetEvents(t *testing.T) {
 	})
 	t.Run("should filter by ID", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			EventId:    transferID,
+			Type:       transferType,
 			StartBlock: 1,
 			EndBlock:   3,
 		})
@@ -86,7 +86,7 @@ func TestGetEvents(t *testing.T) {
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 1)
-		assert.Equal(t, resEvents[0].ID, transferID)
+		assert.Equal(t, resEvents[0].Type, transferType)
 		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
 	})
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Len(t, resEvents, 2)
 		// Mint event first, then Transfer
-		assert.Equal(t, resEvents[0].ID, mintID)
-		assert.Equal(t, resEvents[1].ID, transferID)
+		assert.Equal(t, resEvents[0].Type, mintType)
+		assert.Equal(t, resEvents[1].Type, transferType)
 	})
 }
