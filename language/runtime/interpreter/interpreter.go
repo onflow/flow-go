@@ -75,8 +75,8 @@ func (m StatementTrampoline) Continue() Trampoline {
 // are treated like they are returning a value.
 
 type OnEventEmittedFunc func(EventValue)
-type OnReadStoredValueFunc func(storageIdentifier interface{}, indexingType sema.Type) OptionalValue
-type OnWriteStoredValueFunc func(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue)
+type StorageReadHandlerFunc func(storageIdentifier interface{}, indexingType sema.Type) OptionalValue
+type StorageWriteHandlerFunc func(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue)
 
 type Interpreter struct {
 	Checker             *sema.Checker
@@ -88,8 +88,8 @@ type Interpreter struct {
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
 	onEventEmitted      OnEventEmittedFunc
-	onReadStoredValue   OnReadStoredValueFunc
-	onWriteStoredValue  OnWriteStoredValueFunc
+	storageReadHandler  StorageReadHandlerFunc
+	storageWriteHandler StorageWriteHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -122,22 +122,22 @@ func WithPredefinedValues(predefinedValues map[string]Value) Option {
 	}
 }
 
-// WithOnReadStoredValue returns an interpreter option which sets the given function
+// WithStorageReadHandler returns an interpreter option which sets the given function
 // as the function that is used when a stored value is read.
 //
-func WithOnReadStoredValue(handler OnReadStoredValueFunc) Option {
+func WithStorageReadHandler(handler StorageReadHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
-		interpreter.SetOnReadStoredValue(handler)
+		interpreter.SetStorageReadHandler(handler)
 		return nil
 	}
 }
 
-// WithOnWriteStoredValue returns an interpreter option which sets the given function
+// WithStorageWriteHandler returns an interpreter option which sets the given function
 // as the function that is used when a stored value is written.
 //
-func WithOnWriteStoredValue(handler OnWriteStoredValueFunc) Option {
+func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
-		interpreter.SetOnWriteStoredValue(handler)
+		interpreter.SetStorageWriteHandler(handler)
 		return nil
 	}
 }
@@ -170,16 +170,16 @@ func (interpreter *Interpreter) SetOnEventEmitted(function OnEventEmittedFunc) {
 	interpreter.onEventEmitted = function
 }
 
-// SetOnReadStoredValue sets the function that is used when a stored value is read.
+// SetStorageReadHandler sets the function that is used when a stored value is read.
 //
-func (interpreter *Interpreter) SetOnReadStoredValue(function OnReadStoredValueFunc) {
-	interpreter.onReadStoredValue = function
+func (interpreter *Interpreter) SetStorageReadHandler(function StorageReadHandlerFunc) {
+	interpreter.storageReadHandler = function
 }
 
-// SetOnWriteStoredValue sets the function that is used when a stored value is written.
+// SetStorageWriteHandler sets the function that is used when a stored value is written.
 //
-func (interpreter *Interpreter) SetOnWriteStoredValue(function OnWriteStoredValueFunc) {
-	interpreter.onWriteStoredValue = function
+func (interpreter *Interpreter) SetStorageWriteHandler(function StorageWriteHandlerFunc) {
+	interpreter.storageWriteHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -2056,9 +2056,9 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 }
 
 func (interpreter *Interpreter) readStored(storageIdentifier interface{}, indexingType sema.Type) OptionalValue {
-	return interpreter.onReadStoredValue(storageIdentifier, indexingType)
+	return interpreter.storageReadHandler(storageIdentifier, indexingType)
 }
 
 func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue) {
-	interpreter.onWriteStoredValue(storageIdentifier, indexingType, value)
+	interpreter.storageWriteHandler(storageIdentifier, indexingType, value)
 }

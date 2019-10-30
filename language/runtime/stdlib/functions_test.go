@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 func TestAssert(t *testing.T) {
@@ -17,7 +18,7 @@ func TestAssert(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		ast.StringLocation(""),
+		utils.TestLocation,
 		sema.WithPredeclaredValues(BuiltinFunctions.ToValueDeclarations()),
 	)
 	require.Nil(t, err)
@@ -51,7 +52,7 @@ func TestPanic(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		&ast.Program{},
-		ast.StringLocation(""),
+		utils.TestLocation,
 		sema.WithPredeclaredValues(BuiltinFunctions.ToValueDeclarations()),
 	)
 	require.Nil(t, err)
