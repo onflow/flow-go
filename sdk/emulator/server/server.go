@@ -29,6 +29,8 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
+const defaultBlockInterval = 5 * time.Second
+
 // Config is the configuration for an emulator server.
 type Config struct {
 	Port           int
@@ -53,14 +55,18 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
-			WithField("eventID", event.ID).
+			WithField("eventType", event.Type).
 			Infof("🔔  Event emitted: %s", event)
 
 		ctx := context.Background()
 		err := eventStore.Add(ctx, blockNumber, event)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to save event %s", event.ID)
+			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
 		}
+	}
+
+	if conf.BlockInterval == 0 {
+		conf.BlockInterval = defaultBlockInterval
 	}
 
 	server := &EmulatorServer{

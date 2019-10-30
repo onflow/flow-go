@@ -164,14 +164,14 @@ func TestGetEvents(t *testing.T) {
 
 	// Set up a mock event response
 	mockEvent := flow.Event{
-		ID: "Transfer",
+		Type: "Transfer",
 		Values: map[string]interface{}{
 			"to":   flow.ZeroAddress,
 			"from": flow.ZeroAddress,
 			"id":   1,
 		},
 	}
-	events := []*flow.Event{&mockEvent}
+	events := []flow.Event{mockEvent}
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(events)
@@ -185,10 +185,10 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass the response to the client
-		res, err := c.GetEvents(ctx, &flow.EventQuery{})
+		res, err := c.GetEvents(ctx, client.EventQuery{})
 		assert.Nil(t, err)
 		assert.Equal(t, len(res), 1)
-		assert.Equal(t, res[0].ID, mockEvent.ID)
+		assert.Equal(t, res[0].Type, mockEvent.Type)
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -199,7 +199,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetEvents(ctx, &flow.EventQuery{})
+		_, err = c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
 
@@ -211,7 +211,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should return an error because it should fail to decode
-		_, err = c.GetEvents(ctx, &flow.EventQuery{})
+		_, err = c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
 }

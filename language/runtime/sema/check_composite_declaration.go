@@ -393,11 +393,8 @@ func (checker *Checker) membersAndOrigins(
 
 			checker.report(
 				&InvalidVariableKindError{
-					Kind: field.VariableKind,
-					Range: ast.Range{
-						StartPos: field.Identifier.Pos,
-						EndPos:   field.Identifier.Pos,
-					},
+					Kind:  field.VariableKind,
+					Range: ast.NewRangeFromPositioned(field.Identifier),
 				},
 			)
 		}

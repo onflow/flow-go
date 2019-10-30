@@ -16,7 +16,7 @@ export function activate(ctx: ExtensionContext) {
 
   let client = startServer(ctx);
 
-  registerCommand("bamboo.restartServer", async () => {
+  registerCommand("cadence.restartServer", async () => {
     if (!client) {
       return;
     }
@@ -26,25 +26,35 @@ export function activate(ctx: ExtensionContext) {
 }
 
 function startServer(ctx: ExtensionContext): LanguageClient | undefined {
-  const serverBinaryPath: string | undefined = workspace
-    .getConfiguration("bamboo")
-    .get("languageServerPath");
+  const languageServerCommand: string | undefined = workspace
+    .getConfiguration("cadence")
+    .get("languageServerCommand");
 
-  if (!serverBinaryPath) {
-    window.showWarningMessage("Missing path to Bamboo language server");
+  if (!languageServerCommand) {
+    window.showWarningMessage("Missing command to start the Cadence language server");
     return;
   }
 
+  const startLanguageServerCommandAndArgs = languageServerCommand.split(/\s+/)
+  if (startLanguageServerCommandAndArgs.length < 1) {
+    window.showWarningMessage("Malformed language server command")
+    return
+  }
+
+  const command = startLanguageServerCommandAndArgs[0]
+  const args = startLanguageServerCommandAndArgs.splice(1)
+
   const client = new LanguageClient(
-    "bamboo",
-    "Bamboo",
+    "cadence",
+    "Cadence",
     {
-      command: serverBinaryPath
+      command,
+      args,
     },
     {
-      documentSelector: [{ scheme: "file", language: "bamboo" }],
+      documentSelector: [{ scheme: "file", language: "cadence" }],
       synchronize: {
-        configurationSection: "bamboo"
+        configurationSection: "cadence"
       }
     }
   );
@@ -52,11 +62,11 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
   client
     .onReady()
     .then(() => {
-      return window.showInformationMessage("Bamboo language server started");
+      return window.showInformationMessage("Cadence language server started");
     })
     .catch(error => {
       return window.showErrorMessage(
-        `Bamboo language server failed to start: ${error}`
+        `Cadence language server failed to start: ${error}`
       );
     });
 
@@ -70,7 +80,7 @@ function detectLaunchConfigurationChanges() {
   workspace.onDidChangeConfiguration(e => {
     const promptRestartKeys = ["languageServerPath"];
     const shouldPromptRestart = promptRestartKeys.some(key =>
-      e.affectsConfiguration(`bamboo.${key}`)
+      e.affectsConfiguration(`cadence.${key}`)
     );
     if (shouldPromptRestart) {
       window

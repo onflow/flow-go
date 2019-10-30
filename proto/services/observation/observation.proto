@@ -64,7 +64,7 @@ message ExecuteScriptResponse {
 }
 
 message GetEventsRequest {
-    string event_id = 1;
+    string type = 1;
     uint64 start_block = 2;
     uint64 end_block = 3;
 }

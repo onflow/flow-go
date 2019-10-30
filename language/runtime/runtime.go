@@ -421,21 +421,21 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 		values[field.Identifier] = value.ToGoValue()
 	}
 
-	var eventID string
+	var eventTypeID string
 
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
-		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
 	case TransactionLocation:
-		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
 	case ScriptLocation:
-		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: values,
 	}
 
@@ -447,7 +447,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	values ...interface{},
 ) {
-	eventID := fmt.Sprintf("flow.%s", eventType.Identifier)
+	eventTypeID := fmt.Sprintf("flow.%s", eventType.Identifier)
 
 	valueMap := make(map[string]interface{})
 
@@ -457,7 +457,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: valueMap,
 	}
 
@@ -571,8 +571,8 @@ func (r *interpreterRuntime) executeScript(
 		interpreter.WithOnEventEmittedHandler(func(eventValue interpreter.EventValue) {
 			r.emitEvent(eventValue, runtimeInterface)
 		}),
-		interpreter.WithOnReadStoredValue(r.storageReadHandler(runtimeInterface)),
-		interpreter.WithOnWriteStoredValue(r.storageWriteHandler(runtimeInterface)),
+		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
+		interpreter.WithStorageWriteHandler(r.storageWriteHandler(runtimeInterface)),
 	)
 	if err != nil {
 		return nil, Error{[]error{err}}
@@ -648,7 +648,7 @@ func accountValue(address flow.Address) interpreter.Value {
 	}
 }
 
-func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.OnReadStoredValueFunc {
+func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
 	return func(storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
 		address := storageIdentifier.(flow.Address)
 		key := []byte(keyType.String())
@@ -676,7 +676,7 @@ func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) inte
 	}
 }
 
-func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.OnWriteStoredValueFunc {
+func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
 	return func(storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
 		address := storageIdentifier.(flow.Address)
 		key := []byte(keyType.String())

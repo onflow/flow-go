@@ -2,7 +2,6 @@ package start
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/cli"
 	"os"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/cli/flow/initialize"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
