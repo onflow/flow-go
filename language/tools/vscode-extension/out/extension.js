@@ -16,7 +16,7 @@ function activate(ctx) {
         ctx.subscriptions.push(vscode_1.commands.registerCommand(command, callback));
     }
     let client = startServer(ctx);
-    registerCommand("bamboo.restartServer", () => __awaiter(this, void 0, void 0, function* () {
+    registerCommand("cadence.restartServer", () => __awaiter(this, void 0, void 0, function* () {
         if (!client) {
             return;
         }
@@ -26,28 +26,36 @@ function activate(ctx) {
 }
 exports.activate = activate;
 function startServer(ctx) {
-    const serverBinaryPath = vscode_1.workspace
-        .getConfiguration("bamboo")
-        .get("languageServerPath");
-    if (!serverBinaryPath) {
-        vscode_1.window.showWarningMessage("Missing path to Bamboo language server");
+    const languageServerCommand = vscode_1.workspace
+        .getConfiguration("cadence")
+        .get("languageServerCommand");
+    if (!languageServerCommand) {
+        vscode_1.window.showWarningMessage("Missing command to start the Cadence language server");
         return;
     }
-    const client = new vscode_languageclient_1.LanguageClient("bamboo", "Bamboo", {
-        command: serverBinaryPath
+    const startLanguageServerCommandAndArgs = languageServerCommand.split(/\s+/);
+    if (startLanguageServerCommandAndArgs.length < 1) {
+        vscode_1.window.showWarningMessage("Malformed language server command");
+        return;
+    }
+    const command = startLanguageServerCommandAndArgs[0];
+    const args = startLanguageServerCommandAndArgs.splice(1);
+    const client = new vscode_languageclient_1.LanguageClient("cadence", "Cadence", {
+        command,
+        args,
     }, {
-        documentSelector: [{ scheme: "file", language: "bamboo" }],
+        documentSelector: [{ scheme: "file", language: "cadence" }],
         synchronize: {
-            configurationSection: "bamboo"
+            configurationSection: "cadence"
         }
     });
     client
         .onReady()
         .then(() => {
-        return vscode_1.window.showInformationMessage("Bamboo language server started");
+        return vscode_1.window.showInformationMessage("Cadence language server started");
     })
         .catch(error => {
-        return vscode_1.window.showErrorMessage(`Bamboo language server failed to start: ${error}`);
+        return vscode_1.window.showErrorMessage(`Cadence language server failed to start: ${error}`);
     });
     let languageServerDisposable = client.start();
     ctx.subscriptions.push(languageServerDisposable);
@@ -56,7 +64,7 @@ function startServer(ctx) {
 function detectLaunchConfigurationChanges() {
     vscode_1.workspace.onDidChangeConfiguration(e => {
         const promptRestartKeys = ["languageServerPath"];
-        const shouldPromptRestart = promptRestartKeys.some(key => e.affectsConfiguration(`bamboo.${key}`));
+        const shouldPromptRestart = promptRestartKeys.some(key => e.affectsConfiguration(`cadence.${key}`));
         if (shouldPromptRestart) {
             vscode_1.window
                 .showInformationMessage("Server launch configuration change detected. Reload the window for changes to take effect", "Reload Window", "Not now")
