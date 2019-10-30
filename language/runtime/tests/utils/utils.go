@@ -20,10 +20,9 @@ func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
 }
 
 type ParseAndCheckOptions struct {
-	Values         map[string]sema.ValueDeclaration
-	Types          map[string]sema.TypeDeclaration
-	Location       ast.Location
 	ImportResolver ast.ImportResolver
+	Location       ast.Location
+	Options        []sema.Option
 }
 
 func ParseAndCheckWithOptions(
@@ -48,7 +47,11 @@ func ParseAndCheckWithOptions(
 	if options.Location == nil {
 		options.Location = TestLocation
 	}
-	checker, err := sema.NewChecker(program, options.Values, options.Types, options.Location)
+	checker, err := sema.NewChecker(
+		program,
+		options.Location,
+		options.Options...,
+	)
 	if err != nil {
 		return checker, err
 	}

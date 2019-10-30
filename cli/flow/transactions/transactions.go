@@ -1,7 +1,7 @@
 package transactions
 
 import (
-	"github.com/dapperlabs/flow-go/cli/transactions/send"
+	send "github.com/dapperlabs/flow-go/cli/flow/transactions/send"
 	"github.com/spf13/cobra"
 )
 

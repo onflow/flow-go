@@ -1,4 +1,4 @@
-package project
+package cli
 
 import (
 	"encoding/hex"
@@ -7,17 +7,12 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/dapperlabs/flow-go/cli/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-const (
-	ConfigPath = "flow.json"
-)
-
 var (
-	RootName    = "root"
-	RootAddress = flow.HexToAddress("01")
+	RootAccountName    = "root"
+	RootAccountAddress = flow.HexToAddress("01")
 )
 
 type Account struct {
@@ -72,16 +67,16 @@ func NewConfig() *Config {
 }
 
 func (c *Config) RootAccount() *Account {
-	rootAcct, ok := c.Accounts[RootName]
+	rootAcct, ok := c.Accounts[RootAccountName]
 	if !ok {
-		utils.Exit(1, "Missing root account!")
+		Exit(1, "Missing root account!")
 	}
 	return rootAcct
 }
 
 func (c *Config) SetRootAccount(prKey flow.AccountPrivateKey) {
-	c.Accounts[RootName] = &Account{
-		Address:    RootAddress,
+	c.Accounts[RootAccountName] = &Account{
+		Address:    RootAccountAddress,
 		PrivateKey: prKey,
 	}
 }
@@ -97,7 +92,7 @@ func SaveConfig(conf *Config) error {
 
 func MustSaveConfig(conf *Config) {
 	if err := SaveConfig(conf); err != nil {
-		utils.Exitf(1, "Failed to save config err: %v", err)
+		Exitf(1, "Failed to save config err: %v", err)
 	}
 }
 

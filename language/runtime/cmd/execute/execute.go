@@ -57,14 +57,22 @@ func Execute(args []string) {
 	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
 	location := ast.FileLocation(filename)
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
 	must(err, filename)
 
 	must(checker.Check(), filename)
 
 	values := standardLibraryFunctions.ToValues()
 
-	inter, err := interpreter.NewInterpreter(checker, values)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(values),
+	)
 	must(err, filename)
 
 	must(inter.Interpret(), filename)

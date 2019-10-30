@@ -1,9 +1,8 @@
 package keys
 
 import (
+	generate "github.com/dapperlabs/flow-go/cli/flow/keys/generate"
 	"github.com/spf13/cobra"
-
-	"github.com/dapperlabs/flow-go/cli/keys/generate"
 )
 
 var Cmd = &cobra.Command{

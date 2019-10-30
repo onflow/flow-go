@@ -20,9 +20,9 @@ import (
 )
 
 type ParseCheckAndInterpretOptions struct {
-	PredefinedValueTypes map[string]sema.ValueDeclaration
-	PredefinedValues     map[string]interpreter.Value
-	HandleCheckerError   func(error)
+	Options            []interpreter.Option
+	CheckerOptions     []sema.Option
+	HandleCheckerError func(error)
 }
 
 func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
@@ -38,7 +38,7 @@ func parseCheckAndInterpretWithOptions(
 	checker, err := ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
-			Values: options.PredefinedValueTypes,
+			Options: options.CheckerOptions,
 		},
 	)
 
@@ -51,7 +51,10 @@ func parseCheckAndInterpretWithOptions(
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, options.PredefinedValues)
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		options.Options...,
+	)
 
 	require.Nil(t, err)
 
@@ -1628,11 +1631,12 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	checker, err := sema.NewChecker(
 		program,
-		stdlib.StandardLibraryFunctions{
-			testFunction,
-		}.ToValueDeclarations(),
-		nil,
 		ast.StringLocation(""),
+		sema.WithPredeclaredValues(
+			stdlib.StandardLibraryFunctions{
+				testFunction,
+			}.ToValueDeclarations(),
+		),
 	)
 	assert.Nil(t, err)
 
@@ -1641,9 +1645,11 @@ func TestInterpretHostFunction(t *testing.T) {
 
 	inter, err := interpreter.NewInterpreter(
 		checker,
-		map[string]interpreter.Value{
-			testFunction.Name: testFunction.Function,
-		},
+		interpreter.WithPredefinedValues(
+			map[string]interpreter.Value{
+				testFunction.Name: testFunction.Function,
+			},
+		),
 	)
 
 	assert.Nil(t, err)
@@ -3542,7 +3548,7 @@ func TestInterpretImport(t *testing.T) {
 	)
 	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+	inter, err := interpreter.NewInterpreter(checkerImporting)
 	require.Nil(t, err)
 
 	err = inter.Interpret()
@@ -3570,7 +3576,9 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			Values: valueDeclarations,
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
 		},
 	)
 	require.Nil(t, err)
@@ -3584,7 +3592,9 @@ func TestInterpretImportError(t *testing.T) {
           }
         `,
 		ParseAndCheckOptions{
-			Values: valueDeclarations,
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 				assert.Equal(t,
 					ast.StringLocation("imported"),
@@ -3600,7 +3610,10 @@ func TestInterpretImportError(t *testing.T) {
 		stdlib.PanicFunction,
 	}.ToValues()
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, values)
+	inter, err := interpreter.NewInterpreter(
+		checkerImporting,
+		interpreter.WithPredefinedValues(values),
+	)
 	require.Nil(t, err)
 
 	err = inter.Interpret()
@@ -3746,7 +3759,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	assert.Equal(t,
 		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
 		inter.Globals["x"].Value.(interpreter.DictionaryValue).
-			Get(interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
+			Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
 	)
 }
 
@@ -4609,7 +4622,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 	)
 	require.Nil(t, err)
 
-	inter, err := interpreter.NewInterpreter(checkerImporting, nil)
+	inter, err := interpreter.NewInterpreter(checkerImporting)
 	require.Nil(t, err)
 
 	err = inter.Interpret()
@@ -4628,22 +4641,31 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 	},
 }
 
+type storageIdentifier struct{}
+
 func TestInterpretStorage(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	//
+
+	getter := func(_ interface{}, key sema.Type) interpreter.OptionalValue {
+		value, ok := storedValues[key.String()]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ interface{}, key sema.Type, value interpreter.OptionalValue) {
+		storedValues[key.String()] = value
+	}
+
+	storageIdentifier := &storageIdentifier{}
+
 	storageValue := interpreter.StorageValue{
-		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-		Getter: func(key sema.Type) interpreter.OptionalValue {
-			value, ok := storedValues[key.String()]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return value
-		},
-		Setter: func(key sema.Type, value interpreter.OptionalValue) {
-			storedValues[key.String()] = value
-		},
+		Identifier: storageIdentifier,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t,
@@ -4654,9 +4676,15 @@ func TestInterpretStorage(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5163,9 +5191,13 @@ func TestInterpretReferenceExpression(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
 			},
 		},
 	)
@@ -5182,8 +5214,8 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 	require.Equal(t,
 		interpreter.ReferenceValue{
-			Storage:      storageValue,
-			IndexingType: rType,
+			StorageIdentifier: storageValue.Identifier,
+			IndexingType:      rType,
 		},
 		value,
 	)
@@ -5193,18 +5225,27 @@ func TestInterpretReferenceUse(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
+	storageIdentifier := &storageIdentifier{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+		assert.Equal(t, storageIdentifier, id)
+
+		value, ok := storedValues[keyType.String()]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+		assert.Equal(t, storageIdentifier, id)
+
+		storedValues[keyType.String()] = value
+	}
+
 	storageValue := interpreter.StorageValue{
-		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			value, ok := storedValues[keyType.String()]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return value
-		},
-		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			storedValues[keyType.String()] = value
-		},
+		Identifier: storageIdentifier,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5235,9 +5276,15 @@ func TestInterpretReferenceUse(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5258,18 +5305,27 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
+	storageIdentifier := &storageIdentifier{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+		assert.Equal(t, storageIdentifier, id)
+
+		value, ok := storedValues[keyType.String()]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+		assert.Equal(t, storageIdentifier, id)
+
+		storedValues[keyType.String()] = value
+	}
+
 	storageValue := interpreter.StorageValue{
-		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			value, ok := storedValues[keyType.String()]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return value
-		},
-		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			storedValues[keyType.String()] = value
-		},
+		Identifier: storageIdentifier,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5301,9 +5357,15 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
@@ -5325,18 +5387,27 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
+	storageIdentifier := &storageIdentifier{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+		assert.Equal(t, storageIdentifier, id)
+
+		value, ok := storedValues[keyType.String()]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+		assert.Equal(t, storageIdentifier, id)
+
+		storedValues[keyType.String()] = value
+	}
+
 	storageValue := interpreter.StorageValue{
-		// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			value, ok := storedValues[keyType.String()]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return value
-		},
-		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			storedValues[keyType.String()] = value
-		},
+		Identifier: storageIdentifier,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5350,9 +5421,15 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
           }
         `,
 		ParseCheckAndInterpretOptions{
-			PredefinedValueTypes: storageValueDeclaration,
-			PredefinedValues: map[string]interpreter.Value{
-				"storage": storageValue,
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithOnReadStoredValue(getter),
+				interpreter.WithOnWriteStoredValue(setter),
 			},
 		},
 	)
