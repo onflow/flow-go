@@ -48,10 +48,6 @@ generate-mocks:
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
-.PHONY: install-cli
-install-cli: build-relic
-	go install ./cmd/flow
-
 .PHONY: lint-sdk
 lint-sdk:
 	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
@@ -59,12 +55,16 @@ lint-sdk:
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test
 
-emulator: crypto/relic/build cmd sdk
-	GO111MODULE=on go build -o emulator ./cmd/emulator
+.PHONY: install-cli
+install-cli: crypto/relic/build
+	go install ./cmd/flow
+
+flow: crypto/relic/build cmd sdk
+	GO111MODULE=on go build -o flow ./cmd/flow
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
+	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
