@@ -373,6 +373,11 @@ module FPL-TYPING
 
   syntax Ident ::= "IntLit" [token]
 
+  syntax Ident ::= "length" [token] | "x" [token] | "y" [token] | "at" [token]
+                 | "concat" [token] | "contains" [token] | "append" [token]
+                 | "insert" [token] | "remove" [token] | "removeFirst" [token]
+                 | "removeLast" [token]
+
   rule type(E) => infer(#type(E))
   rule infer(IntLit) => Int
   rule infer([T]) => [infer(T)::Type]
@@ -388,6 +393,8 @@ module FPL-TYPING
   rule #type([ E, .Exps ]) => [ #type(E) ]
   rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
   rule #type(E1 [ E2 ]) => elementType(#type(E1))
+  rule #type(E . F) => fieldType(#type(E), F)
+  rule #type(E . F(_)) => returnType(fieldType(#type(E), F))
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -408,9 +415,20 @@ module FPL-TYPING
   rule #type(_ >= _) => Bool
   rule #type(_ ? E1 : E2) => type(E1, E2)
 
+  syntax Type ::= fieldType(Type, Ident) [function]
+  rule fieldType([_] #Or [_;_::Int], length) => Int
+  rule fieldType(([_] #Or [_;_::Int]) #as T, concat) => ((T): T)
+  rule fieldType([T] #Or [T;_::Int], contains) => ((T): Bool)
+  rule fieldType([T] #Or [T;_::Int], append) => ((T): Void)
+  rule fieldType([T] #Or [T;_::Int], insert) => ((Int, T): Void)
+  rule fieldType([T] #Or [T;_::Int], remove) => ((Int): T)
+  rule fieldType([T] #Or [T;_::Int], removeFirst) => ((.Types): T)
+  rule fieldType([T] #Or [T;_::Int], removeLast) => ((.Types): T)
+
   syntax Type ::= type(Exp, Exp) [function]
                 | #type(Type, Type) [function]
                 | elementType(Type) [function]
+                | returnType(Type) [function]
 
   rule type(E1, E2) => #type(#type(E1), #type(E2))
   rule #type(IntLit, T) => T
@@ -419,6 +437,8 @@ module FPL-TYPING
 
   rule elementType([T]) => T
   rule elementType([T;_::Int]) => T
+
+  rule returnType(((_): T)) => T
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
   rule pow8 => 256 [macro]
