@@ -1,16 +1,14 @@
 REVISION := $(shell git rev-parse --short HEAD)
 
-.PHONY: clone-submodules
-clone-submodules:
+crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
 
-.PHONY: build-relic
-build-relic: clone-submodules
+crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
 .PHONY: install-tools
-install-tools: build-relic
+install-tools: crypto/relic/build
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -60,6 +58,9 @@ lint-sdk:
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test
+
+emulator: crypto/relic/build cmd sdk
+	GO111MODULE=on go build -o emulator ./cmd/emulator
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
