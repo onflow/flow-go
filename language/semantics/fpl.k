@@ -294,9 +294,8 @@ module FPL-SYNTAX
 endmodule
 
 module FPL-SCOPES
-    imports INT-SYNTAX
-
-    syntax Scope ::= "global" | local(Int)
+    syntax Val
+    syntax Scope ::= "global" | local(Val)
 
     syntax Pgm
     syntax KItem ::= declare(Pgm) | initialize(Pgm)
@@ -587,6 +586,7 @@ endmodule
 module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
 
   rule <k> declare(fun F:Ident ( Fs ) : T { _::Contract _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
@@ -621,10 +621,26 @@ module FPL-FUNCTIONS
        <store> S </store>
     requires notBool L in_keys(S)
 
-  rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
-       <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
-       <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
-       <scope> Scope => local(L) </scope>
+  rule <k> (F:Ident)(Args) => call v(V, T) (Args) ... </k>
+       <env>... F |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
+    requires isKResult(Args)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident
+  context HOLE . _::Ident requires notBool isPath(HOLE)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident ( _::Actuals )
+  context E . _::Ident ( HOLE::Actuals ) requires isKResult(E)
+  context HOLE . _::Ident ( _::Actuals ) requires notBool isPath(HOLE)
+
+  rule <k> V . F:Ident (Args) => call V . F (Args) ... </k>
+    requires isKResult(Args) andBool isKResult(V)
+
+  syntax Exp ::= "call" Exp "(" Actuals ")" [strict(1)]
+
+  rule <k> (call v(funDef(... args: Params, body: B, env: Rho') #as V, _) (Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
+       <env> Rho => Rho' </env>
+       <scope> Scope => local(V) </scope>
        <fstack> .List => ListItem(frame(K, Rho, Scope, LS)) ...</fstack>
        <lstack> LS => .List </lstack>
   rule <k> return => return v(unit(), Void) ... </k>
@@ -634,8 +650,7 @@ module FPL-FUNCTIONS
        <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
        <lstack> _ => LS </lstack>
   rule <k> return V:Val => return v(V, T) ... </k>
-       <scope> local(L) </scope>
-       <store>... L |-> funDef(... result: T) ...</store>
+       <scope> local(funDef(... result: T)) </scope>
 
 endmodule
 
