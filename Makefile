@@ -59,8 +59,8 @@ ci: install-tools generate check-generated-code lint-sdk test
 install-cli: crypto/relic/build
 	go install ./cmd/flow
 
-flow: crypto/relic/build cmd sdk
-	GO111MODULE=on go build -o flow ./cmd/flow
+cmd/flow/flow: crypto/relic/build cmd sdk
+	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
