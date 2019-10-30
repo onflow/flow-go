@@ -1,9 +1,8 @@
 package accounts
 
 import (
+	"github.com/dapperlabs/flow-go/cli/flow/accounts/create"
 	"github.com/spf13/cobra"
-
-	"github.com/dapperlabs/flow-go/cli/accounts/create"
 )
 
 var Cmd = &cobra.Command{
