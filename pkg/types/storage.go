@@ -14,7 +14,7 @@ type StateCommitment []byte
 type Storage interface {
 	// Trusted methods (without proof)
 	// Get registers at specific StateCommitment by a list of register ids
-	GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (registers []Register, err error)
+	GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, err error)
 	// Batched atomic updates of a subset of registers at specific state
 	UpdateRegister(registerIDs []RegisterID, values []RegisterValue, stateCommitment StateCommitment) (newStateCommitment StateCommitment, err error)
 
@@ -28,7 +28,7 @@ type Storage interface {
 // StorageVerifier should be designed as an standalone package to verify proofs of storage
 type StorageVerifier interface {
 	// verify if a provided proof for getRegisters is accurate
-	VerifyGetRegistersProof(registers []Register, proof StorageProof, stateCommitment StateCommitment) (verified bool, err error)
+	VerifyGetRegistersProof(registerIDs []RegisterID, stateCommitment StateCommitment, values []RegisterValue, proof []StorageProof) (verified bool, err error)
 	// verify if a provided proof updateRegister is accurate
-	VerifyUpdateRegistersProof(registers []Register, proof StorageProof, initialStateCommitment StateCommitment, finalStateCommitment StateCommitment) (verified bool, err error)
+	VerifyUpdateRegistersProof(registerIDs []RegisterID, values []RegisterValue, startStateCommitment StateCommitment, finalStateCommitment StateCommitment, proof []StorageProof) (verified bool, err error)
 }
