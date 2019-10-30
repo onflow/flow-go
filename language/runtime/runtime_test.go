@@ -588,3 +588,35 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
+
+func TestParseAndCheckProgram(t *testing.T) {
+	t.Run("ValidProgram", func(t *testing.T) {
+		runtime := NewInterpreterRuntime()
+
+		script := []byte("fun test(): Int { return 42 }")
+		runtimeInterface := &testRuntimeInterface{}
+
+		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
+		assert.Nil(t, err)
+	})
+
+	t.Run("InvalidSyntax", func(t *testing.T) {
+		runtime := NewInterpreterRuntime()
+
+		script := []byte("invalid syntax")
+		runtimeInterface := &testRuntimeInterface{}
+
+		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("InvalidSemantics", func(t *testing.T) {
+		runtime := NewInterpreterRuntime()
+
+		script := []byte(`let a: Int = "b"`)
+		runtimeInterface := &testRuntimeInterface{}
+
+		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
+		assert.NotNil(t, err)
+	})
+}
