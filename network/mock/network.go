@@ -96,16 +96,6 @@ func (mn *Network) Register(engineID uint8, engine network.Engine) (network.Cond
 	return conduit, nil
 }
 
-// Unregister removes the engine and prevent the memleak
-func (mn *Network) Unregister(engineID uint8, engine network.Engine) error {
-	engine, ok := mn.engines[engineID]
-	if !ok {
-		return errors.Errorf("engine code does not exist (%d)", engineID)
-	}
-	delete(mn.engines, engineID)
-	return nil
-}
-
 // return a certain node has seen a certain key
 func (mn *Network) haveSeen(key string) bool {
 	mn.Lock()

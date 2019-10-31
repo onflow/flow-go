@@ -86,7 +86,6 @@ func (n *mockPropagationNode) terminate() {
 	// 	n.vol.Close()
 	// }
 	n.vol = nil
-	n.net.Unregister(propagation.CirculatorEngine, n.engine)
 }
 
 func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
