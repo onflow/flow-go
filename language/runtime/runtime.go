@@ -33,8 +33,6 @@ func (l StringLocation) ID() ast.LocationID {
 
 type AddressLocation ast.AddressLocation
 
-func (AddressLocation) isLocation() {}
-
 func (l AddressLocation) ID() ast.LocationID {
 	return ast.LocationID(l.String())
 }
@@ -45,8 +43,6 @@ func (l AddressLocation) String() string {
 
 type TransactionLocation []byte
 
-func (TransactionLocation) isLocation() {}
-
 func (l TransactionLocation) ID() ast.LocationID {
 	return ast.LocationID(l.String())
 }
@@ -56,8 +52,6 @@ func (l TransactionLocation) String() string {
 }
 
 type ScriptLocation []byte
-
-func (ScriptLocation) isLocation() {}
 
 func (l ScriptLocation) ID() ast.LocationID {
 	return ast.LocationID(l.String())
