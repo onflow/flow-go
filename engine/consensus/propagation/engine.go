@@ -20,11 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 )
 
-const (
-	// CirculatorEngine is The engine code for CirculatorEngine
-	CirculatorEngine = 10
-)
-
 // Engine implements the circulation engine of the consensus node, responsible
 // for making sure collections are propagated to all consensus nodes within the
 // flow system.

@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
 	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 func TestHash(t *testing.T) {
