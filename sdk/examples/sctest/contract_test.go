@@ -217,7 +217,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Assert that ID/specialness are correct
-	_, err = b.CallScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
+	_, err = b.ExecuteScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
 	assert.Nil(t, err)
 
 	// Mint a second NF
@@ -238,6 +238,6 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Assert that ID/specialness are correct
-	_, err = b.CallScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
+	_, err = b.ExecuteScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
 	assert.Nil(t, err)
 }

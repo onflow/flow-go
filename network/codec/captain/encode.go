@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	capnp "zombiezen.com/go/capnproto2"
 
+	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/consensus"
 	"github.com/dapperlabs/flow-go/model/trickle"
@@ -14,7 +15,7 @@ import (
 
 func encode(vv interface{}) (*capnp.Message, error) {
 
-	// create capnproto message & segment
+	// set capnproto message & segment
 	m, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize message")
@@ -42,7 +43,7 @@ func encode(vv interface{}) (*capnp.Message, error) {
 	case *trickle.Response:
 		err = encodeRootGossip(msg, v)
 
-		// collection - collection forwarding
+	// collection - collection forwarding
 	case *collection.GuaranteedCollection:
 		err = encodeRootGuaranteedCollection(msg, v)
 
@@ -56,6 +57,14 @@ func encode(vv interface{}) (*capnp.Message, error) {
 	case *consensus.MempoolResponse:
 		err = encodeRootMempoolResponse(msg, v)
 
+	// consensus - coldstuff consensus
+	case *coldstuff.BlockProposal:
+		err = encodeRootBlockProposal(msg, v)
+	case *coldstuff.BlockVote:
+		err = encodeRootBlockVote(msg, v)
+	case *coldstuff.BlockCommit:
+		err = encodeRootBlockCommit(msg, v)
+
 	default:
 		err = errors.Errorf("invalid encode type (%T)", vv)
 	}
@@ -64,6 +73,23 @@ func encode(vv interface{}) (*capnp.Message, error) {
 	}
 
 	return m, nil
+}
+
+// core flow entity types
+
+func encodeBlockHeader(header captain.BlockHeader, v *coldstuff.BlockHeader) error {
+	header.SetHeight(v.Height)
+	header.SetNonce(v.Nonce)
+	header.SetTimestamp(uint64(v.Timestamp.UnixNano()))
+	err := header.SetParent(v.Parent)
+	if err != nil {
+		return errors.Wrap(err, "could not set parent")
+	}
+	err = header.SetPayload(v.Payload)
+	if err != nil {
+		return errors.Wrap(err, "could not set payload")
+	}
+	return nil
 }
 
 // network overlay layer messages
@@ -277,6 +303,56 @@ func encodeMempoolResponse(res captain.MempoolResponse, v *consensus.MempoolResp
 		if err != nil {
 			return errors.Wrapf(err, "could not set guaranteed collection (%d)", i)
 		}
+	}
+	return nil
+}
+
+// consensus - coldstuff consensus
+
+func encodeRootBlockProposal(msg captain.Message, v *coldstuff.BlockProposal) error {
+	prop, err := msg.NewBlockProposal()
+	if err != nil {
+		return errors.Wrap(err, "could not create block proposal")
+	}
+	return encodeBlockProposal(prop, v)
+}
+
+func encodeBlockProposal(proto captain.BlockProposal, v *coldstuff.BlockProposal) error {
+	header, err := proto.NewHeader()
+	if err != nil {
+		return errors.Wrap(err, "could not create block header")
+	}
+	return encodeBlockHeader(header, v.Header)
+}
+
+func encodeRootBlockVote(msg captain.Message, v *coldstuff.BlockVote) error {
+	vote, err := msg.NewBlockVote()
+	if err != nil {
+		return errors.Wrap(err, "could not create block vote")
+	}
+	return encodeBlockVote(vote, v)
+}
+
+func encodeBlockVote(vote captain.BlockVote, v *coldstuff.BlockVote) error {
+	err := vote.SetHash(v.Hash)
+	if err != nil {
+		return errors.Wrap(err, "could not set hash")
+	}
+	return nil
+}
+
+func encodeRootBlockCommit(msg captain.Message, v *coldstuff.BlockCommit) error {
+	com, err := msg.NewBlockCommit()
+	if err != nil {
+		return errors.Wrap(err, "could not create block commit")
+	}
+	return encodeBlockCommit(com, v)
+}
+
+func encodeBlockCommit(com captain.BlockCommit, v *coldstuff.BlockCommit) error {
+	err := com.SetHash(v.Hash)
+	if err != nil {
+		return errors.Wrap(err, "could not set hash")
 	}
 	return nil
 }

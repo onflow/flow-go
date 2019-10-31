@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/dapperlabs/flow-go/cli"
+	"github.com/dapperlabs/flow-go/cli/flow"
 )
 
 func main() {
-	cli.Execute()
+	flow.Execute()
 }

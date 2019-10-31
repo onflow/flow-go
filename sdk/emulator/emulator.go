@@ -253,8 +253,8 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 	b.intermediateWorldStates[string(txHash)] = bytes
 }
 
-// CallScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
+// ExecuteScript executes a read-only script against the world state and returns the result.
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
 	registers := b.pendingWorldState.Registers.NewView()
 	value, events, err := b.computer.ExecuteScript(registers, script)
 	if err != nil {
@@ -266,8 +266,8 @@ func (b *EmulatedBlockchain) CallScript(script []byte) (interface{}, error) {
 	return value, nil
 }
 
-// CallScriptAtVersion executes a read-only script against a specified world state and returns the result.
-func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
+// ExecuteScriptAtVersion executes a read-only script against a specified world state and returns the result.
+func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err
@@ -467,7 +467,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
-		if event.ID == constants.EventAccountCreated {
+		if event.Type == constants.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
 
 			account, err := b.GetAccount(accountAddress)

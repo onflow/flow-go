@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/filter"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/trickle"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -107,10 +107,8 @@ func (n *Network) Address() (string, error) {
 	// get a list of other nodes that are not us, and we are not connected to
 	nodeIDs := n.state.Peers().IDs()
 	nodeIDs = append(nodeIDs, n.com.Me().NodeID)
-	nodes, err := n.com.Select(filter.Not(filter.NodeID(nodeIDs...)))
-	if err != nil {
-		return "", errors.Wrap(err, "could not get nodes")
-	}
+	nodes := n.com.Select().
+		Filter(filter.Not(filter.NodeID(nodeIDs...)))
 
 	// if we don't have nodes available, we can't do anything
 	if len(nodes) == 0 {

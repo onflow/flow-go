@@ -121,6 +121,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	// to the type and check the annotation of the field
 
 	compositeType := &CompositeType{
+		Location:   checker.Location,
 		Kind:       declaration.CompositeKind,
 		Identifier: identifier.Identifier,
 	}
@@ -392,11 +393,8 @@ func (checker *Checker) membersAndOrigins(
 
 			checker.report(
 				&InvalidVariableKindError{
-					Kind: field.VariableKind,
-					Range: ast.Range{
-						StartPos: field.Identifier.Pos,
-						EndPos:   field.Identifier.Pos,
-					},
+					Kind:  field.VariableKind,
+					Range: ast.NewRangeFromPositioned(field.Identifier),
 				},
 			)
 		}

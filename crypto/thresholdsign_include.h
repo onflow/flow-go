@@ -1,3 +1,4 @@
+// +build relic
 
 #ifndef _REL_THRESHOLD_INCLUDE_H
 #define _REL_THRESHOLD_INCLUDE_H

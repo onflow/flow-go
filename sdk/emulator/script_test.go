@@ -1,6 +1,7 @@
 package emulator_test
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -11,25 +12,29 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
-func TestCallScript(t *testing.T) {
+func TestExecuteScript(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+	accountAddress := b.RootAccountAddress()
 
 	tx := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.Nil(t, err)
 
-	tx.AddSignature(b.RootAccountAddress(), sig)
+	tx.AddSignature(accountAddress, sig)
+
+	callScript := fmt.Sprintf(sampleCall, accountAddress)
 
 	// Sample call (value is 0)
-	value, err := b.CallScript([]byte(sampleCall))
+	value, err := b.ExecuteScript([]byte(callScript))
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
@@ -38,7 +43,7 @@ func TestCallScript(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.CallScript([]byte(sampleCall))
+	value, err = b.ExecuteScript([]byte(callScript))
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 }

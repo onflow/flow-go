@@ -216,7 +216,7 @@ func TestCreateAccount(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		require.Equal(t, constants.EventAccountCreated, lastEvent.ID)
+		require.Equal(t, constants.EventAccountCreated, lastEvent.Type)
 		require.IsType(t, flow.Address{}, lastEvent.Values["address"])
 
 		accountAddress := lastEvent.Values["address"].(flow.Address)
@@ -244,6 +244,37 @@ func TestCreateAccount(t *testing.T) {
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
 		require.Nil(t, err)
+
+		tx := flow.Transaction{
+			Script:             createAccountScript,
+			ReferenceBlockHash: nil,
+			Nonce:              getNonce(),
+			ComputeLimit:       10,
+			PayerAccount:       b.RootAccountAddress(),
+		}
+
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+
+		newAccount := b.LastCreatedAccount()
+
+		assert.Equal(t, lastAccount, newAccount)
+	})
+
+	t.Run("InvalidCode", func(t *testing.T) {
+		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+		lastAccount := b.LastCreatedAccount()
+
+		code := []byte("not a valid script")
+
+		createAccountScript, err := templates.CreateAccount(nil, code)
+		assert.Nil(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -445,6 +476,9 @@ func TestRemoveAccountKey(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
+	codeA := []byte("fun a(): Int { return 1 }")
+	codeB := []byte("fun b(): Int { return 2 }")
+
 	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
 	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
@@ -454,16 +488,16 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-
 		assert.Nil(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, account.Code)
+
+		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
-			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
+			Script:             templates.UpdateAccountCode(codeB),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
@@ -484,9 +518,9 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.Nil(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
-
 		assert.Nil(t, err)
-		assert.Equal(t, []byte{7, 8, 9}, account.Code)
+
+		assert.Equal(t, codeB, account.Code)
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
@@ -495,16 +529,16 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, account.Code)
+		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
-			Script:             templates.UpdateAccountCode([]byte{7, 8, 9}),
+			Script:             templates.UpdateAccountCode(codeB),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
@@ -518,13 +552,13 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx.AddSignature(accountAddressA, sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.NotNil(t, err)
+		assert.IsType(t, &emulator.ErrMissingSignature{}, err)
 
 		account, err = b.GetAccount(accountAddressB)
+		assert.Nil(t, err)
 
 		// code should not be updated
-		assert.Nil(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, account.Code)
+		assert.Equal(t, codeA, account.Code)
 	})
 
 	t.Run("UnauthorizedAccount", func(t *testing.T) {
@@ -533,18 +567,17 @@ func TestUpdateAccountCode(t *testing.T) {
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
-		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, []byte{4, 5, 6}, getNonce())
+		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
 		assert.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
 
 		assert.Nil(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, account.Code)
+		assert.Equal(t, codeA, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
 			fun main(account: Account) {
-				let code = [7, 8, 9]
-				updateAccountCode(%s, code)
+				updateAccountCode(%s, nil)
 			}
 		`, accountAddressB.Hex()))
 
@@ -563,13 +596,13 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx.AddSignature(accountAddressA, sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.NotNil(t, err)
+		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 
 		account, err = b.GetAccount(accountAddressB)
 
 		// code should not be updated
 		assert.Nil(t, err)
-		assert.Equal(t, []byte{4, 5, 6}, account.Code)
+		assert.Equal(t, codeA, account.Code)
 	})
 }
 

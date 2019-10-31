@@ -8,7 +8,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 )
 
 var (
@@ -48,6 +49,11 @@ func EntryToID(entry string) (string, error) {
 // New generates a new committee of node identities.
 func New(entries []string, identity string) (*Committee, error) {
 
+	// error if no entries are given
+	if len(entries) == 0 {
+		return nil, errors.New("no identity entries given")
+	}
+
 	// create committee with identity table
 	c := &Committee{
 		identities: make(map[string]flow.Identity),
@@ -81,6 +87,7 @@ func New(entries []string, identity string) (*Committee, error) {
 	if !ok {
 		return nil, errors.Errorf("entry for own identity missing (%s)", identity)
 	}
+
 	c.me = me
 
 	return c, nil
@@ -100,17 +107,37 @@ func (c *Committee) Get(id string) (flow.Identity, error) {
 	return node, nil
 }
 
-// Select will returns the identities fulfilling the given filters.
-func (c *Committee) Select(filters ...module.IdentityFilter) (flow.IdentityList, error) {
+// Select returns the identities fulfilling the given filters.
+func (c *Committee) Select() flow.IdentityList {
 	var identities flow.IdentityList
-Outer:
-	for _, node := range c.identities {
-		for _, filter := range filters {
-			if !filter(node) {
-				continue Outer
-			}
-		}
-		identities = append(identities, node)
+	for _, identity := range c.identities {
+
+		identities = append(identities, identity)
 	}
-	return identities, nil
+	return identities
+}
+
+// Leader returns the deterministically chosen leader at the given height.
+func (c *Committee) Leader(height uint64) flow.Identity {
+
+	// select all consensus nodes and sort deterministically
+	identities := c.Select().Filter(filter.Role("consensus")).Sort(order.ByID)
+
+	// for now, we select the identity by mod
+	index := height % uint64(len(identities))
+	leader := identities[index]
+
+	return leader
+}
+
+// Quorum returns the number of nodes that need to approve a block.
+func (c *Committee) Quorum() uint {
+
+	// select all consensus nodes and sort deterministically
+	identities := c.Select().Filter(filter.Role("consensus")).Sort(order.ByID)
+
+	// currently, quorum is simply everyone but us, for complete consensus
+	quorum := uint(len(identities) - 1)
+
+	return quorum
 }

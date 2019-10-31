@@ -5,28 +5,36 @@ import (
 )
 
 func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
-	typ := checker.checkInvocationExpression(statement.InvocationExpression)
+	invocation := statement.InvocationExpression
 
-	if typ.IsInvalidType() {
+	ty := checker.checkInvocationExpression(invocation)
+
+	if ty.IsInvalidType() {
 		return nil
 	}
 
-	// check that emitted expression is an event
-	eventType, isEventType := typ.(*EventType)
+	// Check that emitted expression is an event
+
+	eventType, isEventType := ty.(*EventType)
 	if !isEventType {
-		checker.report(&EmitNonEventError{
-			Type:  typ,
-			Range: ast.NewRangeFromPositioned(statement),
-		})
+		checker.report(
+			&EmitNonEventError{
+				Type:  ty,
+				Range: ast.NewRangeFromPositioned(statement.InvocationExpression),
+			},
+		)
 		return nil
 	}
 
-	// check that the event isn't imported
+	// Check that the emitted event is declared in the same location
+
 	if eventType.Location.ID() != checker.Location.ID() {
-		checker.report(&EmitImportedEventError{
-			Type:  typ,
-			Range: ast.NewRangeFromPositioned(eventType),
-		})
+		checker.report(
+			&EmitImportedEventError{
+				Type:  ty,
+				Range: ast.NewRangeFromPositioned(statement.InvocationExpression),
+			},
+		)
 	}
 
 	return nil

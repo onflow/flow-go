@@ -25,3 +25,8 @@ func New() (*Volatile, error) {
 	}
 	return v, nil
 }
+
+// Close closes the cache.
+func (v *Volatile) Close() {
+	v.cache.Close()
+}

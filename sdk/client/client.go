@@ -7,8 +7,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 )
 
@@ -78,9 +78,9 @@ func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block
 	return &blockHeader, nil
 }
 
-// CallScript executes a script against the current world state.
-func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, error) {
-	res, err := c.rpcClient.CallScript(ctx, &observation.CallScriptRequest{Script: script})
+// ExecuteScript executes a script against the latest sealed world state.
+func (c *Client) ExecuteScript(ctx context.Context, script []byte) (interface{}, error) {
+	res, err := c.rpcClient.ExecuteScript(ctx, &observation.ExecuteScriptRequest{Script: script})
 	if err != nil {
 		return nil, err
 	}
@@ -131,18 +131,31 @@ func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*flow.Ac
 	return &account, nil
 }
 
+// EventQuery defines a query for Flow events.
+type EventQuery struct {
+	// The event type to search for. If empty, no filtering by type is done.
+	Type string
+	// The block to begin looking for events
+	StartBlock uint64
+	// The block to end looking for events (inclusive)
+	EndBlock uint64
+}
+
 // GetEvents queries the Observation API for events and returns the results.
-func (c *Client) GetEvents(ctx context.Context, query *flow.EventQuery) ([]*flow.Event, error) {
-	res, err := c.rpcClient.GetEvents(
-		ctx,
-		convert.EventQueryToMessage(query),
-	)
+func (c *Client) GetEvents(ctx context.Context, query EventQuery) ([]flow.Event, error) {
+	req := &observation.GetEventsRequest{
+		Type:       query.Type,
+		StartBlock: query.StartBlock,
+		EndBlock:   query.EndBlock,
+	}
+
+	res, err := c.rpcClient.GetEvents(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	// Events are sent over the wire JSON-encoded.
-	var events []*flow.Event
+	var events []flow.Event
 	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
 		return nil, err
 	}

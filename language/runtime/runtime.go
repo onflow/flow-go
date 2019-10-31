@@ -18,21 +18,13 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type ImportLocation interface {
-	isImportLocation()
+func init() {
+	gob.Register(flow.Address{})
 }
-
-type StringImportLocation ast.StringLocation
-
-func (StringImportLocation) isImportLocation() {}
-
-type AddressImportLocation ast.AddressLocation
-
-func (AddressImportLocation) isImportLocation() {}
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
-	ResolveImport(ImportLocation) ([]byte, error)
+	ResolveImport(Location) ([]byte, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
 	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
@@ -70,14 +62,15 @@ func (e Error) Error() string {
 // Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
-	// It returns errors if the program has errors (e.g syntax errors, type errors),
-	// and if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error)
+	//
+	// This function returns an error if the program has errors (e.g syntax errors, type errors),
+	// or if the execution fails.
+	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error)
 
-	// ExecuteTransaction executes the given transaction.
-	// It returns errors if the program has errors (e.g syntax errors, type errors),
-	// and if the execution fails.
-	ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error
+	// ParseAndCheckProgram parses and checks the given code without executing the program.
+	//
+	// This function returns an error if the program contains any syntax or semantic errors.
+	ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error
 }
 
 // mockRuntime is a mocked version of the Flow runtime
@@ -88,11 +81,11 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
 	return nil, nil
 }
 
-func (r *mockRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
+func (r *mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error {
 	return nil
 }
 
@@ -348,7 +341,7 @@ var accountCodeUpdatedEventType = sema.EventType{
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-func (r *interpreterRuntime) parse(script []byte, runtimeInterface Interface) (program *ast.Program, err error) {
+func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err error) {
 	program, _, err = parser.ParseProgram(string(script))
 	return
 }
@@ -357,12 +350,12 @@ type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e er
 
 func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
 	return func(astLocation ast.Location) (program *ast.Program, e error) {
-		var location ImportLocation
+		var location Location
 		switch astLocation := astLocation.(type) {
 		case ast.StringLocation:
-			location = StringImportLocation(astLocation)
+			location = StringLocation(astLocation)
 		case ast.AddressLocation:
-			location = AddressImportLocation(astLocation)
+			location = AddressLocation(astLocation)
 		default:
 			panic(&runtimeErrors.UnreachableError{})
 		}
@@ -370,7 +363,7 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		if err != nil {
 			return nil, err
 		}
-		return r.parse(script, runtimeInterface)
+		return r.parse(script)
 	}
 }
 
@@ -383,21 +376,21 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 		values[field.Identifier] = value.ToGoValue()
 	}
 
-	var eventID string
+	var eventTypeID string
 
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
-		eventID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
-	case ast.TransactionLocation:
-		eventID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
-	case ast.ScriptLocation:
-		eventID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
+		eventTypeID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
+	case TransactionLocation:
+		eventTypeID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
+	case ScriptLocation:
+		eventTypeID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: values,
 	}
 
@@ -409,7 +402,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	values ...interface{},
 ) {
-	eventID := fmt.Sprintf("flow.%s", eventType.Identifier)
+	eventTypeID := fmt.Sprintf("flow.%s", eventType.Identifier)
 
 	valueMap := make(map[string]interface{})
 
@@ -419,28 +412,31 @@ func (r *interpreterRuntime) emitAccountEvent(
 	}
 
 	event := flow.Event{
-		ID:     eventID,
+		Type:   eventTypeID,
 		Values: valueMap,
 	}
 
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) ExecuteTransaction(script []byte, runtimeInterface Interface, txID []byte) error {
-	_, err := r.executeScript(script, runtimeInterface, ast.TransactionLocation(txID))
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
+	return r.executeScript(script, runtimeInterface, location)
+}
+
+func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	return err
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, scriptID []byte) (interface{}, error) {
-	return r.executeScript(script, runtimeInterface, ast.ScriptLocation(scriptID))
-}
-
-func (r *interpreterRuntime) executeScript(
+func (r *interpreterRuntime) parseAndCheckProgram(
 	script []byte,
 	runtimeInterface Interface,
-	location ast.Location,
-) (interface{}, error) {
-	program, err := r.parse(script, runtimeInterface)
+	location Location,
+	functions stdlib.StandardLibraryFunctions,
+) (*sema.Checker, error) {
+	program, err := r.parse(script)
 	if err != nil {
 		return nil, err
 	}
@@ -451,17 +447,35 @@ func (r *interpreterRuntime) executeScript(
 		return nil, err
 	}
 
-	functions := r.standardLibraryFunctions(runtimeInterface)
-
 	valueDeclarations := functions.ToValueDeclarations()
 
-	checker, err := sema.NewChecker(program, valueDeclarations, typeDeclarations, location)
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
 
 	if err := checker.Check(); err != nil {
 		return nil, Error{[]error{err}}
+	}
+
+	return checker, nil
+}
+
+func (r *interpreterRuntime) executeScript(
+	script []byte,
+	runtimeInterface Interface,
+	location Location,
+) (interface{}, error) {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	if err != nil {
+		return nil, err
 	}
 
 	main, ok := checker.GlobalValues["main"]
@@ -506,52 +520,32 @@ func (r *interpreterRuntime) executeScript(
 		}
 	}
 
-	inter, err := interpreter.NewInterpreter(checker, functions.ToValues())
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(functions.ToValues()),
+		interpreter.WithOnEventEmittedHandler(func(eventValue interpreter.EventValue) {
+			r.emitEvent(eventValue, runtimeInterface)
+		}),
+		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
+		interpreter.WithStorageWriteHandler(r.storageWriteHandler(runtimeInterface)),
+	)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
-
-	inter.SetOnEventEmitted(func(eventValue interpreter.EventValue) {
-		r.emitEvent(eventValue, runtimeInterface)
-	})
 
 	if err := inter.Interpret(); err != nil {
 		return nil, Error{[]error{err}}
 	}
 
 	signingAccounts := make([]interface{}, signingAccountsCount)
-	storedValues := make([]map[string]interpreter.Value, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccount, storedValue, err := loadAccount(runtimeInterface, address)
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
-
-		signingAccounts[i] = signingAccount
-		storedValues[i] = storedValue
+		signingAccounts[i] = accountValue(address)
 	}
 
 	value, err := inter.InvokeExportable("main", signingAccounts...)
 	if err != nil {
 		return nil, Error{[]error{err}}
-	}
-
-	for i, storedValue := range storedValues {
-		address := signingAccountAddresses[i]
-
-		var newStoredData bytes.Buffer
-		encoder := gob.NewEncoder(&newStoredData)
-		err = encoder.Encode(&storedValue)
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
-
-		// TODO: fix controller and key
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, []byte("storage"), newStoredData.Bytes())
-		if err != nil {
-			return nil, Error{[]error{err}}
-		}
 	}
 
 	return value.ToGoValue(), nil
@@ -560,18 +554,6 @@ func (r *interpreterRuntime) executeScript(
 func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.BuiltinFunctions,
-		stdlib.NewStandardLibraryFunction(
-			"getValue",
-			&getValueFunctionType,
-			r.newGetValueFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"setValue",
-			&setValueFunctionType,
-			r.newSetValueFunction(runtimeInterface),
-			nil,
-		),
 		stdlib.NewStandardLibraryFunction(
 			"createAccount",
 			&createAccountFunctionType,
@@ -611,96 +593,71 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 	)
 }
 
-func loadAccount(runtimeInterface Interface, address flow.Address) (
-	interface{},
-	map[string]interpreter.Value,
-	error,
-) {
-	// TODO: fix controller and key
-	storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte("storage"))
-	if err != nil {
-		return nil, nil, Error{[]error{err}}
-	}
-
-	storedValue := map[string]interpreter.Value{}
-	if len(storedData) > 0 {
-		decoder := gob.NewDecoder(bytes.NewReader(storedData))
-		err = decoder.Decode(&storedValue)
-		if err != nil {
-			return nil, nil, Error{[]error{err}}
-		}
-	}
-
-	account := interpreter.CompositeValue{
+func accountValue(address flow.Address) interpreter.Value {
+	return interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(address.String()),
-			"storage": storageValue(storedValue),
-		},
-	}
-
-	return account, storedValue, nil
-}
-
-func storageValue(storedValues map[string]interpreter.Value) interpreter.StorageValue {
-	return interpreter.StorageValue{
-		Getter: func(keyType sema.Type) interpreter.OptionalValue {
-			key := keyType.String()
-
-			value, ok := storedValues[key]
-			if !ok {
-				return interpreter.NilValue{}
-			}
-			return interpreter.SomeValue{Value: value}
-		},
-		Setter: func(keyType sema.Type, value interpreter.OptionalValue) {
-			key := keyType.String()
-			switch typedValue := value.(type) {
-			case interpreter.SomeValue:
-				storedValues[key] = typedValue.Value
-				return
-			case interpreter.NilValue:
-				delete(storedValues, key)
-				return
-			default:
-				panic(&runtimeErrors.UnreachableError{})
-			}
+			"storage": interpreter.StorageValue{Identifier: address},
 		},
 	}
 }
 
-func (r *interpreterRuntime) newSetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		owner, controller, key := r.getOwnerControllerKey(arguments)
+func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
+	return func(storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
+		address := storageIdentifier.(flow.Address)
+		key := []byte(keyType.String())
 
-		// TODO: only integer values supported for now. written in internal byte representation
-		intValue, ok := arguments[3].(interpreter.IntValue)
-		if !ok {
-			panic(fmt.Sprintf("setValue requires fourth parameter to be an Int"))
-		}
-		value := intValue.Int.Bytes()
-
-		if err := runtimeInterface.SetValue(owner, controller, key, value); err != nil {
-			panic(err)
-		}
-
-		result := &interpreter.VoidValue{}
-		return trampoline.Done{Result: result}
-	}
-}
-
-func (r *interpreterRuntime) newGetValueFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-
-		owner, controller, key := r.getOwnerControllerKey(arguments)
-
-		value, err := runtimeInterface.GetValue(owner, controller, key)
+		// TODO: fix controller
+		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, key)
 		if err != nil {
 			panic(err)
 		}
 
-		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(value)}
-		return trampoline.Done{Result: result}
+		var storedValue interpreter.Value
+		if len(storedData) == 0 {
+			return interpreter.NilValue{}
+		}
+
+		decoder := gob.NewDecoder(bytes.NewReader(storedData))
+		err = decoder.Decode(&storedValue)
+		if err != nil {
+			panic(err)
+		}
+
+		return interpreter.SomeValue{
+			Value: storedValue,
+		}
+	}
+}
+
+func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
+	return func(storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+		address := storageIdentifier.(flow.Address)
+		key := []byte(keyType.String())
+
+		var newData []byte
+		switch typedValue := value.(type) {
+		case interpreter.SomeValue:
+			var newStoredData bytes.Buffer
+			encoder := gob.NewEncoder(&newStoredData)
+			err := encoder.Encode(&typedValue.Value)
+			if err != nil {
+				panic(err)
+			}
+			newData = newStoredData.Bytes()
+			break
+		case interpreter.NilValue:
+			break
+		default:
+			panic(&runtimeErrors.UnreachableError{})
+		}
+
+		// TODO: fix controller
+		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, key, newData)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -844,11 +801,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 		}
 
 		address := flow.HexToAddress(stringValue.StrValue())
-
-		account, _, err := loadAccount(runtimeInterface, address)
-		if err != nil {
-			panic(err)
-		}
+		account := accountValue(address)
 
 		return trampoline.Done{Result: account}
 	}

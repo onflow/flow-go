@@ -192,8 +192,13 @@ func TestCheckImportTypes(t *testing.T) {
 			// TODO: add support for non-structure / non-resource declarations
 
 			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
+			case common.CompositeKindStructure:
 				assert.Nil(t, err)
+
+			case common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 3)

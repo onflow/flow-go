@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
@@ -892,6 +893,34 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidConstructionError{}, errs[0])
+}
+
+func TestCheckInvalidCreateImportedResource(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+      resource R {}
+	`)
+
+	require.Nil(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		`
+          import R from "imported"
+
+          fun test() {
+              destroy create R()
+          }
+        `,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return checker.Program, nil
+			},
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 }
 
 func TestCheckInvalidResourceLoss(t *testing.T) {
@@ -2527,4 +2556,135 @@ func TestCheckResourceDictionaryLength(t *testing.T) {
     `)
 
 	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- {"x": <-create X()}
+          foo(x: <-xs["x"])
+      }
+
+      fun foo(x: <-X?) {
+          destroy x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+}
+
+func TestCheckInvalidResourceSwap(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+         var x <- create X()
+         x <-> create X()
+         destroy x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSwapExpressionError{}, errs[0])
+}
+
+func TestCheckInvalidResourceConstantResourceFieldSwap(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {}
+
+      resource Bar {
+          let foo: <-Foo
+
+          init(foo: <-Foo) {
+              self.foo <- foo
+          }
+
+          destroy() {
+              destroy self.foo
+          }
+      }
+
+      fun test() {
+          let foo <- create Foo()
+          let bar <- create Bar(foo: <-foo)
+          var foo2 <- create Foo()
+          bar.foo <-> foo2
+          destroy bar
+          destroy foo2
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+}
+
+func TestCheckResourceVariableResourceFieldSwap(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Foo {}
+
+      resource Bar {
+          var foo: <-Foo
+
+          init(foo: <-Foo) {
+              self.foo <- foo
+          }
+
+          destroy() {
+              destroy self.foo
+          }
+      }
+
+      fun test() {
+          let foo <- create Foo()
+          let bar <- create Bar(foo: <-foo)
+          var foo2 <- create Foo()
+          bar.foo <-> foo2
+          destroy bar
+          destroy foo2
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Foo {}
+
+     resource Bar {
+         var foo: <-Foo
+
+         init(foo: <-Foo) {
+             self.foo <- foo
+         }
+
+         destroy() {
+             destroy self.foo
+         }
+     }
+
+     fun test() {
+         let foo <- create Foo()
+         let bar <- create Bar(foo: <-foo)
+         destroy bar.foo
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	// TODO: maybe have dedicated error
+
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
