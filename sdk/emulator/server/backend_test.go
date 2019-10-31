@@ -64,6 +64,7 @@ func TestGetEvents(t *testing.T) {
 		})
 		assert.Error(t, err)
 	})
+
 	t.Run("should return empty list when there are no results", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 2,
@@ -75,6 +76,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Len(t, events, 0)
 	})
+
 	t.Run("should filter by ID", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			Type:       transferType,
@@ -89,6 +91,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Equal(t, resEvents[0].Type, transferType)
 		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
 	})
+
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 1,
@@ -101,6 +104,7 @@ func TestGetEvents(t *testing.T) {
 		// Should get both events
 		assert.Len(t, resEvents, 2)
 	})
+
 	t.Run("should preserve event ordering", func(t *testing.T) {
 		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
 			StartBlock: 1,

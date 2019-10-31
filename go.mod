@@ -18,8 +18,8 @@ require (
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
-	github.com/onsi/ginkgo v1.8.0 // indirect
-	github.com/onsi/gomega v1.5.0
+	github.com/onsi/ginkgo v1.10.1 // indirect
+	github.com/onsi/gomega v1.7.0
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
@@ -36,10 +36,11 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tinylib/msgp v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
-	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
+	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
+	golang.org/x/sys v0.0.0-20190912141932-bc967efca4b8 // indirect
 	golang.org/x/text v0.3.2
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
-	google.golang.org/grpc v1.21.1
+	google.golang.org/grpc v1.23.1
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )
 
