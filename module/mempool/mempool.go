@@ -99,3 +99,10 @@ func (m *Mempool) All() []*collection.GuaranteedCollection {
 	}
 	return collections
 }
+
+// Drop will drop all collections from the memory pool.
+func (m *Mempool) Drop() {
+	m.Lock()
+	defer m.Unlock()
+	m.collections = make(map[string]*collection.GuaranteedCollection)
+}

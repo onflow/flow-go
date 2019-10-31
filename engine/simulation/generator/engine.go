@@ -22,11 +22,11 @@ type Engine struct {
 }
 
 // New creates a new generator engine.
-func New(log zerolog.Logger, tar Target, interval time.Duration) (*Engine, error) {
+func New(log zerolog.Logger, tar Target) (*Engine, error) {
 	e := &Engine{
 		log:      log,
 		tar:      tar,
-		interval: interval,
+		interval: time.Second,
 		wg:       &sync.WaitGroup{},
 		stop:     make(chan struct{}),
 	}

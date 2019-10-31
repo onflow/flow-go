@@ -12,10 +12,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/mempool"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
-	"github.com/dapperlabs/flow-go/engine/fake/generator"
+	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
+	"github.com/dapperlabs/flow-go/engine/simulation/generator"
 	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network/codec/captain"
 	"github.com/dapperlabs/flow-go/network/trickle"
 	"github.com/dapperlabs/flow-go/network/trickle/cache"
@@ -49,13 +50,9 @@ func main() {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
-	// initialize the logger
 	log := zerolog.New(os.Stderr).With().Str("identity", identity).Logger()
 
 	log.Info().Msg("flow consensus node starting up")
-
-	// initialize the network codec
-	codec := captain.NewCodec()
 
 	log.Info().Msg("initializing engine modules")
 
@@ -65,13 +62,11 @@ func main() {
 		log.Fatal().Err(err).Msg("could not initialize flow committee")
 	}
 
-	// initialize the collection memory pool
 	pool, err := mempool.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize engine mempool")
 	}
 
-	// initialize the engine cache
 	vol, err := volatile.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize engine volatile")
@@ -79,19 +74,18 @@ func main() {
 
 	log.Info().Msg("initializing network modules")
 
-	// initialize trickle state
+	codec := captain.NewCodec()
+
 	state, err := state.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle state")
 	}
 
-	// initialize trickle cache
 	cache, err := cache.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle cache")
 	}
 
-	// initialize trickle middleware
 	mw, err := middleware.New(log, codec, connections, com.Me().Address)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle middleware")
@@ -99,7 +93,6 @@ func main() {
 
 	log.Info().Msg("initializing trickle network")
 
-	// initialize trickle network
 	net, err := trickle.NewNetwork(log, codec, com, mw, state, cache)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle network")
@@ -107,7 +100,6 @@ func main() {
 
 	log.Info().Msg("starting trickle network")
 
-	// wait to be connected to a few nodes
 	select {
 	case <-net.Ready():
 		log.Info().Msg("trickle network ready")
@@ -128,7 +120,6 @@ func main() {
 
 	log.Info().Msg("starting propagation engine")
 
-	// wait for propagation engine start
 	select {
 	case <-prop.Ready():
 		log.Info().Msg("propagation engine ready")
@@ -139,15 +130,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info().Msg("initializing fake generator engine")
+	log.Info().Msg("initializing generator engine")
 
 	// initialize the fake collection generation
-	gen, err := generator.New(log, prop, 20*time.Second)
+	gen, err := generator.New(log, prop)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize generator engine")
 	}
 
-	// wait for generator engine start
+	log.Info().Msg("starting generator engine")
+
 	select {
 	case <-gen.Ready():
 		log.Info().Msg("generator engine ready")
@@ -155,6 +147,22 @@ func main() {
 		log.Fatal().Msg("could not start generator engine")
 	case <-sig:
 		log.Warn().Msg("generator engine start aborted")
+	}
+
+	cons, err := coldstuff.New(log, net, com, pool)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize coldstuff engine")
+	}
+
+	log.Info().Msg("starting coldstuff engine")
+
+	select {
+	case <-cons.Ready():
+		log.Info().Msg("coldstuff engine ready")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not start coldstuff engine")
+	case <-sig:
+		log.Warn().Msg("coldstuff engine start aborted")
 		os.Exit(1)
 	}
 
@@ -173,6 +181,17 @@ func main() {
 		log.Fatal().Msg("could not stop generator engine")
 	case <-sig:
 		log.Warn().Msg("generator engine stop aborted")
+	}
+
+	log.Info().Msg("stopping coldstuff engine")
+
+	select {
+	case <-cons.Done():
+		log.Info().Msg("coldstuff engine shutdown complete")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not stop coldstuff engine")
+	case <-sig:
+		log.Warn().Msg("coldstuff engine stop aborted")
 		os.Exit(1)
 	}
 
