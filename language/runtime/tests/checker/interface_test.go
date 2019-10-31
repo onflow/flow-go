@@ -1121,3 +1121,56 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckInterfaceSelfUse(t *testing.T) {
+
+	declarationKinds := []common.DeclarationKind{
+		common.DeclarationKindInitializer,
+		common.DeclarationKindFunction,
+	}
+
+	for _, compositeKind := range common.CompositeKinds {
+		for _, declarationKind := range declarationKinds {
+
+			testName := fmt.Sprintf("%s %s", compositeKind, declarationKind)
+
+			innerDeclaration := ""
+			switch declarationKind {
+			case common.DeclarationKindInitializer:
+				innerDeclaration = declarationKind.Keywords()
+			case common.DeclarationKindFunction:
+				innerDeclaration = fmt.Sprintf("%s test", declarationKind.Keywords())
+			}
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s interface Bar {
+                          balance: Int
+
+                          %[2]s(balance: Int) {
+                              post {
+                                  self.balance == balance
+                              }
+                          }
+                      }
+                    `,
+					compositeKind.Keyword(),
+					innerDeclaration,
+				))
+
+				// TODO: add support for non-structure / non-resource declarations
+
+				switch compositeKind {
+				case common.CompositeKindResource, common.CompositeKindStructure:
+					assert.Nil(t, err)
+
+				default:
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				}
+			})
+		}
+	}
+}

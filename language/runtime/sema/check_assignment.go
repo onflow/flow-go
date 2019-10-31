@@ -3,6 +3,7 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
@@ -25,9 +26,9 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		// The check for a repeated assignment of a constant field after initialization
 		// is not part of this logic here, see `visitMemberExpressionAssignment`
 
-		selfFieldMember := checker.selfFieldAccessMember(assignment.Target)
+		accessedSelfMember := checker.accessedSelfMember(assignment.Target)
 
-		if selfFieldMember != nil &&
+		if accessedSelfMember != nil &&
 			checker.functionActivations.Current().InitializationInfo != nil {
 
 			checker.recordResourceInvalidation(
@@ -47,7 +48,7 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 	return nil
 }
 
-func (checker *Checker) selfFieldAccessMember(expression ast.Expression) *Member {
+func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
 	memberExpression, isMemberExpression := expression.(*ast.MemberExpression)
 	if !isMemberExpression {
 		return nil
@@ -65,8 +66,19 @@ func (checker *Checker) selfFieldAccessMember(expression ast.Expression) *Member
 		return nil
 	}
 
+	var members map[string]*Member
+	switch containerType := variable.Type.(type) {
+	case *CompositeType:
+		members = containerType.Members
+	case *InterfaceType:
+		members = containerType.Members
+	default:
+		panic(&errors.UnreachableError{})
+	}
+
 	fieldName := memberExpression.Identifier.Identifier
-	return variable.Type.(*CompositeType).Members[fieldName]
+
+	return members[fieldName]
 }
 
 func (checker *Checker) visitAssignmentValueType(
@@ -195,8 +207,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	// If this is an assignment to a `self` field, it needs special handling
 	// depending on if the assignment is in an initializer or not
 
-	selfFieldMember := checker.selfFieldAccessMember(target)
-	if selfFieldMember != nil {
+	accessedSelfMember := checker.accessedSelfMember(target)
+	if accessedSelfMember != nil {
 
 		functionActivation := checker.functionActivations.Current()
 
@@ -215,8 +227,8 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 				initializedFieldMembers := functionActivation.InitializationInfo.InitializedFieldMembers
 
-				if selfFieldMember.VariableKind == ast.VariableKindConstant &&
-					initializedFieldMembers.Contains(selfFieldMember) {
+				if accessedSelfMember.VariableKind == ast.VariableKindConstant &&
+					initializedFieldMembers.Contains(accessedSelfMember) {
 
 					// TODO: dedicated error: assignment to constant after initialization
 
@@ -224,11 +236,11 @@ func (checker *Checker) visitMemberExpressionAssignment(
 				} else {
 					// This is the initial assignment to the field, record it
 
-					initializedFieldMembers.Add(selfFieldMember)
+					initializedFieldMembers.Add(accessedSelfMember)
 				}
 			}
 
-		} else if selfFieldMember.VariableKind == ast.VariableKindConstant {
+		} else if accessedSelfMember.VariableKind == ast.VariableKindConstant {
 
 			// If this is an assignment outside the initializer,
 			// an assignment to a constant field is invalid

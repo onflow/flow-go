@@ -66,8 +66,8 @@ func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, po
 		// Otherwise, the member access is to a non-field, e.g. a function,
 		// in which case *all* fields must have been initialized
 
-		selfFieldMember := checker.selfFieldAccessMember(checker.currentMemberExpression)
-		field := initializationInfo.FieldMembers[selfFieldMember]
+		accessedSelfMember := checker.accessedSelfMember(checker.currentMemberExpression)
+		field := initializationInfo.FieldMembers[accessedSelfMember]
 
 		if field == nil {
 			checkInitializationComplete()
