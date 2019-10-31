@@ -518,7 +518,7 @@ func (r *interpreterRuntime) executeScript(
 	inter, err := interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(eventValue interpreter.EventValue) {
+		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
 			r.emitEvent(eventValue, runtimeInterface)
 		}),
 		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
@@ -599,7 +599,7 @@ func accountValue(address flow.Address) interpreter.Value {
 }
 
 func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
-	return func(storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
+	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
 		address := storageIdentifier.(flow.Address)
 		key := []byte(keyType.String())
 
@@ -627,7 +627,7 @@ func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) inte
 }
 
 func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
-	return func(storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
 		address := storageIdentifier.(flow.Address)
 		key := []byte(keyType.String())
 
