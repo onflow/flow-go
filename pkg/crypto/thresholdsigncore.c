@@ -55,8 +55,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t*
         bn_mod_barrt(&acc, &acc, &r, &u);
     }
     if (sign) bn_copy(res, &acc);
-    else { printf("euh\n");
-        bn_sub(res, &r, &acc); }
+    else bn_sub(res, &r, &acc);
 
     // free the temp memory
     bn_free(&r);bn_free(&r_1);

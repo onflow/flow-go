@@ -105,6 +105,7 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 		return out
 	}
 
+	// msg = |tag| Data |
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
 		out.result, out.err = s.receiveShare(index(orig), msg[1:])

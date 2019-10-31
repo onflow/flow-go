@@ -11,7 +11,7 @@ type feldmanVSSQualState struct {
 	// a complaint will be created if a complaint message or an answer was
 	// broadcasted, a complaint will only be checked only when both the
 	// complaint message and the answer were broadcasted
-	complaints map[index]*complaint // TODO: change into a map
+	complaints map[index]*complaint
 	// is the leader disqualified
 	disqualified bool
 }
@@ -22,6 +22,11 @@ type complaint struct {
 	answerReceived bool
 	answer         scalar
 	validComplaint bool
+}
+
+func (s *feldmanVSSQualState) init() {
+	s.feldmanVSSstate.init()
+	s.complaints = make(map[index]*complaint)
 }
 
 func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
@@ -75,6 +80,13 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 
 	if !s.running || orig >= s.Size() || len(msg) == 0 {
 		out.result = invalid
+		return out
+	}
+
+	// In case a broadcasted message is received by the origin node,
+	// the message is just ignored
+	if s.currentIndex == index(orig) {
+		out.result = valid
 		return out
 	}
 

@@ -65,14 +65,21 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 }
 
 func (s *feldmanVSSstate) receiveShare(origin index, data []byte) (DKGresult, error) {
-	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
-	log.Debugf("the share is %d\n", data)
+	// only accept private shares from the leader.
+	if origin != s.leaderIndex {
+		return invalid, nil
+	}
+
 	if s.xReceived {
 		return invalid, nil
 	}
 	if (len(data)) != PrKeyLengthBLS_BLS12381 {
 		return invalid, nil
 	}
+	// temporary log
+	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
+	log.Debugf("the share is %d\n", data)
+
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
@@ -87,14 +94,20 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) (DKGresult, er
 }
 
 func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) (DKGresult, error) {
-	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
-	log.Debugf("the vector is %d\n", data)
+	// only accept the verification vector from the leader.
+	if origin != s.leaderIndex {
+		return invalid, nil
+	}
 	if s.AReceived {
 		return invalid, nil
 	}
 	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
 		return invalid, nil
 	}
+
+	// temporary log
+	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
+	log.Debugf("the vector is %d\n", data)
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
 	readVerifVector(s.A, data)

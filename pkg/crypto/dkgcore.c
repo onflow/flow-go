@@ -8,7 +8,7 @@
 
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
 // r being the order of G1
-// writes P(x) in out and P(x).g2 in y
+// writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
 void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const byte x){
     bn_st r;
@@ -46,7 +46,7 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
     bn_write_bin(out, out_size, &acc); 
 
     // compute y = P(x).g2
-    g2_mul_gen(y, &acc);
+    if (y) g2_mul_gen(y, &acc);
 
     bn_free(&acc)
     bn_free(&mult);
@@ -91,7 +91,6 @@ static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
 // compute the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
-// for small x
 void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A) {
     // order r
     bn_st r;
