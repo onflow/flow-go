@@ -3,12 +3,12 @@ package generate
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/dapperlabs/flow-go/cli"
 	"log"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/crypto"
 )
 

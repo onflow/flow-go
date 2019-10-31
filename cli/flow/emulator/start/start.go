@@ -15,8 +15,8 @@ import (
 )
 
 type Config struct {
-	Port          int           `default:"5000" flag:"port,p" info:"port to run RPC server"`
-	HTTPPort      int           `default:"9090" flag:"http_port" info:"port to run HTTP server"`
+	Port          int           `default:"3569" flag:"port,p" info:"port to run RPC server"`
+	HTTPPort      int           `default:"8080" flag:"http_port" info:"port to run HTTP server"`
 	Verbose       bool          `default:"false" flag:"verbose,v" info:"enable verbose logging"`
 	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
 	RootKey       string        `flag:"root-key" info:"root account key"`
@@ -43,7 +43,7 @@ var Cmd = &cobra.Command{
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
-			fmt.Printf("👤  Address: 0x%s\n", rootAcct.Address)
+			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address.Bytes())
 		}
 
 		rootAcct := cli.LoadConfig().RootAccount()
