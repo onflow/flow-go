@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -170,7 +171,7 @@ func (s Server) DidChangeTextDocument(
 
 		checker, err := sema.NewChecker(
 			program,
-			ast.FileLocation(string(uri)),
+			runtime.FileLocation(string(uri)),
 			sema.WithPredeclaredValues(valueDeclarations),
 			sema.WithPredeclaredTypes(typeDeclarations),
 		)
