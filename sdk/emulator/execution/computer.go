@@ -30,7 +30,7 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx *flow.Transaction) ([]flow.Event, error) {
+func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Transaction) ([]flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 
 	runtimeContext.SetLogger(c.onLogMessage)

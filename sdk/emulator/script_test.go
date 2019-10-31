@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestExecuteScript(t *testing.T) {
@@ -16,7 +17,7 @@ func TestExecuteScript(t *testing.T) {
 
 	accountAddress := b.RootAccountAddress()
 
-	tx := &flow.Transaction{
+	tx := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
@@ -25,7 +26,10 @@ func TestExecuteScript(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx.AddSignature(accountAddress, b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	assert.Nil(t, err)
+
+	tx.AddSignature(accountAddress, sig)
 
 	callScript := fmt.Sprintf(sampleCall, accountAddress)
 

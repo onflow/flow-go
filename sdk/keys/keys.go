@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 )
 
 // KeyType is a key format supported by Flow.
@@ -43,6 +44,8 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	}
 }
 
+const KeyWeightThreshold = constants.AccountKeyWeightThreshold
+
 // GeneratePrivateKey generates a private key of the specified key type.
 func GeneratePrivateKey(keyType KeyType, seed []byte) (flow.AccountPrivateKey, error) {
 	privateKey, err := crypto.GeneratePrivateKey(keyType.SigningAlgorithm(), seed)
@@ -57,33 +60,18 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (flow.AccountPrivateKey, e
 	}, nil
 }
 
-// DecodePrivateKey decodes a private key against a specified key type.
-func DecodePrivateKey(keyType KeyType, b []byte) (flow.AccountPrivateKey, error) {
-	privateKey, err := crypto.DecodePrivateKey(keyType.SigningAlgorithm(), b)
+// SignTransaction signs a transaction with a private key.
+func SignTransaction(
+	tx flow.Transaction,
+	privateKey flow.AccountPrivateKey,
+) (crypto.Signature, error) {
+	hasher, err := crypto.NewHasher(privateKey.HashAlgo)
 	if err != nil {
-		return flow.AccountPrivateKey{}, err
+		return nil, err
 	}
 
-	return flow.AccountPrivateKey{
-		PrivateKey: privateKey,
-		SignAlgo:   keyType.SigningAlgorithm(),
-		HashAlgo:   keyType.HashingAlgorithm(),
-	}, nil
-}
-
-// DecodePublicKey decodes a public key against a specified key type.
-func DecodePublicKey(keyType KeyType, weight int, b []byte) (flow.AccountPublicKey, error) {
-	publicKey, err := crypto.DecodePublicKey(keyType.SigningAlgorithm(), b)
-	if err != nil {
-		return flow.AccountPublicKey{}, err
-	}
-
-	return flow.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  keyType.SigningAlgorithm(),
-		HashAlgo:  keyType.HashingAlgorithm(),
-		Weight:    weight,
-	}, nil
+	b := tx.Encode()
+	return privateKey.PrivateKey.Sign(b, hasher)
 }
 
 // ValidateEncodedPublicKey returns an error if the bytes do not represent a valid public key.
