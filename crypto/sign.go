@@ -33,7 +33,8 @@ type commonSigner struct {
 	signatureLength int
 }
 
-func newSigner(algo SigningAlgorithm) (signer, error) {
+// newNonRelicSigner initializes a signer that does not depend on the Relic library.
+func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	if algo == ECDSA_P256 {
 		ECDSA_P256Once.Do(func() {
 			ECDSA_P256Instance = &(ECDSAalgo{

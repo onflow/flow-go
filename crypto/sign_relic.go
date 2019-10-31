@@ -26,5 +26,5 @@ func NewSigner(algo SigningAlgorithm) (signer, error) {
 		return BLS_BLS12381Instance, nil
 	}
 
-	return newSigner(algo)
+	return newNonRelicSigner(algo)
 }
