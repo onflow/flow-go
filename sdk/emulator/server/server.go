@@ -29,7 +29,11 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
-const defaultBlockInterval = 5 * time.Second
+const (
+	defaultBlockInterval = 5 * time.Second
+	defaultPort          = 3569
+	defaultHTTPPort      = 8080
+)
 
 // Config is the configuration for an emulator server.
 type Config struct {
@@ -69,6 +73,14 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		conf.BlockInterval = defaultBlockInterval
 	}
 
+	if conf.Port == 0 {
+		conf.Port = defaultPort
+	}
+
+	if conf.HTTPPort == 0 {
+		conf.HTTPPort = defaultHTTPPort
+	}
+
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
@@ -98,10 +110,6 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 // This function starts a gRPC server to listen for requests and process incoming transactions.
 // By default, the Flow Emulator server automatically mines a block every BlockInterval.
 func (b *EmulatorServer) Start(ctx context.Context) {
-	b.logger.WithFields(log.Fields{
-		"port": b.config.Port,
-	}).Infof("🌱  Starting Emulator Server on port %d...", b.config.Port)
-
 	// Start gRPC server in a separate goroutine to continually listen for requests
 	go b.startGrpcServer()
 
@@ -116,7 +124,7 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 				"blockNum":  block.Number,
 				"blockHash": block.Hash(),
 				"blockSize": len(block.TransactionHashes),
-			}).Tracef("⛏  Block #%d mined", block.Number)
+			}).Debugf("⛏  Block #%d mined", block.Number)
 
 		case <-ctx.Done():
 			return
@@ -142,6 +150,11 @@ func StartServer(logger *log.Logger, config *Config) {
 	defer cancel()
 
 	emulatorServer := NewEmulatorServer(logger, config)
+
+	logger.
+		WithField("port", config.Port).
+		Infof("🌱  Starting Emulator server on port %d...", config.Port)
+
 	go emulatorServer.Start(ctx)
 
 	wrappedServer := grpcweb.WrapServer(
@@ -156,7 +169,7 @@ func StartServer(logger *log.Logger, config *Config) {
 
 	logger.
 		WithField("port", config.HTTPPort).
-		Infof("🌱  Starting HTTP Server on port %d...", config.HTTPPort)
+		Infof("🌱  Starting wrapped HTTP server on port %d...", config.HTTPPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")

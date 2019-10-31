@@ -2,13 +2,13 @@ package send
 
 import (
 	"context"
-	"github.com/dapperlabs/flow-go/cli"
 	"io/ioutil"
 	"log"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -18,6 +18,7 @@ type Config struct {
 	Signer string `default:"root" flag:"signer,s"`
 	Code   string `flag:"code,c"`
 	Nonce  uint64 `flag:"nonce,n"`
+	Host   string `default:"127.0.0.1:3569" flag:"host" info:"Flow Observation API host address"`
 }
 
 var conf Config
@@ -57,7 +58,7 @@ var Cmd = &cobra.Command{
 
 		tx.AddSignature(signer.Address, sig)
 
-		client, err := client.New("localhost:5000")
+		client, err := client.New(conf.Host)
 		if err != nil {
 			cli.Exit(1, "Failed to connect to emulator")
 		}
