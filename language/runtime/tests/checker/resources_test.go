@@ -2688,3 +2688,68 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
+
+func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
+
+	declarationKinds := []common.DeclarationKind{
+		common.DeclarationKindInitializer,
+		common.DeclarationKindFunction,
+	}
+
+	for _, compositeKind := range common.CompositeKinds {
+		for _, declarationKind := range declarationKinds {
+			for _, hasCondition := range []bool{true, false} {
+
+				testName := fmt.Sprintf(
+					"%s %s/hasCondition=%v",
+					compositeKind,
+					declarationKind,
+					hasCondition,
+				)
+
+				innerDeclaration := ""
+				switch declarationKind {
+				case common.DeclarationKindInitializer:
+					innerDeclaration = declarationKind.Keywords()
+				case common.DeclarationKindFunction:
+					innerDeclaration = fmt.Sprintf("%s test", declarationKind.Keywords())
+				}
+
+				functionBlock := ""
+				if hasCondition {
+					functionBlock = "{ pre { true } }"
+				}
+
+				t.Run(testName, func(t *testing.T) {
+
+					_, err := ParseAndCheck(t, fmt.Sprintf(
+						`
+                          resource X {}
+
+                          %[1]s interface Y {
+
+                              // Should not result in a resource loss error
+                              %[2]s(from: <-X) %[3]s
+                          }
+                        `,
+						compositeKind.Keyword(),
+						innerDeclaration,
+						functionBlock,
+					))
+
+					// TODO: add support for non-structure / non-resource declarations
+
+					switch compositeKind {
+					case common.CompositeKindResource, common.CompositeKindStructure:
+						assert.Nil(t, err)
+
+					default:
+						errs := ExpectCheckerErrors(t, err, 1)
+
+						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+					}
+				})
+			}
+		}
+	}
+}

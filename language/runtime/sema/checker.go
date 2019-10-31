@@ -579,8 +579,10 @@ func (checker *Checker) enterValueScope() {
 	checker.valueActivations.Enter()
 }
 
-func (checker *Checker) leaveValueScope() {
-	checker.checkResourceLoss(checker.valueActivations.Depth())
+func (checker *Checker) leaveValueScope(checkResourceLoss bool) {
+	if checkResourceLoss {
+		checker.checkResourceLoss(checker.valueActivations.Depth())
+	}
 	checker.valueActivations.Leave()
 }
 
@@ -613,12 +615,6 @@ func (checker *Checker) checkResourceLoss(depth int) {
 
 		}
 	}
-}
-
-func (checker *Checker) withValueScope(f func()) {
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
-	f()
 }
 
 func (checker *Checker) recordResourceInvalidation(

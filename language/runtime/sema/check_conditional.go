@@ -21,10 +21,12 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 	case *ast.VariableDeclaration:
 		checker.checkConditionalBranches(
 			func() Type {
-				checker.withValueScope(func() {
-					checker.visitVariableDeclaration(test, true)
-					thenElement.Accept(checker)
-				})
+				checker.enterValueScope()
+				defer checker.leaveValueScope(true)
+
+				checker.visitVariableDeclaration(test, true)
+				thenElement.Accept(checker)
+
 				return nil
 			},
 			func() Type {
