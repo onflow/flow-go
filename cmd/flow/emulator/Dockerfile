@@ -20,9 +20,9 @@ FROM alpine:3.10
 
 COPY --from=build-app /app/app /bin/app
 
-# Expose HTTP and GRPC ports
-EXPOSE 8000
-EXPOSE 9090
+# Expose GRPC and HTTP ports
+EXPOSE 8080
+EXPOSE 3569
 
 # Run the CLI binary as the entrypoint
 ENTRYPOINT ["/bin/app"]
