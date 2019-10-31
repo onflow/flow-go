@@ -110,7 +110,7 @@ type Interpreter struct {
 	PredefinedValues    map[string]Value
 	activations         *activations.Activations
 	Globals             map[string]*Variable
-	interfaces          map[string]*ast.InterfaceDeclaration
+	Interfaces          map[string]*ast.InterfaceDeclaration
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
@@ -185,7 +185,7 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		Checker:             checker,
 		activations:         &activations.Activations{},
 		Globals:             map[string]*Variable{},
-		interfaces:          map[string]*ast.InterfaceDeclaration{},
+		Interfaces:          map[string]*ast.InterfaceDeclaration{},
 		CompositeFunctions:  map[string]map[string]FunctionValue{},
 		DestructorFunctions: map[string]*InterpretedFunctionValue{},
 		SubInterpreters:     map[ast.LocationID]*Interpreter{},
@@ -1626,7 +1626,7 @@ func (interpreter *Interpreter) initializerFunction(
 	var postConditions []*ast.Condition
 
 	for _, conformance := range compositeDeclaration.Conformances {
-		interfaceDeclaration := interpreter.interfaces[conformance.Identifier.Identifier]
+		interfaceDeclaration := interpreter.Interfaces[conformance.Identifier.Identifier]
 
 		// TODO: support multiple overloaded initializers
 
@@ -1715,7 +1715,7 @@ func (interpreter *Interpreter) destructorFunction(
 
 	for _, conformance := range compositeDeclaration.Conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
+		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
 		interfaceDestructor := interfaceDeclaration.Members.Destructor()
 		if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
 			continue
@@ -1815,7 +1815,7 @@ func (interpreter *Interpreter) compositeFunction(
 
 	for _, conformance := range conformances {
 		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.interfaces[conformanceIdentifier]
+		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
 		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
 			continue
@@ -1929,7 +1929,7 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.Inter
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interpreter.interfaces[declaration.Identifier.Identifier] = declaration
+	interpreter.Interfaces[declaration.Identifier.Identifier] = declaration
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
@@ -1984,7 +1984,13 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 				interpreter.setVariable(name, variable)
 
-				// if the imported name refers to a composite, also take the composite functions
+				// If the imported name refers to an interface, also import it from the sub-interpreter
+
+				if interfaceDeclaration, ok := subInterpreter.Interfaces[name]; ok {
+					interpreter.Interfaces[name] = interfaceDeclaration
+				}
+
+				// If the imported name refers to a composite, also import the composite functions
 				// and the destructor function from the sub-interpreter
 
 				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {

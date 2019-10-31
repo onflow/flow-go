@@ -589,3 +589,100 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
+
+func TestRuntimeResourceContractWithInterface(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	imported1 := []byte(`
+      resource interface RI {
+        fun x()
+      }
+    `)
+
+	imported2 := []byte(`
+      import RI from "imported1"
+
+      resource R: RI {
+        fun x() {
+          log("x!")
+        }
+      }
+
+      fun createR(): <-R {
+          return <- create R()
+      }
+    `)
+
+	script1 := []byte(`
+	  import RI from "imported1"
+      import R, createR from "imported2"
+
+      fun main(account: Account) {
+          var r: <-R? <- createR()
+	      account.storage[R] <-> r
+          if r != nil {
+             panic("already initialized")
+          }
+          destroy r
+
+          account.storage[&RI] = &account.storage[R] as RI
+	  }
+    `)
+
+	// TODO: Get rid of the requirement that the underlying type must be imported.
+	//   This requires properly initializing Interpreter.CompositeFunctions.
+	//   Also initialize Interpreter.DestructorFunctions
+
+	script2 := []byte(`
+	  import RI from "imported1"
+      import R from "imported2"
+
+	  fun main(account: Account) {
+	      let ref = account.storage[&RI] ?? panic("no RI ref")
+	      ref.x()
+	  }
+	`)
+
+	storedValues := map[string][]byte{}
+
+	var loggedMessages []string
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+			switch location {
+			case StringImportLocation("imported1"):
+				return imported1, nil
+			case StringImportLocation("imported2"):
+				return imported2, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value []byte) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	if !assert.Nil(t, err) {
+		assert.FailNow(t, errors.UnrollChildErrors(err))
+	}
+
+	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
+}
