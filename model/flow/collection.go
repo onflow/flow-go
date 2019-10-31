@@ -12,10 +12,12 @@ type Collection struct {
 	Transactions []*Transaction
 }
 
+// Hash returns the canonical hash of this collection.
 func (c *Collection) Hash() crypto.Hash {
 	return hash.DefaultHasher.ComputeHash(c.Encode())
 }
 
+// Encode returns the canonical encoding of this collection.
 func (c *Collection) Encode() []byte {
 	w := wrapCollection(*c)
 	return encoding.DefaultEncoder.MustEncode(&w)

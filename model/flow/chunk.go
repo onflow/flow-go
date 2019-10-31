@@ -16,10 +16,12 @@ type Chunk struct {
 	TotalComputationLimit uint64
 }
 
+// Hash returns the canonical hash of this chunk.
 func (c *Chunk) Hash() crypto.Hash {
 	return hash.DefaultHasher.ComputeHash(c.Encode())
 }
 
+// Encode returns the canonical encoding of this chunk.
 func (c *Chunk) Encode() []byte {
 	w := wrapChunk(*c)
 	return encoding.DefaultEncoder.MustEncode(&w)

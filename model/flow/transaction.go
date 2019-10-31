@@ -55,10 +55,12 @@ type Transaction struct {
 	Status             TransactionStatus
 }
 
+// Hash returns the canonical hash of this transaction.
 func (tx *Transaction) Hash() crypto.Hash {
 	return hash.DefaultHasher.ComputeHash(tx.Encode())
 }
 
+// Encode returns the canonical encoding of this transaction.
 func (tx *Transaction) Encode() []byte {
 	w := wrapTransaction(*tx)
 	return encoding.DefaultEncoder.MustEncode(&w)
