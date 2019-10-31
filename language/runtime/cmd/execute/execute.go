@@ -56,7 +56,7 @@ func Execute(args []string) {
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
 	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
-	location := ast.FileLocation(filename)
+	location := runtime.FileLocation(filename)
 	checker, err := sema.NewChecker(
 		program,
 		location,

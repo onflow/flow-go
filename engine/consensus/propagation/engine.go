@@ -12,9 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/consensus"
-	"github.com/dapperlabs/flow-go/model/filter"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
@@ -29,9 +30,9 @@ const (
 // flow system.
 type Engine struct {
 	log     zerolog.Logger   // used to log relevant actions with context
-	com     module.Committee // holds the node identity table for the network
 	con     network.Conduit  // used to talk to other nodes on the network
-	pool    Mempool          // holds guaranteed collections in memory
+	com     module.Committee // holds the node identity table for the network
+	pool    module.Mempool   // holds guaranteed collections in memory
 	vol     Volatile         // holds volatile information on collection exchange
 	polling time.Duration    // interval at which we poll for mempool contents
 	wg      *sync.WaitGroup  // used to wait on cleanup upon shutdown
@@ -40,7 +41,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, com module.Committee, pool Mempool, vol Volatile) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, com module.Committee, pool module.Mempool, vol Volatile) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -48,14 +49,14 @@ func New(log zerolog.Logger, net module.Network, com module.Committee, pool Memp
 		com:     com,
 		pool:    pool,
 		vol:     vol,
-		polling: 20 * time.Second,
+		polling: 2 * time.Second,
 		wg:      &sync.WaitGroup{},
 		once:    &sync.Once{},
 		stop:    make(chan struct{}),
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(CirculatorEngine, e)
+	con, err := net.Register(engine.ConsensusPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -396,17 +397,13 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
 
 	// select all the collection nodes on the network as our targets
-	identities, err := e.com.Select(
-		filter.Role("consensus"),
-		filter.Not(filter.NodeID(e.com.Me().NodeID)),
-	)
-	if err != nil {
-		return errors.Wrap(err, "could not select identities")
-	}
+	identities := e.com.Select().
+		Filter(filter.Role("consensus")).
+		Filter(filter.Not(filter.NodeID(e.com.Me().NodeID)))
 
 	// send the guaranteed collection to all consensus identities
 	targetIDs := identities.NodeIDs()
-	err = e.con.Submit(coll, targetIDs...)
+	err := e.con.Submit(coll, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not push guaranteed collection")
 	}
@@ -424,13 +421,9 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 func (e *Engine) propagateSnapshotRequest() error {
 
 	// select all the consensus nodes on the network to request snapshot
-	identities, err := e.com.Select(
-		filter.Role("consensus"),
-		filter.Not(filter.NodeID(e.com.Me().NodeID)),
-	)
-	if err != nil {
-		return errors.Wrap(err, "could not find consensus nodes")
-	}
+	identities := e.com.Select().
+		Filter(filter.Role("consensus")).
+		Filter(filter.Not(filter.NodeID(e.com.Me().NodeID)))
 
 	// send the snapshot request to the selected nodes
 	hash := e.pool.Hash()
@@ -439,7 +432,7 @@ func (e *Engine) propagateSnapshotRequest() error {
 		Nonce:       rand.Uint64(),
 		MempoolHash: hash,
 	}
-	err = e.con.Submit(req, targetIDs...)
+	err := e.con.Submit(req, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not send snapshot request")
 	}

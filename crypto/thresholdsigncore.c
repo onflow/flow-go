@@ -1,3 +1,4 @@
+// +build relic
 
 #include "thresholdsign_include.h"
 #include "dkg_include.h"

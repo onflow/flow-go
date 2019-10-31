@@ -1,3 +1,5 @@
+// +build relic
+
 #include "misc.h"
 #include "bls_include.h"
 

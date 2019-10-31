@@ -1,3 +1,4 @@
+// +build relic
 
 #include "dkg_include.h"
 #include "bls_include.h"

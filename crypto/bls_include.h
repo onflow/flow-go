@@ -1,3 +1,5 @@
+// +build relic
+
 #ifndef _REL_BLS_INCLUDE_H
 #define _REL_BLS_INCLUDE_H
 
