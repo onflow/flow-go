@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/collection"
@@ -89,6 +88,11 @@ func (e *Engine) Done() <-chan struct{} {
 		e.wg.Wait()
 		close(done)
 	}()
+
+	// release the reference of the injected dependencies
+	e.vol = nil
+	e.com = nil
+	e.pool = nil
 	return done
 }
 
@@ -167,7 +171,7 @@ Loop:
 		case <-time.After(e.polling):
 			err := e.propagateSnapshotRequest()
 			if err != nil {
-				log.Error().Err(err).Msg("could not request snapshot")
+				e.log.Error().Err(err).Msg("could not request snapshot")
 				continue
 			}
 		}
@@ -219,7 +223,7 @@ func (e *Engine) onSnapshotRequest(originID string, req *consensus.SnapshotReque
 // a snapshot of their collection memory pool.
 func (e *Engine) onSnapshotResponse(originID string, res *consensus.SnapshotResponse) error {
 
-	log.Info().
+	e.log.Info().
 		Str("origin_id", originID).
 		Uint64("nonce", res.Nonce).
 		Hex("mempool_hash", res.MempoolHash).
@@ -249,7 +253,7 @@ func (e *Engine) onSnapshotResponse(originID string, res *consensus.SnapshotResp
 	// TODO: we can keep track of which memory pool hashes we have already
 	// requested by adding the memory pool hash into our volatile state
 
-	log.Info().
+	e.log.Info().
 		Str("target_id", originID).
 		Uint64("nonce", res.Nonce).
 		Msg("mempool request sent")
@@ -261,7 +265,7 @@ func (e *Engine) onSnapshotResponse(originID string, res *consensus.SnapshotResp
 // collection memory pool.
 func (e *Engine) onMempoolRequest(originID string, req *consensus.MempoolRequest) error {
 
-	log.Info().
+	e.log.Info().
 		Str("origin_id", originID).
 		Uint64("nonce", req.Nonce).
 		Msg("mempool request received")
@@ -283,7 +287,7 @@ func (e *Engine) onMempoolRequest(originID string, req *consensus.MempoolRequest
 		return errors.Wrap(err, "could not send mempool response")
 	}
 
-	log.Info().
+	e.log.Info().
 		Str("target_id", originID).
 		Uint64("nonce", req.Nonce).
 		Int("sent_collections", len(colls)).
@@ -296,7 +300,7 @@ func (e *Engine) onMempoolRequest(originID string, req *consensus.MempoolRequest
 // collection memory pool.
 func (e *Engine) onMempoolResponse(originID string, res *consensus.MempoolResponse) error {
 
-	log.Info().
+	e.log.Info().
 		Str("origin_id", originID).
 		Uint64("nonce", res.Nonce).
 		Int("received_collections", len(res.Collections)).
@@ -399,7 +403,7 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 		return errors.Wrap(err, "could not push guaranteed collection")
 	}
 
-	log.Info().
+	e.log.Info().
 		Strs("target_ids", targetIDs).
 		Hex("collection_hash", coll.Hash).
 		Msg("guaranteed collection propagated")
@@ -428,7 +432,7 @@ func (e *Engine) propagateSnapshotRequest() error {
 		return errors.Wrap(err, "could not send snapshot request")
 	}
 
-	log.Info().
+	e.log.Info().
 		Uint64("nonce", req.Nonce).
 		Strs("target_ids", targetIDs).
 		Hex("mempool_hash", hash).
