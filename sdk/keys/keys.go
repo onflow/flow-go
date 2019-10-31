@@ -5,7 +5,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 )
@@ -61,26 +60,6 @@ func GeneratePrivateKey(keyType KeyType, seed []byte) (flow.AccountPrivateKey, e
 	}, nil
 }
 
-// EncodePrivateKey encodes a private key as bytes.
-func EncodePrivateKey(a flow.AccountPrivateKey) ([]byte, error) {
-	return encoding.DefaultEncoder.EncodeAccountPrivateKey(a)
-}
-
-// DecodePrivateKey decodes a private key.
-func DecodePrivateKey(b []byte) (flow.AccountPrivateKey, error) {
-	return encoding.DefaultEncoder.DecodeAccountPrivateKey(b)
-}
-
-// EncodePublicKey encodes a public key as bytes.
-func EncodePublicKey(a flow.AccountPublicKey) ([]byte, error) {
-	return encoding.DefaultEncoder.EncodeAccountPublicKey(a)
-}
-
-// DecodePublicKey decodes a public key.
-func DecodePublicKey(b []byte) (flow.AccountPublicKey, error) {
-	return encoding.DefaultEncoder.DecodeAccountPublicKey(b)
-}
-
 // SignTransaction signs a transaction with a private key.
 func SignTransaction(
 	tx flow.Transaction,
@@ -91,7 +70,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b, err := encoding.DefaultEncoder.EncodeTransaction(tx)
+	b, err := tx.Encode()
 	if err != nil {
 		return nil, err
 	}
