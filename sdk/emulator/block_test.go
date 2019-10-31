@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -23,8 +22,6 @@ func TestCommitBlock(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(&tx1)
-
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
 
@@ -34,7 +31,7 @@ func TestCommitBlock(t *testing.T) {
 	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
-	tx, err := b.GetTransaction(tx1.Hash)
+	tx, err := b.GetTransaction(tx1.Hash())
 	assert.Nil(t, err)
 
 	assert.Equal(t, flow.TransactionFinalized, tx.Status)
@@ -48,8 +45,6 @@ func TestCommitBlock(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
-	hash.SetTransactionHash(&tx2)
-
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)
 
@@ -59,7 +54,7 @@ func TestCommitBlock(t *testing.T) {
 	err = b.SubmitTransaction(tx2)
 	assert.NotNil(t, err)
 
-	tx, err = b.GetTransaction(tx2.Hash)
+	tx, err = b.GetTransaction(tx2.Hash())
 	assert.Nil(t, err)
 
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
@@ -68,10 +63,10 @@ func TestCommitBlock(t *testing.T) {
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
-	tx, _ = b.GetTransaction(tx1.Hash)
+	tx, _ = b.GetTransaction(tx1.Hash())
 	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
-	tx, _ = b.GetTransaction(tx2.Hash)
+	tx, _ = b.GetTransaction(tx2.Hash())
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

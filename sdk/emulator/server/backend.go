@@ -58,7 +58,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
 			b.logger.
-				WithField("txHash", tx.Hash.Hex()).
+				WithField("txHash", tx.Hash().Hex()).
 				Infof("💸  Transaction #%d mined", tx.Nonce)
 			b.logger.WithError(err).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
 		case *emulator.ErrDuplicateTransaction:
@@ -72,12 +72,12 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 		}
 	} else {
 		b.logger.
-			WithField("txHash", tx.Hash.Hex()).
+			WithField("txHash", tx.Hash().Hex()).
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
 	response := &observation.SendTransactionResponse{
-		Hash: tx.Hash,
+		Hash: tx.Hash(),
 	}
 
 	return response, nil

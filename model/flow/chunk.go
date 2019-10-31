@@ -32,11 +32,11 @@ func (c *Chunk) String() string {
 		return fmt.Sprintf("An empty chunk")
 	case 1:
 		return fmt.Sprintf("Chunk %v includes a transaction (totalComputationLimit: %v):\n %v",
-			c.Hash, c.TotalComputationLimit, c.Transactions[0].Hash)
+			c.Hash(), c.TotalComputationLimit, c.Transactions[0].Hash())
 	default:
-		return fmt.Sprintf("Chunk %v includes %v transactions (totalComputationLimit: %v):\n %v\n ...\n %v  ", c.Hash,
-			len(c.Transactions), c.TotalComputationLimit, c.Transactions[0].Hash,
-			c.Transactions[len(c.Transactions)-1].Hash)
+		return fmt.Sprintf("Chunk %v includes %v transactions (totalComputationLimit: %v):\n %v\n ...\n %v  ", c.Hash(),
+			len(c.Transactions), c.TotalComputationLimit, c.Transactions[0].Hash(),
+			c.Transactions[len(c.Transactions)-1].Hash())
 	}
 }
 

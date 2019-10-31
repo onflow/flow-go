@@ -10,7 +10,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -43,8 +42,6 @@ func TestEventEmitted(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		hash.SetTransactionHash(&tx)
-
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
 
@@ -55,7 +52,7 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash.Hex())
+		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
 
 		assert.Equal(t, expectedType, events[0].Type)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -41,8 +40,6 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	hash.SetTransactionHash(&tx1)
-
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
 
@@ -56,8 +53,6 @@ func TestWorldStates(t *testing.T) {
 		PayerAccount:       accountAddress,
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
-
-	hash.SetTransactionHash(&tx2)
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)
@@ -154,7 +149,7 @@ func TestWorldStates(t *testing.T) {
 	// World state rollback to ws5 (before tx3)
 	assert.Equal(t, ws5, ws7)
 	// World state does not include tx3
-	assert.False(t, b.pendingWorldState.ContainsTransaction(tx3.Hash))
+	assert.False(t, b.pendingWorldState.ContainsTransaction(tx3.Hash()))
 
 	// Seek to non-committed world state
 	b.SeekToState(ws4)
@@ -179,8 +174,6 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	hash.SetTransactionHash(&tx1)
-
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.Nil(t, err)
 
@@ -194,8 +187,6 @@ func TestQueryByVersion(t *testing.T) {
 		PayerAccount:       accountAddress,
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
-
-	hash.SetTransactionHash(&tx2)
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.Nil(t, err)
@@ -218,27 +209,27 @@ func TestQueryByVersion(t *testing.T) {
 	ws3 := b.pendingWorldState.Hash()
 
 	// Get transaction at invalid world state version (errors)
-	tx, err := b.GetTransactionAtVersion(tx1.Hash, invalidWorldState)
+	tx, err := b.GetTransactionAtVersion(tx1.Hash(), invalidWorldState)
 	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, tx)
 
 	// tx1 does not exist at ws1
-	tx, err = b.GetTransactionAtVersion(tx1.Hash, ws1)
+	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws1)
 	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx1 does exist at ws2
-	tx, err = b.GetTransactionAtVersion(tx1.Hash, ws2)
+	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws2)
 	assert.Nil(t, err)
 	assert.NotNil(t, tx)
 
 	// tx2 does not exist at ws2
-	tx, err = b.GetTransactionAtVersion(tx2.Hash, ws2)
+	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws2)
 	assert.IsType(t, err, &ErrTransactionNotFound{})
 	assert.Nil(t, tx)
 
 	// tx2 does exist at ws3
-	tx, err = b.GetTransactionAtVersion(tx2.Hash, ws3)
+	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws3)
 	assert.Nil(t, err)
 	assert.NotNil(t, tx)
 

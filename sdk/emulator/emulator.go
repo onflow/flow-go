@@ -6,9 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
@@ -196,50 +194,48 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	hash.SetTransactionHash(&tx)
-
 	// TODO: add more invalid transaction checks
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return &ErrInvalidTransaction{TxHash: tx.Hash, MissingFields: missingFields}
+		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
 	}
 
-	if _, exists := b.txPool[string(tx.Hash)]; exists {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash}
+	if _, exists := b.txPool[string(tx.Hash())]; exists {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if b.pendingWorldState.ContainsTransaction(tx.Hash) {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash}
+	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
 	if err := b.verifySignatures(tx); err != nil {
 		return err
 	}
 
-	b.txPool[string(tx.Hash)] = &tx
+	b.txPool[string(tx.Hash())] = &tx
 	b.pendingWorldState.InsertTransaction(&tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
 
 	events, err := b.computer.ExecuteTransaction(registers, tx)
 	if err != nil {
-		b.pendingWorldState.UpdateTransactionStatus(tx.Hash, flow.TransactionReverted)
+		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionReverted)
 
-		b.updatePendingWorldStates(tx.Hash)
+		b.updatePendingWorldStates(tx.Hash())
 
-		return &ErrTransactionReverted{TxHash: tx.Hash, Err: err}
+		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
 	}
 
 	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
-	b.pendingWorldState.UpdateTransactionStatus(tx.Hash, flow.TransactionFinalized)
+	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionFinalized)
 
-	b.updatePendingWorldStates(tx.Hash)
+	b.updatePendingWorldStates(tx.Hash())
 
 	// TODO: improve the pending block, provide all block information
 	prevBlock := b.pendingWorldState.GetLatestBlock()
 	blockNumber := prevBlock.Number + 1
 
-	b.emitTransactionEvents(events, blockNumber, tx.Hash)
+	b.emitTransactionEvents(events, blockNumber, tx.Hash())
 
 	return nil
 }
@@ -295,9 +291,9 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
-		txHashes = append(txHashes, tx.Hash)
-		if b.pendingWorldState.GetTransaction(tx.Hash).Status != flow.TransactionReverted {
-			b.pendingWorldState.UpdateTransactionStatus(tx.Hash, flow.TransactionSealed)
+		txHashes = append(txHashes, tx.Hash())
+		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != flow.TransactionReverted {
+			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionSealed)
 		}
 	}
 	b.txPool = make(map[string]*flow.Transaction)
@@ -363,7 +359,7 @@ func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
 func (b *EmulatedBlockchain) verifySignatures(tx flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
-	encodedTx, err := encoding.DefaultEncoder.EncodeTransaction(tx)
+	encodedTx, err := tx.Encode()
 	if err != nil {
 		return err
 	}

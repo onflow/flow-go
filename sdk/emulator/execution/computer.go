@@ -39,7 +39,7 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 	})
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
 
-	location := runtime.TransactionLocation(tx.Hash)
+	location := runtime.TransactionLocation(tx.Hash())
 
 	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext, location)
 	if err != nil {
