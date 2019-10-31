@@ -17,7 +17,7 @@ type Config struct {
 	Signer string `default:"root" flag:"signer,s"`
 	Code   string `flag:"code,c"`
 	Nonce  uint64 `flag:"nonce,n"`
-	Host   string `default:"127.0.0.1:3569" flag:"host,h" info:"Flow Observation API host address"`
+	Host   string `default:"127.0.0.1:3569" flag:"host" info:"Flow Observation API host address"`
 }
 
 var conf Config
