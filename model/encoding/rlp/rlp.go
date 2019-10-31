@@ -13,9 +13,12 @@ func NewEncoder() *Encoder {
 	return &Encoder{}
 }
 
-func (e *Encoder) EncodeTransaction(tx flow.Transaction) ([]byte, error) {
-	w := wrapTransaction(tx)
-	return rlp.EncodeToBytes(&w)
+func (e *Encoder) Encode(val interface{}) ([]byte, error) {
+	return rlp.EncodeToBytes(val)
+}
+
+func (e *Encoder) Decode(b []byte, val interface{}) error {
+	return rlp.DecodeBytes(b, val)
 }
 
 func (e *Encoder) EncodeAccountPublicKey(a flow.AccountPublicKey) ([]byte, error) {
@@ -94,33 +97,4 @@ func (e *Encoder) DecodeAccountPrivateKey(b []byte) (a flow.AccountPrivateKey, e
 		SignAlgo:   signAlgo,
 		HashAlgo:   hashAlgo,
 	}, nil
-}
-
-func (e *Encoder) EncodeChunk(c flow.Chunk) ([]byte, error) {
-	transactions := make([]transactionWrapper, 0, len(c.Transactions))
-
-	for i, tx := range c.Transactions {
-		transactions[i] = wrapTransaction(*tx)
-	}
-
-	w := chunkWrapper{
-		Transactions:          transactions,
-		TotalComputationLimit: c.TotalComputationLimit,
-	}
-
-	return rlp.EncodeToBytes(&w)
-}
-
-func (e *Encoder) EncodeCollection(c flow.Collection) ([]byte, error) {
-	transactions := make([]transactionWrapper, 0, len(c.Transactions))
-
-	for i, tx := range c.Transactions {
-		transactions[i] = wrapTransaction(*tx)
-	}
-
-	w := collectionWrapper{
-		Transactions: transactions,
-	}
-
-	return rlp.EncodeToBytes(&w)
 }

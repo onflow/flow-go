@@ -5,10 +5,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Encoder encodes and decodes Flow models.
+// Encoder encodes and decodes values to and from bytes.
 type Encoder interface {
-	// EncodeTransaction encodes a transaction to bytes.
-	EncodeTransaction(flow.Transaction) ([]byte, error)
+	Encode(interface{}) ([]byte, error)
+	Decode(interface{}, []byte) error
 
 	// EncodeAccountPublicKey encodes an account public key to bytes.
 	EncodeAccountPublicKey(flow.AccountPublicKey) ([]byte, error)
@@ -19,12 +19,6 @@ type Encoder interface {
 	EncodeAccountPrivateKey(flow.AccountPrivateKey) ([]byte, error)
 	// DecodeAccountPrivateKey decodes an account private key from bytes.
 	DecodeAccountPrivateKey([]byte) (flow.AccountPrivateKey, error)
-
-	// EncodeChunk encodes a chunk to bytes.
-	EncodeChunk(flow.Chunk) ([]byte, error)
-
-	// EncodeCollection encodes a collection to bytes.
-	EncodeCollection(flow.Collection) ([]byte, error)
 }
 
 // DefaultEncoder is the default model encoder used by Flow.

@@ -6,13 +6,24 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // Chunk is a container of transactions with total compute limit less than chunkTotalGasLimit
 type Chunk struct {
-	Hash                  crypto.Hash
 	Transactions          []*Transaction
 	TotalComputationLimit uint64
+}
+
+func (c *Chunk) Hash() crypto.Hash {
+	b, _ := c.Encode()
+	return hash.DefaultHasher.ComputeHash(b)
+}
+
+func (c *Chunk) Encode() ([]byte, error) {
+	w := wrapChunk(*c)
+	return encoding.DefaultEncoder.Encode(&w)
 }
 
 func (c *Chunk) String() string {
@@ -40,4 +51,22 @@ func NewChunk(transactions []*Transaction, totalComputationLimit uint64) *Chunk 
 // Chunker knows how to group a collection of transactions into chunks
 type Chunker interface {
 	CollectionToChunks(collection *Collection, maxComputationLimit uint64) (*[]Chunk, error)
+}
+
+type chunkWrapper struct {
+	Transactions          []transactionWrapper
+	TotalComputationLimit uint64
+}
+
+func wrapChunk(c Chunk) chunkWrapper {
+	transactions := make([]transactionWrapper, 0, len(c.Transactions))
+
+	for i, tx := range c.Transactions {
+		transactions[i] = wrapTransaction(*tx)
+	}
+
+	return chunkWrapper{
+		Transactions:          transactions,
+		TotalComputationLimit: c.TotalComputationLimit,
+	}
 }
