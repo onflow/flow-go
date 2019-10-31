@@ -70,11 +70,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b, err := tx.Encode()
-	if err != nil {
-		return nil, err
-	}
-
+	b := tx.Encode()
 	return privateKey.PrivateKey.Sign(b, hasher)
 }
 

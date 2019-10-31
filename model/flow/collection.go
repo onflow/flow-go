@@ -13,13 +13,12 @@ type Collection struct {
 }
 
 func (c *Collection) Hash() crypto.Hash {
-	b, _ := c.Encode()
-	return hash.DefaultHasher.ComputeHash(b)
+	return hash.DefaultHasher.ComputeHash(c.Encode())
 }
 
-func (c *Collection) Encode() ([]byte, error) {
+func (c *Collection) Encode() []byte {
 	w := wrapCollection(*c)
-	return encoding.DefaultEncoder.Encode(&w)
+	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
 type collectionWrapper struct {

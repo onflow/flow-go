@@ -56,13 +56,12 @@ type Transaction struct {
 }
 
 func (tx *Transaction) Hash() crypto.Hash {
-	b, _ := tx.Encode()
-	return hash.DefaultHasher.ComputeHash(b)
+	return hash.DefaultHasher.ComputeHash(tx.Encode())
 }
 
-func (tx *Transaction) Encode() ([]byte, error) {
+func (tx *Transaction) Encode() []byte {
 	w := wrapTransaction(*tx)
-	return encoding.DefaultEncoder.Encode(&w)
+	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
 // AddSignature signs the transaction with the given account and private key, then adds the signature to the list

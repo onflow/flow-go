@@ -17,13 +17,12 @@ type Chunk struct {
 }
 
 func (c *Chunk) Hash() crypto.Hash {
-	b, _ := c.Encode()
-	return hash.DefaultHasher.ComputeHash(b)
+	return hash.DefaultHasher.ComputeHash(c.Encode())
 }
 
-func (c *Chunk) Encode() ([]byte, error) {
+func (c *Chunk) Encode() []byte {
 	w := wrapChunk(*c)
-	return encoding.DefaultEncoder.Encode(&w)
+	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
 func (c *Chunk) String() string {

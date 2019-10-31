@@ -359,10 +359,7 @@ func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
 func (b *EmulatedBlockchain) verifySignatures(tx flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
-	encodedTx, err := tx.Encode()
-	if err != nil {
-		return err
-	}
+	encodedTx := tx.Encode()
 
 	for _, accountSig := range tx.Signatures {
 		accountPublicKey, err := b.verifyAccountSignature(accountSig, encodedTx)
