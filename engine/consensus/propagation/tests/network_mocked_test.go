@@ -27,6 +27,7 @@ type mockPropagationNode struct {
 	net *mock.Network
 	// the state of the engine, exposed in order for tests to assert
 	pool *mempool.Mempool
+	vol  *volatile.Volatile
 }
 
 // newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
@@ -55,17 +56,18 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		return nil, err
 	}
 
-	net, err := mock.NewNetwork(com, hub)
-	if err != nil {
-		return nil, err
-	}
+	net := mock.NewNetwork(com, hub)
 
 	vol, err := volatile.New()
 	if err != nil {
 		return nil, err
 	}
+	// This should be removed, but for now is to test memory leak
+	vol.Close()
 
-	engine, err := propagation.NewEngine(log, net, com, pool, vol)
+	// vol is set to be nil to avoid memory leak
+	// TODO: figure out why passing vol will cause memory leak
+	engine, err := propagation.NewEngine(log, net, com, pool, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,17 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		engine: engine,
 		net:    net,
 		pool:   pool,
+		vol:    nil,
 	}, nil
+}
+
+func (n *mockPropagationNode) terminate() {
+	<-n.engine.Done()
+	// if n.vol != nil {
+	// 	n.vol.Close()
+	// }
+	n.vol = nil
+	n.net.Unregister(propagation.CirculatorEngine, n.engine)
 }
 
 func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
@@ -280,6 +292,11 @@ func TestSubmitCollection(t *testing.T) {
 			require.Equal(t, M, int(node.pool.Size()))
 			require.Equal(t, sameHash, node.pool.Hash())
 		}
+
+		// terminates nodes
+		for _, node := range nodes {
+			node.terminate()
+		}
 	}
 
 	// N or M could be arbitarily big.
@@ -287,8 +304,8 @@ func TestSubmitCollection(t *testing.T) {
 		testConcrrencyOnce)
 
 	// will take roughly 6 seconds
-	t.Run("run the above tests for 50 times", func(t *testing.T) {
-		for i := 0; i < 50; i++ {
+	t.Run("run the above tests for 100 times", func(t *testing.T) {
+		for i := 0; i < 100; i++ {
 			testConcrrencyOnce(t)
 		}
 	})

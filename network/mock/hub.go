@@ -17,3 +17,13 @@ func NewNetworkHub() *Hub {
 func (hub *Hub) Plug(net *Network) {
 	hub.Networks[net.GetID()] = net
 }
+
+// Unplug remove the stored network
+func (hub *Hub) Unplug(net *Network) {
+	delete(hub.Networks, net.GetID())
+}
+
+// UnplugAll remove all stored network
+func (hub *Hub) UnplugAll() {
+	hub.Networks = make(map[string]*Network)
+}

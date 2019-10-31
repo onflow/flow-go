@@ -95,6 +95,11 @@ func (e *Engine) Done() <-chan struct{} {
 		e.wg.Wait()
 		close(done)
 	}()
+
+	// release the reference of the injected dependencies
+	e.vol = nil
+	e.com = nil
+	e.pool = nil
 	return done
 }
 
