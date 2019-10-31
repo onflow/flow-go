@@ -36,7 +36,7 @@ var Cmd = &cobra.Command{
 			rootAcct := pconf.RootAccount()
 
 			fmt.Printf("⚙️   Flow client initialized with root account:\n\n")
-			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address)
+			fmt.Printf("👤  Address: 0x%x\n", rootAcct.Address.Bytes())
 			fmt.Printf("ℹ️   Start the emulator with this root account by running: flow emulator start\n")
 		} else {
 			fmt.Printf("⚠️   Flow configuration file already exists! Begin by running: flow emulator start\n")
