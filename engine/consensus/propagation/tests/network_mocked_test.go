@@ -58,12 +58,12 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 
 	net := mock.NewNetwork(com, hub)
 
-	vol, err := volatile.New()
-	if err != nil {
-		return nil, err
-	}
-	// This should be removed, but for now is to test memory leak
-	vol.Close()
+	// vol, err := volatile.New()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // This should be removed, but for now is to test memory leak
+	// vol.Close()
 
 	// vol is set to be nil to avoid memory leak
 	// TODO: figure out why passing vol will cause memory leak
