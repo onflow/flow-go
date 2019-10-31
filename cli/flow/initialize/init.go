@@ -2,12 +2,12 @@ package initialize
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/cli"
 	"log"
 
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
