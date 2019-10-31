@@ -1067,6 +1067,7 @@ func init() {
 // CompositeType
 
 type CompositeType struct {
+	Location     ast.Location
 	Kind         common.CompositeKind
 	Identifier   string
 	Conformances []*InterfaceType
@@ -1332,7 +1333,6 @@ type EventType struct {
 	Location                            ast.Location
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
-	ast.Range
 }
 
 func (*EventType) isType() {}
@@ -1473,8 +1473,11 @@ func (t *ReferenceType) IndexingType() Type {
 	return referencedType.IndexingType()
 }
 
-////
-
+// IsSubType determines if the given subtype is a subtype
+// of the given supertype.
+//
+// Types are subtypes of themselves.
+//
 func IsSubType(subType Type, superType Type) bool {
 	if subType.Equal(superType) {
 		return true
@@ -1500,9 +1503,11 @@ func IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
+
 	case *CharacterType:
 		// TODO: only allow valid character literals
 		return subType.Equal(&StringType{})
+
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
@@ -1559,6 +1564,15 @@ func IsSubType(subType Type, superType Type) bool {
 			typedSubType.ElementType(false),
 			typedSuperType.ElementType(false),
 		)
+
+	case *ReferenceType:
+		typedSubType, ok := subType.(*ReferenceType)
+		if !ok {
+			return false
+		}
+
+		// references are covariant: &T <: &U if T <: U
+		return IsSubType(typedSubType.Type, typedSuperType.Type)
 	}
 
 	// TODO: functions

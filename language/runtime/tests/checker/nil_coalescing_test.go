@@ -174,9 +174,13 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
           let y = x ?? panic("nope")
         `,
 		ParseAndCheckOptions{
-			Values: stdlib.StandardLibraryFunctions{
-				stdlib.PanicFunction,
-			}.ToValueDeclarations(),
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+			},
 		},
 	)
 

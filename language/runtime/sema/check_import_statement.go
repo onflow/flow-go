@@ -39,9 +39,9 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 		var err error
 		importChecker, err = NewChecker(
 			imported,
-			checker.PredeclaredValues,
-			checker.PredeclaredTypes,
 			declaration.Location,
+			WithPredeclaredValues(checker.PredeclaredValues),
+			WithPredeclaredTypes(checker.PredeclaredTypes),
 		)
 		if err == nil {
 			checker.ImportCheckers[declaration.Location.ID()] = importChecker

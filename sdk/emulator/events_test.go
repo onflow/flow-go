@@ -48,9 +48,9 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
 
-		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, expectedType, events[0].Type)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
 		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 	})
@@ -72,14 +72,14 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, err := b.CallScript(script)
+		_, err := b.ExecuteScript(script)
 		assert.Nil(t, err)
 
 		require.Len(t, events, 1)
 
-		expectedID := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
 
-		assert.Equal(t, expectedID, events[0].ID)
+		assert.Equal(t, expectedType, events[0].Type)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
 		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 	})
@@ -131,12 +131,12 @@ func TestEventEmitted(t *testing.T) {
 		require.Len(t, events, 2)
 
 		// first event is AccountCreated event
-		expectedEvent := events[1]
+		actualEvent := events[1]
 
-		expectedID := fmt.Sprintf("account.%s.MyEvent", address.Hex())
+		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
 
-		assert.Equal(t, expectedID, expectedEvent.ID)
-		assert.Equal(t, big.NewInt(1), expectedEvent.Values["x"])
-		assert.Equal(t, big.NewInt(2), expectedEvent.Values["y"])
+		assert.Equal(t, expectedType, actualEvent.Type)
+		assert.Equal(t, big.NewInt(1), actualEvent.Values["x"])
+		assert.Equal(t, big.NewInt(2), actualEvent.Values["y"])
 	})
 }

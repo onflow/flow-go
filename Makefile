@@ -1,16 +1,14 @@
 REVISION := $(shell git rev-parse --short HEAD)
 
-.PHONY: clone-submodules
-clone-submodules:
+crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
 
-.PHONY: build-relic
-build-relic: clone-submodules
+crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
 .PHONY: install-tools
-install-tools: build-relic
+install-tools: crypto/relic/build
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -50,10 +48,6 @@ generate-mocks:
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
-.PHONY: install-cli
-install-cli: build-relic
-	go install ./cmd/flow
-
 .PHONY: lint-sdk
 lint-sdk:
 	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
@@ -61,9 +55,16 @@ lint-sdk:
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test
 
+.PHONY: install-cli
+install-cli: crypto/relic/build
+	GO111MODULE=on install ./cmd/flow
+
+cmd/flow/flow: crypto/relic/build cli cmd crypto model proto sdk
+	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
+
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
+	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:

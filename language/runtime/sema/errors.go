@@ -1543,3 +1543,16 @@ func (e *NonStorageReferenceError) Error() string {
 }
 
 func (*NonStorageReferenceError) isSemanticError() {}
+
+// CreateImportedResourceError
+
+type CreateImportedResourceError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *CreateImportedResourceError) Error() string {
+	return fmt.Sprintf("cannot create imported resource type: `%s`", e.Type)
+}
+
+func (*CreateImportedResourceError) isSemanticError() {}

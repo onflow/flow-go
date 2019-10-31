@@ -74,6 +74,10 @@ func (m StatementTrampoline) Continue() Trampoline {
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
+type OnEventEmittedFunc func(EventValue)
+type StorageReadHandlerFunc func(storageIdentifier interface{}, indexingType sema.Type) OptionalValue
+type StorageWriteHandlerFunc func(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue)
+
 type Interpreter struct {
 	Checker             *sema.Checker
 	PredefinedValues    map[string]Value
@@ -83,21 +87,64 @@ type Interpreter struct {
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
-	onEventEmitted      func(EventValue)
+	onEventEmitted      OnEventEmittedFunc
+	storageReadHandler  StorageReadHandlerFunc
+	storageWriteHandler StorageWriteHandlerFunc
 }
 
-type InterpreterOpt func(*Interpreter)
+type Option func(*Interpreter) error
 
-func WithOnEventEmittedHandler(handler func(EventValue)) InterpreterOpt {
-	return func(inter *Interpreter) {
-		inter.onEventEmitted = handler
+// WithOnEventEmittedHandler returns an interpreter option which sets
+// the given function as the event handler.
+//
+func WithOnEventEmittedHandler(handler OnEventEmittedFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetOnEventEmitted(handler)
+		return nil
 	}
 }
 
-func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, opts ...InterpreterOpt) (*Interpreter, error) {
+// WithPredefinedValues returns an interpreter option which declares
+// the given the predefined values.
+//
+func WithPredefinedValues(predefinedValues map[string]Value) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.PredefinedValues = predefinedValues
+
+		for name, value := range predefinedValues {
+			err := interpreter.ImportValue(name, value)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+// WithStorageReadHandler returns an interpreter option which sets the given function
+// as the function that is used when a stored value is read.
+//
+func WithStorageReadHandler(handler StorageReadHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetStorageReadHandler(handler)
+		return nil
+	}
+}
+
+// WithStorageWriteHandler returns an interpreter option which sets the given function
+// as the function that is used when a stored value is written.
+//
+func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetStorageWriteHandler(handler)
+		return nil
+	}
+}
+
+func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
-		PredefinedValues:    predefinedValues,
 		activations:         &activations.Activations{},
 		Globals:             map[string]*Variable{},
 		interfaces:          map[string]*ast.InterfaceDeclaration{},
@@ -107,24 +154,32 @@ func NewInterpreter(checker *sema.Checker, predefinedValues map[string]Value, op
 		onEventEmitted:      func(EventValue) {},
 	}
 
-	for name, value := range predefinedValues {
-		err := interpreter.ImportValue(name, value)
+	for _, option := range options {
+		err := option(interpreter)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for _, opt := range opts {
-		opt(interpreter)
-	}
-
 	return interpreter, nil
 }
 
-// SetOnEventEmitted registers a callback that is triggered when an event is emitted by the program.
+// SetOnEventEmitted sets the function that is triggered when an event is emitted by the program.
 //
-func (interpreter *Interpreter) SetOnEventEmitted(callback func(EventValue)) {
-	interpreter.onEventEmitted = callback
+func (interpreter *Interpreter) SetOnEventEmitted(function OnEventEmittedFunc) {
+	interpreter.onEventEmitted = function
+}
+
+// SetStorageReadHandler sets the function that is used when a stored value is read.
+//
+func (interpreter *Interpreter) SetStorageReadHandler(function StorageReadHandlerFunc) {
+	interpreter.storageReadHandler = function
+}
+
+// SetStorageWriteHandler sets the function that is used when a stored value is written.
+//
+func (interpreter *Interpreter) SetStorageWriteHandler(function StorageWriteHandlerFunc) {
+	interpreter.storageWriteHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -617,10 +672,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 							Message:       message,
 							LocationRange: LocationRange{
 								Location: interpreter.Checker.Location,
-								Range: ast.Range{
-									StartPos: condition.Test.StartPosition(),
-									EndPos:   condition.Test.EndPosition(),
-								},
+								Range:    ast.NewRangeFromPositioned(condition.Test),
 							},
 						})
 					})
@@ -839,15 +891,15 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(target)
-						typedResult.Set(locationRange, indexingValue, value)
+						typedResult.Set(interpreter, locationRange, indexingValue, value)
 
 						// NOTE: no result, so it does *not* act like a return-statement
 						return Done{}
 					})
 
-			case TypeIndexableValue:
+			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
-				typedResult.Set(indexingType, value)
+				interpreter.writeStored(typedResult.Identifier, indexingType, value.(OptionalValue))
 				return Done{}
 
 			default:
@@ -1066,10 +1118,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 	panic(&unsupportedOperation{
 		kind:      common.OperationKindBinary,
 		operation: expression.Operation,
-		Range: ast.Range{
-			StartPos: expression.StartPosition(),
-			EndPos:   expression.EndPosition(),
-		},
+		Range:     ast.NewRangeFromPositioned(expression),
 	})
 }
 
@@ -1219,7 +1268,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 				// NOTE: important to box in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(locationRange, key, SomeValue{value})
+				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
 			}
 
 			return Done{Result: newDictionary}
@@ -1244,13 +1293,13 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(expression)
-						value := typedResult.Get(locationRange, indexingValue)
+						value := typedResult.Get(interpreter, locationRange, indexingValue)
 						return Done{Result: value}
 					})
 
-			case TypeIndexableValue:
+			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-				result := typedResult.Get(indexingType)
+				result := interpreter.readStored(typedResult.Identifier, indexingType)
 				return Done{Result: result}
 
 			default:
@@ -1840,7 +1889,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 	subInterpreter, err := NewInterpreter(
 		importedChecker,
-		interpreter.PredefinedValues,
+		WithPredefinedValues(interpreter.PredefinedValues),
 		WithOnEventEmittedHandler(interpreter.onEventEmitted),
 	)
 	if err != nil {
@@ -1993,9 +2042,17 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 
 			referenceValue := ReferenceValue{
-				Storage:      storage,
-				IndexingType: indexingType,
+				StorageIdentifier: storage.Identifier,
+				IndexingType:      indexingType,
 			}
 			return Done{Result: referenceValue}
 		})
+}
+
+func (interpreter *Interpreter) readStored(storageIdentifier interface{}, indexingType sema.Type) OptionalValue {
+	return interpreter.storageReadHandler(storageIdentifier, indexingType)
+}
+
+func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue) {
+	interpreter.storageWriteHandler(storageIdentifier, indexingType, value)
 }

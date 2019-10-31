@@ -119,16 +119,18 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 func TestSubmitDuplicateTransaction(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
+	accountAddress := b.RootAccountAddress()
+
 	tx1 := &flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	tx1.AddSignature(accountAddress, b.RootKey())
 
 	// Submit tx1
 	err := b.SubmitTransaction(tx1)

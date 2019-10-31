@@ -201,7 +201,7 @@ func TestCreateAccount(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		require.Equal(t, constants.EventAccountCreated, lastEvent.ID)
+		require.Equal(t, constants.EventAccountCreated, lastEvent.Type)
 		require.IsType(t, flow.Address{}, lastEvent.Values["address"])
 
 		accountAddress := lastEvent.Values["address"].(flow.Address)

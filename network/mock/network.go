@@ -1,9 +1,6 @@
 package mock
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -21,6 +18,7 @@ type hash [32]byte
 type Network struct {
 	hub     *Hub
 	com     module.Committee
+	cache   map[string]struct{}
 	engines map[uint8]network.Engine
 	sync.Mutex
 	seenEventIDs map[string]bool
@@ -43,34 +41,33 @@ func NewNetwork(com module.Committee, hub *Hub) *Network {
 
 // submit is called when an Engine is sending an event to an Engine on another node or nodes.
 func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string) error {
-	eventBytes, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	eventHash := sha256.Sum256(eventBytes)
-
 	for _, nodeID := range targetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, ok := mn.hub.Networks[nodeID]
-		if !ok || receiverNetwork == nil {
+		if !ok {
 			return errors.Errorf("Network can not find a node by ID %v", nodeID)
 		}
 
+		key := eventKey(engineID, event)
+
+		// Check if the given engine already received the event.
+		// This prevents a node receiving the same event twice.
+		if receiverNetwork.haveSeen(key) {
+			continue
+		}
+
+		// mark the peer has seen the event
+		receiverNetwork.seen(key)
+
+		// Find the engine of the targeted network
 		receiverEngine, ok := receiverNetwork.engines[engineID]
 		if !ok {
 			return errors.Errorf("Network can not find engine ID: %v for node: %v", engineID, nodeID)
 		}
 
-		if receiverNetwork.haveSeen(nodeID, eventHash) {
-			continue
-		}
-
-		// mark the peer has seen the event
-		receiverNetwork.seen(nodeID, eventHash)
-
 		// Find the engine of the targeted network
 		// Call `Process` to let receiver engine receive the event directly.
-		err = receiverEngine.Process(mn.GetID(), event)
+		err := receiverEngine.Process(mn.GetID(), event)
 
 		if err != nil {
 			return errors.Wrapf(err, "senderEngine failed to process event: %v", event)
@@ -79,7 +76,7 @@ func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string
 	return nil
 }
 
-// GetID returns the identity of the Engine
+// GetID returns the identity of the Node.
 func (mn *Network) GetID() string {
 	me := mn.com.Me()
 	return me.NodeID
@@ -109,27 +106,20 @@ func (mn *Network) Unregister(engineID uint8, engine network.Engine) error {
 	return nil
 }
 
-// return the cached key for seen event
-func eventKey(nodeID string, eventHash hash) string {
-	bytes := eventHash[:]
-	key := hex.EncodeToString(bytes)
-	return nodeID + "-" + key
-}
-
-// return a certain node has seen a certain event
-func (mn *Network) haveSeen(nodeID string, eventHash hash) bool {
+// return a certain node has seen a certain key
+func (mn *Network) haveSeen(key string) bool {
 	mn.Lock()
 	defer mn.Unlock()
-	seen, ok := mn.seenEventIDs[eventKey(nodeID, eventHash)]
+	seen, ok := mn.seenEventIDs[key]
 	if !ok {
 		return false
 	}
 	return seen
 }
 
-// mark a certain node has seen a certain event
-func (mn *Network) seen(nodeID string, eventHash hash) {
+// mark a certain node has seen a certain event for a certain engine
+func (mn *Network) seen(key string) {
 	mn.Lock()
 	defer mn.Unlock()
-	mn.seenEventIDs[eventKey(nodeID, eventHash)] = true
+	mn.seenEventIDs[key] = true
 }

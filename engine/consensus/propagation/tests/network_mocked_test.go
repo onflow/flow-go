@@ -67,7 +67,7 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 
 	// vol is set to be nil to avoid memory leak
 	// TODO: figure out why passing vol will cause memory leak
-	engine, err := propagation.NewEngine(log, net, com, pool, nil)
+	engine, err := propagation.New(log, net, com, pool, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func randCollectionHash() (*collection.GuaranteedCollection, error) {
 // send one collection to one node.
 // extracted in order to be reused in different tests
 func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
-	node.engine.SubmitGuaranteedCollection(gc)
+	node.engine.Submit(gc)
 	wg.Done()
 }
 
@@ -149,7 +149,7 @@ func TestSubmitCollection(t *testing.T) {
 		require.Nil(t, err)
 
 		// node1's engine receives a collection hash
-		err = node1.engine.SubmitGuaranteedCollection(gc)
+		err = node1.engine.Process(node1.net.GetID(), gc)
 		require.Nil(t, err)
 
 		// inspect node2's mempool to check if node2's engine received the collection hash
@@ -191,16 +191,13 @@ func TestSubmitCollection(t *testing.T) {
 			require.NotEqual(t, gc1.Hash, gc2.Hash)
 
 			// send gc1 to node1, which will broadcast to other nodes synchronously
-			err = node1.engine.SubmitGuaranteedCollection(gc1)
-			require.Nil(t, err)
+			node1.engine.Submit(gc1)
 
 			// send gc2 to node2, which will broadcast to other nodes synchronously
-			err = node2.engine.SubmitGuaranteedCollection(gc2)
-			require.Nil(t, err)
+			node2.engine.Submit(gc2)
 
 			// send gc3 to node3, which will broadcast to other nodes synchronously
-			err = node3.engine.SubmitGuaranteedCollection(gc3)
-			require.Nil(t, err)
+			node3.engine.Submit(gc3)
 
 			// now, check that all 3 nodes should have the same mempool state
 

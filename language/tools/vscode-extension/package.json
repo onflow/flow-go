@@ -1,12 +1,12 @@
 {
-  "name": "bamboo",
-  "displayName": "Bamboo",
+  "name": "cadence",
+  "displayName": "Cadence",
   "publisher": "dapperlabs",
   "description": "",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dapperlabs/bamboo-node.git"
+    "url": "https://github.com/dapperlabs/flow-go.git"
   },
   "engines": {
     "vscode": "^1.36.0"
@@ -15,52 +15,56 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:bamboo"
+    "onLanguage:cadence"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "bamboo.restartServer",
-        "category": "Bamboo",
+        "command": "cadence.restartServer",
+        "category": "Cadence",
         "title": "Restart language server"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "Bamboo configuration",
+      "title": "Cadence configuration",
       "properties": {
-        "bamboo.languageServerPath": {
+        "cadence.languageServerCommand": {
           "type": "string",
-          "default": "",
-          "description": "The path to the Bamboo language server binary",
+          "default": "flow cadence language-server",
+          "description": "The command to start the Cadence language server",
           "scope": "resource"
         }
       }
     },
     "languages": [
       {
-        "id": "bamboo",
+        "id": "cadence",
         "extensions": [
-          ".bpl"
+          ".bpl",
+          ".cadence",
+          ".cdc",
+          ".cdn",
+          ".cdnc"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "bamboo",
-        "scopeName": "source.bamboo",
-        "path": "./syntaxes/bamboo.tmGrammar.json"
+        "language": "cadence",
+        "scopeName": "source.cadence",
+        "path": "./syntaxes/cadence.tmGrammar.json"
       },
       {
-        "scopeName": "markdown.bamboo.codeblock",
+        "scopeName": "markdown.cadence.codeblock",
         "path": "./syntaxes/codeblock.json",
         "injectTo": [
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.bamboo": "bamboo"
+          "meta.embedded.block.cadence": "cadence"
         }
       }
     ]

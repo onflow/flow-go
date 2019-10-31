@@ -11,8 +11,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/client/mocks"
 	"github.com/dapperlabs/flow-go/sdk/convert"
@@ -93,7 +93,7 @@ func TestGetLatestBlock(t *testing.T) {
 	})
 }
 
-func TestCallScript(t *testing.T) {
+func TestExecuteScript(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -107,11 +107,11 @@ func TestCallScript(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		// client should return non-error if RPC call succeeds
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: valueBytes}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
-		value, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		value, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Nil(t, err)
 		assert.Equal(t, value, float64(1))
 	})
@@ -119,36 +119,36 @@ func TestCallScript(t *testing.T) {
 	t.Run("Server error", func(t *testing.T) {
 		// client should return error if RPC call fails
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
+			ExecuteScript(ctx, gomock.Any()).
 			Return(nil, errors.New("dummy error")).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
 	t.Run("Error - empty return value", func(t *testing.T) {
 		// client should return error if value is empty
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: []byte{}}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: []byte{}}, nil).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
 	t.Run("Error - malformed return value", func(t *testing.T) {
 		// client should return error if value is malformed
 		mockRPC.EXPECT().
-			CallScript(ctx, gomock.Any()).
-			Return(&observation.CallScriptResponse{Value: []byte("asdfafa")}, nil).
+			ExecuteScript(ctx, gomock.Any()).
+			Return(&observation.ExecuteScriptResponse{Value: []byte("asdfafa")}, nil).
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.CallScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 }
@@ -164,14 +164,14 @@ func TestGetEvents(t *testing.T) {
 
 	// Set up a mock event response
 	mockEvent := flow.Event{
-		ID: "Transfer",
+		Type: "Transfer",
 		Values: map[string]interface{}{
 			"to":   flow.ZeroAddress,
 			"from": flow.ZeroAddress,
 			"id":   1,
 		},
 	}
-	events := []*flow.Event{&mockEvent}
+	events := []flow.Event{mockEvent}
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(events)
@@ -185,10 +185,10 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass the response to the client
-		res, err := c.GetEvents(ctx, &flow.EventQuery{})
+		res, err := c.GetEvents(ctx, client.EventQuery{})
 		assert.Nil(t, err)
 		assert.Equal(t, len(res), 1)
-		assert.Equal(t, res[0].ID, mockEvent.ID)
+		assert.Equal(t, res[0].Type, mockEvent.Type)
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -199,7 +199,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetEvents(ctx, &flow.EventQuery{})
+		_, err = c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
 
@@ -211,7 +211,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should return an error because it should fail to decode
-		_, err = c.GetEvents(ctx, &flow.EventQuery{})
+		_, err = c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
 }

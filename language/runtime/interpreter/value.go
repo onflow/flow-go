@@ -29,15 +29,8 @@ type ExportableValue interface {
 // ValueIndexableValue
 
 type ValueIndexableValue interface {
-	Get(locationRange LocationRange, key Value) Value
-	Set(locationRange LocationRange, key Value, value Value)
-}
-
-// TypeIndexableValue
-
-type TypeIndexableValue interface {
-	Get(key sema.Type) Value
-	Set(key sema.Type, value Value)
+	Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value
+	Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value)
 }
 
 // MemberAccessibleValue
@@ -165,7 +158,7 @@ func (v StringValue) Slice(from IntValue, to IntValue) Value {
 	return NewStringValue(str[fromInt:toInt])
 }
 
-func (v StringValue) Get(_ LocationRange, key Value) Value {
+func (v StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
@@ -181,7 +174,7 @@ func (v StringValue) Get(_ LocationRange, key Value) Value {
 	return NewStringValue(char)
 }
 
-func (v StringValue) Set(_ LocationRange, key Value, value Value) {
+func (v StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
 	i := key.(IntegerValue).IntValue()
 	char := value.(StringValue).StrValue()
 
@@ -286,11 +279,11 @@ func (v ArrayValue) Concat(other ConcatenatableValue) Value {
 	return NewArrayValue(values...)
 }
 
-func (v ArrayValue) Get(_ LocationRange, key Value) Value {
+func (v ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	return (*v.Values)[key.(IntegerValue).IntValue()]
 }
 
-func (v ArrayValue) Set(_ LocationRange, key Value, value Value) {
+func (v ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
 	(*v.Values)[key.(IntegerValue).IntValue()] = value
 }
 
@@ -1193,7 +1186,7 @@ func (v DictionaryValue) ToGoValue() interface{} {
 	return v
 }
 
-func (v DictionaryValue) Get(_ LocationRange, keyValue Value) Value {
+func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
 	value, ok := v[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
@@ -1213,7 +1206,7 @@ type HasKeyString interface {
 	KeyString() string
 }
 
-func (v DictionaryValue) Set(_ LocationRange, keyValue Value, value Value) {
+func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
 	key := dictionaryKey(keyValue)
 	switch typedValue := value.(type) {
 	case SomeValue:
@@ -1487,32 +1480,22 @@ func (v AnyValue) String() string {
 // StorageValue
 
 type StorageValue struct {
-	Getter func(key sema.Type) OptionalValue
-	Setter func(key sema.Type, value OptionalValue)
+	Identifier interface{}
 }
 
 func (StorageValue) isValue() {}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
-		Getter: v.Getter,
-		Setter: v.Setter,
+		Identifier: v.Identifier,
 	}
-}
-
-func (v StorageValue) Get(key sema.Type) Value {
-	return v.Getter(key)
-}
-
-func (v StorageValue) Set(key sema.Type, value Value) {
-	v.Setter(key, value.(OptionalValue))
 }
 
 // ReferenceValue
 
 type ReferenceValue struct {
-	Storage      StorageValue
-	IndexingType sema.Type
+	StorageIdentifier interface{}
+	IndexingType      sema.Type
 }
 
 func (ReferenceValue) isValue() {}
@@ -1521,8 +1504,9 @@ func (v ReferenceValue) Copy() Value {
 	return v
 }
 
-func (v ReferenceValue) referencedValue(locationRange LocationRange) Value {
-	switch referenced := v.Storage.Getter(v.IndexingType).(type) {
+func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
+	switch referenced :=
+		interpreter.readStored(v.StorageIdentifier, v.IndexingType).(type) {
 	case SomeValue:
 		return referenced.Value
 	case NilValue:
@@ -1535,23 +1519,23 @@ func (v ReferenceValue) referencedValue(locationRange LocationRange) Value {
 }
 
 func (v ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
-	return v.referencedValue(locationRange).(MemberAccessibleValue).
+	return v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		GetMember(interpreter, locationRange, name)
 }
 
 func (v ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
-	v.referencedValue(locationRange).(MemberAccessibleValue).
+	v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		SetMember(interpreter, locationRange, name, value)
 }
 
-func (v ReferenceValue) Get(locationRange LocationRange, key Value) Value {
-	return v.referencedValue(locationRange).(ValueIndexableValue).
-		Get(locationRange, key)
+func (v ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
+	return v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
+		Get(interpreter, locationRange, key)
 }
 
-func (v ReferenceValue) Set(locationRange LocationRange, key Value, value Value) {
-	v.referencedValue(locationRange).(ValueIndexableValue).
-		Set(locationRange, key, value)
+func (v ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
+	v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
+		Set(interpreter, locationRange, key, value)
 }
 
 func init() {
