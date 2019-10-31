@@ -18,7 +18,10 @@ install-tools: crypto/relic/build
 
 .PHONY: test
 test:
-	GO111MODULE=on go test ./...
+	# test all packages with Relic library enabled
+	GO111MODULE=on go test --tags relic ./...
+	# test SDK package with Relic library disabled
+	GO111MODULE=on go test -count 1 ./sdk/...
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-mocks

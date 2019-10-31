@@ -1,3 +1,5 @@
+// +build relic
+
 #ifndef _REL_MISC_INCLUDE_H
 #define _REL_MISC_INCLUDE_H
 
