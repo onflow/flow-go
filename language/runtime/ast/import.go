@@ -92,28 +92,6 @@ func init() {
 	gob.Register(AddressLocation([]byte{}))
 }
 
-// FileLocation
-
-type FileLocation string
-
-func (l FileLocation) ID() LocationID {
-	return LocationID(l.String())
-}
-
-func (l FileLocation) String() string {
-	return string(l)
-}
-
-type REPLLocation struct{}
-
-func (l REPLLocation) ID() LocationID {
-	return LocationID(l.String())
-}
-
-func (l REPLLocation) String() string {
-	return "REPL"
-}
-
 // HasImportLocation
 
 type HasImportLocation interface {

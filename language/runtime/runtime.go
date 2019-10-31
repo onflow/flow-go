@@ -3,7 +3,6 @@ package runtime
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -21,44 +20,6 @@ import (
 
 func init() {
 	gob.Register(flow.Address{})
-}
-
-type Location ast.Location
-
-type StringLocation string
-
-func (l StringLocation) ID() ast.LocationID {
-	return ast.LocationID(l)
-}
-
-type AddressLocation ast.AddressLocation
-
-func (l AddressLocation) ID() ast.LocationID {
-	return ast.LocationID(l.String())
-}
-
-func (l AddressLocation) String() string {
-	return hex.EncodeToString([]byte(l))
-}
-
-type TransactionLocation []byte
-
-func (l TransactionLocation) ID() ast.LocationID {
-	return ast.LocationID(l.String())
-}
-
-func (l TransactionLocation) String() string {
-	return hex.EncodeToString([]byte(l))
-}
-
-type ScriptLocation []byte
-
-func (l ScriptLocation) ID() ast.LocationID {
-	return ast.LocationID(l.String())
-}
-
-func (l ScriptLocation) String() string {
-	return hex.EncodeToString([]byte(l))
 }
 
 type Interface interface {

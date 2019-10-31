@@ -16,7 +16,7 @@ type REPL struct {
 }
 
 func NewREPL(onError func(error), onResult func(interpreter.Value)) (*REPL, error) {
-	checker, err := sema.NewChecker(nil, ast.REPLLocation{})
+	checker, err := sema.NewChecker(nil, REPLLocation{})
 	if err != nil {
 		return nil, err
 	}
