@@ -18,5 +18,5 @@ This package contains everything related to the programming language:
 - We plan to write a specification for the language in [K](http://www.kframework.org/index.php/Main_Page)
   and automatically derive an interpreter from it
 
-- Once we have received more feedack for the first iteration of the language and its implementation,
+- Once we have received more feedback for the first iteration of the language and its implementation,
   we hope to specify an instruction set and implement a more efficient virtual machine
