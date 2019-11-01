@@ -5,15 +5,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -199,8 +196,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	privateKeyA := b.RootKey()
 
-	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+		[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
+	publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 	accountAddressA := b.RootAccountAddress()
 	accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, nil, getNonce())
@@ -310,7 +308,8 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		// use key-pair that does not exist on root account
-		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("invalid key"))
+		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("invalid key elephant ears space cowboy octopus rodeo potato cannon"))
 
 		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
@@ -333,11 +332,13 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("KeyWeights", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-		publicKeyA := privateKeyA.PublicKey(constants.AccountKeyWeightThreshold / 2)
+		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
+		publicKeyA := privateKeyA.PublicKey(keys.PublicKeyWeightThreshold / 2)
 
-		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("space cowboy"))
-		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold / 2)
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("space cowboy elephant ears octopus rodeo potato cannon pineapple"))
+		publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold / 2)
 
 		accountAddressA, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
 		assert.Nil(t, err)
@@ -415,8 +416,9 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		privateKeyA := b.RootKey()
 
-		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-		publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
+		privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
+		publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, nil, getNonce())

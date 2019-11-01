@@ -1,6 +1,8 @@
 package keys
 
 import (
+	"encoding/hex"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -44,6 +46,23 @@ func DecodePrivateKey(b []byte) (a flow.AccountPrivateKey, err error) {
 		SignAlgo:   signAlgo,
 		HashAlgo:   hashAlgo,
 	}, nil
+}
+
+// MustDecodePrivateKeyHex decodes a private key from a hexadecimal string.
+//
+// This function panics if the input string does not represent a valid private key.
+func MustDecodePrivateKeyHex(h string) flow.AccountPrivateKey {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		panic(err)
+	}
+
+	a, err := DecodePrivateKey(b)
+	if err != nil {
+		panic(err)
+	}
+
+	return a
 }
 
 // EncodePublicKey encodes a public key as bytes.

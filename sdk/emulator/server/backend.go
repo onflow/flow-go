@@ -92,13 +92,11 @@ func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		Hash:              block.Hash(),
 		PreviousBlockHash: block.PreviousBlockHash,
 		Number:            block.Number,
-		TransactionCount:  uint32(len(block.TransactionHashes)),
 	}
 
 	b.logger.WithFields(log.Fields{
 		"blockNum":  blockHeader.Number,
 		"blockHash": blockHeader.Hash.Hex(),
-		"blockSize": blockHeader.TransactionCount,
 	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observation.GetLatestBlockResponse{

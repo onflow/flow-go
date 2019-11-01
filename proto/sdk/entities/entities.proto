@@ -10,7 +10,6 @@ message BlockHeader {
   bytes hash = 1;
   bytes previousBlockHash = 2;
   uint64 number = 3;
-  uint32 transactionCount = 4;
 }
 
 message Block {
