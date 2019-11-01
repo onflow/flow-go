@@ -38,9 +38,9 @@ func generateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 		import Vault, createVault from 0x%s
 
 		fun main(acct: Account) {
-			var vaultA: <-Vault <- createVault(initialBalance: %d)
-    		var vaultB: <-Vault <- createVault(initialBalance: %d)
-			var vaultC: <-Vault <- createVault(initialBalance: %d)
+			let vaultA: <-Vault <- createVault(initialBalance: %d)
+    		let vaultB: <-Vault <- createVault(initialBalance: %d)
+			let vaultC: <-Vault <- createVault(initialBalance: %d)
 			
 			var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
 
@@ -106,7 +106,6 @@ func generateInspectVaultScript(nftCodeAddr, userAddr flow.Address, vaultNumber 
 			let acct = getAccount("%s")
 			let vaultArray <- acct.storage[[Vault]] ?? panic("missing vault")
 			if vaultArray[%d].balance != %d {
-				log(vaultArray[2].balance)
 				panic("incorrect Balance!")
 			}
 

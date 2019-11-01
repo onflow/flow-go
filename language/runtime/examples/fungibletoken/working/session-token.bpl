@@ -102,37 +102,25 @@ pub fun createVault(initialBalance: Int): <-Vault {
 fun main() {
 
     // create three new vaults with different balances
-    var vaultA <- createVault(initialBalance: 10)
-    var vaultB <- createVault(initialBalance: 0)
-    var vaultC <- createVault(initialBalance: 5)
-
-    // var vaultA <- create Vault(balance: 10)
-    // var vaultB <- create Vault(balance: 0)
-    // var vaultC <- create Vault(balance: 5)
+    let vaultA <- createVault(initialBalance: 10)
+    let vaultB <- createVault(initialBalance: 0)
+    let vaultC <- createVault(initialBalance: 5)
 
     var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
-
-    //var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB, <-vaultC]
 
     vaultArray.append(<-vaultC)
 
     // withdraw tokens from vaultA, which creates
     // a new vault
-    // let vaultD <- vaultA.withdraw(amount: 7)
     let vaultD <- vaultArray[0].withdraw(amount: 7)
 
     // deposit the new vault's tokens into VaultB
     // which destroys vaultD
-    //vaultB.deposit(from: <-vaultD)
     vaultArray[1].deposit(from: <-vaultD)
 
+    // transfer is a work in progress
     // let referenceA: &Vault = &vaultArray[0] as Vault
-
     // vaultArray[2].transfer(to: referenceA, amount: 1)
-
-    // log(vaultA.balance)  // 10
-    // log(vaultB.balance)  // 7
-    // log(vaultC.balance)  // 5
 
     log(vaultArray[0].balance)  // 10
     log(vaultArray[1].balance)  // 7
@@ -141,8 +129,5 @@ fun main() {
     // in this example, the vaults are not 
     // stored in an account, so they must
     // be destroyed explicitly
-    // destroy vaultA
-    // destroy vaultB
-    // destroy vaultC
     destroy vaultArray
 }
