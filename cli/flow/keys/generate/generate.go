@@ -13,7 +13,7 @@ import (
 )
 
 type Config struct {
-	Seed string `default:"elephant ears" flag:"seed,s"`
+	Seed string `default:"elephant ears" flag:"seed,s-making the seed longer"`
 }
 
 var conf Config

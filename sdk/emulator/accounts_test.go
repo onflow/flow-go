@@ -302,7 +302,8 @@ func TestAddAccountKey(t *testing.T) {
 	t.Run("ValidKey", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
 		publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
@@ -380,7 +381,8 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
-	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+		[]byte("pineapple elephant ears space cowboy octopus rodeo potato cannon"))
 	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
@@ -479,7 +481,8 @@ func TestUpdateAccountCode(t *testing.T) {
 	codeA := []byte("fun a(): Int { return 1 }")
 	codeB := []byte("fun b(): Int { return 2 }")
 
-	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+		[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
 	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {

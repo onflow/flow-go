@@ -53,14 +53,16 @@ const (
 	// ECDSA
 
 	// NIST P256
-	SignatureLengthECDSA_P256 = 64
-	PrKeyLengthECDSA_P256     = 32
-	PubKeyLengthECDSA_P256    = 64
+	SignatureLengthECDSA_P256         = 64
+	PrKeyLengthECDSA_P256             = 32
+	PubKeyLengthECDSA_P256            = 64
+	KeyGenerationSeedMinLenECDSA_P256 = 40
 
 	// SEC p256k1
-	SignatureLengthECDSA_SECp256k1 = 64
-	PrKeyLengthECDSA_SECp256k1     = 32
-	PubKeyLengthECDSA_SECp256k1    = 64
+	SignatureLengthECDSA_SECp256k1         = 64
+	PrKeyLengthECDSA_SECp256k1             = 32
+	PubKeyLengthECDSA_SECp256k1            = 64
+	KeyGenerationSeedMinLenECDSA_SECp256k1 = 40
 
 	DKGMinSize int = 3
 	ThresholdMinSize

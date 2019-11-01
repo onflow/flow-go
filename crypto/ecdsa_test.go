@@ -13,9 +13,9 @@ func TestECDSA(t *testing.T) {
 		ECDSA_P256,
 		ECDSA_SECp256k1,
 	}
-	ECDSAskLen := []int{
-		PrKeyLengthECDSA_P256,
-		PrKeyLengthECDSA_SECp256k1,
+	ECDSAseedLen := []int{
+		KeyGenerationSeedMinLenECDSA_P256,
+		KeyGenerationSeedMinLenECDSA_SECp256k1,
 	}
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
@@ -25,7 +25,7 @@ func TestECDSA(t *testing.T) {
 			log.Error(err.Error())
 			return
 		}
-		seed := make([]byte, ECDSAskLen[i]+8)
+		seed := make([]byte, ECDSAseedLen[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = byte(j)
 		}
@@ -69,15 +69,15 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		ECDSA_P256,
 		ECDSA_SECp256k1,
 	}
-	ECDSAskLen := []int{
-		PrKeyLengthECDSA_P256,
-		PrKeyLengthECDSA_SECp256k1,
+	ECDSAseedLen := []int{
+		KeyGenerationSeedMinLenECDSA_P256,
+		KeyGenerationSeedMinLenECDSA_SECp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		// Key generation seed
-		seed := make([]byte, ECDSAskLen[i]+8)
+		seed := make([]byte, ECDSAseedLen[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = byte(j)
 		}
