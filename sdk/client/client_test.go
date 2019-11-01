@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/crypto"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -149,6 +151,49 @@ func TestExecuteScript(t *testing.T) {
 
 		// error should be passed to user
 		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		assert.Error(t, err)
+	})
+}
+
+func TestGetTransaction(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockRPC := mocks.NewMockRPCClient(mockCtrl)
+
+	c := client.NewFromRPCClient(mockRPC)
+	ctx := context.Background()
+
+	tx := unittest.TransactionFixture()
+
+	events := []flow.Event{unittest.EventFixture()}
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(events)
+	assert.Nil(t, err)
+
+	t.Run("Success", func(t *testing.T) {
+		mockRPC.EXPECT().
+			GetTransaction(ctx, gomock.Any()).
+			Return(&observation.GetTransactionResponse{
+				Transaction: convert.TransactionToMessage(tx),
+				EventsJson:  buf.Bytes(),
+			}, nil).
+			Times(1)
+
+		res, err := c.GetTransaction(ctx, crypto.Hash{})
+		assert.Nil(t, err)
+		assert.Len(t, res.Events, 1)
+		assert.Equal(t, events[0].Type, res.Events[0].Type)
+	})
+
+	t.Run("Server error", func(t *testing.T) {
+		mockRPC.EXPECT().
+			GetTransaction(ctx, gomock.Any()).
+			Return(nil, fmt.Errorf("dummy error")).
+			Times(1)
+
+		// The client should pass along the error
+		_, err = c.GetTransaction(ctx, crypto.Hash{})
 		assert.Error(t, err)
 	})
 }

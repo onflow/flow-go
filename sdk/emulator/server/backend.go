@@ -127,9 +127,14 @@ func (b *Backend) GetTransaction(ctx context.Context, req *observation.GetTransa
 		Debugf("💵  GetTransaction called")
 
 	txMsg := convert.TransactionToMessage(*tx)
-
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(tx.Events)
+	if err != nil {
+		return nil, err
+	}
 	return &observation.GetTransactionResponse{
 		Transaction: txMsg,
+		EventsJson:  buf.Bytes(),
 	}, nil
 }
 

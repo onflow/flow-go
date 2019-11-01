@@ -228,6 +228,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 
 	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
 	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionFinalized)
+	b.pendingWorldState.UpdateTransactionEvents(tx.Hash(), events)
 
 	b.updatePendingWorldStates(tx.Hash())
 
@@ -458,9 +459,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 //
 // This function parses AccountCreated events to update the lastCreatedAccount field.
 func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
-	for i, event := range events {
-		event.Index = uint(i)
-		event.TxHash = txHash
+	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == constants.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)

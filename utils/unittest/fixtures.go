@@ -76,3 +76,14 @@ func AccountPublicKeyFixture() flow.AccountPublicKey {
 		Weight:    constants.AccountKeyWeightThreshold,
 	}
 }
+
+func EventFixture() flow.Event {
+	return flow.Event{
+		Type: "Transfer",
+		Values: map[string]interface{}{
+			"to":   flow.ZeroAddress,
+			"from": flow.ZeroAddress,
+			"id":   1,
+		},
+	}
+}
