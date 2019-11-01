@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -216,7 +215,7 @@ func TestCreateAccount(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
-		require.Equal(t, constants.EventAccountCreated, lastEvent.Type)
+		require.Equal(t, flow.EventAccountCreated, lastEvent.Type)
 		require.IsType(t, flow.Address{}, lastEvent.Values["address"])
 
 		accountAddress := lastEvent.Values["address"].(flow.Address)
