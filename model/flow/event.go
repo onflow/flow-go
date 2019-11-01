@@ -5,6 +5,8 @@ package flow
 import (
 	"fmt"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/hash"
 	"strings"
 )
 
@@ -40,28 +42,25 @@ func (e Event) String() string {
 
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() string {
-	b, _ := e.Encode()
-	_ = b
-	// TODO hash here
-	return ""
+	return hash.DefaultHasher.ComputeHash(e.Encode()).Hex()
 }
 
-func (e Event) Encode() ([]byte, error) {
+// Encode returns the canonical encoding of the event, containing only the
+// fields necessary to uniquely identify it.
+func (e Event) Encode() []byte {
 	w := wrapEvent(e)
-	_ = w
-	// TODO encode here
-	return nil, nil
+	return encoding.DefaultEncoder.MustEncode(w)
 }
 
 // Defines only the fields needed to uniquely identify an event.
 type eventWrapper struct {
 	TxHash []byte
-	Index  int
+	Index  uint
 }
 
 func wrapEvent(e Event) eventWrapper {
 	return eventWrapper{
 		TxHash: e.TxHash,
-		Index:  e.Index,
+		Index:  uint(e.Index),
 	}
 }

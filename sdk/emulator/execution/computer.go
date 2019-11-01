@@ -45,13 +45,8 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 	if err != nil {
 		return nil, err
 	}
-	events := runtimeContext.Events()
-	for i, event := range events {
-		event.Index = i
-		event.TxHash = tx.Hash()
-	}
 
-	return events, nil
+	return runtimeContext.Events(), nil
 }
 
 // ExecuteScript executes a plain script in the runtime.
