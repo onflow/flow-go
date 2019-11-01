@@ -9,5 +9,5 @@ The documentation for the Bamboo Programming Language is available as
 
 ## Updating the HTML and PDF
 
-- Install the dependencies: `node install`
+- Install the dependencies: `npm install`
 - Run the generator: `node generate.js`
