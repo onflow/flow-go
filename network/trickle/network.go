@@ -209,20 +209,9 @@ func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error
 		return nil, nil, errors.Wrap(err, "could not encode event")
 	}
 
-	// if we don't have the engine, use an engine specific payload hash
-	engine, ok := n.engines[engineID]
-	if !ok {
-		return nil, nil, errors.Errorf("missing engine on pack (%d)", engineID)
-	}
-
-	// try to identify using engine, otherwise use same engine specific hash
-	eventID, err := engine.Identify(event)
-	if err != nil {
-		sip := siphash.New([]byte("trickleengine" + fmt.Sprintf("%03d", engineID)))
-		return sip.Sum(payload), payload, nil
-	}
-
-	return eventID, payload, nil
+	// use a hash with an engine-specific salt to get the payload hash
+	sip := siphash.New([]byte("trickleengine" + fmt.Sprintf("%03d", engineID)))
+	return sip.Sum(payload), payload, nil
 }
 
 // submit will submit the given event for the given engine to the overlay layer
