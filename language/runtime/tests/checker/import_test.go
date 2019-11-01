@@ -156,7 +156,9 @@ func TestCheckImportTypes(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-               %s Test {}
+               %[1]s Test {}
+
+               %[1]s interface TestInterface {}
             `, kind.Keyword()))
 
 			// TODO: add support for non-structure / non-resource declarations
@@ -166,9 +168,10 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.Nil(t, err)
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 			}
 
 			_, err = ParseAndCheckWithOptions(t,
@@ -176,8 +179,11 @@ func TestCheckImportTypes(t *testing.T) {
 					`
                       import "imported"
 
-                      let x: %[1]sTest %[2]s %[3]s Test()
+                      %[1]s TestImpl: TestInterface {}
+
+                      let x: %[2]sTest %[3]s %[4]s Test()
                     `,
+					kind.Keyword(),
 					kind.Annotation(),
 					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
@@ -201,9 +207,13 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 3)
+				errs := ExpectCheckerErrors(t, err, 5)
 
 				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[4])
 			}
 
 		})
