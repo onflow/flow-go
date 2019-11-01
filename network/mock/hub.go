@@ -1,6 +1,8 @@
 package mock
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 // Hub is a value that stores mocked networks in order for them to send events directly
 type Hub struct {
