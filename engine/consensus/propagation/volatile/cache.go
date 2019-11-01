@@ -7,26 +7,25 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Volatile struct {
+type Cache struct {
 	cache *ristretto.Cache
 }
 
-func New() (*Volatile, error) {
+func NewCache() (*Cache, error) {
 	cache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 1e7, // 10x num items on full cache
-		MaxCost:     1e6, // 1 MB total size
+		NumCounters: 1e6, // 1M hashes
+		MaxCost:     1e5, // 100k hashes
 		BufferItems: 64,  // recommended value
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize cache")
 	}
-	v := &Volatile{
+	c := &Cache{
 		cache: cache,
 	}
-	return v, nil
+	return c, nil
 }
 
-// Close closes the cache.
-func (v *Volatile) Close() {
-	v.cache.Close()
+func (c *Cache) Close() {
+	c.cache.Close()
 }

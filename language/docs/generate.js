@@ -34,8 +34,8 @@ const processor = unified()
   .use(validateLinks)
   .use(styleGuide)
   .use(highlight, {
-    languageScopes: {'bamboo': 'source.bamboo'},
-    grammarPaths: ['../tools/vscode-extension/syntaxes/bamboo.tmGrammar.json'],
+    languageScopes: {'cadence': 'source.cadence'},
+    grammarPaths: ['../tools/vscode-extension/syntaxes/cadence.tmGrammar.json'],
     themePath: './light_vs.json'
   })
   .use(
@@ -48,7 +48,7 @@ const processor = unified()
   .use(sectionize)
   .use(remark2rehype)
   .use(doc, {
-    title: 'Bamboo Programming Language',
+    title: 'Cadence Programming Language',
     css: ['style.css', "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css"]
   })
   .use(addClasses, {

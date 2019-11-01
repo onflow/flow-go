@@ -53,6 +53,7 @@ type Transaction struct {
 	ScriptAccounts     []Address
 	Signatures         []AccountSignature
 	Status             TransactionStatus
+	Events             []Event
 }
 
 // Hash returns the canonical hash of this transaction.

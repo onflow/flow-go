@@ -81,4 +81,6 @@ message GetTransactionRequest {
 
 message GetTransactionResponse {
   flow.sdk.entities.Transaction transaction = 1;
+  // Contains JSON-encoded array of event objects
+  bytes events_json = 2;
 }

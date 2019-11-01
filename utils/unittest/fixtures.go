@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 const PublicKeyFixtureCount = 2
@@ -43,7 +43,6 @@ func BlockHeaderFixture() flow.BlockHeader {
 		Hash:              crypto.Hash("abc"),
 		PreviousBlockHash: crypto.Hash("def"),
 		Number:            100,
-		TransactionCount:  2000,
 	}
 }
 
@@ -73,6 +72,17 @@ func AccountPublicKeyFixture() flow.AccountPublicKey {
 		PublicKey: PublicKeyFixtures()[0],
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
+		Weight:    keys.PublicKeyWeightThreshold,
+	}
+}
+
+func EventFixture() flow.Event {
+	return flow.Event{
+		Type: "Transfer",
+		Values: map[string]interface{}{
+			"to":   flow.ZeroAddress,
+			"from": flow.ZeroAddress,
+			"id":   1,
+		},
 	}
 }

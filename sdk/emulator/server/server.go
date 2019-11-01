@@ -122,7 +122,7 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 
 			b.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,
-				"blockHash": block.Hash(),
+				"blockHash": block.Hash().Hex(),
 				"blockSize": len(block.TransactionHashes),
 			}).Debugf("⛏  Block #%d mined", block.Number)
 

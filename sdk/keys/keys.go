@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 )
 
 // KeyType is a key format supported by Flow.
@@ -44,7 +43,8 @@ func (k KeyType) HashingAlgorithm() crypto.HashingAlgorithm {
 	}
 }
 
-const KeyWeightThreshold = constants.AccountKeyWeightThreshold
+// PublicKeyWeightThreshold is the total weight required for a set of keys to unlock an account.
+const PublicKeyWeightThreshold int = 1000
 
 // GeneratePrivateKey generates a private key of the specified key type.
 func GeneratePrivateKey(keyType KeyType, seed []byte) (flow.AccountPrivateKey, error) {

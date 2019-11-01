@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -109,7 +108,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
+		publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
 
 		address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
 		assert.Nil(t, err)
