@@ -13,7 +13,7 @@ import (
 )
 
 type Config struct {
-	Seed string `flag:"seed,s"`
+	Seed string `flag:"seed,s" info:"deterministic seed phrase"`
 }
 
 var conf Config
