@@ -222,6 +222,12 @@
             <p><a href="#storage-references">Storage References</a></p>
           </li>
           <li>
+            <p><a href="#events">Events</a></p>
+            <ul>
+              <li><a href="#emitting-events">Emitting events</a></li>
+            </ul>
+          </li>
+          <li>
             <p><a href="#transactions">Transactions</a></p>
             <ul>
               <li><a href="#deploying-code">Deploying Code</a></li>
@@ -4694,6 +4700,32 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">limitedReference.increment()</span><span>
 </span></code></pre>
+      </section>
+      <section>
+        <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
+        <p>Events are special values that can be emitted during the execution of a program.</p>
+        <p>An event type can be declared with the <code>event</code> keyword:</p>
+        <pre><code class="language-bamboo">event MyEvent(x: Int, y: Int)
+</code></pre>
+        <p>The syntax of an event declaration is similar to that of a <a href="#function-declarations">function declaration</a>; events contain named parameters, each of which has an optional argument label.</p>
+        <pre><code class="language-bamboo">// Event with argument labels
+event MyEvent(fieldA x: Int, fieldB y: Int)
+</code></pre>
+        <section>
+          <h3 id="emitting-events"><a href="#emitting-events" aria-hidden="true"><span class="icon icon-link"></span></a>Emitting events</h3>
+          <p>To emit an event from a program, use the <code>emit</code> statement:</p>
+          <pre><code class="language-bamboo">event MyEvent(x: Int, y: Int)
+
+fun foo() {
+    emit MyEvent(x: 1, y: 2)
+}
+</code></pre>
+          <p>Restrictions:</p>
+          <ul>
+            <li>Events can only be invoked in an <code>emit</code> statement. This means events cannot be assigned to variables or used as function parameters.</li>
+            <li>Events can only be emitted from the location in which they are defined.</li>
+          </ul>
+        </section>
       </section>
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
