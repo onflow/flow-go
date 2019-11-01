@@ -496,9 +496,9 @@ func TestGetTransaction(t *testing.T) {
 
 		assert.Equal(t, resTx.Status, flow.TransactionFinalized)
 		assert.Len(t, resTx.Events, 1)
-		assert.Equal(t, resTx.Events[0].TxHash, tx.Hash())
-		assert.Equal(t, resTx.Events[0].Type, fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex()))
-		assert.Equal(t, resTx.Events[0].Index, uint(0))
-		assert.Equal(t, resTx.Events[0].Values["x"], big.NewInt(1))
+		assert.Equal(t, tx.Hash(), resTx.Events[0].TxHash)
+		assert.Equal(t, fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex()), resTx.Events[0].Type)
+		assert.Equal(t, uint(0), resTx.Events[0].Index)
+		assert.Equal(t, big.NewInt(1), resTx.Events[0].Values["x"])
 	})
 }
