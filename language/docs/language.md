@@ -71,16 +71,16 @@ Mutli-line comments are balanced.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind a value to a name.
-Constants can only be initialized with a value and cannot be reassigned afterwards.
-Variables can be initialized with a value and can be reassigned later.
-Declarations are valid in any scope, including the global scope.
+Constants and variables are declarations that bind a value and [type](#type-safety) to an identifier.
+Constants are initialized with a value and cannot be reassigned afterwards.
+Variables are initialized with a value and can be reassigned later.
+Declarations can be created in any scope, including the global scope.
 
-Constant means that the *name* is constant, not the *value* –
-the value may still be changed if it allows it, i.e. is mutable.
+Constant means that the *identifier's* association is constant, not the *value* itself –
+the value may still be changed if is mutable. 
 
 Constants are declared using the `let` keyword. Variables are declared using the `var` keyword.
-The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the identifier, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```cadence,file=constants-and-variables.cdc
 // Declare a constant named `a`.
@@ -108,9 +108,7 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared,
-it cannot be redeclared with the same name,
-with a different type,
+Once a constant or variable is declared, it cannot be redeclared
 or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
 
 ```cadence
@@ -194,9 +192,8 @@ let integerWithoutAnnotation = 1
 let smallIntegerWithAnnotation: Int8 = 1
 ```
 
-If a type annotation is provided, the initial value must be of this type,
-and new values assigned to variables must match the declaration's explicit type
-or the type that was inferred when the variable was declared.
+If a type annotation is provided, the initial value must be of this type.
+All new values assigned to variables must match its type.
 This type safety is explained in more detail in a [separate section](#type-safety).
 
 ```cadence
@@ -348,7 +345,7 @@ let binaryNumber = 0b10_11_01
 
 ### Integers
 
-Integers are whole numbers without a fractional part.
+Integers are numbers without a fractional part.
 They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero)
 and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
@@ -383,7 +380,7 @@ let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
 Integer literals are [inferred](#type-inference) to have type `Int`,
-or if the literal occurrs in a position that expects an explicit type,
+or if the literal occurs in a position that expects an explicit type,
 e.g. in a variable declaration with an explicit type annotation.
 
 ```cadence
@@ -394,7 +391,7 @@ let someNumber = 123
 
 Negative integers are encoded in two's complement representation.
 
-Integer types are not converted automatically. Types most be explicitly converted,
+Integer types are not converted automatically. Types must be explicitly converted,
 which can be done by calling the constructor of the type with the integer type.
 
 ```cadence
@@ -620,8 +617,8 @@ let b = a ?? 2
 let c = 1 ?? 2
 ```
 
-The type of the right-hand side of the operator (the alternative value) must be a subtype
-of the type of the left-hand side, i.e. the right-hand side of the operator must
+The type of the right-hand side of the operator (the alternative value) must be compatible
+with the left-hand side, i.e. the right-hand side of the operator must
 be the non-optional or optional type matching the type of the left-hand side.
 
 ```cadence
@@ -1370,8 +1367,8 @@ let a = 1
 a = 2
 ```
 
-The left-hand side of the assignment opera must be an identifier,
-followed by one or more index or access expressions.
+The left-hand side of the assignment operand must be an identifier.
+For arrays and dictionaries, followed by one or more index or access expressions.
 
 ```cadence,file=assignment-numbers.cdc
 // Declare an array of integers.
@@ -2187,7 +2184,7 @@ Control flow statements control the flow of execution in a function.
 If-statements allow a certain piece of code to be executed only when a given condition is true.
 
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
-The condition must be boolean and the braces are required.
+The condition expression must be Bool
 The braces are required and not optional.
 Parentheses around the condition are optional.
 
@@ -2640,7 +2637,7 @@ However, the initial values for fields are set in the initializer,
 **not** in the field declaration.
 All fields **must** be initialized in the initializer, exactly once.
 
-Having to provide intitial values in the initializer might seem restrictive,
+Having to provide initial values in the initializer might seem restrictive,
 but this ensures that all fields are always initialized in one location, the initializer,
 and the initialization order is clear.
 
@@ -2659,7 +2656,7 @@ The initializer always follows any fields.
 There are three kinds of fields:
 
 - **Constant fields** are also stored in the composite value,
-  but after they have been inititalized with a value they **cannot** have new values assigned to them afterwards.
+  but after they have been initialized with a value they **cannot** have new values assigned to them afterwards.
   A constant field must be initialized exactly once.
 
   Constant fields are declared using the `let` keyword.
@@ -2695,7 +2692,7 @@ Fields can be read (if they are constant or variable) and set (if they are varia
 // Both fields are initialized through the initializer.
 //
 // The public access modifier `pub` is used in this example to allow
-// thes fields to be read in outer scopes. Fields can also be declared
+// the fields to be read in outer scopes. Fields can also be declared
 // private so they cannot be accessed in outer scopes.
 // Access control will be explained in a later section.
 //
@@ -2791,7 +2788,8 @@ struct Token {
 
 ### Composite Data Type Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  Assignments are not allowed at all in getters and setters.
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  
+Only certain assignments are allowed in getters and setters.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
@@ -2826,7 +2824,7 @@ let example = GetterExample(balance: 10)
 // `example.balance` is `10`
 
 example.balance = -50
-// `example.balance` is `0`. Without the getter it would be `-50`.
+// `example.balance` is `-50` internally, but while reading value, getter returns `0` instead.
 ```
 
 Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses.
@@ -3049,7 +3047,7 @@ var something: A = A()
 // Invalid: Assign a value of type `B` to the variable.
 // Even though types `A` and `B` have the same declarations,
 // a function with the same name and type, the types' names differ,
-// so they are not compatbile.
+// so they are not compatible.
 //
 something = B()
 
@@ -3142,7 +3140,7 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`.
 //
-let a: <-SomeResource <- SomeResource(value: 0)
+let a: <-SomeResource <- create SomeResource(value: 0)
 
 // *Move* the resource value to a new constant.
 //
@@ -3199,7 +3197,7 @@ d.value
 ```
 
 To make it explicit that the type is moved, it must be prefixed with `<-` in all type annotations,
-e.g. for variable declarations, parametes, or return types.
+e.g. for variable declarations, parameters, or return types.
 
 ```cadence,file=resource-type-annotation.cdc
 // Declare a constant with an explicit type annotation.
@@ -3369,7 +3367,7 @@ destroy res
 
 #### Nested Resources
 
-Fields in composite data types behave diffently when they have a resource type.
+Fields in composite data types behave differently when they have a resource type.
 
 If a resource type has fields that have a resource type it **must** declare a destructor,
 which **must** invalidate all resource fields, i.e. move or destroy them.
