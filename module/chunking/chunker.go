@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	exec "github.com/dapperlabs/flow-go/pkg/model/execution"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	exec "github.com/dapperlabs/flow-go/model/execution"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Chunker converts executed transactions into chunks
@@ -16,7 +16,7 @@ type Chunker interface {
 // GetChunks returns an array of chunks given an slice of ExecutedTransaction (greedy chunker)
 func GetChunks(Txs []exec.ExecutedTransaction, maxGasSpentPerChunk uint64) ([]exec.Chunk, error) {
 	var totalGasSpent uint64
-	var activeTxs []types.Transaction
+	var activeTxs []flow.Transaction
 	var chunks []exec.Chunk
 	for _, tx := range Txs {
 		if tx.GasSpent > maxGasSpentPerChunk {
@@ -26,7 +26,7 @@ func GetChunks(Txs []exec.ExecutedTransaction, maxGasSpentPerChunk uint64) ([]ex
 		// if adding tx would overflow the chunk
 		if totalGasSpent+tx.GasSpent > maxGasSpentPerChunk {
 			chunks = append(chunks, exec.Chunk{Transactions: activeTxs, TotalGasSpent: totalGasSpent, FirstTxInTheNextChunk: tx.Tx})
-			activeTxs = make([]types.Transaction, 0)
+			activeTxs = make([]flow.Transaction, 0)
 			totalGasSpent = 0
 		}
 		activeTxs = append(activeTxs, *tx.Tx)

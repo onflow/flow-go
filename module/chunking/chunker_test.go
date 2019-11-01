@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	exec "github.com/dapperlabs/flow-go/pkg/model/execution"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	exec "github.com/dapperlabs/flow-go/model/execution"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type TestCase struct {
@@ -43,7 +43,7 @@ func TestGetChunks(t *testing.T) {
 		var txs []exec.ExecutedTransaction
 		for _, spending := range testCase.gasSpendingSeq {
 			expectedTotalComputationLimit += spending
-			txs = append(txs, exec.ExecutedTransaction{Tx: &types.Transaction{}, GasSpent: spending, MaxGas: 1000})
+			txs = append(txs, exec.ExecutedTransaction{Tx: &flow.Transaction{}, GasSpent: spending, MaxGas: 1000})
 		}
 		chunks, err := GetChunks(txs, testCase.maxComputationLimit)
 		if err == nil {

@@ -5,8 +5,8 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	exec "github.com/dapperlabs/flow-go/pkg/model/execution"
+	"github.com/dapperlabs/flow-go/crypto"
+	exec "github.com/dapperlabs/flow-go/model/execution"
 )
 
 // SeedPrep prepares a seed for Rand

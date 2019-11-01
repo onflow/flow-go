@@ -5,9 +5,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	exec "github.com/dapperlabs/flow-go/pkg/model/execution"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	exec "github.com/dapperlabs/flow-go/model/execution"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestSeedPrep(t *testing.T) {
@@ -20,7 +20,7 @@ func TestChunkSelectAndVerify(t *testing.T) {
 	var ChunkTotalGasSpent = []uint64{100, 200, 100, 200, 100, 200}
 	var chunks []exec.Chunk
 	for i, totalGas := range ChunkTotalGasSpent {
-		chunks = append(chunks, exec.Chunk{Transactions: []types.Transaction{types.Transaction{Script: []byte("script"), ReferenceBlockHash: []byte("blockhash"), Nonce: uint64(i), ComputeLimit: uint64(1000)}}, TotalGasSpent: totalGas})
+		chunks = append(chunks, exec.Chunk{Transactions: []flow.Transaction{flow.Transaction{Script: []byte("script"), ReferenceBlockHash: []byte("blockhash"), Nonce: uint64(i), ComputeLimit: uint64(1000)}}, TotalGasSpent: totalGas})
 	}
 	ratio := 0.5
 	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, []byte{1, 2, 3, 4})
@@ -46,7 +46,7 @@ func TestChunkSelectAndVerify(t *testing.T) {
 	}
 
 	// check the proofs
-	verified, _ := VerifyChunkSelfSelect(er, ratio, sk.Publickey(), selectedChunks, proof)
+	verified, _ := VerifyChunkSelfSelect(er, ratio, sk.PublicKey(), selectedChunks, proof)
 	if !verified {
 		t.Error(fmt.Sprintf("Failed to verify the output of ChunkSelfSelect"))
 	}

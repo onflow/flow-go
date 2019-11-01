@@ -9,7 +9,6 @@ import (
 
 type Spock []byte
 
-// this is the part is publishable
 type ExecutionReceipt struct {
 	ExecutionResult   ExecutionResult
 	Spocks            []Spock
