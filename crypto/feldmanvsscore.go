@@ -31,14 +31,14 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	// One DKGToSend to be broadcasted
 	out.action = make([]DKGToSend, s.size)
 	for i := 1; i <= s.size; i++ {
-		shareSize := PrKeyLengthBLS_BLS12381
+		shareSize := PrKeyLenBLS_BLS12381
 		// the leader own share
 		if i-1 == s.currentIndex {
 			xdata := make([]byte, shareSize)
 			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
 				(*C.uchar)(&xdata[0]),
-				PrKeyLengthBLS_BLS12381,
+				PrKeyLenBLS_BLS12381,
 			)
 			continue
 		}
@@ -54,7 +54,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 	// prepare the DKGToSend to be broadcasted
 	toBroadcast := &(out.action[s.size-1])
 	toBroadcast.broadcast = true
-	vectorSize := (PubKeyLengthBLS_BLS12381) * (s.threshold + 1)
+	vectorSize := (PubKeyLenBLS_BLS12381) * (s.threshold + 1)
 	data := make([]byte, vectorSize+1)
 	data[0] = byte(FeldmanVSSVerifVec)
 	writeVerifVector(data[1:], s.A)
@@ -71,13 +71,13 @@ func (s *feldmanVSSstate) receiveShare(origin int, data []byte) (DKGresult, erro
 	if s.xReceived {
 		return invalid, nil
 	}
-	if (len(data)) != PrKeyLengthBLS_BLS12381 {
+	if (len(data)) != PrKeyLenBLS_BLS12381 {
 		return invalid, nil
 	}
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLengthBLS_BLS12381,
+		PrKeyLenBLS_BLS12381,
 	)
 
 	s.xReceived = true
@@ -93,7 +93,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin int, data []byte) (DKGresult
 	if s.AReceived {
 		return invalid, nil
 	}
-	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
+	if (PubKeyLenBLS_BLS12381)*(s.threshold+1) != len(data) {
 		return invalid, nil
 	}
 	// read the verification vector

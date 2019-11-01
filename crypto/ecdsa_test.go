@@ -14,8 +14,8 @@ func TestECDSA(t *testing.T) {
 		ECDSA_SECp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenerationSeedMinLenECDSA_P256,
-		KeyGenerationSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenECDSA_P256,
+		KeyGenSeedMinLenECDSA_SECp256k1,
 	}
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
@@ -70,8 +70,8 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		ECDSA_SECp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenerationSeedMinLenECDSA_P256,
-		KeyGenerationSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenECDSA_P256,
+		KeyGenSeedMinLenECDSA_SECp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {

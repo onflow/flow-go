@@ -24,7 +24,7 @@ var Cmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var seed []byte
 		if conf.Seed == "" {
-			seed = cli.RandomSeed(crypto.KeyGenerationSeedMinLenECDSA_P256)
+			seed = cli.RandomSeed(crypto.KeyGenSeedMinLenECDSA_P256)
 		} else {
 			seed = []byte(conf.Seed)
 		}
