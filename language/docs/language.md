@@ -4614,6 +4614,39 @@ limitedReference.count  // is `43`
 limitedReference.increment()
 ```
 
+## Events
+
+Events are special values that can be emitted during the execution of a program.
+
+An event type can be declared with the `event` keyword:
+
+```bamboo
+event MyEvent(x: Int, y: Int)
+```
+
+The syntax of an event declaration is similar to that of a [function declaration](#function-declarations); events contain named parameters, each of which has an optional argument label.
+
+```bamboo
+// Event with argument labels
+event MyEvent(fieldA x: Int, fieldB y: Int)
+```
+
+### Emitting events
+
+To emit an event from a program, use the `emit` statement:
+
+```bamboo
+event MyEvent(x: Int, y: Int)
+
+fun foo() {
+    emit MyEvent(x: 1, y: 2)
+}
+```
+
+Restrictions:
+- Events can only be invoked in an `emit` statement. This means events cannot be assigned to variables or used as function parameters.
+- Events can only be emitted from the location in which they are defined.
+
 ## Transactions
 
 > 🚧 Status: The `transaction` syntax is not implemented yet. For now, declare a function named `main`.
