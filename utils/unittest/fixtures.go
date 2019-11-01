@@ -43,7 +43,6 @@ func BlockHeaderFixture() flow.BlockHeader {
 		Hash:              crypto.Hash("abc"),
 		PreviousBlockHash: crypto.Hash("def"),
 		Number:            100,
-		TransactionCount:  2000,
 	}
 }
 
