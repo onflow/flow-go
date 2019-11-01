@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -371,12 +370,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx flow.Transaction) error {
 		accountWeights[accountSig.Account] += accountPublicKey.Weight
 	}
 
-	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
+	if accountWeights[tx.PayerAccount] < keys.PublicKeyWeightThreshold {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < constants.AccountKeyWeightThreshold {
+		if accountWeights[account] < keys.PublicKeyWeightThreshold {
 			return &ErrMissingSignature{account}
 		}
 	}
@@ -461,7 +460,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
-		if event.Type == constants.EventAccountCreated {
+		if event.Type == flow.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
 
 			account, err := b.GetAccount(accountAddress)
@@ -500,7 +499,7 @@ func createRootAccount(
 		privateKey = *customPrivateKey
 	}
 
-	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 	publicKeyBytes, _ := flow.EncodeAccountPublicKey(publicKey)
 
 	registers := ws.Registers.NewView()

@@ -11,6 +11,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
+// List of built-in account event types.
+const (
+	EventAccountCreated string = "flow.AccountCreated"
+	EventAccountUpdated string = "flow.AccountUpdated"
+)
+
 type Event struct {
 	// TxHash is the hash of the transaction this event was emitted from.
 	TxHash crypto.Hash

@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 const PublicKeyFixtureCount = 2
@@ -72,7 +72,7 @@ func AccountPublicKeyFixture() flow.AccountPublicKey {
 		PublicKey: PublicKeyFixtures()[0],
 		SignAlgo:  crypto.ECDSA_P256,
 		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
+		Weight:    keys.PublicKeyWeightThreshold,
 	}
 }
 
