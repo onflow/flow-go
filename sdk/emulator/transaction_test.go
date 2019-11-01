@@ -2,6 +2,7 @@ package emulator_test
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -497,7 +498,7 @@ func TestGetTransaction(t *testing.T) {
 		assert.Len(t, resTx.Events, 1)
 		assert.Equal(t, resTx.Events[0].TxHash, tx.Hash())
 		assert.Equal(t, resTx.Events[0].Type, fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex()))
-		assert.Equal(t, resTx.Events[0].Index, 0)
-		assert.Equal(t, resTx.Events[0].Values["x"], 1)
+		assert.Equal(t, resTx.Events[0].Index, uint(0))
+		assert.Equal(t, resTx.Events[0].Values["x"], big.NewInt(1))
 	})
 }

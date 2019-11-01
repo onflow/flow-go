@@ -459,9 +459,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 //
 // This function parses AccountCreated events to update the lastCreatedAccount field.
 func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
-	for i, event := range events {
-		event.Index = uint(i)
-		event.TxHash = txHash
+	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == constants.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
