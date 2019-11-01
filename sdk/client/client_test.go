@@ -21,6 +21,36 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func TestPing(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockRPC := mocks.NewMockRPCClient(mockCtrl)
+
+	c := client.NewFromRPCClient(mockRPC)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		mockRPC.EXPECT().
+			Ping(ctx, gomock.Any()).
+			Return(&observation.PingResponse{}, nil).
+			Times(1)
+
+		err := c.Ping(ctx)
+		assert.Nil(t, err)
+	})
+
+	t.Run("ServerError", func(t *testing.T) {
+		mockRPC.EXPECT().
+			Ping(ctx, gomock.Any()).
+			Return(nil, fmt.Errorf("fake error")).
+			Times(1)
+
+		err := c.Ping(ctx)
+		assert.Error(t, err)
+	})
+}
+
 func TestSendTransaction(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

@@ -51,6 +51,12 @@ func (c *Client) Close() error {
 	return c.close()
 }
 
+// Ping tests the connection to the Observation API.
+func (c *Client) Ping(ctx context.Context) error {
+	_, err := c.rpcClient.Ping(ctx, &observation.PingRequest{})
+	return err
+}
+
 // SendTransaction submits a transaction to the network.
 func (c *Client) SendTransaction(ctx context.Context, tx flow.Transaction) error {
 	txMsg := convert.TransactionToMessage(tx)
