@@ -19,7 +19,7 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 		hasher := &sha3_256Algo{
 			commonHasher: &commonHasher{
 				algo:       algo,
-				outputSize: HashLengthSha3_256,
+				outputSize: HashLenSha3_256,
 				Hash:       sha3.New256()}}
 
 		// Output length sanity check, size() is provided by Hash.hash
@@ -34,7 +34,7 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 		hasher := &sha3_384Algo{
 			commonHasher: &commonHasher{
 				algo:       algo,
-				outputSize: HashLengthSha3_384,
+				outputSize: HashLenSha3_384,
 				Hash:       sha3.New384()}}
 		// Output length sanity check, size() is provided by Hash.hash
 		if hasher.outputSize != hasher.Size() {
@@ -48,7 +48,7 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 		hasher := &sha2_256Algo{
 			commonHasher: &commonHasher{
 				algo:       algo,
-				outputSize: HashLengthSha2_256,
+				outputSize: HashLenSha2_256,
 				Hash:       sha256.New()}}
 
 		// Output length sanity check, size() is provided by Hash.hash
@@ -63,7 +63,7 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 		hasher := &sha2_384Algo{
 			commonHasher: &commonHasher{
 				algo:       algo,
-				outputSize: HashLengthSha2_384,
+				outputSize: HashLenSha2_384,
 				Hash:       sha512.New384()}}
 
 		// Output length sanity check, size() is provided by Hash.hash

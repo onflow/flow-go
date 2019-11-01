@@ -23,9 +23,9 @@ var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() error {
 	// sanity checks of lengths
-	if a.prKeyLength != PrKeyLengthBLS_BLS12381 ||
-		a.pubKeyLength != PubKeyLengthBLS_BLS12381 ||
-		a.signatureLength != SignatureLengthBLS_BLS12381 {
+	if a.prKeyLength != PrKeyLenBLS_BLS12381 ||
+		a.pubKeyLength != PubKeyLenBLS_BLS12381 ||
+		a.signatureLength != SignatureLenBLS_BLS12381 {
 		return cryptoError{"BLS Lengths in types.go are not matching bls_include.h"}
 	}
 
