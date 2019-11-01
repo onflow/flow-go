@@ -129,7 +129,7 @@ func randCollectionHash() (*collection.GuaranteedCollection, error) {
 // extracted in order to be reused in different tests
 func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
 	node.engine.Submit(gc)
-	node.net.Hub().FlushAll()
+	node.net.FlushAll()
 	wg.Done()
 }
 
@@ -151,7 +151,7 @@ func TestSubmitCollection(t *testing.T) {
 		// node1's engine receives a collection hash
 		err = node1.engine.Process(node1.net.GetID(), gc)
 		require.Nil(t, err)
-		node1.net.Hub().FlushAll()
+		node1.net.FlushAll()
 
 		// inspect node2's mempool to check if node2's engine received the collection hash
 		coll, err := node2.pool.Get(gc.Hash)
@@ -193,15 +193,15 @@ func TestSubmitCollection(t *testing.T) {
 
 			// send gc1 to node1, which will broadcast to other nodes synchronously
 			node1.engine.Submit(gc1)
-			node1.net.Hub().FlushAll()
+			node1.net.FlushAll()
 
 			// send gc2 to node2, which will broadcast to other nodes synchronously
 			node2.engine.Submit(gc2)
-			node1.net.Hub().FlushAll()
+			node1.net.FlushAll()
 
 			// send gc3 to node3, which will broadcast to other nodes synchronously
 			node3.engine.Submit(gc3)
-			node1.net.Hub().FlushAll()
+			node1.net.FlushAll()
 
 			// now, check that all 3 nodes should have the same mempool state
 
