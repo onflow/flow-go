@@ -93,7 +93,8 @@ func (mn *Network) FlushAll() {
 	mn.hub.Buffer.Flush(mn.sendToAllTargets)
 }
 
-// FlushUnblocked takes a predict function to return if a message should be blocked.
+// FlushUnblocked takes a predict function, which returns if a message should be blocked, and flushes all the pending
+// messages in the buffer..
 // When going through each message, it will ignore the message if the message should be blocked, or send it off if not.
 // It runs in a loop until all the pending messages have been either blocked or sent out.
 func (mn *Network) FlushUnblocked(shouldBlock func(*PendingMessage) bool) {
