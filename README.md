@@ -137,7 +137,7 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 | Collection  | [Peter Siemens](https://github.com/psiemens) | [/internal/roles/collect](/internal/roles/collect) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
-| Verification | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
+| Verification | [Moar Zamski](https://github.com/pazams) [Ramtin Seraj](https://github.com/ramtinms)| [/internal/roles/verify](/internal/roles/verify) |
 | Observation | [Peter Siemens](https://github.com/psiemens)     | [/internal/roles/observe](/internal/roles/observe) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/pkg/network](/pkg/network) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/pkg/crypto](/pkg/crypto) |
