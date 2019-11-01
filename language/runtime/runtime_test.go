@@ -649,11 +649,11 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location ImportLocation) (bytes []byte, e error) {
+		resolveImport: func(location Location) (bytes []byte, e error) {
 			switch location {
-			case StringImportLocation("imported1"):
+			case StringLocation("imported1"):
 				return imported1, nil
-			case StringImportLocation("imported2"):
+			case StringLocation("imported2"):
 				return imported2, nil
 			default:
 				return nil, fmt.Errorf("unknown import location: %s", location)
