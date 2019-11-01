@@ -18,7 +18,7 @@ func TestSubmitCollection(t *testing.T) {
 	// If a consensus node receives a collection hash, then another connected node should receive it as well.
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
-		// can be delivery directly to another engine on a different node
+		// can be delivered directly to another engine on a different node
 		_, nodes, err := createConnectedNodes([]string{"consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298"})
 		require.Nil(t, err)
 
