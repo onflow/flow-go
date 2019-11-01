@@ -26,7 +26,7 @@ func TestCreateAccount(t *testing.T) {
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
@@ -63,14 +63,14 @@ func TestCreateAccount(t *testing.T) {
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		publicKeyB := flow.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil)
@@ -108,14 +108,14 @@ func TestCreateAccount(t *testing.T) {
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		publicKeyB := flow.AccountPublicKey{
 			PublicKey: publicKeys[1],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		code := []byte("fun main() {}")
@@ -192,7 +192,7 @@ func TestCreateAccount(t *testing.T) {
 			PublicKey: publicKeys[0],
 			SignAlgo:  crypto.ECDSA_P256,
 			HashAlgo:  crypto.SHA3_256,
-			Weight:    constants.AccountKeyWeightThreshold,
+			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
 		code := []byte("fun main() {}")
@@ -239,7 +239,7 @@ func TestCreateAccount(t *testing.T) {
 			SignAlgo:  crypto.ECDSA_P256,
 			// SHA2_384 is not compatible with ECDSA_P256
 			HashAlgo: crypto.SHA2_384,
-			Weight:   constants.AccountKeyWeightThreshold,
+			Weight:   keys.PublicKeyWeightThreshold,
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
@@ -303,7 +303,7 @@ func TestAddAccountKey(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-		publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+		publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
 		assert.Nil(t, err)
@@ -352,7 +352,7 @@ func TestAddAccountKey(t *testing.T) {
 			SignAlgo:  crypto.ECDSA_P256,
 			// SHA2_384 is not compatible with ECDSA_P256
 			HashAlgo: crypto.SHA2_384,
-			Weight:   constants.AccountKeyWeightThreshold,
+			Weight:   keys.PublicKeyWeightThreshold,
 		}
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
@@ -381,7 +381,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.Nil(t, err)
@@ -480,7 +480,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	codeB := []byte("fun b(): Int { return 2 }")
 
 	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
-	publicKeyB := privateKeyB.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {
 		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
@@ -615,7 +615,7 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	publicKey := b.RootKey().PublicKey(constants.AccountKeyWeightThreshold)
+	publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
 
 	address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
 	assert.Nil(t, err)

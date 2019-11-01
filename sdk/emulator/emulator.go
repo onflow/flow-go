@@ -371,12 +371,12 @@ func (b *EmulatedBlockchain) verifySignatures(tx flow.Transaction) error {
 		accountWeights[accountSig.Account] += accountPublicKey.Weight
 	}
 
-	if accountWeights[tx.PayerAccount] < constants.AccountKeyWeightThreshold {
+	if accountWeights[tx.PayerAccount] < keys.PublicKeyWeightThreshold {
 		return &ErrMissingSignature{tx.PayerAccount}
 	}
 
 	for _, account := range tx.ScriptAccounts {
-		if accountWeights[account] < constants.AccountKeyWeightThreshold {
+		if accountWeights[account] < keys.PublicKeyWeightThreshold {
 			return &ErrMissingSignature{account}
 		}
 	}
@@ -500,7 +500,7 @@ func createRootAccount(
 		privateKey = *customPrivateKey
 	}
 
-	publicKey := privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 	publicKeyBytes, _ := flow.EncodeAccountPublicKey(publicKey)
 
 	registers := ws.Registers.NewView()

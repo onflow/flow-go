@@ -7,7 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -19,7 +19,7 @@ func TestCreateAccount(t *testing.T) {
 		PublicKey: publicKey,
 		SignAlgo:  publicKey.Algorithm(),
 		HashAlgo:  crypto.SHA3_256,
-		Weight:    constants.AccountKeyWeightThreshold,
+		Weight:    keys.PublicKeyWeightThreshold,
 	}
 
 	// create account with no code
