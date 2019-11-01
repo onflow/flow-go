@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestEventEmitted(t *testing.T) {
@@ -33,7 +34,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		tx := &flow.Transaction{
+		tx := flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -41,16 +42,21 @@ func TestEventEmitted(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
 
-		err := b.SubmitTransaction(tx)
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
 
 		require.Len(t, events, 1)
 
 		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, events[0].Type)
+		assert.Equal(t, expectedID, events[0].ID())
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
 		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
 	})
@@ -78,6 +84,7 @@ func TestEventEmitted(t *testing.T) {
 		require.Len(t, events, 1)
 
 		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, events[0].Type)
 		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
@@ -115,7 +122,7 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`, address.Hex()))
 
-		tx := &flow.Transaction{
+		tx := flow.Transaction{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
@@ -123,7 +130,10 @@ func TestEventEmitted(t *testing.T) {
 			PayerAccount:       b.RootAccountAddress(),
 		}
 
-		tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
@@ -134,8 +144,10 @@ func TestEventEmitted(t *testing.T) {
 		actualEvent := events[1]
 
 		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
+		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)
+		assert.Equal(t, expectedID, actualEvent.ID())
 		assert.Equal(t, big.NewInt(1), actualEvent.Values["x"])
 		assert.Equal(t, big.NewInt(2), actualEvent.Values["y"])
 	})

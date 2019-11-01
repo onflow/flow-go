@@ -2,11 +2,9 @@
 package flow
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/cli/flow/accounts"
 	"github.com/dapperlabs/flow-go/cli/flow/cadence"
 	"github.com/dapperlabs/flow-go/cli/flow/emulator"
@@ -31,7 +29,6 @@ func init() {
 
 func Execute() {
 	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		cli.Exit(1, err.Error())
 	}
 }

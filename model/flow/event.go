@@ -5,13 +5,23 @@ package flow
 import (
 	"fmt"
 	"strings"
+
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 type Event struct {
+	// TxHash is the hash of the transaction this event was emitted from.
+	TxHash crypto.Hash
+	// Type is the qualified event type.
 	Type string
 	// Values is a map of all the parameters to the event, keys are parameter
 	// names, values are the parameter values and must be primitive types.
 	Values map[string]interface{}
+	// Index defines the ordering of events in a transaction. The first event
+	// emitted has index 0, the second has index 1, and so on.
+	Index uint
 }
 
 // String returns the string representation of this event.
@@ -29,4 +39,29 @@ func (e Event) String() string {
 	}
 
 	return fmt.Sprintf("%s(%s)", e.Type, values.String())
+}
+
+// ID returns a canonical identifier that is guaranteed to be unique.
+func (e Event) ID() string {
+	return hash.DefaultHasher.ComputeHash(e.Encode()).Hex()
+}
+
+// Encode returns the canonical encoding of the event, containing only the
+// fields necessary to uniquely identify it.
+func (e Event) Encode() []byte {
+	w := wrapEvent(e)
+	return encoding.DefaultEncoder.MustEncode(w)
+}
+
+// Defines only the fields needed to uniquely identify an event.
+type eventWrapper struct {
+	TxHash []byte
+	Index  uint
+}
+
+func wrapEvent(e Event) eventWrapper {
+	return eventWrapper{
+		TxHash: e.TxHash,
+		Index:  e.Index,
+	}
 }

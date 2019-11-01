@@ -4650,7 +4650,7 @@ func TestInterpretStorage(t *testing.T) {
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	//
 
-	getter := func(_ interface{}, key sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type) interpreter.OptionalValue {
 		value, ok := storedValues[key.String()]
 		if !ok {
 			return interpreter.NilValue{}
@@ -4658,7 +4658,7 @@ func TestInterpretStorage(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ interface{}, key sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type, value interpreter.OptionalValue) {
 		storedValues[key.String()] = value
 	}
 
@@ -5041,7 +5041,7 @@ func TestInterpretEmitEvent(t *testing.T) {
             `,
 	)
 
-	inter.SetOnEventEmitted(func(event interpreter.EventValue) {
+	inter.SetOnEventEmittedHandler(func(_ *interpreter.Interpreter, event interpreter.EventValue) {
 		actualEvents = append(actualEvents, event)
 	})
 
@@ -5228,7 +5228,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
 		value, ok := storedValues[keyType.String()]
@@ -5238,7 +5238,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 		return value
 	}
 
-	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
 		storedValues[keyType.String()] = value
@@ -5308,7 +5308,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
 		value, ok := storedValues[keyType.String()]
@@ -5318,7 +5318,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 		return value
 	}
 
-	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
 		storedValues[keyType.String()] = value
@@ -5390,7 +5390,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
 		value, ok := storedValues[keyType.String()]
@@ -5400,7 +5400,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 		return value
 	}
 
-	setter := func(id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
 		storedValues[keyType.String()] = value

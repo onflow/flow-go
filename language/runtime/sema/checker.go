@@ -190,6 +190,10 @@ func (checker *Checker) report(err error) {
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
+	for _, declaration := range program.ImportDeclarations() {
+		checker.declareImportDeclaration(declaration)
+	}
+
 	// pre-declare interfaces, composites, and functions (check afterwards)
 
 	for _, declaration := range program.InterfaceDeclarations() {
@@ -211,6 +215,12 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	// check all declarations
 
 	for _, declaration := range program.Declarations {
+
+		// Skip import declarations, they are already handled above
+		if _, isImport := declaration.(*ast.ImportDeclaration); isImport {
+			continue
+		}
+
 		declaration.Accept(checker)
 		checker.declareGlobalDeclaration(declaration)
 	}
@@ -579,8 +589,10 @@ func (checker *Checker) enterValueScope() {
 	checker.valueActivations.Enter()
 }
 
-func (checker *Checker) leaveValueScope() {
-	checker.checkResourceLoss(checker.valueActivations.Depth())
+func (checker *Checker) leaveValueScope(checkResourceLoss bool) {
+	if checkResourceLoss {
+		checker.checkResourceLoss(checker.valueActivations.Depth())
+	}
 	checker.valueActivations.Leave()
 }
 
@@ -615,12 +627,6 @@ func (checker *Checker) checkResourceLoss(depth int) {
 	}
 }
 
-func (checker *Checker) withValueScope(f func()) {
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
-	f()
-}
-
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
@@ -641,11 +647,11 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
-	selfFieldMember := checker.selfFieldAccessMember(expression)
+	accessedSelfMember := checker.accessedSelfMember(expression)
 
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if selfFieldMember == nil {
+		if accessedSelfMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
@@ -661,8 +667,8 @@ func (checker *Checker) recordResourceInvalidation(
 		EndPos:   expression.EndPosition(),
 	}
 
-	if selfFieldMember != nil {
-		checker.resources.AddInvalidation(selfFieldMember, invalidation)
+	if accessedSelfMember != nil {
+		checker.resources.AddInvalidation(accessedSelfMember, invalidation)
 		return
 	}
 

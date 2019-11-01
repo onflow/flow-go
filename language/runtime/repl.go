@@ -60,7 +60,7 @@ func (r *REPL) execute(element ast.Element) {
 
 func (r *REPL) check(element ast.Element, code string) bool {
 	element.Accept(r.checker)
-	return !r.handleCheckerError(code)
+	return r.handleCheckerError(code)
 }
 
 func (r *REPL) Accept(code string) (inputIsComplete bool) {

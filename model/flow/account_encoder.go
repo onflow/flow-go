@@ -100,11 +100,3 @@ func DecodeAccountPrivateKey(b []byte) (AccountPrivateKey, error) {
 		HashAlgo:   hashAlgo,
 	}, nil
 }
-
-func EncodeAccountSignature(a AccountSignature) []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		a.Account.Bytes(),
-		a.Signature,
-	})
-	return b
-}

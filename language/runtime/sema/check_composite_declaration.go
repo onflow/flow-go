@@ -490,8 +490,10 @@ func (checker *Checker) checkSpecialFunction(
 	// NOTE: new activation, so `self`
 	// is only visible inside the special function
 
+	checkResourceLoss := containerKind != ContainerKindInterface
+
 	checker.enterValueScope()
-	defer checker.leaveValueScope()
+	defer checker.leaveValueScope(checkResourceLoss)
 
 	checker.declareSelfValue(containerType)
 
@@ -507,6 +509,7 @@ func (checker *Checker) checkSpecialFunction(
 		specialFunction.FunctionBlock,
 		true,
 		initializationInfo,
+		checkResourceLoss,
 	)
 
 	if containerKind == ContainerKindInterface &&
@@ -524,23 +527,27 @@ func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
 	selfType *CompositeType,
 ) {
+
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.withValueScope(func() {
+		func() {
+			checker.enterValueScope()
+			defer checker.leaveValueScope(true)
 
 			checker.declareSelfValue(selfType)
 
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:        true,
-					declareFunction: false,
+					mustExit:          true,
+					declareFunction:   false,
+					checkResourceLoss: true,
 				},
 			)
-		})
+		}()
 	}
 }
 
