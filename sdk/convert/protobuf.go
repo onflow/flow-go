@@ -15,7 +15,6 @@ func MessageToBlockHeader(m *entities.BlockHeader) flow.BlockHeader {
 		Hash:              crypto.BytesToHash(m.GetHash()),
 		PreviousBlockHash: crypto.BytesToHash(m.GetPreviousBlockHash()),
 		Number:            m.GetNumber(),
-		TransactionCount:  m.GetTransactionCount(),
 	}
 }
 
@@ -24,7 +23,6 @@ func BlockHeaderToMessage(b flow.BlockHeader) *entities.BlockHeader {
 		Hash:              b.Hash,
 		PreviousBlockHash: b.PreviousBlockHash,
 		Number:            b.Number,
-		TransactionCount:  b.TransactionCount,
 	}
 }
 
