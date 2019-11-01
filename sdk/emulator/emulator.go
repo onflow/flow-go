@@ -491,7 +491,8 @@ func createRootAccount(
 
 	if customPrivateKey == nil {
 		var err error
-		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte("elephant ears"))
+		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
+			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
 		if err != nil {
 			panic(err)
 		}

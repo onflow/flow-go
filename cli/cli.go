@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -43,4 +44,15 @@ func MustDecodeAccountPrivateKeyHex(prKeyHex string) flow.AccountPrivateKey {
 		Exitf(1, "Failed to decode account private key err: %v", err)
 	}
 	return prKey
+}
+
+func RandomSeed(n int) []byte {
+	seed := make([]byte, n)
+
+	_, err := rand.Read(seed)
+	if err != nil {
+		Exitf(1, "Failed to generate random seed: %v", err)
+	}
+
+	return seed
 }
