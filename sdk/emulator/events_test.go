@@ -66,7 +66,6 @@ func TestEventEmitted(t *testing.T) {
 
 		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
 			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				fmt.Println(event.Index, event.TxHash)
 				events = append(events, event)
 			},
 		})
