@@ -21,7 +21,7 @@ type Event struct {
 	Values map[string]interface{}
 	// Index defines the ordering of events in a transaction. The first event
 	// emitted has index 0, the second has index 1, and so on.
-	Index int
+	Index uint
 }
 
 // String returns the string representation of this event.
@@ -62,6 +62,6 @@ type eventWrapper struct {
 func wrapEvent(e Event) eventWrapper {
 	return eventWrapper{
 		TxHash: e.TxHash,
-		Index:  uint(e.Index),
+		Index:  e.Index,
 	}
 }
