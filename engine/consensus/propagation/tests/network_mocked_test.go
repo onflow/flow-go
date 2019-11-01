@@ -129,6 +129,7 @@ func randCollectionHash() (*collection.GuaranteedCollection, error) {
 // extracted in order to be reused in different tests
 func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
 	node.engine.Submit(gc)
+	node.net.Hub().FlushAll()
 	wg.Done()
 }
 

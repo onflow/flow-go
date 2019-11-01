@@ -39,40 +39,13 @@ func NewNetwork(com module.Committee, hub *Hub) *Network {
 	return o
 }
 
+func (mn *Network) Hub() *Hub {
+	return mn.hub
+}
+
 // submit is called when an Engine is sending an event to an Engine on another node or nodes.
 func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string) error {
-	for _, nodeID := range targetIDs {
-		// Find the network of the targeted node
-		receiverNetwork, ok := mn.hub.Networks[nodeID]
-		if !ok {
-			return errors.Errorf("Network can not find a node by ID %v", nodeID)
-		}
-
-		key := eventKey(engineID, event)
-
-		// Check if the given engine already received the event.
-		// This prevents a node receiving the same event twice.
-		if receiverNetwork.haveSeen(key) {
-			continue
-		}
-
-		// mark the peer has seen the event
-		receiverNetwork.seen(key)
-
-		// Find the engine of the targeted network
-		receiverEngine, ok := receiverNetwork.engines[engineID]
-		if !ok {
-			return errors.Errorf("Network can not find engine ID: %v for node: %v", engineID, nodeID)
-		}
-
-		// Find the engine of the targeted network
-		// Call `Process` to let receiver engine receive the event directly.
-		err := receiverEngine.Process(mn.GetID(), event)
-
-		if err != nil {
-			return errors.Wrapf(err, "senderEngine failed to process event: %v", event)
-		}
-	}
+	mn.hub.Buffer(mn.GetID(), engineID, event, targetIDs)
 	return nil
 }
 
