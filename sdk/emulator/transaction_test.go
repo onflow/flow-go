@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -447,5 +451,53 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressA.Bytes()))
 		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressB.Bytes()))
+	})
+}
+
+func TestGetTransaction(t *testing.T) {
+	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+	eventsScript := `
+		event MyEvent(x: Int)
+
+		fun main(account: Account) {
+			emit MyEvent(x: 1)	
+		}
+	`
+
+	tx := flow.Transaction{
+		Script:         []byte(eventsScript),
+		Nonce:          getNonce(),
+		ComputeLimit:   10,
+		PayerAccount:   b.RootAccountAddress(),
+		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
+	}
+
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	assert.Nil(t, err)
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
+
+	err = b.SubmitTransaction(tx)
+	assert.Nil(t, err)
+
+	t.Run("InvalidHash", func(t *testing.T) {
+		_, err := b.GetTransaction(crypto.Hash{})
+		if assert.Error(t, err) {
+			fmt.Println(err.Error())
+			assert.IsType(t, nil, nil)
+		}
+	})
+
+	t.Run("ValidHash", func(t *testing.T) {
+		resTx, err := b.GetTransaction(tx.Hash())
+		require.Nil(t, err)
+
+		assert.Equal(t, resTx.Status, flow.TransactionFinalized)
+		assert.Len(t, resTx.Events, 1)
+		assert.Equal(t, resTx.Events[0].TxHash, tx.Hash())
+		assert.Equal(t, resTx.Events[0].Type, fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex()))
+		assert.Equal(t, resTx.Events[0].Index, 0)
+		assert.Equal(t, resTx.Events[0].Values["x"], 1)
 	})
 }

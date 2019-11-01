@@ -228,6 +228,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 
 	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
 	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionFinalized)
+	b.pendingWorldState.UpdateTransactionEvents(tx.Hash(), events)
 
 	b.updatePendingWorldStates(tx.Hash())
 
