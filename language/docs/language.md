@@ -1,10 +1,10 @@
-# Bamboo Programming Language
+# Cadence Programming Language
 
 ## Table of Contents
 
 ## Introduction
 
-The Bamboo Programming Language is a new high-level programming language intended for smart contract development.
+The Cadence Programming Language is a new high-level programming language intended for smart contract development.
 
 The language's goals are, in order of importance:
 
@@ -42,7 +42,7 @@ A comment is text that is not executed.
 *Single-line comments* start with two slashes (`//`).
 These comments can go on a line by themselves or they can go directly after a line of code.
 
-```bamboo,file=single-line-comment.bpl
+```cadence,file=single-line-comment.bpl
 // This is a comment on a single line.
 // Another comment line that is not executed.
 
@@ -52,20 +52,20 @@ let x = 1  // Here is another comment after a line of code.
 *Multi-line comments* start with a slash and an asterisk (`/*`)
 and end with an asterisk and a slash (`*/`):
 
-```bamboo,file=multi-line-comment.bpl
+```cadence,file=multi-line-comment.bpl
 /* This is a comment which
 spans multiple lines. */
 ```
 
 Comments may be nested.
 
-```bamboo,file=nested-comment.bpl
+```cadence,file=nested-comment.bpl
 /* /* this */ is a valid comment */
 ```
 
 Mutli-line comments are balanced.
 
-```bamboo,file=invalid-nested-comment.bpl
+```cadence,file=invalid-nested-comment.bpl
 /* this is a // comment up to here */ this is not part of the comment */
 ```
 
@@ -82,7 +82,7 @@ the value may still be changed if it allows it, i.e. is mutable.
 Constants are declared using the `let` keyword. Variables are declared using the `var` keyword.
 The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
-```bamboo,file=constants-and-variables.bpl
+```cadence,file=constants-and-variables.bpl
 // Declare a constant named `a`.
 //
 let a = 1
@@ -102,7 +102,7 @@ b = 4
 
 Variables and constants **must** be initialized.
 
-```bamboo
+```cadence
 // Invalid: the constant has no initial value.
 //
 let a
@@ -113,7 +113,7 @@ it cannot be redeclared with the same name,
 with a different type,
 or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
 
-```bamboo
+```cadence
 // Declare a constant named `a`.
 //
 let a = 1
@@ -141,7 +141,7 @@ var a = 5
 
 However, variables can be redeclared in sub-scopes.
 
-```bamboo
+```cadence
 // Declare a constant named `a`.
 //
 let a = 1
@@ -159,7 +159,7 @@ if true {
 
 A variable cannot be used as its own initial value.
 
-```bamboo
+```cadence
 // Invalid: Use of variable in its own initial value.
 let a = a
 ```
@@ -171,7 +171,7 @@ to make it explicit what type the declaration has.
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
-```bamboo,file=type-annotations.bpl
+```cadence,file=type-annotations.bpl
 // Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.
 //
 // `Bool` is the type of booleans.
@@ -199,7 +199,7 @@ and new values assigned to variables must match the declaration's explicit type
 or the type that was inferred when the variable was declared.
 This type safety is explained in more detail in a [separate section](#type-safety).
 
-```bamboo
+```cadence
 // Invalid: declare a variable with an explicit type `Bool`,
 // but the initial value has type `Int`.
 //
@@ -220,7 +220,7 @@ Names may start with any upper or lowercase letter (A-Z, a-z) or an underscore (
 This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
 Names may not begin with a number.
 
-```bamboo
+```cadence
 // Valid: title-case
 //
 PersonID
@@ -265,7 +265,7 @@ but can be omitted if only one statement appears on the line.
 Semicolons must be used to separate multiple statements if they appear on the same line –
 exactly one semicolon between each pair of statements.
 
-```bamboo,file=semicolons.bpl
+```cadence,file=semicolons.bpl
 // Declare a constant, without a semicolon.
 //
 let a = 1
@@ -303,7 +303,7 @@ Non-decimal literals have a specific prefix.
 | **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
-```bamboo,file=numbers.bpl
+```cadence,file=numbers.bpl
 // A decimal number
 //
 1234567890  // is `1234567890`
@@ -333,7 +333,7 @@ Non-decimal literals have a specific prefix.
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
-```bamboo,file=number-underscores-decimal.bpl
+```cadence,file=number-underscores-decimal.bpl
 let largeNumber = 1_000_000
 
 // Invalid: Value is not a number literal, but a variable.
@@ -342,7 +342,7 @@ let notNumber = _123
 
 Underscores are allowed for all numeral systems.
 
-```bamboo,file=number-underscores-binary.bpl
+```cadence,file=number-underscores-binary.bpl
 let binaryNumber = 0b10_11_01
 ```
 
@@ -365,12 +365,12 @@ The types are independent types, i.e. not subtypes of each other.
 - **`UInt32`**: 0 through 4294967295
 - **`UInt64`**: 0 through 18446744073709551615
 
-```bamboo
+```cadence
 // Declare a constant that has type `UInt8` and the value 10.
 let smallNumber: UInt8 = 10
 ```
 
-```bamboo
+```cadence
 // Invalid: negative literal cannot be used as an unsigned integer
 //
 let invalidNumber: UInt8 = -10
@@ -378,7 +378,7 @@ let invalidNumber: UInt8 = -10
 
 In addition, the arbitrary precision integer type `Int` is provided.
 
-```bamboo
+```cadence
 let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
@@ -386,7 +386,7 @@ Integer literals are [inferred](#type-inference) to have type `Int`,
 or if the literal occurrs in a position that expects an explicit type,
 e.g. in a variable declaration with an explicit type annotation.
 
-```bamboo
+```cadence
 let someNumber = 123
 
 // `someNumber` has type `Int`
@@ -397,7 +397,7 @@ Negative integers are encoded in two's complement representation.
 Integer types are not converted automatically. Types most be explicitly converted,
 which can be done by calling the constructor of the type with the integer type.
 
-```bamboo
+```cadence
 let x: Int8 = 1
 let y: Int16 = 2
 
@@ -429,7 +429,7 @@ The type `Address` represents an address.
 Addresses are unsigned integers with a size of 160 bits (20 bytes).
 Hexadecimal integer literals can be used to create address values.
 
-```bamboo
+```cadence
 // Declare a constant that has type `Address`.
 //
 let someAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d
@@ -447,7 +447,7 @@ let alsoNotAnAddress: Address = 0x06012c8cf97bead5deae237070f9587f8e7a266d123456
 
 Integer literals are not inferred to be an address.
 
-```bamboo
+```cadence
 // Declare a number. Even though it happens to be a valid address,
 // it is not inferred as it.
 //
@@ -459,7 +459,7 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 
 `Any` is the top type, i.e., all types are a subtype of it.
 
-```bamboo
+```cadence
 // Declare a variable that has the type `Any`.
 // Any value can be assigned to it, for example an integer.
 //
@@ -473,7 +473,7 @@ However, using `Any` does not opt-out of type checking.
 It is invalid to access fields and call functions on `Any` typed values,
 as it has no fields and functions.
 
-```bamboo
+```cadence
 // Declare a variable that has the type `Any`. The initial value is an integer,
 // but the variable  still has the explicit type `Any`.
 //
@@ -488,7 +488,7 @@ a + 2
 `Any` may be used like any other type, for example, it may be the element type of [arrays](#arrays)
 or be the element type of an [optional type](#optionals).
 
-```bamboo
+```cadence
 // Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.
 //
 let anyValues: [Any] = [1, "2", true]
@@ -504,7 +504,7 @@ maybeSomething = nil
 
 `Any` is also the super-type of optional types.
 
-```bamboo
+```cadence
 let maybeInt: Int? = 1
 let anything: Any = y
 ```
@@ -520,7 +520,7 @@ i.e. either nothing, or an integer.
 
 The value representing nothing is `nil`.
 
-```bamboo,file=optional.bpl
+```cadence,file=optional.bpl
 // Declare a constant which has an optional integer type,
 // with nil as its initial value.
 //
@@ -542,7 +542,7 @@ let x: Int = nil
 
 Optionals can be created for any value, not just for literals.
 
-```bamboo,file=optional-wrapping.bpl
+```cadence,file=optional-wrapping.bpl
 // Declare a constant which has a non-optional integer type,
 // with 1 as its initial value.
 //
@@ -562,7 +562,7 @@ var z: Any? = x
 
 A non-optional type is a subtype of its optional type.
 
-```bamboo
+```cadence
 var a: Int? = nil
 let b = 2
 a = b
@@ -572,7 +572,7 @@ a = b
 
 Optional types may be contained in other types, for example [arrays](#arrays) or even optionals.
 
-```bamboo
+```cadence
 // Declare a constant which has an array type of optional integers.
 let xs: [Int?] = [1, nil, 2, nil]
 
@@ -588,7 +588,7 @@ or returns an alternative value if the optional has no value, i.e., the optional
 
 If the left-hand side is non-nil, the right-hand side is not evaluated.
 
-```bamboo
+```cadence
 // Declare a constant which has an optional integer type
 //
 let a: Int? = nil
@@ -602,7 +602,7 @@ let b: Int = a ?? 42
 
 The nil-coalescing operator can only be applied to values which have an optional type.
 
-```bamboo
+```cadence
 // Declare a constant with a non-optional integer type.
 //
 let a = 1
@@ -613,7 +613,7 @@ let a = 1
 let b = a ?? 2
 ```
 
-```bamboo
+```cadence
 // Invalid: nil-coalescing operator is applied to a value which has a non-optional type
 // (the integer literal is of type `Int`).
 //
@@ -624,7 +624,7 @@ The type of the right-hand side of the operator (the alternative value) must be 
 of the type of the left-hand side, i.e. the right-hand side of the operator must
 be the non-optional or optional type matching the type of the left-hand side.
 
-```bamboo
+```cadence
 // Declare a constant with an optional integer type.
 //
 let a: Int? = nil
@@ -652,7 +652,7 @@ otherwise the result is `nil`.
 The cast and check is performed at run-time, i.e. when the program is executed,
 not statically, i.e. when the program is checked.
 
-```bamboo,file=conditional-downcasting-any.bpl
+```cadence,file=conditional-downcasting-any.bpl
 // Declare a constant named `something` which has type `Any`,
 // with an initial value which has type `Int`.
 //
@@ -676,7 +676,7 @@ Downcasting works for nested types (e.g. arrays),
 interfaces (if a [resource](#resources) interface not to a concrete resource),
 and optionals.
 
-```bamboo,file=conditional-downcasting-any-array.bpl
+```cadence,file=conditional-downcasting-any-array.bpl
 // Declare a constant named `values` which has type `[Any]`,
 // i.e. an array of arbitrarily typed values.
 //
@@ -696,7 +696,7 @@ There is no value that has type `Never`.
 `Never` can be used as the return type for functions that never return normally.
 For example, it is the return type of the function [`panic`](#panic).
 
-```bamboo
+```cadence
 // Declare a function named `crashAndBurn` which will never return,
 // because it calls the function named `panic`, which never returns.
 //
@@ -727,7 +727,7 @@ Strings are immutable.
 
 String and character literals are enclosed in double quotation marks (`"`).
 
-```bamboo
+```cadence
 let someString = "Hello, world!"
 ```
 
@@ -744,7 +744,7 @@ String literals may contain escape sequences. An escape sequence starts with a b
   where `x` is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value,
   i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
 
-```bamboo
+```cadence
 // Declare a constant which contains two lines of text
 // (separated by the line feed character `\n`), and ends
 // with a thumbs up emoji, which has code point U+1F44D (0x1F44D).
@@ -766,7 +766,7 @@ which turns a `u` into a `ü`.
 
 Still, both variants represent the same human-readable character `ü`.
 
-```bamboo
+```cadence
 let singleScalar: Character = "\u{FC}"
 // `singleScalar` is `ü`
 let twoScalars: Character = "\u{75}\u{308}"
@@ -777,7 +777,7 @@ Another example where multiple Unicode scalar values are rendered as a single,
 human-readable character is a flag emoji.
 These emojis consist of two "REGIONAL INDICATOR SYMBOL LETTER" Unicode scalar values.
 
-```bamboo
+```cadence
 // Declare a constant for a string with a single character, the emoji
 // for the Canadian flag, which consists of two Unicode scalar values:
 // - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)
@@ -793,7 +793,7 @@ Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
 
-    ```bamboo,file=string-length-field.bpl
+    ```cadence,file=string-length-field.bpl
     let example = "hello"
 
     // Find the number of elements of the string.
@@ -807,7 +807,7 @@ Strings have multiple built-in functions you can use.
   This function creates a new string whose length is the sum of the lengths
   of the string the function is called on and the string given as a parameter.
 
-    ```bamboo,file=string-concat.bpl
+    ```cadence,file=string-concat.bpl
     let example = "hello"
     let new = "world"
 
@@ -823,7 +823,7 @@ Strings have multiple built-in functions you can use.
   It does not modify the original string.
   If either of the parameters are out of the bounds of the string, the function will fail.
 
-    ```bamboo,file=string-slice.bpl
+    ```cadence,file=string-slice.bpl
     let example = "helloworld"
 
     // Create a new slice of part of the original string.
@@ -851,7 +851,7 @@ All values in an array must have the same type.
 Arrays may contain a value multiple times.
 Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
-```bamboo,file=arrays.bpl
+```cadence,file=arrays.bpl
 // An empty array
 //
 []
@@ -882,7 +882,7 @@ when assigning to a variable,
 when used as function argument,
 or when returned from a function call.
 
-```bamboo,file=array-types.bpl
+```cadence,file=array-types.bpl
 // Declare a fixed-sized array of integers
 // which always contains exactly two elements.
 //
@@ -911,7 +911,7 @@ Indexes start at 0 for the first element in the array.
 
 Accessing an element which is out of bounds results in a fatal error at run-time and aborts the program.
 
-```bamboo,file=arrays-indexing.bpl
+```cadence,file=arrays-indexing.bpl
 // Declare an array of integers.
 let numbers = [42, 23]
 
@@ -928,7 +928,7 @@ numbers[1] // is `23`
 numbers[2]
 ```
 
-```bamboo,file=arrays-nested-indexing.bpl
+```cadence,file=arrays-nested-indexing.bpl
 // Declare an array of arrays of integers, i.e. the type is `[[Int]]`.
 let arrays = [[1, 2], [3, 4]]
 
@@ -939,7 +939,7 @@ arrays[1][0] // is `3`
 
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
-```bamboo,file=array-indexing-assignment.bpl
+```cadence,file=array-indexing-assignment.bpl
 // Declare an array of integers.
 let numbers = [42, 23]
 
@@ -965,7 +965,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
 - `length: Int`:
   Returns the number of elements in the array.
 
-    ```bamboo,file=array-length-field.bpl
+    ```cadence,file=array-length-field.bpl
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -984,7 +984,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
   This function creates a new array whose length is the sum of the length of the array
   the function is called on and the length of the array given as the parameter.
 
-    ```bamboo,file=array-concat.bpl
+    ```cadence,file=array-concat.bpl
     // Declare two arrays of integers.
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
@@ -1002,7 +1002,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
 - `contains(_ element: T): Bool`:
   Indicates whether the given element of type `T` is in the array.
 
-    ```bamboo,file=array-contains.bpl
+    ```cadence,file=array-contains.bpl
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1030,7 +1030,7 @@ It is invalid to use one of these functions on a fixed-sized array.
 
   The new element must be the same type as all the other elements in the array.
 
-    ```bamboo,file=array-append.bpl
+    ```cadence,file=array-append.bpl
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1054,7 +1054,7 @@ It is invalid to use one of these functions on a fixed-sized array.
 
   All the elements after the new inserted element are shifted to the right by one.
 
-    ```bamboo,file=array-insert.bpl
+    ```cadence,file=array-insert.bpl
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1072,7 +1072,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The `index` must be within the bounds of the array.
   If the index is outside the bounds, the program aborts.
 
-    ```bamboo,file=array-remove.bpl
+    ```cadence,file=array-remove.bpl
     // Declare an array of integers.
     let numbers = [42, 23, 31]
 
@@ -1091,7 +1091,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The array must not be empty.
   If the array is empty, the program aborts.
 
-    ```bamboo,file=array-remove-first.bpl
+    ```cadence,file=array-remove-first.bpl
     // Declare an array of integers.
     let numbers = [42, 23]
 
@@ -1115,7 +1115,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The array must not be empty.
   If the array is empty, the program aborts.
 
-    ```bamboo,file=array-remove.bpl
+    ```cadence,file=array-remove.bpl
     // Declare an array of integers.
     let numbers = [42, 23]
 
@@ -1151,7 +1151,7 @@ Dictionaries may contain a key only once and may contain a value multiple times.
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`.
 Keys are separated from values by a colon, and key-value associations are separated by commas.
 
-```bamboo,file=dictionaries.bpl
+```cadence,file=dictionaries.bpl
 // An empty dictionary
 //
 {}
@@ -1178,7 +1178,7 @@ where `K` is the type of the key,
 and `V` is the type of the value.
 For example, a dictionary with `Int` keys and `Bool` values has type `{Int: Bool}`.
 
-```bamboo,file=dictionary-types.bpl
+```cadence,file=dictionary-types.bpl
 // Declare a constant that has type `{Int: Bool}`,
 // a dictionary mapping integers to booleans.
 //
@@ -1208,7 +1208,7 @@ Accessing a key returns an [optional](#optionals):
 If the key is found in the dictionary, the value for the given key is returned,
 and if the key is not found, `nil` is returned.
 
-```bamboo,file=dictionary-access-integer-keys.bpl
+```cadence,file=dictionary-access-integer-keys.bpl
 // Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping integers to booleans.
 //
@@ -1228,7 +1228,7 @@ booleans[2]  // is `nil`
 booleans["1"]
 ```
 
-```bamboo,file=dictionary-access-boolean-keys.bpl
+```cadence,file=dictionary-access-boolean-keys.bpl
 // Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping booleans to integers.
 //
@@ -1245,7 +1245,7 @@ integers[false] // is `0`
 
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
-```bamboo,file=dictionary-assignment.bpl
+```cadence,file=dictionary-assignment.bpl
 // Declare a constant that has type `{Int: Bool}`,
 // a dictionary mapping booleans to integers.
 //
@@ -1266,7 +1266,7 @@ booleans[0] = true
 - `length: Int`:
   Returns the number of entries in the dictionary.
 
-    ```bamboo,file=dictionary-length-field.bpl
+    ```cadence,file=dictionary-length-field.bpl
     // Declare a dictionary mapping strings to integers.
     let numbers = {"fortyTwo": 42, "twentyThree": 23}
 
@@ -1282,7 +1282,7 @@ booleans[0] = true
   Returns the value of type `V` as an optional if the dictionary contained the key,
   otherwise `nil`.
 
-    ```bamboo,file=dictionary-remove.bpl
+    ```cadence,file=dictionary-remove.bpl
     // Declare a dictionary mapping strings to integers.
     let numbers = {"fortyTwo": 42, "twentyThree": 23}
 
@@ -1328,14 +1328,14 @@ They are either unary, binary, or ternary.
 
 The `-` unary operator negates an integer:
 
-```bamboo,file=integer-negation.bpl
+```cadence,file=integer-negation.bpl
 let a = 1
 -a  // is `-1`
 ```
 
 The `!` unary operator logically negates a boolean:
 
-```bamboo,file=boolean-negation.bpl
+```cadence,file=boolean-negation.bpl
 let a = true
 !a  // is `false`
 ```
@@ -1345,7 +1345,7 @@ let a = true
 The binary assignment operator `=` can be used to assign a new value to a variable.
 It is only allowed in a statement and is not allowed in expressions.
 
-```bamboo,file=assignment.bpl
+```cadence,file=assignment.bpl
 var a = 1
 a = 2
 // `a` is `2`
@@ -1364,7 +1364,7 @@ a = b
 
 Assignments to constants are invalid.
 
-```bamboo,file=assignment-to-constant.bpl
+```cadence,file=assignment-to-constant.bpl
 let a = 1
 // Invalid: Assignments are only for variables, not constants.
 a = 2
@@ -1373,7 +1373,7 @@ a = 2
 The left-hand side of the assignment opera must be an identifier,
 followed by one or more index or access expressions.
 
-```bamboo,file=assignment-numbers.bpl
+```cadence,file=assignment-numbers.bpl
 // Declare an array of integers.
 let numbers = [1, 2]
 
@@ -1384,7 +1384,7 @@ numbers[0] = 3
 // `numbers` is `[3, 2]`
 ```
 
-```bamboo,file=assignment-arrays.bpl
+```cadence,file=assignment-arrays.bpl
 // Declare an array of arrays of integers.
 let arrays = [[1, 2], [3, 4]]
 
@@ -1395,7 +1395,7 @@ arrays[1][0] = 5
 // `arrays` is `[[1, 2], [5, 4]]`
 ```
 
-```bamboo,file=assignment-dictionaries.bpl
+```cadence,file=assignment-dictionaries.bpl
 let dictionaries = {
   true: {1: 2},
   false: {3: 4}
@@ -1414,7 +1414,7 @@ dictionaries[false][3] = 0
 The binary swap operator `<->` can be used to exchange the values of two variables.
 It is only allowed in a statement and is not allowed in expressions.
 
-```bamboo,file=swap.bpl
+```cadence,file=swap.bpl
 var a = 1
 var b = 2
 a <-> b
@@ -1433,7 +1433,7 @@ a <-> b
 
 Both sides of the swap operation must be variable, assignment to constants is invalid.
 
-```bamboo,file=swap-with-constant.bpl
+```cadence,file=swap-with-constant.bpl
 var a = 1
 let b = 2
 
@@ -1454,7 +1454,7 @@ There are four arithmetic operators:
 - Division: `/`
 - Remainder: `%`
 
-```bamboo,file=operator-plus.bpl
+```cadence,file=operator-plus.bpl
 let a = 1 + 2
 // `a` is `3`
 ```
@@ -1464,7 +1464,7 @@ The result is always the same type as the arguments.
 
 Arithmetic operators do not cause values to overflow.
 
-```bamboo,file=operator-times.bpl
+```cadence,file=operator-times.bpl
 let a: Int8 = 100
 let b: Int8 = 100
 let c = a * b
@@ -1479,39 +1479,39 @@ If overflow behavior is intended, overflowing operators are available, which are
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
-```bamboo
+```cadence
 //     11111111 = 255
 // &+         1
 //  = 100000000 = 0
 ```
 
-```bamboo,file=operator-overflow-plus.bpl
+```cadence,file=operator-overflow-plus.bpl
 let a: UInt8 = 255
 a &+ 1 // is `0`
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
-```bamboo,file=operator-minus.bpl
+```cadence,file=operator-minus.bpl
 //     00000000
 // &-         1
 //  =  11111111 = 255
 ```
 
-```bamboo
+```cadence
 let b: UInt8 = 0
 b &- 1  // is `255`
 ```
 
 Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
 
-```bamboo
+```cadence
 //    10000000 = -128
 // &-        1
 //  = 01111111 = 127
 ```
 
-```bamboo
+```cadence
 let c: Int8 = -128
 c &- 1  // is `127`
 ```
@@ -1524,7 +1524,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical AND: `a && b`
 
-    ```bamboo,file=operator-and.bpl
+    ```cadence,file=operator-and.bpl
     true && true  // is `true`
 
     true && false  // is `false`
@@ -1538,7 +1538,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical OR: `a || b`
 
-    ```bamboo,file=operator-or.bpl
+    ```cadence,file=operator-or.bpl
     true || true  // is `true`
 
     true || false  // is `true`
@@ -1559,36 +1559,36 @@ Comparison operators work with boolean and integer values.
     Both sides of the equality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
 
-    ```bamboo,file=operator-equal-int.bpl
+    ```cadence,file=operator-equal-int.bpl
     1 == 1  // is `true`
 
     1 == 2  // is `false`
     ```
 
-    ```bamboo,file=operator-equal-bool.bpl
+    ```cadence,file=operator-equal-bool.bpl
     true == true  // is `true`
 
     true == false  // is `false`
     ```
 
-    ```bamboo,file=operator-equal-optional-int-nil.bpl
+    ```cadence,file=operator-equal-optional-int-nil.bpl
     let x: Int? = 1
     x == nil  // is `false`
     ```
 
-    ```bamboo,file=operator-equal-int-nil.bpl
+    ```cadence,file=operator-equal-int-nil.bpl
     let x: Int = 1
     x == nil  // is `false`
     ```
 
-    ```bamboo,file=operator-equal-int-nil.bpl
+    ```cadence,file=operator-equal-int-nil.bpl
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = nil
     x == y  // is `false`
     ```
 
-    ```bamboo,file=operator-equal-optional-int-optionals-int.bpl
+    ```cadence,file=operator-equal-optional-int-optionals-int.bpl
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = 2
@@ -1600,36 +1600,36 @@ Comparison operators work with boolean and integer values.
     Both sides of the inequality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
 
-    ```bamboo,file=operator-not-equal-int.bpl
+    ```cadence,file=operator-not-equal-int.bpl
     1 != 1  // is `false`
 
     1 != 2  // is `true`
     ```
 
-    ```bamboo,file=operator-not-equal-bool.bpl
+    ```cadence,file=operator-not-equal-bool.bpl
     true != true  // is `false`
 
     true != false  // is `true`
     ```
 
-    ```bamboo,file=operator-not-equal-optional-int-nil.bpl
+    ```cadence,file=operator-not-equal-optional-int-nil.bpl
     let x: Int? = 1
     x != nil  // is `true`
     ```
 
-    ```bamboo,file=operator-not-equal-int-nil.bpl
+    ```cadence,file=operator-not-equal-int-nil.bpl
     let x: Int = 1
     x != nil  // is `true`
     ```
 
-    ```bamboo,file=operator-not-equal-int-nil.bpl
+    ```cadence,file=operator-not-equal-int-nil.bpl
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = nil
     x != y  // is `true`
     ```
 
-    ```bamboo,file=operator-not-equal-optional-int-optionals-int.bpl
+    ```cadence,file=operator-not-equal-optional-int-optionals-int.bpl
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = 2
@@ -1638,7 +1638,7 @@ Comparison operators work with boolean and integer values.
 
 - Less than: `<`, for integers
 
-    ```bamboo,file=operator-less.bpl
+    ```cadence,file=operator-less.bpl
     1 < 1  // is `false`
 
     1 < 2  // is `true`
@@ -1648,7 +1648,7 @@ Comparison operators work with boolean and integer values.
 
 - Less or equal than: `<=`, for integers
 
-    ```bamboo,file=operator-less-equals.bpl
+    ```cadence,file=operator-less-equals.bpl
     1 <= 1  // is `true`
 
     1 <= 2  // is `true`
@@ -1658,7 +1658,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater than: `>`, for integers
 
-    ```bamboo,file=operator-greater.bpl
+    ```cadence,file=operator-greater.bpl
     1 > 1  // is `false`
 
     1 > 2  // is `false`
@@ -1668,7 +1668,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater or equal than: `>=`, for integers
 
-    ```bamboo,file=operator-greater-equals.bpl
+    ```cadence,file=operator-greater-equals.bpl
     1 >= 1  // is `true`
 
     1 >= 2  // is `false`
@@ -1688,7 +1688,7 @@ The first value must be a boolean (must have the type `Bool`).
 The second value and third value can be of any type.
 The result type is the least common supertype of the second and third value.
 
-```bamboo,file=operator-ternary-conditional.bpl
+```cadence,file=operator-ternary-conditional.bpl
 let x = 1 > 2 ? 3 : 4
 // `x` is `4` and has type `Int`
 
@@ -1748,7 +1748,7 @@ Function calls may provide arguments for parameters which are subtypes of the pa
 There is **no** support for optional parameters, i.e. default values for parameters,
 and variadic functions, i.e. functions that take an arbitrary amount of arguments.
 
-```bamboo,file=function-double.bpl
+```cadence,file=function-double.bpl
 // Declare a function named `double`, which multiples a number by two.
 //
 // The special argument label _ is specified for the parameter,
@@ -1769,7 +1769,7 @@ double(2)  // is `4`
 It is possible to require argument labels for some parameters,
 and not require argument labels for other parameters.
 
-```bamboo,file=function-clamp.bpl
+```cadence,file=function-clamp.bpl
 // Declare a function named `clamp`. The function takes an integer value,
 // the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
@@ -1810,7 +1810,7 @@ let clamped = clamp(123, min: 0, max: 100)
 // `clamped` is `100`
 ```
 
-```bamboo,file=function-send.bpl
+```cadence,file=function-send.bpl
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
@@ -1866,7 +1866,7 @@ send(from: sender, to: receiver, amount: 100)
 
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
-```bamboo,file=function-test.bpl
+```cadence,file=function-test.bpl
 // Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
@@ -1881,7 +1881,7 @@ test(second: 1, first: 2)
 
 Functions can be nested, i.e., the code of a function may declare further functions.
 
-```bamboo,file=function-doubleAndAddOne.bpl
+```cadence,file=function-doubleAndAddOne.bpl
 // Declare a function which multiplies a number by two, and adds one.
 //
 fun doubleAndAddOne(_ x: Int): Int {
@@ -1905,7 +1905,7 @@ doubleAndAddOne(2)  // is `5`
 It is possible to declare functions with the same name, as long as they have different sets of argument labels.
 This is known as function overloading.
 
-```bamboo,file=function-overloading.bpl
+```cadence,file=function-overloading.bpl
 // Declare a function named "assert" which requires a test value
 // and a message argument.
 //
@@ -1926,7 +1926,7 @@ fun assert(_ test: Bool) {
 Functions can be also used as expressions.
 The syntax is the same as for function declarations, except that function expressions have no name, i.e., they are anonymous.
 
-```bamboo,file=function-expression.bpl
+```cadence,file=function-expression.bpl
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called.
@@ -1943,7 +1943,7 @@ let double =
 
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
-```bamboo,file=function-call.bpl
+```cadence,file=function-call.bpl
 fun double(_ x: Int): Int {
     return x * 2
 }
@@ -1968,7 +1968,7 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by a colon (`:`), and end with the return type.
 The whole function type needs to be enclosed in parentheses.
 
-```bamboo,file=function-type.bpl
+```cadence,file=function-type.bpl
 // Declare a function named `add`, with the function type `((Int, Int): Int)`.
 //
 fun add(a: Int, b: Int): Int {
@@ -1976,7 +1976,7 @@ fun add(a: Int, b: Int): Int {
 }
 ```
 
-```bamboo,file=function-type-expression.bpl
+```cadence,file=function-type-expression.bpl
 // Declare a constant named `add`, with the function type `((Int, Int): Int)`
 //
 let add: ((Int, Int): Int) =
@@ -1987,7 +1987,7 @@ let add: ((Int, Int): Int) =
 
 If the function has no return type, it implicitly has the return type `Void`.
 
-```bamboo,file=function-doNothing.bpl
+```cadence,file=function-doNothing.bpl
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing.
 //
@@ -2006,7 +2006,7 @@ This has the advantage that functions with different argument labels, potentiall
 It has the disadvantage that function calls to plain function values,
 cannot accept argument labels.
 
-```bamboo,file=function-no-argument-labels.bpl
+```cadence,file=function-no-argument-labels.bpl
 // Declare a function which takes one argument that has type `Int`.
 // The function has type `((Int): Void)`.
 //
@@ -2051,7 +2051,7 @@ A function may refer to variables and constants of its outer scopes in which it 
 It is called a closure, because it is closing over those variables and constants.
 A closure can can read from the variables and constants and assign to the variables it refers to.
 
-```bamboo,file=closures-counter.bpl
+```cadence,file=closures-counter.bpl
 // Declare a function named `makeCounter` which returns a function that
 // each time when called, returns the next integer, starting at 1.
 //
@@ -2077,7 +2077,7 @@ When arguments are passed to a function, they are copied.
 Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
 This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_value).
 
-```bamboo,file=function-change.bpl
+```cadence,file=function-change.bpl
 // Declare a function that changes the first two elements
 // of an array of integers.
 //
@@ -2098,7 +2098,7 @@ change(numbers)
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
-```bamboo,file=function-parameter-assignment.bpl
+```cadence,file=function-parameter-assignment.bpl
 fun test(x: Int) {
     // Invalid: cannot assign to a parameter (constant)
     //
@@ -2121,7 +2121,7 @@ A conditions block consists of one or more conditions. Conditions are expression
 TODO:
 
 For now, function calls are not allowed in preconditions and postconditions.
-See https://github.com/dapperlabs/bamboo-runtime/issues/84
+See https://github.com/dapperlabs/flow-go/issues/70
 
 -->
 
@@ -2132,7 +2132,7 @@ The condition description is used as an error message when the condition fails.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
-```bamboo,file=function-factorial.bpl
+```cadence,file=function-factorial.bpl
 fun factorial(_ n: Int): Int {
     pre {
         // Require the parameter `n` to be greater than or equal to zero.
@@ -2163,7 +2163,7 @@ factorial(-2)
 
 In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
 
-```bamboo,file=function-increment.bpl
+```cadence,file=function-increment.bpl
 var n = 0
 
 fun incrementN() {
@@ -2191,7 +2191,7 @@ The condition must be boolean and the braces are required.
 The braces are required and not optional.
 Parentheses around the condition are optional.
 
-```bamboo,file=control-flow-if.bpl
+```cadence,file=control-flow-if.bpl
 let a = 0
 var b = 0
 
@@ -2210,7 +2210,7 @@ if (a != 0) {
 An additional, optional else-clause can be added to execute another piece of code when the condition is false.
 The else-clause is introduced by the `else` keyword followed by braces that contain the code that should be executed.
 
-```bamboo,file=control-flow-if-else.bpl
+```cadence,file=control-flow-if-else.bpl
 let a = 0
 var b = 0
 
@@ -2226,7 +2226,7 @@ if a == 1 {
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 In this case the braces can be omitted.
 
-```bamboo,file=control-flow-if-else-if.bpl
+```cadence,file=control-flow-if-else-if.bpl
 let a = 0
 var b = 0
 
@@ -2260,7 +2260,7 @@ If the optional contains a value, the first branch is executed and a temporary c
 
 Optional bindings are declared using the `if` keyword like an if-statement, but instead of the boolean test value, it is followed by the `let` or `var` keywords, to either introduce a constant or variable, followed by a name, the equal sign (`=`), and the optional value.
 
-```bamboo,file=control-flow-optional-binding-not-nil.bpl
+```cadence,file=control-flow-optional-binding-not-nil.bpl
 let maybeNumber: Int? = 1
 
 if let number = maybeNumber {
@@ -2271,7 +2271,7 @@ if let number = maybeNumber {
 }
 ```
 
-```bamboo,file=control-flow-optional-binding-nil.bpl
+```cadence,file=control-flow-optional-binding-nil.bpl
 let noNumber: Int? = nil
 
 if let number = noNumber {
@@ -2294,7 +2294,7 @@ If the condition is false, the execution is done.
 If it is true, the piece of code is executed and the evaluation of the condition is repeated.
 Thus, the piece of code is executed zero or more times.
 
-```bamboo,file=control-flow-while.bpl
+```cadence,file=control-flow-while.bpl
 var a = 0
 while a < 5 {
     a = a + 1
@@ -2305,7 +2305,7 @@ while a < 5 {
 
 The `continue` statement can be used to stop the current iteration of the loop and start the next iteration.
 
-```bamboo,file=control-flow-continue.bpl
+```cadence,file=control-flow-continue.bpl
 var i = 0
 var x = 0
 while i < 10 {
@@ -2321,7 +2321,7 @@ while i < 10 {
 
 The `break` statement can be used to stop the loop.
 
-```bamboo,file=control-flow-break.bpl
+```cadence,file=control-flow-break.bpl
 var x = 0
 while x < 10 {
     x = x + 1
@@ -2349,7 +2349,7 @@ TODO: examples
 
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
-```bamboo,file=scope.bpl
+```cadence,file=scope.bpl
 let x = 10
 
 fun f(): Int {
@@ -2364,7 +2364,7 @@ f()  // is `20`
 y
 ```
 
-```bamboo,file=scope-doubleAndAddOne.bpl
+```cadence,file=scope-doubleAndAddOne.bpl
 fun doubleAndAddOne(_ n: Int): Int {
     fun double(_ x: Int) {
         return x * 2
@@ -2379,7 +2379,7 @@ double(1)
 
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
-```bamboo,file=scope-test.bpl
+```cadence,file=scope-test.bpl
 let x = 2
 
 fun test(): Int {
@@ -2392,7 +2392,7 @@ test()  // is `3`
 
 Scope is lexical, not dynamic.
 
-```bamboo,file=scope-lexical.bpl
+```cadence,file=scope-lexical.bpl
 let x = 10
 
 fun f(): Int {
@@ -2409,7 +2409,7 @@ g()  // is `10`, not `20`
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
-```bamboo,file=scope-no-hoisting.bpl
+```cadence,file=scope-no-hoisting.bpl
 let x = 2
 
 fun f(): Int {
@@ -2424,11 +2424,12 @@ f()  // is `2`
 
 ## Type Safety
 
-The Bamboo programming language is a *type-safe* language.
+The Cadence programming language is a *type-safe* language.
 
-When assigning a new value to a variable, the value must be the same type as the variable. For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
+When assigning a new value to a variable, the value must be the same type as the variable.
+For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
-```bamboo,file=type-safety-assign-int-to-bool.bpl
+```cadence,file=type-safety-assign-int-to-bool.bpl
 // Declare a variable that has type `Bool`.
 var a = true
 
@@ -2439,7 +2440,7 @@ a = 0
 
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, *only* a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
-```bamboo,file=type-safety-nand.bpl
+```cadence,file=type-safety-nand.bpl
 fun nand(_ a: Bool, _ b: Bool): Bool {
     return !(a && b)
 }
@@ -2458,7 +2459,7 @@ nor is an `Int32` automatically converted to an `Int8`,
 nor is an optional integer `Int?` automatically converted to a non-optional integer `Int`,
 or vice-versa.
 
-```bamboo,file=type-safety-add.bpl
+```cadence,file=type-safety-add.bpl
 fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
@@ -2486,7 +2487,7 @@ the declaration's type is inferred from the initial value.
 
 Integer literals are inferred to type `Int`.
 
-```bamboo,file=type-inference-int.bpl
+```cadence,file=type-inference-int.bpl
 let a = 1
 
 // `a` has type `Int`
@@ -2494,7 +2495,7 @@ let a = 1
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
-```bamboo,file=type-inference-intergers.bpl
+```cadence,file=type-inference-intergers.bpl
 let integers = [1, 2]
 // `integers` has type `[Int]`
 
@@ -2505,7 +2506,7 @@ let invalidMixed = [1, true, 2, false]
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
-```bamboo,file=type-inference-dictionary.bpl
+```cadence,file=type-inference-dictionary.bpl
 let booleans = {
     1: true,
     2: false
@@ -2522,7 +2523,7 @@ let invalidMixed = {
 
 Functions are inferred based on the parameter types and the return type.
 
-```bamboo,file=type-inference-function.bpl
+```cadence,file=type-inference-function.bpl
 let add = (a: Int8, b: Int8): Int {
     return a + b
 }
@@ -2535,7 +2536,7 @@ Type inference is performed for each expression / statement, and not across stat
 There are cases where types cannot be inferred.
 In these cases explicit type annotations are required.
 
-```bamboo,file=type-inference-impossible.bpl
+```cadence,file=type-inference-impossible.bpl
 // Invalid: not possible to infer type based on array literal's elements.
 //
 let array = []
@@ -2545,7 +2546,7 @@ let array = []
 let arrary: [Int] = []
 ```
 
-```bamboo
+```cadence
 // Invalid: not possible to infer type based on dictionary literal's keys and values.
 //
 let dictionary = {}
@@ -2556,7 +2557,7 @@ let dictionary = {}
 let dictionary: {String: Int} = {}
 ```
 
-```bamboo
+```cadence
 // Invalid: not possible to infer type based on nil literal.
 //
 let maybeSomething = nil
@@ -2602,7 +2603,7 @@ but not in structures, as that would allow resources to be copied.
 
 Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
 
-```bamboo,file=composite-data-type-declaration.bpl
+```cadence,file=composite-data-type-declaration.bpl
 struct SomeStruct {
     // ...
 }
@@ -2616,13 +2617,13 @@ Structures and resources are types.
 
 Structures are created (instantiated) by calling the type like a function.
 
-```bamboo,file=structure-instantiation.bpl
+```cadence,file=structure-instantiation.bpl
 SomeStruct()
 ```
 
 Resource must be created (instantiated) by using the `create` keyword and calling the type like a function.
 
-```bamboo,file=resource-instantiation.bpl
+```cadence,file=resource-instantiation.bpl
 create SomeResource()
 ```
 
@@ -2687,7 +2688,7 @@ In initializers, the special constant `self` refers to the composite value that 
 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
 
-```bamboo,file=composite-data-type-fields-and-init.bpl
+```cadence,file=composite-data-type-fields-and-init.bpl
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2711,7 +2712,7 @@ struct Token {
 
 Note that it is invalid to provide the initial value for a field in the field declaration.
 
-```bamboo
+```cadence
 struct StructureWithConstantField {
     // Invalid: It is invalid to provide an initial value in the field declaration.
     // The field must be initialized by setting the initial value in the initializer.
@@ -2722,7 +2723,7 @@ struct StructureWithConstantField {
 
 The field access syntax must be used to access fields –  fields are not available as variables.
 
-```bamboo
+```cadence
 struct Token {
     pub let id: Int
 
@@ -2737,7 +2738,7 @@ struct Token {
 
 The initializer is **not** automatically derived from the fields, it must be explicitly declared.
 
-```bamboo
+```cadence
 struct Token {
     pub let id: Int
 
@@ -2747,7 +2748,7 @@ struct Token {
 
 A composite value can be created by calling the constructor and the value's fields can be accessed.
 
-```bamboo,file=composite-data-type-fields-assignment.bpl
+```cadence,file=composite-data-type-fields-assignment.bpl
 let token = Token(id: 42, balance: 1_000_00)
 
 token.id  // is `42`
@@ -2763,7 +2764,7 @@ token.id = 23
 
 Initializers support overloading. This allows for example providing default values for certain parameters.
 
-```bamboo,file=composite-data-type-initializer-overloading.bpl
+```cadence,file=composite-data-type-initializer-overloading.bpl
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2796,7 +2797,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 
 Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
 
-```bamboo,file=composite-data-type-field-getter.bpl
+```cadence,file=composite-data-type-field-getter.bpl
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -2833,7 +2834,7 @@ The parameter has implicitly the type of the field. Another type cannot be speci
 
 The types of values assigned to setters must always match the field's type.
 
-```bamboo,file=composite-data-type-field-setter.bpl
+```cadence,file=composite-data-type-field-setter.bpl
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -2869,7 +2870,7 @@ Synthetic fields are declared using the `synthetic` keyword.
 
 Synthetic fields are read-only when only a getter is provided.
 
-```bamboo,file=composite-type-synthetic-field-getter-only.bpl
+```cadence,file=composite-type-synthetic-field-getter-only.bpl
 struct Rectangle {
     pub var width: Int
     pub var height: Int
@@ -2896,7 +2897,7 @@ struct Rectangle {
 
 Synthetic fields are readable and writable when both a getter and a setter is declared.
 
-```bamboo,file=composite-type-synthetic-field-setter-getter.bpl
+```cadence,file=composite-type-synthetic-field-setter-getter.bpl
 // Declare a struct named `GoalTracker` which stores a number
 // of target goals, a number of completed goals,
 // and has a synthetic field to provide the left number of goals.
@@ -2954,7 +2955,7 @@ It is invalid to declare a synthetic field with only a setter.
 Composite data types may contain functions.
 Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
-```bamboo,file=composite-data-type-function.bpl
+```cadence,file=composite-data-type-function.bpl
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -2984,7 +2985,7 @@ rectangle.scale(factor: 4)
 
 Functions support overloading.
 
-```bamboo,file=composite-data-type-function-overloading.bpl
+```cadence,file=composite-data-type-function-overloading.bpl
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -3026,7 +3027,7 @@ i.e., nominal typing applies instead of structural typing.
 Even if two composite data types declare the same fields and functions,
 the types are only compatible if their names match.
 
-```bamboo,file=composite-data-type.bpl
+```cadence,file=composite-data-type.bpl
 // Declare a structure named `A` which has a function `test`
 // which has type `((): Void)`.
 //
@@ -3068,7 +3069,7 @@ and when returned from a function.
 
 Accessing a field or calling a function of a structure does not copy it.
 
-```bamboo,file=struct-behavior.bpl
+```cadence,file=struct-behavior.bpl
 // Declare a structure named `SomeStruct`, with a variable integer field.
 //
 struct SomeStruct {
@@ -3128,7 +3129,7 @@ when it is moved to a different variable,
 when it is moved to a function as an argument,
 and when it is returned from a function.
 
-```bamboo,file=resource-behavior.bpl
+```cadence,file=resource-behavior.bpl
 // Declare a resource named `SomeResource`, with a variable integer field.
 //
 resource SomeResource {
@@ -3174,7 +3175,7 @@ use(resource: <-b)
 b.value
 ```
 
-```bamboo,file=resource-loss.bpl
+```cadence,file=resource-loss.bpl
 // Declare another, unrelated value of resource type `SomeResource`.
 //
 let c <- create SomeResource(value: 10)
@@ -3182,7 +3183,7 @@ let c <- create SomeResource(value: 10)
 // Invalid: `c` is not used, but must be; it cannot be lost.
 ```
 
-```bamboo,file=resource-destruction.bpl
+```cadence,file=resource-destruction.bpl
 // Declare another, unrelated value of resource type `SomeResource`.
 //
 let d <- create SomeResource(value: 20)
@@ -3200,7 +3201,7 @@ d.value
 To make it explicit that the type is moved, it must be prefixed with `<-` in all type annotations,
 e.g. for variable declarations, parametes, or return types.
 
-```bamboo,file=resource-type-annotation.bpl
+```cadence,file=resource-type-annotation.bpl
 // Declare a constant with an explicit type annotation.
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`.
@@ -3228,7 +3229,7 @@ fun get(): <-SomeResource {
 
 Resources **must** be used exactly once.
 
-```bamboo,file=resource-must-use.bpl
+```cadence,file=resource-must-use.bpl
 // Declare a function which consumes a resource but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
@@ -3237,7 +3238,7 @@ fun forgetToUse(resource: <-SomeResource) {
 }
 ```
 
-```bamboo,file=resource-use-after-move.bpl
+```cadence,file=resource-use-after-move.bpl
 // Declare a constant named `res` which has the resource type `SomeResource`.
 let res <- create SomeResource()
 
@@ -3255,7 +3256,7 @@ use(resource: <-res)
 res.value
 ```
 
-```bamboo,file=resource-not-used.bpl
+```cadence,file=resource-not-used.bpl
 // Declare a function which has a resource parameter but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
@@ -3264,7 +3265,7 @@ fun forgetToUse(resource: <-SomeResource) {
 }
 ```
 
-```bamboo,file=resource-not-definitely-destroyed.bpl
+```cadence,file=resource-not-definitely-destroyed.bpl
 // Declare a function which has a resource parameter.
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
@@ -3279,7 +3280,7 @@ fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
 }
 ```
 
-```bamboo,file=resource-always-invalidated.bpl
+```cadence,file=resource-always-invalidated.bpl
 // Declare a function which has a resource parameter.
 // This function is valid, as it always uses the resource parameter,
 // and does not cause a loss of the resource.
@@ -3295,7 +3296,7 @@ fun alwaysUse(resource: <-SomeResource, destroyResource: Bool) {
 }
 ```
 
-```bamboo,file=resource-loss-return.bpl
+```cadence,file=resource-loss-return.bpl
 // Declare a function which has a resource parameter.
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
@@ -3323,7 +3324,7 @@ Resource variables cannot be assigned to as that would lead to the loss of the v
 
 Instead, use a swap statement (`<->`) to replace the resource variable with another resource.
 
-```bamboo,file=resource-variable-invalid-assignment.bpl
+```cadence,file=resource-variable-invalid-assignment.bpl
 resource R {}
 
 var x <- create R()
@@ -3348,7 +3349,7 @@ Resource may have a destructor, which is executed when the resource is destroyed
 Destructors have no parameters and no return value and are declared using the `destroy` name.
 A resource may have only one destructor.
 
-```bamboo,file=resource-destructor.bpl
+```cadence,file=resource-destructor.bpl
 var destructorCalled = false
 
 resource Resource {
@@ -3373,7 +3374,7 @@ Fields in composite data types behave diffently when they have a resource type.
 If a resource type has fields that have a resource type it **must** declare a destructor,
 which **must** invalidate all resource fields, i.e. move or destroy them.
 
-```bamboo,file=resource-nested-field.bpl
+```cadence,file=resource-nested-field.bpl
 resource Child {
     let name: String
 
@@ -3408,7 +3409,7 @@ Accessing a field or calling function on a resource field is valid,
 however moving a resource out of a variable resource field is **not** allowed.
 Instead, use a swap statement to replace the resource with another resource.
 
-```bamboo,file=resource-field-swap.bpl
+```cadence,file=resource-field-swap.bpl
 let child <- create Child(name: "Child 1")
 let parent <- create Parent(name: "Parent", child: <-child)
 
@@ -3430,7 +3431,7 @@ parent.child <-> otherChild
 
 Resources can not be captured in closures, as that could potentially result in duplications.
 
-```bamboo,file=resource-capturing
+```cadence,file=resource-capturing
 resource R {}
 
 // Invalid: Declare a function which returns a closure which refers to
@@ -3454,7 +3455,7 @@ or indexing into a dictionary to read a value for a certain key or set a value f
 
 Instead, use a swap statement to replace the accessed resource with another resource.
 
-```bamboo,file=resource-in-array.bpl
+```cadence,file=resource-in-array.bpl
 resource R {}
 
 // Declare a constant for an array of resources.
@@ -3486,7 +3487,7 @@ resources[0] <-> res
 
 The same applies to dictionaries.
 
-```bamboo,file=resource-in-dictionary.bpl
+```cadence,file=resource-in-dictionary.bpl
 // Declare a constant for a dictionary of resources.
 // Create three resources and move them into the dictionary.
 //
@@ -3522,7 +3523,7 @@ resources["r1"] <-> res
 Resources cannot be moved into arrays and dictionaries multiple times,
 as that would cause a duplication.
 
-```bamboo,file=resource-array-duplication.bpl
+```cadence,file=resource-array-duplication.bpl
 let resource <- create R()
 
 // Invalid: The resource variable `resource` can only be moved into the array once.
@@ -3533,7 +3534,7 @@ let resources <- [
 ]
 ```
 
-```bamboo,file=resource-dictionary-duplication.bpl
+```cadence,file=resource-dictionary-duplication.bpl
 let resource <- create R()
 
 // Invalid: The resource variable `resource` can only be moved into the dictionary once.
@@ -3545,7 +3546,7 @@ let resources <- {
 
 Resource arrays and dictionaries can be destroyed.
 
-```bamboo,file=resource-array-destroy.bpl
+```cadence,file=resource-array-destroy.bpl
 let resources <- [
     <-create R(),
     <-create R()
@@ -3553,7 +3554,7 @@ let resources <- [
 destroy resources
 ```
 
-```bamboo,file=resource-dictionary-destroy.bpl
+```cadence,file=resource-dictionary-destroy.bpl
 let resources <- {
     "r1": <-create R(),
     "r2": <-create R()
@@ -3564,7 +3565,7 @@ destroy resources
 The variable array functions like `append`, `insert`, and `remove` behave like for non-resource arrays.
 Note however, that the result of the `remove` functions must be used.
 
-```bamboo,file-resource-array-mutating-functions.bpl
+```cadence,file-resource-array-mutating-functions.bpl
 let resources <- [<-create R()]
 // `resources.length` is `1`
 
@@ -3593,7 +3594,7 @@ The variable array function `concat` is not available, as it would result in the
 The dictionary functions like `insert` and `remove` behave like for non-resource dictionaries.
 Note however, that the result of these functions must be used.
 
-```bamboo,file-resource-dictionary-mutating-functions.bpl
+```cadence,file-resource-dictionary-mutating-functions.bpl
 let resources <- {"r1": <-create R()}
 // `resources.length` is `1`
 
@@ -3667,7 +3668,7 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
-```bamboo,file=access-control-globals.bpl
+```cadence,file=access-control-globals.bpl
 // Declare a private constant, inaccessible/invisible in outer scope.
 //
 let a = 1
@@ -3677,7 +3678,7 @@ let a = 1
 pub let b = 2
 ```
 
-```bamboo,file=acess-control-struct.bpl
+```cadence,file=acess-control-struct.bpl
 // Declare a public struct, accessible/visible in all scopes.
 //
 pub struct SomeStruct {
@@ -3813,7 +3814,7 @@ Variable field requirements can be specified to also be publicly settable by usi
 
 The special type `Self` can be used to refer to the type implementing the interface.
 
-```bamboo,file=interface-declaration.bpl
+```cadence,file=interface-declaration.bpl
 // Declare a resource interface for a fungible token.
 // Only resources can implement this resource interface.
 //
@@ -3939,7 +3940,7 @@ but leaves it to the implementation what kind the field is.
 The function implementations must match the function requirements in the interface
 in terms of name, parameter argument labels, parameter types, and the return type.
 
-```bamboo,file=interface-implementation.bpl
+```cadence,file=interface-implementation.bpl
 // Declare a resource named `ExampleToken` that has to implement
 // the `FungibleToken` interface.
 //
@@ -4044,7 +4045,7 @@ The access level for variable fields in an implementation may be less restrictiv
 For example, an interface may require a field to be at least public (i.e. the `pub` keyword is specified),
 and an implementation may provide a variable field which is public, but also publicly settable (the `pub(set)` keyword is specified).
 
-```bamboo
+```cadence
 struct interface AnInterface {
     // Require the implementing type to provide a publicly readable
     // field named `a` that has type `Int`. It may be a constant field,
@@ -4073,7 +4074,7 @@ struct AnImplementation: AnInterface {
 Interfaces are types.
 Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.
 
-```bamboo,file=interface-type.bpl
+```cadence,file=interface-type.bpl
 // Declare an interface named `Shape`.
 //
 // Require implementing types to provide a field which returns the area,
@@ -4152,7 +4153,7 @@ var shape: Shape = Rectangle(width: 10, height: 20)
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
-```bamboo,file=interface-type-assignment.bpl
+```cadence,file=interface-type-assignment.bpl
 // Assign a value of type `Square` to the variable `shape` that has type `Shape`.
 //
 shape = Square(length: 30)
@@ -4165,7 +4166,7 @@ let rectangle: Rectangle = Square(length: 10)
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
-```bamboo,file=interface-type-fields-and-functions.bpl
+```cadence,file=interface-type-fields-and-functions.bpl
 // Declare a constant which has the type `Shape`.
 // and is initialized with a value that has type `Rectangle`.
 //
@@ -4188,7 +4189,7 @@ Interfaces can require implementing types to also implement other interfaces of 
 Interface implementation requirements can be declared by following the interface name with a colon (`:`)
 and one or more names of interfaces of the same kind, separated by commas.
 
-```bamboo,file=interface-implementation-requirement.bpl
+```cadence,file=interface-implementation-requirement.bpl
 // Declare a structure interface named `Shape`.
 //
 struct interface Shape {}
@@ -4211,7 +4212,7 @@ struct Hexagon: Polygon {}
 Interfaces can be arbitrarily nested.
 Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
 
-```bamboo,file=interface-nesting.bpl
+```cadence,file=interface-nesting.bpl
 // Declare a resource interface `OuterInterface`, which declares
 // a nested structure interface named `InnerInterface`.
 //
@@ -4243,7 +4244,7 @@ struct SomeInner: OuterInterface.InnerInterface {}
 Interfaces can require implementing types to provide concrete nested types.
 For example, a resource interface may require an implementing type to provide a resource type.
 
-```bamboo,file=interface-nested-type-requirement.bpl
+```cadence,file=interface-nested-type-requirement.bpl
 // Declare a resource interface named `FungibleToken`.
 //
 // Require implementing types to provide a resource type named `Vault`
@@ -4285,13 +4286,13 @@ Most of the built-in types are equatable, like booleans and integers. Arrays are
 
 To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
 
-```bamboo,file=equatable.bpl
+```cadence,file=equatable.bpl
 struct interface Equatable {
     pub fun equals(_ other: Self): Bool
 }
 ```
 
-```bamboo,file=equatable-impl.bpl
+```cadence,file=equatable-impl.bpl
 // Declare a struct named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
@@ -4348,13 +4349,13 @@ then the implementation must return the same integer hash value for each of the 
 The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed.
 The integer hash value must not necessarily be the same across multiple executions.
 
-```bamboo,file=hashable.bpl
+```cadence,file=hashable.bpl
 struct interface Hashable: Equatable {
     pub hashValue: Int
 }
 ```
 
-```bamboo,file=hashable-impl.bpl
+```cadence,file=hashable-impl.bpl
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
@@ -4402,6 +4403,31 @@ struct Point: Hashable {
 }
 ```
 
+## Imports
+
+Programs can import declarations (types, functions, variables, etc.) from other programs.
+
+Imports are declared using the `import` keyword.
+
+It can either be followed by a location, which imports all declarations;
+or it can be followed by the names of the declarations that should be imported,
+followed by the `from` keyword, and then followed by the location.
+
+If importing a local file, the location is a string literal, and the path to the file.
+
+If importing an external type, the location is an address literal, and the address
+of the account where the declarations are deployed to and published.
+
+```cadence,file=imports.bpl
+// Import the type `Counter` from a local file.
+//
+import Counter from "examples/counter.bpl"
+
+// Import the type `Counter` from an external account.
+//
+import Counter from 0x299F20A29311B9248F12
+```
+
 ## Attestations
 
 > 🚧 Status: Attestations are not implemented yet.
@@ -4423,7 +4449,7 @@ It is not possible to change the ownership of a resource through an attestation,
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
 
-```bamboo,file=attestations.bpl
+```cadence,file=attestations.bpl
 // Declare a resource named `Token`.
 //
 resource Token {}
@@ -4442,7 +4468,7 @@ Like resources, attestations are associated with an [account](#accounts).
 
 ## Accounts
 
-```bamboo
+```cadence
 struct interface Account {
     address: Address
     storage: Storage  // explained below
@@ -4460,7 +4486,7 @@ the value must be a value that has the type `Vault` or is a subtype of `Vault`.
 
 The index operator `[]` is used for both reading and writing stored values.
 
-```bamboo,file=account-storage.bpl
+```cadence,file=account-storage.bpl
 // Declare a resource named `Counter`.
 //
 resource Counter {
@@ -4478,9 +4504,15 @@ resource Counter {
 //
 // The type `Counter` is used as the key to refer to the stored value.
 //
-account.storage[Counter] <- create Counter(count: 42)
+// A swap must be used to store the counter, because assignment
+// is not available, as it would override a potentially existing counter.
+//
+// To perform the swap, the declaration must be variable and have an optional type.
+//
+var counter: Counter? <- create Counter(count: 42)
+account.storage[Counter] <-> counter
 
-account.storage[Counter].count  // is `42`
+// `counter` is now the counter that was potentially stored before.
 ```
 
 ## Storage References
@@ -4507,7 +4539,7 @@ References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
 
-```bamboo,file=storage-reference.bpl
+```cadence,file=storage-reference.bpl
 
 // Declare a resource interface `HasCount`.
 //
@@ -4541,63 +4573,63 @@ resource Counter: HasCount {
 //
 // The type `Counter` is used as the key to refer to the stored value.
 //
-account.storage[Counter] <- create Counter(count: 0)
+// A swap must be used to store the counter, because assignment
+// is not available, as it would override a potentially existing counter.
+//
+// To perform the swap, the declaration must be variable and have an optional type.
+//
+var counter: Counter? <- create Counter(count: 42)
+account.storage[Counter] <-> counter
 
-account.storage[Counter].increment()
-
-account.storage[Counter].count  // is `1`
+// `counter` is now the counter that was potentially stored before.
 
 // Create a reference to the storage location `account.storage[Counter]`
-// and allow access to it as the type `HasCount`.
+// and allow access to it as the type `Counter`.
 //
-let reference: &HasCount = &account.storage[Counter] as HasCount
+let counterReference: &Counter = &account.storage[Counter] as Counter
 
-// Read the counter's current count.
-// The refeference has all fields
+counterReference.count  // is `42`
+
+counterReference.increment()
+
+counterReference.count  // is `43`
+
+// Create another reference to the storage location `account.storage[Counter]`
+// and only allow access to it as the type `HasCount`.
 //
-reference.count  // is `1`
+let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+
+// Read the counter's current count through the limited reference.
+//
+// This is valid because the `HasCount` resource interface declares
+// the field `count`.
+//
+limitedReference.count  // is `43`
 
 // Invalid: The `increment` function is not accessible for the reference,
 // because the reference has the type `&HasCount`,
-// i.e. only fields and functions of type `HasCount` can be used.
+// i.e. only fields and functions of type `HasCount` can be used,
+// and `increment` is not declared in it.
 //
-reference.increment()
+limitedReference.increment()
 ```
 
 ## Transactions
 
-> 🚧 Status: The usage of external types is not implemented yet.
+> 🚧 Status: The `transaction` syntax is not implemented yet. For now, declare a function named `main`.
 
-Transactions are objects that are signed by one or more [accounts](#accounts) and are sent to the chain to interact with it.
+Transactions are objects that are signed by one or more [accounts](#accounts)
+and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
-Before the transaction declaration, there can be imports of any necessary local or external types and interfaces that are needed, using the `import` keyword, followed by `from`, and then followed by the location.
-If importing a local file's type definition, the location will be the path to the file that has the definition.
-If importing an external type that has been published by another account, that account's `Address` must be given.
-
-Importing an external resource does not move it from the account that holds it.
-It simply imports the type definition so that it can be used within a transaction.
-
-```bamboo,file=imports.bpl
-// Import the type `Counter` from a local file.
-//
-import Counter from "examples/counter.bpl"
-
-// Import the type `Counter` from an external account.
-//
-import Counter from 0x299F20A29311B9248F12
-```
-
-Next is definitions of any new types that will be used or deployed within the transaction.
-These are kind of like global constants or variables.
 
 Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
 Each phase is a block of code that executes sequentially.
 
 - The **prepare phase** acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-  The preparer has the permissions to read from and write to the storage of all the accounts that signed the transaction.
+  The prepare phase has the permissions to read from and write to the storage of all the accounts that signed the transaction.
 
 - The **execute phase** is where all interaction with external contracts happens.
   This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
@@ -4608,17 +4640,17 @@ Transactions are declared using the `transaction` keyword.
 
 Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
 
-The preparer is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
+The prepare phase is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
-```bamboo,file=transaction-declaration.bpl
+```cadence,file=transaction-declaration.bpl
 // Optional: Importing external types from other accounts using `import`.
 
 transaction {
 
     // Optional: type declarations and fields, which must be initialized in `prepare`.
 
-    // The preparer needs to have as many account parameters
+    // The prepare phase needs to have as many account parameters
     // as there are signers for the transaction.
     //
     prepare(signer1: Account) {
@@ -4635,19 +4667,21 @@ transaction {
 }
 ```
 
-### Deployment
+### Deploying Code
 
-Transactions can deploy resources and resource interfaces to the storage of any of the signing accounts.  Here is an example of a resource interface that will be deployed to an account.  Imagine it is in a file named `FungibleToken.bpl`.
+Transactions can deploy contract code to the storage of any of the signing accounts.
 
-```bamboo,file=fungible-token-interface.bpl
-// Declare a resource interface for a fungible token.
-//
-// It requires implementing types to provide a resource implementation named `Vault`,
-// which needs to implement the interfaces `Provider` and `Receiver`.
+Here is an example of a resource interface that will be deployed to an account.
+Imagine it is in a file named `FungibleToken.bpl`.
+
+```cadence,file=fungible-token-interface.bpl
+// Declare resource interfaces for the two parts of a fungible token:
+// - A provider, which allows withdrawing tokens
+// - A receiver, which allows depositing tokens
 //
 pub resource interface Provider {
 
-    pub fun withdraw(amount: Int): <-Vault {
+    pub fun withdraw(amount: Int): <-FungibleToken {
         pre {
             amount > 0:
                 "withdrawal amount must be positive"
@@ -4660,12 +4694,15 @@ pub resource interface Provider {
 }
 
 pub resource interface Receiver {
-    pub fun deposit(vault: <-Vault)
+    pub fun deposit(token: <-FungibleToken)
 }
 
-// `Vault` is an interface that implements both `Provider` and `Receiver`.
+// Declare a resource interface for a fungible token.
 //
-pub resource interface Vault: Provider, Receiver {
+// It requires that conforming implementations also implement
+// the interfaces `Provider` and `Receiver`.
+//
+pub resource interface FungibleToken: Provider, Receiver {
 
     pub balance: Int {
         set(newBalance) {
@@ -4700,9 +4737,9 @@ pub resource interface Vault: Provider, Receiver {
         }
     }
 
-    pub fun deposit(vault: <-Self) {
+    pub fun deposit(token: <-Self) {
         post {
-            self.balance == before(self.balance) + vault.balance:
+            self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
         }
     }
@@ -4715,53 +4752,65 @@ followed by the name of the type, the `from` keyword,
 and the string literal for the path of the file which contains the code of the type.
 
 <!-- TODO:
-     move explanation for using statement into separate section?
+     move explanation for import statement into separate section?
      also see below for version referring to deployed code with an address
 -->
 
-The preparer can use the signing account's `deploy` function to deploy
-the resource interface.  This essentially stores the resource interface in the account's `types` object so it can be used again.
+The prepare phase can use the signing account's `deploy` function to deploy types.
 
-Once deployed, the resource interface is available in the account's `types` object, which is how the deployed types are accessed.
+This essentially stores the types in the account's `types` object so it can be used again.
 
-When deploying a resource or interface to an account, it is private by default, just like fields and functions within the resources.  This is a second layer of access control that BPL adds to ensure that certain interfaces and resources are not available to anyone. The `publish` action can be used to override this access control and make certain subsets of the resources public.
+A second layer of access control manages which user has access to stored values.
 
-The `publish` operator is used to make the resource or interface type publicly available.  After a resource or interface is published, any account can import it into a transaction and use it to import the type, call the functions defined in the resource at the owners address, or call the functions in a published interface in a resource that implements it.
+When deploying code to an account, it is private by default,
+just like fields and functions within the resources, i.e. it can only be imported
+by code in the same account.
 
-```bamboo,file=deploy-resource-interface.bpl
-// Import the resource interface type `Vault`
+The `publish` operator can be used to make deployed types publicly available to other accounts.
+
+After a type is published it can be imported by other code.
+
+```cadence,file=deploy-resource-interface.bpl
+// Import the resource interface type `FungibleToken`
 // from the local file "FungibleToken.bpl".
 //
-import Vault from "FungibleToken.bpl"
+import FungibleToken from "FungibleToken.bpl"
 
-// Define a transaction which deploys the code for the resource interface `Vault`,
-// and makes the deployed interface type publicly available.
+// Run a transaction which deploys the code for the resource interface
+// `FungibleToken` and makes it publicly available by publishing it.
 //
 transaction {
 
     prepare(signer: Account) {
-        // Deploy the  resource interface type `Vault`
+        // Deploy the code for the resource interface type `FungibleToken`
         // in the signing account.
         //
-        signer.deploy(Vault)
+        signer.deploy(FungibleToken)
 
-        // Make the deployed type publicly available,
-        // so anyone can import the `Vault` interface from the account.
+        // Make the deployed type publicly available, so anyone can import
+        // resource interface type `FungibleToken` from the signing account.
         //
-        publish signer.types[Vault]
+        publish signer.types[FungibleToken]
     }
 }
 ```
 
-Now, anybody can import the vault interface from the account storage if they want to use it for their resources.
+Now, anybody can import the type `FungibleToken` from the signing account
+and concrete fungible token implementations that conform to the interface can be created.
 
-Just like resource interfaces it is possible to deploy resources.  Imagine this resource definition below is also in the local file `FungibleToken.bpl` that was used above.
+Imagine this declaration below for a concrete fungible token implementation conforming
+to the fungible token interface is in a local file named `ExampleToken.bpl`.
 
-```bamboo,file=example-token.bpl
-// Declare a resource named `FungibleToken` which implements
-// the resource interface `Vault`.
+```cadence,file=example-token.bpl
+// Import the resource interface type `FungibleToken`,
+// which was deployed above, in this example to the account with address 0x23.
 //
-resource FungibleToken: Vault {
+import FungibleToken from 0x23
+
+// Declare a resource named `ExampleToken`, which is a concrete fungible token,
+// i.e. it implements the resource interface `FungibleToken`.
+//
+resource ExampleToken: FungibleToken {
 
         pub var balance: Int
 
@@ -4769,95 +4818,120 @@ resource FungibleToken: Vault {
             self.balance = balance
         }
 
-        pub fun withdraw(amount: Int): <-Vault {
+        pub fun withdraw(amount: Int): <-ExampleToken {
             self.balance = self.balance - amount
-            return create Vault(balance: amount)
+            return create ExampleToken(balance: amount)
         }
 
-        pub fun deposit(_ vault: <-Vault) {
-            self.balance = self.balance + vault.balance
-            destroy vault
+        pub fun deposit(token: <-ExampleToken) {
+            self.balance = self.balance + token.balance
+            destroy token
         }
+}
+
+// Declare a function that lets any user create an example token
+// with an initial empty balance.
+//
+fun newEmptyExampleToken(): <-ExampleToken {
+    return <-create ExampleToken(balance: 0)
 }
 ```
 
-Now, in the same transaction that was used to deploy and publish the interface, the resource can also be stored and published.
+Again, the type must be deployed and published.
 
-```bamboo,file=deploy-resource.bpl
-import FungibleToken from "FungibleToken.bpl"
+```cadence,file=deploy-example-token.bpl
+import ExampleToken from "ExampleToken.bpl"
 
-// Execute a transaction which deploys the code for the resource `FungibleToken`,
-// and makes the deployed type publicly available.
+// Run a transaction which deploys the code for the resource type `ExampleToken`
+// and makes the deployed type publicly available by publishing it.
 //
 transaction {
 
     prepare(signer: Account) {
-        signer.deploy(Vault)
-        publish signer.types[Vault]
-
-        signer.deploy(FungibleToken)
-        signer.storage[FungibleToken] <- create FungibleToken(balance: 100)
-        publish signer.types[FungibleToken]
+        signer.deploy(ExampleToken)
+        publish signer.types[ExampleToken]
     }
 }
 ```
 
-Now, the `Vault` and the `FungibleToken` types are deployed to the account and published so that anyone who wants to use them or interact with them can easily do so by importing them.
+Now, the resource type `ExampleToken` is deployed to the account
+and published so that anyone who wants to use it
+or interact with it can easily do so by importing it from the account.
 
-In many scenarios, publishing the entire interface for the resource may be necessary because everyone might want to be able to access all functionality of the type.  In most situations though, including this one, it is important to expose only a subset of the functionality of the resources because some of the functionality should only be visible to the owner.  In this example, the withdraw function should only be callable by the account owner, so instead of publishing the Vault and FungibleToken interface,  the receiver interface is the only one that should be published.
+### Using Deployed Code
 
-The next section will show how an account can deploy its own instance of `FungibleToken` based on a published external type and publish the correct interface.
+Once code is deployed, it can be used in other code and in transactions.
 
-### Interacting with Deployed Resources
+In many scenarios, publishing a stored value might be necessary,
+because any user should have access all public functionality of the type.
 
-<!-- TODO:
-     move explanation for using statement into separate section?
-     also see above for version referring to local code with a path
--->
+In most situations though it is important to expose only a subset of the functionality
+of the stored values, because some of the functionality should only be available to the owner.
 
-```bamboo,file=setup-transaction.bpl
-// Import the resource type `FungibleToken`, which was "deployed" above,
-// from address 0x42.
+The following transaction creates an empty token and stores it in the signer's account.
+This allows the owner to withdraw and deposit. As this functionality should not be available
+to anyone else, the token is not published.
+
+However, the deposit function should be available to anyone. To achieve this,
+an additional reference to the token is created, stored, and published,
+which has the type `Receiver`, i.e. it only exposes the `deposit` function.
+
+```cadence,file=setup-transaction.bpl
+// Import the resource interface types `Receiver` and `Provider`,
+// which were deployed above, in this example to the account with address 0x23.
 //
-import FungibleToken from 0x42
+import Receiver, Provider from 0x23
 
-// Execute a transaction which creates a new example token vault
-// for the signing account.
+// Import the resource type `ExampleToken` and the function `newEmptyExampleToken`,
+// which were deployed above, in this example to the account with address 0x42.
+//
+import ExampleToken, newEmptyExampleToken from 0x42
+
+// Run a transaction which creates a new example token for the signing account
+// and sets up references to it for allowing withdrawals for the owner
+// and deposits from anyone.
 //
 transaction {
 
     prepare(signer: Account) {
-        // Create a new example token vault for the signing account.
+        // Create a new example token for the signing account.
         //
-        // NOTE: the vault is not publicly accessible.
+        // NOTE: the token is not published, so that only the owner can access it.
         //
-        signer.storage[FungibleToken] <- create FungibleToken()
+        var exampleToken: ExampleToken? <- newEmptyExampleToken()
+        signer.storage[ExampleToken] <-> exampleToken
 
-        // Store two storage references in the signing account:
-        // One reference to the stored vault, keyed by the resource
-        // interface `Provider`, and another reference to the stored vault,
-        // keyed by the resource interface `Provider`.
+        // `exampleToken` now contains the previously stored token, if any.
         //
-        signer.storage[FungibleToken.Provider] =
-            &signer.storage[FungibleToken.Vault] as FungibleToken.Provider
+        // In this example it is simply destroyed, because it is assumed
+        // there was no prior stored token.
+        //
+        destroy exampleToken
 
-        signer.storage[FungibleToken.Receiver] =
-            &signer.storage[FungibleToken.Vault] as FungibleToken.Receiver
+        // Store a reference to the token as a provider in the signing account,
+        // so the owner can use it to withdraw tokens.
+        //
+        // NOTE: the provider is not published, so that only the owner can access it.
+        //
+        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
 
-        // Publish only the receiver so it can be accessed publicly.
+        // Store a reference to the token as a receiver in the signing account
+        // and publish it, so anyone can use it to deposit tokens.
         //
-        // NOTE: Neither the vault nor the publisher are published,
-        // so that only the owner has access to it.
-        //
-        publish signer.storage[FungibleToken.Receiver]
+        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
+        publish signer.storage[&Receiver]
     }
 }
 ```
 
-```bamboo,file=send-transaction.bpl
-// Import the resource type `FungibleToken` deployed at example address 0x42.
+Once an account is prepared in such a way, transactions can be run that deposit
+tokens into the account.
+
+```cadence,file=send-transaction.bpl
+// Import the resource type `ExampleToken`,
+// in this example deployed to the account with address 0x42.
 //
-import FungibleToken from 0x42
+import ExampleToken from 0x42
 
 // Execute a transaction which sends five coins from one account to another.
 //
@@ -4871,30 +4945,47 @@ import FungibleToken from 0x42
 //
 transaction {
 
-    let sentFunds: FungibleToken.Vault
+    let sentFunds: <-ExampleToken
 
     prepare(signer: Account) {
 
-        // Call the stored provider's withdraw function,
-        // withdraw 5 tokens, and move the them to the field `sentFunds`.
+        // Get the provider reference from the signer's account storage.
         //
-        // As the access is performed in the preparer of the transaction,
-        // the unpublished reference `FungibleToken.Provider`
-        // can be accessed (if it exists; otherwise the transaction aborts).
+        // As the access is performed in the prepare phase of the transaction,
+        // the unpublished reference `&Provider` can be accessed.
         //
-        self.sentFunds <- signer.storage[FungibleToken.Provider].withdraw(amount: 5)
+        // If the signer's account has no provider reference stored in it,
+        // or it is not published, abort the transaction.
+        //
+        let provider = signer.storage[&Provider] ?? panic("Signer has no provider")
+
+        // Withdraw 5 tokens from the provider by calling the provider's
+        // `withdraw` function, and move the tokens to the field `sentFunds`,
+        // so they can be deposited in the execute phase below.
+        //
+        self.sentFunds <- provider.withdraw(amount: 5)
     }
 
     execute {
-        // The recipient account
+        // Get the recipient's account. In this example it has the address 0x1234.
         //
-        let recipient: Account = // ...
+        let recipient = getAccount(0x1234)
 
-        // Deposit the amount withdrawn from the signer in the recipient receivr,
-        // which is assumed to be stored in the recipient account.
-        // If the recipient has no receiver the transaction aborts.
+        // Note that the recipient's account is not a signing account –
+        // deposits need no signature, the recipient's receiver is published
+        // and can be used by anyone (if set up in this manner).
+
+        // Get the receiver reference from the recipient's account storage.
+        // If the recipient's account has no receiver reference stored in it,
+        // or it is not published, abort the transaction.
         //
-        recipient.storage[ExampleToken.Receiver].deposit(vault: <-self.sentFunds)
+        let receiver = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
+
+        // Deposit the amount withdrawn from the signer's provider/token
+        // into the recipient's receiver/token.
+        // (It was withdrawn in the preparation phase above).
+        //
+        receiver.deposit(token: <-self.sentFunds)
     }
 }
 ```
@@ -4907,7 +4998,7 @@ There is currently no built-in function that allows getting the address of the s
 
 ### `panic`
 
-```bamboo
+```cadence
 fun panic(_ message: String): Never
 ```
 
@@ -4915,14 +5006,14 @@ Terminates the program unconditionally and reports a message which explains why 
 
 #### Example
 
-```bamboo
+```cadence
 let optionalAccount: Account? = // ...
 let account = optionalAccount ?? panic("missing account")
 ```
 
 ### `assert`
 
-```bamboo
+```cadence
 fun assert(_ condition: Bool, message: String)
 ```
 
