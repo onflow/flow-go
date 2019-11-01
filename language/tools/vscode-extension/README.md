@@ -7,8 +7,10 @@
 ## Installation
 
 To install the extension, ensure you [have VS Code installed](https://code.visualstudio.com/docs/setup/mac)
-and have configured the [`code` command line interface](https://code.visualstudio.com/docs/setup/mac#_launching-from-the-command-line),
-then run:
+and have configured the [`code` command line interface](https://code.visualstudio.com/docs/setup/mac#_launching-from-the-command-line).
+
+Make sure you are in this `vscode-extension` directory, then run:
+
 ```shell script
 code --install-extension cadence-*.vsix
 ```
