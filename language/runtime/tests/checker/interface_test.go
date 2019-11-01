@@ -1122,6 +1122,19 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 	}
 }
 
+func TestCheckInterfaceUseCompositeInInitializer(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      struct Foo {}
+
+      struct interface Bar {
+          init(foo: Foo)
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
 func TestCheckInterfaceSelfUse(t *testing.T) {
 
 	declarationKinds := []common.DeclarationKind{

@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/module/committee"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -27,7 +28,6 @@ type mockPropagationNode struct {
 	net *mock.Network
 	// the state of the engine, exposed in order for tests to assert
 	pool *mempool.Mempool
-	vol  *volatile.Volatile
 }
 
 // newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
@@ -58,16 +58,7 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 
 	net := mock.NewNetwork(com, hub)
 
-	// vol, err := volatile.New()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// // This should be removed, but for now is to test memory leak
-	// vol.Close()
-
-	// vol is set to be nil to avoid memory leak
-	// TODO: figure out why passing vol will cause memory leak
-	engine, err := propagation.New(log, net, com, pool, nil)
+	engine, err := propagation.New(log, net, com, pool)
 	if err != nil {
 		return nil, err
 	}
@@ -76,16 +67,11 @@ func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*m
 		engine: engine,
 		net:    net,
 		pool:   pool,
-		vol:    nil,
 	}, nil
 }
 
 func (n *mockPropagationNode) terminate() {
 	<-n.engine.Done()
-	// if n.vol != nil {
-	// 	n.vol.Close()
-	// }
-	n.vol = nil
 }
 
 func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
@@ -108,21 +94,21 @@ func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNo
 }
 
 // a utility func to return a random collection hash
-func randHash() ([]byte, error) {
+func randHash() []byte {
 	hash := make([]byte, 32)
 	_, err := rand.Read(hash)
-	return hash, err
+	if err != nil {
+		panic(err.Error()) // should never error
+	}
+	return hash
 }
 
 // a utiliy func to generate a GuaranteedCollection with random hash
-func randCollectionHash() (*collection.GuaranteedCollection, error) {
-	hash, err := randHash()
-	if err != nil {
-		return nil, err
-	}
+func randCollection() *collection.GuaranteedCollection {
+	hash := randHash()
 	return &collection.GuaranteedCollection{
 		Hash: hash,
-	}, nil
+	}
 }
 
 // send one collection to one node.
@@ -134,6 +120,9 @@ func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg 
 }
 
 func TestSubmitCollection(t *testing.T) {
+
+	rand.Seed(time.Now().UnixNano())
+
 	// If a consensus node receives a collection hash, then another connected node should receive it as well.
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
@@ -145,8 +134,7 @@ func TestSubmitCollection(t *testing.T) {
 		node2 := nodes[1]
 
 		// prepare a random collection hash
-		gc, err := randCollectionHash()
-		require.Nil(t, err)
+		gc := randCollection()
 
 		// node1's engine receives a collection hash
 		err = node1.engine.Process(node1.net.GetID(), gc)
@@ -179,14 +167,9 @@ func TestSubmitCollection(t *testing.T) {
 			node3 := nodes[2]
 
 			// prepare 3 different GuaranteedCollections: gc1, gc2, gc3
-			gc1, err := randCollectionHash()
-			require.Nil(t, err)
-
-			gc2, err := randCollectionHash()
-			require.Nil(t, err)
-
-			gc3, err := randCollectionHash()
-			require.Nil(t, err)
+			gc1 := randCollection()
+			gc2 := randCollection()
+			gc3 := randCollection()
 
 			// check the collections are different
 			require.NotEqual(t, gc1.Hash, gc2.Hash)
@@ -227,14 +210,9 @@ func TestSubmitCollection(t *testing.T) {
 		node3 := nodes[2]
 
 		// prepare 3 different GuaranteedCollections: gc1, gc2, gc3
-		gc1, err := randCollectionHash()
-		require.Nil(t, err)
-
-		gc2, err := randCollectionHash()
-		require.Nil(t, err)
-
-		gc3, err := randCollectionHash()
-		require.Nil(t, err)
+		gc1 := randCollection()
+		gc2 := randCollection()
+		gc3 := randCollection()
 
 		// send different collection to different nodes concurrently
 		var wg sync.WaitGroup
@@ -272,9 +250,7 @@ func TestSubmitCollection(t *testing.T) {
 		// prepare M distinct collection hashes
 		gcs := make([]*collection.GuaranteedCollection, M)
 		for m := 0; m < M; m++ {
-			gc, err := randCollectionHash()
-			require.Nil(t, err)
-			gcs[m] = gc
+			gcs[m] = randCollection()
 		}
 
 		// send each collection concurrently to a random node
@@ -308,6 +284,7 @@ func TestSubmitCollection(t *testing.T) {
 	t.Run("run the above tests for 100 times", func(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			testConcrrencyOnce(t)
+			runtime.GC()
 		}
 	})
 }

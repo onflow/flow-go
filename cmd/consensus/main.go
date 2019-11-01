@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/simulation/generator"
 	"github.com/dapperlabs/flow-go/module/committee"
@@ -67,11 +66,6 @@ func main() {
 		log.Fatal().Err(err).Msg("could not initialize engine mempool")
 	}
 
-	vol, err := volatile.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize engine volatile")
-	}
-
 	log.Info().Msg("initializing network modules")
 
 	codec := captain.NewCodec()
@@ -113,7 +107,7 @@ func main() {
 	log.Info().Msg("initializing propagation engine")
 
 	// initialize the propagation engines
-	prop, err := propagation.New(log, net, com, pool, vol)
+	prop, err := propagation.New(log, net, com, pool)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize propagation engine")
 	}

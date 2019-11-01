@@ -161,3 +161,17 @@ func (ws *WorldState) UpdateTransactionStatus(h crypto.Hash, status flow.Transac
 	tx.Status = status
 	ws.Transactions[string(tx.Hash())] = tx
 }
+
+// UpdateTransactionEvents updates a transaction with events emitted by its execution.
+func (ws *WorldState) UpdateTransactionEvents(h crypto.Hash, events []flow.Event) {
+	tx := ws.GetTransaction(h)
+	if tx == nil {
+		return
+	}
+
+	ws.transactionsMutex.Lock()
+	defer ws.transactionsMutex.Unlock()
+
+	tx.Events = events
+	ws.Transactions[string(tx.Hash())] = tx
+}

@@ -5,6 +5,7 @@ import "fmt"
 type Program struct {
 	// all declarations, in the order they are defined
 	Declarations          []Declaration
+	importDeclarations    []*ImportDeclaration
 	interfaceDeclarations []*InterfaceDeclaration
 	compositeDeclarations []*CompositeDeclaration
 	functionDeclarations  []*FunctionDeclaration
@@ -32,6 +33,18 @@ func (p *Program) EndPosition() Position {
 
 func (p *Program) Accept(visitor Visitor) Repr {
 	return visitor.VisitProgram(p)
+}
+
+func (p *Program) ImportDeclarations() []*ImportDeclaration {
+	if p.importDeclarations == nil {
+		p.importDeclarations = make([]*ImportDeclaration, 0)
+		for _, declaration := range p.Declarations {
+			if importDeclaration, ok := declaration.(*ImportDeclaration); ok {
+				p.importDeclarations = append(p.importDeclarations, importDeclaration)
+			}
+		}
+	}
+	return p.importDeclarations
 }
 
 func (p *Program) InterfaceDeclarations() []*InterfaceDeclaration {

@@ -110,6 +110,13 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*flow.Trans
 		return nil, err
 	}
 
+	// Events are sent over the wire JSON-encoded.
+	var events []flow.Event
+	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
+		return nil, err
+	}
+	tx.Events = events
+
 	return &tx, nil
 }
 

@@ -6,6 +6,11 @@ import (
 )
 
 func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+	// Handled in `declareImportDeclaration`
+	panic(&UnreachableStatementError{})
+}
+
+func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	imports := checker.Program.ImportedPrograms()
 
 	imported := imports[declaration.Location.ID()]
@@ -180,8 +185,8 @@ func (checker *Checker) importTypes(
 		// TODO: improve position
 		// TODO: allow cross-module types?
 
-		// don't import predeclared values
-		if _, ok := importChecker.PredeclaredValues[name]; ok {
+		// don't import predeclared types
+		if _, ok := importChecker.PredeclaredTypes[name]; ok {
 			continue
 		}
 
