@@ -10,8 +10,7 @@ import (
 type Committee interface {
 	Me() flow.Identity
 	Get(nodeID string) (flow.Identity, error)
-	Select(filters ...IdentityFilter) (flow.IdentityList, error)
+	Select() flow.IdentityList
+	Leader(height uint64) flow.Identity
+	Quorum() uint
 }
-
-// IdentityFilter is a function that returns true if we want to include a node.
-type IdentityFilter func(flow.Identity) bool

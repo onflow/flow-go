@@ -10,8 +10,9 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	return checker.visitFunctionDeclaration(
 		declaration,
 		functionDeclarationOptions{
-			mustExit:        true,
-			declareFunction: true,
+			mustExit:          true,
+			declareFunction:   true,
+			checkResourceLoss: true,
 		},
 	)
 }
@@ -25,6 +26,9 @@ type functionDeclarationOptions struct {
 	// the current scope. This might be e.g. true for global function
 	// declarations, but false for function declarations of composites
 	declareFunction bool
+	// checkResourceLoss if the function should be checked for resource loss.
+	// For example, function declarations in interfaces should not be checked.
+	checkResourceLoss bool
 }
 
 func (checker *Checker) visitFunctionDeclaration(
@@ -53,6 +57,7 @@ func (checker *Checker) visitFunctionDeclaration(
 		declaration.FunctionBlock,
 		options.mustExit,
 		nil,
+		options.checkResourceLoss,
 	)
 
 	return nil
@@ -96,6 +101,7 @@ func (checker *Checker) checkFunction(
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
 	initializationInfo *InitializationInfo,
+	checkResourceLoss bool,
 ) {
 	// check argument labels
 	checker.checkArgumentLabels(parameterList)
@@ -114,7 +120,7 @@ func (checker *Checker) checkFunction(
 				//   variable declarations will have proper function activation
 				//   associated to it, and declare parameters in this new scope
 				checker.enterValueScope()
-				defer checker.leaveValueScope()
+				defer checker.leaveValueScope(checkResourceLoss)
 
 				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
 
@@ -124,6 +130,7 @@ func (checker *Checker) checkFunction(
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,
+					checkResourceLoss,
 				)
 
 				if mustExit {
@@ -272,10 +279,14 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 	panic(&errors.UnreachableError{})
 }
 
-func (checker *Checker) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnTypeAnnotation *TypeAnnotation) {
+func (checker *Checker) visitFunctionBlock(
+	functionBlock *ast.FunctionBlock,
+	returnTypeAnnotation *TypeAnnotation,
+	checkResourceLoss bool,
+) {
 
 	checker.enterValueScope()
-	defer checker.leaveValueScope()
+	defer checker.leaveValueScope(checkResourceLoss)
 
 	checker.visitConditions(functionBlock.PreConditions)
 
@@ -336,6 +347,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 		expression.FunctionBlock,
 		true,
 		nil,
+		true,
 	)
 
 	// function expressions are not allowed in conditions

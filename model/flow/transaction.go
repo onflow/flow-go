@@ -3,9 +3,9 @@
 package flow
 
 import (
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // TransactionStatus represents the status of a Transaction.
@@ -55,67 +55,26 @@ type Transaction struct {
 	Status             TransactionStatus
 }
 
-// Hash computes the hash over the necessary transaction data.
+// Hash returns the canonical hash of this transaction.
 func (tx *Transaction) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	return hasher.ComputeHash(tx.CanonicalEncoding())
+	return hash.DefaultHasher.ComputeHash(tx.Encode())
 }
 
-// CanonicalEncoding returns the encoded canonical transaction as bytes.
-func (tx *Transaction) CanonicalEncoding() []byte {
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		tx.Script,
-		tx.ReferenceBlockHash,
-		tx.Nonce,
-		tx.ComputeLimit,
-		tx.PayerAccount,
-		tx.ScriptAccounts,
-	})
-
-	return b
-}
-
-// FullEncoding returns the encoded full transaction (including signatures) as bytes.
-func (tx *Transaction) FullEncoding() []byte {
-	sigs := make([][]byte, len(tx.ScriptAccounts))
-	for i, sig := range tx.Signatures {
-		sigs[i] = EncodeAccountSignature(sig)
-	}
-
-	b, _ := rlp.EncodeToBytes([]interface{}{
-		tx.Script,
-		tx.ReferenceBlockHash,
-		tx.Nonce,
-		tx.ComputeLimit,
-		tx.PayerAccount,
-		tx.ScriptAccounts,
-		sigs,
-	})
-
-	return b
+// Encode returns the canonical encoding of this transaction.
+func (tx *Transaction) Encode() []byte {
+	w := wrapTransaction(*tx)
+	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
 // AddSignature signs the transaction with the given account and private key, then adds the signature to the list
 // of signatures.
-func (tx *Transaction) AddSignature(account Address, key AccountPrivateKey) error {
-	hasher, err := crypto.NewHasher(key.HashAlgo)
-	if err != nil {
-		return err
-	}
-
-	sig, err := key.PrivateKey.Sign(tx.CanonicalEncoding(), hasher)
-	if err != nil {
-		return err
-	}
-
+func (tx *Transaction) AddSignature(account Address, sig crypto.Signature) {
 	accountSig := AccountSignature{
 		Account:   account,
 		Signature: sig.Bytes(),
 	}
 
 	tx.Signatures = append(tx.Signatures, accountSig)
-
-	return nil
 }
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
@@ -145,4 +104,31 @@ func (tx *Transaction) MissingFields() []string {
 	}
 
 	return missingFields
+}
+
+type transactionWrapper struct {
+	Script             []byte
+	ReferenceBlockHash []byte
+	Nonce              uint64
+	ComputeLimit       uint64
+	PayerAccount       []byte
+	ScriptAccounts     [][]byte
+}
+
+func wrapTransaction(tx Transaction) transactionWrapper {
+	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
+	for i, scriptAccount := range tx.ScriptAccounts {
+		scriptAccounts[i] = scriptAccount.Bytes()
+	}
+
+	w := transactionWrapper{
+		Script:             tx.Script,
+		ReferenceBlockHash: tx.ReferenceBlockHash,
+		Nonce:              tx.Nonce,
+		ComputeLimit:       tx.ComputeLimit,
+		PayerAccount:       tx.PayerAccount.Bytes(),
+		ScriptAccounts:     scriptAccounts,
+	}
+
+	return w
 }

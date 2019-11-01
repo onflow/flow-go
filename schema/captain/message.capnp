@@ -10,6 +10,7 @@ $Go.import("github.com/dapperlabs/flow-go/schema/captain");
 using Trickle = import "trickle.capnp";
 using Collection = import "collection.capnp";
 using Consensus = import "consensus.capnp";
+using Coldstuff = import "coldstuff.capnp";
 
 struct Message {
   union {
@@ -22,9 +23,13 @@ struct Message {
 
     guaranteedCollection @6: Collection.GuaranteedCollection;
 
-    snapshotRequest @7: Consensus.SnapshotRequest;
-    snapshotResponse @8: Consensus.SnapshotResponse;
+    snapshotRequest @7 :Consensus.SnapshotRequest;
+    snapshotResponse @8 :Consensus.SnapshotResponse;
     mempoolRequest @9: Consensus.MempoolRequest;
     mempoolResponse @10: Consensus.MempoolResponse;
+
+    blockProposal @11 :Coldstuff.BlockProposal;
+    blockVote @12 :Coldstuff.BlockVote;
+    blockCommit @13 :Coldstuff.BlockCommit;
   }
 }

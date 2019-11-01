@@ -3,9 +3,11 @@ package sema
 import "github.com/dapperlabs/flow-go/language/runtime/ast"
 
 func (checker *Checker) VisitBlock(block *ast.Block) ast.Repr {
-	checker.withValueScope(func() {
-		checker.visitStatements(block.Statements)
-	})
+	checker.enterValueScope()
+	defer checker.leaveValueScope(true)
+
+	checker.visitStatements(block.Statements)
+
 	return nil
 }
 

@@ -589,8 +589,10 @@ func (checker *Checker) enterValueScope() {
 	checker.valueActivations.Enter()
 }
 
-func (checker *Checker) leaveValueScope() {
-	checker.checkResourceLoss(checker.valueActivations.Depth())
+func (checker *Checker) leaveValueScope(checkResourceLoss bool) {
+	if checkResourceLoss {
+		checker.checkResourceLoss(checker.valueActivations.Depth())
+	}
 	checker.valueActivations.Leave()
 }
 
@@ -625,12 +627,6 @@ func (checker *Checker) checkResourceLoss(depth int) {
 	}
 }
 
-func (checker *Checker) withValueScope(f func()) {
-	checker.enterValueScope()
-	defer checker.leaveValueScope()
-	f()
-}
-
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
@@ -651,11 +647,11 @@ func (checker *Checker) recordResourceInvalidation(
 
 	// TODO: improve handling of `self`: only allow invalidation once
 
-	selfFieldMember := checker.selfFieldAccessMember(expression)
+	accessedSelfMember := checker.accessedSelfMember(expression)
 
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if selfFieldMember == nil {
+		if accessedSelfMember == nil {
 			reportInvalidNestedMove()
 			return
 		}
@@ -671,8 +667,8 @@ func (checker *Checker) recordResourceInvalidation(
 		EndPos:   expression.EndPosition(),
 	}
 
-	if selfFieldMember != nil {
-		checker.resources.AddInvalidation(selfFieldMember, invalidation)
+	if accessedSelfMember != nil {
+		checker.resources.AddInvalidation(accessedSelfMember, invalidation)
 		return
 	}
 

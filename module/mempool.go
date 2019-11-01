@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package propagation
+package module
 
 import (
 	"github.com/dapperlabs/flow-go/model/collection"
@@ -14,4 +14,5 @@ type Mempool interface {
 	Hash() []byte
 	Size() uint
 	All() []*collection.GuaranteedCollection
+	Drop()
 }

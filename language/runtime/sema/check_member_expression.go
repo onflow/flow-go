@@ -11,8 +11,8 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 		return &InvalidType{}
 	}
 
-	selfFieldMember := checker.selfFieldAccessMember(expression)
-	if selfFieldMember != nil {
+	accessedSelfMember := checker.accessedSelfMember(expression)
+	if accessedSelfMember != nil {
 
 		functionActivation := checker.functionActivations.Current()
 
@@ -28,9 +28,9 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 		isInInitializer := info != nil
 
 		if isInInitializer {
-			fieldInitialized := info.InitializedFieldMembers.Contains(selfFieldMember)
+			fieldInitialized := info.InitializedFieldMembers.Contains(accessedSelfMember)
 
-			field := info.FieldMembers[selfFieldMember]
+			field := info.FieldMembers[accessedSelfMember]
 			if field != nil && !fieldInitialized {
 
 				checker.report(
@@ -71,16 +71,16 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	// If the the access is to a member of `self` and a resource,
 	// its use must be recorded/checked, so that it isn't used after it was invalidated
 
-	selfFieldMember := checker.selfFieldAccessMember(expression)
-	if selfFieldMember != nil &&
-		selfFieldMember.Type.IsResourceType() {
+	accessedSelfMember := checker.accessedSelfMember(expression)
+	if accessedSelfMember != nil &&
+		accessedSelfMember.Type.IsResourceType() {
 
 		// NOTE: Preventing the capturing of the resource field is already implicitly handled:
 		// By definition, the resource field can only be nested in a resource,
 		// so `self` is a resource, and the capture of it is checked separately
 
-		checker.checkResourceUseAfterInvalidation(selfFieldMember, expression.Identifier)
-		checker.resources.AddUse(selfFieldMember, expression.Identifier.Pos)
+		checker.checkResourceUseAfterInvalidation(accessedSelfMember, expression.Identifier)
+		checker.resources.AddUse(accessedSelfMember, expression.Identifier.Pos)
 	}
 
 	origins := checker.memberOrigins[expressionType]

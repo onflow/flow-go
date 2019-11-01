@@ -16,6 +16,7 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 		nil,
 		false,
 		nil,
+		false,
 	)
 
 	// check that parameters are primitive types

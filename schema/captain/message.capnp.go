@@ -24,10 +24,13 @@ const (
 	Message_Which_snapshotResponse     Message_Which = 8
 	Message_Which_mempoolRequest       Message_Which = 9
 	Message_Which_mempoolResponse      Message_Which = 10
+	Message_Which_blockProposal        Message_Which = 11
+	Message_Which_blockVote            Message_Which = 12
+	Message_Which_blockCommit          Message_Which = 13
 )
 
 func (w Message_Which) String() string {
-	const s = "authpingpongannouncerequestresponseguaranteedCollectionsnapshotRequestsnapshotResponsemempoolRequestmempoolResponse"
+	const s = "authpingpongannouncerequestresponseguaranteedCollectionsnapshotRequestsnapshotResponsemempoolRequestmempoolResponseblockProposalblockVoteblockCommit"
 	switch w {
 	case Message_Which_auth:
 		return s[0:4]
@@ -51,6 +54,12 @@ func (w Message_Which) String() string {
 		return s[86:100]
 	case Message_Which_mempoolResponse:
 		return s[100:115]
+	case Message_Which_blockProposal:
+		return s[115:128]
+	case Message_Which_blockVote:
+		return s[128:137]
+	case Message_Which_blockCommit:
+		return s[137:148]
 
 	}
 	return "Message_Which(" + strconv.FormatUint(uint64(w), 10) + ")"
@@ -445,6 +454,105 @@ func (s Message) NewMempoolResponse() (MempoolResponse, error) {
 	return ss, err
 }
 
+func (s Message) BlockProposal() (BlockProposal, error) {
+	if s.Struct.Uint16(0) != 11 {
+		panic("Which() != blockProposal")
+	}
+	p, err := s.Struct.Ptr(0)
+	return BlockProposal{Struct: p.Struct()}, err
+}
+
+func (s Message) HasBlockProposal() bool {
+	if s.Struct.Uint16(0) != 11 {
+		return false
+	}
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
+func (s Message) SetBlockProposal(v BlockProposal) error {
+	s.Struct.SetUint16(0, 11)
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
+}
+
+// NewBlockProposal sets the blockProposal field to a newly
+// allocated BlockProposal struct, preferring placement in s's segment.
+func (s Message) NewBlockProposal() (BlockProposal, error) {
+	s.Struct.SetUint16(0, 11)
+	ss, err := NewBlockProposal(s.Struct.Segment())
+	if err != nil {
+		return BlockProposal{}, err
+	}
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
+	return ss, err
+}
+
+func (s Message) BlockVote() (BlockVote, error) {
+	if s.Struct.Uint16(0) != 12 {
+		panic("Which() != blockVote")
+	}
+	p, err := s.Struct.Ptr(0)
+	return BlockVote{Struct: p.Struct()}, err
+}
+
+func (s Message) HasBlockVote() bool {
+	if s.Struct.Uint16(0) != 12 {
+		return false
+	}
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
+func (s Message) SetBlockVote(v BlockVote) error {
+	s.Struct.SetUint16(0, 12)
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
+}
+
+// NewBlockVote sets the blockVote field to a newly
+// allocated BlockVote struct, preferring placement in s's segment.
+func (s Message) NewBlockVote() (BlockVote, error) {
+	s.Struct.SetUint16(0, 12)
+	ss, err := NewBlockVote(s.Struct.Segment())
+	if err != nil {
+		return BlockVote{}, err
+	}
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
+	return ss, err
+}
+
+func (s Message) BlockCommit() (BlockCommit, error) {
+	if s.Struct.Uint16(0) != 13 {
+		panic("Which() != blockCommit")
+	}
+	p, err := s.Struct.Ptr(0)
+	return BlockCommit{Struct: p.Struct()}, err
+}
+
+func (s Message) HasBlockCommit() bool {
+	if s.Struct.Uint16(0) != 13 {
+		return false
+	}
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
+func (s Message) SetBlockCommit(v BlockCommit) error {
+	s.Struct.SetUint16(0, 13)
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
+}
+
+// NewBlockCommit sets the blockCommit field to a newly
+// allocated BlockCommit struct, preferring placement in s's segment.
+func (s Message) NewBlockCommit() (BlockCommit, error) {
+	s.Struct.SetUint16(0, 13)
+	ss, err := NewBlockCommit(s.Struct.Segment())
+	if err != nil {
+		return BlockCommit{}, err
+	}
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
+	return ss, err
+}
+
 // Message_List is a list of Message.
 type Message_List struct{ capnp.List }
 
@@ -515,39 +623,58 @@ func (p Message_Promise) MempoolResponse() MempoolResponse_Promise {
 	return MempoolResponse_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
-const schema_cc8ede639915bf22 = "x\xdal\xd0Kh\x13_\x14\x06\xf0\xef\xccL\x92\xa6" +
-	"\xfd\xff\xcd\xc8\x8c\x82\x14Q\xa4\xad\x0f\xaa$\xd8.\xac" +
-	"\x15\xa3R\xac\xd2J\xd3q#\x14\xcb4\xbd$\xc5d" +
-	"f\xccL@\xba\x11\x02\xe2#\xa8\x0bW\x82\x0b\x17v" +
-	"S\x90@\xb7.BA\xa8\xf8\xd8\x8b\x82\xad\x0b\x15\xc1" +
-	"\x85 Z\xad\x8f+g\xcct!.\xe7\xfc\xbes\xbe" +
-	"\xe1\xa6\xafPV\xc9\xc4n\xc6\x81\xdcH,.\xa7\x9a" +
-	"\xe9S\xf7\xae\xcf6\x90\xdb@$w47\xdd\xce\xbf" +
-	"\xba\xf1\x14C\x94\xe8\x00\x8c\xbd\xea\x82\xd1\xaf&\x80\xfd" +
-	"\x19\xd5U\xb0$\xcb\xc2\xf7\xed\x82\xd8Gy\xdbs\xbc" +
-	"\x81Q\xb1-\xfc\x1e#\xca\xf5\xaa\xda\x7fRj\x04\x18" +
-	"\xdd\xb4\x07\xb0\xb6\x93JV/)\xf4?\xfd\x92&1" +
-	"\xec\x0e\xa1\x8b!\xcd\xa0\xfc\x94&)\\\x14\xc2.\x86" +
-	">\x06\xf5\x874I\x05\x8c\x0c\x9d\x04\xac4\xc3 \x83" +
-	"\xf6]\x9a\xa4\x01\xc6\x01:\x0aX}\x0cY\x86\xd8\x9a" +
-	"4)\x06\x18\x87\xc2\x8dA\x86a\x86\xf87iR\x1c" +
-	"0\x86h\x1e\xb0\x86\x19N3$\xbeJ\x93\x12\x80\x91" +
-	"\xa3\x1a`\x8d1L0\xb4\xadJ\x93\xda\x00\xe3\x0c]" +
-	"\x03\xac\x09\x86\"C\xf2\x8b4)\x09\x18\x82f\x01k" +
-	"\x9a\xc1ch\xff,Mj\x07\x8crx\xaa\xc4p\x81" +
-	"\x14J\xd9\xd5\xa0H\xba\xdc\xd9x\x92x\xb7\xfa\xec9" +
-	"@\xa4\x83R\xde\x8cS ]\xd6\x1eo\xd1\xb2\x93\x07" +
-	"\xeb\xebc7\x1co\xec\xf9\x94\x94\x14_l\x8d\xa5\xed" +
-	"8n\xd5\xc9\x0b\x00\xa4\xcb\xad\x8d\xfab]\x9c{\xd1" +
-	"\xd2\x8b\x15q\xbe*\xfc\x80t\xf9\xfe\xf5\xc8\xe8\xc7f" +
-	"\xcf\x9bh\xaf\"|\xcfu\xfc\xd6^\xe7\xca\xf2R\x7f" +
-	"\xb7\xbb\x12i\xa1jWl'\x10$\xa6\x8f\xb9\xa5\x92" +
-	"\xc8\xa7\x82\x19\xd7\xe1\xe0\x1d\xadv\x7f\xfe\xec\xc3(\xe8" +
-	";\xb6\xe7\x17\xdd\x80\xc6\xff4\xf1\xb1\x8e\xe3\x0f\xe6:" +
-	"7\xdf\x9a\xfbG&\xea$]v]U\x06\x8e\xbc\xbc" +
-	"\xfc!J\x95E\xd9s\xdd\xd28\x0e\xaf\xff\xf3\xdb\xca" +
-	"\xa3\xb5\xa9K\xe5\xbb\x7fG(\xba\xc3\xcf$&\x97O" +
-	"\x98\xc1B+\xf3;\x00\x00\xff\xffw\x10\xb7\xab"
+func (p Message_Promise) BlockProposal() BlockProposal_Promise {
+	return BlockProposal_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+}
+
+func (p Message_Promise) BlockVote() BlockVote_Promise {
+	return BlockVote_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+}
+
+func (p Message_Promise) BlockCommit() BlockCommit_Promise {
+	return BlockCommit_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+}
+
+const schema_cc8ede639915bf22 = "x\xdal\xd0[H\x14\x7f\x14\x07\xf0\xef\xd9\x9d\xddu" +
+	"\xbd\xce\x9f\x99\x7f\x17$\x84(\x83\x1e\xc4\x08!\x8d\xc8" +
+	"\x92\x8a\"C\x9d\xe8)\x92\xd9uPqwf\xdb\x99" +
+	"\x85\x92\xa4\x12%K\x0c\xa5z\x90\x16\xeaA)\x04Q" +
+	"\xa4\x87n`\x82\x90\x95AB\x0fv!\x0d\xba\x10\xf8" +
+	"\x10YY\x96\xfd\xe2l\x8eT\xf48\xe7\xf3=\x97\xf9" +
+	"\x15\xceS\xa9g\x83\xefR\x1aPY\xe3\xf3\x8b\xd0p" +
+	"\xe1\xbe\x9e\x8e\xc6\x01Tf\x13\x89\xd5\xc3\xffw\x87_" +
+	"\x9c\x1d\xc7\x0e\x0ad\x03J\x914\xa4l\x91\x02\xc0\xc6" +
+	"bi\xb9\x17\x02A\x115l[\xaf5\x0a(\xac\xc7" +
+	"\xccXI\xb9\x91\x97\xfa\xae \xaa\xdc\xe4\x952\x85\x90" +
+	"\x08P\x8e\xd2z@s\xc8K\xda\x09\xf2P\x16\xfd\x10" +
+	"*14\xa5\xe0\x08C\x0b\x83gA\xa8\xe4\x01\x94\x93" +
+	")8\xc6\xd0\xc6\xe0\xfd.T\xf2\x02J+\xed\x01\xb4" +
+	"\x16\x86N\x06\xe9\x9bPI\x02\x94\x0e\xda\x0ehm\x0c" +
+	"\xe7\x19|\xf3B%\x1f\xa0t\xa5::\x19\x92\x0c\xfe" +
+	"\xafB%?\xa0tS\x1f\xa0%\x19\xae2\x04\xbe\x08" +
+	"\x95\x02\x80\xd2K\xcd\x80\xd6\xc30\xc8\x906'TJ" +
+	"\x03\x94~:\x03h\x83\x0c\xb7\x19\x82\x9f\x85JA@" +
+	"\xb9A\x8d\x80v\x9da\x94!\xfd\x93P)\x1dPF" +
+	"R\xa3\xee0\x8c3d|\x14*e\x00\xca=\x8a\x03" +
+	"\xda\x18\xc3c\x86\xccY\xa1R&\xa0LP\x15\xa0=" +
+	"bx\xce\x90\xf5A\xa8\x94\x05(O(\x04h\x93\x0c" +
+	"\xaf\xc8C9z\xc2\xa9#Y\xac\x1bx\x10x;\xf7" +
+	"p\x12 \x92A9\xb1z\xb3\x96d\xd1|\x7f\xa5T" +
+	"Z\xbd\xb9}\xa9l\xa5\xca\xff\xe5\xcf\x06\x05\xf9G\x16" +
+	"\xcbB7M+a\x86\x0d\x00$\x8bU\x03\xed#\xed" +
+	"F\xc3\xd3E=\x1e7\x0e'\x0c\xdb!Y\xbc{\xb9" +
+	"\xb7\xfc\xfdp\xfek\xb7/n\xd81\xcb\xb4\x17\xfbr" +
+	"\xa7\xa7\xee\x16\xad\xb5\xa6]\xadM\xe8q\xddt\x0c2" +
+	"j\xca\xacH\xc4\x08\xe78\xf5\x96\xc9\xc1\xa4\xd4\xdc\xdf" +
+	"wh\xd4\x0d\xda\xa6\x1e\xb3\xeb,\x87\xaa~m\xe2a" +
+	"\x19\xbbn\xf5\xe6.;\xd7\xfb\x8f\x8c\xbb\x93d\xb1\xe6" +
+	"\xb4\xa7d\xdb\xb3S3n*jDc\x96\x15\xa9\xc2" +
+	"\xd6\xa5\x9b\xdf\xc4\xc7\xe6C\xad\xd1\xcb\x7fG\xc8\x9d\xc3" +
+	"\xcfdTO\xedV\x9d!7\x13\x8aX\xe1\x86\x8a\xb8" +
+	"\x85\xbc\x98e\xeb\x11\x92E\xc1\x95k3;\x0f6$" +
+	"\xffH\x1c\xb0\x1c\x90A\xf2B\xcf\x8a\x9bM\x17\xfa;" +
+	"\x7f\xb72+\x8a@\xb4\x9e/\xb8\x98_\xbc\x7f\xa2\x8b" +
+	"\xdc_\xf9\x19\x00\x00\xff\xff\x13\x0c\xf3\xd5"
 
 func init() {
 	schemas.Register(schema_cc8ede639915bf22,

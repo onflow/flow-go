@@ -8,12 +8,10 @@ import (
 	"sync"
 )
 
-var BLS_BLS12381Instance *BLS_BLS12381Algo
 var ECDSA_P256Instance *ECDSAalgo
 var ECDSA_SECp256k1Instance *ECDSAalgo
 
 //  Once variables to make sure each Signer is instantiated only once
-var BLS_BLS12381Once sync.Once
 var ECDSA_P256Once sync.Once
 var ECDSA_SECp256k1Once sync.Once
 
@@ -35,23 +33,8 @@ type commonSigner struct {
 	signatureLength int
 }
 
-// NewSigner chooses and initializes a signature scheme
-func NewSigner(algo SigningAlgorithm) (signer, error) {
-	if algo == BLS_BLS12381 {
-		BLS_BLS12381Once.Do(func() {
-			BLS_BLS12381Instance = &(BLS_BLS12381Algo{
-				commonSigner: &commonSigner{
-					algo,
-					prKeyLengthBLS_BLS12381,
-					pubKeyLengthBLS_BLS12381,
-					signatureLengthBLS_BLS12381,
-				},
-			})
-			BLS_BLS12381Instance.init()
-		})
-		return BLS_BLS12381Instance, nil
-	}
-
+// newNonRelicSigner initializes a signer that does not depend on the Relic library.
+func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	if algo == ECDSA_P256 {
 		ECDSA_P256Once.Do(func() {
 			ECDSA_P256Instance = &(ECDSAalgo{

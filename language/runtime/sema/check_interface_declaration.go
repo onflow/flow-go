@@ -26,6 +26,9 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	interfaceType.Members = members
 
+	interfaceType.InitializerParameterTypeAnnotations =
+		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
+
 	checker.memberOrigins[interfaceType] = origins
 
 	checker.checkInitializers(
@@ -103,15 +106,19 @@ func (checker *Checker) checkInterfaceFunctions(
 		// shouldn't be visible in other function declarations,
 		// and `self` is is only visible inside function
 
-		checker.withValueScope(func() {
+		func() {
+			checker.enterValueScope()
+			defer checker.leaveValueScope(false)
+
 			// NOTE: required for
 			checker.declareSelfValue(interfaceType)
 
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:        false,
-					declareFunction: false,
+					mustExit:          false,
+					declareFunction:   false,
+					checkResourceLoss: false,
 				},
 			)
 
@@ -122,7 +129,7 @@ func (checker *Checker) checkInterfaceFunctions(
 					common.DeclarationKindFunction,
 				)
 			}
-		})
+		}()
 	}
 }
 
@@ -152,11 +159,10 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		},
 	)
 
-	// NOTE: members are added in `VisitInterfaceDeclaration` –
-	//   left out for now, as field and function requirements could refer to e.g. composites
-
-	interfaceType.InitializerParameterTypeAnnotations =
-		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
+	// NOTE: interface type's `InitializerParameterTypeAnnotations` and  `members` fields
+	// are added in `VisitInterfaceDeclaration`.
+	// They are left out for now, as initializers, fields, and function requirements
+	// could already refer to e.g. composites
 
 	checker.Elaboration.InterfaceDeclarationTypes[declaration] = interfaceType
 }
