@@ -4,10 +4,11 @@ package flow
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
-	"strings"
 )
 
 type Event struct {
