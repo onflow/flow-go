@@ -75,7 +75,7 @@ func TestECDSAEncodeDecode(t *testing.T) {
 	}
 
 	for i, curve := range ECDSAcurves {
-		t.Logf("Testing ECDSA for curve %s", curve)
+		t.Logf("Testing encode/decode for curve %s", curve)
 		// Key generation seed
 		seed := make([]byte, ECDSAseedLen[i])
 		for j := 0; j < len(seed); j++ {

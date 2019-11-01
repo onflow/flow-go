@@ -78,12 +78,13 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, err
 // This is only a test function!
 func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
-	if len(seed) < Nlen+8 {
-		return nil, cryptoError{fmt.Sprintf("the seed should be at least %d bytes.", Nlen+8)}
+	minSeedLen := Nlen + 8
+	if len(seed) < minSeedLen {
+		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes", minSeedLen)}
 	}
 	sk, err := goecdsa.GenerateKey(a.curve, bytes.NewReader(seed))
 	if err != nil {
-		return nil, cryptoError{"The ECDSA key generation has failed"}
+		return nil, cryptoError{"ECDSA key generation has failed"}
 	}
 	return &PrKeyECDSA{a, sk}, nil
 }
@@ -91,7 +92,7 @@ func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 func (a *ECDSAalgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	if len(der) != Nlen {
-		return nil, cryptoError{"the raw private key is not valid."}
+		return nil, cryptoError{"raw private key is not valid"}
 	}
 	var d big.Int
 	d.SetBytes(der)
@@ -117,13 +118,13 @@ func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 	if a.algo == ECDSA_SECp256k1 {
 		return a.rawDecodePrivateKey(der)
 	}
-	return nil, cryptoError{"The curve is not supported."}
+	return nil, cryptoError{"curve is not supported"}
 }
 
 func (a *ECDSAalgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	Plen := bitsToBytes((a.curve.Params().P).BitLen())
 	if len(der) != 2*Plen {
-		return nil, cryptoError{"the raw public key is not valid."}
+		return nil, cryptoError{"raw public key is not valid"}
 	}
 	var x, y big.Int
 	x.SetBytes(der[:Plen])
@@ -154,7 +155,7 @@ func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 	if a.algo == ECDSA_SECp256k1 {
 		return a.rawDecodePublicKey(der)
 	}
-	return nil, cryptoError{"The curve is not supported."}
+	return nil, cryptoError{"curve is not supported"}
 }
 
 // PrKeyECDSA is the private key of ECDSA, it implements PrivateKey
@@ -183,6 +184,7 @@ func (sk *PrKeyECDSA) PublicKey() PublicKey {
 	}
 }
 
+// given a private key (d), returns a raw encoding bytes(d)
 func (sk *PrKeyECDSA) rawEncode() ([]byte, error) {
 	skBytes := sk.goPrKey.D.Bytes()
 	Nlen := bitsToBytes((sk.alg.curve.Params().N).BitLen())
@@ -196,6 +198,9 @@ func (sk *PrKeyECDSA) rawEncode() ([]byte, error) {
 	return skEncoded, nil
 }
 
+// Encode returns a byte representation of a private key.
+// X.509 encoding is used in the case of NIST curves (https://tools.ietf.org/html/rfc5280)
+// while a simple raw encoding is used in the case of SEC2 curves
 func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 	// NIST curves case
 	if sk.Algorithm() == ECDSA_P256 {
@@ -205,7 +210,7 @@ func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 	if sk.Algorithm() == ECDSA_SECp256k1 {
 		return sk.rawEncode()
 	}
-	return nil, cryptoError{"The curve is not supported."}
+	return nil, cryptoError{"curve is not supported"}
 }
 
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
@@ -226,6 +231,7 @@ func (pk *PubKeyECDSA) KeySize() int {
 	return 2 * bitsToBytes((pk.goPubKey.Params().P).BitLen())
 }
 
+// given a public key (x,y), returns a raw encoding bytes(x)||bytes(y)
 func (pk *PubKeyECDSA) rawEncode() ([]byte, error) {
 	xBytes := pk.goPubKey.X.Bytes()
 	yBytes := pk.goPubKey.Y.Bytes()
@@ -244,6 +250,9 @@ func (pk *PubKeyECDSA) rawEncode() ([]byte, error) {
 	return pkEncoded, nil
 }
 
+// Encode returns a byte representation of a public key.
+// X.509 encoding is used in the case of NIST curves (https://tools.ietf.org/html/rfc5280)
+// while a simple raw encoding is used in the case of SEC2 curves
 func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	// NIST curves case
 	if pk.Algorithm() == ECDSA_P256 {
@@ -253,5 +262,5 @@ func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	if pk.Algorithm() == ECDSA_SECp256k1 {
 		return pk.rawEncode()
 	}
-	return nil, cryptoError{"The curve is not supported."}
+	return nil, cryptoError{"curve is not supported"}
 }
