@@ -4620,13 +4620,13 @@ Events are special values that can be emitted during the execution of a program.
 
 An event type can be declared with the `event` keyword:
 
-```bamboo
+```cadence
 event MyEvent(x: Int, y: Int)
 ```
 
 The syntax of an event declaration is similar to that of a [function declaration](#function-declarations); events contain named parameters, each of which has an optional argument label.
 
-```bamboo
+```cadence
 // Event with argument labels
 event MyEvent(fieldA x: Int, fieldB y: Int)
 ```
@@ -4635,7 +4635,7 @@ event MyEvent(fieldA x: Int, fieldB y: Int)
 
 To emit an event from a program, use the `emit` statement:
 
-```bamboo
+```cadence,file=events.cdc
 event MyEvent(x: Int, y: Int)
 
 fun foo() {
