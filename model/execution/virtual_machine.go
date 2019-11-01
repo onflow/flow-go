@@ -1,11 +1,11 @@
 package execution
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type VirtualMachine interface {
 	GetStorage()
 	GetComputer()
-	ExecuteTransaction(tx *types.Transaction, StartState StateCommitment) (ExecutedTransaction, error)
+	ExecuteTransaction(tx *flow.Transaction, StartState StateCommitment) (ExecutedTransaction, error)
 }

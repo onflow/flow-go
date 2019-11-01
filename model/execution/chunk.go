@@ -3,17 +3,17 @@ package execution
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Chunk is a collection of transactions, we assume Tx content correctness and orders in block has been verfied by Chunk builder
 type Chunk struct {
-	Transactions          []types.Transaction
+	Transactions          []flow.Transaction
 	TotalGasSpent         uint64
 	StartState            StateCommitment
-	FirstTxInTheNextChunk *types.Transaction
+	FirstTxInTheNextChunk *flow.Transaction
 }
 
 func (c *Chunk) String() string {
