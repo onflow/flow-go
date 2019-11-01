@@ -42,7 +42,7 @@ A comment is text that is not executed.
 *Single-line comments* start with two slashes (`//`).
 These comments can go on a line by themselves or they can go directly after a line of code.
 
-```cadence,file=single-line-comment.bpl
+```cadence,file=single-line-comment.cdc
 // This is a comment on a single line.
 // Another comment line that is not executed.
 
@@ -52,20 +52,20 @@ let x = 1  // Here is another comment after a line of code.
 *Multi-line comments* start with a slash and an asterisk (`/*`)
 and end with an asterisk and a slash (`*/`):
 
-```cadence,file=multi-line-comment.bpl
+```cadence,file=multi-line-comment.cdc
 /* This is a comment which
 spans multiple lines. */
 ```
 
 Comments may be nested.
 
-```cadence,file=nested-comment.bpl
+```cadence,file=nested-comment.cdc
 /* /* this */ is a valid comment */
 ```
 
 Mutli-line comments are balanced.
 
-```cadence,file=invalid-nested-comment.bpl
+```cadence,file=invalid-nested-comment.cdc
 /* this is a // comment up to here */ this is not part of the comment */
 ```
 
@@ -82,7 +82,7 @@ the value may still be changed if it allows it, i.e. is mutable.
 Constants are declared using the `let` keyword. Variables are declared using the `var` keyword.
 The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
-```cadence,file=constants-and-variables.bpl
+```cadence,file=constants-and-variables.cdc
 // Declare a constant named `a`.
 //
 let a = 1
@@ -171,7 +171,7 @@ to make it explicit what type the declaration has.
 
 If no type annotation is provided, the type of the declaration is [inferred from the initial value](#type-inference).
 
-```cadence,file=type-annotations.bpl
+```cadence,file=type-annotations.cdc
 // Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.
 //
 // `Bool` is the type of booleans.
@@ -265,7 +265,7 @@ but can be omitted if only one statement appears on the line.
 Semicolons must be used to separate multiple statements if they appear on the same line –
 exactly one semicolon between each pair of statements.
 
-```cadence,file=semicolons.bpl
+```cadence,file=semicolons.cdc
 // Declare a constant, without a semicolon.
 //
 let a = 1
@@ -303,7 +303,7 @@ Non-decimal literals have a specific prefix.
 | **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
 | **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
 
-```cadence,file=numbers.bpl
+```cadence,file=numbers.cdc
 // A decimal number
 //
 1234567890  // is `1234567890`
@@ -333,7 +333,7 @@ Non-decimal literals have a specific prefix.
 
 Decimal numbers may contain underscores (`_`) to logically separate components.
 
-```cadence,file=number-underscores-decimal.bpl
+```cadence,file=number-underscores-decimal.cdc
 let largeNumber = 1_000_000
 
 // Invalid: Value is not a number literal, but a variable.
@@ -342,7 +342,7 @@ let notNumber = _123
 
 Underscores are allowed for all numeral systems.
 
-```cadence,file=number-underscores-binary.bpl
+```cadence,file=number-underscores-binary.cdc
 let binaryNumber = 0b10_11_01
 ```
 
@@ -520,7 +520,7 @@ i.e. either nothing, or an integer.
 
 The value representing nothing is `nil`.
 
-```cadence,file=optional.bpl
+```cadence,file=optional.cdc
 // Declare a constant which has an optional integer type,
 // with nil as its initial value.
 //
@@ -542,7 +542,7 @@ let x: Int = nil
 
 Optionals can be created for any value, not just for literals.
 
-```cadence,file=optional-wrapping.bpl
+```cadence,file=optional-wrapping.cdc
 // Declare a constant which has a non-optional integer type,
 // with 1 as its initial value.
 //
@@ -652,7 +652,7 @@ otherwise the result is `nil`.
 The cast and check is performed at run-time, i.e. when the program is executed,
 not statically, i.e. when the program is checked.
 
-```cadence,file=conditional-downcasting-any.bpl
+```cadence,file=conditional-downcasting-any.cdc
 // Declare a constant named `something` which has type `Any`,
 // with an initial value which has type `Int`.
 //
@@ -676,7 +676,7 @@ Downcasting works for nested types (e.g. arrays),
 interfaces (if a [resource](#resources) interface not to a concrete resource),
 and optionals.
 
-```cadence,file=conditional-downcasting-any-array.bpl
+```cadence,file=conditional-downcasting-any-array.cdc
 // Declare a constant named `values` which has type `[Any]`,
 // i.e. an array of arbitrarily typed values.
 //
@@ -793,7 +793,7 @@ Strings have multiple built-in functions you can use.
 
 - `length: Int`: Returns the number of characters in the string as an integer.
 
-    ```cadence,file=string-length-field.bpl
+    ```cadence,file=string-length-field.cdc
     let example = "hello"
 
     // Find the number of elements of the string.
@@ -807,7 +807,7 @@ Strings have multiple built-in functions you can use.
   This function creates a new string whose length is the sum of the lengths
   of the string the function is called on and the string given as a parameter.
 
-    ```cadence,file=string-concat.bpl
+    ```cadence,file=string-concat.cdc
     let example = "hello"
     let new = "world"
 
@@ -823,7 +823,7 @@ Strings have multiple built-in functions you can use.
   It does not modify the original string.
   If either of the parameters are out of the bounds of the string, the function will fail.
 
-    ```cadence,file=string-slice.bpl
+    ```cadence,file=string-slice.cdc
     let example = "helloworld"
 
     // Create a new slice of part of the original string.
@@ -851,7 +851,7 @@ All values in an array must have the same type.
 Arrays may contain a value multiple times.
 Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
 
-```cadence,file=arrays.bpl
+```cadence,file=arrays.cdc
 // An empty array
 //
 []
@@ -882,7 +882,7 @@ when assigning to a variable,
 when used as function argument,
 or when returned from a function call.
 
-```cadence,file=array-types.bpl
+```cadence,file=array-types.cdc
 // Declare a fixed-sized array of integers
 // which always contains exactly two elements.
 //
@@ -911,7 +911,7 @@ Indexes start at 0 for the first element in the array.
 
 Accessing an element which is out of bounds results in a fatal error at run-time and aborts the program.
 
-```cadence,file=arrays-indexing.bpl
+```cadence,file=arrays-indexing.cdc
 // Declare an array of integers.
 let numbers = [42, 23]
 
@@ -928,7 +928,7 @@ numbers[1] // is `23`
 numbers[2]
 ```
 
-```cadence,file=arrays-nested-indexing.bpl
+```cadence,file=arrays-nested-indexing.cdc
 // Declare an array of arrays of integers, i.e. the type is `[[Int]]`.
 let arrays = [[1, 2], [3, 4]]
 
@@ -939,7 +939,7 @@ arrays[1][0] // is `3`
 
 To set an element of an array at a specific index, the indexing syntax can be used as well.
 
-```cadence,file=array-indexing-assignment.bpl
+```cadence,file=array-indexing-assignment.cdc
 // Declare an array of integers.
 let numbers = [42, 23]
 
@@ -965,7 +965,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
 - `length: Int`:
   Returns the number of elements in the array.
 
-    ```cadence,file=array-length-field.bpl
+    ```cadence,file=array-length-field.cdc
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -984,7 +984,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
   This function creates a new array whose length is the sum of the length of the array
   the function is called on and the length of the array given as the parameter.
 
-    ```cadence,file=array-concat.bpl
+    ```cadence,file=array-concat.cdc
     // Declare two arrays of integers.
     let numbers = [42, 23, 31, 12]
     let moreNumbers = [11, 27]
@@ -1002,7 +1002,7 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
 - `contains(_ element: T): Bool`:
   Indicates whether the given element of type `T` is in the array.
 
-    ```cadence,file=array-contains.bpl
+    ```cadence,file=array-contains.cdc
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1030,7 +1030,7 @@ It is invalid to use one of these functions on a fixed-sized array.
 
   The new element must be the same type as all the other elements in the array.
 
-    ```cadence,file=array-append.bpl
+    ```cadence,file=array-append.cdc
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1054,7 +1054,7 @@ It is invalid to use one of these functions on a fixed-sized array.
 
   All the elements after the new inserted element are shifted to the right by one.
 
-    ```cadence,file=array-insert.bpl
+    ```cadence,file=array-insert.cdc
     // Declare an array of integers.
     let numbers = [42, 23, 31, 12]
 
@@ -1072,7 +1072,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The `index` must be within the bounds of the array.
   If the index is outside the bounds, the program aborts.
 
-    ```cadence,file=array-remove.bpl
+    ```cadence,file=array-remove.cdc
     // Declare an array of integers.
     let numbers = [42, 23, 31]
 
@@ -1091,7 +1091,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The array must not be empty.
   If the array is empty, the program aborts.
 
-    ```cadence,file=array-remove-first.bpl
+    ```cadence,file=array-remove-first.cdc
     // Declare an array of integers.
     let numbers = [42, 23]
 
@@ -1115,7 +1115,7 @@ It is invalid to use one of these functions on a fixed-sized array.
   The array must not be empty.
   If the array is empty, the program aborts.
 
-    ```cadence,file=array-remove.bpl
+    ```cadence,file=array-remove.cdc
     // Declare an array of integers.
     let numbers = [42, 23]
 
@@ -1151,7 +1151,7 @@ Dictionaries may contain a key only once and may contain a value multiple times.
 Dictionary literals start with an opening brace `{` and end with a closing brace `}`.
 Keys are separated from values by a colon, and key-value associations are separated by commas.
 
-```cadence,file=dictionaries.bpl
+```cadence,file=dictionaries.cdc
 // An empty dictionary
 //
 {}
@@ -1178,7 +1178,7 @@ where `K` is the type of the key,
 and `V` is the type of the value.
 For example, a dictionary with `Int` keys and `Bool` values has type `{Int: Bool}`.
 
-```cadence,file=dictionary-types.bpl
+```cadence,file=dictionary-types.cdc
 // Declare a constant that has type `{Int: Bool}`,
 // a dictionary mapping integers to booleans.
 //
@@ -1208,7 +1208,7 @@ Accessing a key returns an [optional](#optionals):
 If the key is found in the dictionary, the value for the given key is returned,
 and if the key is not found, `nil` is returned.
 
-```cadence,file=dictionary-access-integer-keys.bpl
+```cadence,file=dictionary-access-integer-keys.cdc
 // Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping integers to booleans.
 //
@@ -1228,7 +1228,7 @@ booleans[2]  // is `nil`
 booleans["1"]
 ```
 
-```cadence,file=dictionary-access-boolean-keys.bpl
+```cadence,file=dictionary-access-boolean-keys.cdc
 // Declare a constant that has type `{Bool: Int}`,
 // a dictionary mapping booleans to integers.
 //
@@ -1245,7 +1245,7 @@ integers[false] // is `0`
 
 To set the value for a key of a dictionary, the access syntax can be used as well.
 
-```cadence,file=dictionary-assignment.bpl
+```cadence,file=dictionary-assignment.cdc
 // Declare a constant that has type `{Int: Bool}`,
 // a dictionary mapping booleans to integers.
 //
@@ -1266,7 +1266,7 @@ booleans[0] = true
 - `length: Int`:
   Returns the number of entries in the dictionary.
 
-    ```cadence,file=dictionary-length-field.bpl
+    ```cadence,file=dictionary-length-field.cdc
     // Declare a dictionary mapping strings to integers.
     let numbers = {"fortyTwo": 42, "twentyThree": 23}
 
@@ -1282,7 +1282,7 @@ booleans[0] = true
   Returns the value of type `V` as an optional if the dictionary contained the key,
   otherwise `nil`.
 
-    ```cadence,file=dictionary-remove.bpl
+    ```cadence,file=dictionary-remove.cdc
     // Declare a dictionary mapping strings to integers.
     let numbers = {"fortyTwo": 42, "twentyThree": 23}
 
@@ -1328,14 +1328,14 @@ They are either unary, binary, or ternary.
 
 The `-` unary operator negates an integer:
 
-```cadence,file=integer-negation.bpl
+```cadence,file=integer-negation.cdc
 let a = 1
 -a  // is `-1`
 ```
 
 The `!` unary operator logically negates a boolean:
 
-```cadence,file=boolean-negation.bpl
+```cadence,file=boolean-negation.cdc
 let a = true
 !a  // is `false`
 ```
@@ -1345,7 +1345,7 @@ let a = true
 The binary assignment operator `=` can be used to assign a new value to a variable.
 It is only allowed in a statement and is not allowed in expressions.
 
-```cadence,file=assignment.bpl
+```cadence,file=assignment.cdc
 var a = 1
 a = 2
 // `a` is `2`
@@ -1364,7 +1364,7 @@ a = b
 
 Assignments to constants are invalid.
 
-```cadence,file=assignment-to-constant.bpl
+```cadence,file=assignment-to-constant.cdc
 let a = 1
 // Invalid: Assignments are only for variables, not constants.
 a = 2
@@ -1373,7 +1373,7 @@ a = 2
 The left-hand side of the assignment opera must be an identifier,
 followed by one or more index or access expressions.
 
-```cadence,file=assignment-numbers.bpl
+```cadence,file=assignment-numbers.cdc
 // Declare an array of integers.
 let numbers = [1, 2]
 
@@ -1384,7 +1384,7 @@ numbers[0] = 3
 // `numbers` is `[3, 2]`
 ```
 
-```cadence,file=assignment-arrays.bpl
+```cadence,file=assignment-arrays.cdc
 // Declare an array of arrays of integers.
 let arrays = [[1, 2], [3, 4]]
 
@@ -1395,7 +1395,7 @@ arrays[1][0] = 5
 // `arrays` is `[[1, 2], [5, 4]]`
 ```
 
-```cadence,file=assignment-dictionaries.bpl
+```cadence,file=assignment-dictionaries.cdc
 let dictionaries = {
   true: {1: 2},
   false: {3: 4}
@@ -1414,7 +1414,7 @@ dictionaries[false][3] = 0
 The binary swap operator `<->` can be used to exchange the values of two variables.
 It is only allowed in a statement and is not allowed in expressions.
 
-```cadence,file=swap.bpl
+```cadence,file=swap.cdc
 var a = 1
 var b = 2
 a <-> b
@@ -1433,7 +1433,7 @@ a <-> b
 
 Both sides of the swap operation must be variable, assignment to constants is invalid.
 
-```cadence,file=swap-with-constant.bpl
+```cadence,file=swap-with-constant.cdc
 var a = 1
 let b = 2
 
@@ -1454,7 +1454,7 @@ There are four arithmetic operators:
 - Division: `/`
 - Remainder: `%`
 
-```cadence,file=operator-plus.bpl
+```cadence,file=operator-plus.cdc
 let a = 1 + 2
 // `a` is `3`
 ```
@@ -1464,7 +1464,7 @@ The result is always the same type as the arguments.
 
 Arithmetic operators do not cause values to overflow.
 
-```cadence,file=operator-times.bpl
+```cadence,file=operator-times.cdc
 let a: Int8 = 100
 let b: Int8 = 100
 let c = a * b
@@ -1485,14 +1485,14 @@ For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111
 //  = 100000000 = 0
 ```
 
-```cadence,file=operator-overflow-plus.bpl
+```cadence,file=operator-overflow-plus.cdc
 let a: UInt8 = 255
 a &+ 1 // is `0`
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
-```cadence,file=operator-minus.bpl
+```cadence,file=operator-minus.cdc
 //     00000000
 // &-         1
 //  =  11111111 = 255
@@ -1524,7 +1524,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical AND: `a && b`
 
-    ```cadence,file=operator-and.bpl
+    ```cadence,file=operator-and.cdc
     true && true  // is `true`
 
     true && false  // is `false`
@@ -1538,7 +1538,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 - Logical OR: `a || b`
 
-    ```cadence,file=operator-or.bpl
+    ```cadence,file=operator-or.cdc
     true || true  // is `true`
 
     true || false  // is `true`
@@ -1559,36 +1559,36 @@ Comparison operators work with boolean and integer values.
     Both sides of the equality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
 
-    ```cadence,file=operator-equal-int.bpl
+    ```cadence,file=operator-equal-int.cdc
     1 == 1  // is `true`
 
     1 == 2  // is `false`
     ```
 
-    ```cadence,file=operator-equal-bool.bpl
+    ```cadence,file=operator-equal-bool.cdc
     true == true  // is `true`
 
     true == false  // is `false`
     ```
 
-    ```cadence,file=operator-equal-optional-int-nil.bpl
+    ```cadence,file=operator-equal-optional-int-nil.cdc
     let x: Int? = 1
     x == nil  // is `false`
     ```
 
-    ```cadence,file=operator-equal-int-nil.bpl
+    ```cadence,file=operator-equal-int-nil.cdc
     let x: Int = 1
     x == nil  // is `false`
     ```
 
-    ```cadence,file=operator-equal-int-nil.bpl
+    ```cadence,file=operator-equal-int-nil.cdc
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = nil
     x == y  // is `false`
     ```
 
-    ```cadence,file=operator-equal-optional-int-optionals-int.bpl
+    ```cadence,file=operator-equal-optional-int-optionals-int.cdc
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = 2
@@ -1600,36 +1600,36 @@ Comparison operators work with boolean and integer values.
     Both sides of the inequality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
 
-    ```cadence,file=operator-not-equal-int.bpl
+    ```cadence,file=operator-not-equal-int.cdc
     1 != 1  // is `false`
 
     1 != 2  // is `true`
     ```
 
-    ```cadence,file=operator-not-equal-bool.bpl
+    ```cadence,file=operator-not-equal-bool.cdc
     true != true  // is `false`
 
     true != false  // is `true`
     ```
 
-    ```cadence,file=operator-not-equal-optional-int-nil.bpl
+    ```cadence,file=operator-not-equal-optional-int-nil.cdc
     let x: Int? = 1
     x != nil  // is `true`
     ```
 
-    ```cadence,file=operator-not-equal-int-nil.bpl
+    ```cadence,file=operator-not-equal-int-nil.cdc
     let x: Int = 1
     x != nil  // is `true`
     ```
 
-    ```cadence,file=operator-not-equal-int-nil.bpl
+    ```cadence,file=operator-not-equal-int-nil.cdc
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = nil
     x != y  // is `true`
     ```
 
-    ```cadence,file=operator-not-equal-optional-int-optionals-int.bpl
+    ```cadence,file=operator-not-equal-optional-int-optionals-int.cdc
     // Comparisons of different levels of optionals are possible.
     let x: Int? = 2
     let y: Int?? = 2
@@ -1638,7 +1638,7 @@ Comparison operators work with boolean and integer values.
 
 - Less than: `<`, for integers
 
-    ```cadence,file=operator-less.bpl
+    ```cadence,file=operator-less.cdc
     1 < 1  // is `false`
 
     1 < 2  // is `true`
@@ -1648,7 +1648,7 @@ Comparison operators work with boolean and integer values.
 
 - Less or equal than: `<=`, for integers
 
-    ```cadence,file=operator-less-equals.bpl
+    ```cadence,file=operator-less-equals.cdc
     1 <= 1  // is `true`
 
     1 <= 2  // is `true`
@@ -1658,7 +1658,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater than: `>`, for integers
 
-    ```cadence,file=operator-greater.bpl
+    ```cadence,file=operator-greater.cdc
     1 > 1  // is `false`
 
     1 > 2  // is `false`
@@ -1668,7 +1668,7 @@ Comparison operators work with boolean and integer values.
 
 - Greater or equal than: `>=`, for integers
 
-    ```cadence,file=operator-greater-equals.bpl
+    ```cadence,file=operator-greater-equals.cdc
     1 >= 1  // is `true`
 
     1 >= 2  // is `false`
@@ -1688,7 +1688,7 @@ The first value must be a boolean (must have the type `Bool`).
 The second value and third value can be of any type.
 The result type is the least common supertype of the second and third value.
 
-```cadence,file=operator-ternary-conditional.bpl
+```cadence,file=operator-ternary-conditional.cdc
 let x = 1 > 2 ? 3 : 4
 // `x` is `4` and has type `Int`
 
@@ -1748,7 +1748,7 @@ Function calls may provide arguments for parameters which are subtypes of the pa
 There is **no** support for optional parameters, i.e. default values for parameters,
 and variadic functions, i.e. functions that take an arbitrary amount of arguments.
 
-```cadence,file=function-double.bpl
+```cadence,file=function-double.cdc
 // Declare a function named `double`, which multiples a number by two.
 //
 // The special argument label _ is specified for the parameter,
@@ -1769,7 +1769,7 @@ double(2)  // is `4`
 It is possible to require argument labels for some parameters,
 and not require argument labels for other parameters.
 
-```cadence,file=function-clamp.bpl
+```cadence,file=function-clamp.cdc
 // Declare a function named `clamp`. The function takes an integer value,
 // the lower limit, and the upper limit. It returns an integer between
 // the lower and upper limit.
@@ -1810,7 +1810,7 @@ let clamped = clamp(123, min: 0, max: 100)
 // `clamped` is `100`
 ```
 
-```cadence,file=function-send.bpl
+```cadence,file=function-send.cdc
 // Declare a function named `send`, which transfers an amount
 // from one account to another.
 //
@@ -1866,7 +1866,7 @@ send(from: sender, to: receiver, amount: 100)
 
 The order of the arguments in a function call must match the order of the parameters in the function declaration.
 
-```cadence,file=function-test.bpl
+```cadence,file=function-test.cdc
 // Declare a function named `test`, which accepts two parameters, named `first` and `second`
 //
 fun test(first: Int, second: Int) {
@@ -1881,7 +1881,7 @@ test(second: 1, first: 2)
 
 Functions can be nested, i.e., the code of a function may declare further functions.
 
-```cadence,file=function-doubleAndAddOne.bpl
+```cadence,file=function-doubleAndAddOne.cdc
 // Declare a function which multiplies a number by two, and adds one.
 //
 fun doubleAndAddOne(_ x: Int): Int {
@@ -1905,7 +1905,7 @@ doubleAndAddOne(2)  // is `5`
 It is possible to declare functions with the same name, as long as they have different sets of argument labels.
 This is known as function overloading.
 
-```cadence,file=function-overloading.bpl
+```cadence,file=function-overloading.cdc
 // Declare a function named "assert" which requires a test value
 // and a message argument.
 //
@@ -1926,7 +1926,7 @@ fun assert(_ test: Bool) {
 Functions can be also used as expressions.
 The syntax is the same as for function declarations, except that function expressions have no name, i.e., they are anonymous.
 
-```cadence,file=function-expression.bpl
+```cadence,file=function-expression.cdc
 // Declare a constant named `double`, which has a function as its value.
 //
 // The function multiplies a number by two when it is called.
@@ -1943,7 +1943,7 @@ let double =
 
 Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.
 
-```cadence,file=function-call.bpl
+```cadence,file=function-call.cdc
 fun double(_ x: Int): Int {
     return x * 2
 }
@@ -1968,7 +1968,7 @@ Function types consist of the function's parameter types and the function's retu
 The parameter types need to be enclosed in parentheses, followed by a colon (`:`), and end with the return type.
 The whole function type needs to be enclosed in parentheses.
 
-```cadence,file=function-type.bpl
+```cadence,file=function-type.cdc
 // Declare a function named `add`, with the function type `((Int, Int): Int)`.
 //
 fun add(a: Int, b: Int): Int {
@@ -1976,7 +1976,7 @@ fun add(a: Int, b: Int): Int {
 }
 ```
 
-```cadence,file=function-type-expression.bpl
+```cadence,file=function-type-expression.cdc
 // Declare a constant named `add`, with the function type `((Int, Int): Int)`
 //
 let add: ((Int, Int): Int) =
@@ -1987,7 +1987,7 @@ let add: ((Int, Int): Int) =
 
 If the function has no return type, it implicitly has the return type `Void`.
 
-```cadence,file=function-doNothing.bpl
+```cadence,file=function-doNothing.cdc
 // Declare a constant named `doNothing`, which is a function
 // that takes no parameters and returns nothing.
 //
@@ -2006,7 +2006,7 @@ This has the advantage that functions with different argument labels, potentiall
 It has the disadvantage that function calls to plain function values,
 cannot accept argument labels.
 
-```cadence,file=function-no-argument-labels.bpl
+```cadence,file=function-no-argument-labels.cdc
 // Declare a function which takes one argument that has type `Int`.
 // The function has type `((Int): Void)`.
 //
@@ -2051,7 +2051,7 @@ A function may refer to variables and constants of its outer scopes in which it 
 It is called a closure, because it is closing over those variables and constants.
 A closure can can read from the variables and constants and assign to the variables it refers to.
 
-```cadence,file=closures-counter.bpl
+```cadence,file=closures-counter.cdc
 // Declare a function named `makeCounter` which returns a function that
 // each time when called, returns the next integer, starting at 1.
 //
@@ -2077,7 +2077,7 @@ When arguments are passed to a function, they are copied.
 Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
 This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_value).
 
-```cadence,file=function-change.bpl
+```cadence,file=function-change.cdc
 // Declare a function that changes the first two elements
 // of an array of integers.
 //
@@ -2098,7 +2098,7 @@ change(numbers)
 
 Parameters are constant, i.e., it is not allowed to assign to them.
 
-```cadence,file=function-parameter-assignment.bpl
+```cadence,file=function-parameter-assignment.cdc
 fun test(x: Int) {
     // Invalid: cannot assign to a parameter (constant)
     //
@@ -2132,7 +2132,7 @@ The condition description is used as an error message when the condition fails.
 
 In postconditions, the special constant `result` refers to the result of the function.
 
-```cadence,file=function-factorial.bpl
+```cadence,file=function-factorial.cdc
 fun factorial(_ n: Int): Int {
     pre {
         // Require the parameter `n` to be greater than or equal to zero.
@@ -2163,7 +2163,7 @@ factorial(-2)
 
 In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
 
-```cadence,file=function-increment.bpl
+```cadence,file=function-increment.cdc
 var n = 0
 
 fun incrementN() {
@@ -2191,7 +2191,7 @@ The condition must be boolean and the braces are required.
 The braces are required and not optional.
 Parentheses around the condition are optional.
 
-```cadence,file=control-flow-if.bpl
+```cadence,file=control-flow-if.cdc
 let a = 0
 var b = 0
 
@@ -2210,7 +2210,7 @@ if (a != 0) {
 An additional, optional else-clause can be added to execute another piece of code when the condition is false.
 The else-clause is introduced by the `else` keyword followed by braces that contain the code that should be executed.
 
-```cadence,file=control-flow-if-else.bpl
+```cadence,file=control-flow-if-else.cdc
 let a = 0
 var b = 0
 
@@ -2226,7 +2226,7 @@ if a == 1 {
 The else-clause can contain another if-statement, i.e., if-statements can be chained together.
 In this case the braces can be omitted.
 
-```cadence,file=control-flow-if-else-if.bpl
+```cadence,file=control-flow-if-else-if.cdc
 let a = 0
 var b = 0
 
@@ -2260,7 +2260,7 @@ If the optional contains a value, the first branch is executed and a temporary c
 
 Optional bindings are declared using the `if` keyword like an if-statement, but instead of the boolean test value, it is followed by the `let` or `var` keywords, to either introduce a constant or variable, followed by a name, the equal sign (`=`), and the optional value.
 
-```cadence,file=control-flow-optional-binding-not-nil.bpl
+```cadence,file=control-flow-optional-binding-not-nil.cdc
 let maybeNumber: Int? = 1
 
 if let number = maybeNumber {
@@ -2271,7 +2271,7 @@ if let number = maybeNumber {
 }
 ```
 
-```cadence,file=control-flow-optional-binding-nil.bpl
+```cadence,file=control-flow-optional-binding-nil.cdc
 let noNumber: Int? = nil
 
 if let number = noNumber {
@@ -2294,7 +2294,7 @@ If the condition is false, the execution is done.
 If it is true, the piece of code is executed and the evaluation of the condition is repeated.
 Thus, the piece of code is executed zero or more times.
 
-```cadence,file=control-flow-while.bpl
+```cadence,file=control-flow-while.cdc
 var a = 0
 while a < 5 {
     a = a + 1
@@ -2305,7 +2305,7 @@ while a < 5 {
 
 The `continue` statement can be used to stop the current iteration of the loop and start the next iteration.
 
-```cadence,file=control-flow-continue.bpl
+```cadence,file=control-flow-continue.cdc
 var i = 0
 var x = 0
 while i < 10 {
@@ -2321,7 +2321,7 @@ while i < 10 {
 
 The `break` statement can be used to stop the loop.
 
-```cadence,file=control-flow-break.bpl
+```cadence,file=control-flow-break.cdc
 var x = 0
 while x < 10 {
     x = x + 1
@@ -2349,7 +2349,7 @@ TODO: examples
 
 Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
 
-```cadence,file=scope.bpl
+```cadence,file=scope.cdc
 let x = 10
 
 fun f(): Int {
@@ -2364,7 +2364,7 @@ f()  // is `20`
 y
 ```
 
-```cadence,file=scope-doubleAndAddOne.bpl
+```cadence,file=scope-doubleAndAddOne.cdc
 fun doubleAndAddOne(_ n: Int): Int {
     fun double(_ x: Int) {
         return x * 2
@@ -2379,7 +2379,7 @@ double(1)
 
 Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
 
-```cadence,file=scope-test.bpl
+```cadence,file=scope-test.cdc
 let x = 2
 
 fun test(): Int {
@@ -2392,7 +2392,7 @@ test()  // is `3`
 
 Scope is lexical, not dynamic.
 
-```cadence,file=scope-lexical.bpl
+```cadence,file=scope-lexical.cdc
 let x = 10
 
 fun f(): Int {
@@ -2409,7 +2409,7 @@ g()  // is `10`, not `20`
 
 Declarations are **not** moved to the top of the enclosing function (hoisted).
 
-```cadence,file=scope-no-hoisting.bpl
+```cadence,file=scope-no-hoisting.cdc
 let x = 2
 
 fun f(): Int {
@@ -2429,7 +2429,7 @@ The Cadence programming language is a *type-safe* language.
 When assigning a new value to a variable, the value must be the same type as the variable.
 For example, if a variable has type `Bool`, it can *only* be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
 
-```cadence,file=type-safety-assign-int-to-bool.bpl
+```cadence,file=type-safety-assign-int-to-bool.cdc
 // Declare a variable that has type `Bool`.
 var a = true
 
@@ -2440,7 +2440,7 @@ a = 0
 
 When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type `Bool`, *only* a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
 
-```cadence,file=type-safety-nand.bpl
+```cadence,file=type-safety-nand.cdc
 fun nand(_ a: Bool, _ b: Bool): Bool {
     return !(a && b)
 }
@@ -2459,7 +2459,7 @@ nor is an `Int32` automatically converted to an `Int8`,
 nor is an optional integer `Int?` automatically converted to a non-optional integer `Int`,
 or vice-versa.
 
-```cadence,file=type-safety-add.bpl
+```cadence,file=type-safety-add.cdc
 fun add(_ a: Int8, _ b: Int8): Int {
     return a + b
 }
@@ -2487,7 +2487,7 @@ the declaration's type is inferred from the initial value.
 
 Integer literals are inferred to type `Int`.
 
-```cadence,file=type-inference-int.bpl
+```cadence,file=type-inference-int.cdc
 let a = 1
 
 // `a` has type `Int`
@@ -2495,7 +2495,7 @@ let a = 1
 
 Array literals are inferred based on the elements of the literal, and to be variable-size.
 
-```cadence,file=type-inference-intergers.bpl
+```cadence,file=type-inference-intergers.cdc
 let integers = [1, 2]
 // `integers` has type `[Int]`
 
@@ -2506,7 +2506,7 @@ let invalidMixed = [1, true, 2, false]
 
 Dictionary literals are inferred based on the keys and values of the literal.
 
-```cadence,file=type-inference-dictionary.bpl
+```cadence,file=type-inference-dictionary.cdc
 let booleans = {
     1: true,
     2: false
@@ -2523,7 +2523,7 @@ let invalidMixed = {
 
 Functions are inferred based on the parameter types and the return type.
 
-```cadence,file=type-inference-function.bpl
+```cadence,file=type-inference-function.cdc
 let add = (a: Int8, b: Int8): Int {
     return a + b
 }
@@ -2536,7 +2536,7 @@ Type inference is performed for each expression / statement, and not across stat
 There are cases where types cannot be inferred.
 In these cases explicit type annotations are required.
 
-```cadence,file=type-inference-impossible.bpl
+```cadence,file=type-inference-impossible.cdc
 // Invalid: not possible to infer type based on array literal's elements.
 //
 let array = []
@@ -2603,7 +2603,7 @@ but not in structures, as that would allow resources to be copied.
 
 Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
 
-```cadence,file=composite-data-type-declaration.bpl
+```cadence,file=composite-data-type-declaration.cdc
 struct SomeStruct {
     // ...
 }
@@ -2617,13 +2617,13 @@ Structures and resources are types.
 
 Structures are created (instantiated) by calling the type like a function.
 
-```cadence,file=structure-instantiation.bpl
+```cadence,file=structure-instantiation.cdc
 SomeStruct()
 ```
 
 Resource must be created (instantiated) by using the `create` keyword and calling the type like a function.
 
-```cadence,file=resource-instantiation.bpl
+```cadence,file=resource-instantiation.cdc
 create SomeResource()
 ```
 
@@ -2688,7 +2688,7 @@ In initializers, the special constant `self` refers to the composite value that 
 
 Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
 
-```cadence,file=composite-data-type-fields-and-init.bpl
+```cadence,file=composite-data-type-fields-and-init.cdc
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2748,7 +2748,7 @@ struct Token {
 
 A composite value can be created by calling the constructor and the value's fields can be accessed.
 
-```cadence,file=composite-data-type-fields-assignment.bpl
+```cadence,file=composite-data-type-fields-assignment.cdc
 let token = Token(id: 42, balance: 1_000_00)
 
 token.id  // is `42`
@@ -2764,7 +2764,7 @@ token.id = 23
 
 Initializers support overloading. This allows for example providing default values for certain parameters.
 
-```cadence,file=composite-data-type-initializer-overloading.bpl
+```cadence,file=composite-data-type-initializer-overloading.cdc
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2797,7 +2797,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 
 Getters are declared using the `get` keyword. Getters have no parameters and their return type is implicitly the type of the field.
 
-```cadence,file=composite-data-type-field-getter.bpl
+```cadence,file=composite-data-type-field-getter.cdc
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -2834,7 +2834,7 @@ The parameter has implicitly the type of the field. Another type cannot be speci
 
 The types of values assigned to setters must always match the field's type.
 
-```cadence,file=composite-data-type-field-setter.bpl
+```cadence,file=composite-data-type-field-setter.cdc
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -2870,7 +2870,7 @@ Synthetic fields are declared using the `synthetic` keyword.
 
 Synthetic fields are read-only when only a getter is provided.
 
-```cadence,file=composite-type-synthetic-field-getter-only.bpl
+```cadence,file=composite-type-synthetic-field-getter-only.cdc
 struct Rectangle {
     pub var width: Int
     pub var height: Int
@@ -2897,7 +2897,7 @@ struct Rectangle {
 
 Synthetic fields are readable and writable when both a getter and a setter is declared.
 
-```cadence,file=composite-type-synthetic-field-setter-getter.bpl
+```cadence,file=composite-type-synthetic-field-setter-getter.cdc
 // Declare a struct named `GoalTracker` which stores a number
 // of target goals, a number of completed goals,
 // and has a synthetic field to provide the left number of goals.
@@ -2955,7 +2955,7 @@ It is invalid to declare a synthetic field with only a setter.
 Composite data types may contain functions.
 Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
-```cadence,file=composite-data-type-function.bpl
+```cadence,file=composite-data-type-function.cdc
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -2985,7 +2985,7 @@ rectangle.scale(factor: 4)
 
 Functions support overloading.
 
-```cadence,file=composite-data-type-function-overloading.bpl
+```cadence,file=composite-data-type-function-overloading.cdc
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -3027,7 +3027,7 @@ i.e., nominal typing applies instead of structural typing.
 Even if two composite data types declare the same fields and functions,
 the types are only compatible if their names match.
 
-```cadence,file=composite-data-type.bpl
+```cadence,file=composite-data-type.cdc
 // Declare a structure named `A` which has a function `test`
 // which has type `((): Void)`.
 //
@@ -3069,7 +3069,7 @@ and when returned from a function.
 
 Accessing a field or calling a function of a structure does not copy it.
 
-```cadence,file=struct-behavior.bpl
+```cadence,file=struct-behavior.cdc
 // Declare a structure named `SomeStruct`, with a variable integer field.
 //
 struct SomeStruct {
@@ -3129,7 +3129,7 @@ when it is moved to a different variable,
 when it is moved to a function as an argument,
 and when it is returned from a function.
 
-```cadence,file=resource-behavior.bpl
+```cadence,file=resource-behavior.cdc
 // Declare a resource named `SomeResource`, with a variable integer field.
 //
 resource SomeResource {
@@ -3175,7 +3175,7 @@ use(resource: <-b)
 b.value
 ```
 
-```cadence,file=resource-loss.bpl
+```cadence,file=resource-loss.cdc
 // Declare another, unrelated value of resource type `SomeResource`.
 //
 let c <- create SomeResource(value: 10)
@@ -3183,7 +3183,7 @@ let c <- create SomeResource(value: 10)
 // Invalid: `c` is not used, but must be; it cannot be lost.
 ```
 
-```cadence,file=resource-destruction.bpl
+```cadence,file=resource-destruction.cdc
 // Declare another, unrelated value of resource type `SomeResource`.
 //
 let d <- create SomeResource(value: 20)
@@ -3201,7 +3201,7 @@ d.value
 To make it explicit that the type is moved, it must be prefixed with `<-` in all type annotations,
 e.g. for variable declarations, parametes, or return types.
 
-```cadence,file=resource-type-annotation.bpl
+```cadence,file=resource-type-annotation.cdc
 // Declare a constant with an explicit type annotation.
 //
 // The constant has a resource type, so the type name must be prefixed with `<-`.
@@ -3229,7 +3229,7 @@ fun get(): <-SomeResource {
 
 Resources **must** be used exactly once.
 
-```cadence,file=resource-must-use.bpl
+```cadence,file=resource-must-use.cdc
 // Declare a function which consumes a resource but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
@@ -3238,7 +3238,7 @@ fun forgetToUse(resource: <-SomeResource) {
 }
 ```
 
-```cadence,file=resource-use-after-move.bpl
+```cadence,file=resource-use-after-move.cdc
 // Declare a constant named `res` which has the resource type `SomeResource`.
 let res <- create SomeResource()
 
@@ -3256,7 +3256,7 @@ use(resource: <-res)
 res.value
 ```
 
-```cadence,file=resource-not-used.bpl
+```cadence,file=resource-not-used.cdc
 // Declare a function which has a resource parameter but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
@@ -3265,7 +3265,7 @@ fun forgetToUse(resource: <-SomeResource) {
 }
 ```
 
-```cadence,file=resource-not-definitely-destroyed.bpl
+```cadence,file=resource-not-definitely-destroyed.cdc
 // Declare a function which has a resource parameter.
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
@@ -3280,7 +3280,7 @@ fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
 }
 ```
 
-```cadence,file=resource-always-invalidated.bpl
+```cadence,file=resource-always-invalidated.cdc
 // Declare a function which has a resource parameter.
 // This function is valid, as it always uses the resource parameter,
 // and does not cause a loss of the resource.
@@ -3296,7 +3296,7 @@ fun alwaysUse(resource: <-SomeResource, destroyResource: Bool) {
 }
 ```
 
-```cadence,file=resource-loss-return.bpl
+```cadence,file=resource-loss-return.cdc
 // Declare a function which has a resource parameter.
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
@@ -3324,7 +3324,7 @@ Resource variables cannot be assigned to as that would lead to the loss of the v
 
 Instead, use a swap statement (`<->`) to replace the resource variable with another resource.
 
-```cadence,file=resource-variable-invalid-assignment.bpl
+```cadence,file=resource-variable-invalid-assignment.cdc
 resource R {}
 
 var x <- create R()
@@ -3349,7 +3349,7 @@ Resource may have a destructor, which is executed when the resource is destroyed
 Destructors have no parameters and no return value and are declared using the `destroy` name.
 A resource may have only one destructor.
 
-```cadence,file=resource-destructor.bpl
+```cadence,file=resource-destructor.cdc
 var destructorCalled = false
 
 resource Resource {
@@ -3374,7 +3374,7 @@ Fields in composite data types behave diffently when they have a resource type.
 If a resource type has fields that have a resource type it **must** declare a destructor,
 which **must** invalidate all resource fields, i.e. move or destroy them.
 
-```cadence,file=resource-nested-field.bpl
+```cadence,file=resource-nested-field.cdc
 resource Child {
     let name: String
 
@@ -3409,7 +3409,7 @@ Accessing a field or calling function on a resource field is valid,
 however moving a resource out of a variable resource field is **not** allowed.
 Instead, use a swap statement to replace the resource with another resource.
 
-```cadence,file=resource-field-swap.bpl
+```cadence,file=resource-field-swap.cdc
 let child <- create Child(name: "Child 1")
 let parent <- create Parent(name: "Parent", child: <-child)
 
@@ -3455,7 +3455,7 @@ or indexing into a dictionary to read a value for a certain key or set a value f
 
 Instead, use a swap statement to replace the accessed resource with another resource.
 
-```cadence,file=resource-in-array.bpl
+```cadence,file=resource-in-array.cdc
 resource R {}
 
 // Declare a constant for an array of resources.
@@ -3487,7 +3487,7 @@ resources[0] <-> res
 
 The same applies to dictionaries.
 
-```cadence,file=resource-in-dictionary.bpl
+```cadence,file=resource-in-dictionary.cdc
 // Declare a constant for a dictionary of resources.
 // Create three resources and move them into the dictionary.
 //
@@ -3523,7 +3523,7 @@ resources["r1"] <-> res
 Resources cannot be moved into arrays and dictionaries multiple times,
 as that would cause a duplication.
 
-```cadence,file=resource-array-duplication.bpl
+```cadence,file=resource-array-duplication.cdc
 let resource <- create R()
 
 // Invalid: The resource variable `resource` can only be moved into the array once.
@@ -3534,7 +3534,7 @@ let resources <- [
 ]
 ```
 
-```cadence,file=resource-dictionary-duplication.bpl
+```cadence,file=resource-dictionary-duplication.cdc
 let resource <- create R()
 
 // Invalid: The resource variable `resource` can only be moved into the dictionary once.
@@ -3546,7 +3546,7 @@ let resources <- {
 
 Resource arrays and dictionaries can be destroyed.
 
-```cadence,file=resource-array-destroy.bpl
+```cadence,file=resource-array-destroy.cdc
 let resources <- [
     <-create R(),
     <-create R()
@@ -3554,7 +3554,7 @@ let resources <- [
 destroy resources
 ```
 
-```cadence,file=resource-dictionary-destroy.bpl
+```cadence,file=resource-dictionary-destroy.cdc
 let resources <- {
     "r1": <-create R(),
     "r2": <-create R()
@@ -3565,7 +3565,7 @@ destroy resources
 The variable array functions like `append`, `insert`, and `remove` behave like for non-resource arrays.
 Note however, that the result of the `remove` functions must be used.
 
-```cadence,file-resource-array-mutating-functions.bpl
+```cadence,file-resource-array-mutating-functions.cdc
 let resources <- [<-create R()]
 // `resources.length` is `1`
 
@@ -3594,7 +3594,7 @@ The variable array function `concat` is not available, as it would result in the
 The dictionary functions like `insert` and `remove` behave like for non-resource dictionaries.
 Note however, that the result of these functions must be used.
 
-```cadence,file-resource-dictionary-mutating-functions.bpl
+```cadence,file-resource-dictionary-mutating-functions.cdc
 let resources <- {"r1": <-create R()}
 // `resources.length` is `1`
 
@@ -3668,7 +3668,7 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
-```cadence,file=access-control-globals.bpl
+```cadence,file=access-control-globals.cdc
 // Declare a private constant, inaccessible/invisible in outer scope.
 //
 let a = 1
@@ -3678,7 +3678,7 @@ let a = 1
 pub let b = 2
 ```
 
-```cadence,file=acess-control-struct.bpl
+```cadence,file=acess-control-struct.cdc
 // Declare a public struct, accessible/visible in all scopes.
 //
 pub struct SomeStruct {
@@ -3814,7 +3814,7 @@ Variable field requirements can be specified to also be publicly settable by usi
 
 The special type `Self` can be used to refer to the type implementing the interface.
 
-```cadence,file=interface-declaration.bpl
+```cadence,file=interface-declaration.cdc
 // Declare a resource interface for a fungible token.
 // Only resources can implement this resource interface.
 //
@@ -3940,7 +3940,7 @@ but leaves it to the implementation what kind the field is.
 The function implementations must match the function requirements in the interface
 in terms of name, parameter argument labels, parameter types, and the return type.
 
-```cadence,file=interface-implementation.bpl
+```cadence,file=interface-implementation.cdc
 // Declare a resource named `ExampleToken` that has to implement
 // the `FungibleToken` interface.
 //
@@ -4074,7 +4074,7 @@ struct AnImplementation: AnInterface {
 Interfaces are types.
 Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.
 
-```cadence,file=interface-type.bpl
+```cadence,file=interface-type.cdc
 // Declare an interface named `Shape`.
 //
 // Require implementing types to provide a field which returns the area,
@@ -4153,7 +4153,7 @@ var shape: Shape = Rectangle(width: 10, height: 20)
 
 Values implementing an interface are assignable to variables that have the interface as their type.
 
-```cadence,file=interface-type-assignment.bpl
+```cadence,file=interface-type-assignment.cdc
 // Assign a value of type `Square` to the variable `shape` that has type `Shape`.
 //
 shape = Square(length: 30)
@@ -4166,7 +4166,7 @@ let rectangle: Rectangle = Square(length: 10)
 
 Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
 
-```cadence,file=interface-type-fields-and-functions.bpl
+```cadence,file=interface-type-fields-and-functions.cdc
 // Declare a constant which has the type `Shape`.
 // and is initialized with a value that has type `Rectangle`.
 //
@@ -4189,7 +4189,7 @@ Interfaces can require implementing types to also implement other interfaces of 
 Interface implementation requirements can be declared by following the interface name with a colon (`:`)
 and one or more names of interfaces of the same kind, separated by commas.
 
-```cadence,file=interface-implementation-requirement.bpl
+```cadence,file=interface-implementation-requirement.cdc
 // Declare a structure interface named `Shape`.
 //
 struct interface Shape {}
@@ -4212,7 +4212,7 @@ struct Hexagon: Polygon {}
 Interfaces can be arbitrarily nested.
 Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
 
-```cadence,file=interface-nesting.bpl
+```cadence,file=interface-nesting.cdc
 // Declare a resource interface `OuterInterface`, which declares
 // a nested structure interface named `InnerInterface`.
 //
@@ -4244,7 +4244,7 @@ struct SomeInner: OuterInterface.InnerInterface {}
 Interfaces can require implementing types to provide concrete nested types.
 For example, a resource interface may require an implementing type to provide a resource type.
 
-```cadence,file=interface-nested-type-requirement.bpl
+```cadence,file=interface-nested-type-requirement.cdc
 // Declare a resource interface named `FungibleToken`.
 //
 // Require implementing types to provide a resource type named `Vault`
@@ -4286,13 +4286,13 @@ Most of the built-in types are equatable, like booleans and integers. Arrays are
 
 To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
 
-```cadence,file=equatable.bpl
+```cadence,file=equatable.cdc
 struct interface Equatable {
     pub fun equals(_ other: Self): Bool
 }
 ```
 
-```cadence,file=equatable-impl.bpl
+```cadence,file=equatable-impl.cdc
 // Declare a struct named `Cat`, which has one field named `id`
 // that has type `Int`, i.e., the identifier of the cat.
 //
@@ -4349,13 +4349,13 @@ then the implementation must return the same integer hash value for each of the 
 The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed.
 The integer hash value must not necessarily be the same across multiple executions.
 
-```cadence,file=hashable.bpl
+```cadence,file=hashable.cdc
 struct interface Hashable: Equatable {
     pub hashValue: Int
 }
 ```
 
-```cadence,file=hashable-impl.bpl
+```cadence,file=hashable-impl.cdc
 // Declare a structure named `Point` with two fields
 // named `x` and `y` that have type `Int`.
 //
@@ -4418,10 +4418,10 @@ If importing a local file, the location is a string literal, and the path to the
 If importing an external type, the location is an address literal, and the address
 of the account where the declarations are deployed to and published.
 
-```cadence,file=imports.bpl
+```cadence,file=imports.cdc
 // Import the type `Counter` from a local file.
 //
-import Counter from "examples/counter.bpl"
+import Counter from "examples/counter.cdc"
 
 // Import the type `Counter` from an external account.
 //
@@ -4449,7 +4449,7 @@ It is not possible to change the ownership of a resource through an attestation,
 Attestations of resources are created using the `@` operator.
 Attestation types have the name of the resource type, prefixed with the `@` symbol.
 
-```cadence,file=attestations.bpl
+```cadence,file=attestations.cdc
 // Declare a resource named `Token`.
 //
 resource Token {}
@@ -4486,7 +4486,7 @@ the value must be a value that has the type `Vault` or is a subtype of `Vault`.
 
 The index operator `[]` is used for both reading and writing stored values.
 
-```cadence,file=account-storage.bpl
+```cadence,file=account-storage.cdc
 // Declare a resource named `Counter`.
 //
 resource Counter {
@@ -4539,7 +4539,7 @@ References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
 
-```cadence,file=storage-reference.bpl
+```cadence,file=storage-reference.cdc
 
 // Declare a resource interface `HasCount`.
 //
@@ -4676,7 +4676,7 @@ Within the transaction, but before the prepare phase, any number of constants an
 The prepare phase is declared using the `prepare` keyword and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
-```cadence,file=transaction-declaration.bpl
+```cadence,file=transaction-declaration.cdc
 // Optional: Importing external types from other accounts using `import`.
 
 transaction {
@@ -4705,9 +4705,9 @@ transaction {
 Transactions can deploy contract code to the storage of any of the signing accounts.
 
 Here is an example of a resource interface that will be deployed to an account.
-Imagine it is in a file named `FungibleToken.bpl`.
+Imagine it is in a file named `FungibleToken.cdc`.
 
-```cadence,file=fungible-token-interface.bpl
+```cadence,file=fungible-token-interface.cdc
 // Declare resource interfaces for the two parts of a fungible token:
 // - A provider, which allows withdrawing tokens
 // - A receiver, which allows depositing tokens
@@ -4803,11 +4803,11 @@ The `publish` operator can be used to make deployed types publicly available to 
 
 After a type is published it can be imported by other code.
 
-```cadence,file=deploy-resource-interface.bpl
+```cadence,file=deploy-resource-interface.cdc
 // Import the resource interface type `FungibleToken`
-// from the local file "FungibleToken.bpl".
+// from the local file "FungibleToken.cdc".
 //
-import FungibleToken from "FungibleToken.bpl"
+import FungibleToken from "FungibleToken.cdc"
 
 // Run a transaction which deploys the code for the resource interface
 // `FungibleToken` and makes it publicly available by publishing it.
@@ -4832,9 +4832,9 @@ Now, anybody can import the type `FungibleToken` from the signing account
 and concrete fungible token implementations that conform to the interface can be created.
 
 Imagine this declaration below for a concrete fungible token implementation conforming
-to the fungible token interface is in a local file named `ExampleToken.bpl`.
+to the fungible token interface is in a local file named `ExampleToken.cdc`.
 
-```cadence,file=example-token.bpl
+```cadence,file=example-token.cdc
 // Import the resource interface type `FungibleToken`,
 // which was deployed above, in this example to the account with address 0x23.
 //
@@ -4872,8 +4872,8 @@ fun newEmptyExampleToken(): <-ExampleToken {
 
 Again, the type must be deployed and published.
 
-```cadence,file=deploy-example-token.bpl
-import ExampleToken from "ExampleToken.bpl"
+```cadence,file=deploy-example-token.cdc
+import ExampleToken from "ExampleToken.cdc"
 
 // Run a transaction which deploys the code for the resource type `ExampleToken`
 // and makes the deployed type publicly available by publishing it.
@@ -4909,7 +4909,7 @@ However, the deposit function should be available to anyone. To achieve this,
 an additional reference to the token is created, stored, and published,
 which has the type `Receiver`, i.e. it only exposes the `deposit` function.
 
-```cadence,file=setup-transaction.bpl
+```cadence,file=setup-transaction.cdc
 // Import the resource interface types `Receiver` and `Provider`,
 // which were deployed above, in this example to the account with address 0x23.
 //
@@ -4960,7 +4960,7 @@ transaction {
 Once an account is prepared in such a way, transactions can be run that deposit
 tokens into the account.
 
-```cadence,file=send-transaction.bpl
+```cadence,file=send-transaction.cdc
 // Import the resource type `ExampleToken`,
 // in this example deployed to the account with address 0x42.
 //

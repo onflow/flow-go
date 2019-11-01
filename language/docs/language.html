@@ -302,7 +302,7 @@
           <em>Single-line comments</em> start with two slashes (<code>//</code>).
           These comments can go on a line by themselves or they can go directly after a line of code.
         </p>
-        <pre><code class="language-cadence,file=single-line-comment.bpl"><span style="color: #008000">// This is a comment on a single line.</span><span>
+        <pre><code class="language-cadence,file=single-line-comment.cdc"><span style="color: #008000">// This is a comment on a single line.</span><span>
 </span><span style="color: #008000">// Another comment line that is not executed.</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// Here is another comment after a line of code.</span><span>
@@ -311,14 +311,14 @@
           <em>Multi-line comments</em> start with a slash and an asterisk (<code>/*</code>)
           and end with an asterisk and a slash (<code>*/</code>):
         </p>
-        <pre><code class="language-cadence,file=multi-line-comment.bpl"><span style="color: #008000">/* This is a comment which</span><span>
+        <pre><code class="language-cadence,file=multi-line-comment.cdc"><span style="color: #008000">/* This is a comment which</span><span>
 </span><span style="color: #008000">spans multiple lines. */</span><span>
 </span></code></pre>
         <p>Comments may be nested.</p>
-        <pre><code class="language-cadence,file=nested-comment.bpl"><span style="color: #008000">/* /* this */ is a valid comment */</span><span>
+        <pre><code class="language-cadence,file=nested-comment.cdc"><span style="color: #008000">/* /* this */ is a valid comment */</span><span>
 </span></code></pre>
         <p>Mutli-line comments are balanced.</p>
-        <pre><code class="language-cadence,file=invalid-nested-comment.bpl"><span style="color: #008000">/* this is a // comment up to here */</span><span style="color: #000000"> this is not part of the comment </span><span style="color: #CD3131">*/</span><span>
+        <pre><code class="language-cadence,file=invalid-nested-comment.cdc"><span style="color: #008000">/* this is a // comment up to here */</span><span style="color: #000000"> this is not part of the comment </span><span style="color: #CD3131">*/</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -337,7 +337,7 @@
           Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword.
           The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
         </p>
-        <pre><code class="language-cadence,file=constants-and-variables.bpl"><span style="color: #008000">// Declare a constant named `a`.</span><span>
+        <pre><code class="language-cadence,file=constants-and-variables.cdc"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
@@ -415,7 +415,7 @@
           to make it explicit what type the declaration has.
         </p>
         <p>If no type annotation is provided, the type of the declaration is <a href="#type-inference">inferred from the initial value</a>.</p>
-        <pre><code class="language-cadence,file=type-annotations.bpl"><span style="color: #008000">// Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.</span><span>
+        <pre><code class="language-cadence,file=type-annotations.cdc"><span style="color: #008000">// Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// `Bool` is the type of booleans.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -510,7 +510,7 @@
           Semicolons must be used to separate multiple statements if they appear on the same line –
           exactly one semicolon between each pair of statements.
         </p>
-        <pre><code class="language-cadence,file=semicolons.bpl"><span style="color: #008000">// Declare a constant, without a semicolon.</span><span>
+        <pre><code class="language-cadence,file=semicolons.cdc"><span style="color: #008000">// Declare a constant, without a semicolon.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
@@ -573,7 +573,7 @@
               </tr>
             </tbody>
           </table>
-          <pre><code class="language-cadence,file=numbers.bpl"><span style="color: #008000">// A decimal number</span><span>
+          <pre><code class="language-cadence,file=numbers.cdc"><span style="color: #008000">// A decimal number</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #09885A">1234567890</span><span style="color: #000000">  </span><span style="color: #008000">// is `1234567890`</span><span>
 </span><span>
@@ -600,13 +600,13 @@
 </span><span style="color: #09885A">0b001000</span><span style="color: #000000">  </span><span style="color: #008000">// is `8`</span><span>
 </span></code></pre>
           <p>Decimal numbers may contain underscores (<code>_</code>) to logically separate components.</p>
-          <pre><code class="language-cadence,file=number-underscores-decimal.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> largeNumber = </span><span style="color: #09885A">1_000_000</span><span>
+          <pre><code class="language-cadence,file=number-underscores-decimal.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> largeNumber = </span><span style="color: #09885A">1_000_000</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Value is not a number literal, but a variable.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> notNumber = _123</span><span>
 </span></code></pre>
           <p>Underscores are allowed for all numeral systems.</p>
-          <pre><code class="language-cadence,file=number-underscores-binary.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> binaryNumber = </span><span style="color: #09885A">0b10_11_01</span><span>
+          <pre><code class="language-cadence,file=number-underscores-binary.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> binaryNumber = </span><span style="color: #09885A">0b10_11_01</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -769,7 +769,7 @@
             i.e. either nothing, or an integer.
           </p>
           <p>The value representing nothing is <code>nil</code>.</p>
-          <pre><code class="language-cadence,file=optional.bpl"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+          <pre><code class="language-cadence,file=optional.cdc"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -788,7 +788,7 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
           <p>Optionals can be created for any value, not just for literals.</p>
-          <pre><code class="language-cadence,file=optional-wrapping.bpl"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
+          <pre><code class="language-cadence,file=optional-wrapping.cdc"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
 </span><span style="color: #008000">// with 1 as its initial value.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span>
@@ -888,7 +888,7 @@
               The cast and check is performed at run-time, i.e. when the program is executed,
               not statically, i.e. when the program is checked.
             </p>
-            <pre><code class="language-cadence,file=conditional-downcasting-any.bpl"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+            <pre><code class="language-cadence,file=conditional-downcasting-any.cdc"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
 </span><span style="color: #008000">// with an initial value which has type `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
@@ -911,7 +911,7 @@
               interfaces (if a <a href="#resources">resource</a> interface not to a concrete resource),
               and optionals.
             </p>
-            <pre><code class="language-cadence,file=conditional-downcasting-any-array.bpl"><span style="color: #008000">// Declare a constant named `values` which has type `[Any]`,</span><span>
+            <pre><code class="language-cadence,file=conditional-downcasting-any-array.cdc"><span style="color: #008000">// Declare a constant named `values` which has type `[Any]`,</span><span>
 </span><span style="color: #008000">// i.e. an array of arbitrarily typed values.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
@@ -1023,7 +1023,7 @@
             <ul>
               <li>
                 <p><code>length: Int</code>: Returns the number of characters in the string as an integer.</p>
-                <pre><code class="language-cadence,file=string-length-field.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
+                <pre><code class="language-cadence,file=string-length-field.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
 </span><span>
 </span><span style="color: #008000">// Find the number of elements of the string.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> length = example.length</span><span>
@@ -1038,7 +1038,7 @@
                   This function creates a new string whose length is the sum of the lengths
                   of the string the function is called on and the string given as a parameter.
                 </p>
-                <pre><code class="language-cadence,file=string-concat.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
+                <pre><code class="language-cadence,file=string-concat.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> new = </span><span style="color: #A31515">"world"</span><span>
 </span><span>
 </span><span style="color: #008000">// Concatenate the new string onto the example string and return the new string.</span><span>
@@ -1055,7 +1055,7 @@
                   It does not modify the original string.
                   If either of the parameters are out of the bounds of the string, the function will fail.
                 </p>
-                <pre><code class="language-cadence,file=string-slice.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"helloworld"</span><span>
+                <pre><code class="language-cadence,file=string-slice.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"helloworld"</span><span>
 </span><span>
 </span><span style="color: #008000">// Create a new slice of part of the original string.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> slice = example.slice(from: </span><span style="color: #09885A">3</span><span style="color: #000000">, upTo: </span><span style="color: #09885A">6</span><span style="color: #000000">)</span><span>
@@ -1076,7 +1076,7 @@
             Arrays may contain a value multiple times.
             Array literals start with an opening square bracket <code>[</code> and end with a closing square bracket <code>]</code>.
           </p>
-          <pre><code class="language-cadence,file=arrays.bpl"><span style="color: #008000">// An empty array</span><span>
+          <pre><code class="language-cadence,file=arrays.cdc"><span style="color: #008000">// An empty array</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">[]</span><span>
 </span><span>
@@ -1107,7 +1107,7 @@
               when used as function argument,
               or when returned from a function call.
             </p>
-            <pre><code class="language-cadence,file=array-types.bpl"><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
+            <pre><code class="language-cadence,file=array-types.cdc"><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
 </span><span style="color: #008000">// which always contains exactly two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -1135,7 +1135,7 @@
             </p>
             <p>Indexes start at 0 for the first element in the array.</p>
             <p>Accessing an element which is out of bounds results in a fatal error at run-time and aborts the program.</p>
-            <pre><code class="language-cadence,file=arrays-indexing.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+            <pre><code class="language-cadence,file=arrays-indexing.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Get the first number of the array.</span><span>
@@ -1150,7 +1150,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">numbers[</span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=arrays-nested-indexing.bpl"><span style="color: #008000">// Declare an array of arrays of integers, i.e. the type is `[[Int]]`.</span><span>
+            <pre><code class="language-cadence,file=arrays-nested-indexing.cdc"><span style="color: #008000">// Declare an array of arrays of integers, i.e. the type is `[[Int]]`.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
 </span><span>
 </span><span style="color: #008000">// Get the first number of the second array.</span><span>
@@ -1158,7 +1158,7 @@
 </span><span style="color: #000000">arrays[</span><span style="color: #09885A">1</span><span style="color: #000000">][</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is `3`</span><span>
 </span></code></pre>
             <p>To set an element of an array at a specific index, the indexing syntax can be used as well.</p>
-            <pre><code class="language-cadence,file=array-indexing-assignment.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+            <pre><code class="language-cadence,file=array-indexing-assignment.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the second number in the array.</span><span>
@@ -1188,7 +1188,7 @@
                   <code>length: Int</code>:
                   Returns the number of elements in the array.
                 </p>
-                <pre><code class="language-cadence,file=array-length-field.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                <pre><code class="language-cadence,file=array-length-field.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Find the number of elements of the array.</span><span>
@@ -1208,7 +1208,7 @@
                   This function creates a new array whose length is the sum of the length of the array
                   the function is called on and the length of the array given as the parameter.
                 </p>
-                <pre><code class="language-cadence,file=array-concat.bpl"><span style="color: #008000">// Declare two arrays of integers.</span><span>
+                <pre><code class="language-cadence,file=array-concat.cdc"><span style="color: #008000">// Declare two arrays of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> moreNumbers = [</span><span style="color: #09885A">11</span><span style="color: #000000">, </span><span style="color: #09885A">27</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1227,7 +1227,7 @@
                   <code>contains(_ element: T): Bool</code>:
                   Indicates whether the given element of type <code>T</code> is in the array.
                 </p>
-                <pre><code class="language-cadence,file=array-contains.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                <pre><code class="language-cadence,file=array-contains.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Check if the array contains 11.</span><span>
@@ -1258,7 +1258,7 @@
                     Adds the new element <code>element</code> of type <code>T</code> to the end of the array.
                   </p>
                   <p>The new element must be the same type as all the other elements in the array.</p>
-                  <pre><code class="language-cadence,file=array-append.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                  <pre><code class="language-cadence,file=array-append.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Add a new element to the array.</span><span>
@@ -1281,7 +1281,7 @@
                   </p>
                   <p>The existing element at the supplied index is not overwritten.</p>
                   <p>All the elements after the new inserted element are shifted to the right by one.</p>
-                  <pre><code class="language-cadence,file=array-insert.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                  <pre><code class="language-cadence,file=array-insert.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Insert a new element at position 1 of the array.</span><span>
@@ -1301,7 +1301,7 @@
                     The <code>index</code> must be within the bounds of the array.
                     If the index is outside the bounds, the program aborts.
                   </p>
-                  <pre><code class="language-cadence,file=array-remove.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                  <pre><code class="language-cadence,file=array-remove.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove element at position 1 of the array.</span><span>
@@ -1322,7 +1322,7 @@
                     The array must not be empty.
                     If the array is empty, the program aborts.
                   </p>
-                  <pre><code class="language-cadence,file=array-remove-first.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                  <pre><code class="language-cadence,file=array-remove-first.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove the first element of the array.</span><span>
@@ -1348,7 +1348,7 @@
                     The array must not be empty.
                     If the array is empty, the program aborts.
                   </p>
-                  <pre><code class="language-cadence,file=array-remove.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+                  <pre><code class="language-cadence,file=array-remove.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove the last element of the array.</span><span>
@@ -1380,7 +1380,7 @@
             Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>.
             Keys are separated from values by a colon, and key-value associations are separated by commas.
           </p>
-          <pre><code class="language-cadence,file=dictionaries.bpl"><span style="color: #008000">// An empty dictionary</span><span>
+          <pre><code class="language-cadence,file=dictionaries.cdc"><span style="color: #008000">// An empty dictionary</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">{}</span><span>
 </span><span>
@@ -1406,7 +1406,7 @@
               and <code>V</code> is the type of the value.
               For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>{Int: Bool}</code>.
             </p>
-            <pre><code class="language-cadence,file=dictionary-types.bpl"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
+            <pre><code class="language-cadence,file=dictionary-types.cdc"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping integers to booleans.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
@@ -1436,7 +1436,7 @@
               If the key is found in the dictionary, the value for the given key is returned,
               and if the key is not found, <code>nil</code> is returned.
             </p>
-            <pre><code class="language-cadence,file=dictionary-access-integer-keys.bpl"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
+            <pre><code class="language-cadence,file=dictionary-access-integer-keys.cdc"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping integers to booleans.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
@@ -1454,7 +1454,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">booleans[</span><span style="color: #A31515">"1"</span><span style="color: #000000">]</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=dictionary-access-boolean-keys.bpl"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
+            <pre><code class="language-cadence,file=dictionary-access-boolean-keys.cdc"><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
@@ -1468,7 +1468,7 @@
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">false</span><span style="color: #000000">] </span><span style="color: #008000">// is `0`</span><span>
 </span></code></pre>
             <p>To set the value for a key of a dictionary, the access syntax can be used as well.</p>
-            <pre><code class="language-cadence,file=dictionary-assignment.bpl"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
+            <pre><code class="language-cadence,file=dictionary-assignment.cdc"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
@@ -1491,7 +1491,7 @@
                   <code>length: Int</code>:
                   Returns the number of entries in the dictionary.
                 </p>
-                <pre><code class="language-cadence,file=dictionary-length-field.bpl"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+                <pre><code class="language-cadence,file=dictionary-length-field.cdc"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Find the number of entries of the dictionary.</span><span>
@@ -1509,7 +1509,7 @@
                   Returns the value of type <code>V</code> as an optional if the dictionary contained the key,
                   otherwise <code>nil</code>.
                 </p>
-                <pre><code class="language-cadence,file=dictionary-remove.bpl"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+                <pre><code class="language-cadence,file=dictionary-remove.cdc"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Remove the key `"fortyTwo"` from the dictionary.</span><span>
@@ -1568,11 +1568,11 @@
         <section>
           <h3 id="negation"><a href="#negation" aria-hidden="true"><span class="icon icon-link"></span></a>Negation</h3>
           <p>The <code>-</code> unary operator negates an integer:</p>
-          <pre><code class="language-cadence,file=integer-negation.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=integer-negation.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">-a  </span><span style="color: #008000">// is `-1`</span><span>
 </span></code></pre>
           <p>The <code>!</code> unary operator logically negates a boolean:</p>
-          <pre><code class="language-cadence,file=boolean-negation.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
+          <pre><code class="language-cadence,file=boolean-negation.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
 </span><span style="color: #000000">!a  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
         </section>
@@ -1582,7 +1582,7 @@
             The binary assignment operator <code>=</code> can be used to assign a new value to a variable.
             It is only allowed in a statement and is not allowed in expressions.
           </p>
-          <pre><code class="language-cadence,file=assignment.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=assignment.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #008000">// `a` is `2`</span><span>
 </span><span>
@@ -1598,7 +1598,7 @@
 </span><span style="color: #000000">a = b</span><span>
 </span></code></pre>
           <p>Assignments to constants are invalid.</p>
-          <pre><code class="language-cadence,file=assignment-to-constant.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=assignment-to-constant.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #008000">// Invalid: Assignments are only for variables, not constants.</span><span>
 </span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
@@ -1606,7 +1606,7 @@
             The left-hand side of the assignment opera must be an identifier,
             followed by one or more index or access expressions.
           </p>
-          <pre><code class="language-cadence,file=assignment-numbers.bpl"><span style="color: #008000">// Declare an array of integers.</span><span>
+          <pre><code class="language-cadence,file=assignment-numbers.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the first element of the array.</span><span>
@@ -1615,7 +1615,7 @@
 </span><span>
 </span><span style="color: #008000">// `numbers` is `[3, 2]`</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=assignment-arrays.bpl"><span style="color: #008000">// Declare an array of arrays of integers.</span><span>
+          <pre><code class="language-cadence,file=assignment-arrays.cdc"><span style="color: #008000">// Declare an array of arrays of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
 </span><span>
 </span><span style="color: #008000">// Change the first element in the second array</span><span>
@@ -1624,7 +1624,7 @@
 </span><span>
 </span><span style="color: #008000">// `arrays` is `[[1, 2], [5, 4]]`</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=assignment-dictionaries.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> dictionaries = {</span><span>
+          <pre><code class="language-cadence,file=assignment-dictionaries.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> dictionaries = {</span><span>
 </span><span style="color: #000000">  </span><span style="color: #0000FF">true</span><span style="color: #000000">: {</span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span style="color: #000000">},</span><span>
 </span><span style="color: #000000">  </span><span style="color: #0000FF">false</span><span style="color: #000000">: {</span><span style="color: #09885A">3</span><span style="color: #000000">: </span><span style="color: #09885A">4</span><span style="color: #000000">}</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -1643,7 +1643,7 @@
             The binary swap operator <code>&#x3C;-></code> can be used to exchange the values of two variables.
             It is only allowed in a statement and is not allowed in expressions.
           </p>
-          <pre><code class="language-cadence,file=swap.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=swap.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">a &#x3C;-> b</span><span>
 </span><span style="color: #008000">// `a` is `2`</span><span>
@@ -1659,7 +1659,7 @@
 </span><span style="color: #000000">a &#x3C;-> b</span><span>
 </span></code></pre>
           <p>Both sides of the swap operation must be variable, assignment to constants is invalid.</p>
-          <pre><code class="language-cadence,file=swap-with-constant.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=swap-with-constant.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Swapping is only possible for variables, not constants.</span><span>
@@ -1680,7 +1680,7 @@
             <li>Division: <code>/</code></li>
             <li>Remainder: <code>%</code></li>
           </ul>
-          <pre><code class="language-cadence,file=operator-plus.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
+          <pre><code class="language-cadence,file=operator-plus.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #008000">// `a` is `3`</span><span>
 </span></code></pre>
           <p>
@@ -1688,7 +1688,7 @@
             The result is always the same type as the arguments.
           </p>
           <p>Arithmetic operators do not cause values to overflow.</p>
-          <pre><code class="language-cadence,file=operator-times.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
+          <pre><code class="language-cadence,file=operator-times.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
 </span><span style="color: #008000">// `c` is `10000`, and has type `Int`</span><span>
@@ -1704,11 +1704,11 @@
 </span><span style="color: #008000">// &#x26;+         1</span><span>
 </span><span style="color: #008000">//  = 100000000 = 0</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=operator-overflow-plus.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+          <pre><code class="language-cadence,file=operator-overflow-plus.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
 </span><span style="color: #000000">a &#x26;+ </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is `0`</span><span>
 </span></code></pre>
           <p>Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.</p>
-          <pre><code class="language-cadence,file=operator-minus.bpl"><span style="color: #008000">//     00000000</span><span>
+          <pre><code class="language-cadence,file=operator-minus.cdc"><span style="color: #008000">//     00000000</span><span>
 </span><span style="color: #008000">// &#x26;-         1</span><span>
 </span><span style="color: #008000">//  =  11111111 = 255</span><span>
 </span></code></pre>
@@ -1731,7 +1731,7 @@
           <ul>
             <li>
               <p>Logical AND: <code>a &#x26;&#x26; b</code></p>
-              <pre><code class="language-cadence,file=operator-and.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-and.cdc"><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
@@ -1743,7 +1743,7 @@
             </li>
             <li>
               <p>Logical OR: <code>a || b</code></p>
-              <pre><code class="language-cadence,file=operator-or.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-or.cdc"><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
@@ -1765,26 +1765,26 @@
                 Both sides of the equality operator may be optional, even of different levels,
                 so it is for example possible to compare a non-optional with a double-optional (<code>??</code>).
               </p>
-              <pre><code class="language-cadence,file=operator-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-equal-int.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-equal-bool.cdc"><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-int-nil.bpl"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+              <pre><code class="language-cadence,file=operator-equal-int-nil.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-optional-int-optionals-int.bpl"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+              <pre><code class="language-cadence,file=operator-equal-optional-int-optionals-int.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `true`</span><span>
@@ -1796,26 +1796,26 @@
                 Both sides of the inequality operator may be optional, even of different levels,
                 so it is for example possible to compare a non-optional with a double-optional (<code>??</code>).
               </p>
-              <pre><code class="language-cadence,file=operator-not-equal-int.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-int.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-bool.bpl"><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-bool.cdc"><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-optional-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-int-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-int-nil.bpl"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-int-nil.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-optional-int-optionals-int.bpl"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-optional-int-optionals-int.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `false`</span><span>
@@ -1823,7 +1823,7 @@
             </li>
             <li>
               <p>Less than: <code>&#x3C;</code>, for integers</p>
-              <pre><code class="language-cadence,file=operator-less.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+              <pre><code class="language-cadence,file=operator-less.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
@@ -1832,7 +1832,7 @@
             </li>
             <li>
               <p>Less or equal than: <code>&#x3C;=</code>, for integers</p>
-              <pre><code class="language-cadence,file=operator-less-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-less-equals.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
@@ -1841,7 +1841,7 @@
             </li>
             <li>
               <p>Greater than: <code>></code>, for integers</p>
-              <pre><code class="language-cadence,file=operator-greater.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+              <pre><code class="language-cadence,file=operator-greater.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
@@ -1850,7 +1850,7 @@
             </li>
             <li>
               <p>Greater or equal than: <code>>=</code>, for integers</p>
-              <pre><code class="language-cadence,file=operator-greater-equals.bpl"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+              <pre><code class="language-cadence,file=operator-greater-equals.cdc"><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span><span>
 </span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span><span>
@@ -1872,7 +1872,7 @@
             The second value and third value can be of any type.
             The result type is the least common supertype of the second and third value.
           </p>
-          <pre><code class="language-cadence,file=operator-ternary-conditional.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #09885A">3</span><span style="color: #000000"> : </span><span style="color: #09885A">4</span><span>
+          <pre><code class="language-cadence,file=operator-ternary-conditional.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #09885A">3</span><span style="color: #000000"> : </span><span style="color: #09885A">4</span><span>
 </span><span style="color: #008000">// `x` is `4` and has type `Int`</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #0000FF">nil</span><span style="color: #000000"> : </span><span style="color: #09885A">3</span><span>
@@ -1927,7 +1927,7 @@
             There is <strong>no</strong> support for optional parameters, i.e. default values for parameters,
             and variadic functions, i.e. functions that take an arbitrary amount of arguments.
           </p>
-          <pre><code class="language-cadence,file=function-double.bpl"><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
+          <pre><code class="language-cadence,file=function-double.cdc"><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The special argument label _ is specified for the parameter,</span><span>
 </span><span style="color: #008000">// so no argument label has to be provided in a function call.</span><span>
@@ -1947,7 +1947,7 @@
             It is possible to require argument labels for some parameters,
             and not require argument labels for other parameters.
           </p>
-          <pre><code class="language-cadence,file=function-clamp.bpl"><span style="color: #008000">// Declare a function named `clamp`. The function takes an integer value,</span><span>
+          <pre><code class="language-cadence,file=function-clamp.cdc"><span style="color: #008000">// Declare a function named `clamp`. The function takes an integer value,</span><span>
 </span><span style="color: #008000">// the lower limit, and the upper limit. It returns an integer between</span><span>
 </span><span style="color: #008000">// the lower and upper limit.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1986,7 +1986,7 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span><span style="color: #008000">// `clamped` is `100`</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=function-send.bpl"><span style="color: #008000">// Declare a function named `send`, which transfers an amount</span><span>
+          <pre><code class="language-cadence,file=function-send.cdc"><span style="color: #008000">// Declare a function named `send`, which transfers an amount</span><span>
 </span><span style="color: #008000">// from one account to another.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The implementation is omitted for brevity.</span><span>
@@ -2039,7 +2039,7 @@
 </span><span style="color: #000000">send(from: sender, to: receiver, amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>The order of the arguments in a function call must match the order of the parameters in the function declaration.</p>
-          <pre><code class="language-cadence,file=function-test.bpl"><span style="color: #008000">// Declare a function named `test`, which accepts two parameters, named `first` and `second`</span><span>
+          <pre><code class="language-cadence,file=function-test.cdc"><span style="color: #008000">// Declare a function named `test`, which accepts two parameters, named `first` and `second`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(first: Int, second: Int) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
@@ -2051,7 +2051,7 @@
 </span><span style="color: #000000">test(second: </span><span style="color: #09885A">1</span><span style="color: #000000">, first: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Functions can be nested, i.e., the code of a function may declare further functions.</p>
-          <pre><code class="language-cadence,file=function-doubleAndAddOne.bpl"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one.</span><span>
+          <pre><code class="language-cadence,file=function-doubleAndAddOne.cdc"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
 </span><span>
@@ -2076,7 +2076,7 @@
             It is possible to declare functions with the same name, as long as they have different sets of argument labels.
             This is known as function overloading.
           </p>
-          <pre><code class="language-cadence,file=function-overloading.bpl"><span style="color: #008000">// Declare a function named "assert" which requires a test value</span><span>
+          <pre><code class="language-cadence,file=function-overloading.cdc"><span style="color: #008000">// Declare a function named "assert" which requires a test value</span><span>
 </span><span style="color: #008000">// and a message argument.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ test: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) {</span><span>
@@ -2097,7 +2097,7 @@
             Functions can be also used as expressions.
             The syntax is the same as for function declarations, except that function expressions have no name, i.e., they are anonymous.
           </p>
-          <pre><code class="language-cadence,file=function-expression.bpl"><span style="color: #008000">// Declare a constant named `double`, which has a function as its value.</span><span>
+          <pre><code class="language-cadence,file=function-expression.cdc"><span style="color: #008000">// Declare a constant named `double`, which has a function as its value.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The function multiplies a number by two when it is called.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2112,7 +2112,7 @@
         <section>
           <h3 id="function-calls"><a href="#function-calls" aria-hidden="true"><span class="icon icon-link"></span></a>Function Calls</h3>
           <p>Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.</p>
-          <pre><code class="language-cadence,file=function-call.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
+          <pre><code class="language-cadence,file=function-call.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2136,13 +2136,13 @@
             The parameter types need to be enclosed in parentheses, followed by a colon (<code>:</code>), and end with the return type.
             The whole function type needs to be enclosed in parentheses.
           </p>
-          <pre><code class="language-cadence,file=function-type.bpl"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`.</span><span>
+          <pre><code class="language-cadence,file=function-type.cdc"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=function-type-expression.bpl"><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
+          <pre><code class="language-cadence,file=function-type-expression.cdc"><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((Int, Int): Int) =</span><span>
 </span><span style="color: #000000">    fun (a: Int, b: Int): Int {</span><span>
@@ -2150,7 +2150,7 @@
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
           <p>If the function has no return type, it implicitly has the return type <code>Void</code>.</p>
-          <pre><code class="language-cadence,file=function-doNothing.bpl"><span style="color: #008000">// Declare a constant named `doNothing`, which is a function</span><span>
+          <pre><code class="language-cadence,file=function-doNothing.cdc"><span style="color: #008000">// Declare a constant named `doNothing`, which is a function</span><span>
 </span><span style="color: #008000">// that takes no parameters and returns nothing.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> doNothing: ((): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) =</span><span>
@@ -2168,7 +2168,7 @@
             It has the disadvantage that function calls to plain function values,
             cannot accept argument labels.
           </p>
-          <pre><code class="language-cadence,file=function-no-argument-labels.bpl"><span style="color: #008000">// Declare a function which takes one argument that has type `Int`.</span><span>
+          <pre><code class="language-cadence,file=function-no-argument-labels.cdc"><span style="color: #008000">// Declare a function which takes one argument that has type `Int`.</span><span>
 </span><span style="color: #008000">// The function has type `((Int): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo1(x: Int) {}</span><span>
@@ -2213,7 +2213,7 @@
             It is called a closure, because it is closing over those variables and constants.
             A closure can can read from the variables and constants and assign to the variables it refers to.
           </p>
-          <pre><code class="language-cadence,file=closures-counter.bpl"><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
+          <pre><code class="language-cadence,file=closures-counter.cdc"><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
 </span><span style="color: #008000">// each time when called, returns the next integer, starting at 1.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCounter(): ((): Int) {</span><span>
@@ -2239,7 +2239,7 @@
             Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
             This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_value">call-by-value</a>.
           </p>
-          <pre><code class="language-cadence,file=function-change.bpl"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
+          <pre><code class="language-cadence,file=function-change.cdc"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
 </span><span style="color: #008000">// of an array of integers.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: [Int]) {</span><span>
@@ -2257,7 +2257,7 @@
 </span><span style="color: #008000">// `numbers` is still `[0, 1]`</span><span>
 </span></code></pre>
           <p>Parameters are constant, i.e., it is not allowed to assign to them.</p>
-          <pre><code class="language-cadence,file=function-parameter-assignment.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: Int) {</span><span>
+          <pre><code class="language-cadence,file=function-parameter-assignment.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: Int) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: cannot assign to a parameter (constant)</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    x = </span><span style="color: #09885A">2</span><span>
@@ -2276,7 +2276,7 @@
             The condition description is used as an error message when the condition fails.
           </p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
-          <pre><code class="language-cadence,file=function-factorial.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
+          <pre><code class="language-cadence,file=function-factorial.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -2304,7 +2304,7 @@
 </span><span style="color: #000000">factorial(</span><span style="color: #09885A">-2</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>In postconditions, the special function <code>before</code> can be used to get the value of an expression just before the function is called.</p>
-          <pre><code class="language-cadence,file=function-increment.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> n = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=function-increment.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> n = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> incrementN() {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
@@ -2331,7 +2331,7 @@
             The braces are required and not optional.
             Parentheses around the condition are optional.
           </p>
-          <pre><code class="language-cadence,file=control-flow-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-if.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
@@ -2349,7 +2349,7 @@
             An additional, optional else-clause can be added to execute another piece of code when the condition is false.
             The else-clause is introduced by the <code>else</code> keyword followed by braces that contain the code that should be executed.
           </p>
-          <pre><code class="language-cadence,file=control-flow-if-else.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-if-else.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
@@ -2364,7 +2364,7 @@
             The else-clause can contain another if-statement, i.e., if-statements can be chained together.
             In this case the braces can be omitted.
           </p>
-          <pre><code class="language-cadence,file=control-flow-if-else-if.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-if-else-if.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
@@ -2396,7 +2396,7 @@
           </p>
           <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
           <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
-          <pre><code class="language-cadence,file=control-flow-optional-binding-not-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=control-flow-optional-binding-not-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is executed as `maybeNumber` is not `nil`.</span><span>
@@ -2405,7 +2405,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `maybeNumber` is not `nil`</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=control-flow-optional-binding-nil.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+          <pre><code class="language-cadence,file=control-flow-optional-binding-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `noNumber` is `nil`.</span><span>
@@ -2428,7 +2428,7 @@
             If it is true, the piece of code is executed and the evaluation of the condition is repeated.
             Thus, the piece of code is executed zero or more times.
           </p>
-          <pre><code class="language-cadence,file=control-flow-while.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-while.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">while</span><span style="color: #000000"> a &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    a = a + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2436,7 +2436,7 @@
 </span><span style="color: #008000">// `a` is `5`</span><span>
 </span></code></pre>
           <p>The <code>continue</code> statement can be used to stop the current iteration of the loop and start the next iteration.</p>
-          <pre><code class="language-cadence,file=control-flow-continue.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-continue.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
@@ -2449,7 +2449,7 @@
 </span><span style="color: #008000">// `x` is `8`</span><span>
 </span></code></pre>
           <p>The <code>break</code> statement can be used to stop the loop.</p>
-          <pre><code class="language-cadence,file=control-flow-break.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+          <pre><code class="language-cadence,file=control-flow-break.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
@@ -2468,7 +2468,7 @@
       <section>
         <h2 id="scope"><a href="#scope" aria-hidden="true"><span class="icon icon-link"></span></a>Scope</h2>
         <p>Every function and block (<code>{</code> ... <code>}</code>) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.</p>
-        <pre><code class="language-cadence,file=scope.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+        <pre><code class="language-cadence,file=scope.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
@@ -2481,7 +2481,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">y</span><span>
 </span></code></pre>
-        <pre><code class="language-cadence,file=scope-doubleAndAddOne.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
+        <pre><code class="language-cadence,file=scope-doubleAndAddOne.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -2493,7 +2493,7 @@
 </span><span style="color: #000000">double(</span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
 </span></code></pre>
         <p>Each scope can introduce new declarations, i.e., the outer declaration is shadowed.</p>
-        <pre><code class="language-cadence,file=scope-test.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+        <pre><code class="language-cadence,file=scope-test.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
@@ -2503,7 +2503,7 @@
 </span><span style="color: #000000">test()  </span><span style="color: #008000">// is `3`</span><span>
 </span></code></pre>
         <p>Scope is lexical, not dynamic.</p>
-        <pre><code class="language-cadence,file=scope-lexical.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+        <pre><code class="language-cadence,file=scope-lexical.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
@@ -2517,7 +2517,7 @@
 </span><span style="color: #000000">g()  </span><span style="color: #008000">// is `10`, not `20`</span><span>
 </span></code></pre>
         <p>Declarations are <strong>not</strong> moved to the top of the enclosing function (hoisted).</p>
-        <pre><code class="language-cadence,file=scope-no-hoisting.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+        <pre><code class="language-cadence,file=scope-no-hoisting.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
@@ -2536,7 +2536,7 @@
           When assigning a new value to a variable, the value must be the same type as the variable.
           For example, if a variable has type <code>Bool</code>, it can <em>only</em> be assigned a value that has type <code>Bool</code>, and not for example a value that has type <code>Int</code>.
         </p>
-        <pre><code class="language-cadence,file=type-safety-assign-int-to-bool.bpl"><span style="color: #008000">// Declare a variable that has type `Bool`.</span><span>
+        <pre><code class="language-cadence,file=type-safety-assign-int-to-bool.cdc"><span style="color: #008000">// Declare a variable that has type `Bool`.</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: cannot assign a value that has type `Int` to a variable which has type `Bool`.</span><span>
@@ -2544,7 +2544,7 @@
 </span><span style="color: #000000">a = </span><span style="color: #09885A">0</span><span>
 </span></code></pre>
         <p>When passing arguments to a function, the types of the values must match the function parameters' types. For example, if a function expects an argument that has type <code>Bool</code>, <em>only</em> a value that has type <code>Bool</code> can be provided, and not for example a value which has type <code>Int</code>.</p>
-        <pre><code class="language-cadence,file=type-safety-nand.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+        <pre><code class="language-cadence,file=type-safety-nand.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> !(a &#x26;&#x26; b)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2562,7 +2562,7 @@
           nor is an optional integer <code>Int?</code> automatically converted to a non-optional integer <code>Int</code>,
           or vice-versa.
         </p>
-        <pre><code class="language-cadence,file=type-safety-add.bpl"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
+        <pre><code class="language-cadence,file=type-safety-add.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2590,12 +2590,12 @@
           the declaration's type is inferred from the initial value.
         </p>
         <p>Integer literals are inferred to type <code>Int</code>.</p>
-        <pre><code class="language-cadence,file=type-inference-int.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+        <pre><code class="language-cadence,file=type-inference-int.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// `a` has type `Int`</span><span>
 </span></code></pre>
         <p>Array literals are inferred based on the elements of the literal, and to be variable-size.</p>
-        <pre><code class="language-cadence,file=type-inference-intergers.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+        <pre><code class="language-cadence,file=type-inference-intergers.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span style="color: #008000">// `integers` has type `[Int]`</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: mixed types</span><span>
@@ -2603,7 +2603,7 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidMixed = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
 </span></code></pre>
         <p>Dictionary literals are inferred based on the keys and values of the literal.</p>
-        <pre><code class="language-cadence,file=type-inference-dictionary.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+        <pre><code class="language-cadence,file=type-inference-dictionary.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #09885A">2</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2617,7 +2617,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         <p>Functions are inferred based on the parameter types and the return type.</p>
-        <pre><code class="language-cadence,file=type-inference-function.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8): Int {</span><span>
+        <pre><code class="language-cadence,file=type-inference-function.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2628,7 +2628,7 @@
           There are cases where types cannot be inferred.
           In these cases explicit type annotations are required.
         </p>
-        <pre><code class="language-cadence,file=type-inference-impossible.bpl"><span style="color: #008000">// Invalid: not possible to infer type based on array literal's elements.</span><span>
+        <pre><code class="language-cadence,file=type-inference-impossible.cdc"><span style="color: #008000">// Invalid: not possible to infer type based on array literal's elements.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> array = []</span><span>
 </span><span>
@@ -2692,7 +2692,7 @@
         <section>
           <h3 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h3>
           <p>Structures are declared using the <code>struct</code> keyword and resources are declared using the <code>resource</code> keyword. The keyword is followed by the name.</p>
-          <pre><code class="language-cadence,file=composite-data-type-declaration.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-declaration.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2702,10 +2702,10 @@
 </span></code></pre>
           <p>Structures and resources are types.</p>
           <p>Structures are created (instantiated) by calling the type like a function.</p>
-          <pre><code class="language-cadence,file=structure-instantiation.bpl"><span style="color: #000000">SomeStruct()</span><span>
+          <pre><code class="language-cadence,file=structure-instantiation.cdc"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
           <p>Resource must be created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
-          <pre><code class="language-cadence,file=resource-instantiation.bpl"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+          <pre><code class="language-cadence,file=resource-instantiation.cdc"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span></code></pre>
           <p>
             The constructor function may require parameters
@@ -2801,7 +2801,7 @@
           </table>
           <p>In initializers, the special constant <code>self</code> refers to the composite value that is to be initialized.</p>
           <p>Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (<code>.</code>) and the name of the field.</p>
-          <pre><code class="language-cadence,file=composite-data-type-fields-and-init.bpl"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-fields-and-init.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
 </span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Both fields are initialized through the initializer.</span><span>
@@ -2849,7 +2849,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>A composite value can be created by calling the constructor and the value's fields can be accessed.</p>
-          <pre><code class="language-cadence,file=composite-data-type-fields-assignment.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-fields-assignment.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">token.id  </span><span style="color: #008000">// is `42`</span><span>
 </span><span style="color: #000000">token.balance  </span><span style="color: #008000">// is `1_000_000`</span><span>
@@ -2862,7 +2862,7 @@
 </span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
 </span></code></pre>
           <p>Initializers support overloading. This allows for example providing default values for certain parameters.</p>
-          <pre><code class="language-cadence,file=composite-data-type-initializer-overloading.bpl"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-initializer-overloading.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
 </span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The first initializer allows initializing both fields with a given value.</span><span>
@@ -2891,7 +2891,7 @@
           <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written. Assignments are not allowed at all in getters and setters.</p>
           <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
           <p>Getters are declared using the <code>get</code> keyword. Getters have no parameters and their return type is implicitly the type of the field.</p>
-          <pre><code class="language-cadence,file=composite-data-type-field-getter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-field-getter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which ensures the read value is always non-negative.</span><span>
@@ -2926,7 +2926,7 @@
             The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
           </p>
           <p>The types of values assigned to setters must always match the field's type.</p>
-          <pre><code class="language-cadence,file=composite-data-type-field-setter.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-field-setter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a setter</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive.</span><span>
@@ -2960,7 +2960,7 @@
           </p>
           <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
           <p>Synthetic fields are read-only when only a getter is provided.</p>
-          <pre><code class="language-cadence,file=composite-type-synthetic-field-getter-only.bpl"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+          <pre><code class="language-cadence,file=composite-type-synthetic-field-getter-only.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
 </span><span>
@@ -2984,7 +2984,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Synthetic fields are readable and writable when both a getter and a setter is declared.</p>
-          <pre><code class="language-cadence,file=composite-type-synthetic-field-setter-getter.bpl"><span style="color: #008000">// Declare a struct named `GoalTracker` which stores a number</span><span>
+          <pre><code class="language-cadence,file=composite-type-synthetic-field-setter-getter.cdc"><span style="color: #008000">// Declare a struct named `GoalTracker` which stores a number</span><span>
 </span><span style="color: #008000">// of target goals, a number of completed goals,</span><span>
 </span><span style="color: #008000">// and has a synthetic field to provide the left number of goals.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3041,7 +3041,7 @@
             Composite data types may contain functions.
             Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type-function.bpl"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-function.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
 </span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
@@ -3068,7 +3068,7 @@
 </span><span style="color: #008000">// `rectangle.height` is `12`</span><span>
 </span></code></pre>
           <p>Functions support overloading.</p>
-          <pre><code class="language-cadence,file=composite-data-type-function-overloading.bpl"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+          <pre><code class="language-cadence,file=composite-data-type-function-overloading.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
 </span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
@@ -3111,7 +3111,7 @@
             Even if two composite data types declare the same fields and functions,
             the types are only compatible if their names match.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type.bpl"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
+          <pre><code class="language-cadence,file=composite-data-type.cdc"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
 </span><span style="color: #008000">// which has type `((): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> A {</span><span>
@@ -3152,7 +3152,7 @@
               and when returned from a function.
             </p>
             <p>Accessing a field or calling a function of a structure does not copy it.</p>
-            <pre><code class="language-cadence,file=struct-behavior.bpl"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field.</span><span>
+            <pre><code class="language-cadence,file=struct-behavior.cdc"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
@@ -3212,7 +3212,7 @@
               when it is moved to a function as an argument,
               and when it is returned from a function.
             </p>
-            <pre><code class="language-cadence,file=resource-behavior.bpl"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field.</span><span>
+            <pre><code class="language-cadence,file=resource-behavior.cdc"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
@@ -3256,13 +3256,13 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">b.value</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-loss.bpl"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
+            <pre><code class="language-cadence,file=resource-loss.cdc"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: `c` is not used, but must be; it cannot be lost.</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-destruction.bpl"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
+            <pre><code class="language-cadence,file=resource-destruction.cdc"><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> d &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
 </span><span>
@@ -3279,7 +3279,7 @@
               To make it explicit that the type is moved, it must be prefixed with <code>&#x3C;-</code> in all type annotations,
               e.g. for variable declarations, parametes, or return types.
             </p>
-            <pre><code class="language-cadence,file=resource-type-annotation.bpl"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
+            <pre><code class="language-cadence,file=resource-type-annotation.cdc"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3304,14 +3304,14 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
             <p>Resources <strong>must</strong> be used exactly once.</p>
-            <pre><code class="language-cadence,file=resource-must-use.bpl"><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
+            <pre><code class="language-cadence,file=resource-must-use.cdc"><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-use-after-move.bpl"><span style="color: #008000">// Declare a constant named `res` which has the resource type `SomeResource`.</span><span>
+            <pre><code class="language-cadence,file=resource-use-after-move.cdc"><span style="color: #008000">// Declare a constant named `res` which has the resource type `SomeResource`.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span><span>
 </span><span style="color: #008000">// Call the function `use` and move the resource `res` into it.</span><span>
@@ -3327,14 +3327,14 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">res.value</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-not-used.bpl"><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
+            <pre><code class="language-cadence,file=resource-not-used.cdc"><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-not-definitely-destroyed.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+            <pre><code class="language-cadence,file=resource-not-definitely-destroyed.cdc"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
 </span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3347,7 +3347,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// it might have been destroyed or not.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-always-invalidated.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+            <pre><code class="language-cadence,file=resource-always-invalidated.cdc"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
 </span><span style="color: #008000">// This function is valid, as it always uses the resource parameter,</span><span>
 </span><span style="color: #008000">// and does not cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3361,7 +3361,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// It was either destroyed or moved in the call of function `use`.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-loss-return.bpl"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+            <pre><code class="language-cadence,file=resource-loss-return.cdc"><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
 </span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3386,7 +3386,7 @@
             <h4 id="resource-variables"><a href="#resource-variables" aria-hidden="true"><span class="icon icon-link"></span></a>Resource variables</h4>
             <p>Resource variables cannot be assigned to as that would lead to the loss of the variable's current resource value.</p>
             <p>Instead, use a swap statement (<code>&#x3C;-></code>) to replace the resource variable with another resource.</p>
-            <pre><code class="language-cadence,file=resource-variable-invalid-assignment.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+            <pre><code class="language-cadence,file=resource-variable-invalid-assignment.cdc"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
 </span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> x &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> y &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
@@ -3411,7 +3411,7 @@
               Destructors have no parameters and no return value and are declared using the <code>destroy</code> name.
               A resource may have only one destructor.
             </p>
-            <pre><code class="language-cadence,file=resource-destructor.bpl"><span style="color: #0000FF">var</span><span style="color: #000000"> destructorCalled = </span><span style="color: #0000FF">false</span><span>
+            <pre><code class="language-cadence,file=resource-destructor.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> destructorCalled = </span><span style="color: #0000FF">false</span><span>
 </span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Resource {</span><span>
 </span><span>
@@ -3435,7 +3435,7 @@
               If a resource type has fields that have a resource type it <strong>must</strong> declare a destructor,
               which <strong>must</strong> invalidate all resource fields, i.e. move or destroy them.
             </p>
-            <pre><code class="language-cadence,file=resource-nested-field.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> Child {</span><span>
+            <pre><code class="language-cadence,file=resource-nested-field.cdc"><span style="color: #0000FF">resource</span><span style="color: #000000"> Child {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
@@ -3469,7 +3469,7 @@
               however moving a resource out of a variable resource field is <strong>not</strong> allowed.
               Instead, use a swap statement to replace the resource with another resource.
             </p>
-            <pre><code class="language-cadence,file=resource-field-swap.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> child &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 1"</span><span style="color: #000000">)</span><span>
+            <pre><code class="language-cadence,file=resource-field-swap.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> child &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 1"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> parent &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Parent(name: </span><span style="color: #A31515">"Parent"</span><span style="color: #000000">, child: &#x3C;-child)</span><span>
 </span><span>
 </span><span style="color: #000000">child.name  </span><span style="color: #008000">// is "Child"</span><span>
@@ -3512,7 +3512,7 @@
               or indexing into a dictionary to read a value for a certain key or set a value for the key is <strong>not</strong> allowed.
             </p>
             <p>Instead, use a swap statement to replace the accessed resource with another resource.</p>
-            <pre><code class="language-cadence,file=resource-in-array.bpl"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+            <pre><code class="language-cadence,file=resource-in-array.cdc"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant for an array of resources.</span><span>
 </span><span style="color: #008000">// Create two resources and move them into the array.</span><span>
@@ -3541,7 +3541,7 @@
 </span><span style="color: #008000">// `res` now contains the old resource.</span><span>
 </span></code></pre>
             <p>The same applies to dictionaries.</p>
-            <pre><code class="language-cadence,file=resource-in-dictionary.bpl"><span style="color: #008000">// Declare a constant for a dictionary of resources.</span><span>
+            <pre><code class="language-cadence,file=resource-in-dictionary.cdc"><span style="color: #008000">// Declare a constant for a dictionary of resources.</span><span>
 </span><span style="color: #008000">// Create three resources and move them into the dictionary.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
@@ -3576,7 +3576,7 @@
               Resources cannot be moved into arrays and dictionaries multiple times,
               as that would cause a duplication.
             </p>
-            <pre><code class="language-cadence,file=resource-array-duplication.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+            <pre><code class="language-cadence,file=resource-array-duplication.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the array once.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3585,7 +3585,7 @@
 </span><span style="color: #000000">    &#x3C;-resource</span><span>
 </span><span style="color: #000000">]</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-dictionary-duplication.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+            <pre><code class="language-cadence,file=resource-dictionary-duplication.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the dictionary once.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
@@ -3594,13 +3594,13 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
             <p>Resource arrays and dictionaries can be destroyed.</p>
-            <pre><code class="language-cadence,file=resource-array-destroy.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+            <pre><code class="language-cadence,file=resource-array-destroy.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
 </span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
 </span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #000000">]</span><span>
 </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
 </span></code></pre>
-            <pre><code class="language-cadence,file=resource-dictionary-destroy.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+            <pre><code class="language-cadence,file=resource-dictionary-destroy.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"r2"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3610,7 +3610,7 @@
               The variable array functions like <code>append</code>, <code>insert</code>, and <code>remove</code> behave like for non-resource arrays.
               Note however, that the result of the <code>remove</code> functions must be used.
             </p>
-            <pre><code class="language-cadence,file-resource-array-mutating-functions.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [&#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()]</span><span>
+            <pre><code class="language-cadence,file-resource-array-mutating-functions.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [&#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()]</span><span>
 </span><span style="color: #008000">// `resources.length` is `1`</span><span>
 </span><span>
 </span><span style="color: #000000">resources.append(&#x3C;-create R())</span><span>
@@ -3638,7 +3638,7 @@
               The dictionary functions like <code>insert</code> and <code>remove</code> behave like for non-resource dictionaries.
               Note however, that the result of these functions must be used.
             </p>
-            <pre><code class="language-cadence,file-resource-dictionary-mutating-functions.bpl"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()}</span><span>
+            <pre><code class="language-cadence,file-resource-dictionary-mutating-functions.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()}</span><span>
 </span><span style="color: #008000">// `resources.length` is `1`</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> first &#x3C;- resource.remove(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">)</span><span>
@@ -3765,7 +3765,7 @@
             </tr>
           </tbody>
         </table>
-        <pre><code class="language-cadence,file=access-control-globals.bpl"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope.</span><span>
+        <pre><code class="language-cadence,file=access-control-globals.cdc"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span>
@@ -3773,7 +3773,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
-        <pre><code class="language-cadence,file=acess-control-struct.bpl"><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes.</span><span>
+        <pre><code class="language-cadence,file=acess-control-struct.cdc"><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span>
@@ -3913,7 +3913,7 @@
             Variable field requirements can be specified to also be publicly settable by using the <code>pub(set)</code> keyword.
           </p>
           <p>The special type <code>Self</code> can be used to refer to the type implementing the interface.</p>
-          <pre><code class="language-cadence,file=interface-declaration.bpl"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
+          <pre><code class="language-cadence,file=interface-declaration.cdc"><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
 </span><span style="color: #008000">// Only resources can implement this resource interface.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
@@ -4039,7 +4039,7 @@
             The function implementations must match the function requirements in the interface
             in terms of name, parameter argument labels, parameter types, and the return type.
           </p>
-          <pre><code class="language-cadence,file=interface-implementation.bpl"><span style="color: #008000">// Declare a resource named `ExampleToken` that has to implement</span><span>
+          <pre><code class="language-cadence,file=interface-implementation.cdc"><span style="color: #008000">// Declare a resource named `ExampleToken` that has to implement</span><span>
 </span><span style="color: #008000">// the `FungibleToken` interface.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// It has a variable field named `balance`, that can be written</span><span>
@@ -4172,7 +4172,7 @@
             Interfaces are types.
             Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.
           </p>
-          <pre><code class="language-cadence,file=interface-type.bpl"><span style="color: #008000">// Declare an interface named `Shape`.</span><span>
+          <pre><code class="language-cadence,file=interface-type.cdc"><span style="color: #008000">// Declare an interface named `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Require implementing types to provide a field which returns the area,</span><span>
 </span><span style="color: #008000">// and a function which scales the shape by a given factor.</span><span>
@@ -4248,7 +4248,7 @@
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">10</span><span style="color: #000000">, height: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Values implementing an interface are assignable to variables that have the interface as their type.</p>
-          <pre><code class="language-cadence,file=interface-type-assignment.bpl"><span style="color: #008000">// Assign a value of type `Square` to the variable `shape` that has type `Shape`.</span><span>
+          <pre><code class="language-cadence,file=interface-type-assignment.cdc"><span style="color: #008000">// Assign a value of type `Square` to the variable `shape` that has type `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">shape = Square(length: </span><span style="color: #09885A">30</span><span style="color: #000000">)</span><span>
 </span><span>
@@ -4258,7 +4258,7 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle: </span><span style="color: #0000FF">Rectangle</span><span style="color: #000000"> = Square(length: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.</p>
-          <pre><code class="language-cadence,file=interface-type-fields-and-functions.bpl"><span style="color: #008000">// Declare a constant which has the type `Shape`.</span><span>
+          <pre><code class="language-cadence,file=interface-type-fields-and-functions.cdc"><span style="color: #008000">// Declare a constant which has the type `Shape`.</span><span>
 </span><span style="color: #008000">// and is initialized with a value that has type `Rectangle`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
@@ -4281,7 +4281,7 @@
             Interface implementation requirements can be declared by following the interface name with a colon (<code>:</code>)
             and one or more names of interfaces of the same kind, separated by commas.
           </p>
-          <pre><code class="language-cadence,file=interface-implementation-requirement.bpl"><span style="color: #008000">// Declare a structure interface named `Shape`.</span><span>
+          <pre><code class="language-cadence,file=interface-implementation-requirement.cdc"><span style="color: #008000">// Declare a structure interface named `Shape`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {}</span><span>
 </span><span>
@@ -4304,7 +4304,7 @@
             Interfaces can be arbitrarily nested.
             Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
           </p>
-          <pre><code class="language-cadence,file=interface-nesting.bpl"><span style="color: #008000">// Declare a resource interface `OuterInterface`, which declares</span><span>
+          <pre><code class="language-cadence,file=interface-nesting.cdc"><span style="color: #008000">// Declare a resource interface `OuterInterface`, which declares</span><span>
 </span><span style="color: #008000">// a nested structure interface named `InnerInterface`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Resources implementing `OuterInterface` do not need to provide</span><span>
@@ -4336,7 +4336,7 @@
             Interfaces can require implementing types to provide concrete nested types.
             For example, a resource interface may require an implementing type to provide a resource type.
           </p>
-          <pre><code class="language-cadence,file=interface-nested-type-requirement.bpl"><span style="color: #008000">// Declare a resource interface named `FungibleToken`.</span><span>
+          <pre><code class="language-cadence,file=interface-nested-type-requirement.cdc"><span style="color: #008000">// Declare a resource interface named `FungibleToken`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Require implementing types to provide a resource type named `Vault`</span><span>
 </span><span style="color: #008000">// which must have a field named `balance`.</span><span>
@@ -4374,11 +4374,11 @@
           <p>Equatable types can be compared for equality using the equals operator (<code>==</code>) or inequality using the unequals operator (<code>!=</code>).</p>
           <p>Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.</p>
           <p>To make a type equatable the <code>Equatable</code> interface must be implemented, which requires the implementation of the function <code>equals</code>, which accepts another value that the given value should be compared for equality. Note that the parameter type is <code>Self</code>, i.e., the other value must have the same type as the implementing type.</p>
-          <pre><code class="language-cadence,file=equatable.bpl"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Equatable {</span><span>
+          <pre><code class="language-cadence,file=equatable.cdc"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Equatable {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=equatable-impl.bpl"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
+          <pre><code class="language-cadence,file=equatable-impl.cdc"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
 </span><span style="color: #008000">// that has type `Int`, i.e., the identifier of the cat.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// `Cat` also will implement the interface `Equatable`</span><span>
@@ -4440,11 +4440,11 @@
             The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed.
             The integer hash value must not necessarily be the same across multiple executions.
           </p>
-          <pre><code class="language-cadence,file=hashable.bpl"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Hashable: Equatable {</span><span>
+          <pre><code class="language-cadence,file=hashable.cdc"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Hashable: Equatable {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> hashValue: Int</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=hashable-impl.bpl"><span style="color: #008000">// Declare a structure named `Point` with two fields</span><span>
+          <pre><code class="language-cadence,file=hashable-impl.cdc"><span style="color: #008000">// Declare a structure named `Point` with two fields</span><span>
 </span><span style="color: #008000">// named `x` and `y` that have type `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// `Point` is declared to implement the `Hashable` interface,</span><span>
@@ -4506,9 +4506,9 @@
           If importing an external type, the location is an address literal, and the address
           of the account where the declarations are deployed to and published.
         </p>
-        <pre><code class="language-cadence,file=imports.bpl"><span style="color: #008000">// Import the type `Counter` from a local file.</span><span>
+        <pre><code class="language-cadence,file=imports.cdc"><span style="color: #008000">// Import the type `Counter` from a local file.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">import</span><span style="color: #000000"> Counter </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"examples/counter.bpl"</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> Counter </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"examples/counter.cdc"</span><span>
 </span><span>
 </span><span style="color: #008000">// Import the type `Counter` from an external account.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -4539,7 +4539,7 @@
           Attestations of resources are created using the <code>@</code> operator.
           Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
         </p>
-        <pre><code class="language-cadence,file=attestations.bpl"><span style="color: #008000">// Declare a resource named `Token`.</span><span>
+        <pre><code class="language-cadence,file=attestations.cdc"><span style="color: #008000">// Declare a resource named `Token`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Token {}</span><span>
 </span><span>
@@ -4572,7 +4572,7 @@
           the value must be a value that has the type <code>Vault</code> or is a subtype of <code>Vault</code>.
         </p>
         <p>The index operator <code>[]</code> is used for both reading and writing stored values.</p>
-        <pre><code class="language-cadence,file=account-storage.bpl"><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
+        <pre><code class="language-cadence,file=account-storage.cdc"><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
@@ -4627,7 +4627,7 @@
           For example, <code>&#x26;R</code> is a subtype of <code>&#x26;RI</code>, if <code>R</code> is a resource, <code>RI</code> is a resource interface,
           and resource <code>R</code> conforms to (implements) resource interface <code>RI</code>.
         </p>
-        <pre><code class="language-cadence,file=storage-reference.bpl"><span>
+        <pre><code class="language-cadence,file=storage-reference.cdc"><span>
 </span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
@@ -4765,7 +4765,7 @@
           The prepare phase is declared using the <code>prepare</code> keyword and the execution phase can be declared using the <code>execute</code> keyword.
           The <code>post</code> section can be used to declare postconditions.
         </p>
-        <pre><code class="language-cadence,file=transaction-declaration.bpl"><span style="color: #008000">// Optional: Importing external types from other accounts using `import`.</span><span>
+        <pre><code class="language-cadence,file=transaction-declaration.cdc"><span style="color: #008000">// Optional: Importing external types from other accounts using `import`.</span><span>
 </span><span>
 </span><span style="color: #000000">transaction {</span><span>
 </span><span>
@@ -4792,9 +4792,9 @@
           <p>Transactions can deploy contract code to the storage of any of the signing accounts.</p>
           <p>
             Here is an example of a resource interface that will be deployed to an account.
-            Imagine it is in a file named <code>FungibleToken.bpl</code>.
+            Imagine it is in a file named <code>FungibleToken.cdc</code>.
           </p>
-          <pre><code class="language-cadence,file=fungible-token-interface.bpl"><span style="color: #008000">// Declare resource interfaces for the two parts of a fungible token:</span><span>
+          <pre><code class="language-cadence,file=fungible-token-interface.cdc"><span style="color: #008000">// Declare resource interfaces for the two parts of a fungible token:</span><span>
 </span><span style="color: #008000">// - A provider, which allows withdrawing tokens</span><span>
 </span><span style="color: #008000">// - A receiver, which allows depositing tokens</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -4880,10 +4880,10 @@
           </p>
           <p>The <code>publish</code> operator can be used to make deployed types publicly available to other accounts.</p>
           <p>After a type is published it can be imported by other code.</p>
-          <pre><code class="language-cadence,file=deploy-resource-interface.bpl"><span style="color: #008000">// Import the resource interface type `FungibleToken`</span><span>
-</span><span style="color: #008000">// from the local file "FungibleToken.bpl".</span><span>
+          <pre><code class="language-cadence,file=deploy-resource-interface.cdc"><span style="color: #008000">// Import the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #008000">// from the local file "FungibleToken.cdc".</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"FungibleToken.bpl"</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"FungibleToken.cdc"</span><span>
 </span><span>
 </span><span style="color: #008000">// Run a transaction which deploys the code for the resource interface</span><span>
 </span><span style="color: #008000">// `FungibleToken` and makes it publicly available by publishing it.</span><span>
@@ -4909,9 +4909,9 @@
           </p>
           <p>
             Imagine this declaration below for a concrete fungible token implementation conforming
-            to the fungible token interface is in a local file named <code>ExampleToken.bpl</code>.
+            to the fungible token interface is in a local file named <code>ExampleToken.cdc</code>.
           </p>
-          <pre><code class="language-cadence,file=example-token.bpl"><span style="color: #008000">// Import the resource interface type `FungibleToken`,</span><span>
+          <pre><code class="language-cadence,file=example-token.cdc"><span style="color: #008000">// Import the resource interface type `FungibleToken`,</span><span>
 </span><span style="color: #008000">// which was deployed above, in this example to the account with address 0x23.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x23</span><span>
@@ -4946,7 +4946,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Again, the type must be deployed and published.</p>
-          <pre><code class="language-cadence,file=deploy-example-token.bpl"><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"ExampleToken.bpl"</span><span>
+          <pre><code class="language-cadence,file=deploy-example-token.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"ExampleToken.cdc"</span><span>
 </span><span>
 </span><span style="color: #008000">// Run a transaction which deploys the code for the resource type `ExampleToken`</span><span>
 </span><span style="color: #008000">// and makes the deployed type publicly available by publishing it.</span><span>
@@ -4986,7 +4986,7 @@
             an additional reference to the token is created, stored, and published,
             which has the type <code>Receiver</code>, i.e. it only exposes the <code>deposit</code> function.
           </p>
-          <pre><code class="language-cadence,file=setup-transaction.bpl"><span style="color: #008000">// Import the resource interface types `Receiver` and `Provider`,</span><span>
+          <pre><code class="language-cadence,file=setup-transaction.cdc"><span style="color: #008000">// Import the resource interface types `Receiver` and `Provider`,</span><span>
 </span><span style="color: #008000">// which were deployed above, in this example to the account with address 0x23.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">import</span><span style="color: #000000"> Receiver, Provider </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x23</span><span>
@@ -5036,7 +5036,7 @@
             Once an account is prepared in such a way, transactions can be run that deposit
             tokens into the account.
           </p>
-          <pre><code class="language-cadence,file=send-transaction.bpl"><span style="color: #008000">// Import the resource type `ExampleToken`,</span><span>
+          <pre><code class="language-cadence,file=send-transaction.cdc"><span style="color: #008000">// Import the resource type `ExampleToken`,</span><span>
 </span><span style="color: #008000">// in this example deployed to the account with address 0x42.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
