@@ -26,22 +26,22 @@ pub resource interface Receiver {
             balance >= 0:
                 "Initial balance must be non-negative"
         }
-        // post {
-        //     self.balance == balance:
-        //         "Balance must be initialized to the initial balance"
-        // }
+        post {
+            self.balance == balance:
+                "Balance must be initialized to the initial balance"
+        }
     }
 
-    //pub fun deposit(from: <-Vault) {}
-        // pre {
-        //     from.balance > 0:
-        //         "Deposit balance needs to be positive!"
-        // }
-        // post {
-        //     self.balance == before(self.balance) + before(from.balance):
-        //         "Incorrect amount removed"
-        // }
-    //}
+    pub fun deposit(from: <-Vault) {
+        pre {
+            from.balance > 0:
+                "Deposit balance needs to be positive!"
+        }
+        post {
+            self.balance == before(self.balance) + before(from.balance):
+                "Incorrect amount removed"
+        }
+    }
 }
 
 pub resource Vault: Provider, Receiver {
@@ -63,30 +63,22 @@ pub resource Vault: Provider, Receiver {
     // }
 
     pub fun withdraw(amount: Int): <-Vault {
-        pre {
-            amount <= self.balance:
-                "Insufficient funds"
-        }
-        post {
-            self.balance == before(self.balance) - amount:
-                "Incorrect amount removed"
-        }
         self.balance = self.balance - amount
         return <-create Vault(balance: amount)
     }
 
-    pub fun transfer(to: &Vault, amount: Int) {
-        pre {
-            amount <= self.balance:
-                "Insufficient funds"
-        }
-        post {
-            self.balance == before(self.balance) - amount:
-                "Incorrect amount removed"
-        }
-        self.balance = self.balance - amount
-        to.deposit(from: <-create Vault(balance: amount))
-    }
+    // pub fun transfer(to: &Vault, amount: Int) {
+    //     pre {
+    //         amount <= self.balance:
+    //             "Insufficient funds"
+    //     }
+    //     post {
+    //         self.balance == before(self.balance) - amount:
+    //             "Incorrect amount removed"
+    //     }
+    //     self.balance = self.balance - amount
+    //     to.deposit(from: <-create Vault(balance: amount))
+    // }
 
     pub fun deposit(from: <-Vault) {
         self.balance = self.balance + from.balance
@@ -108,37 +100,49 @@ pub fun createVault(initialBalance: Int): <-Vault {
 
 
 fun main() {
+
+    // create three new vaults with different balances
     var vaultA <- createVault(initialBalance: 10)
     var vaultB <- createVault(initialBalance: 0)
     var vaultC <- createVault(initialBalance: 5)
 
-    // var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
+    // var vaultA <- create Vault(balance: 10)
+    // var vaultB <- create Vault(balance: 0)
+    // var vaultC <- create Vault(balance: 5)
 
-    // vaultArray.append(<-vaultC)
+    var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
 
-    var vaultArray: <-[Vault]? <- [<-vaultA, <-vaultB]
+    //var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB, <-vaultC]
 
-    if var arrayValue <- vaultArray {
-        arrayValue.append(<-vaultC)
-        vaultArray <-> arrayValue
-        destroy arrayValue
-    }
+    vaultArray.append(<-vaultC)
 
-
+    // withdraw tokens from vaultA, which creates
+    // a new vault
+    // let vaultD <- vaultA.withdraw(amount: 7)
     let vaultD <- vaultArray[0].withdraw(amount: 7)
 
+    // deposit the new vault's tokens into VaultB
+    // which destroys vaultD
+    //vaultB.deposit(from: <-vaultD)
     vaultArray[1].deposit(from: <-vaultD)
 
     // let referenceA: &Vault = &vaultArray[0] as Vault
 
     // vaultArray[2].transfer(to: referenceA, amount: 1)
 
-    log(vaultArray[0].balance)
-    log(vaultArray[1].balance)
-    log(vaultArray[2].balance)
-    //log(vaultC.balance)
+    // log(vaultA.balance)  // 10
+    // log(vaultB.balance)  // 7
+    // log(vaultC.balance)  // 5
 
+    log(vaultArray[0].balance)  // 10
+    log(vaultArray[1].balance)  // 7
+    log(vaultArray[2].balance)  // 5
+
+    // in this example, the vaults are not 
+    // stored in an account, so they must
+    // be destroyed explicitly
     // destroy vaultA
     // destroy vaultB
+    // destroy vaultC
     destroy vaultArray
 }

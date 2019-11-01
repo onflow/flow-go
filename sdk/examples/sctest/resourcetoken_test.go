@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
 const (
@@ -34,14 +33,14 @@ func generateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance))
 }
 
-func generateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance int) []byte {
+func generateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance int, bal2 int, bal3 int) []byte {
 	template := `
 		import Vault, createVault from 0x%s
 
 		fun main(acct: Account) {
 			var vaultA: <-Vault <- createVault(initialBalance: %d)
-    		var vaultB: <-Vault <- createVault(initialBalance: 0)
-			var vaultC: <-Vault <- createVault(initialBalance: 5)
+    		var vaultB: <-Vault <- createVault(initialBalance: %d)
+			var vaultC: <-Vault <- createVault(initialBalance: %d)
 			
 			var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
 
@@ -52,19 +51,18 @@ func generateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 
 			destroy storedVaults
 		}`
-	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance))
+	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance, bal2, bal3))
 }
 
-// Creates a script that mints an NFT and put it into storage.
-// The minter must have been instantiated already.
-func generateWithdrawScript(tokenCodeAddr flow.Address, withdrawAmount int) []byte {
+// Creates a script that withdraws tokens from a vault
+func generateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdrawAmount int) []byte {
 	template := `
 		import Vault from 0x%s
 
 		fun main(acct: Account) {
 			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
 			
-			let withdrawVault <- vaultArray[0].withdraw(amount: %d)
+			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
 
 			var storedVaults: <-[Vault]? <- vaultArray
 			acct.storage[[Vault]] <-> storedVaults
@@ -73,20 +71,43 @@ func generateWithdrawScript(tokenCodeAddr flow.Address, withdrawAmount int) []by
 			destroy storedVaults
 		}`
 
-	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), withdrawAmount))
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), vaultNumber, withdrawAmount))
+}
+
+// Creates a script that withdraws tokens from a vault
+// and deposits them to another vault
+func generateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumber int, depositVaultNumber int, withdrawAmount int) []byte {
+	template := `
+		import Vault from 0x%s
+
+		fun main(acct: Account) {
+			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
+			
+			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
+
+			vaultArray[%d].deposit(from: <-withdrawVault)
+
+			var storedVaults: <-[Vault]? <- vaultArray
+			acct.storage[[Vault]] <-> storedVaults
+
+			destroy storedVaults
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), withdrawVaultNumber, withdrawAmount, depositVaultNumber))
 }
 
 // Creates a script that retrieves an Vault from storage and makes assertions
 // about its properties. If these assertions fail, the script panics.
-func generateInspectVaultScript(nftCodeAddr, userAddr flow.Address, expectedBalance int) []byte {
+func generateInspectVaultScript(nftCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
 	template := `
 		import Vault from 0x%s
 
 		fun main() {
 			let acct = getAccount("%s")
 			let vaultArray <- acct.storage[[Vault]] ?? panic("missing vault")
-			if vaultArray[0].balance != %d {
-				panic("incorrect id")
+			if vaultArray[%d].balance != %d {
+				log(vaultArray[2].balance)
+				panic("incorrect Balance!")
 			}
 
 			var storedVaults: <-[Vault]? <- vaultArray
@@ -95,7 +116,7 @@ func generateInspectVaultScript(nftCodeAddr, userAddr flow.Address, expectedBala
 			destroy storedVaults
 		}`
 
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, expectedBalance))
+	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, vaultNumber, expectedBalance))
 }
 
 func TestTokenDeployment(t *testing.T) {
@@ -121,18 +142,12 @@ func TestCreateToken(t *testing.T) {
 		tx := flow.Transaction{
 			Script:         generateCreateTokenScript(contractAddr, -7),
 			Nonce:          getNonce(),
-			ComputeLimit:   20,
+			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
-
-		if assert.Error(t, err) {
-			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
-		}
+		signAndSubmit(tx, b, t, true)
 	})
 
 	t.Run("Should be able to create token", func(t *testing.T) {
@@ -144,37 +159,23 @@ func TestCreateToken(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
-
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		b.CommitBlock()
+		signAndSubmit(tx, b, t, false)
 	})
 
 	t.Run("Should be able to create multiple tokens and store them in an array", func(t *testing.T) {
 		tx := flow.Transaction{
-			Script:         generateCreateThreeTokensArrayScript(contractAddr, 10),
+			Script:         generateCreateThreeTokensArrayScript(contractAddr, 10, 20, 5),
 			Nonce:          getNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
-
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		b.CommitBlock()
+		signAndSubmit(tx, b, t, false)
 	})
 }
 
-func TestWithdraw(t *testing.T) {
+func TestTransfers(t *testing.T) {
 	b := newEmulator()
 
 	// First, deploy the contract
@@ -184,42 +185,53 @@ func TestWithdraw(t *testing.T) {
 
 	// then deploy the three tokens to an account
 	tx := flow.Transaction{
-		Script:         generateCreateThreeTokensArrayScript(contractAddr, 10),
+		Script:         generateCreateThreeTokensArrayScript(contractAddr, 10, 20, 5),
 		Nonce:          getNonce(),
 		ComputeLimit:   20,
 		PayerAccount:   b.RootAccountAddress(),
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-	assert.Nil(t, err)
-	err = b.SubmitTransaction(&tx)
-
-	if !assert.Nil(t, err) {
-		t.Log(err.Error())
-	}
-	b.CommitBlock()
+	signAndSubmit(tx, b, t, false)
 
 	t.Run("Should be able to withdraw tokens from a vault", func(t *testing.T) {
 		tx := flow.Transaction{
-			Script:         generateWithdrawScript(contractAddr, 3),
+			Script:         generateWithdrawScript(contractAddr, 0, 3),
 			Nonce:          getNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
+		signAndSubmit(tx, b, t, false)
 
+		// Assert that the vaults balance is correct
+		_, err = b.ExecuteScript(generateInspectVaultScript(contractAddr, b.RootAccountAddress(), 0, 7))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
-		b.CommitBlock()
+	})
 
-		// Assert that ID/specialness are correct
-		_, err = b.ExecuteScript(generateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
+	t.Run("Should be able to transfer tokens from one vault to another", func(t *testing.T) {
+
+		tx = flow.Transaction{
+			Script:         generateWithdrawDepositScript(contractAddr, 1, 2, 8),
+			Nonce:          getNonce(),
+			ComputeLimit:   20,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
+		}
+
+		signAndSubmit(tx, b, t, false)
+
+		// Assert that the vault's balance is correct
+		_, err = b.ExecuteScript(generateInspectVaultScript(contractAddr, b.RootAccountAddress(), 1, 12))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the vault's balance is correct
+		_, err = b.ExecuteScript(generateInspectVaultScript(contractAddr, b.RootAccountAddress(), 2, 13))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}

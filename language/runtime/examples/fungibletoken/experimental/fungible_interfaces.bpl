@@ -17,7 +17,7 @@ pub resource interface IFungibleToken {
     }
 
     // owner functions mean that only the account where the resource is stored can call it
-    owner fun transfer(recipient: Address, amount: Int) {
+    auth fun transfer(recipient: Address, amount: Int) {
         pre {
             recipient != Address(0):
                 "Cannot send to the 0 address"
@@ -72,7 +72,7 @@ pub contract interface ITokenContract {
 }
 
 pub contract interface IMintableToken: ITokenContract {
-    owner fun mint(amount: Int): Void {
+    auth fun mint(amount: Int): Void {
         pre {
             amount > 0:
                     "Cannot mint 0 or negative token amounts!"
@@ -81,7 +81,7 @@ pub contract interface IMintableToken: ITokenContract {
 }
 
 pub contract interface IBurnableToken: ITokenContract {
-    owner fun burn(tokensToBurn: <-Tokens): Void {}
+    auth fun burn(tokensToBurn: <-Tokens): Void {}
 }
 
 // for approving other accounts to send tokens for you
@@ -114,7 +114,7 @@ pub contract interface IApprovalToken: ITokenContract {
 
         // This is what the account who has been approved calls to send tokens
         // on the approver's behalf
-        owner fun approved_transfer(to: &BasicToken.Tokens, amount: UInt) {
+        auth fun approved_transfer(to: &BasicToken.Tokens, amount: UInt) {
             pre {
                 to != Address(0):
                     "Can't send to the zero address"
@@ -131,7 +131,7 @@ pub contract interface IApprovalToken: ITokenContract {
 
         // the token owner calls this function to approve another account to send tokens on their behalf
         // This creates the approval resource and sends it to the recipient
-        owner fun approve(recipient: Address, amount: UInt, time: UInt) {
+        auth fun approve(recipient: Address, amount: UInt, time: UInt) {
 
         }
     }

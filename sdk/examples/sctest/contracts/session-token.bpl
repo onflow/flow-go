@@ -26,22 +26,22 @@ pub resource interface Receiver {
             balance >= 0:
                 "Initial balance must be non-negative"
         }
-        // post {
-        //     self.balance == balance:
-        //         "Balance must be initialized to the initial balance"
-        // }
+        post {
+            self.balance == balance:
+                "Balance must be initialized to the initial balance"
+        }
     }
 
-    //pub fun deposit(from: <-Vault) {
-        // pre {
-        //     from.balance > 0:
-        //         "Deposit balance needs to be positive!"
-        // }
-        // post {
-        //     self.balance == before(self.balance) + before(from.balance):
-        //         "Incorrect amount removed"
-        // }
-    //}
+    pub fun deposit(from: <-Vault) {
+        pre {
+            from.balance > 0:
+                "Deposit balance needs to be positive!"
+        }
+        post {
+            self.balance == before(self.balance) + before(from.balance):
+                "Incorrect amount removed"
+        }
+    }
 }
 
 pub resource Vault: Provider, Receiver {
@@ -63,14 +63,6 @@ pub resource Vault: Provider, Receiver {
     // }
 
     pub fun withdraw(amount: Int): <-Vault {
-        pre {
-            amount <= self.balance:
-                "Insufficient funds"
-        }
-        post {
-            self.balance == before(self.balance) - amount:
-                "Incorrect amount removed"
-        }
         self.balance = self.balance - amount
         return <-create Vault(balance: amount)
     }
@@ -94,10 +86,6 @@ pub resource Vault: Provider, Receiver {
     }
 
     init(balance: Int) {
-        post {
-            self.balance == balance:
-                "Balance must be initialized to the initial balance"
-        }
         self.balance = balance
     }
 }
@@ -107,20 +95,20 @@ fun createVault(initialBalance: Int): <- Vault {
 }
 
 
-fun main() {
-    let vaultA <- create Vault(balance: 10)
-    let vaultB <- create Vault(balance: 0)
+// fun main() {
+//     let vaultA <- create Vault(balance: 10)
+//     let vaultB <- create Vault(balance: 0)
 
-    let vaultC <- vaultA.withdraw(amount: 7)
+//     let vaultC <- vaultA.withdraw(amount: 7)
 
-    vaultB.deposit(from: <-vaultC)
+//     vaultB.deposit(from: <-vaultC)
 
-    //vaultB.transfer(to: &vaultA, amount: 1)
+//     //vaultB.transfer(to: &vaultA, amount: 1)
 
-    log(vaultA.balance)
-    log(vaultB.balance)
-    //log(vaultC.balance)
+//     log(vaultA.balance)
+//     log(vaultB.balance)
+//     //log(vaultC.balance)
 
-    destroy vaultA
-    destroy vaultB
-}
+//     destroy vaultA
+//     destroy vaultB
+// }
