@@ -121,7 +121,7 @@ func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 }
 
 func (a *ECDSAalgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
-	Plen := bitsToBytes((a.curve.Params().N).BitLen())
+	Plen := bitsToBytes((a.curve.Params().P).BitLen())
 	if len(der) != 2*Plen {
 		return nil, cryptoError{"the raw public key is not valid."}
 	}
