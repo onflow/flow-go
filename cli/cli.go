@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -48,7 +47,7 @@ func MustDecodeAccountPrivateKeyHex(prKeyHex string) flow.AccountPrivateKey {
 }
 
 func RandomSeed(n int) []byte {
-	seed := make([]byte, crypto.KeyGenerationSeedMinLenECDSA_P256)
+	seed := make([]byte, n)
 
 	_, err := rand.Read(seed)
 	if err != nil {
