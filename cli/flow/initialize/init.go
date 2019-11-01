@@ -47,10 +47,11 @@ var Cmd = &cobra.Command{
 
 // InitProject generates a new root key and saves project config.
 func InitProject() *cli.Config {
-	seed := make([]byte, crypto.KeyGenerationSeedMinLenECDSA_P256)
+	seed := cli.RandomSeed(crypto.KeyGenerationSeedMinLenECDSA_P256)
+
 	prKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, seed)
 	if err != nil {
-		cli.Exitf(1, "Failed to generate private key err: %v", err)
+		cli.Exitf(1, "Failed to generate private key: %v", err)
 	}
 
 	return InitProjectWithRootKey(prKey)
