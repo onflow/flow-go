@@ -10,6 +10,7 @@ package crypto
 
 import (
 	goec "crypto/elliptic"
+	"encoding/asn1"
 	"math/big"
 )
 
@@ -221,3 +222,5 @@ func secp256k1() *SECCurve {
 	secp256k1Curve.BitSize = 256
 	return secp256k1Curve
 }
+
+var oidNamedCurveSECp256k1 = asn1.ObjectIdentifier{1, 3, 132, 0, 10}
