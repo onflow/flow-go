@@ -10,10 +10,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/pkg/types/proto"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
@@ -36,8 +36,8 @@ func NewBackend(blockchain *emulator.EmulatedBlockchain, eventStore events.Store
 }
 
 // Ping the Observation API server for a response.
-func (b *Backend) Ping(ctx context.Context, req *observe.PingRequest) (*observe.PingResponse, error) {
-	response := &observe.PingResponse{
+func (b *Backend) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
+	response := &observation.PingResponse{
 		Address: []byte("pong!"),
 	}
 
@@ -45,15 +45,15 @@ func (b *Backend) Ping(ctx context.Context, req *observe.PingRequest) (*observe.
 }
 
 // SendTransaction submits a transaction to the network.
-func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransactionRequest) (*observe.SendTransactionResponse, error) {
+func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
 	txMsg := req.GetTransaction()
 
-	tx, err := proto.MessageToTransaction(txMsg)
+	tx, err := convert.MessageToTransaction(txMsg)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = b.blockchain.SubmitTransaction(&tx)
+	err = b.blockchain.SubmitTransaction(tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrTransactionReverted:
@@ -76,15 +76,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 			Infof("💸  Transaction #%d mined ", tx.Nonce)
 	}
 
-	block := b.blockchain.CommitBlock()
-
-	b.logger.WithFields(log.Fields{
-		"blockNum":  block.Number,
-		"blockHash": block.Hash().Hex(),
-		"blockSize": len(block.TransactionHashes),
-	}).Infof("⛏  Block #%d mined", block.Number)
-
-	response := &observe.SendTransactionResponse{
+	response := &observation.SendTransactionResponse{
 		Hash: tx.Hash(),
 	}
 
@@ -92,32 +84,30 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observe.SendTransact
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (b *Backend) GetLatestBlock(ctx context.Context, req *observe.GetLatestBlockRequest) (*observe.GetLatestBlockResponse, error) {
+func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
 	block := b.blockchain.GetLatestBlock()
 
 	// create block header for block
-	blockHeader := types.BlockHeader{
+	blockHeader := flow.BlockHeader{
 		Hash:              block.Hash(),
 		PreviousBlockHash: block.PreviousBlockHash,
 		Number:            block.Number,
-		TransactionCount:  uint32(len(block.TransactionHashes)),
 	}
 
 	b.logger.WithFields(log.Fields{
 		"blockNum":  blockHeader.Number,
 		"blockHash": blockHeader.Hash.Hex(),
-		"blockSize": blockHeader.TransactionCount,
 	}).Debugf("🎁  GetLatestBlock called")
 
-	response := &observe.GetLatestBlockResponse{
-		Block: proto.BlockHeaderToMessage(blockHeader),
+	response := &observation.GetLatestBlockResponse{
+		Block: convert.BlockHeaderToMessage(blockHeader),
 	}
 
 	return response, nil
 }
 
 // GetTransaction gets a transaction by hash.
-func (b *Backend) GetTransaction(ctx context.Context, req *observe.GetTransactionRequest) (*observe.GetTransactionResponse, error) {
+func (b *Backend) GetTransaction(ctx context.Context, req *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
 	hash := crypto.BytesToHash(req.GetHash())
 
 	tx, err := b.blockchain.GetTransaction(hash)
@@ -134,16 +124,21 @@ func (b *Backend) GetTransaction(ctx context.Context, req *observe.GetTransactio
 		WithField("txHash", hash.Hex()).
 		Debugf("💵  GetTransaction called")
 
-	txMsg := proto.TransactionToMessage(*tx)
-
-	return &observe.GetTransactionResponse{
+	txMsg := convert.TransactionToMessage(*tx)
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(tx.Events)
+	if err != nil {
+		return nil, err
+	}
+	return &observation.GetTransactionResponse{
 		Transaction: txMsg,
+		EventsJson:  buf.Bytes(),
 	}, nil
 }
 
 // GetAccount returns the info associated with an address.
-func (b *Backend) GetAccount(ctx context.Context, req *observe.GetAccountRequest) (*observe.GetAccountResponse, error) {
-	address := types.BytesToAddress(req.GetAddress())
+func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
+	address := flow.BytesToAddress(req.GetAddress())
 	account, err := b.blockchain.GetAccount(address)
 	if err != nil {
 		switch err.(type) {
@@ -158,17 +153,20 @@ func (b *Backend) GetAccount(ctx context.Context, req *observe.GetAccountRequest
 		WithField("address", address).
 		Debugf("👤  GetAccount called")
 
-	accMsg := proto.AccountToMessage(*account)
+	accMsg, err := convert.AccountToMessage(*account)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
-	return &observe.GetAccountResponse{
+	return &observation.GetAccountResponse{
 		Account: accMsg,
 	}, nil
 }
 
-// CallScript performs a call.
-func (b *Backend) CallScript(ctx context.Context, req *observe.CallScriptRequest) (*observe.CallScriptResponse, error) {
+// ExecuteScript performs a call.
+func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
 	script := req.GetScript()
-	value, err := b.blockchain.CallScript(script)
+	value, err := b.blockchain.ExecuteScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -182,8 +180,8 @@ func (b *Backend) CallScript(ctx context.Context, req *observe.CallScriptRequest
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueBytes, _ := json.Marshal(value)
 
-	response := &observe.CallScriptResponse{
-		// TODO: standardize types to be language-agnostic
+	response := &observation.ExecuteScriptResponse{
+		// TODO: standardize flow to be language-agnostic
 		Type:  reflect.TypeOf(value).String(),
 		Value: valueBytes,
 	}
@@ -192,23 +190,21 @@ func (b *Backend) CallScript(ctx context.Context, req *observe.CallScriptRequest
 }
 
 // GetEvents returns events matching a query.
-func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) (*observe.GetEventsResponse, error) {
-	query := proto.MessageToEventQuery(req)
-
+func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
 	// Check for invalid queries
-	if query.StartBlock > query.EndBlock {
+	if req.StartBlock > req.EndBlock {
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	events, err := b.eventStore.Query(ctx, query)
+	events, err := b.eventStore.Query(ctx, req.Type, req.StartBlock, req.EndBlock)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	b.logger.WithFields(log.Fields{
-		"eventID":    query.ID,
-		"startBlock": query.StartBlock,
-		"endBlock":   query.EndBlock,
+		"eventType":  req.Type,
+		"startBlock": req.StartBlock,
+		"endBlock":   req.EndBlock,
 		"results":    len(events),
 	}).Debugf("🎁  GetEvents called")
 
@@ -217,7 +213,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observe.GetEventsRequest) 
 	if err != nil {
 		return nil, err
 	}
-	res := observe.GetEventsResponse{
+	res := observation.GetEventsResponse{
 		EventsJson: buf.Bytes(),
 	}
 

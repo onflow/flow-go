@@ -20,7 +20,7 @@ type Storage interface {
 
 	// Untrusted methods (providing proofs)
 	// Get registers at specific StateCommitment by a list of register ids with proofs
-	GetRegistersWithProof(registerIDs []RegisterID, stateCommitment StateCommitment) (registers []Register, proofs []StorageProof, err error)
+	GetRegistersWithProof(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, proofs []StorageProof, err error)
 	// Batched atomic updates of a subset of registers at specific state with proofs
 	UpdateRegisterWithProof(registerIDs []RegisterID, values []RegisterValue, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proofs []StorageProof, err error)
 }

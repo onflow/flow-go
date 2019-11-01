@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"math/big"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 func init() {
 	gob.Register(new(crypto.Hash))
+	gob.Register(new(big.Int))
 }
 
 // Encode serializes a World State object into bytes.

@@ -1,16 +1,16 @@
 package execution
 
 import (
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/language/runtime"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Computer uses a runtime instance to execute transactions and scripts.
 type Computer struct {
 	runtime        runtime.Runtime
 	onLogMessage   func(string)
-	onEventEmitted func(event types.Event, blockNumber uint64, txHash crypto.Hash)
+	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // NewComputer returns a new Computer initialized with a runtime and logger.
@@ -30,30 +30,41 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *types.RegistersView, tx *types.Transaction) ([]types.Event, error) {
+func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Transaction) ([]flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 
+	runtimeContext.SetLogger(c.onLogMessage)
+	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
+		return c.runtime.ParseAndCheckProgram(code, runtimeContext, location)
+	})
 	runtimeContext.SetSigningAccounts(tx.ScriptAccounts)
-	runtimeContext.SetOnLogMessage(c.onLogMessage)
 
-	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, tx.Hash())
+	location := runtime.TransactionLocation(tx.Hash())
+
+	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext, location)
 	if err != nil {
 		return nil, err
 	}
 
-	return runtimeContext.Events(), nil
+	events := runtimeContext.Events()
+	for i, _ := range events {
+		events[i].Index = uint(i)
+		events[i].TxHash = tx.Hash()
+	}
+
+	return events, nil
 }
 
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(registers *types.RegistersView, script []byte) (interface{}, []types.Event, error) {
+func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (interface{}, []flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
-	runtimeContext.SetOnLogMessage(c.onLogMessage)
+	runtimeContext.SetLogger(c.onLogMessage)
 
-	scriptHash := ScriptHash(script)
+	location := runtime.ScriptLocation(ScriptHash(script))
 
-	value, err := c.runtime.ExecuteScript(script, runtimeContext, scriptHash)
+	value, err := c.runtime.ExecuteScript(script, runtimeContext, location)
 	if err != nil {
 		return nil, nil, err
 	}

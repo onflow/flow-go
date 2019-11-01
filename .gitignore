@@ -1,4 +1,5 @@
 /cmd/consensus/consensus
+/cmd/flow/flow
 
 # Test binary, build with `go test -c`
 *.test

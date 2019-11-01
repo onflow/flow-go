@@ -12,9 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
@@ -29,12 +29,18 @@ type EmulatorServer struct {
 	logger     *log.Logger
 }
 
+const (
+	defaultBlockInterval = 5 * time.Second
+	defaultPort          = 3569
+	defaultHTTPPort      = 8080
+)
+
 // Config is the configuration for an emulator server.
 type Config struct {
 	Port           int
 	HTTPPort       int
 	BlockInterval  time.Duration
-	RootAccountKey crypto.PrivateKey
+	RootAccountKey *flow.AccountPrivateKey
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
@@ -51,16 +57,28 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	eventStore := events.NewMemStore()
 
-	options.OnEventEmitted = func(event types.Event, blockNumber uint64, txHash crypto.Hash) {
+	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
-			WithField("eventID", event.ID).
+			WithField("eventType", event.Type).
 			Infof("🔔  Event emitted: %s", event)
 
 		ctx := context.Background()
 		err := eventStore.Add(ctx, blockNumber, event)
 		if err != nil {
-			logger.WithError(err).Errorf("Failed to save event %s", event.ID)
+			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
 		}
+	}
+
+	if conf.BlockInterval == 0 {
+		conf.BlockInterval = defaultBlockInterval
+	}
+
+	if conf.Port == 0 {
+		conf.Port = defaultPort
+	}
+
+	if conf.HTTPPort == 0 {
+		conf.HTTPPort = defaultHTTPPort
 	}
 
 	server := &EmulatorServer{
@@ -76,14 +94,14 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 
 	address := server.backend.blockchain.RootAccountAddress()
 	prKey := server.backend.blockchain.RootKey()
-	prKeyBytes, _ := prKey.Encode()
+	prKeyBytes, _ := prKey.PrivateKey.Encode()
 
 	logger.WithFields(log.Fields{
 		"address": address.Hex(),
 		"prKey":   hex.EncodeToString(prKeyBytes),
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
-	observe.RegisterObserveServiceServer(server.grpcServer, server.backend)
+	observation.RegisterObserveServiceServer(server.grpcServer, server.backend)
 	return server
 }
 
@@ -92,24 +110,21 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 // This function starts a gRPC server to listen for requests and process incoming transactions.
 // By default, the Flow Emulator server automatically mines a block every BlockInterval.
 func (b *EmulatorServer) Start(ctx context.Context) {
-	b.logger.WithFields(log.Fields{
-		"port": b.config.Port,
-	}).Infof("🌱  Starting Emulator Server on port %d...", b.config.Port)
-
 	// Start gRPC server in a separate goroutine to continually listen for requests
 	go b.startGrpcServer()
 
-	tick := time.Tick(b.config.BlockInterval)
+	ticker := time.NewTicker(b.config.BlockInterval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-ticker.C:
 			block := b.backend.blockchain.CommitBlock()
 
 			b.logger.WithFields(log.Fields{
 				"blockNum":  block.Number,
-				"blockHash": block.Hash(),
+				"blockHash": block.Hash().Hex(),
 				"blockSize": len(block.TransactionHashes),
-			}).Tracef("⛏  Block #%d mined", block.Number)
+			}).Debugf("⛏  Block #%d mined", block.Number)
 
 		case <-ctx.Done():
 			return
@@ -123,7 +138,10 @@ func (b *EmulatorServer) startGrpcServer() {
 		b.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
-	b.grpcServer.Serve(lis)
+	err = b.grpcServer.Serve(lis)
+	if err != nil {
+		b.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
+	}
 }
 
 // StartServer sets up a wrapped instance of the Flow Emulator server and starts it.
@@ -132,6 +150,11 @@ func StartServer(logger *log.Logger, config *Config) {
 	defer cancel()
 
 	emulatorServer := NewEmulatorServer(logger, config)
+
+	logger.
+		WithField("port", config.Port).
+		Infof("🌱  Starting Emulator server on port %d...", config.Port)
+
 	go emulatorServer.Start(ctx)
 
 	wrappedServer := grpcweb.WrapServer(
@@ -146,7 +169,7 @@ func StartServer(logger *log.Logger, config *Config) {
 
 	logger.
 		WithField("port", config.HTTPPort).
-		Infof("🌱  Starting HTTP Server on port %d...", config.HTTPPort)
+		Infof("🌱  Starting wrapped HTTP server on port %d...", config.HTTPPort)
 
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")

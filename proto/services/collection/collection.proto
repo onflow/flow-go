@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package flow.services.collection;
+
+option go_package = "collection";
+
+import "sdk/entities/entities.proto";
+
+service CollectService {
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  rpc SubmitTransaction (SubmitTransactionRequest) returns (SubmitTransactionResponse);
+
+  rpc SubmitCollection (SubmitCollectionRequest) returns (SubmitCollectionResponse);
+
+  rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
+
+  rpc GetCollection (GetCollectionRequest) returns (GetCollectionResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  bytes address = 1;
+}
+
+message SubmitTransactionRequest {
+  flow.sdk.entities.Transaction transaction = 1;
+}
+
+message SubmitTransactionResponse {}
+
+message SubmitCollectionRequest {
+  flow.sdk.entities.Collection collection = 1;
+  bytes accessSignature = 2;
+}
+
+message GetTransactionRequest {
+  bytes hash = 1;
+}
+
+message GetTransactionResponse {
+  flow.sdk.entities.Transaction transaction = 1;
+}
+
+message SubmitCollectionResponse {
+  bytes accessSignature = 1;
+}
+
+message GetCollectionRequest {
+  bytes collectionHash = 1;
+}
+
+message GetCollectionResponse {
+  flow.sdk.entities.Collection collection = 1;
+}

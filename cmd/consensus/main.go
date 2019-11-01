@@ -11,14 +11,16 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/internal/roles/consensus/propagation"
-	"github.com/dapperlabs/flow-go/pkg/codec/capnp"
-	"github.com/dapperlabs/flow-go/pkg/module/committee"
-	"github.com/dapperlabs/flow-go/pkg/module/mempool"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/cache"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/middleware"
-	"github.com/dapperlabs/flow-go/pkg/network/trickle/state"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
+	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
+	"github.com/dapperlabs/flow-go/engine/simulation/generator"
+	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/network/codec/captain"
+	"github.com/dapperlabs/flow-go/network/trickle"
+	"github.com/dapperlabs/flow-go/network/trickle/cache"
+	"github.com/dapperlabs/flow-go/network/trickle/middleware"
+	"github.com/dapperlabs/flow-go/network/trickle/state"
 )
 
 func main() {
@@ -47,43 +49,37 @@ func main() {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
-	// initialize the logger
 	log := zerolog.New(os.Stderr).With().Str("identity", identity).Logger()
 
 	log.Info().Msg("flow consensus node starting up")
-
-	// initialize the network codec
-	codec := capnp.NewCodec()
 
 	log.Info().Msg("initializing engine modules")
 
 	// initialize the node identity list
 	com, err := committee.New(entries, identity)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize consensus committee")
+		log.Fatal().Err(err).Msg("could not initialize flow committee")
 	}
 
-	// initialize the collection memory pool
 	pool, err := mempool.New()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize collection mempool")
+		log.Fatal().Err(err).Msg("could not initialize engine mempool")
 	}
 
 	log.Info().Msg("initializing network modules")
 
-	// initialize trickle state
+	codec := captain.NewCodec()
+
 	state, err := state.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle state")
 	}
 
-	// initialize trickle cache
 	cache, err := cache.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle cache")
 	}
 
-	// initialize trickle middleware
 	mw, err := middleware.New(log, codec, connections, com.Me().Address)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle middleware")
@@ -91,7 +87,6 @@ func main() {
 
 	log.Info().Msg("initializing trickle network")
 
-	// initialize trickle network
 	net, err := trickle.NewNetwork(log, codec, com, mw, state, cache)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle network")
@@ -99,7 +94,6 @@ func main() {
 
 	log.Info().Msg("starting trickle network")
 
-	// wait to be connected to a few nodes
 	select {
 	case <-net.Ready():
 		log.Info().Msg("trickle network ready")
@@ -113,16 +107,13 @@ func main() {
 	log.Info().Msg("initializing propagation engine")
 
 	// initialize the propagation engines
-	prop, err := propagation.NewEngine(log, net, com, pool)
+	prop, err := propagation.New(log, net, com, pool)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize propagation engine")
 	}
 
-	go propagation.Generate(prop, 20*time.Second)
-
 	log.Info().Msg("starting propagation engine")
 
-	// wait to have our collection mempool bootstrapped
 	select {
 	case <-prop.Ready():
 		log.Info().Msg("propagation engine ready")
@@ -133,11 +124,70 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info().Msg("initializing generator engine")
+
+	// initialize the fake collection generation
+	gen, err := generator.New(log, prop)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize generator engine")
+	}
+
+	log.Info().Msg("starting generator engine")
+
+	select {
+	case <-gen.Ready():
+		log.Info().Msg("generator engine ready")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not start generator engine")
+	case <-sig:
+		log.Warn().Msg("generator engine start aborted")
+	}
+
+	cons, err := coldstuff.New(log, net, com, pool)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize coldstuff engine")
+	}
+
+	log.Info().Msg("starting coldstuff engine")
+
+	select {
+	case <-cons.Ready():
+		log.Info().Msg("coldstuff engine ready")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not start coldstuff engine")
+	case <-sig:
+		log.Warn().Msg("coldstuff engine start aborted")
+		os.Exit(1)
+	}
+
 	log.Info().Msg("flow consensus node startup complete")
 
 	<-sig
 
 	log.Info().Msg("flow consensus node shutting down")
+
+	log.Info().Msg("stopping generator engine")
+
+	select {
+	case <-gen.Done():
+		log.Info().Msg("generator engine shutdown complete")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not stop generator engine")
+	case <-sig:
+		log.Warn().Msg("generator engine stop aborted")
+	}
+
+	log.Info().Msg("stopping coldstuff engine")
+
+	select {
+	case <-cons.Done():
+		log.Info().Msg("coldstuff engine shutdown complete")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not stop coldstuff engine")
+	case <-sig:
+		log.Warn().Msg("coldstuff engine stop aborted")
+		os.Exit(1)
+	}
 
 	log.Info().Msg("stopping propagation engine")
 
