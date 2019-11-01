@@ -12,7 +12,6 @@ type BlockHeader struct {
 	Hash              crypto.Hash
 	PreviousBlockHash crypto.Hash
 	Number            uint64
-	TransactionCount  uint32
 }
 
 type Block struct {
