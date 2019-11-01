@@ -4705,19 +4705,27 @@
         <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
         <p>Events are special values that can be emitted during the execution of a program.</p>
         <p>An event type can be declared with the <code>event</code> keyword:</p>
-        <pre><code class="language-cadence"><span style="color: #000000">event MyEvent(x: Int, y: Int)</span><span>
+        <pre><code class="language-cadence"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
 </span></code></pre>
         <p>The syntax of an event declaration is similar to that of a <a href="#function-declarations">function declaration</a>; events contain named parameters, each of which has an optional argument label.</p>
-        <pre><code class="language-cadence"><span style="color: #008000">// Event with argument labels</span><span>
-</span><span style="color: #000000">event MyEvent(fieldA x: Int, fieldB y: Int)</span><span>
+        <pre><code class="language-cadence"><span style="color: #008000">// Event with explicit argument labels</span><span>
+</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
 </span></code></pre>
         <section>
           <h3 id="emitting-events"><a href="#emitting-events" aria-hidden="true"><span class="icon icon-link"></span></a>Emitting events</h3>
           <p>To emit an event from a program, use the <code>emit</code> statement:</p>
-          <pre><code class="language-cadence,file=events.cdc"><span style="color: #000000">event MyEvent(x: Int, y: Int)</span><span>
+          <pre><code class="language-cadence,file=events.cdc"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo() {</span><span>
-</span><span style="color: #000000">    emit MyEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// Event with argument labels</span><span>
+</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
+</span><span style="color: #000000">    emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names, </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
+</span><span style="color: #000000">    emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Restrictions:</p>

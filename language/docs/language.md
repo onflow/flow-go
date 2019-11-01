@@ -4621,14 +4621,14 @@ Events are special values that can be emitted during the execution of a program.
 An event type can be declared with the `event` keyword:
 
 ```cadence
-event MyEvent(x: Int, y: Int)
+event FooEvent(x: Int, y: Int)
 ```
 
 The syntax of an event declaration is similar to that of a [function declaration](#function-declarations); events contain named parameters, each of which has an optional argument label.
 
 ```cadence
-// Event with argument labels
-event MyEvent(fieldA x: Int, fieldB y: Int)
+// Event with explicit argument labels
+event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
 ```
 
 ### Emitting events
@@ -4636,10 +4636,18 @@ event MyEvent(fieldA x: Int, fieldB y: Int)
 To emit an event from a program, use the `emit` statement:
 
 ```cadence,file=events.cdc
-event MyEvent(x: Int, y: Int)
+event FooEvent(x: Int, y: Int)
 
-fun foo() {
-    emit MyEvent(x: 1, y: 2)
+// Event with argument labels
+event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
+
+fun events() {
+    emit FooEvent(x: 1, y: 2)
+
+    // Emit event with explicit argument labels
+    // Note that the emitted event will only contain the field names, 
+    // not the argument labels used at the invocation site.
+    emit FooEvent(labelA: 1, labelB: 2)
 }
 ```
 
