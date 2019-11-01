@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 const (
@@ -121,9 +122,12 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		if assert.Error(t, err) {
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
@@ -138,8 +142,12 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		_ = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
-		err = b.SubmitTransaction(&tx)
+		sig, err := keys.SignTransaction(tx, b.RootKey())
+		assert.Nil(t, err)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		if assert.Error(t, err) {
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
@@ -154,10 +162,14 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		err = tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.Nil(t, err)
-		err = b.SubmitTransaction(&tx)
+
+		tx.AddSignature(b.RootAccountAddress(), sig)
+
+		err = b.SubmitTransaction(tx)
 		assert.Nil(t, err)
+
 		b.CommitBlock()
 	})
 }
@@ -179,9 +191,12 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	err = createMinterTx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(createMinterTx, b.RootKey())
 	assert.Nil(t, err)
-	err = b.SubmitTransaction(&createMinterTx)
+
+	createMinterTx.AddSignature(b.RootAccountAddress(), sig)
+
+	err = b.SubmitTransaction(createMinterTx)
 	assert.Nil(t, err)
 
 	// Mint the first NFT
@@ -193,16 +208,19 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	err = mintTx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(mintTx, b.RootKey())
 	assert.Nil(t, err)
-	err = b.SubmitTransaction(&mintTx)
+
+	mintTx.AddSignature(b.RootAccountAddress(), sig)
+
+	err = b.SubmitTransaction(mintTx)
 	assert.Nil(t, err)
 
 	// Assert that ID/specialness are correct
 	_, err = b.ExecuteScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
 	assert.Nil(t, err)
 
-	// Mint a second NFT
+	// Mint a second NF
 	mintTx2 := flow.Transaction{
 		Script:         generateMintScript(contractAddr),
 		Nonce:          getNonce(),
@@ -211,9 +229,12 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	err = mintTx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(mintTx2, b.RootKey())
 	assert.Nil(t, err)
-	err = b.SubmitTransaction(&mintTx2)
+
+	mintTx2.AddSignature(b.RootAccountAddress(), sig)
+
+	err = b.SubmitTransaction(mintTx2)
 	assert.Nil(t, err)
 
 	// Assert that ID/specialness are correct

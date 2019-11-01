@@ -28,6 +28,12 @@ func New() (*State, error) {
 func (s *State) Up(peerID string) {
 	s.Lock()
 	defer s.Unlock()
+
+	// return if the peer already exists
+	if _, ok := s.peers[peerID]; ok {
+		return
+	}
+
 	s.peers[peerID] = &trickle.Peer{
 		ID:   peerID,
 		Seen: make(map[string]struct{}),
@@ -52,6 +58,19 @@ func (s *State) Seen(peerID string, eventID []byte) {
 	}
 	key := hex.EncodeToString(eventID)
 	peer.Seen[key] = struct{}{}
+}
+
+// PeerHaveSeen indicates whether a given peer has seen a event with a given eventID
+func (s *State) PeerHaveSeen(peerID string, eventID []byte) bool {
+	s.Lock()
+	defer s.Unlock()
+	peer, ok := s.peers[peerID]
+	if !ok {
+		return false
+	}
+	key := hex.EncodeToString(eventID)
+	_, ok = peer.Seen[key]
+	return ok
 }
 
 // Down will mark the given peer as disconnected, dropping its state for now.

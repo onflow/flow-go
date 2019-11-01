@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
@@ -30,7 +31,7 @@ func TestWorldStates(t *testing.T) {
 	accountAddress := b.RootAccountAddress()
 
 	// Create 3 signed transactions (tx1, tx2, tx3)
-	tx1 := &flow.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
@@ -39,9 +40,12 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(accountAddress, b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
 
-	tx2 := &flow.Transaction{
+	tx1.AddSignature(accountAddress, sig)
+
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
@@ -50,9 +54,12 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(accountAddress, b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
 
-	tx3 := &flow.Transaction{
+	tx2.AddSignature(accountAddress, sig)
+
+	tx3 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
@@ -61,7 +68,10 @@ func TestWorldStates(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx3.AddSignature(accountAddress, b.RootKey())
+	sig, err = keys.SignTransaction(tx3, b.RootKey())
+	assert.Nil(t, err)
+
+	tx3.AddSignature(accountAddress, sig)
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: %x\n", ws1)
@@ -70,7 +80,7 @@ func TestWorldStates(t *testing.T) {
 	assert.Len(t, b.txPool, 0)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -155,7 +165,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	accountAddress := b.RootAccountAddress()
 
-	tx1 := &flow.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
@@ -164,9 +174,12 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(accountAddress, b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
 
-	tx2 := &flow.Transaction{
+	tx1.AddSignature(accountAddress, sig)
+
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
@@ -175,14 +188,17 @@ func TestQueryByVersion(t *testing.T) {
 		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(accountAddress, b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
+
+	tx2.AddSignature(accountAddress, sig)
 
 	var invalidWorldState crypto.Hash
 
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
 
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()

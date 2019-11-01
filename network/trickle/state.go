@@ -10,6 +10,7 @@ type State interface {
 	Up(peerID string)
 	Alive(peerID string) bool
 	Seen(peerID string, hash []byte)
+	PeerHaveSeen(peerID string, hash []byte) bool
 	Down(peerID string)
 	Count() uint
 	Peers(filters ...PeerFilter) PeerList

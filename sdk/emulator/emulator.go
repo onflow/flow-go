@@ -190,13 +190,12 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address flow.Address, version c
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx *flow.Transaction) error {
+func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	missingFields := tx.MissingFields()
-
 	// TODO: add more invalid transaction checks
+	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
 		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
 	}
@@ -213,8 +212,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *flow.Transaction) error {
 		return err
 	}
 
-	b.txPool[string(tx.Hash())] = tx
-	b.pendingWorldState.InsertTransaction(tx)
+	b.txPool[string(tx.Hash())] = &tx
+	b.pendingWorldState.InsertTransaction(&tx)
 
 	registers := b.pendingWorldState.Registers.NewView()
 
@@ -357,11 +356,13 @@ func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
-func (b *EmulatedBlockchain) verifySignatures(tx *flow.Transaction) error {
+func (b *EmulatedBlockchain) verifySignatures(tx flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
+	encodedTx := tx.Encode()
+
 	for _, accountSig := range tx.Signatures {
-		accountPublicKey, err := b.verifyAccountSignature(accountSig, tx.CanonicalEncoding())
+		accountPublicKey, err := b.verifyAccountSignature(accountSig, encodedTx)
 		if err != nil {
 			return err
 		}
@@ -384,13 +385,17 @@ func (b *EmulatedBlockchain) verifySignatures(tx *flow.Transaction) error {
 
 // CreateAccount submits a transaction to create a new account with the given
 // account keys and code. The transaction is paid by the root account.
-func (b *EmulatedBlockchain) CreateAccount(keys []flow.AccountPublicKey, code []byte, nonce uint64) (flow.Address, error) {
-	createAccountScript, err := templates.CreateAccount(keys, code)
+func (b *EmulatedBlockchain) CreateAccount(
+	publicKeys []flow.AccountPublicKey,
+	code []byte, nonce uint64,
+) (flow.Address, error) {
+	createAccountScript, err := templates.CreateAccount(publicKeys, code)
+
 	if err != nil {
 		return flow.Address{}, nil
 	}
 
-	tx := &flow.Transaction{
+	tx := flow.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,
@@ -398,7 +403,12 @@ func (b *EmulatedBlockchain) CreateAccount(keys []flow.AccountPublicKey, code []
 		PayerAccount:       b.RootAccountAddress(),
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	if err != nil {
+		return flow.Address{}, nil
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx)
 	if err != nil {

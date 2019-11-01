@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // BLS_BLS12381Algo, embeds SignAlgo

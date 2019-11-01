@@ -18,7 +18,10 @@ install-tools: crypto/relic/build
 
 .PHONY: test
 test:
-	GO111MODULE=on go test ./...
+	# test all packages with Relic library enabled
+	GO111MODULE=on go test --tags relic ./...
+	# test SDK package with Relic library disabled
+	GO111MODULE=on go test -count 1 ./sdk/...
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-mocks
@@ -59,7 +62,7 @@ ci: install-tools generate check-generated-code lint-sdk test
 install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
 
-cmd/flow/flow: crypto/relic/build cli cmd crypto model proto sdk
+cmd/flow/flow: cli cmd crypto model proto sdk
 	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: docker-build-emulator
