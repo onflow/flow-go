@@ -1,3 +1,5 @@
+// +build relic
+
 package chunking
 
 import (
@@ -25,7 +27,7 @@ func TestChunkSelectAndVerify(t *testing.T) {
 	ratio := 0.5
 	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, []byte{1, 2, 3, 4})
 	if err != nil {
-		t.Error(fmt.Sprintf("Error creating keys"))
+		t.Error(fmt.Sprintf("%v Error creating keys", err))
 	}
 	er := exec.ExecutionResult{Chunks: chunks}
 	selectedChunks, proof, err := ChunkSelfSelect(er, ratio, sk)
