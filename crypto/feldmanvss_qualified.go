@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // Implements Feldman Verifiable Secret Sharing using BLS G2 group.
@@ -71,6 +73,11 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 	return x, Y, y, nil
 }
 
+const (
+	complaintSize      = 1
+	complainAnswerSize = 1 + PrKeyLenBLS_BLS12381
+)
+
 func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	out := &DKGoutput{
 		result: invalid,
@@ -92,13 +99,13 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result, out.action, out.err = s.receiveShare(index(orig), msg[1:])
+		out.result, out.action = s.receiveShare(index(orig), msg[1:])
 	case FeldmanVSSVerifVec:
-		out.result, out.action, out.err = s.receiveVerifVector(index(orig), msg[1:])
+		out.result, out.action = s.receiveVerifVector(index(orig), msg[1:])
 	case FeldmanVSSComplaint:
-		out.result, out.action, out.err = s.receiveComplaint(index(orig), msg[1:])
+		out.result, out.action = s.receiveComplaint(index(orig), msg[1:])
 	case FeldmanVSSComplaintAnswer:
-		out.result, out.err = s.receiveComplaintAnswer(index(orig), msg[1:])
+		out.result = s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
 	}
 	return out

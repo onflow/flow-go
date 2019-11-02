@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/consensus"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -28,7 +29,7 @@ type Engine struct {
 	con     network.Conduit  // used to talk to other nodes on the network
 	com     module.Committee // holds the node identity table for the network
 	pool    module.Mempool   // holds guaranteed collections in memory
-	vol     Volatile         // holds volatile information on collection exchange
+	cache   Cache            // holds volatile information on collection exchange
 	polling time.Duration    // interval at which we poll for mempool contents
 	wg      *sync.WaitGroup  // used to wait on cleanup upon shutdown
 	once    *sync.Once       // used to only close the done channel once
@@ -36,14 +37,20 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, com module.Committee, pool module.Mempool, vol Volatile) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, com module.Committee, pool module.Mempool) (*Engine, error) {
+
+	// initialize the volatile storage
+	cache, err := volatile.NewCache()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not initialize cache")
+	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:     log,
 		com:     com,
 		pool:    pool,
-		vol:     vol,
+		cache:   cache,
 		polling: 2 * time.Second,
 		wg:      &sync.WaitGroup{},
 		once:    &sync.Once{},
@@ -86,13 +93,9 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 	go func() {
 		e.wg.Wait()
+		e.cache.Close()
 		close(done)
 	}()
-
-	// release the reference of the injected dependencies
-	e.vol = nil
-	e.com = nil
-	e.pool = nil
 	return done
 }
 

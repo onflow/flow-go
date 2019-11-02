@@ -51,6 +51,12 @@ func (c *Client) Close() error {
 	return c.close()
 }
 
+// Ping tests the connection to the Observation API.
+func (c *Client) Ping(ctx context.Context) error {
+	_, err := c.rpcClient.Ping(ctx, &observation.PingRequest{})
+	return err
+}
+
 // SendTransaction submits a transaction to the network.
 func (c *Client) SendTransaction(ctx context.Context, tx flow.Transaction) error {
 	txMsg := convert.TransactionToMessage(tx)
@@ -109,6 +115,13 @@ func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*flow.Trans
 	if err != nil {
 		return nil, err
 	}
+
+	// Events are sent over the wire JSON-encoded.
+	var events []flow.Event
+	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
+		return nil, err
+	}
+	tx.Events = events
 
 	return &tx, nil
 }

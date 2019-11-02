@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cli"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -46,9 +47,11 @@ var Cmd = &cobra.Command{
 
 // InitProject generates a new root key and saves project config.
 func InitProject() *cli.Config {
-	prKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, []byte{})
+	seed := cli.RandomSeed(crypto.KeyGenSeedMinLenECDSA_P256)
+
+	prKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, seed)
 	if err != nil {
-		cli.Exitf(1, "Failed to generate private key err: %v", err)
+		cli.Exitf(1, "Failed to generate private key: %v", err)
 	}
 
 	return InitProjectWithRootKey(prKey)

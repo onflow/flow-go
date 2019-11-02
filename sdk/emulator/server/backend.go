@@ -92,13 +92,11 @@ func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		Hash:              block.Hash(),
 		PreviousBlockHash: block.PreviousBlockHash,
 		Number:            block.Number,
-		TransactionCount:  uint32(len(block.TransactionHashes)),
 	}
 
 	b.logger.WithFields(log.Fields{
 		"blockNum":  blockHeader.Number,
 		"blockHash": blockHeader.Hash.Hex(),
-		"blockSize": blockHeader.TransactionCount,
 	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observation.GetLatestBlockResponse{
@@ -127,9 +125,14 @@ func (b *Backend) GetTransaction(ctx context.Context, req *observation.GetTransa
 		Debugf("💵  GetTransaction called")
 
 	txMsg := convert.TransactionToMessage(*tx)
-
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(tx.Events)
+	if err != nil {
+		return nil, err
+	}
 	return &observation.GetTransactionResponse{
 		Transaction: txMsg,
+		EventsJson:  buf.Bytes(),
 	}, nil
 }
 

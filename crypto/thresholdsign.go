@@ -42,7 +42,7 @@ type ThresholdSigner struct {
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
+func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", ThresholdMinSize, ThresholdMaxSize)}
 	}
@@ -54,7 +54,7 @@ func NewThresholdSigner(size int, hash AlgoName) (*ThresholdSigner, error) {
 	if err != nil {
 		return nil, err
 	}
-	shares := make([]byte, 0, size*signatureLengthBLS_BLS12381)
+	shares := make([]byte, 0, size*SignatureLenBLS_BLS12381)
 	signers := make([]index, 0, size)
 
 	return &ThresholdSigner{

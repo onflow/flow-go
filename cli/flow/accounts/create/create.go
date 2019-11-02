@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/cli"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/client"
-	"github.com/dapperlabs/flow-go/sdk/emulator/constants"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
 )
@@ -37,7 +36,7 @@ var Cmd = &cobra.Command{
 
 		for i, privateKeyHex := range conf.Keys {
 			privateKey := cli.MustDecodeAccountPrivateKeyHex(privateKeyHex)
-			accountKeys[i] = privateKey.PublicKey(constants.AccountKeyWeightThreshold)
+			accountKeys[i] = privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 		}
 
 		var (

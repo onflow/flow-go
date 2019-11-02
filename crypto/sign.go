@@ -41,9 +41,9 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 				curve: elliptic.P256(),
 				commonSigner: &commonSigner{
 					algo,
-					PrKeyLengthECDSA_P256,
-					PubKeyLengthECDSA_P256,
-					SignatureLengthECDSA_P256,
+					PrKeyLenECDSA_P256,
+					PubKeyLenECDSA_P256,
+					SignatureLenECDSA_P256,
 				},
 			})
 		})
@@ -56,9 +56,9 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 				curve: secp256k1(),
 				commonSigner: &commonSigner{
 					algo,
-					PrKeyLengthECDSA_SECp256k1,
-					PubKeyLengthECDSA_SECp256k1,
-					SignatureLengthECDSA_SECp256k1,
+					PrKeyLenECDSA_SECp256k1,
+					PubKeyLenECDSA_SECp256k1,
+					SignatureLenECDSA_SECp256k1,
 				},
 			})
 		})

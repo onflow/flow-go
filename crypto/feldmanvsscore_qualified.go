@@ -1,3 +1,5 @@
+// +build relic
+
 package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
@@ -8,17 +10,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult, []DKGToSend, error) {
+func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult, []DKGToSend) {
 	// only accept private shares from the leader.
 	if origin != s.leaderIndex {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 
 	if s.xReceived {
-		return invalid, nil, nil
+		return invalid, nil
 	}
-	if (len(data)) != PrKeyLengthBLS_BLS12381 {
-		return invalid, nil, nil
+	if (len(data)) != shareSize {
+		return invalid, nil
 	}
 	// temporary log
 	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
@@ -26,14 +28,14 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLengthBLS_BLS12381,
+		PrKeyLenBLS_BLS12381,
 	)
 
 	s.xReceived = true
 	if s.AReceived {
 		result := s.verifyShare()
 		if result == valid {
-			return result, nil, nil
+			return result, nil
 		}
 		// otherwise, build a complaint to send and add it to the local
 		// complaints map
@@ -45,22 +47,22 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult
 			received:       true,
 			answerReceived: false,
 		}
-		return result, []DKGToSend{toSend}, nil
+		return result, []DKGToSend{toSend}
 	}
-	return valid, nil, nil
+	return valid, nil
 }
 
-func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKGresult, []DKGToSend, error) {
+func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKGresult, []DKGToSend) {
 	// only accept the verification vector from the leader.
 	if origin != s.leaderIndex {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 
 	if s.AReceived {
-		return invalid, nil, nil
+		return invalid, nil
 	}
-	if (PubKeyLengthBLS_BLS12381)*(s.threshold+1) != len(data) {
-		return invalid, nil, nil
+	if len(data) != verifVectorSize*(s.threshold+1) {
+		return invalid, nil
 	}
 
 	// temporary log
@@ -85,7 +87,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKG
 	if s.xReceived {
 		result := s.verifyShare()
 		if result == valid {
-			return result, nil, nil
+			return result, nil
 		}
 		// otherwise, build a complaint to send and add it to the local
 		// complaints map
@@ -97,9 +99,9 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKG
 			received:       true,
 			answerReceived: false,
 		}
-		return result, []DKGToSend{toSend}, nil
+		return result, []DKGToSend{toSend}
 	}
-	return valid, nil, nil
+	return valid, nil
 }
 
 // assuming a complaint and its answer were received, this function updates
@@ -113,13 +115,17 @@ func (s *feldmanVSSQualState) checkComplaint(complainee index, c *complaint) {
 }
 
 // data = |complainee|
-func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGresult, []DKGToSend, error) {
+func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGresult, []DKGToSend) {
+	if len(data) == 0 || origin == s.leaderIndex {
+		return invalid, nil
+	}
+
 	// first byte encodes the complainee
 	complainee := index(data[0])
 
 	// if the complainee is not the leader, ignore the complaint
-	if complainee != s.leaderIndex || len(data) != 1 {
-		return invalid, nil, nil
+	if complainee != s.leaderIndex || len(data) != complaintSize {
+		return invalid, nil
 	}
 
 	c, ok := s.complaints[origin]
@@ -131,8 +137,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGre
 		}
 		// if the complainee is the current node, prepare an answer
 		if s.currentIndex == s.leaderIndex {
-			complainAnswerSize := 2 + PrKeyLengthBLS_BLS12381
-			data := make([]byte, complainAnswerSize)
+			data := make([]byte, complainAnswerSize+1)
 			data[0] = byte(FeldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
 			ZrPolynomialImage(data[2:], s.a, origin, nil)
@@ -142,35 +147,33 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGre
 			}
 			s.complaints[origin].answerReceived = true
 			s.complaints[origin].validComplaint = false
-			return valid, []DKGToSend{toSend}, nil
+			return valid, []DKGToSend{toSend}
 		}
-		return valid, nil, nil
+		return valid, nil
 	}
 	// complaint is not new in the map
 	// check if the complain has been already received
 	if c.received {
-		return invalid, nil, nil
+		return invalid, nil
 	}
 	c.received = true
 	// first flag check is a sanity check
 	if c.answerReceived && !c.validComplaint && s.currentIndex != s.leaderIndex {
 		s.checkComplaint(origin, c)
-		return valid, nil, nil
+		return valid, nil
 	}
-	return invalid, nil, nil
+	return invalid, nil
 }
 
 // answer = |complainer| private share |
-func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) (DKGresult, error) {
+func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) DKGresult {
+	// check for invalid answers
+	if origin != s.leaderIndex || len(data) == 0 {
+		return invalid
+	}
 
 	// first byte encodes the complainee
 	complainer := index(data[0])
-
-	// check for invalid answers
-	complainAnswerSize := 2 + PrKeyLengthBLS_BLS12381
-	if origin != s.leaderIndex {
-		return invalid, nil
-	}
 
 	c, ok := s.complaints[complainer]
 	// if the complaint is new, add it
@@ -182,35 +185,35 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// check the answer format
 		if complainer == s.leaderIndex || len(data) != complainAnswerSize {
 			s.complaints[complainer].validComplaint = true
-			return invalid, nil
+			return valid
 		}
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLengthBLS_BLS12381,
+			PrKeyLenBLS_BLS12381,
 		)
-		return valid, nil
+		return valid
 	}
 	// complaint is not new in the map
 	// check if the answer has been already received
 	if c.answerReceived {
-		return invalid, nil
+		return invalid
 	}
 	c.answerReceived = true
-	if complainer == s.leaderIndex || len(data) != complainAnswerSize {
+	if len(data) != complainAnswerSize {
 		s.complaints[complainer].validComplaint = true
-		return invalid, nil
+		return valid
 	}
 
-	// first flag check is a sanity check
+	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLengthBLS_BLS12381,
+			PrKeyLenBLS_BLS12381,
 		)
 		s.checkComplaint(complainer, c)
-		return valid, nil
+		return valid
 	}
-	return invalid, nil
+	return invalid
 }

@@ -89,6 +89,13 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
+const (
+	shareSize = PrKeyLenBLS_BLS12381
+	// the actual verifVectorSize depends on the state and should be:
+	// PubKeyLenBLS_BLS12381*(t+1)
+	verifVectorSize = PubKeyLenBLS_BLS12381
+)
+
 func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	out := &DKGoutput{
 		action: []DKGToSend{},
@@ -110,9 +117,9 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	// msg = |tag| Data |
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result, out.err = s.receiveShare(index(orig), msg[1:])
+		out.result = s.receiveShare(index(orig), msg[1:])
 	case FeldmanVSSVerifVec:
-		out.result, out.err = s.receiveVerifVector(index(orig), msg[1:])
+		out.result = s.receiveVerifVector(index(orig), msg[1:])
 	default:
 		out.result = invalid
 	}

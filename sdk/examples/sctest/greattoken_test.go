@@ -4,36 +4,16 @@ package sctest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 const (
 	greatTokenContractFile = "./contracts/great-token.bpl"
 )
-
-func readFile(path string) []byte {
-	contents, err := ioutil.ReadFile(path)
-	if err != nil {
-		panic(err)
-	}
-	return contents
-}
-
-// Returns a nonce value that is guaranteed to be unique.
-var getNonce = func() func() uint64 {
-	var nonce uint64
-	return func() uint64 {
-		nonce++
-		return nonce
-	}
-}()
 
 // Creates a script that instantiates a new GreatNFTMinter instance
 // and stores it in memory.
@@ -87,12 +67,6 @@ func generateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, expectedID, expectedIsSpecial))
 }
 
-func newEmulator() *emulator.EmulatedBlockchain {
-	return emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-		OnLogMessage: func(msg string) {},
-	})
-}
-
 func TestDeployment(t *testing.T) {
 	b := newEmulator()
 
@@ -122,15 +96,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
-
-		tx.AddSignature(b.RootAccountAddress(), sig)
-
-		err = b.SubmitTransaction(tx)
-		if assert.Error(t, err) {
-			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
-		}
+		signAndSubmit(tx, b, t, true)
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
@@ -142,15 +108,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
-
-		tx.AddSignature(b.RootAccountAddress(), sig)
-
-		err = b.SubmitTransaction(tx)
-		if assert.Error(t, err) {
-			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
-		}
+		signAndSubmit(tx, b, t, true)
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
@@ -162,15 +120,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
-
-		tx.AddSignature(b.RootAccountAddress(), sig)
-
-		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
-
-		b.CommitBlock()
+		signAndSubmit(tx, b, t, false)
 	})
 }
 
@@ -191,13 +141,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	sig, err := keys.SignTransaction(createMinterTx, b.RootKey())
-	assert.Nil(t, err)
-
-	createMinterTx.AddSignature(b.RootAccountAddress(), sig)
-
-	err = b.SubmitTransaction(createMinterTx)
-	assert.Nil(t, err)
+	signAndSubmit(createMinterTx, b, t, false)
 
 	// Mint the first NFT
 	mintTx := flow.Transaction{
@@ -208,13 +152,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	sig, err = keys.SignTransaction(mintTx, b.RootKey())
-	assert.Nil(t, err)
-
-	mintTx.AddSignature(b.RootAccountAddress(), sig)
-
-	err = b.SubmitTransaction(mintTx)
-	assert.Nil(t, err)
+	signAndSubmit(mintTx, b, t, false)
 
 	// Assert that ID/specialness are correct
 	_, err = b.ExecuteScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
@@ -229,13 +167,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	sig, err = keys.SignTransaction(mintTx2, b.RootKey())
-	assert.Nil(t, err)
-
-	mintTx2.AddSignature(b.RootAccountAddress(), sig)
-
-	err = b.SubmitTransaction(mintTx2)
-	assert.Nil(t, err)
+	signAndSubmit(mintTx2, b, t, false)
 
 	// Assert that ID/specialness are correct
 	_, err = b.ExecuteScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
