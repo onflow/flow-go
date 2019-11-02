@@ -61,12 +61,13 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
-	if dkg == FeldmanVSS {
-		common := &dkgCommon{
-			size:         size,
-			threshold:    threshold,
-			currentIndex: index(currentIndex),
-		}
+	common := &dkgCommon{
+		size:         size,
+		threshold:    threshold,
+		currentIndex: index(currentIndex),
+	}
+	switch dkg {
+	case FeldmanVSS:
 		fvss := &feldmanVSSstate{
 			dkgCommon:   common,
 			leaderIndex: index(leaderIndex),
@@ -74,9 +75,17 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 		fvss.init()
 		log.Debugf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
 		return fvss, nil
+	case FeldmanVSSQual:
+		fvssq := &feldmanVSSstate{
+			dkgCommon:   common,
+			leaderIndex: index(leaderIndex),
+		}
+		fvssq.init()
+		log.Debugf("new dkg my index %d, leader is %d\n", fvssq.currentIndex, fvssq.leaderIndex)
+		return fvssq, nil
+	default:
+		return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 	}
-
-	return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 }
 
 // dkgCommon holds the common data of all DKG protocols
