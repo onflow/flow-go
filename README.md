@@ -63,7 +63,7 @@ You can find a high-level overview of the Flow architecture on the [documentatio
 export `$GOPATH=$HOME/path-to-your-go-workspace/`
 ```
 
-It's also a good idea to update your `$PATH` to use third party GO binaries: 
+It's also a good idea to update your `$PATH` to use third party GO binaries:
 
 ```bash
 export PATH="$PATH:$GOPATH/bin"
@@ -89,14 +89,6 @@ make install-tools
 ```
 
 ### Generating code
-
-#### Dependency injection using Wire
-
-This project uses [Wire](https://github.com/google/wire) for compile-time dependency injection. Edit the `Makefile` to update the list of packages that use Wire.
-
-```bash
-make generate-wire
-```
 
 #### Generate gRPC stubs from protobuf files
 
@@ -126,7 +118,7 @@ This guide provides a comprehensive overview of our development processes, guide
 
 ### Work streams
 
-Flow development is divided across several streams of work with the goal of separating concerns and facilitating rapid development. 
+Flow development is divided across several streams of work with the goal of separating concerns and facilitating rapid development.
 
 Each stream is owned by a Flow core team member who oversees and directs all development within that stream. As a contributor, you will communicate primarily with your stream owner.
 
@@ -134,17 +126,17 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
-| Collection  | [Peter Siemens](https://github.com/psiemens) | [/internal/roles/collect](/internal/roles/collect) |
-| Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/internal/roles/consensus](/internal/roles/consensus) |
-| Execution      | [Bastian Müller](https://github.com/turbolent) | [/internal/roles/execute](/internal/roles/execute) |
-| Verification | [Moar Zamski](https://github.com/pazams) | [/internal/roles/verify](/internal/roles/verify) |
-| Observation | [Peter Siemens](https://github.com/psiemens)     | [/internal/roles/observe](/internal/roles/observe) |
-| Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/pkg/network](/pkg/network) |
-| Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/pkg/crypto](/pkg/crypto) |
+| Collection  | [Peter Siemens](https://github.com/psiemens) | [/engine/collection](/engine/collection) |
+| Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/engine/consensus](/engine/consensus) |
+| Execution      | [Bastian Müller](https://github.com/turbolent) | [/engine/execution](/engine/execution) |
+| Verification | [Moar Zamski](https://github.com/pazams) | [/engine/verification](/engine/verification) |
+| Observation | [Peter Siemens](https://github.com/psiemens)     | [/engine/observation](/engine/observation) |
+| Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/networking/gossip](/networking/gossip) |
+| Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/crypto](/crypto) |
 | Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens), [Jordan Schalm](https://github.com/jordanschalm) | [/sdk/emulator](/sdk/emulator) |
-| Client Library | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/sdk/client](/sdk/client), [/internal/cli](/internal/cli), [/cmd/flow](/cmd/flow) |
+| Client Library | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/sdk/client](/sdk/client), [/cli](/cli), [/cmd/flow](/cmd/flow) |
 | Ops & Performance | [Leo Zhang](https://github.com/zhangchiqing) | |
-| Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [/pkg/language](/pkg/language) |
+| Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [/language](/language) |
 
 ### Workflow
 
@@ -194,7 +186,7 @@ To develop in _production level_ standard of the Flow project, the following bes
 - Please think as a user of your code, and optimize the interface for as easy and error-prone experience as possible.
 	- TODO: add example(s)
 - Please optimize the time, memory, and communication overhead of our code.
-	- TODO: add example(s) 
+	- TODO: add example(s)
 - Please properly identify the possible errors and make sure that they are handled.
 	- TODO: add example(s)
 - Please properly identify the corner cases and edge cases and handle them on our happy path.
@@ -203,15 +195,15 @@ To develop in _production level_ standard of the Flow project, the following bes
 	- TODO: add example(s)
 - Please make sure that variables, functions, packages, etc, are well-named.
 	- TODO: add example(s)
-- Please write tests for your code that covers all possible range of inputs. 
+- Please write tests for your code that covers all possible range of inputs.
 	- TODO: add example(s)
-- Please test each (tiny) module individually, and then move to the composability testing. 
+- Please test each (tiny) module individually, and then move to the composability testing.
 	- TODO: add example(s)
 - Please break your implementation into as concise and precise modules, functions, and methods as possible.
 	- TODO: add example(s)
-- Please make sure that your code is well-documented with a proper quick start that helps other engineers to quickly utilize your code without any hard effort. 
+- Please make sure that your code is well-documented with a proper quick start that helps other engineers to quickly utilize your code without any hard effort.
 	- TODO: add example(s)
-- Please append your suggestions to this list, advertise them within the team, and replace the _"TODO: add example"_ parts with the code pieces you think are exemplary and worthy to share. 
+- Please append your suggestions to this list, advertise them within the team, and replace the _"TODO: add example"_ parts with the code pieces you think are exemplary and worthy to share.
 
 TODO: add style guide
 
@@ -229,21 +221,23 @@ Stream owners are responsible for ensuring that all code owned by their stream i
 
 Each stream should contain a README in its home directory. This page, which acts as a jumping-off point for new contributors, should list each function of the stream along with a short description and links to relevant packages.
 
-Here's an example: [internal/roles/collect/README.md](internal/roles/collect/README.md)
+Here's an example: [cmd/consensus/README.md](cmd/consensus/README.md)
 
-#### Stream package documentation 
+#### Stream package documentation
 
 All packages owned by a stream should be documented using `godoc`.
 
-Here's an example: [internal/roles/collect/clusters](internal/roles/collect/clusters)
+Here's an example: [network/gossip](network/gossip)
 
 ##### Auto-generated READMEs
 
-A `README.md` can be generated from the `godoc` output by updating [godoc.sh](/godoc.sh) with the path of your package. The above example was generated by this line:
+A `README.md` can be generated from the `godoc` output by updating the make file with the path of your package. The above example was generated by this line:
 
 ```bash
-godoc2md github.com/dapperlabs/flow-go/internal/roles/collect/clusters > internal/roles/collect/clusters/README.md
+godoc2md github.com/dapperlabs/flow-go/engine/collection/clusters > internal/roles/collect/clusters/README.md
 ```
+
+WARNING: `godoc2md` is currently not working with Go modules.
 
 Once your package is added to that file, running `go generate` in the root of this repo will generate a new `README.md`.
 

@@ -4,34 +4,32 @@
 # Streams
 
 # Collection Stream
-/internal/roles/collect @psiemens
-/proto/services/collect @psiemens
-/grpc/services/collect @psiemens
-/cmd/collect @psiemens
+/cmd/collection @psiemens
+/engine/collection @psiemens
+/proto/services/collection @psiemens
 
 # Consensus Stream
-/internal/roles/consensus @AlexHentschel @awishformore
-/proto/services/consensus @AlexHentschel @awishformore
-/grpc/services/consensus @AlexHentschel @awishformore
 /cmd/consensus @AlexHentschel @awishformore
+/engine/consensus @AlexHentschel @awishformore
 
 # Execution Stream
-/internal/roles/execute @turbolent
-/proto/services/execute @turbolent
-/grpc/services/execute @turbolent
-/cmd/execute @turbolent
+/cmd/execution @turbolent
+/engine/execution @turbolent
 
 # Observation Stream
-/internal/roles/observe @psiemens
-/proto/services/observe @psiemens
-/grpc/services/observe @psiemens
-/cmd/observe @psiemens
+/cmd/observation @psiemens
+/engine/observation @psiemens
+/proto/services/observation @psiemens
+
+# Verification Stream
+/cmd/verification @ramtinms
+/engine/verification @ramtinms
 
 # Networking Stream
-/pkg/network @yhassanzadeh
+/network/gossip @yhassanzadeh
 
 # Cryptography Stream
-/pkg/crypto @tarakby
+/crypto @tarakby
 
 # Emulator Stream
 /sdk/emulator @mrbrianhobo @psiemens @jordanschalm
@@ -40,4 +38,4 @@
 /sdk @mrbrianhobo @psiemens
 
 # Language Stream
-/pkg/language @turbolent
+/language @turbolent

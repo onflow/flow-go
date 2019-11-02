@@ -1,0 +1,15 @@
+syntax="proto3";
+
+package testnet;
+
+message Message {
+  string sender = 1;
+  bytes content = 2;
+}
+
+
+message Void {}
+
+service Receiver {
+  rpc DisplayMessage(Message) returns (Void);
+}

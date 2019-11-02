@@ -28,8 +28,15 @@ do
   pids+=($!)
 done
 
+function stop() {
+  for pid in ${pids[@]}
+  do
+    wait $pid
+  done
+}
+
 # trap termination signal to avoid abrupt script exit
-trap 'kill -TERM $PID' TERM INT
+trap stop SIGINT
 
 # wait for nodes to exit; signal is propagated in spite of trapping
 for pid in ${pids[@]}

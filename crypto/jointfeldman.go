@@ -1,0 +1,3 @@
+// +build relic
+
+package crypto

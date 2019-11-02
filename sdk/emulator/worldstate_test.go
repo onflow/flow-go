@@ -1,68 +1,77 @@
 package emulator
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
 	fun main(account: Account) {
-		let controller = [1]
-		let owner = [2]
-		let key = [3]
-		let value = getValue(controller, owner, key)
-		setValue(controller, owner, key, value + 2)
+		account.storage[Int] = (account.storage[Int] ?? 0) + 2
 	}
 `
 
 const sampleCall = `
 	fun main(): Int {
-		return getValue([1], [2], [3])
+		return getAccount("%s").storage[Int] ?? 0
 	}
 `
 
 func TestWorldStates(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
+	accountAddress := b.RootAccountAddress()
+
 	// Create 3 signed transactions (tx1, tx2, tx3)
-	tx1 := &types.Transaction{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
 
-	tx2 := &types.Transaction{
+	tx1.AddSignature(accountAddress, sig)
+
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
 
-	tx3 := &types.Transaction{
+	tx2.AddSignature(accountAddress, sig)
+
+	tx3 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              3,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx3.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx3, b.RootKey())
+	assert.Nil(t, err)
+
+	tx3.AddSignature(accountAddress, sig)
 
 	ws1 := b.pendingWorldState.Hash()
 	t.Logf("initial world state: %x\n", ws1)
@@ -71,7 +80,7 @@ func TestWorldStates(t *testing.T) {
 	assert.Len(t, b.txPool, 0)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -154,34 +163,42 @@ func TestWorldStates(t *testing.T) {
 func TestQueryByVersion(t *testing.T) {
 	b := NewEmulatedBlockchain(DefaultOptions)
 
-	tx1 := &types.Transaction{
+	accountAddress := b.RootAccountAddress()
+
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              1,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.Nil(t, err)
 
-	tx2 := &types.Transaction{
+	tx1.AddSignature(accountAddress, sig)
+
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              2,
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.Nil(t, err)
+
+	tx2.AddSignature(accountAddress, sig)
 
 	var invalidWorldState crypto.Hash
 
 	// Submit tx1 and tx2 (logging state versions before and after)
 	ws1 := b.pendingWorldState.Hash()
 
-	err := b.SubmitTransaction(tx1)
+	err = b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -217,22 +234,23 @@ func TestQueryByVersion(t *testing.T) {
 	assert.NotNil(t, tx)
 
 	// Call script at invalid world state version (errors)
-	value, err := b.CallScriptAtVersion([]byte(sampleCall), invalidWorldState)
+	callScript := fmt.Sprintf(sampleCall, accountAddress)
+	value, err := b.ExecuteScriptAtVersion([]byte(callScript), invalidWorldState)
 	assert.IsType(t, err, &ErrInvalidStateVersion{})
 	assert.Nil(t, value)
 
 	// Value at ws1 is 0
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws1)
+	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws1)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws2)
+	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws2)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
-	value, err = b.CallScriptAtVersion([]byte(sampleCall), ws3)
+	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws3)
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(4), value)
 
