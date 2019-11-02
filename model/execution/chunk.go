@@ -10,10 +10,13 @@ import (
 
 // Chunk is a collection of transactions, we assume Tx content correctness and orders in block has been verfied by Chunk builder
 type Chunk struct {
-	Transactions          []flow.Transaction
-	TotalGasSpent         uint64
-	StartState            StateCommitment
-	FirstTxInTheNextChunk *flow.Transaction
+	Transactions                  []flow.Transaction
+	TotalGasSpent                 uint64
+	StartState                    StateCommitment
+	FinalState                    StateCommitment
+	FirstTxInTheNextChunk         *flow.Transaction
+	FirstTxGasSpent               uint64 // T0
+	FirstTxInTheNextChunkGasSpent uint64 // T'0
 }
 
 func (c *Chunk) String() string {
