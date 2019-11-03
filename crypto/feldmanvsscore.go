@@ -134,6 +134,9 @@ func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
+	if x == 2 || x == 3 {
+		dest[2] = 255
+	}
 }
 
 // writeVerifVector exports A vector into a slice of bytes

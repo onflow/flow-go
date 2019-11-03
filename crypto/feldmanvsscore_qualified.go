@@ -10,7 +10,45 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func (s *feldmanVSSQualState) setSharesTimeout() []DKGToSend {
+	s.sharesTimeout = true
+	// if verif vector is not received, disqualify the leader
+	if !s.AReceived {
+		s.disqualified = true
+		return []DKGToSend{}
+	}
+	// if share is not received, make a complaint
+	if !s.xReceived {
+		toSend := DKGToSend{
+			broadcast: true,
+			data:      []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)},
+		}
+		s.complaints[s.currentIndex] = &complaint{
+			received:       true,
+			answerReceived: false,
+		}
+		return []DKGToSend{toSend}
+	}
+	return []DKGToSend{}
+}
+
+func (s *feldmanVSSQualState) setComplaintsTimeout() {
+	s.complaintsTimeout = true
+	// if more than t complaints are received, the leader is disqualified
+	// regardless of the answers.
+	// (at this point, all answered complaints should have been already received)
+	// (i.e there is no complaint with (!c.received && c.answerReceived)
+	// TODO: sanity check and return an error?
+	if len(s.complaints) > s.threshold {
+		s.disqualified = true
+	}
+}
+
 func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult, []DKGToSend) {
+	// check the share timeout
+	if s.sharesTimeout {
+		return invalid, nil
+	}
 	// only accept private shares from the leader.
 	if origin != s.leaderIndex {
 		return invalid, nil
@@ -30,12 +68,11 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLS_BLS12381,
 	)
-
 	s.xReceived = true
 	if s.AReceived {
 		result := s.verifyShare()
 		if result == valid {
-			return result, nil
+			return valid, nil
 		}
 		// otherwise, build a complaint to send and add it to the local
 		// complaints map
@@ -47,12 +84,17 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult
 			received:       true,
 			answerReceived: false,
 		}
-		return result, []DKGToSend{toSend}
+		return valid, []DKGToSend{toSend}
 	}
 	return valid, nil
 }
 
 func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKGresult, []DKGToSend) {
+	// check the share timeout
+	if s.sharesTimeout {
+		return invalid, nil
+	}
+
 	// only accept the verification vector from the leader.
 	if origin != s.leaderIndex {
 		return invalid, nil
@@ -99,7 +141,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKG
 			received:       true,
 			answerReceived: false,
 		}
-		return result, []DKGToSend{toSend}
+		return valid, []DKGToSend{toSend}
 	}
 	return valid, nil
 }
@@ -116,6 +158,11 @@ func (s *feldmanVSSQualState) checkComplaint(complainee index, c *complaint) {
 
 // data = |complainee|
 func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGresult, []DKGToSend) {
+	// check the complaints timeout
+	if s.complaintsTimeout {
+		return invalid, nil
+	}
+
 	if len(data) == 0 || origin == s.leaderIndex {
 		return invalid, nil
 	}
@@ -140,7 +187,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGre
 			data := make([]byte, complainAnswerSize+1)
 			data[0] = byte(FeldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
-			ZrPolynomialImage(data[2:], s.a, origin, nil)
+			ZrPolynomialImage(data[2:], s.a, origin+1, nil)
 			toSend := DKGToSend{
 				broadcast: true,
 				data:      data,
@@ -160,6 +207,9 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGre
 	// first flag check is a sanity check
 	if c.answerReceived && !c.validComplaint && s.currentIndex != s.leaderIndex {
 		s.checkComplaint(origin, c)
+		if c.validComplaint {
+			s.disqualified = true
+		}
 		return valid, nil
 	}
 	return invalid, nil
@@ -183,8 +233,9 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			answerReceived: true,
 		}
 		// check the answer format
-		if complainer == s.leaderIndex || len(data) != complainAnswerSize {
+		if len(data) != complainAnswerSize {
 			s.complaints[complainer].validComplaint = true
+			s.disqualified = true
 			return valid
 		}
 		// read the complainer private share
@@ -199,20 +250,29 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	if c.answerReceived {
 		return invalid
 	}
+
 	c.answerReceived = true
 	if len(data) != complainAnswerSize {
 		s.complaints[complainer].validComplaint = true
+		s.disqualified = true
 		return valid
 	}
 
-	// flag check is a sanity check
-	if c.received {
+	// first flag check is a sanity check
+	if c.received && !c.validComplaint {
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLS_BLS12381,
 		)
 		s.checkComplaint(complainer, c)
+		if c.validComplaint {
+			s.disqualified = true
+		}
+		// fix the share of the current node if the compplaint in invalid
+		if !c.validComplaint && complainer == s.currentIndex {
+			s.x = c.answer
+		}
 		return valid
 	}
 	return invalid

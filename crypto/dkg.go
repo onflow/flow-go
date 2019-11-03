@@ -76,9 +76,13 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 		log.Debugf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
 		return fvss, nil
 	case FeldmanVSSQual:
-		fvssq := &feldmanVSSstate{
+		fvss := &feldmanVSSstate{
 			dkgCommon:   common,
 			leaderIndex: index(leaderIndex),
+		}
+		fvssq := &feldmanVSSQualState{
+			feldmanVSSstate: fvss,
+			disqualified:    false,
 		}
 		fvssq.init()
 		log.Debugf("new dkg my index %d, leader is %d\n", fvssq.currentIndex, fvssq.leaderIndex)

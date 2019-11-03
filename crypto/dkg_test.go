@@ -25,7 +25,7 @@ type toProcess struct {
 // it simulates sending a message from one node to another
 func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProcess) {
 	log.Infof("%d Sending to %d:\n", orig, dest)
-	log.Debug(msg)
+	log.Info(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	chans[dest] <- newMsg
 }
@@ -34,7 +34,7 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 // it simulates broadcasting a message from one node to all nodes
 func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) {
 	log.Infof("%d Broadcasting:", orig)
-	log.Debug(msg)
+	log.Info(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	for i := 0; i < len(chans); i++ {
 		if i != orig {
@@ -50,7 +50,7 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 	for {
 		select {
 		case newMsg := <-chans[current]:
-			log.Infof("%d Receiving from %d:", current, newMsg.orig)
+			log.Debugf("%d Receiving from %d:", current, newMsg.orig)
 			out := dkg[current].ReceiveDKGMsg(newMsg.orig, newMsg.msg.(DKGmsg))
 			out.processDkgOutput(current, dkg, chans, t)
 		// if timeout, stop and finalize
@@ -84,10 +84,10 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 	}
 }
 
-// Testing the happy path of Feldman VSS by simulating a network of n nodes
-func TestFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-	log.Debug("Feldman VSS starts")
+// Testing Feldman VSS with the qualified system by simulating a network of n nodes
+func TestFeldmanVSSQual(t *testing.T) {
+	log.SetLevel(log.InfoLevel)
+	log.Debug("Feldman VSS with complaints starts")
 	// number of nodes to test
 	n := 5
 	lead := 0
@@ -99,7 +99,7 @@ func TestFeldmanVSS(t *testing.T) {
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
-		dkg[current], err = NewDKG(FeldmanVSS, n, current, lead)
+		dkg[current], err = NewDKG(FeldmanVSSQual, n, current, lead)
 		assert.Nil(t, err)
 		if err != nil {
 			log.Error(err.Error())
@@ -138,10 +138,12 @@ func TestFeldmanVSS(t *testing.T) {
 	}
 }
 
-// Testing Feldman VSS with the qualified system by simulating a network of n nodes
-func TestFeldmanVSSQual(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
-	log.Debug("Feldman VSS with complaints starts")
+// ---------------------------------------------------------------
+
+// Testing the happy path of Feldman VSS by simulating a network of n nodes
+func TestFeldmanVSS(t *testing.T) {
+	log.SetLevel(log.ErrorLevel)
+	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 5
 	lead := 0
@@ -153,7 +155,7 @@ func TestFeldmanVSSQual(t *testing.T) {
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
-		dkg[current], err = NewDKG(FeldmanVSSQual, n, current, lead)
+		dkg[current], err = NewDKG(FeldmanVSS, n, current, lead)
 		assert.Nil(t, err)
 		if err != nil {
 			log.Error(err.Error())

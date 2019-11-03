@@ -16,6 +16,14 @@ type feldmanVSSQualState struct {
 	complaints map[index]*complaint
 	// is the leader disqualified
 	disqualified bool
+	// Timeout to receive shares and verification vectors
+	// - if a share is not received before this timeout a complaint will be formed
+	// - if the verification is not received before this timeout,
+	// leader is disqualified
+	sharesTimeout bool
+	// Timeout to receive complaints
+	// all complaints received after this timeout are ignored
+	complaintsTimeout bool
 }
 
 // these data are required to be stored to justify a slashing
@@ -31,44 +39,73 @@ func (s *feldmanVSSQualState) init() {
 	s.complaints = make(map[index]*complaint)
 }
 
-func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
-	s.running = false
-	// TODO: iterate on the map and check the number of valid complaints
-	// if the number is more than t+1, disqualify the leader and return nil,nil,nil, nil
-	errorString := ""
-	// private key of the current node
-	var x PrivateKey
-	if s.xReceived {
-		x = &PrKeyBLS_BLS12381{
-			alg:    s.blsContext, // signer algo
-			scalar: s.x,          // the private share
-		}
-	} else {
-		errorString += "The private key is missing\n"
+// sets the next protocol timeout
+func (s *feldmanVSSQualState) NextTimeout() *DKGoutput {
+	out := &DKGoutput{
+		result: valid,
+		action: []DKGToSend{},
+		err:    nil,
 	}
 
-	// Group public key
-	var Y PublicKey
-	if s.AReceived {
-		Y = &PubKeyBLS_BLS12381{
-			point: s.A[0],
+	if !s.running {
+		out.err = cryptoError{"dkg protocol is not running"}
+		return out
+	}
+	// if leader is already disqualified, there is nothing to do
+	if s.disqualified {
+		return out
+	}
+	if !s.sharesTimeout && !s.complaintsTimeout {
+		out.action = s.setSharesTimeout()
+		return out
+	}
+	if s.sharesTimeout && !s.complaintsTimeout {
+		s.setComplaintsTimeout()
+		return out
+	}
+	out.err = cryptoError{"next timeout would be to end DKG protocol"}
+	return out
+}
+
+// EndDKG ends the protocol and returns the keys
+// This is also a timeout to receiving all complaints answers
+func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
+	if !s.running {
+		return nil, nil, nil, cryptoError{"dkg protocol is not running"}
+	}
+	s.running = false
+	// check if a complaint has remained without an answer
+	// a leader is disqualified if a complaint is not answered
+	if !s.disqualified {
+		for _, c := range s.complaints {
+			if c.received && !c.answerReceived {
+				s.disqualified = true
+				break
+			}
 		}
-	} else {
-		errorString += "The group public key is missing\n"
+	}
+
+	// If the leader is disqualified, all keys are ignored
+	// otherwise, the keys are valid
+	if s.disqualified {
+		return nil, nil, nil, nil
+	}
+
+	// private key of the current node
+	x := &PrKeyBLS_BLS12381{
+		alg:    s.blsContext, // signer algo
+		scalar: s.x,          // the private share
+	}
+	// Group public key
+	Y := &PubKeyBLS_BLS12381{
+		point: s.A[0],
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
-	if s.y != nil {
-		for i, p := range s.y {
-			y[i] = &PubKeyBLS_BLS12381{
-				point: p,
-			}
+	for i, p := range s.y {
+		y[i] = &PubKeyBLS_BLS12381{
+			point: p,
 		}
-	} else {
-		errorString += "The nodes public keys are missing\n"
-	}
-	if errorString != "" {
-		return x, Y, y, cryptoError{errorString}
 	}
 	return x, Y, y, nil
 }
@@ -94,6 +131,11 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
 		out.result = valid
+		return out
+	}
+
+	// if leader is already disqualified, ignore the message
+	if s.disqualified {
 		return out
 	}
 
