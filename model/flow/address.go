@@ -4,6 +4,7 @@ package flow
 
 import (
 	"encoding/hex"
+	"fmt"
 )
 
 const (
@@ -53,4 +54,13 @@ func (a Address) Hex() string {
 // String returns the string representation of the address.
 func (a Address) String() string {
 	return a.Hex()
+}
+
+func (a Address) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", a.Hex())), nil
+}
+
+func (a *Address) UnmarshalJSON(data []byte) error {
+	*a = HexToAddress(string(data))
+	return nil
 }
