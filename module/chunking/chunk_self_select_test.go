@@ -13,7 +13,7 @@ import (
 )
 
 func TestSeedPrep(t *testing.T) {
-	seed := SeedPrep([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+	seed, _ := SeedPrep([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	if seed[0] != uint64(72623859790382856) || seed[1] != uint64(651345242494996240) {
 		t.Error(fmt.Sprintf("Error with SeedPrep"))
 	}

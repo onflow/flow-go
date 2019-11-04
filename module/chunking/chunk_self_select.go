@@ -10,8 +10,11 @@ import (
 )
 
 // SeedPrep prepares a seed for Rand
-func SeedPrep(proof []byte) []uint64 {
-	var seed []uint64
+func SeedPrep(proof []byte) ([]uint64, error) {
+	if len(proof)%8 != 0 {
+		return nil, errors.New("Proof size should be multiple of 8")
+	}
+	seed := make([]uint64, 0, len(proof)/8)
 	for i := 0; i < len(proof); i += 8 {
 		data := proof[i : i+8]
 		var ret uint64
@@ -24,7 +27,7 @@ func SeedPrep(proof []byte) []uint64 {
 		}
 		seed = append(seed, ret)
 	}
-	return seed
+	return seed, nil
 }
 
 // FisherYatesShuffle shuffles an slice of a chunks and returns the subset
@@ -52,7 +55,7 @@ func ChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, sk crypto.Priv
 	if err != nil {
 		return nil, nil, errors.New("failed to load hasher")
 	}
-	seed := SeedPrep(proof)
+	seed, _ := SeedPrep(proof)
 	n := int(math.Ceil(float64(len(er.Chunks)) * checkRatio))
 	selectedChunks := FisherYatesShuffle(seed, n, er.Chunks)
 	return selectedChunks, proof, nil
@@ -70,7 +73,7 @@ func VerifyChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, pk crypt
 		return false, nil
 	}
 	// check computation
-	seed := SeedPrep(proof)
+	seed, _ := SeedPrep(proof)
 	n := int(math.Ceil(float64(len(er.Chunks)) * checkRatio))
 	expectedSelectedChunks := FisherYatesShuffle(seed, n, er.Chunks)
 	return reflect.DeepEqual(expectedSelectedChunks, selectedchunks), nil
