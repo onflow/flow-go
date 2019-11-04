@@ -1,4 +1,9 @@
-REVISION := $(shell git rev-parse --short HEAD)
+# The short Git commit hash
+SHORT_COMMIT := $(shell git rev-parse --short HEAD)
+# The Git commit hash
+COMMIT := $(shell git rev-parse HEAD)
+# The tag of the current commit, otherwise empty
+VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -63,12 +68,15 @@ install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
 
 cmd/flow/flow: cli cmd crypto model proto sdk
-	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
+	GO111MODULE=on go build \
+	    -ldflags \
+	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+	    -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
+	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(REVISION)" .
+	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .

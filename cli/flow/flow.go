@@ -2,6 +2,7 @@
 package flow
 
 import (
+	"github.com/dapperlabs/flow-go/cli/flow/version"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cli"
@@ -25,6 +26,7 @@ func init() {
 	cmd.AddCommand(emulator.Cmd)
 	cmd.AddCommand(cadence.Cmd)
 	cmd.AddCommand(transactions.Cmd)
+	cmd.AddCommand(version.Cmd)
 }
 
 func Execute() {
