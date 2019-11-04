@@ -172,7 +172,7 @@ Loop:
 			break Loop
 
 		case <-time.After(e.polling):
-			err := e.propagateSnapshotRequest()
+			err := e.PropagateSnapshotRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not request snapshot")
 				continue
@@ -354,7 +354,7 @@ func (e *Engine) onGuaranteedCollection(originID string, coll *collection.Guaran
 	}
 
 	// then propagate the guaranteed collections to relevant nodes on the network
-	err = e.propagateGuaranteedCollection(coll)
+	err = e.PropagateGuaranteedCollection(coll)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast collection")
 	}
@@ -390,9 +390,9 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 	return nil
 }
 
-// propagateGuaranteedCollection will propagate the collection to the relevant
+// PropagateGuaranteedCollection will propagate the collection to the relevant
 // nodes on the network.
-func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+func (e *Engine) PropagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
 
 	// select all the collection nodes on the network as our targets
 	identities := e.com.Select().
@@ -416,7 +416,7 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 
 // propagateSnapshotRequest will propagate a memory pool snapshot request to the
 // relevant nodes on the network.
-func (e *Engine) propagateSnapshotRequest() error {
+func (e *Engine) PropagateSnapshotRequest() error {
 
 	// select all the consensus nodes on the network to request snapshot
 	identities := e.com.Select().

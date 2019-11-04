@@ -1,133 +1,23 @@
 package tests
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/model/collection"
-	"github.com/dapperlabs/flow-go/module/committee"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network/mock"
 )
 
-// mockPropagationNode is a mocked node instance for testing propagation engine.
-type mockPropagationNode struct {
-	// the real engine to be tested
-	engine *propagation.Engine
-	// a mocked network layer in order for the Hub to route events in memory to a targeted node
-	net *mock.Network
-	// the state of the engine, exposed in order for tests to assert
-	pool *mempool.Mempool
-}
-
-// newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
-func newMockPropagationNode(hub *mock.Hub, allNodes []string, nodeIndex int) (*mockPropagationNode, error) {
-	if nodeIndex >= len(allNodes) {
-		return nil, errors.Errorf("nodeIndex is out of range: %v", nodeIndex)
-	}
-
-	nodeEntry := allNodes[nodeIndex]
-
-	nodeID, err := committee.EntryToID(nodeEntry)
-	if err != nil {
-		return nil, err
-	}
-
-	// only log error logs
-	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-
-	pool, err := mempool.New()
-	if err != nil {
-		return nil, err
-	}
-
-	com, err := committee.New(allNodes, nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	net := mock.NewNetwork(com, hub)
-
-	engine, err := propagation.New(log, net, com, pool)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mockPropagationNode{
-		engine: engine,
-		net:    net,
-		pool:   pool,
-	}, nil
-}
-
-func (n *mockPropagationNode) terminate() {
-	<-n.engine.Done()
-}
-
-func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
-	if len(nodeEntries) == 0 {
-		return nil, nil, errors.New("NodeEntries must not be empty")
-	}
-
-	hub := mock.NewNetworkHub()
-
-	nodes := make([]*mockPropagationNode, 0)
-	for i := range nodeEntries {
-		node, err := newMockPropagationNode(hub, nodeEntries, i)
-		if err != nil {
-			return nil, nil, err
-		}
-		nodes = append(nodes, node)
-	}
-
-	return hub, nodes, nil
-}
-
-// a utility func to return a random collection hash
-func randHash() []byte {
-	hash := make([]byte, 32)
-	_, err := rand.Read(hash)
-	if err != nil {
-		panic(err.Error()) // should never error
-	}
-	return hash
-}
-
-// a utiliy func to generate a GuaranteedCollection with random hash
-func randCollection() *collection.GuaranteedCollection {
-	hash := randHash()
-	return &collection.GuaranteedCollection{
-		Hash: hash,
-	}
-}
-
-// send one collection to one node.
-// extracted in order to be reused in different tests
-func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
-	node.engine.Submit(gc)
-	node.net.FlushAll()
-	wg.Done()
-}
-
 func TestSubmitCollection(t *testing.T) {
-
-	rand.Seed(time.Now().UnixNano())
 
 	// If a consensus node receives a collection hash, then another connected node should receive it as well.
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
-		// can be delivery directly to another engine on a different node
-		_, nodes, err := createConnectedNodes([]string{"consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298"})
+		// can be delivered directly to another engine on a different node
+		_, nodes, err := createConnectedNodes("consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298")
 		require.Nil(t, err)
 
 		node1 := nodes[0]
@@ -137,8 +27,7 @@ func TestSubmitCollection(t *testing.T) {
 		gc := randCollection()
 
 		// node1's engine receives a collection hash
-		err = node1.engine.Process(node1.net.GetID(), gc)
-		require.Nil(t, err)
+		node1.engine.Submit(gc)
 		node1.net.FlushAll()
 
 		// inspect node2's mempool to check if node2's engine received the collection hash
@@ -147,6 +36,7 @@ func TestSubmitCollection(t *testing.T) {
 
 		// should match
 		require.Equal(t, coll.Hash, gc.Hash)
+		terminate(node1, node2)
 	})
 
 	// Verify the behavior property:
@@ -154,11 +44,11 @@ func TestSubmitCollection(t *testing.T) {
 	// result all nodes receive all hashes, and their mempools should all produce the same hash.
 	t.Run("all nodes should have the same mempool state after exchanging received collections",
 		func(t *testing.T) {
-			_, nodes, err := createConnectedNodes([]string{
+			_, nodes, err := createConnectedNodes(
 				"consensus-consensus1@localhost:7297",
 				"consensus-consensus2@localhost:7298",
 				"consensus-consensus3@localhost:7299",
-			})
+			)
 			require.Nil(t, err)
 
 			// prepare 3 nodes that are connected to each other
@@ -194,14 +84,16 @@ func TestSubmitCollection(t *testing.T) {
 			// check mempool hash are the same
 			require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 			require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
+
+			terminate(node1, node2, node3)
 		})
 
 	t.Run("should produce the same hash with concurrent calls", func(t *testing.T) {
-		_, nodes, err := createConnectedNodes([]string{
+		_, nodes, err := createConnectedNodes(
 			"consensus-consensus1@localhost:7297",
 			"consensus-consensus2@localhost:7298",
 			"consensus-consensus3@localhost:7299",
-		})
+		)
 		require.Nil(t, err)
 
 		// prepare 3 nodes that are connected to each other
@@ -232,26 +124,17 @@ func TestSubmitCollection(t *testing.T) {
 		// check mempool hash are the same
 		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 		require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
+
+		terminate(node1, node2, node3)
 	})
 
 	testConcrrencyOnce := func(t *testing.T) {
-		N := rand.Intn(100) + 1 // at least 1 node, at most 100 nodes
-		M := rand.Intn(200) + 1 // at least 1 collection, at most 200 collections
-		t.Logf("preparing %v nodes to send %v messages concurrently", N, M)
-
-		// prepare N connected nodes
-		entries := make([]string, N)
-		for e := 0; e < N; e++ {
-			entries[e] = fmt.Sprintf("consensus-consensus%v@localhost:10%v", e, e)
-		}
-		_, nodes, err := createConnectedNodes(entries)
+		nodes, gcs, err := prepareNRandomNodesAndMRandomCollectionHashes()
 		require.Nil(t, err)
 
-		// prepare M distinct collection hashes
-		gcs := make([]*collection.GuaranteedCollection, M)
-		for m := 0; m < M; m++ {
-			gcs[m] = randCollection()
-		}
+		N := len(nodes)
+		M := len(gcs)
+		t.Logf("preparing %v nodes to send %v messages concurrently", N, M)
 
 		// send each collection concurrently to a random node
 		var wg sync.WaitGroup
@@ -271,9 +154,7 @@ func TestSubmitCollection(t *testing.T) {
 		}
 
 		// terminates nodes
-		for _, node := range nodes {
-			node.terminate()
-		}
+		terminate(nodes...)
 	}
 
 	// N or M could be arbitarily big.
@@ -287,4 +168,12 @@ func TestSubmitCollection(t *testing.T) {
 			runtime.GC()
 		}
 	})
+}
+
+// send one collection to one node.
+// extracted in order to be reused in different tests
+func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+	node.engine.Submit(gc)
+	node.net.FlushAll()
+	wg.Done()
 }
