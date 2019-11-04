@@ -15,12 +15,9 @@ func NewNetworkHub() *Hub {
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)
-func (hub *Hub) GetNetwork(networkID string) *Network {
-	network, ok := hub.networks[networkID]
-	if !ok {
-		return nil
-	}
-	return network
+func (hub *Hub) GetNetwork(networkID string) (*Network, bool) {
+	net, ok := hub.networks[networkID]
+	return net, ok
 }
 
 // Plug stores the reference of the network in the hub object, in order for networks to find

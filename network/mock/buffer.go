@@ -42,10 +42,6 @@ func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
 	for {
 		toSend := b.takeAll()
 
-		if len(toSend) == 0 {
-			return
-		}
-
 		for _, msg := range toSend {
 			sendOne(msg)
 		}
@@ -57,12 +53,8 @@ func (b *Buffer) takeAll() []*PendingMessage {
 	b.Lock()
 	defer b.Unlock()
 
-	toSend := make([]*PendingMessage, 0)
+	toSend := b.pending[:]
+	b.pending = nil
 
-	for _, msg := range b.pending {
-		toSend = append(toSend, msg)
-	}
-
-	b.pending = make([]*PendingMessage, 0)
 	return toSend
 }
