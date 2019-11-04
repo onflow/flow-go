@@ -12,8 +12,10 @@ import (
 type TransactionStatus int
 
 const (
+	// TransactionStatusUnknown indicates that the transaction status is not known.
+	TransactionStatusUnknown TransactionStatus = iota
 	// TransactionPending is the status of a pending transaction.
-	TransactionPending TransactionStatus = iota
+	TransactionPending
 	// TransactionFinalized is the status of a finalized transaction.
 	TransactionFinalized
 	// TransactionReverted is the status of a reverted transaction.

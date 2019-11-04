@@ -63,6 +63,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		PayerAccount:       flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:     scriptAccounts,
 		Signatures:         signatures,
+		Status:             flow.TransactionStatus(m.GetStatus()),
 	}, nil
 }
 
@@ -85,6 +86,7 @@ func TransactionToMessage(t flow.Transaction) *entities.Transaction {
 		PayerAccount:       t.PayerAccount.Bytes(),
 		ScriptAccounts:     scriptAccounts,
 		Signatures:         signatures,
+		Status:             entities.TransactionStatus(t.Status),
 	}
 }
 

@@ -211,6 +211,8 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 		return err
 	}
 
+	tx.Status = flow.TransactionPending
+
 	b.txPool[string(tx.Hash())] = &tx
 	b.pendingWorldState.InsertTransaction(&tx)
 
