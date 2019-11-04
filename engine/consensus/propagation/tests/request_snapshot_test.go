@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,8 +11,6 @@ import (
 )
 
 func TestPropagateSnapshotRequest(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-
 	// If a propagation engine found its peer has different snapshot state from its peer, it should pull the missing
 	// collections from that peer and after that both of them should be in sync.
 	t.Run("should pull missing collection hashes from its peers", func(t *testing.T) {
@@ -35,7 +32,7 @@ func TestPropagateSnapshotRequest(t *testing.T) {
 		node1.engine.Submit(gc)
 
 		// block the forwarded updates to its peer
-		node1.net.FlushUnblocked(blockGuaranteedCollection)
+		node1.net.FlushAllExcept(blockGuaranteedCollection)
 
 		// should get out of sync
 		require.NotEqual(t, node1.pool.Hash(), node2.pool.Hash())
@@ -45,7 +42,7 @@ func TestPropagateSnapshotRequest(t *testing.T) {
 		require.Nil(t, err)
 
 		// flush all but still block the push updates
-		node1.net.FlushUnblocked(blockGuaranteedCollection)
+		node1.net.FlushAllExcept(blockGuaranteedCollection)
 
 		// should be in sync
 		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
@@ -64,9 +61,9 @@ func TestPropagateSnapshotRequest(t *testing.T) {
 
 func sendOneAndBlockBroadcast(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
 	node.engine.Submit(gc)
-	node.net.FlushUnblocked(blockGuaranteedCollection)
+	node.net.FlushAllExcept(blockGuaranteedCollection)
 	node.engine.PropagateSnapshotRequest()
-	node.net.FlushUnblocked(blockGuaranteedCollection)
+	node.net.FlushAllExcept(blockGuaranteedCollection)
 	wg.Done()
 }
 
@@ -96,7 +93,7 @@ func fuzzyTestPropagationSnapshotRequest(t *testing.T) {
 			require.Nil(t, err)
 
 			// flush all but still block the push updates
-			node.net.FlushUnblocked(blockGuaranteedCollection)
+			node.net.FlushAllExcept(blockGuaranteedCollection)
 			allSynced.Done()
 		}(node)
 	}

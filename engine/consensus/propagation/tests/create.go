@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -12,6 +13,9 @@ import (
 
 func prepareNRandomNodesAndMRandomCollectionHashes() (
 	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+
+	rand.Seed(time.Now().UnixNano())
+
 	N := rand.Intn(100) + 1 // at least 1 node, at most 100 nodes
 	M := rand.Intn(200) + 1 // at least 1 collection, at most 200 collections
 

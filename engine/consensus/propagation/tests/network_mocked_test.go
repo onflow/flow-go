@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +12,6 @@ import (
 )
 
 func TestSubmitCollection(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 
 	// If a consensus node receives a collection hash, then another connected node should receive it as well.
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
