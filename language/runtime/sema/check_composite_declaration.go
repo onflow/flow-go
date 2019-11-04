@@ -45,16 +45,6 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		initializationInfo,
 	)
 
-	checker.checkDestructors(
-		declaration.Members.Destructors(),
-		declaration.Members.FieldsByIdentifier(),
-		compositeType.Members,
-		compositeType,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
-		ContainerKindComposite,
-	)
-
 	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
 
 	checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
@@ -78,6 +68,18 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 			conformance.Identifier,
 		)
 	}
+
+	// NOTE: check destructors after initializer and functions
+
+	checker.checkDestructors(
+		declaration.Members.Destructors(),
+		declaration.Members.FieldsByIdentifier(),
+		compositeType.Members,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		ContainerKindComposite,
+	)
 
 	// TODO: support non-structure / non-resources composites, such as contracts
 

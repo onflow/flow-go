@@ -2753,3 +2753,33 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface RI {}
+
+     resource R {
+         var ris: <-{String: RI}
+
+         init(_ ri: <-RI) {
+             self.ris <- {"first": <-ri}
+         }
+
+         pub fun use() {
+            let ri <- self.ris.remove(key: "first")
+            absorb(<-ri)
+         }
+
+         destroy() {
+             destroy self.ris
+         }
+     }
+
+     fun absorb(_ ri: <-RI?) {
+         destroy ri
+     }
+   `)
+
+	assert.Nil(t, err)
+}
