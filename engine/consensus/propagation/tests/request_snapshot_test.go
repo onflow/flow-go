@@ -92,7 +92,7 @@ func fuzzyTestPropagationSnapshotRequest(t *testing.T) {
 			err = node.engine.PropagateSnapshotRequest()
 			require.Nil(t, err)
 
-			// flush all but still block the push updates
+			// flush all but still block the pushed updates
 			node.net.FlushAllExcept(blockGuaranteedCollection)
 			allSynced.Done()
 		}(node)
