@@ -30,6 +30,8 @@ type DKGstate interface {
 	Threshold() int
 	// StartDKG starts running a DKG
 	StartDKG(seed []byte) *DKGoutput
+	// NextTimeout set the next timeout of the protocol if any timeout applies
+	NextTimeout() *DKGoutput
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ReceiveDKGMsg processes a new DKG message received by the current node
@@ -109,6 +111,12 @@ func (s *dkgCommon) Size() int {
 // Threshold returns the threshold value t
 func (s *dkgCommon) Threshold() int {
 	return s.threshold
+}
+
+// NextTimeout sets the next protocol timeout if there is any
+// this function should be overwritten by any protocol that uses timeouts
+func (s *dkgCommon) NextTimeout() *DKGoutput {
+	return nil
 }
 
 // DKGmsg is the data sent in any DKG communication

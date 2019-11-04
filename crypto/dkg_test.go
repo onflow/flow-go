@@ -25,7 +25,11 @@ type toProcess struct {
 // it simulates sending a message from one node to another
 func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProcess) {
 	log.Infof("%d Sending to %d:\n", orig, dest)
-	log.Info(msg)
+	log.Debug(msg)
+	/*msgBytes, _ := msg.(DKGmsg)
+	if orig == 0 && (dest == 1 || dest == 2 || dest == 3) {
+		msgBytes[4] = 255
+	}*/
 	newMsg := &toProcess{orig, msgType, msg}
 	chans[dest] <- newMsg
 }
@@ -34,7 +38,7 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 // it simulates broadcasting a message from one node to all nodes
 func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) {
 	log.Infof("%d Broadcasting:", orig)
-	log.Info(msg)
+	log.Debug(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	for i := 0; i < len(chans); i++ {
 		if i != orig {
@@ -46,7 +50,7 @@ func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) 
 // This is a testing function
 // It simulates processing incoming messages by a node
 func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
-	pkChan chan PublicKey, sync chan int, t *testing.T) {
+	pkChan chan PublicKey, sync chan int, t *testing.T, phase int) {
 	for {
 		select {
 		case newMsg := <-chans[current]:
@@ -55,9 +59,22 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 			out.processDkgOutput(current, dkg, chans, t)
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
-			log.Infof("%d quit \n", current)
-			_, pk, _, _ := dkg[current].EndDKG()
-			pkChan <- pk
+			if phase == 0 {
+				log.Infof("%d shares phase ended \n", current)
+				out := dkg[current].NextTimeout()
+				out.processDkgOutput(current, dkg, chans, t)
+			}
+			if phase == 1 {
+				log.Infof("%d complaints phase ended \n", current)
+				out := dkg[current].NextTimeout()
+				out.processDkgOutput(current, dkg, chans, t)
+			}
+			if phase == 2 {
+				log.Infof("%d dkg ended \n", current)
+				_, pk, _, err := dkg[current].EndDKG()
+				assert.Nil(t, err, "end dkg error should be nil")
+				pkChan <- pk
+			}
 			sync <- 0
 			return
 		}
@@ -109,7 +126,7 @@ func TestFeldmanVSSQual(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t)
+		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 0)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
@@ -123,22 +140,48 @@ func TestFeldmanVSSQual(t *testing.T) {
 	out := dkg[lead].StartDKG(seed)
 	out.processDkgOutput(lead, dkg, chans, t)
 
-	// TODO: check the reconstructed key is equal to a_0
+	// sync the first timeout at all nodes and start the second phase
+	for i := 0; i < n; i++ {
+		<-sync
+	}
+	for i := 0; i < n; i++ {
+		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 1)
+	}
+
+	// sync the secomd timeout at all nodes and start the last phase
+	for i := 0; i < n; i++ {
+		<-sync
+	}
+	for i := 0; i < n; i++ {
+		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 2)
+	}
 
 	// this loop synchronizes the main thread to end all DKGs
-	var pkTemp, groupPK []byte
+	var tempPK, groupPK PublicKey
+	var tempPKBytes, groupPKBytes []byte
+	// TODO: check the reconstructed key is equal to a_0
 	for i := 0; i < n; i++ {
 		if i == 0 {
-			groupPK, _ = (<-pkChan).Encode()
+			groupPK = <-pkChan
+			if groupPK == nil {
+				groupPKBytes = []byte{}
+			} else {
+				groupPKBytes, _ = groupPK.Encode()
+			}
+			//fmt.Println("PK", groupPKBytes)
 		} else {
-			pkTemp, _ = (<-pkChan).Encode()
-			assert.Equal(t, groupPK, pkTemp, "2 group public keys are mismatching")
+			tempPK = <-pkChan
+			if tempPK == nil {
+				tempPKBytes = []byte{}
+			} else {
+				tempPKBytes, _ = tempPK.Encode()
+			}
+			assert.Equal(t, groupPKBytes, tempPKBytes, "2 group public keys are mismatching")
 		}
 		<-sync
 	}
+	log.Error("END")
 }
-
-// ---------------------------------------------------------------
 
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
 func TestFeldmanVSS(t *testing.T) {
@@ -165,7 +208,7 @@ func TestFeldmanVSS(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t)
+		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 2)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}

@@ -31,7 +31,6 @@ type complaint struct {
 	received       bool
 	answerReceived bool
 	answer         scalar
-	validComplaint bool
 }
 
 func (s *feldmanVSSQualState) init() {
@@ -53,6 +52,11 @@ func (s *feldmanVSSQualState) NextTimeout() *DKGoutput {
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
+		if s.sharesTimeout {
+			s.complaintsTimeout = true
+		} else {
+			s.sharesTimeout = true
+		}
 		return out
 	}
 	if !s.sharesTimeout && !s.complaintsTimeout {
@@ -73,9 +77,14 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 	if !s.running {
 		return nil, nil, nil, cryptoError{"dkg protocol is not running"}
 	}
+	if !s.sharesTimeout || !s.complaintsTimeout {
+		return nil, nil, nil,
+			cryptoError{"two timeouts should be set before ending dkg"}
+	}
+	//fmt.Println(s.currentIndex, len(s.complaints), s.disqualified)
 	s.running = false
 	// check if a complaint has remained without an answer
-	// a leader is disqualified if a complaint is not answered
+	// a leader is disqualified if a complaint was never answered
 	if !s.disqualified {
 		for _, c := range s.complaints {
 			if c.received && !c.answerReceived {
@@ -84,6 +93,7 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 			}
 		}
 	}
+	//fmt.Println(s.currentIndex, len(s.complaints), s.disqualified)
 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
