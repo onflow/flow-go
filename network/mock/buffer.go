@@ -1,6 +1,8 @@
 package mock
 
-import "sync"
+import (
+	"sync"
+)
 
 // PendingMessage is a pending message to be sent
 type PendingMessage struct {
@@ -41,6 +43,11 @@ func (b *Buffer) Save(from string, engineID uint8, event interface{}, targetIDs 
 func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
 	for {
 		toSend := b.takeAll()
+
+		// This check is necessary to exit the endless forloop
+		if len(toSend) == 0 {
+			return
+		}
 
 		for _, msg := range toSend {
 			sendOne(msg)
