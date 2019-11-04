@@ -66,7 +66,7 @@ func (n *mockPropagationNode) terminate() {
 	<-n.engine.Done()
 }
 
-func terminate(nodes []*mockPropagationNode) {
+func terminate(nodes ...*mockPropagationNode) {
 	for _, n := range nodes {
 		n.terminate()
 	}

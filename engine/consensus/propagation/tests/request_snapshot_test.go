@@ -14,14 +14,12 @@ import (
 func TestPropagateSnapshotRequest(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 
-	rand.Seed(time.Now().UnixNano())
-
 	// If a propagation engine found its peer has different snapshot state from its peer, it should pull the missing
 	// collections from that peer and after that both of them should be in sync.
 	t.Run("should pull missing collection hashes from its peers", func(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
 		// can be delivery directly to another engine on a different node
-		_, nodes, err := createConnectedNodes([]string{"consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298"})
+		_, nodes, err := createConnectedNodes("consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298")
 		require.Nil(t, err)
 
 		node1 := nodes[0]
@@ -53,7 +51,7 @@ func TestPropagateSnapshotRequest(t *testing.T) {
 		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 
 		// clean up
-		terminate([]*mockPropagationNode{node1, node2})
+		terminate(node1, node2)
 	})
 
 	t.Run("fuzzy test once that PropagateSnapshotRequest can keep node stay in sync", fuzzyTestPropagationSnapshotRequest)
@@ -113,5 +111,5 @@ func fuzzyTestPropagationSnapshotRequest(t *testing.T) {
 	}
 
 	// terminates nodes
-	terminate(nodes)
+	terminate(nodes...)
 }

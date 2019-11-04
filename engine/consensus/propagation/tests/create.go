@@ -20,7 +20,7 @@ func prepareNRandomNodesAndMRandomCollectionHashes() (
 	for e := 0; e < N; e++ {
 		entries[e] = fmt.Sprintf("consensus-consensus%v@localhost:10%v", e, e)
 	}
-	_, nodes, err := createConnectedNodes(entries)
+	_, nodes, err := createConnectedNodes(entries...)
 
 	// prepare M distinct collection hashes
 	gcs := make([]*collection.GuaranteedCollection, M)
@@ -31,7 +31,7 @@ func prepareNRandomNodesAndMRandomCollectionHashes() (
 }
 
 // given a list of node entries, return a list of mock nodes and connect them all to a hub
-func createConnectedNodes(nodeEntries []string) (*mock.Hub, []*mockPropagationNode, error) {
+func createConnectedNodes(nodeEntries ...string) (*mock.Hub, []*mockPropagationNode, error) {
 	if len(nodeEntries) == 0 {
 		return nil, nil, errors.New("NodeEntries must not be empty")
 	}

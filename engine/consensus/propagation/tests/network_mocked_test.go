@@ -19,7 +19,7 @@ func TestSubmitCollection(t *testing.T) {
 	t.Run("should propagate collection to connected nodes", func(t *testing.T) {
 		// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
 		// can be delivered directly to another engine on a different node
-		_, nodes, err := createConnectedNodes([]string{"consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298"})
+		_, nodes, err := createConnectedNodes("consensus-consensus1@localhost:7297", "consensus-consensus2@localhost:7298")
 		require.Nil(t, err)
 
 		node1 := nodes[0]
@@ -38,7 +38,7 @@ func TestSubmitCollection(t *testing.T) {
 
 		// should match
 		require.Equal(t, coll.Hash, gc.Hash)
-		terminate([]*mockPropagationNode{node1, node2})
+		terminate(node1, node2)
 	})
 
 	// Verify the behavior property:
@@ -46,11 +46,11 @@ func TestSubmitCollection(t *testing.T) {
 	// result all nodes receive all hashes, and their mempools should all produce the same hash.
 	t.Run("all nodes should have the same mempool state after exchanging received collections",
 		func(t *testing.T) {
-			_, nodes, err := createConnectedNodes([]string{
+			_, nodes, err := createConnectedNodes(
 				"consensus-consensus1@localhost:7297",
 				"consensus-consensus2@localhost:7298",
 				"consensus-consensus3@localhost:7299",
-			})
+			)
 			require.Nil(t, err)
 
 			// prepare 3 nodes that are connected to each other
@@ -87,15 +87,15 @@ func TestSubmitCollection(t *testing.T) {
 			require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 			require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
 
-			terminate([]*mockPropagationNode{node1, node2, node3})
+			terminate(node1, node2, node3)
 		})
 
 	t.Run("should produce the same hash with concurrent calls", func(t *testing.T) {
-		_, nodes, err := createConnectedNodes([]string{
+		_, nodes, err := createConnectedNodes(
 			"consensus-consensus1@localhost:7297",
 			"consensus-consensus2@localhost:7298",
 			"consensus-consensus3@localhost:7299",
-		})
+		)
 		require.Nil(t, err)
 
 		// prepare 3 nodes that are connected to each other
@@ -127,7 +127,7 @@ func TestSubmitCollection(t *testing.T) {
 		require.Equal(t, node1.pool.Hash(), node2.pool.Hash())
 		require.Equal(t, node1.pool.Hash(), node3.pool.Hash())
 
-		terminate([]*mockPropagationNode{node1, node2, node3})
+		terminate(node1, node2, node3)
 	})
 
 	testConcrrencyOnce := func(t *testing.T) {
@@ -156,7 +156,7 @@ func TestSubmitCollection(t *testing.T) {
 		}
 
 		// terminates nodes
-		terminate(nodes)
+		terminate(nodes...)
 	}
 
 	// N or M could be arbitarily big.
