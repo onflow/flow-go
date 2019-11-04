@@ -93,11 +93,11 @@ func (mn *Network) FlushAll() {
 	mn.hub.Buffer.Flush(mn.sendToAllTargets)
 }
 
-// FlushUnblocked takes a predict function, which returns if a message should be blocked, and flushes all the pending
-// messages in the buffer..
-// When going through each message, it will ignore the message if the message should be blocked, or send it off if not.
+// FlushAllExcept takes a function which determines whether a message should be blocked,
+// and go through all pending messages in the buffer, ignore the blocked ones, and send out
+// unblocked messages.
 // It runs in a loop until all the pending messages have been either blocked or sent out.
-func (mn *Network) FlushUnblocked(shouldBlock func(*PendingMessage) bool) {
+func (mn *Network) FlushAllExcept(shouldBlock func(*PendingMessage) bool) {
 	mn.hub.Buffer.Flush(func(m *PendingMessage) error {
 		if shouldBlock(m) {
 			return nil
@@ -111,8 +111,8 @@ func (mn *Network) sendToAllTargets(m *PendingMessage) error {
 	key := eventKey(m.EngineID, m.Event)
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node
-		receiverNetwork := mn.hub.GetNetwork(nodeID)
-		if receiverNetwork == nil {
+		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
+		if exist == false {
 			return errors.Errorf("Network can not find a node by ID %v", nodeID)
 		}
 
