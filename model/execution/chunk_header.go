@@ -4,6 +4,21 @@ package execution
 type ChunkHeader struct {
 	StartState               StateCommitment
 	T0                       uint64 // Computation Consumption of the first transaction
-	StartingTransactionIndex uint32 // pointer to transaction inside the collection
+	StartingTransactionIndex uint32
+	BlockNumber              uint32
 	ComputationConsumption   uint64
+}
+
+func ChunksToChunkHeaders(chunks []Chunk) []ChunkHeader {
+	var chunkHeaders []ChunkHeader
+	var txCounter = 0
+	for _, chunk := range chunks {
+		newChunkHeader := ChunkHeader{StartState: chunk.StartState,
+			T0:                       chunk.FirstTxGasSpent,
+			StartingTransactionIndex: uint32(txCounter),
+			ComputationConsumption:   chunk.TotalGasSpent}
+		chunkHeaders = append(chunkHeaders, newChunkHeader)
+		txCounter += len(chunk.Transactions)
+	}
+	return chunkHeaders
 }
