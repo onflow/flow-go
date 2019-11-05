@@ -123,12 +123,6 @@ func (s *ThresholdSigner) ClearShares() {
 
 // ReceiveThresholdSignatureMsg processes a new TS message received by the current node
 func (s *ThresholdSigner) ReceiveThresholdSignatureMsg(orig int, share Signature) (bool, Signature, error) {
-	// if origin is disqualified, ignore the message
-	// a desqualified node is encoded with a nil public key
-	if s.nodePublicKeys[orig] == nil {
-		return false, nil, nil
-	}
-
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
 		return false, nil, err

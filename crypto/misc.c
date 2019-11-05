@@ -257,7 +257,7 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
 // Simple hashing to G1 as described in the original BLS paper 
 // https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
 // taken and modified from Relic library
-void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
+void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	uint8_t digest[RLC_MD_LEN];
@@ -316,10 +316,15 @@ void mapToG1_simple(ep_t p, const uint8_t *msg, int len) {
 
 // computes hashing to G1 
 // DEBUG/test function
+#define hashToPoint 1
 ep_st* _hashToG1(const byte* data, const int len) {
     ep_st* h = (ep_st*) malloc(sizeof(ep_st));
     ep_new(h);
     // hash to G1 (construction 2 in https://eprint.iacr.org/2019/403.pdf)
-    mapToG1_swu(h, data, len); 
+    #if hashToPoint==1
+    mapToG1_swu(h, data, len);
+    #else 
+    mapToG1_hashCheck(h, data, len);
+    #endif
     return h;
 }

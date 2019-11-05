@@ -14,7 +14,7 @@ var messageToSign = []byte{1, 2, 3}
 
 // This is a testing function
 // It simulates processing incoming messages by a node during DKG
-func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSigner, chans []chan *toProcess,
+func tsDkgRunChan(n int, current int, dkg []DKGstate, ts []*ThresholdSigner, chans []chan *toProcess,
 	pkChan chan PublicKey, dkgSync chan int, t *testing.T) {
 	for {
 		select {
@@ -44,7 +44,7 @@ func tsDkgProcessChan(n int, current int, dkg []DKGstate, ts []*ThresholdSigner,
 
 // This is a testing function
 // It simulates processing incoming messages by a node during TS
-func tsProcessChan(current int, ts []*ThresholdSigner, chans []chan *toProcess,
+func tsRunChan(current int, ts []*ThresholdSigner, chans []chan *toProcess,
 	tsSync chan int, t *testing.T) {
 	// Sign a share and broadcast it
 	sighShare, _ := ts[current].SignShare()
@@ -101,7 +101,7 @@ func TestThresholdSignature(t *testing.T) {
 	// create the node (buffered) communication channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 2*n)
-		go tsDkgProcessChan(n, i, dkg, ts, chans, pkChan, dkgSync, t)
+		go tsDkgRunChan(n, i, dkg, ts, chans, pkChan, dkgSync, t)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
@@ -130,7 +130,7 @@ func TestThresholdSignature(t *testing.T) {
 	// Start TS
 	log.Info("TS starts")
 	for i := 0; i < n; i++ {
-		go tsProcessChan(i, ts, chans, tsSync, t)
+		go tsRunChan(i, ts, chans, tsSync, t)
 	}
 	// this loop synchronizes the main thread to end TS
 	for i := 1; i < n; i++ {

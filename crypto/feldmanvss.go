@@ -2,7 +2,8 @@
 
 package crypto
 
-// Implements Feldman Verifiable Secret Sharing using BLS G2 group.
+// Implements Feldman Verifiable Secret Sharing using BLS set up on BLS381 curve.
+// Private keys are Zr elements while public keys are G2 elements
 
 type feldmanVSSstate struct {
 	// common DKG state
@@ -37,10 +38,12 @@ func (s *feldmanVSSstate) init() {
 }
 
 func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
-	s.running = true
-	// Generate shares if necessary
-	if s.leaderIndex == s.currentIndex {
-		return s.generateShares(seed)
+	if !s.running {
+		s.running = true
+		// Generate shares if necessary
+		if s.leaderIndex == s.currentIndex {
+			return s.generateShares(seed)
+		}
 	}
 	out := &DKGoutput{
 		result: valid,

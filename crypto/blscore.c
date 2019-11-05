@@ -169,7 +169,7 @@ void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
         ep_swu_b12(q, t, -3, neg);
         ep_add(p, p, q);
         ep_norm(p, p);
-        /* Now, multiply by cofactor to get the correct group. */
+        /* multiply by the prime parameter z to get the correct group. */
         fp_prime_get_par(k);
         bn_neg(k, k);
         bn_add_dig(k, k, 1);
@@ -237,7 +237,7 @@ void _blsSign(byte* s, const bn_st *sk, const byte* data, const int len) {
     ep_st h;
     ep_new(&h);
     // hash to G1
-    mapToG1_swu(&h, data, len); 
+    mapToG1_swu(&h, data, len);
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h, SIGNATURE_LEN);

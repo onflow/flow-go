@@ -19,8 +19,6 @@ const (
 	FeldmanVSSQual
 	// Joint Feldman (Pedersen)
 	JointFeldman
-	// Gennaro et.al protocol
-	GJKR
 )
 
 type DKGstate interface {
@@ -36,6 +34,8 @@ type DKGstate interface {
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ReceiveDKGMsg processes a new DKG message received by the current node
 	ReceiveDKGMsg(int, DKGmsg) *DKGoutput
+	// Running returns the running state of the DKG protocol
+	Running() bool
 }
 
 // index is the node index type used as participants ID
@@ -89,6 +89,13 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 		fvssq.init()
 		log.Debugf("new dkg my index %d, leader is %d\n", fvssq.currentIndex, fvssq.leaderIndex)
 		return fvssq, nil
+	case JointFeldman:
+		jf := &JointFeldmanState{
+			dkgCommon: common,
+		}
+		jf.init()
+		log.Debugf("new dkg my index %d\n", jf.currentIndex)
+		return jf, nil
 	default:
 		return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
 	}
@@ -101,6 +108,11 @@ type dkgCommon struct {
 	currentIndex index
 	// running is true when the DKG protocol is runnig, is false otherwise
 	running bool
+}
+
+// Running returns the running state of the DKG protocol
+func (s *dkgCommon) Running() bool {
+	return s.running
 }
 
 // Size returns the size of the DKG group n
@@ -116,7 +128,7 @@ func (s *dkgCommon) Threshold() int {
 // NextTimeout sets the next protocol timeout if there is any
 // this function should be overwritten by any protocol that uses timeouts
 func (s *dkgCommon) NextTimeout() *DKGoutput {
-	return nil
+	return &DKGoutput{invalid, nil, nil}
 }
 
 // DKGmsg is the data sent in any DKG communication
@@ -147,7 +159,7 @@ const (
 	invalid
 )
 
-// DKGoutput is the type of the uotput of any DKG fucntion
+// DKGoutput is the outtput type of any DKG fucntion
 type DKGoutput struct {
 	result DKGresult
 	action []DKGToSend

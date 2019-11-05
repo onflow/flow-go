@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -49,8 +50,11 @@ func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) 
 
 // This is a testing function
 // It simulates processing incoming messages by a node
-func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
+func dkgRunChan(current int, dkg []DKGstate, chans []chan *toProcess,
 	pkChan chan PublicKey, sync chan int, t *testing.T, phase int) {
+	// wait till DKG starts
+	for dkg[current].Running() == false {
+	}
 	for {
 		select {
 		case newMsg := <-chans[current]:
@@ -85,11 +89,10 @@ func dkgProcessChan(current int, dkg []DKGstate, chans []chan *toProcess,
 // It processes the output of a the DKG library
 func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 	chans []chan *toProcess, t *testing.T) {
-	assert.Nil(t, out.err)
-	if out.err != nil {
-		log.Error("DKG output error: " + out.err.Error())
+	if out == nil {
+		fmt.Println("AAAAH")
 	}
-
+	assert.Nil(t, out.err, "DKG output error")
 	assert.Equal(t, out.result, valid, "Result computed by %d is not correct", current)
 
 	for _, msg := range out.action {
@@ -101,9 +104,10 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 	}
 }
 
+//-----------------------------------------------------------------------------
 // Testing Feldman VSS with the qualified system by simulating a network of n nodes
 func TestFeldmanVSSQual(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS with complaints starts")
 	// number of nodes to test
 	n := 5
@@ -126,26 +130,21 @@ func TestFeldmanVSSQual(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 0)
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 0)
 	}
-	// start DKG in all nodes but the leader
+	// start DKG in all nodes
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
-		if current != lead {
-			out := dkg[current].StartDKG(seed)
-			out.processDkgOutput(current, dkg, chans, t)
-		}
+		out := dkg[current].StartDKG(seed)
+		out.processDkgOutput(current, dkg, chans, t)
 	}
-	// start the leader (this avoids a data racing issue)
-	out := dkg[lead].StartDKG(seed)
-	out.processDkgOutput(lead, dkg, chans, t)
 
 	// sync the first timeout at all nodes and start the second phase
 	for i := 0; i < n; i++ {
 		<-sync
 	}
 	for i := 0; i < n; i++ {
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 1)
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 1)
 	}
 
 	// sync the secomd timeout at all nodes and start the last phase
@@ -153,7 +152,7 @@ func TestFeldmanVSSQual(t *testing.T) {
 		<-sync
 	}
 	for i := 0; i < n; i++ {
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 2)
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 2)
 	}
 
 	// this loop synchronizes the main thread to end all DKGs
@@ -180,12 +179,12 @@ func TestFeldmanVSSQual(t *testing.T) {
 		}
 		<-sync
 	}
-	log.Error("END")
 }
 
+//-----------------------------------------------------------------------------
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
-func TestFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
+func TestFeldmanVSSSimple(t *testing.T) {
+	log.SetLevel(log.InfoLevel)
 	log.Debug("Feldman VSS starts")
 	// number of nodes to test
 	n := 5
@@ -208,30 +207,112 @@ func TestFeldmanVSS(t *testing.T) {
 	// create the node channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *toProcess, 10)
-		go dkgProcessChan(i, dkg, chans, pkChan, sync, t, 2)
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 2)
 	}
-	// start DKG in all nodes but the leader
+	// start DKG in all nodes
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
-		if current != lead {
-			out := dkg[current].StartDKG(seed)
-			out.processDkgOutput(current, dkg, chans, t)
-		}
+		out := dkg[current].StartDKG(seed)
+		out.processDkgOutput(current, dkg, chans, t)
 	}
-	// start the leader (this avoids a data racing issue)
-	out := dkg[lead].StartDKG(seed)
-	out.processDkgOutput(lead, dkg, chans, t)
-
-	// TODO: check the reconstructed key is equal to a_0
 
 	// this loop synchronizes the main thread to end all DKGs
-	var pkTemp, groupPK []byte
+	var tempPK, groupPK PublicKey
+	var tempPKBytes, groupPKBytes []byte
+	// TODO: check the reconstructed key is equal to a_0
 	for i := 0; i < n; i++ {
 		if i == 0 {
-			groupPK, _ = (<-pkChan).Encode()
+			groupPK = <-pkChan
+			if groupPK == nil {
+				groupPKBytes = []byte{}
+			} else {
+				groupPKBytes, _ = groupPK.Encode()
+			}
+			//fmt.Println("PK", groupPKBytes)
 		} else {
-			pkTemp, _ = (<-pkChan).Encode()
-			assert.Equal(t, groupPK, pkTemp, "2 group public keys are mismatching")
+			tempPK = <-pkChan
+			if tempPK == nil {
+				tempPKBytes = []byte{}
+			} else {
+				tempPKBytes, _ = tempPK.Encode()
+			}
+			assert.Equal(t, groupPKBytes, tempPKBytes, "2 group public keys are mismatching")
+		}
+		<-sync
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Testing JointFeldman by simulating a network of n nodes
+func TestJointFeldman(t *testing.T) {
+	log.SetLevel(log.InfoLevel)
+	log.Debug("Feldman VSS with complaints starts")
+	// number of nodes to test
+	n := 5
+	dkg := make([]DKGstate, n)
+	pkChan := make(chan PublicKey)
+	chans := make([]chan *toProcess, n)
+	sync := make(chan int)
+
+	// create DKG in all nodes
+	for current := 0; current < n; current++ {
+		var err error
+		dkg[current], err = NewDKG(JointFeldman, n, current, 0)
+		assert.Nil(t, err)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+	}
+	// create the node channels
+	for i := 0; i < n; i++ {
+		chans[i] = make(chan *toProcess, 10)
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 0)
+	}
+	// start DKG in all nodes
+	seed := []byte{1, 2, 3}
+	for current := 0; current < n; current++ {
+		out := dkg[current].StartDKG(seed)
+		out.processDkgOutput(current, dkg, chans, t)
+	}
+
+	// sync the first timeout at all nodes and start the second phase
+	for i := 0; i < n; i++ {
+		<-sync
+	}
+	for i := 0; i < n; i++ {
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 1)
+	}
+
+	// sync the secomd timeout at all nodes and start the last phase
+	for i := 0; i < n; i++ {
+		<-sync
+	}
+	for i := 0; i < n; i++ {
+		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 2)
+	}
+
+	// this loop synchronizes the main thread to end all DKGs
+	var tempPK, groupPK PublicKey
+	var tempPKBytes, groupPKBytes []byte
+	// TODO: check the reconstructed key is equal to a_0
+	for i := 0; i < n; i++ {
+		if i == 0 {
+			groupPK = <-pkChan
+			if groupPK == nil {
+				groupPKBytes = []byte{}
+			} else {
+				groupPKBytes, _ = groupPK.Encode()
+			}
+			//fmt.Println("PK", groupPKBytes)
+		} else {
+			tempPK = <-pkChan
+			if tempPK == nil {
+				tempPKBytes = []byte{}
+			} else {
+				tempPKBytes, _ = tempPK.Encode()
+			}
+			assert.Equal(t, groupPKBytes, tempPKBytes, "2 group public keys are mismatching")
 		}
 		<-sync
 	}

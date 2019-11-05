@@ -2,8 +2,9 @@
 
 package crypto
 
-// Implements Feldman Verifiable Secret Sharing using BLS G2 group.
+// Implements Feldman Verifiable Secret Sharing using BLS setup on BLS381 curve.
 // a complaint system is added to qualify/disqualify the leader
+// Private keys are Zr elements while public keys are G2 elements
 
 type feldmanVSSQualState struct {
 	// feldmanVSSstate state
