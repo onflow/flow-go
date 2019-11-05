@@ -27,6 +27,7 @@ func init() {
 	cmd.AddCommand(cadence.Cmd)
 	cmd.AddCommand(transactions.Cmd)
 	cmd.AddCommand(version.Cmd)
+	cmd.PersistentFlags().StringVarP(&cli.ConfigPath, "config-path", "f", "flow.json", "Path to flow configuration file")
 }
 
 func Execute() {
