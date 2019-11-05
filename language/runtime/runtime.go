@@ -528,8 +528,7 @@ func (r *interpreterRuntime) executeScript(
 		}),
 		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
 		interpreter.WithStorageWriteHandler(r.storageWriteHandler(runtimeInterface)),
-		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
-			// TODO: improve
+		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 			return indexingType.String()
 		}),
 	)
@@ -602,17 +601,15 @@ func accountValue(address flow.Address) interpreter.Value {
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(address.String()),
-			"storage": interpreter.StorageValue{Identifier: address},
+			"storage": interpreter.StorageValue{Identifier: address.String()},
 		},
 	}
 }
 
 func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, key interface{}) interpreter.OptionalValue {
-		address := storageIdentifier.(flow.Address)
-
+	return func(_ *interpreter.Interpreter, storageIdentifier string, key string) interpreter.OptionalValue {
 		// TODO: fix controller
-		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte(key.(string)))
+		storedData, err := runtimeInterface.GetValue([]byte(storageIdentifier), []byte{}, []byte(key))
 		if err != nil {
 			panic(err)
 		}
@@ -635,10 +632,7 @@ func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) inte
 }
 
 func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType interface{}, value interpreter.OptionalValue) {
-		address := storageIdentifier.(flow.Address)
-		key := []byte(keyType.(string))
-
+	return func(_ *interpreter.Interpreter, storageIdentifier string, key string, value interpreter.OptionalValue) {
 		var newData []byte
 		switch typedValue := value.(type) {
 		case interpreter.SomeValue:
@@ -657,7 +651,7 @@ func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) int
 		}
 
 		// TODO: fix controller
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, key, newData)
+		err := runtimeInterface.SetValue([]byte(storageIdentifier), []byte{}, []byte(key), newData)
 		if err != nil {
 			panic(err)
 		}

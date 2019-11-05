@@ -92,16 +92,16 @@ type OnStatementFunc func(
 //
 type StorageReadHandlerFunc func(
 	interpreter *Interpreter,
-	storageIdentifier interface{},
-	key interface{},
+	storageIdentifier string,
+	key string,
 ) OptionalValue
 
 // StorageWriteHandlerFunc is a function that handles storage writes.
 //
 type StorageWriteHandlerFunc func(
 	interpreter *Interpreter,
-	storageIdentifier interface{},
-	key interface{},
+	storageIdentifier string,
+	key string,
 	value OptionalValue,
 )
 
@@ -109,9 +109,9 @@ type StorageWriteHandlerFunc func(
 //
 type StorageKeyHandlerFunc func(
 	interpreter *Interpreter,
-	storageIdentifier interface{},
+	storageIdentifier string,
 	indexingType sema.Type,
-) interface{}
+) string
 
 type Interpreter struct {
 	Checker             *sema.Checker
@@ -2135,10 +2135,10 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 		})
 }
 
-func (interpreter *Interpreter) readStored(storageIdentifier interface{}, key interface{}) OptionalValue {
+func (interpreter *Interpreter) readStored(storageIdentifier string, key string) OptionalValue {
 	return interpreter.storageReadHandler(interpreter, storageIdentifier, key)
 }
 
-func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, key interface{}, value OptionalValue) {
+func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
 	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
 }

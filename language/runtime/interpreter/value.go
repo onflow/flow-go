@@ -1481,7 +1481,7 @@ func (v AnyValue) String() string {
 // StorageValue
 
 type StorageValue struct {
-	Identifier interface{}
+	Identifier string
 }
 
 func (StorageValue) isValue() {}
@@ -1495,8 +1495,8 @@ func (v StorageValue) Copy() Value {
 // ReferenceValue
 
 type ReferenceValue struct {
-	StorageIdentifier interface{}
-	Key               interface{}
+	StorageIdentifier string
+	Key               string
 }
 
 func (ReferenceValue) isValue() {}
