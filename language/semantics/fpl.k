@@ -187,15 +187,15 @@ module FPL-COMMON-SYNTAX
 
   syntax Path ::= Ident
                 | "self"
-                | Path "[" Exp "]"
-                | Path "." Ident
+                | Path "[" Exp "]" [klabel(index)]
+                | Path "." Ident [klabel(field)]
+                | "(" Path ")" [bracket]
 
   syntax left lval
 
   syntax Exp ::= IntLit [klabel(intLit), avoid, symbol, function]
                | FPLString
-               | Ident
-               | "self"
+               | Path
                | "nil"
                | Bool
                | "(" Exp ")" [bracket]
@@ -204,10 +204,10 @@ module FPL-COMMON-SYNTAX
                | "{" DictEntries "}" [strict(1)]
                | "fun" "(" Formals ")" FunBody
                | "fun" "(" Formals ")" ":" Annot FunBody
-               | Exp "[" Exp "]" [lval, seqstrict]
-               | Exp "." Ident    [lval, strict(1)] // field access
+               | Exp "[" Exp "]" [lval, seqstrict, klabel(index)]
+               | Exp "." Ident    [lval, klabel(field)] // field access
                | Ident "(" Actuals ")" [strict(2), klabel(call)]
-               | Exp "." Ident "(" Actuals ")" [seqstrict(1,3)]
+               | Exp "." Ident "(" Actuals ")"
                | TypeId "(" Actuals ")" [klabel(call)]          // struct creation
                | "create" TypeId "(" Actuals ")" // resource creation
                > non-assoc:
@@ -294,9 +294,8 @@ module FPL-SYNTAX
 endmodule
 
 module FPL-SCOPES
-    imports INT-SYNTAX
-
-    syntax Scope ::= "global" | local(Int)
+    syntax Val
+    syntax Scope ::= "global" | local(Val)
 
     syntax Pgm
     syntax KItem ::= declare(Pgm) | initialize(Pgm)
@@ -374,6 +373,11 @@ module FPL-TYPING
 
   syntax Ident ::= "IntLit" [token]
 
+  syntax Ident ::= "length" [token] | "x" [token] | "y" [token] | "at" [token]
+                 | "concat" [token] | "contains" [token] | "append" [token]
+                 | "insert" [token] | "remove" [token] | "removeFirst" [token]
+                 | "removeLast" [token]
+
   rule type(E) => infer(#type(E))
   rule infer(IntLit) => Int
   rule infer([T]) => [infer(T)::Type]
@@ -389,6 +393,8 @@ module FPL-TYPING
   rule #type([ E, .Exps ]) => [ #type(E) ]
   rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
   rule #type(E1 [ E2 ]) => elementType(#type(E1))
+  rule #type(E . F) => fieldType(#type(E), F)
+  rule #type(E . F(_)) => returnType(fieldType(#type(E), F))
   rule #type(- E => E)
   rule #type(! _) => Bool
   rule #type(E1 * E2) => type(E1, E2)
@@ -409,9 +415,20 @@ module FPL-TYPING
   rule #type(_ >= _) => Bool
   rule #type(_ ? E1 : E2) => type(E1, E2)
 
+  syntax Type ::= fieldType(Type, Ident) [function]
+  rule fieldType([_] #Or [_;_::Int], length) => Int
+  rule fieldType(([_] #Or [_;_::Int]) #as T, concat) => ((T): T)
+  rule fieldType([T] #Or [T;_::Int], contains) => ((T): Bool)
+  rule fieldType([T] #Or [T;_::Int], append) => ((T): Void)
+  rule fieldType([T] #Or [T;_::Int], insert) => ((Int, T): Void)
+  rule fieldType([T] #Or [T;_::Int], remove) => ((Int): T)
+  rule fieldType([T] #Or [T;_::Int], removeFirst) => ((.Types): T)
+  rule fieldType([T] #Or [T;_::Int], removeLast) => ((.Types): T)
+
   syntax Type ::= type(Exp, Exp) [function]
                 | #type(Type, Type) [function]
                 | elementType(Type) [function]
+                | returnType(Type) [function]
 
   rule type(E1, E2) => #type(#type(E1), #type(E2))
   rule #type(IntLit, T) => T
@@ -420,6 +437,8 @@ module FPL-TYPING
 
   rule elementType([T]) => T
   rule elementType([T;_::Int]) => T
+
+  rule returnType(((_): T)) => T
 
   syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
   rule pow8 => 256 [macro]
@@ -512,24 +531,24 @@ module FPL-VARIABLE-DECLARATION
 
   syntax Path ::= loc(Path)
   syntax Path ::= Loc
-  syntax Loc ::= loc(Int, List)
+  syntax Loc ::= loc(Int, List, Type)
   syntax KResult ::= Loc
 
   context (HOLE::Path => loc(HOLE)) = _
 
-  rule <k> loc(X:Ident) => loc(loc(L, .List)) ... </k>
-       <env>... X |-> env(... loc: L) ...</env>
+  rule <k> loc(X:Ident) => loc(loc(L, .List, T)) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
   context loc((HOLE::Path => loc(HOLE)) [ _ ])
-  context loc(loc(_, _) [ HOLE ] )
-  rule loc(loc(_, _) [ v(I:Int, _) => I ] )
-  rule loc(loc(L, Idx) [ I:Int ]) => loc(loc(L, Idx ListItem(I)))
+  context loc(loc(_, _, _) [ HOLE ] )
+  rule loc(loc(_, _, _) [ v(I:Int, _) => I ] )
+  rule loc(loc(L, Idx, T) [ I:Int ]) => loc(loc(L, Idx ListItem(I), elementType(T)))
 
-  context loc(_, _) = HOLE
+  context loc(_, _, _) = HOLE
 
-  rule <k> loc(L, Idx) = (V':Val #Or v(V':Val, _)) => . ... </k>
+  rule <k> loc(L, Idx, _) = (V':Val #Or v(V':Val, _)) => . ... </k>
        <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
     requires isValid(V, Idx)
-  rule <k> loc(L, Idx) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
+  rule <k> loc(L, Idx, _) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
        <store>... L |-> V ...</store>
     requires notBool isValid(V, Idx)
 
@@ -541,6 +560,9 @@ module FPL-VARIABLE-DECLARATION
   rule updateLoc(.List, _, V) => V
   rule updateLoc(ListItem(I:Int) L, array(V:List), V') => array(V [ I <- updateLoc(L, {V [ I ]}:>Val, V') ])
 
+  syntax Val ::= getLoc(List, Val) [function]
+  rule getLoc(.List, V) => V
+  rule getLoc(ListItem(I:Int) L, array(V:List)) => getLoc(L, {V [ I ]}:>Val)
 
 endmodule
 
@@ -584,6 +606,7 @@ endmodule
 module FPL-FUNCTIONS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
 
   rule <k> declare(fun F:Ident ( Fs ) : T { _::Contract _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
@@ -618,10 +641,26 @@ module FPL-FUNCTIONS
        <store> S </store>
     requires notBool L in_keys(S)
 
-  rule <k>((F:Ident)(Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
-       <env> (_::Map F |-> env(... loc: L)) #as Rho => Rho' </env>
-       <store>... L |-> funDef(... args: Params, body: B, env: Rho') ...</store>
-       <scope> Scope => local(L) </scope>
+  rule <k> (F:Ident)(Args) => call v(V, T) (Args) ... </k>
+       <env>... F |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
+    requires isKResult(Args)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident
+  context HOLE . _::Ident requires notBool isPath(HOLE)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident ( _::Actuals )
+  context E . _::Ident ( HOLE::Actuals ) requires isKResult(E)
+  context HOLE . _::Ident ( _::Actuals ) requires notBool isPath(HOLE)
+
+  rule <k> V . F:Ident (Args) => call V . F (Args) ... </k>
+    requires isKResult(Args) andBool isKResult(V)
+
+  syntax Exp ::= "call" Exp "(" Actuals ")" [strict(1)]
+
+  rule <k> (call v(funDef(... args: Params, body: B, env: Rho') #as V, _) (Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
+       <env> Rho => Rho' </env>
+       <scope> Scope => local(V) </scope>
        <fstack> .List => ListItem(frame(K, Rho, Scope, LS)) ...</fstack>
        <lstack> LS => .List </lstack>
   rule <k> return => return v(unit(), Void) ... </k>
@@ -631,8 +670,7 @@ module FPL-FUNCTIONS
        <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
        <lstack> _ => LS </lstack>
   rule <k> return V:Val => return v(V, T) ... </k>
-       <scope> local(L) </scope>
-       <store>... L |-> funDef(... result: T) ...</store>
+       <scope> local(funDef(... result: T)) </scope>
 
 endmodule
 
@@ -753,6 +791,7 @@ endmodule
 module FPL-ARRAYS
   imports FPL-CONFIGURATION
   imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
 
   rule [ Vs ] => array(arrayLit(Vs))
     requires isKResult(Vs)
@@ -769,8 +808,45 @@ module FPL-ARRAYS
   rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
     requires I <Int 0 orBool I >=Int size(L)
 
-  syntax Ident ::= "length" [token]
+  rule <k> loc(Loc, Idx, [_] #Or [_;_::Int]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V </store>
+  rule loc(L, Idx, ([_] #Or [_;_::Int]) #as T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
+  rule loc(L, Idx, [T] #Or [T;_::Int]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
   rule v(array(L::List), _) . length => v(size(L), Int)
+  rule v(array(L::List), T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, concat, x), .Map), ((T): T))
+  rule v(array(L::List), [T]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, contains, x), .Map), ((T): Bool))
+  rule loc(L, Idx, [T]) . append => v(funDef(#token("_", "Ident") x: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, append, x), .Map), ((T): Void))
+  rule loc(L, Idx, [T]) . insert => v(funDef(at x: Int, #token("_", "Ident") y: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, insert, x, y), .Map), ((Int, T): Void))
+  rule loc(L, Idx, [T]) . remove => v(funDef(at x: Int, T, pre { .Conditions }, return arrayBuiltin(L, Idx, remove, x), .Map), ((Int): T))
+  rule loc(L, Idx, [T]) . removeFirst => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeFirst, .Exps), .Map), ((.Types): T))
+  rule loc(L, Idx, [T]) . removeLast => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeLast, .Exps), .Map), ((.Types): T))
+
+  syntax Exp ::= arrayBuiltin(List, Ident, Exps) [strict(3)]
+  rule arrayBuiltin(L, concat, v(array(L2), _)) => array(L L2)
+  rule arrayBuiltin(L, contains, v(V, _)) => V in L
+
+  syntax Exp ::= arrayBuiltin(Int, List, Ident, Exps) [strict(4)]
+  rule <k> arrayBuiltin(Loc, Idx, concat, v(array(L2), _)) => #fun(array(L) => array(L L2))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, contains, v(V', _)) => #fun(array(L) => V' in L)(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, append, v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(L ListItem(V')))(getLoc(Idx, V)))) ...</store>
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) ListItem(V') range(L, At, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), _) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => getLoc(Idx ListItem(At), V) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) range(L, At +Int 1, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx::List, removeFirst, .Exps) => arrayBuiltin(Loc, Idx, remove, v(0, Int)) ... </k>
+  rule <k> arrayBuiltin(Loc, Idx, removeLast, .Exps) => arrayBuiltin(Loc, Idx, remove, v(#fun(array(L) => size(L) -Int 1)(getLoc(Idx, V)), Int)) ... </k>
+       <store>... Loc |-> V ...</store>
 endmodule
 
 module FPL
