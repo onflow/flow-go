@@ -528,6 +528,10 @@ func (r *interpreterRuntime) executeScript(
 		}),
 		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
 		interpreter.WithStorageWriteHandler(r.storageWriteHandler(runtimeInterface)),
+		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+			// TODO: improve
+			return indexingType.String()
+		}),
 	)
 	if err != nil {
 		return nil, Error{[]error{err}}
@@ -604,12 +608,11 @@ func accountValue(address flow.Address) interpreter.Value {
 }
 
 func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
+	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, key interface{}) interpreter.OptionalValue {
 		address := storageIdentifier.(flow.Address)
-		key := []byte(keyType.String())
 
 		// TODO: fix controller
-		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, key)
+		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, []byte(key.(string)))
 		if err != nil {
 			panic(err)
 		}
@@ -632,9 +635,9 @@ func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) inte
 }
 
 func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType interface{}, value interpreter.OptionalValue) {
 		address := storageIdentifier.(flow.Address)
-		key := []byte(keyType.String())
+		key := []byte(keyType.(string))
 
 		var newData []byte
 		switch typedValue := value.(type) {

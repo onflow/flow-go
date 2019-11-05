@@ -4650,16 +4650,16 @@ func TestInterpretStorage(t *testing.T) {
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	//
 
-	getter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type) interpreter.OptionalValue {
-		value, ok := storedValues[key.String()]
+	getter := func(_ *interpreter.Interpreter, _ interface{}, key interface{}) interpreter.OptionalValue {
+		value, ok := storedValues[key.(string)]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type, value interpreter.OptionalValue) {
-		storedValues[key.String()] = value
+	setter := func(_ *interpreter.Interpreter, _ interface{}, key interface{}, value interpreter.OptionalValue) {
+		storedValues[key.(string)] = value
 	}
 
 	storageIdentifier := &storageIdentifier{}
@@ -4685,6 +4685,11 @@ func TestInterpretStorage(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5198,6 +5203,11 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5215,7 +5225,8 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	require.Equal(t,
 		interpreter.ReferenceValue{
 			StorageIdentifier: storageValue.Identifier,
-			IndexingType:      rType,
+			// TODO: improve
+			Key: rType.String(),
 		},
 		value,
 	)
@@ -5228,20 +5239,20 @@ func TestInterpretReferenceUse(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, key interface{}) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key.(string)]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, key interface{}, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key.(string)] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5285,6 +5296,11 @@ func TestInterpretReferenceUse(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5308,20 +5324,20 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, key interface{}) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key.(string)]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, key interface{}, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key.(string)] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5366,6 +5382,11 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5390,20 +5411,20 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 	storageIdentifier := &storageIdentifier{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id interface{}, key interface{}) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key.(string)]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id interface{}, key interface{}, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key.(string)] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5430,6 +5451,11 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ interface{}, indexingType sema.Type) interface{} {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)

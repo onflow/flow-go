@@ -93,7 +93,7 @@ type OnStatementFunc func(
 type StorageReadHandlerFunc func(
 	interpreter *Interpreter,
 	storageIdentifier interface{},
-	indexingType sema.Type,
+	key interface{},
 ) OptionalValue
 
 // StorageWriteHandlerFunc is a function that handles storage writes.
@@ -101,9 +101,17 @@ type StorageReadHandlerFunc func(
 type StorageWriteHandlerFunc func(
 	interpreter *Interpreter,
 	storageIdentifier interface{},
-	indexingType sema.Type,
+	key interface{},
 	value OptionalValue,
 )
+
+// StorageKeyHandlerFunc is a function that handles storage indexing types.
+//
+type StorageKeyHandlerFunc func(
+	interpreter *Interpreter,
+	storageIdentifier interface{},
+	indexingType sema.Type,
+) interface{}
 
 type Interpreter struct {
 	Checker             *sema.Checker
@@ -118,6 +126,7 @@ type Interpreter struct {
 	onStatement         OnStatementFunc
 	storageReadHandler  StorageReadHandlerFunc
 	storageWriteHandler StorageWriteHandlerFunc
+	storageKeyHandler   StorageKeyHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -180,6 +189,16 @@ func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
 	}
 }
 
+// WithStorageKeyHandlerFunc returns an interpreter option which sets the given function
+// as the function that is used when a stored value is written.
+//
+func WithStorageKeyHandlerFunc(handler StorageKeyHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetStorageKeyHandler(handler)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:             checker,
@@ -223,6 +242,12 @@ func (interpreter *Interpreter) SetStorageReadHandler(function StorageReadHandle
 //
 func (interpreter *Interpreter) SetStorageWriteHandler(function StorageWriteHandlerFunc) {
 	interpreter.storageWriteHandler = function
+}
+
+// SetStorageKeyHandler sets the function that is used when a storage is indexed.
+//
+func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerFunc) {
+	interpreter.storageKeyHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -947,7 +972,8 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 
 			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
-				interpreter.writeStored(typedResult.Identifier, indexingType, value.(OptionalValue))
+				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
+				interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
 				return Done{}
 
 			default:
@@ -1347,7 +1373,8 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 
 			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-				result := interpreter.readStored(typedResult.Identifier, indexingType)
+				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
+				result := interpreter.readStored(typedResult.Identifier, key)
 				return Done{Result: result}
 
 			default:
@@ -2097,19 +2124,21 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			storage := result.(StorageValue)
 
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
 			referenceValue := ReferenceValue{
 				StorageIdentifier: storage.Identifier,
-				IndexingType:      indexingType,
+				Key:               key,
 			}
+
 			return Done{Result: referenceValue}
 		})
 }
 
-func (interpreter *Interpreter) readStored(storageIdentifier interface{}, indexingType sema.Type) OptionalValue {
-	return interpreter.storageReadHandler(interpreter, storageIdentifier, indexingType)
+func (interpreter *Interpreter) readStored(storageIdentifier interface{}, key interface{}) OptionalValue {
+	return interpreter.storageReadHandler(interpreter, storageIdentifier, key)
 }
 
-func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, indexingType sema.Type, value OptionalValue) {
-	interpreter.storageWriteHandler(interpreter, storageIdentifier, indexingType, value)
+func (interpreter *Interpreter) writeStored(storageIdentifier interface{}, key interface{}, value OptionalValue) {
+	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
 }

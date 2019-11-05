@@ -1461,7 +1461,8 @@ func (v SomeValue) String() string {
 
 type AnyValue struct {
 	Value Value
-	Type  sema.Type
+	// TODO: don't store
+	Type sema.Type
 }
 
 func (AnyValue) isValue() {}
@@ -1495,7 +1496,7 @@ func (v StorageValue) Copy() Value {
 
 type ReferenceValue struct {
 	StorageIdentifier interface{}
-	IndexingType      sema.Type
+	Key               interface{}
 }
 
 func (ReferenceValue) isValue() {}
@@ -1506,7 +1507,7 @@ func (v ReferenceValue) Copy() Value {
 
 func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	switch referenced :=
-		interpreter.readStored(v.StorageIdentifier, v.IndexingType).(type) {
+		interpreter.readStored(v.StorageIdentifier, v.Key).(type) {
 	case SomeValue:
 		return referenced.Value
 	case NilValue:
