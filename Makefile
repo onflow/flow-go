@@ -62,7 +62,7 @@ ci: install-tools generate check-generated-code lint-sdk test
 install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
 
-cmd/flow/flow: cli cmd crypto model proto sdk
+cmd/flow/flow: $(wildcard cli/**/*.go) $(wildcard cmd/**/*.go) $(wildcard crypto/**/*.go) $(wildcard model/**/*.go) $(wildcard proto/**/*.go) $(wildcard sdk/**/*.go)
 	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: docker-build-emulator
