@@ -1,7 +1,6 @@
 package sema
 
 import (
-	"encoding/gob"
 	"fmt"
 	"math"
 	"math/big"
@@ -1645,32 +1644,4 @@ func IsValidEqualityType(ty Type) bool {
 	}
 
 	return false
-}
-
-////
-
-func init() {
-	gob.Register(&AnyType{})
-	gob.Register(&NeverType{})
-	gob.Register(&VoidType{})
-	gob.Register(&InvalidType{})
-	gob.Register(&OptionalType{})
-	gob.Register(&BoolType{})
-	gob.Register(&StringType{})
-	gob.Register(&IntegerType{})
-	gob.Register(&IntType{})
-	gob.Register(&Int8Type{})
-	gob.Register(&Int16Type{})
-	gob.Register(&Int32Type{})
-	gob.Register(&Int64Type{})
-	gob.Register(&UInt8Type{})
-	gob.Register(&UInt16Type{})
-	gob.Register(&UInt32Type{})
-	gob.Register(&UInt64Type{})
-	gob.Register(&DictionaryType{})
-	gob.Register(&VariableSizedType{})
-	gob.Register(&ConstantSizedType{})
-	gob.Register(&FunctionType{})
-	gob.Register(&CompositeType{})
-	gob.Register(&InterfaceType{})
 }

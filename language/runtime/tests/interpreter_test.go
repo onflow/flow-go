@@ -4650,23 +4650,19 @@ func TestInterpretStorage(t *testing.T) {
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	//
 
-	getter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type) interpreter.OptionalValue {
-		value, ok := storedValues[key.String()]
+	getter := func(_ *interpreter.Interpreter, _ string, key string) interpreter.OptionalValue {
+		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, _ interface{}, key sema.Type, value interpreter.OptionalValue) {
-		storedValues[key.String()] = value
+	setter := func(_ *interpreter.Interpreter, _ string, key string, value interpreter.OptionalValue) {
+		storedValues[key] = value
 	}
 
-	storageIdentifier := &storageIdentifier{}
-
-	storageValue := interpreter.StorageValue{
-		Identifier: storageIdentifier,
-	}
+	storageValue := interpreter.StorageValue{}
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
@@ -4685,6 +4681,11 @@ func TestInterpretStorage(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5198,6 +5199,11 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5215,7 +5221,8 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	require.Equal(t,
 		interpreter.ReferenceValue{
 			StorageIdentifier: storageValue.Identifier,
-			IndexingType:      rType,
+			// TODO: improve
+			Key: rType.String(),
 		},
 		value,
 	)
@@ -5225,23 +5232,23 @@ func TestInterpretReferenceUse(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := &storageIdentifier{}
+	storageIdentifier := "test-account-storage"
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5285,6 +5292,11 @@ func TestInterpretReferenceUse(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5305,23 +5317,23 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := &storageIdentifier{}
+	storageIdentifier := "test-account-storage"
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5366,6 +5378,11 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
@@ -5387,23 +5404,23 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := &storageIdentifier{}
+	storageIdentifier := "test-account-storage"
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
 		assert.Equal(t, storageIdentifier, id)
 
-		value, ok := storedValues[keyType.String()]
+		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
 		}
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id interface{}, keyType sema.Type, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
 		assert.Equal(t, storageIdentifier, id)
 
-		storedValues[keyType.String()] = value
+		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
@@ -5430,6 +5447,11 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
 			},
 		},
 	)
