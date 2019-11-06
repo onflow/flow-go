@@ -3158,6 +3158,39 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 	)
 }
 
+func TestInterpretCompositeNilEquality(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		// TODO: add support for contracts
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		inter := parseCheckAndInterpret(t, fmt.Sprintf(`
+          %[1]s X {}
+
+          let x: %[2]sX? %[3]s %[4]s X()
+          let y = x == nil
+          let z = nil == x
+        `,
+			kind.Keyword(),
+			kind.Annotation(),
+			kind.TransferOperator(),
+			kind.ConstructionKeyword(),
+		))
+
+		assert.Equal(t,
+			interpreter.BoolValue(false),
+			inter.Globals["y"].Value,
+		)
+
+		assert.Equal(t,
+			interpreter.BoolValue(false),
+			inter.Globals["z"].Value,
+		)
+	}
+}
+
 func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `

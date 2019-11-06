@@ -1210,7 +1210,7 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 		return left.Equal(right)
 
 	case BoolValue:
-		return BoolValue(left == right)
+		return left == right
 
 	case NilValue:
 		_, ok := right.(NilValue)
@@ -1223,6 +1223,10 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 			return false
 		}
 		return left.Equal(right)
+
+	case CompositeValue:
+		_, ok := right.(NilValue)
+		return BoolValue(!ok)
 	}
 
 	panic(&errors.UnreachableError{})
