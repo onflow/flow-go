@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/collection"
-	"github.com/dapperlabs/flow-go/network/mock"
+	"github.com/dapperlabs/flow-go/network/stub"
 )
 
 func prepareNRandomNodesAndMRandomCollectionHashes() (
@@ -35,12 +35,12 @@ func prepareNRandomNodesAndMRandomCollectionHashes() (
 }
 
 // given a list of node entries, return a list of mock nodes and connect them all to a hub
-func createConnectedNodes(nodeEntries ...string) (*mock.Hub, []*mockPropagationNode, error) {
+func createConnectedNodes(nodeEntries ...string) (*stub.Hub, []*mockPropagationNode, error) {
 	if len(nodeEntries) == 0 {
 		return nil, nil, errors.New("NodeEntries must not be empty")
 	}
 
-	hub := mock.NewNetworkHub()
+	hub := stub.NewNetworkHub()
 
 	nodes := make([]*mockPropagationNode, 0)
 	for i := range nodeEntries {

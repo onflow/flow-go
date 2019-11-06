@@ -1,4 +1,4 @@
-package mock
+package stub
 
 // Hub is a value that stores mocked networks in order for them to send events directly
 type Hub struct {

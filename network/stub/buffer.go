@@ -1,4 +1,4 @@
-package mock
+package stub
 
 import (
 	"sync"

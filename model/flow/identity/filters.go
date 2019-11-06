@@ -1,20 +1,15 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package filter
+package identity
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Address filters nodes for the given addresses.
-func Address(addresses ...string) flow.IdentityFilter {
-	lookup := make(map[string]struct{})
-	for _, address := range addresses {
-		lookup[address] = struct{}{}
-	}
+// Not filters nodes that are the opposite of the wrapped filter.
+func Not(filter flow.IdentityFilter) flow.IdentityFilter {
 	return func(identity flow.Identity) bool {
-		_, ok := lookup[identity.Address]
-		return ok
+		return !filter(identity)
 	}
 }
 
@@ -30,10 +25,15 @@ func NodeID(nodeIDs ...string) flow.IdentityFilter {
 	}
 }
 
-// Not filters nodes that are the opposite of the wrapped filter.
-func Not(filter flow.IdentityFilter) flow.IdentityFilter {
+// Address filters nodes for the given addresses.
+func Address(addresses ...string) flow.IdentityFilter {
+	lookup := make(map[string]struct{})
+	for _, address := range addresses {
+		lookup[address] = struct{}{}
+	}
 	return func(identity flow.Identity) bool {
-		return !filter(identity)
+		_, ok := lookup[identity.Address]
+		return ok
 	}
 }
 

@@ -8,8 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 )
 
 var (
@@ -121,7 +120,9 @@ func (c *Committee) Select() flow.IdentityList {
 func (c *Committee) Leader(height uint64) flow.Identity {
 
 	// select all consensus nodes and sort deterministically
-	identities := c.Select().Filter(filter.Role("consensus")).Sort(order.ByID)
+	identities := c.Select().
+		Filter(identity.Role(identity.Consensus)).
+		Sort(identity.NodeIDAsc)
 
 	// for now, we select the identity by mod
 	index := height % uint64(len(identities))
@@ -134,7 +135,9 @@ func (c *Committee) Leader(height uint64) flow.Identity {
 func (c *Committee) Quorum() uint {
 
 	// select all consensus nodes and sort deterministically
-	identities := c.Select().Filter(filter.Role("consensus")).Sort(order.ByID)
+	identities := c.Select().
+		Filter(identity.Role(identity.Consensus)).
+		Sort(identity.NodeIDAsc)
 
 	// currently, quorum is simply everyone but us, for complete consensus
 	quorum := uint(len(identities) - 1)

@@ -1,4 +1,4 @@
-package mock
+package stub
 
 import (
 	"sync"
@@ -8,8 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
-
-type hash [32]byte
 
 // Network is a mocked network layer made for testing Engine's behavior.
 // When an Engine is installed on a Network, the mocked network will deliver
