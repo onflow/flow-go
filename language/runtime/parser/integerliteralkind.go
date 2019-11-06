@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=IntegerLiteralKind
 
@@ -26,7 +28,7 @@ func (k IntegerLiteralKind) Base() int {
 		return 16
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (k IntegerLiteralKind) Name() string {
@@ -43,5 +45,5 @@ func (k IntegerLiteralKind) Name() string {
 		return "hexadecimal"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

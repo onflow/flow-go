@@ -25,5 +25,5 @@ func (k InvalidIntegerLiteralKind) Description() string {
 		return "unknown prefix"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

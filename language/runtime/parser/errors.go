@@ -117,5 +117,5 @@ func (e *InvalidIntegerLiteralError) SecondaryError() string {
 		return "did you mean `0x` (hexadecimal), `0b` (binary), or `0o` (octal)?"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

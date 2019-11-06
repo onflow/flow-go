@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=CompositeKind
 
@@ -29,7 +31,7 @@ func (k CompositeKind) Name() string {
 		return "contract"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (k CompositeKind) Keyword() string {
@@ -42,7 +44,7 @@ func (k CompositeKind) Keyword() string {
 		return "contract"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (k CompositeKind) Annotation() string {
