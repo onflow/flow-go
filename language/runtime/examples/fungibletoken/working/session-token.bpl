@@ -52,7 +52,7 @@ pub resource Vault: Provider, Receiver {
     //             result >= 0:
     //                 "Balances are always non-negative"
     //         }
-    //     } 
+    //     }
     //     set(newBalance) {
     //         pre {
     //             newBalance >= 0:
@@ -126,7 +126,7 @@ fun main() {
     log(vaultArray[1].balance)  // 7
     log(vaultArray[2].balance)  // 5
 
-    // in this example, the vaults are not 
+    // in this example, the vaults are not
     // stored in an account, so they must
     // be destroyed explicitly
     destroy vaultArray

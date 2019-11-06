@@ -14,7 +14,7 @@ import (
 )
 
 type ProgramVisitor struct {
-	*BaseStrictusVisitor
+	*BaseCadenceVisitor
 	parseErrors []error
 }
 

@@ -1,6 +1,6 @@
-// Code generated from parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from parser/Cadence.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
-package parser // Strictus
+package parser // Cadence
 import (
 	"fmt"
 	"reflect"
@@ -412,12 +412,12 @@ func init() {
 	}
 }
 
-type StrictusParser struct {
+type CadenceParser struct {
 	*antlr.BaseParser
 }
 
-func NewStrictusParser(input antlr.TokenStream) *StrictusParser {
-	this := new(StrictusParser)
+func NewCadenceParser(input antlr.TokenStream) *CadenceParser {
+	this := new(CadenceParser)
 
 	this.BaseParser = antlr.NewBaseParser(input)
 
@@ -425,7 +425,7 @@ func NewStrictusParser(input antlr.TokenStream) *StrictusParser {
 	this.RuleNames = ruleNames
 	this.LiteralNames = literalNames
 	this.SymbolicNames = symbolicNames
-	this.GrammarFileName = "Strictus.g4"
+	this.GrammarFileName = "Cadence.g4"
 
 	return this
 }
@@ -434,7 +434,7 @@ func NewStrictusParser(input antlr.TokenStream) *StrictusParser {
 // token stream a token exists on the Hidden channel which
 // either is a line terminator, or is a multi line comment that
 // contains a line terminator.
-func (p *StrictusParser) lineTerminatorAhead() bool {
+func (p *CadenceParser) lineTerminatorAhead() bool {
 	// Get the token ahead of the current index.
 	possibleIndexEosToken := p.GetCurrentToken().GetTokenIndex() - 1
 	ahead := p.GetTokenStream().Get(possibleIndexEosToken)
@@ -444,12 +444,12 @@ func (p *StrictusParser) lineTerminatorAhead() bool {
 		return true
 	}
 
-	if ahead.GetTokenType() == StrictusParserTerminator {
+	if ahead.GetTokenType() == CadenceParserTerminator {
 		// There is definitely a line terminator ahead.
 		return true
 	}
 
-	if ahead.GetTokenType() == StrictusParserWS {
+	if ahead.GetTokenType() == CadenceParserWS {
 		// Get the token ahead of the current whitespaces.
 		possibleIndexEosToken = p.GetCurrentToken().GetTokenIndex() - 2
 		ahead = p.GetTokenStream().Get(possibleIndexEosToken)
@@ -460,180 +460,180 @@ func (p *StrictusParser) lineTerminatorAhead() bool {
 	_type := ahead.GetTokenType()
 
 	// Check if the token is, or contains a line terminator.
-	return (_type == StrictusParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
-		(_type == StrictusParserTerminator)
+	return (_type == CadenceParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
+		(_type == CadenceParserTerminator)
 }
 
-func (p *StrictusParser) noWhitespace() bool {
+func (p *CadenceParser) noWhitespace() bool {
 	index := p.GetCurrentToken().GetTokenIndex()
-	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
+	return p.GetTokenStream().Get(index-1).GetTokenType() != CadenceParserWS
 }
 
-// StrictusParser tokens.
+// CadenceParser tokens.
 const (
-	StrictusParserEOF                  = antlr.TokenEOF
-	StrictusParserT__0                 = 1
-	StrictusParserT__1                 = 2
-	StrictusParserT__2                 = 3
-	StrictusParserT__3                 = 4
-	StrictusParserT__4                 = 5
-	StrictusParserT__5                 = 6
-	StrictusParserT__6                 = 7
-	StrictusParserT__7                 = 8
-	StrictusParserT__8                 = 9
-	StrictusParserT__9                 = 10
-	StrictusParserT__10                = 11
-	StrictusParserT__11                = 12
-	StrictusParserEqual                = 13
-	StrictusParserUnequal              = 14
-	StrictusParserLess                 = 15
-	StrictusParserGreater              = 16
-	StrictusParserLessEqual            = 17
-	StrictusParserGreaterEqual         = 18
-	StrictusParserPlus                 = 19
-	StrictusParserMinus                = 20
-	StrictusParserMul                  = 21
-	StrictusParserDiv                  = 22
-	StrictusParserMod                  = 23
-	StrictusParserAmpersand            = 24
-	StrictusParserNegate               = 25
-	StrictusParserMove                 = 26
-	StrictusParserOptional             = 27
-	StrictusParserNilCoalescing        = 28
-	StrictusParserDowncasting          = 29
-	StrictusParserFailableDowncasting  = 30
-	StrictusParserOpenParen            = 31
-	StrictusParserCloseParen           = 32
-	StrictusParserTransaction          = 33
-	StrictusParserStruct               = 34
-	StrictusParserResource             = 35
-	StrictusParserContract             = 36
-	StrictusParserInterface            = 37
-	StrictusParserFun                  = 38
-	StrictusParserEvent                = 39
-	StrictusParserEmit                 = 40
-	StrictusParserPre                  = 41
-	StrictusParserPost                 = 42
-	StrictusParserPub                  = 43
-	StrictusParserPubSet               = 44
-	StrictusParserReturn               = 45
-	StrictusParserBreak                = 46
-	StrictusParserContinue             = 47
-	StrictusParserLet                  = 48
-	StrictusParserVar                  = 49
-	StrictusParserIf                   = 50
-	StrictusParserElse                 = 51
-	StrictusParserWhile                = 52
-	StrictusParserTrue                 = 53
-	StrictusParserFalse                = 54
-	StrictusParserNil                  = 55
-	StrictusParserImport               = 56
-	StrictusParserFrom                 = 57
-	StrictusParserCreate               = 58
-	StrictusParserDestroy              = 59
-	StrictusParserIdentifier           = 60
-	StrictusParserDecimalLiteral       = 61
-	StrictusParserBinaryLiteral        = 62
-	StrictusParserOctalLiteral         = 63
-	StrictusParserHexadecimalLiteral   = 64
-	StrictusParserInvalidNumberLiteral = 65
-	StrictusParserStringLiteral        = 66
-	StrictusParserWS                   = 67
-	StrictusParserTerminator           = 68
-	StrictusParserBlockComment         = 69
-	StrictusParserLineComment          = 70
+	CadenceParserEOF                  = antlr.TokenEOF
+	CadenceParserT__0                 = 1
+	CadenceParserT__1                 = 2
+	CadenceParserT__2                 = 3
+	CadenceParserT__3                 = 4
+	CadenceParserT__4                 = 5
+	CadenceParserT__5                 = 6
+	CadenceParserT__6                 = 7
+	CadenceParserT__7                 = 8
+	CadenceParserT__8                 = 9
+	CadenceParserT__9                 = 10
+	CadenceParserT__10                = 11
+	CadenceParserT__11                = 12
+	CadenceParserEqual                = 13
+	CadenceParserUnequal              = 14
+	CadenceParserLess                 = 15
+	CadenceParserGreater              = 16
+	CadenceParserLessEqual            = 17
+	CadenceParserGreaterEqual         = 18
+	CadenceParserPlus                 = 19
+	CadenceParserMinus                = 20
+	CadenceParserMul                  = 21
+	CadenceParserDiv                  = 22
+	CadenceParserMod                  = 23
+	CadenceParserAmpersand            = 24
+	CadenceParserNegate               = 25
+	CadenceParserMove                 = 26
+	CadenceParserOptional             = 27
+	CadenceParserNilCoalescing        = 28
+	CadenceParserDowncasting          = 29
+	CadenceParserFailableDowncasting  = 30
+	CadenceParserOpenParen            = 31
+	CadenceParserCloseParen           = 32
+	CadenceParserTransaction          = 33
+	CadenceParserStruct               = 34
+	CadenceParserResource             = 35
+	CadenceParserContract             = 36
+	CadenceParserInterface            = 37
+	CadenceParserFun                  = 38
+	CadenceParserEvent                = 39
+	CadenceParserEmit                 = 40
+	CadenceParserPre                  = 41
+	CadenceParserPost                 = 42
+	CadenceParserPub                  = 43
+	CadenceParserPubSet               = 44
+	CadenceParserReturn               = 45
+	CadenceParserBreak                = 46
+	CadenceParserContinue             = 47
+	CadenceParserLet                  = 48
+	CadenceParserVar                  = 49
+	CadenceParserIf                   = 50
+	CadenceParserElse                 = 51
+	CadenceParserWhile                = 52
+	CadenceParserTrue                 = 53
+	CadenceParserFalse                = 54
+	CadenceParserNil                  = 55
+	CadenceParserImport               = 56
+	CadenceParserFrom                 = 57
+	CadenceParserCreate               = 58
+	CadenceParserDestroy              = 59
+	CadenceParserIdentifier           = 60
+	CadenceParserDecimalLiteral       = 61
+	CadenceParserBinaryLiteral        = 62
+	CadenceParserOctalLiteral         = 63
+	CadenceParserHexadecimalLiteral   = 64
+	CadenceParserInvalidNumberLiteral = 65
+	CadenceParserStringLiteral        = 66
+	CadenceParserWS                   = 67
+	CadenceParserTerminator           = 68
+	CadenceParserBlockComment         = 69
+	CadenceParserLineComment          = 70
 )
 
-// StrictusParser rules.
+// CadenceParser rules.
 const (
-	StrictusParserRULE_program                       = 0
-	StrictusParserRULE_replInput                     = 1
-	StrictusParserRULE_declaration                   = 2
-	StrictusParserRULE_importDeclaration             = 3
-	StrictusParserRULE_access                        = 4
-	StrictusParserRULE_compositeDeclaration          = 5
-	StrictusParserRULE_conformances                  = 6
-	StrictusParserRULE_variableKind                  = 7
-	StrictusParserRULE_field                         = 8
-	StrictusParserRULE_interfaceDeclaration          = 9
-	StrictusParserRULE_members                       = 10
-	StrictusParserRULE_member                        = 11
-	StrictusParserRULE_compositeKind                 = 12
-	StrictusParserRULE_specialFunctionDeclaration    = 13
-	StrictusParserRULE_functionDeclaration           = 14
-	StrictusParserRULE_eventDeclaration              = 15
-	StrictusParserRULE_parameterList                 = 16
-	StrictusParserRULE_parameter                     = 17
-	StrictusParserRULE_typeAnnotation                = 18
-	StrictusParserRULE_fullType                      = 19
-	StrictusParserRULE_baseType                      = 20
-	StrictusParserRULE_nominalType                   = 21
-	StrictusParserRULE_functionType                  = 22
-	StrictusParserRULE_variableSizedType             = 23
-	StrictusParserRULE_constantSizedType             = 24
-	StrictusParserRULE_dictionaryType                = 25
-	StrictusParserRULE_block                         = 26
-	StrictusParserRULE_functionBlock                 = 27
-	StrictusParserRULE_preConditions                 = 28
-	StrictusParserRULE_postConditions                = 29
-	StrictusParserRULE_conditions                    = 30
-	StrictusParserRULE_condition                     = 31
-	StrictusParserRULE_statements                    = 32
-	StrictusParserRULE_statement                     = 33
-	StrictusParserRULE_returnStatement               = 34
-	StrictusParserRULE_breakStatement                = 35
-	StrictusParserRULE_continueStatement             = 36
-	StrictusParserRULE_ifStatement                   = 37
-	StrictusParserRULE_whileStatement                = 38
-	StrictusParserRULE_emitStatement                 = 39
-	StrictusParserRULE_variableDeclaration           = 40
-	StrictusParserRULE_assignment                    = 41
-	StrictusParserRULE_swap                          = 42
-	StrictusParserRULE_transfer                      = 43
-	StrictusParserRULE_expression                    = 44
-	StrictusParserRULE_conditionalExpression         = 45
-	StrictusParserRULE_orExpression                  = 46
-	StrictusParserRULE_andExpression                 = 47
-	StrictusParserRULE_equalityExpression            = 48
-	StrictusParserRULE_relationalExpression          = 49
-	StrictusParserRULE_nilCoalescingExpression       = 50
-	StrictusParserRULE_failableDowncastingExpression = 51
-	StrictusParserRULE_concatenatingExpression       = 52
-	StrictusParserRULE_additiveExpression            = 53
-	StrictusParserRULE_multiplicativeExpression      = 54
-	StrictusParserRULE_unaryExpression               = 55
-	StrictusParserRULE_primaryExpression             = 56
-	StrictusParserRULE_composedExpression            = 57
-	StrictusParserRULE_primaryExpressionSuffix       = 58
-	StrictusParserRULE_equalityOp                    = 59
-	StrictusParserRULE_relationalOp                  = 60
-	StrictusParserRULE_additiveOp                    = 61
-	StrictusParserRULE_multiplicativeOp              = 62
-	StrictusParserRULE_unaryOp                       = 63
-	StrictusParserRULE_primaryExpressionStart        = 64
-	StrictusParserRULE_createExpression              = 65
-	StrictusParserRULE_destroyExpression             = 66
-	StrictusParserRULE_referenceExpression           = 67
-	StrictusParserRULE_identifierExpression          = 68
-	StrictusParserRULE_literalExpression             = 69
-	StrictusParserRULE_functionExpression            = 70
-	StrictusParserRULE_nestedExpression              = 71
-	StrictusParserRULE_expressionAccess              = 72
-	StrictusParserRULE_memberAccess                  = 73
-	StrictusParserRULE_bracketExpression             = 74
-	StrictusParserRULE_invocation                    = 75
-	StrictusParserRULE_argument                      = 76
-	StrictusParserRULE_literal                       = 77
-	StrictusParserRULE_booleanLiteral                = 78
-	StrictusParserRULE_nilLiteral                    = 79
-	StrictusParserRULE_stringLiteral                 = 80
-	StrictusParserRULE_integerLiteral                = 81
-	StrictusParserRULE_positiveIntegerLiteral        = 82
-	StrictusParserRULE_arrayLiteral                  = 83
-	StrictusParserRULE_dictionaryLiteral             = 84
-	StrictusParserRULE_dictionaryEntry               = 85
-	StrictusParserRULE_identifier                    = 86
-	StrictusParserRULE_eos                           = 87
+	CadenceParserRULE_program                       = 0
+	CadenceParserRULE_replInput                     = 1
+	CadenceParserRULE_declaration                   = 2
+	CadenceParserRULE_importDeclaration             = 3
+	CadenceParserRULE_access                        = 4
+	CadenceParserRULE_compositeDeclaration          = 5
+	CadenceParserRULE_conformances                  = 6
+	CadenceParserRULE_variableKind                  = 7
+	CadenceParserRULE_field                         = 8
+	CadenceParserRULE_interfaceDeclaration          = 9
+	CadenceParserRULE_members                       = 10
+	CadenceParserRULE_member                        = 11
+	CadenceParserRULE_compositeKind                 = 12
+	CadenceParserRULE_specialFunctionDeclaration    = 13
+	CadenceParserRULE_functionDeclaration           = 14
+	CadenceParserRULE_eventDeclaration              = 15
+	CadenceParserRULE_parameterList                 = 16
+	CadenceParserRULE_parameter                     = 17
+	CadenceParserRULE_typeAnnotation                = 18
+	CadenceParserRULE_fullType                      = 19
+	CadenceParserRULE_baseType                      = 20
+	CadenceParserRULE_nominalType                   = 21
+	CadenceParserRULE_functionType                  = 22
+	CadenceParserRULE_variableSizedType             = 23
+	CadenceParserRULE_constantSizedType             = 24
+	CadenceParserRULE_dictionaryType                = 25
+	CadenceParserRULE_block                         = 26
+	CadenceParserRULE_functionBlock                 = 27
+	CadenceParserRULE_preConditions                 = 28
+	CadenceParserRULE_postConditions                = 29
+	CadenceParserRULE_conditions                    = 30
+	CadenceParserRULE_condition                     = 31
+	CadenceParserRULE_statements                    = 32
+	CadenceParserRULE_statement                     = 33
+	CadenceParserRULE_returnStatement               = 34
+	CadenceParserRULE_breakStatement                = 35
+	CadenceParserRULE_continueStatement             = 36
+	CadenceParserRULE_ifStatement                   = 37
+	CadenceParserRULE_whileStatement                = 38
+	CadenceParserRULE_emitStatement                 = 39
+	CadenceParserRULE_variableDeclaration           = 40
+	CadenceParserRULE_assignment                    = 41
+	CadenceParserRULE_swap                          = 42
+	CadenceParserRULE_transfer                      = 43
+	CadenceParserRULE_expression                    = 44
+	CadenceParserRULE_conditionalExpression         = 45
+	CadenceParserRULE_orExpression                  = 46
+	CadenceParserRULE_andExpression                 = 47
+	CadenceParserRULE_equalityExpression            = 48
+	CadenceParserRULE_relationalExpression          = 49
+	CadenceParserRULE_nilCoalescingExpression       = 50
+	CadenceParserRULE_failableDowncastingExpression = 51
+	CadenceParserRULE_concatenatingExpression       = 52
+	CadenceParserRULE_additiveExpression            = 53
+	CadenceParserRULE_multiplicativeExpression      = 54
+	CadenceParserRULE_unaryExpression               = 55
+	CadenceParserRULE_primaryExpression             = 56
+	CadenceParserRULE_composedExpression            = 57
+	CadenceParserRULE_primaryExpressionSuffix       = 58
+	CadenceParserRULE_equalityOp                    = 59
+	CadenceParserRULE_relationalOp                  = 60
+	CadenceParserRULE_additiveOp                    = 61
+	CadenceParserRULE_multiplicativeOp              = 62
+	CadenceParserRULE_unaryOp                       = 63
+	CadenceParserRULE_primaryExpressionStart        = 64
+	CadenceParserRULE_createExpression              = 65
+	CadenceParserRULE_destroyExpression             = 66
+	CadenceParserRULE_referenceExpression           = 67
+	CadenceParserRULE_identifierExpression          = 68
+	CadenceParserRULE_literalExpression             = 69
+	CadenceParserRULE_functionExpression            = 70
+	CadenceParserRULE_nestedExpression              = 71
+	CadenceParserRULE_expressionAccess              = 72
+	CadenceParserRULE_memberAccess                  = 73
+	CadenceParserRULE_bracketExpression             = 74
+	CadenceParserRULE_invocation                    = 75
+	CadenceParserRULE_argument                      = 76
+	CadenceParserRULE_literal                       = 77
+	CadenceParserRULE_booleanLiteral                = 78
+	CadenceParserRULE_nilLiteral                    = 79
+	CadenceParserRULE_stringLiteral                 = 80
+	CadenceParserRULE_integerLiteral                = 81
+	CadenceParserRULE_positiveIntegerLiteral        = 82
+	CadenceParserRULE_arrayLiteral                  = 83
+	CadenceParserRULE_dictionaryLiteral             = 84
+	CadenceParserRULE_dictionaryEntry               = 85
+	CadenceParserRULE_identifier                    = 86
+	CadenceParserRULE_eos                           = 87
 )
 
 // IProgramContext is an interface to support dynamic dispatch.
@@ -655,7 +655,7 @@ type ProgramContext struct {
 func NewEmptyProgramContext() *ProgramContext {
 	var p = new(ProgramContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_program
+	p.RuleIndex = CadenceParserRULE_program
 	return p
 }
 
@@ -667,7 +667,7 @@ func NewProgramContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_program
+	p.RuleIndex = CadenceParserRULE_program
 
 	return p
 }
@@ -675,7 +675,7 @@ func NewProgramContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *ProgramContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ProgramContext) EOF() antlr.TerminalNode {
-	return s.GetToken(StrictusParserEOF, 0)
+	return s.GetToken(CadenceParserEOF, 0)
 }
 
 func (s *ProgramContext) AllDeclaration() []IDeclarationContext {
@@ -710,20 +710,20 @@ func (s *ProgramContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 }
 
 func (s *ProgramContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterProgram(s)
 	}
 }
 
 func (s *ProgramContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitProgram(s)
 	}
 }
 
 func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitProgram(s)
 
 	default:
@@ -731,9 +731,9 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Program() (localctx IProgramContext) {
+func (p *CadenceParser) Program() (localctx IProgramContext) {
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 0, StrictusParserRULE_program)
+	p.EnterRule(localctx, 0, CadenceParserRULE_program)
 	var _la int
 
 	defer func() {
@@ -757,7 +757,7 @@ func (p *StrictusParser) Program() (localctx IProgramContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(StrictusParserStruct-34))|(1<<(StrictusParserResource-34))|(1<<(StrictusParserContract-34))|(1<<(StrictusParserFun-34))|(1<<(StrictusParserEvent-34))|(1<<(StrictusParserPub-34))|(1<<(StrictusParserPubSet-34))|(1<<(StrictusParserLet-34))|(1<<(StrictusParserVar-34))|(1<<(StrictusParserImport-34)))) != 0 {
+	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34))|(1<<(CadenceParserFun-34))|(1<<(CadenceParserEvent-34))|(1<<(CadenceParserPub-34))|(1<<(CadenceParserPubSet-34))|(1<<(CadenceParserLet-34))|(1<<(CadenceParserVar-34))|(1<<(CadenceParserImport-34)))) != 0 {
 		{
 			p.SetState(176)
 			p.Declaration()
@@ -766,10 +766,10 @@ func (p *StrictusParser) Program() (localctx IProgramContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == StrictusParserT__0 {
+		if _la == CadenceParserT__0 {
 			{
 				p.SetState(177)
-				p.Match(StrictusParserT__0)
+				p.Match(CadenceParserT__0)
 			}
 
 		}
@@ -780,7 +780,7 @@ func (p *StrictusParser) Program() (localctx IProgramContext) {
 	}
 	{
 		p.SetState(185)
-		p.Match(StrictusParserEOF)
+		p.Match(CadenceParserEOF)
 	}
 
 	return localctx
@@ -805,7 +805,7 @@ type ReplInputContext struct {
 func NewEmptyReplInputContext() *ReplInputContext {
 	var p = new(ReplInputContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_replInput
+	p.RuleIndex = CadenceParserRULE_replInput
 	return p
 }
 
@@ -817,7 +817,7 @@ func NewReplInputContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_replInput
+	p.RuleIndex = CadenceParserRULE_replInput
 
 	return p
 }
@@ -853,20 +853,20 @@ func (s *ReplInputContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 }
 
 func (s *ReplInputContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterReplInput(s)
 	}
 }
 
 func (s *ReplInputContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitReplInput(s)
 	}
 }
 
 func (s *ReplInputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitReplInput(s)
 
 	default:
@@ -874,9 +874,9 @@ func (s *ReplInputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) ReplInput() (localctx IReplInputContext) {
+func (p *CadenceParser) ReplInput() (localctx IReplInputContext) {
 	localctx = NewReplInputContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 2, StrictusParserRULE_replInput)
+	p.EnterRule(localctx, 2, CadenceParserRULE_replInput)
 
 	defer func() {
 		p.ExitRule()
@@ -935,7 +935,7 @@ type DeclarationContext struct {
 func NewEmptyDeclarationContext() *DeclarationContext {
 	var p = new(DeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_declaration
+	p.RuleIndex = CadenceParserRULE_declaration
 	return p
 }
 
@@ -947,7 +947,7 @@ func NewDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_declaration
+	p.RuleIndex = CadenceParserRULE_declaration
 
 	return p
 }
@@ -1023,20 +1023,20 @@ func (s *DeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 }
 
 func (s *DeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDeclaration(s)
 	}
 }
 
 func (s *DeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDeclaration(s)
 	}
 }
 
 func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDeclaration(s)
 
 	default:
@@ -1044,9 +1044,9 @@ func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *StrictusParser) Declaration() (localctx IDeclarationContext) {
+func (p *CadenceParser) Declaration() (localctx IDeclarationContext) {
 	localctx = NewDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 4, StrictusParserRULE_declaration)
+	p.EnterRule(localctx, 4, CadenceParserRULE_declaration)
 
 	defer func() {
 		p.ExitRule()
@@ -1133,7 +1133,7 @@ type ImportDeclarationContext struct {
 func NewEmptyImportDeclarationContext() *ImportDeclarationContext {
 	var p = new(ImportDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_importDeclaration
+	p.RuleIndex = CadenceParserRULE_importDeclaration
 	return p
 }
 
@@ -1145,7 +1145,7 @@ func NewImportDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_importDeclaration
+	p.RuleIndex = CadenceParserRULE_importDeclaration
 
 	return p
 }
@@ -1153,7 +1153,7 @@ func NewImportDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *ImportDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ImportDeclarationContext) Import() antlr.TerminalNode {
-	return s.GetToken(StrictusParserImport, 0)
+	return s.GetToken(CadenceParserImport, 0)
 }
 
 func (s *ImportDeclarationContext) StringLiteral() IStringLiteralContext {
@@ -1167,7 +1167,7 @@ func (s *ImportDeclarationContext) StringLiteral() IStringLiteralContext {
 }
 
 func (s *ImportDeclarationContext) HexadecimalLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserHexadecimalLiteral, 0)
+	return s.GetToken(CadenceParserHexadecimalLiteral, 0)
 }
 
 func (s *ImportDeclarationContext) AllIdentifier() []IIdentifierContext {
@@ -1194,7 +1194,7 @@ func (s *ImportDeclarationContext) Identifier(i int) IIdentifierContext {
 }
 
 func (s *ImportDeclarationContext) From() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFrom, 0)
+	return s.GetToken(CadenceParserFrom, 0)
 }
 
 func (s *ImportDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -1206,20 +1206,20 @@ func (s *ImportDeclarationContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *ImportDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterImportDeclaration(s)
 	}
 }
 
 func (s *ImportDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitImportDeclaration(s)
 	}
 }
 
 func (s *ImportDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitImportDeclaration(s)
 
 	default:
@@ -1227,9 +1227,9 @@ func (s *ImportDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext) {
+func (p *CadenceParser) ImportDeclaration() (localctx IImportDeclarationContext) {
 	localctx = NewImportDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 6, StrictusParserRULE_importDeclaration)
+	p.EnterRule(localctx, 6, CadenceParserRULE_importDeclaration)
 	var _la int
 
 	defer func() {
@@ -1251,13 +1251,13 @@ func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(199)
-		p.Match(StrictusParserImport)
+		p.Match(CadenceParserImport)
 	}
 	p.SetState(210)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(StrictusParserFrom-57))|(1<<(StrictusParserCreate-57))|(1<<(StrictusParserDestroy-57))|(1<<(StrictusParserIdentifier-57)))) != 0 {
+	if ((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(CadenceParserFrom-57))|(1<<(CadenceParserCreate-57))|(1<<(CadenceParserDestroy-57))|(1<<(CadenceParserIdentifier-57)))) != 0 {
 		{
 			p.SetState(200)
 			p.Identifier()
@@ -1266,10 +1266,10 @@ func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(201)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(202)
@@ -1282,7 +1282,7 @@ func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext
 		}
 		{
 			p.SetState(208)
-			p.Match(StrictusParserFrom)
+			p.Match(CadenceParserFrom)
 		}
 
 	}
@@ -1290,16 +1290,16 @@ func (p *StrictusParser) ImportDeclaration() (localctx IImportDeclarationContext
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserStringLiteral:
+	case CadenceParserStringLiteral:
 		{
 			p.SetState(212)
 			p.StringLiteral()
 		}
 
-	case StrictusParserHexadecimalLiteral:
+	case CadenceParserHexadecimalLiteral:
 		{
 			p.SetState(213)
-			p.Match(StrictusParserHexadecimalLiteral)
+			p.Match(CadenceParserHexadecimalLiteral)
 		}
 
 	default:
@@ -1328,7 +1328,7 @@ type AccessContext struct {
 func NewEmptyAccessContext() *AccessContext {
 	var p = new(AccessContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_access
+	p.RuleIndex = CadenceParserRULE_access
 	return p
 }
 
@@ -1340,7 +1340,7 @@ func NewAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invok
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_access
+	p.RuleIndex = CadenceParserRULE_access
 
 	return p
 }
@@ -1348,11 +1348,11 @@ func NewAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invok
 func (s *AccessContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AccessContext) Pub() antlr.TerminalNode {
-	return s.GetToken(StrictusParserPub, 0)
+	return s.GetToken(CadenceParserPub, 0)
 }
 
 func (s *AccessContext) PubSet() antlr.TerminalNode {
-	return s.GetToken(StrictusParserPubSet, 0)
+	return s.GetToken(CadenceParserPubSet, 0)
 }
 
 func (s *AccessContext) GetRuleContext() antlr.RuleContext {
@@ -1364,20 +1364,20 @@ func (s *AccessContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 }
 
 func (s *AccessContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterAccess(s)
 	}
 }
 
 func (s *AccessContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitAccess(s)
 	}
 }
 
 func (s *AccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitAccess(s)
 
 	default:
@@ -1385,9 +1385,9 @@ func (s *AccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Access() (localctx IAccessContext) {
+func (p *CadenceParser) Access() (localctx IAccessContext) {
 	localctx = NewAccessContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 8, StrictusParserRULE_access)
+	p.EnterRule(localctx, 8, CadenceParserRULE_access)
 
 	defer func() {
 		p.ExitRule()
@@ -1409,21 +1409,21 @@ func (p *StrictusParser) Access() (localctx IAccessContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserStruct, StrictusParserResource, StrictusParserContract, StrictusParserFun, StrictusParserLet, StrictusParserVar, StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier:
+	case CadenceParserStruct, CadenceParserResource, CadenceParserContract, CadenceParserFun, CadenceParserLet, CadenceParserVar, CadenceParserFrom, CadenceParserCreate, CadenceParserDestroy, CadenceParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 
-	case StrictusParserPub:
+	case CadenceParserPub:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(217)
-			p.Match(StrictusParserPub)
+			p.Match(CadenceParserPub)
 		}
 
-	case StrictusParserPubSet:
+	case CadenceParserPubSet:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(218)
-			p.Match(StrictusParserPubSet)
+			p.Match(CadenceParserPubSet)
 		}
 
 	default:
@@ -1452,7 +1452,7 @@ type CompositeDeclarationContext struct {
 func NewEmptyCompositeDeclarationContext() *CompositeDeclarationContext {
 	var p = new(CompositeDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_compositeDeclaration
+	p.RuleIndex = CadenceParserRULE_compositeDeclaration
 	return p
 }
 
@@ -1464,7 +1464,7 @@ func NewCompositeDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_compositeDeclaration
+	p.RuleIndex = CadenceParserRULE_compositeDeclaration
 
 	return p
 }
@@ -1530,20 +1530,20 @@ func (s *CompositeDeclarationContext) ToStringTree(ruleNames []string, recog ant
 }
 
 func (s *CompositeDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterCompositeDeclaration(s)
 	}
 }
 
 func (s *CompositeDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitCompositeDeclaration(s)
 	}
 }
 
 func (s *CompositeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitCompositeDeclaration(s)
 
 	default:
@@ -1551,9 +1551,9 @@ func (s *CompositeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *StrictusParser) CompositeDeclaration() (localctx ICompositeDeclarationContext) {
+func (p *CadenceParser) CompositeDeclaration() (localctx ICompositeDeclarationContext) {
 	localctx = NewCompositeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 10, StrictusParserRULE_compositeDeclaration)
+	p.EnterRule(localctx, 10, CadenceParserRULE_compositeDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -1590,7 +1590,7 @@ func (p *StrictusParser) CompositeDeclaration() (localctx ICompositeDeclarationC
 	}
 	{
 		p.SetState(225)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(226)
@@ -1598,7 +1598,7 @@ func (p *StrictusParser) CompositeDeclaration() (localctx ICompositeDeclarationC
 	}
 	{
 		p.SetState(227)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -1623,7 +1623,7 @@ type ConformancesContext struct {
 func NewEmptyConformancesContext() *ConformancesContext {
 	var p = new(ConformancesContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_conformances
+	p.RuleIndex = CadenceParserRULE_conformances
 	return p
 }
 
@@ -1635,7 +1635,7 @@ func NewConformancesContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_conformances
+	p.RuleIndex = CadenceParserRULE_conformances
 
 	return p
 }
@@ -1674,20 +1674,20 @@ func (s *ConformancesContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *ConformancesContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterConformances(s)
 	}
 }
 
 func (s *ConformancesContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitConformances(s)
 	}
 }
 
 func (s *ConformancesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitConformances(s)
 
 	default:
@@ -1695,9 +1695,9 @@ func (s *ConformancesContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) Conformances() (localctx IConformancesContext) {
+func (p *CadenceParser) Conformances() (localctx IConformancesContext) {
 	localctx = NewConformancesContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 12, StrictusParserRULE_conformances)
+	p.EnterRule(localctx, 12, CadenceParserRULE_conformances)
 	var _la int
 
 	defer func() {
@@ -1721,10 +1721,10 @@ func (p *StrictusParser) Conformances() (localctx IConformancesContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserT__4 {
+	if _la == CadenceParserT__4 {
 		{
 			p.SetState(229)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(230)
@@ -1734,10 +1734,10 @@ func (p *StrictusParser) Conformances() (localctx IConformancesContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(231)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(232)
@@ -1773,7 +1773,7 @@ type VariableKindContext struct {
 func NewEmptyVariableKindContext() *VariableKindContext {
 	var p = new(VariableKindContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_variableKind
+	p.RuleIndex = CadenceParserRULE_variableKind
 	return p
 }
 
@@ -1785,7 +1785,7 @@ func NewVariableKindContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_variableKind
+	p.RuleIndex = CadenceParserRULE_variableKind
 
 	return p
 }
@@ -1793,11 +1793,11 @@ func NewVariableKindContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *VariableKindContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *VariableKindContext) Let() antlr.TerminalNode {
-	return s.GetToken(StrictusParserLet, 0)
+	return s.GetToken(CadenceParserLet, 0)
 }
 
 func (s *VariableKindContext) Var() antlr.TerminalNode {
-	return s.GetToken(StrictusParserVar, 0)
+	return s.GetToken(CadenceParserVar, 0)
 }
 
 func (s *VariableKindContext) GetRuleContext() antlr.RuleContext {
@@ -1809,20 +1809,20 @@ func (s *VariableKindContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *VariableKindContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterVariableKind(s)
 	}
 }
 
 func (s *VariableKindContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitVariableKind(s)
 	}
 }
 
 func (s *VariableKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitVariableKind(s)
 
 	default:
@@ -1830,9 +1830,9 @@ func (s *VariableKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) VariableKind() (localctx IVariableKindContext) {
+func (p *CadenceParser) VariableKind() (localctx IVariableKindContext) {
 	localctx = NewVariableKindContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 14, StrictusParserRULE_variableKind)
+	p.EnterRule(localctx, 14, CadenceParserRULE_variableKind)
 	var _la int
 
 	defer func() {
@@ -1856,7 +1856,7 @@ func (p *StrictusParser) VariableKind() (localctx IVariableKindContext) {
 		p.SetState(240)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == StrictusParserLet || _la == StrictusParserVar) {
+		if !(_la == CadenceParserLet || _la == CadenceParserVar) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -1886,7 +1886,7 @@ type FieldContext struct {
 func NewEmptyFieldContext() *FieldContext {
 	var p = new(FieldContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_field
+	p.RuleIndex = CadenceParserRULE_field
 	return p
 }
 
@@ -1898,7 +1898,7 @@ func NewFieldContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_field
+	p.RuleIndex = CadenceParserRULE_field
 
 	return p
 }
@@ -1954,20 +1954,20 @@ func (s *FieldContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 }
 
 func (s *FieldContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterField(s)
 	}
 }
 
 func (s *FieldContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitField(s)
 	}
 }
 
 func (s *FieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitField(s)
 
 	default:
@@ -1975,9 +1975,9 @@ func (s *FieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Field() (localctx IFieldContext) {
+func (p *CadenceParser) Field() (localctx IFieldContext) {
 	localctx = NewFieldContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 16, StrictusParserRULE_field)
+	p.EnterRule(localctx, 16, CadenceParserRULE_field)
 	var _la int
 
 	defer func() {
@@ -2005,7 +2005,7 @@ func (p *StrictusParser) Field() (localctx IFieldContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserLet || _la == StrictusParserVar {
+	if _la == CadenceParserLet || _la == CadenceParserVar {
 		{
 			p.SetState(243)
 			p.VariableKind()
@@ -2018,7 +2018,7 @@ func (p *StrictusParser) Field() (localctx IFieldContext) {
 	}
 	{
 		p.SetState(247)
-		p.Match(StrictusParserT__4)
+		p.Match(CadenceParserT__4)
 	}
 	{
 		p.SetState(248)
@@ -2047,7 +2047,7 @@ type InterfaceDeclarationContext struct {
 func NewEmptyInterfaceDeclarationContext() *InterfaceDeclarationContext {
 	var p = new(InterfaceDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_interfaceDeclaration
+	p.RuleIndex = CadenceParserRULE_interfaceDeclaration
 	return p
 }
 
@@ -2059,7 +2059,7 @@ func NewInterfaceDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_interfaceDeclaration
+	p.RuleIndex = CadenceParserRULE_interfaceDeclaration
 
 	return p
 }
@@ -2087,7 +2087,7 @@ func (s *InterfaceDeclarationContext) CompositeKind() ICompositeKindContext {
 }
 
 func (s *InterfaceDeclarationContext) Interface() antlr.TerminalNode {
-	return s.GetToken(StrictusParserInterface, 0)
+	return s.GetToken(CadenceParserInterface, 0)
 }
 
 func (s *InterfaceDeclarationContext) Identifier() IIdentifierContext {
@@ -2119,20 +2119,20 @@ func (s *InterfaceDeclarationContext) ToStringTree(ruleNames []string, recog ant
 }
 
 func (s *InterfaceDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterInterfaceDeclaration(s)
 	}
 }
 
 func (s *InterfaceDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitInterfaceDeclaration(s)
 	}
 }
 
 func (s *InterfaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitInterfaceDeclaration(s)
 
 	default:
@@ -2140,9 +2140,9 @@ func (s *InterfaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationContext) {
+func (p *CadenceParser) InterfaceDeclaration() (localctx IInterfaceDeclarationContext) {
 	localctx = NewInterfaceDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, StrictusParserRULE_interfaceDeclaration)
+	p.EnterRule(localctx, 18, CadenceParserRULE_interfaceDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -2171,7 +2171,7 @@ func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationC
 	}
 	{
 		p.SetState(252)
-		p.Match(StrictusParserInterface)
+		p.Match(CadenceParserInterface)
 	}
 	{
 		p.SetState(253)
@@ -2179,7 +2179,7 @@ func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationC
 	}
 	{
 		p.SetState(254)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(255)
@@ -2187,7 +2187,7 @@ func (p *StrictusParser) InterfaceDeclaration() (localctx IInterfaceDeclarationC
 	}
 	{
 		p.SetState(256)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -2219,7 +2219,7 @@ type MembersContext struct {
 func NewEmptyMembersContext() *MembersContext {
 	var p = new(MembersContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_members
+	p.RuleIndex = CadenceParserRULE_members
 	return p
 }
 
@@ -2231,7 +2231,7 @@ func NewMembersContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_members
+	p.RuleIndex = CadenceParserRULE_members
 
 	p.functionBlockRequired = functionBlockRequired
 
@@ -2276,20 +2276,20 @@ func (s *MembersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 }
 
 func (s *MembersContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterMembers(s)
 	}
 }
 
 func (s *MembersContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitMembers(s)
 	}
 }
 
 func (s *MembersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitMembers(s)
 
 	default:
@@ -2297,9 +2297,9 @@ func (s *MembersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Members(functionBlockRequired bool) (localctx IMembersContext) {
+func (p *CadenceParser) Members(functionBlockRequired bool) (localctx IMembersContext) {
 	localctx = NewMembersContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
-	p.EnterRule(localctx, 20, StrictusParserRULE_members)
+	p.EnterRule(localctx, 20, CadenceParserRULE_members)
 	var _la int
 
 	defer func() {
@@ -2323,7 +2323,7 @@ func (p *StrictusParser) Members(functionBlockRequired bool) (localctx IMembersC
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(StrictusParserStruct-34))|(1<<(StrictusParserResource-34))|(1<<(StrictusParserContract-34))|(1<<(StrictusParserFun-34))|(1<<(StrictusParserPub-34))|(1<<(StrictusParserPubSet-34))|(1<<(StrictusParserLet-34))|(1<<(StrictusParserVar-34))|(1<<(StrictusParserFrom-34))|(1<<(StrictusParserCreate-34))|(1<<(StrictusParserDestroy-34))|(1<<(StrictusParserIdentifier-34)))) != 0 {
+	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34))|(1<<(CadenceParserFun-34))|(1<<(CadenceParserPub-34))|(1<<(CadenceParserPubSet-34))|(1<<(CadenceParserLet-34))|(1<<(CadenceParserVar-34))|(1<<(CadenceParserFrom-34))|(1<<(CadenceParserCreate-34))|(1<<(CadenceParserDestroy-34))|(1<<(CadenceParserIdentifier-34)))) != 0 {
 		{
 			p.SetState(258)
 			p.Member(functionBlockRequired)
@@ -2363,7 +2363,7 @@ type MemberContext struct {
 func NewEmptyMemberContext() *MemberContext {
 	var p = new(MemberContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_member
+	p.RuleIndex = CadenceParserRULE_member
 	return p
 }
 
@@ -2375,7 +2375,7 @@ func NewMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invok
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_member
+	p.RuleIndex = CadenceParserRULE_member
 
 	p.functionBlockRequired = functionBlockRequired
 
@@ -2447,20 +2447,20 @@ func (s *MemberContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 }
 
 func (s *MemberContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterMember(s)
 	}
 }
 
 func (s *MemberContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitMember(s)
 	}
 }
 
 func (s *MemberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitMember(s)
 
 	default:
@@ -2468,9 +2468,9 @@ func (s *MemberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Member(functionBlockRequired bool) (localctx IMemberContext) {
+func (p *CadenceParser) Member(functionBlockRequired bool) (localctx IMemberContext) {
 	localctx = NewMemberContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
-	p.EnterRule(localctx, 22, StrictusParserRULE_member)
+	p.EnterRule(localctx, 22, CadenceParserRULE_member)
 
 	defer func() {
 		p.ExitRule()
@@ -2550,7 +2550,7 @@ type CompositeKindContext struct {
 func NewEmptyCompositeKindContext() *CompositeKindContext {
 	var p = new(CompositeKindContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_compositeKind
+	p.RuleIndex = CadenceParserRULE_compositeKind
 	return p
 }
 
@@ -2562,7 +2562,7 @@ func NewCompositeKindContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_compositeKind
+	p.RuleIndex = CadenceParserRULE_compositeKind
 
 	return p
 }
@@ -2570,15 +2570,15 @@ func NewCompositeKindContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *CompositeKindContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *CompositeKindContext) Struct() antlr.TerminalNode {
-	return s.GetToken(StrictusParserStruct, 0)
+	return s.GetToken(CadenceParserStruct, 0)
 }
 
 func (s *CompositeKindContext) Resource() antlr.TerminalNode {
-	return s.GetToken(StrictusParserResource, 0)
+	return s.GetToken(CadenceParserResource, 0)
 }
 
 func (s *CompositeKindContext) Contract() antlr.TerminalNode {
-	return s.GetToken(StrictusParserContract, 0)
+	return s.GetToken(CadenceParserContract, 0)
 }
 
 func (s *CompositeKindContext) GetRuleContext() antlr.RuleContext {
@@ -2590,20 +2590,20 @@ func (s *CompositeKindContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *CompositeKindContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterCompositeKind(s)
 	}
 }
 
 func (s *CompositeKindContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitCompositeKind(s)
 	}
 }
 
 func (s *CompositeKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitCompositeKind(s)
 
 	default:
@@ -2611,9 +2611,9 @@ func (s *CompositeKindContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) CompositeKind() (localctx ICompositeKindContext) {
+func (p *CadenceParser) CompositeKind() (localctx ICompositeKindContext) {
 	localctx = NewCompositeKindContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 24, StrictusParserRULE_compositeKind)
+	p.EnterRule(localctx, 24, CadenceParserRULE_compositeKind)
 	var _la int
 
 	defer func() {
@@ -2637,7 +2637,7 @@ func (p *StrictusParser) CompositeKind() (localctx ICompositeKindContext) {
 		p.SetState(271)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(StrictusParserStruct-34))|(1<<(StrictusParserResource-34))|(1<<(StrictusParserContract-34)))) != 0) {
+		if !(((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -2681,7 +2681,7 @@ type SpecialFunctionDeclarationContext struct {
 func NewEmptySpecialFunctionDeclarationContext() *SpecialFunctionDeclarationContext {
 	var p = new(SpecialFunctionDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_specialFunctionDeclaration
+	p.RuleIndex = CadenceParserRULE_specialFunctionDeclaration
 	return p
 }
 
@@ -2693,7 +2693,7 @@ func NewSpecialFunctionDeclarationContext(parser antlr.Parser, parent antlr.Pars
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_specialFunctionDeclaration
+	p.RuleIndex = CadenceParserRULE_specialFunctionDeclaration
 
 	p.functionBlockRequired = functionBlockRequired
 
@@ -2753,20 +2753,20 @@ func (s *SpecialFunctionDeclarationContext) ToStringTree(ruleNames []string, rec
 }
 
 func (s *SpecialFunctionDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterSpecialFunctionDeclaration(s)
 	}
 }
 
 func (s *SpecialFunctionDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitSpecialFunctionDeclaration(s)
 	}
 }
 
 func (s *SpecialFunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitSpecialFunctionDeclaration(s)
 
 	default:
@@ -2774,9 +2774,9 @@ func (s *SpecialFunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisito
 	}
 }
 
-func (p *StrictusParser) SpecialFunctionDeclaration(functionBlockRequired bool) (localctx ISpecialFunctionDeclarationContext) {
+func (p *CadenceParser) SpecialFunctionDeclaration(functionBlockRequired bool) (localctx ISpecialFunctionDeclarationContext) {
 	localctx = NewSpecialFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
-	p.EnterRule(localctx, 26, StrictusParserRULE_specialFunctionDeclaration)
+	p.EnterRule(localctx, 26, CadenceParserRULE_specialFunctionDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -2865,7 +2865,7 @@ type FunctionDeclarationContext struct {
 func NewEmptyFunctionDeclarationContext() *FunctionDeclarationContext {
 	var p = new(FunctionDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_functionDeclaration
+	p.RuleIndex = CadenceParserRULE_functionDeclaration
 	return p
 }
 
@@ -2877,7 +2877,7 @@ func NewFunctionDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_functionDeclaration
+	p.RuleIndex = CadenceParserRULE_functionDeclaration
 
 	p.functionBlockRequired = functionBlockRequired
 
@@ -2909,7 +2909,7 @@ func (s *FunctionDeclarationContext) Access() IAccessContext {
 }
 
 func (s *FunctionDeclarationContext) Fun() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFun, 0)
+	return s.GetToken(CadenceParserFun, 0)
 }
 
 func (s *FunctionDeclarationContext) Identifier() IIdentifierContext {
@@ -2961,20 +2961,20 @@ func (s *FunctionDeclarationContext) ToStringTree(ruleNames []string, recog antl
 }
 
 func (s *FunctionDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFunctionDeclaration(s)
 	}
 }
 
 func (s *FunctionDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFunctionDeclaration(s)
 	}
 }
 
 func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFunctionDeclaration(s)
 
 	default:
@@ -2982,9 +2982,9 @@ func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *StrictusParser) FunctionDeclaration(functionBlockRequired bool) (localctx IFunctionDeclarationContext) {
+func (p *CadenceParser) FunctionDeclaration(functionBlockRequired bool) (localctx IFunctionDeclarationContext) {
 	localctx = NewFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState(), functionBlockRequired)
-	p.EnterRule(localctx, 28, StrictusParserRULE_functionDeclaration)
+	p.EnterRule(localctx, 28, CadenceParserRULE_functionDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -3009,7 +3009,7 @@ func (p *StrictusParser) FunctionDeclaration(functionBlockRequired bool) (localc
 	}
 	{
 		p.SetState(281)
-		p.Match(StrictusParserFun)
+		p.Match(CadenceParserFun)
 	}
 	{
 		p.SetState(282)
@@ -3025,7 +3025,7 @@ func (p *StrictusParser) FunctionDeclaration(functionBlockRequired bool) (localc
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(284)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(285)
@@ -3077,7 +3077,7 @@ type EventDeclarationContext struct {
 func NewEmptyEventDeclarationContext() *EventDeclarationContext {
 	var p = new(EventDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_eventDeclaration
+	p.RuleIndex = CadenceParserRULE_eventDeclaration
 	return p
 }
 
@@ -3089,7 +3089,7 @@ func NewEventDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_eventDeclaration
+	p.RuleIndex = CadenceParserRULE_eventDeclaration
 
 	return p
 }
@@ -3097,7 +3097,7 @@ func NewEventDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *EventDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EventDeclarationContext) Event() antlr.TerminalNode {
-	return s.GetToken(StrictusParserEvent, 0)
+	return s.GetToken(CadenceParserEvent, 0)
 }
 
 func (s *EventDeclarationContext) Identifier() IIdentifierContext {
@@ -3129,20 +3129,20 @@ func (s *EventDeclarationContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 func (s *EventDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterEventDeclaration(s)
 	}
 }
 
 func (s *EventDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitEventDeclaration(s)
 	}
 }
 
 func (s *EventDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitEventDeclaration(s)
 
 	default:
@@ -3150,9 +3150,9 @@ func (s *EventDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *StrictusParser) EventDeclaration() (localctx IEventDeclarationContext) {
+func (p *CadenceParser) EventDeclaration() (localctx IEventDeclarationContext) {
 	localctx = NewEventDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 30, StrictusParserRULE_eventDeclaration)
+	p.EnterRule(localctx, 30, CadenceParserRULE_eventDeclaration)
 
 	defer func() {
 		p.ExitRule()
@@ -3173,7 +3173,7 @@ func (p *StrictusParser) EventDeclaration() (localctx IEventDeclarationContext) 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(293)
-		p.Match(StrictusParserEvent)
+		p.Match(CadenceParserEvent)
 	}
 	{
 		p.SetState(294)
@@ -3206,7 +3206,7 @@ type ParameterListContext struct {
 func NewEmptyParameterListContext() *ParameterListContext {
 	var p = new(ParameterListContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_parameterList
+	p.RuleIndex = CadenceParserRULE_parameterList
 	return p
 }
 
@@ -3218,7 +3218,7 @@ func NewParameterListContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_parameterList
+	p.RuleIndex = CadenceParserRULE_parameterList
 
 	return p
 }
@@ -3226,11 +3226,11 @@ func NewParameterListContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *ParameterListContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ParameterListContext) OpenParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserOpenParen, 0)
+	return s.GetToken(CadenceParserOpenParen, 0)
 }
 
 func (s *ParameterListContext) CloseParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserCloseParen, 0)
+	return s.GetToken(CadenceParserCloseParen, 0)
 }
 
 func (s *ParameterListContext) AllParameter() []IParameterContext {
@@ -3265,20 +3265,20 @@ func (s *ParameterListContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *ParameterListContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterParameterList(s)
 	}
 }
 
 func (s *ParameterListContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitParameterList(s)
 	}
 }
 
 func (s *ParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitParameterList(s)
 
 	default:
@@ -3286,9 +3286,9 @@ func (s *ParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) ParameterList() (localctx IParameterListContext) {
+func (p *CadenceParser) ParameterList() (localctx IParameterListContext) {
 	localctx = NewParameterListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 32, StrictusParserRULE_parameterList)
+	p.EnterRule(localctx, 32, CadenceParserRULE_parameterList)
 	var _la int
 
 	defer func() {
@@ -3310,13 +3310,13 @@ func (p *StrictusParser) ParameterList() (localctx IParameterListContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(297)
-		p.Match(StrictusParserOpenParen)
+		p.Match(CadenceParserOpenParen)
 	}
 	p.SetState(306)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(StrictusParserFrom-57))|(1<<(StrictusParserCreate-57))|(1<<(StrictusParserDestroy-57))|(1<<(StrictusParserIdentifier-57)))) != 0 {
+	if ((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(CadenceParserFrom-57))|(1<<(CadenceParserCreate-57))|(1<<(CadenceParserDestroy-57))|(1<<(CadenceParserIdentifier-57)))) != 0 {
 		{
 			p.SetState(298)
 			p.Parameter()
@@ -3325,10 +3325,10 @@ func (p *StrictusParser) ParameterList() (localctx IParameterListContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(299)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(300)
@@ -3343,7 +3343,7 @@ func (p *StrictusParser) ParameterList() (localctx IParameterListContext) {
 	}
 	{
 		p.SetState(308)
-		p.Match(StrictusParserCloseParen)
+		p.Match(CadenceParserCloseParen)
 	}
 
 	return localctx
@@ -3382,7 +3382,7 @@ type ParameterContext struct {
 func NewEmptyParameterContext() *ParameterContext {
 	var p = new(ParameterContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_parameter
+	p.RuleIndex = CadenceParserRULE_parameter
 	return p
 }
 
@@ -3394,7 +3394,7 @@ func NewParameterContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_parameter
+	p.RuleIndex = CadenceParserRULE_parameter
 
 	return p
 }
@@ -3451,20 +3451,20 @@ func (s *ParameterContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 }
 
 func (s *ParameterContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterParameter(s)
 	}
 }
 
 func (s *ParameterContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitParameter(s)
 	}
 }
 
 func (s *ParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitParameter(s)
 
 	default:
@@ -3472,9 +3472,9 @@ func (s *ParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Parameter() (localctx IParameterContext) {
+func (p *CadenceParser) Parameter() (localctx IParameterContext) {
 	localctx = NewParameterContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 34, StrictusParserRULE_parameter)
+	p.EnterRule(localctx, 34, CadenceParserRULE_parameter)
 
 	defer func() {
 		p.ExitRule()
@@ -3515,7 +3515,7 @@ func (p *StrictusParser) Parameter() (localctx IParameterContext) {
 	}
 	{
 		p.SetState(314)
-		p.Match(StrictusParserT__4)
+		p.Match(CadenceParserT__4)
 	}
 	{
 		p.SetState(315)
@@ -3544,7 +3544,7 @@ type TypeAnnotationContext struct {
 func NewEmptyTypeAnnotationContext() *TypeAnnotationContext {
 	var p = new(TypeAnnotationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_typeAnnotation
+	p.RuleIndex = CadenceParserRULE_typeAnnotation
 	return p
 }
 
@@ -3556,7 +3556,7 @@ func NewTypeAnnotationContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_typeAnnotation
+	p.RuleIndex = CadenceParserRULE_typeAnnotation
 
 	return p
 }
@@ -3574,7 +3574,7 @@ func (s *TypeAnnotationContext) FullType() IFullTypeContext {
 }
 
 func (s *TypeAnnotationContext) Move() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMove, 0)
+	return s.GetToken(CadenceParserMove, 0)
 }
 
 func (s *TypeAnnotationContext) GetRuleContext() antlr.RuleContext {
@@ -3586,20 +3586,20 @@ func (s *TypeAnnotationContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *TypeAnnotationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterTypeAnnotation(s)
 	}
 }
 
 func (s *TypeAnnotationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitTypeAnnotation(s)
 	}
 }
 
 func (s *TypeAnnotationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitTypeAnnotation(s)
 
 	default:
@@ -3607,9 +3607,9 @@ func (s *TypeAnnotationContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) TypeAnnotation() (localctx ITypeAnnotationContext) {
+func (p *CadenceParser) TypeAnnotation() (localctx ITypeAnnotationContext) {
 	localctx = NewTypeAnnotationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 36, StrictusParserRULE_typeAnnotation)
+	p.EnterRule(localctx, 36, CadenceParserRULE_typeAnnotation)
 	var _la int
 
 	defer func() {
@@ -3633,10 +3633,10 @@ func (p *StrictusParser) TypeAnnotation() (localctx ITypeAnnotationContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserMove {
+	if _la == CadenceParserMove {
 		{
 			p.SetState(317)
-			p.Match(StrictusParserMove)
+			p.Match(CadenceParserMove)
 		}
 
 	}
@@ -3688,7 +3688,7 @@ type FullTypeContext struct {
 func NewEmptyFullTypeContext() *FullTypeContext {
 	var p = new(FullTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_fullType
+	p.RuleIndex = CadenceParserRULE_fullType
 	return p
 }
 
@@ -3700,7 +3700,7 @@ func NewFullTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_fullType
+	p.RuleIndex = CadenceParserRULE_fullType
 
 	return p
 }
@@ -3730,15 +3730,15 @@ func (s *FullTypeContext) BaseType() IBaseTypeContext {
 }
 
 func (s *FullTypeContext) Ampersand() antlr.TerminalNode {
-	return s.GetToken(StrictusParserAmpersand, 0)
+	return s.GetToken(CadenceParserAmpersand, 0)
 }
 
 func (s *FullTypeContext) AllOptional() []antlr.TerminalNode {
-	return s.GetTokens(StrictusParserOptional)
+	return s.GetTokens(CadenceParserOptional)
 }
 
 func (s *FullTypeContext) Optional(i int) antlr.TerminalNode {
-	return s.GetToken(StrictusParserOptional, i)
+	return s.GetToken(CadenceParserOptional, i)
 }
 
 func (s *FullTypeContext) GetRuleContext() antlr.RuleContext {
@@ -3750,20 +3750,20 @@ func (s *FullTypeContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 }
 
 func (s *FullTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFullType(s)
 	}
 }
 
 func (s *FullTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFullType(s)
 	}
 }
 
 func (s *FullTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFullType(s)
 
 	default:
@@ -3771,9 +3771,9 @@ func (s *FullTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
+func (p *CadenceParser) FullType() (localctx IFullTypeContext) {
 	localctx = NewFullTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 38, StrictusParserRULE_fullType)
+	p.EnterRule(localctx, 38, CadenceParserRULE_fullType)
 
 	defer func() {
 		p.ExitRule()
@@ -3797,12 +3797,12 @@ func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserAmpersand:
+	case CadenceParserAmpersand:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(322)
 
-			var _m = p.Match(StrictusParserAmpersand)
+			var _m = p.Match(CadenceParserAmpersand)
 
 			localctx.(*FullTypeContext).reference = _m
 		}
@@ -3816,7 +3816,7 @@ func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
 			p.BaseType()
 		}
 
-	case StrictusParserT__2, StrictusParserT__5, StrictusParserOpenParen, StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier:
+	case CadenceParserT__2, CadenceParserT__5, CadenceParserOpenParen, CadenceParserFrom, CadenceParserCreate, CadenceParserDestroy, CadenceParserIdentifier:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(325)
@@ -3836,7 +3836,7 @@ func (p *StrictusParser) FullType() (localctx IFullTypeContext) {
 				{
 					p.SetState(327)
 
-					var _m = p.Match(StrictusParserOptional)
+					var _m = p.Match(CadenceParserOptional)
 
 					localctx.(*FullTypeContext)._Optional = _m
 				}
@@ -3874,7 +3874,7 @@ type BaseTypeContext struct {
 func NewEmptyBaseTypeContext() *BaseTypeContext {
 	var p = new(BaseTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_baseType
+	p.RuleIndex = CadenceParserRULE_baseType
 	return p
 }
 
@@ -3886,7 +3886,7 @@ func NewBaseTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_baseType
+	p.RuleIndex = CadenceParserRULE_baseType
 
 	return p
 }
@@ -3952,20 +3952,20 @@ func (s *BaseTypeContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 }
 
 func (s *BaseTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBaseType(s)
 	}
 }
 
 func (s *BaseTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBaseType(s)
 	}
 }
 
 func (s *BaseTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBaseType(s)
 
 	default:
@@ -3973,9 +3973,9 @@ func (s *BaseTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) BaseType() (localctx IBaseTypeContext) {
+func (p *CadenceParser) BaseType() (localctx IBaseTypeContext) {
 	localctx = NewBaseTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 40, StrictusParserRULE_baseType)
+	p.EnterRule(localctx, 40, CadenceParserRULE_baseType)
 
 	defer func() {
 		p.ExitRule()
@@ -4055,7 +4055,7 @@ type NominalTypeContext struct {
 func NewEmptyNominalTypeContext() *NominalTypeContext {
 	var p = new(NominalTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_nominalType
+	p.RuleIndex = CadenceParserRULE_nominalType
 	return p
 }
 
@@ -4067,7 +4067,7 @@ func NewNominalTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_nominalType
+	p.RuleIndex = CadenceParserRULE_nominalType
 
 	return p
 }
@@ -4093,20 +4093,20 @@ func (s *NominalTypeContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 }
 
 func (s *NominalTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterNominalType(s)
 	}
 }
 
 func (s *NominalTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitNominalType(s)
 	}
 }
 
 func (s *NominalTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitNominalType(s)
 
 	default:
@@ -4114,9 +4114,9 @@ func (s *NominalTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *StrictusParser) NominalType() (localctx INominalTypeContext) {
+func (p *CadenceParser) NominalType() (localctx INominalTypeContext) {
 	localctx = NewNominalTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 42, StrictusParserRULE_nominalType)
+	p.EnterRule(localctx, 42, CadenceParserRULE_nominalType)
 
 	defer func() {
 		p.ExitRule()
@@ -4183,7 +4183,7 @@ type FunctionTypeContext struct {
 func NewEmptyFunctionTypeContext() *FunctionTypeContext {
 	var p = new(FunctionTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_functionType
+	p.RuleIndex = CadenceParserRULE_functionType
 	return p
 }
 
@@ -4195,7 +4195,7 @@ func NewFunctionTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_functionType
+	p.RuleIndex = CadenceParserRULE_functionType
 
 	return p
 }
@@ -4215,19 +4215,19 @@ func (s *FunctionTypeContext) GetParameterTypes() []ITypeAnnotationContext { ret
 func (s *FunctionTypeContext) SetParameterTypes(v []ITypeAnnotationContext) { s.parameterTypes = v }
 
 func (s *FunctionTypeContext) AllOpenParen() []antlr.TerminalNode {
-	return s.GetTokens(StrictusParserOpenParen)
+	return s.GetTokens(CadenceParserOpenParen)
 }
 
 func (s *FunctionTypeContext) OpenParen(i int) antlr.TerminalNode {
-	return s.GetToken(StrictusParserOpenParen, i)
+	return s.GetToken(CadenceParserOpenParen, i)
 }
 
 func (s *FunctionTypeContext) AllCloseParen() []antlr.TerminalNode {
-	return s.GetTokens(StrictusParserCloseParen)
+	return s.GetTokens(CadenceParserCloseParen)
 }
 
 func (s *FunctionTypeContext) CloseParen(i int) antlr.TerminalNode {
-	return s.GetToken(StrictusParserCloseParen, i)
+	return s.GetToken(CadenceParserCloseParen, i)
 }
 
 func (s *FunctionTypeContext) AllTypeAnnotation() []ITypeAnnotationContext {
@@ -4262,20 +4262,20 @@ func (s *FunctionTypeContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *FunctionTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFunctionType(s)
 	}
 }
 
 func (s *FunctionTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFunctionType(s)
 	}
 }
 
 func (s *FunctionTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFunctionType(s)
 
 	default:
@@ -4283,9 +4283,9 @@ func (s *FunctionTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
+func (p *CadenceParser) FunctionType() (localctx IFunctionTypeContext) {
 	localctx = NewFunctionTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 44, StrictusParserRULE_functionType)
+	p.EnterRule(localctx, 44, CadenceParserRULE_functionType)
 	var _la int
 
 	defer func() {
@@ -4307,17 +4307,17 @@ func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(344)
-		p.Match(StrictusParserOpenParen)
+		p.Match(CadenceParserOpenParen)
 	}
 	{
 		p.SetState(345)
-		p.Match(StrictusParserOpenParen)
+		p.Match(CadenceParserOpenParen)
 	}
 	p.SetState(354)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserAmpersand)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(StrictusParserFrom-57))|(1<<(StrictusParserCreate-57))|(1<<(StrictusParserDestroy-57))|(1<<(StrictusParserIdentifier-57)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__2)|(1<<CadenceParserT__5)|(1<<CadenceParserAmpersand)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(CadenceParserFrom-57))|(1<<(CadenceParserCreate-57))|(1<<(CadenceParserDestroy-57))|(1<<(CadenceParserIdentifier-57)))) != 0) {
 		{
 			p.SetState(346)
 
@@ -4330,10 +4330,10 @@ func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(347)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(348)
@@ -4352,11 +4352,11 @@ func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
 	}
 	{
 		p.SetState(356)
-		p.Match(StrictusParserCloseParen)
+		p.Match(CadenceParserCloseParen)
 	}
 	{
 		p.SetState(357)
-		p.Match(StrictusParserT__4)
+		p.Match(CadenceParserT__4)
 	}
 	{
 		p.SetState(358)
@@ -4367,7 +4367,7 @@ func (p *StrictusParser) FunctionType() (localctx IFunctionTypeContext) {
 	}
 	{
 		p.SetState(359)
-		p.Match(StrictusParserCloseParen)
+		p.Match(CadenceParserCloseParen)
 	}
 
 	return localctx
@@ -4392,7 +4392,7 @@ type VariableSizedTypeContext struct {
 func NewEmptyVariableSizedTypeContext() *VariableSizedTypeContext {
 	var p = new(VariableSizedTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_variableSizedType
+	p.RuleIndex = CadenceParserRULE_variableSizedType
 	return p
 }
 
@@ -4404,7 +4404,7 @@ func NewVariableSizedTypeContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_variableSizedType
+	p.RuleIndex = CadenceParserRULE_variableSizedType
 
 	return p
 }
@@ -4430,20 +4430,20 @@ func (s *VariableSizedTypeContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *VariableSizedTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterVariableSizedType(s)
 	}
 }
 
 func (s *VariableSizedTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitVariableSizedType(s)
 	}
 }
 
 func (s *VariableSizedTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitVariableSizedType(s)
 
 	default:
@@ -4451,9 +4451,9 @@ func (s *VariableSizedTypeContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) VariableSizedType() (localctx IVariableSizedTypeContext) {
+func (p *CadenceParser) VariableSizedType() (localctx IVariableSizedTypeContext) {
 	localctx = NewVariableSizedTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 46, StrictusParserRULE_variableSizedType)
+	p.EnterRule(localctx, 46, CadenceParserRULE_variableSizedType)
 
 	defer func() {
 		p.ExitRule()
@@ -4474,7 +4474,7 @@ func (p *StrictusParser) VariableSizedType() (localctx IVariableSizedTypeContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(361)
-		p.Match(StrictusParserT__5)
+		p.Match(CadenceParserT__5)
 	}
 	{
 		p.SetState(362)
@@ -4482,7 +4482,7 @@ func (p *StrictusParser) VariableSizedType() (localctx IVariableSizedTypeContext
 	}
 	{
 		p.SetState(363)
-		p.Match(StrictusParserT__6)
+		p.Match(CadenceParserT__6)
 	}
 
 	return localctx
@@ -4514,7 +4514,7 @@ type ConstantSizedTypeContext struct {
 func NewEmptyConstantSizedTypeContext() *ConstantSizedTypeContext {
 	var p = new(ConstantSizedTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_constantSizedType
+	p.RuleIndex = CadenceParserRULE_constantSizedType
 	return p
 }
 
@@ -4526,7 +4526,7 @@ func NewConstantSizedTypeContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_constantSizedType
+	p.RuleIndex = CadenceParserRULE_constantSizedType
 
 	return p
 }
@@ -4548,7 +4548,7 @@ func (s *ConstantSizedTypeContext) FullType() IFullTypeContext {
 }
 
 func (s *ConstantSizedTypeContext) DecimalLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDecimalLiteral, 0)
+	return s.GetToken(CadenceParserDecimalLiteral, 0)
 }
 
 func (s *ConstantSizedTypeContext) GetRuleContext() antlr.RuleContext {
@@ -4560,20 +4560,20 @@ func (s *ConstantSizedTypeContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *ConstantSizedTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterConstantSizedType(s)
 	}
 }
 
 func (s *ConstantSizedTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitConstantSizedType(s)
 	}
 }
 
 func (s *ConstantSizedTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitConstantSizedType(s)
 
 	default:
@@ -4581,9 +4581,9 @@ func (s *ConstantSizedTypeContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) ConstantSizedType() (localctx IConstantSizedTypeContext) {
+func (p *CadenceParser) ConstantSizedType() (localctx IConstantSizedTypeContext) {
 	localctx = NewConstantSizedTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 48, StrictusParserRULE_constantSizedType)
+	p.EnterRule(localctx, 48, CadenceParserRULE_constantSizedType)
 
 	defer func() {
 		p.ExitRule()
@@ -4604,7 +4604,7 @@ func (p *StrictusParser) ConstantSizedType() (localctx IConstantSizedTypeContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(365)
-		p.Match(StrictusParserT__5)
+		p.Match(CadenceParserT__5)
 	}
 	{
 		p.SetState(366)
@@ -4612,18 +4612,18 @@ func (p *StrictusParser) ConstantSizedType() (localctx IConstantSizedTypeContext
 	}
 	{
 		p.SetState(367)
-		p.Match(StrictusParserT__0)
+		p.Match(CadenceParserT__0)
 	}
 	{
 		p.SetState(368)
 
-		var _m = p.Match(StrictusParserDecimalLiteral)
+		var _m = p.Match(CadenceParserDecimalLiteral)
 
 		localctx.(*ConstantSizedTypeContext).size = _m
 	}
 	{
 		p.SetState(369)
-		p.Match(StrictusParserT__6)
+		p.Match(CadenceParserT__6)
 	}
 
 	return localctx
@@ -4662,7 +4662,7 @@ type DictionaryTypeContext struct {
 func NewEmptyDictionaryTypeContext() *DictionaryTypeContext {
 	var p = new(DictionaryTypeContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_dictionaryType
+	p.RuleIndex = CadenceParserRULE_dictionaryType
 	return p
 }
 
@@ -4674,7 +4674,7 @@ func NewDictionaryTypeContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_dictionaryType
+	p.RuleIndex = CadenceParserRULE_dictionaryType
 
 	return p
 }
@@ -4721,20 +4721,20 @@ func (s *DictionaryTypeContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *DictionaryTypeContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDictionaryType(s)
 	}
 }
 
 func (s *DictionaryTypeContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDictionaryType(s)
 	}
 }
 
 func (s *DictionaryTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDictionaryType(s)
 
 	default:
@@ -4742,9 +4742,9 @@ func (s *DictionaryTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) DictionaryType() (localctx IDictionaryTypeContext) {
+func (p *CadenceParser) DictionaryType() (localctx IDictionaryTypeContext) {
 	localctx = NewDictionaryTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 50, StrictusParserRULE_dictionaryType)
+	p.EnterRule(localctx, 50, CadenceParserRULE_dictionaryType)
 
 	defer func() {
 		p.ExitRule()
@@ -4765,7 +4765,7 @@ func (p *StrictusParser) DictionaryType() (localctx IDictionaryTypeContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(371)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(372)
@@ -4776,7 +4776,7 @@ func (p *StrictusParser) DictionaryType() (localctx IDictionaryTypeContext) {
 	}
 	{
 		p.SetState(373)
-		p.Match(StrictusParserT__4)
+		p.Match(CadenceParserT__4)
 	}
 	{
 		p.SetState(374)
@@ -4787,7 +4787,7 @@ func (p *StrictusParser) DictionaryType() (localctx IDictionaryTypeContext) {
 	}
 	{
 		p.SetState(375)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -4812,7 +4812,7 @@ type BlockContext struct {
 func NewEmptyBlockContext() *BlockContext {
 	var p = new(BlockContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_block
+	p.RuleIndex = CadenceParserRULE_block
 	return p
 }
 
@@ -4824,7 +4824,7 @@ func NewBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_block
+	p.RuleIndex = CadenceParserRULE_block
 
 	return p
 }
@@ -4850,20 +4850,20 @@ func (s *BlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 }
 
 func (s *BlockContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBlock(s)
 	}
 }
 
 func (s *BlockContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBlock(s)
 	}
 }
 
 func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBlock(s)
 
 	default:
@@ -4871,9 +4871,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Block() (localctx IBlockContext) {
+func (p *CadenceParser) Block() (localctx IBlockContext) {
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 52, StrictusParserRULE_block)
+	p.EnterRule(localctx, 52, CadenceParserRULE_block)
 
 	defer func() {
 		p.ExitRule()
@@ -4894,7 +4894,7 @@ func (p *StrictusParser) Block() (localctx IBlockContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(377)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(378)
@@ -4902,7 +4902,7 @@ func (p *StrictusParser) Block() (localctx IBlockContext) {
 	}
 	{
 		p.SetState(379)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -4927,7 +4927,7 @@ type FunctionBlockContext struct {
 func NewEmptyFunctionBlockContext() *FunctionBlockContext {
 	var p = new(FunctionBlockContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_functionBlock
+	p.RuleIndex = CadenceParserRULE_functionBlock
 	return p
 }
 
@@ -4939,7 +4939,7 @@ func NewFunctionBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_functionBlock
+	p.RuleIndex = CadenceParserRULE_functionBlock
 
 	return p
 }
@@ -4985,20 +4985,20 @@ func (s *FunctionBlockContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *FunctionBlockContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFunctionBlock(s)
 	}
 }
 
 func (s *FunctionBlockContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFunctionBlock(s)
 	}
 }
 
 func (s *FunctionBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFunctionBlock(s)
 
 	default:
@@ -5006,9 +5006,9 @@ func (s *FunctionBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) FunctionBlock() (localctx IFunctionBlockContext) {
+func (p *CadenceParser) FunctionBlock() (localctx IFunctionBlockContext) {
 	localctx = NewFunctionBlockContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 54, StrictusParserRULE_functionBlock)
+	p.EnterRule(localctx, 54, CadenceParserRULE_functionBlock)
 	var _la int
 
 	defer func() {
@@ -5030,13 +5030,13 @@ func (p *StrictusParser) FunctionBlock() (localctx IFunctionBlockContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(381)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	p.SetState(383)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserPre {
+	if _la == CadenceParserPre {
 		{
 			p.SetState(382)
 			p.PreConditions()
@@ -5047,7 +5047,7 @@ func (p *StrictusParser) FunctionBlock() (localctx IFunctionBlockContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserPost {
+	if _la == CadenceParserPost {
 		{
 			p.SetState(385)
 			p.PostConditions()
@@ -5060,7 +5060,7 @@ func (p *StrictusParser) FunctionBlock() (localctx IFunctionBlockContext) {
 	}
 	{
 		p.SetState(389)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -5085,7 +5085,7 @@ type PreConditionsContext struct {
 func NewEmptyPreConditionsContext() *PreConditionsContext {
 	var p = new(PreConditionsContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_preConditions
+	p.RuleIndex = CadenceParserRULE_preConditions
 	return p
 }
 
@@ -5097,7 +5097,7 @@ func NewPreConditionsContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_preConditions
+	p.RuleIndex = CadenceParserRULE_preConditions
 
 	return p
 }
@@ -5105,7 +5105,7 @@ func NewPreConditionsContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *PreConditionsContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *PreConditionsContext) Pre() antlr.TerminalNode {
-	return s.GetToken(StrictusParserPre, 0)
+	return s.GetToken(CadenceParserPre, 0)
 }
 
 func (s *PreConditionsContext) Conditions() IConditionsContext {
@@ -5127,20 +5127,20 @@ func (s *PreConditionsContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *PreConditionsContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterPreConditions(s)
 	}
 }
 
 func (s *PreConditionsContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitPreConditions(s)
 	}
 }
 
 func (s *PreConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitPreConditions(s)
 
 	default:
@@ -5148,9 +5148,9 @@ func (s *PreConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) PreConditions() (localctx IPreConditionsContext) {
+func (p *CadenceParser) PreConditions() (localctx IPreConditionsContext) {
 	localctx = NewPreConditionsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 56, StrictusParserRULE_preConditions)
+	p.EnterRule(localctx, 56, CadenceParserRULE_preConditions)
 
 	defer func() {
 		p.ExitRule()
@@ -5171,11 +5171,11 @@ func (p *StrictusParser) PreConditions() (localctx IPreConditionsContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(391)
-		p.Match(StrictusParserPre)
+		p.Match(CadenceParserPre)
 	}
 	{
 		p.SetState(392)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(393)
@@ -5183,7 +5183,7 @@ func (p *StrictusParser) PreConditions() (localctx IPreConditionsContext) {
 	}
 	{
 		p.SetState(394)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -5208,7 +5208,7 @@ type PostConditionsContext struct {
 func NewEmptyPostConditionsContext() *PostConditionsContext {
 	var p = new(PostConditionsContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_postConditions
+	p.RuleIndex = CadenceParserRULE_postConditions
 	return p
 }
 
@@ -5220,7 +5220,7 @@ func NewPostConditionsContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_postConditions
+	p.RuleIndex = CadenceParserRULE_postConditions
 
 	return p
 }
@@ -5228,7 +5228,7 @@ func NewPostConditionsContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *PostConditionsContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *PostConditionsContext) Post() antlr.TerminalNode {
-	return s.GetToken(StrictusParserPost, 0)
+	return s.GetToken(CadenceParserPost, 0)
 }
 
 func (s *PostConditionsContext) Conditions() IConditionsContext {
@@ -5250,20 +5250,20 @@ func (s *PostConditionsContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *PostConditionsContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterPostConditions(s)
 	}
 }
 
 func (s *PostConditionsContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitPostConditions(s)
 	}
 }
 
 func (s *PostConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitPostConditions(s)
 
 	default:
@@ -5271,9 +5271,9 @@ func (s *PostConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) PostConditions() (localctx IPostConditionsContext) {
+func (p *CadenceParser) PostConditions() (localctx IPostConditionsContext) {
 	localctx = NewPostConditionsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 58, StrictusParserRULE_postConditions)
+	p.EnterRule(localctx, 58, CadenceParserRULE_postConditions)
 
 	defer func() {
 		p.ExitRule()
@@ -5294,11 +5294,11 @@ func (p *StrictusParser) PostConditions() (localctx IPostConditionsContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(396)
-		p.Match(StrictusParserPost)
+		p.Match(CadenceParserPost)
 	}
 	{
 		p.SetState(397)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	{
 		p.SetState(398)
@@ -5306,7 +5306,7 @@ func (p *StrictusParser) PostConditions() (localctx IPostConditionsContext) {
 	}
 	{
 		p.SetState(399)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -5331,7 +5331,7 @@ type ConditionsContext struct {
 func NewEmptyConditionsContext() *ConditionsContext {
 	var p = new(ConditionsContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_conditions
+	p.RuleIndex = CadenceParserRULE_conditions
 	return p
 }
 
@@ -5343,7 +5343,7 @@ func NewConditionsContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_conditions
+	p.RuleIndex = CadenceParserRULE_conditions
 
 	return p
 }
@@ -5405,20 +5405,20 @@ func (s *ConditionsContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *ConditionsContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterConditions(s)
 	}
 }
 
 func (s *ConditionsContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitConditions(s)
 	}
 }
 
 func (s *ConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitConditions(s)
 
 	default:
@@ -5426,9 +5426,9 @@ func (s *ConditionsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Conditions() (localctx IConditionsContext) {
+func (p *CadenceParser) Conditions() (localctx IConditionsContext) {
 	localctx = NewConditionsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 60, StrictusParserRULE_conditions)
+	p.EnterRule(localctx, 60, CadenceParserRULE_conditions)
 	var _la int
 
 	defer func() {
@@ -5452,7 +5452,7 @@ func (p *StrictusParser) Conditions() (localctx IConditionsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserAmpersand)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(StrictusParserFun-38))|(1<<(StrictusParserTrue-38))|(1<<(StrictusParserFalse-38))|(1<<(StrictusParserNil-38))|(1<<(StrictusParserFrom-38))|(1<<(StrictusParserCreate-38))|(1<<(StrictusParserDestroy-38))|(1<<(StrictusParserIdentifier-38))|(1<<(StrictusParserDecimalLiteral-38))|(1<<(StrictusParserBinaryLiteral-38))|(1<<(StrictusParserOctalLiteral-38))|(1<<(StrictusParserHexadecimalLiteral-38))|(1<<(StrictusParserInvalidNumberLiteral-38))|(1<<(StrictusParserStringLiteral-38)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__2)|(1<<CadenceParserT__5)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(CadenceParserFun-38))|(1<<(CadenceParserTrue-38))|(1<<(CadenceParserFalse-38))|(1<<(CadenceParserNil-38))|(1<<(CadenceParserFrom-38))|(1<<(CadenceParserCreate-38))|(1<<(CadenceParserDestroy-38))|(1<<(CadenceParserIdentifier-38))|(1<<(CadenceParserDecimalLiteral-38))|(1<<(CadenceParserBinaryLiteral-38))|(1<<(CadenceParserOctalLiteral-38))|(1<<(CadenceParserHexadecimalLiteral-38))|(1<<(CadenceParserInvalidNumberLiteral-38))|(1<<(CadenceParserStringLiteral-38)))) != 0) {
 		{
 			p.SetState(401)
 			p.Condition()
@@ -5503,7 +5503,7 @@ type ConditionContext struct {
 func NewEmptyConditionContext() *ConditionContext {
 	var p = new(ConditionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_condition
+	p.RuleIndex = CadenceParserRULE_condition
 	return p
 }
 
@@ -5515,7 +5515,7 @@ func NewConditionContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_condition
+	p.RuleIndex = CadenceParserRULE_condition
 
 	return p
 }
@@ -5562,20 +5562,20 @@ func (s *ConditionContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 }
 
 func (s *ConditionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterCondition(s)
 	}
 }
 
 func (s *ConditionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitCondition(s)
 	}
 }
 
 func (s *ConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitCondition(s)
 
 	default:
@@ -5583,9 +5583,9 @@ func (s *ConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Condition() (localctx IConditionContext) {
+func (p *CadenceParser) Condition() (localctx IConditionContext) {
 	localctx = NewConditionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 62, StrictusParserRULE_condition)
+	p.EnterRule(localctx, 62, CadenceParserRULE_condition)
 
 	defer func() {
 		p.ExitRule()
@@ -5617,7 +5617,7 @@ func (p *StrictusParser) Condition() (localctx IConditionContext) {
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 28, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(410)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(411)
@@ -5651,7 +5651,7 @@ type StatementsContext struct {
 func NewEmptyStatementsContext() *StatementsContext {
 	var p = new(StatementsContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_statements
+	p.RuleIndex = CadenceParserRULE_statements
 	return p
 }
 
@@ -5663,7 +5663,7 @@ func NewStatementsContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_statements
+	p.RuleIndex = CadenceParserRULE_statements
 
 	return p
 }
@@ -5725,20 +5725,20 @@ func (s *StatementsContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *StatementsContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterStatements(s)
 	}
 }
 
 func (s *StatementsContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitStatements(s)
 	}
 }
 
 func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitStatements(s)
 
 	default:
@@ -5746,9 +5746,9 @@ func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Statements() (localctx IStatementsContext) {
+func (p *CadenceParser) Statements() (localctx IStatementsContext) {
 	localctx = NewStatementsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 64, StrictusParserRULE_statements)
+	p.EnterRule(localctx, 64, CadenceParserRULE_statements)
 	var _la int
 
 	defer func() {
@@ -5772,7 +5772,7 @@ func (p *StrictusParser) Statements() (localctx IStatementsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la-3)&-(0x1f+1)) == 0 && ((1<<uint((_la-3)))&((1<<(StrictusParserT__2-3))|(1<<(StrictusParserT__5-3))|(1<<(StrictusParserMinus-3))|(1<<(StrictusParserAmpersand-3))|(1<<(StrictusParserNegate-3))|(1<<(StrictusParserMove-3))|(1<<(StrictusParserOpenParen-3))|(1<<(StrictusParserStruct-3)))) != 0) || (((_la-35)&-(0x1f+1)) == 0 && ((1<<uint((_la-35)))&((1<<(StrictusParserResource-35))|(1<<(StrictusParserContract-35))|(1<<(StrictusParserFun-35))|(1<<(StrictusParserEvent-35))|(1<<(StrictusParserEmit-35))|(1<<(StrictusParserPub-35))|(1<<(StrictusParserPubSet-35))|(1<<(StrictusParserReturn-35))|(1<<(StrictusParserBreak-35))|(1<<(StrictusParserContinue-35))|(1<<(StrictusParserLet-35))|(1<<(StrictusParserVar-35))|(1<<(StrictusParserIf-35))|(1<<(StrictusParserWhile-35))|(1<<(StrictusParserTrue-35))|(1<<(StrictusParserFalse-35))|(1<<(StrictusParserNil-35))|(1<<(StrictusParserImport-35))|(1<<(StrictusParserFrom-35))|(1<<(StrictusParserCreate-35))|(1<<(StrictusParserDestroy-35))|(1<<(StrictusParserIdentifier-35))|(1<<(StrictusParserDecimalLiteral-35))|(1<<(StrictusParserBinaryLiteral-35))|(1<<(StrictusParserOctalLiteral-35))|(1<<(StrictusParserHexadecimalLiteral-35))|(1<<(StrictusParserInvalidNumberLiteral-35))|(1<<(StrictusParserStringLiteral-35)))) != 0) {
+	for (((_la-3)&-(0x1f+1)) == 0 && ((1<<uint((_la-3)))&((1<<(CadenceParserT__2-3))|(1<<(CadenceParserT__5-3))|(1<<(CadenceParserMinus-3))|(1<<(CadenceParserAmpersand-3))|(1<<(CadenceParserNegate-3))|(1<<(CadenceParserMove-3))|(1<<(CadenceParserOpenParen-3))|(1<<(CadenceParserStruct-3)))) != 0) || (((_la-35)&-(0x1f+1)) == 0 && ((1<<uint((_la-35)))&((1<<(CadenceParserResource-35))|(1<<(CadenceParserContract-35))|(1<<(CadenceParserFun-35))|(1<<(CadenceParserEvent-35))|(1<<(CadenceParserEmit-35))|(1<<(CadenceParserPub-35))|(1<<(CadenceParserPubSet-35))|(1<<(CadenceParserReturn-35))|(1<<(CadenceParserBreak-35))|(1<<(CadenceParserContinue-35))|(1<<(CadenceParserLet-35))|(1<<(CadenceParserVar-35))|(1<<(CadenceParserIf-35))|(1<<(CadenceParserWhile-35))|(1<<(CadenceParserTrue-35))|(1<<(CadenceParserFalse-35))|(1<<(CadenceParserNil-35))|(1<<(CadenceParserImport-35))|(1<<(CadenceParserFrom-35))|(1<<(CadenceParserCreate-35))|(1<<(CadenceParserDestroy-35))|(1<<(CadenceParserIdentifier-35))|(1<<(CadenceParserDecimalLiteral-35))|(1<<(CadenceParserBinaryLiteral-35))|(1<<(CadenceParserOctalLiteral-35))|(1<<(CadenceParserHexadecimalLiteral-35))|(1<<(CadenceParserInvalidNumberLiteral-35))|(1<<(CadenceParserStringLiteral-35)))) != 0) {
 		{
 			p.SetState(414)
 			p.Statement()
@@ -5809,7 +5809,7 @@ type StatementContext struct {
 func NewEmptyStatementContext() *StatementContext {
 	var p = new(StatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_statement
+	p.RuleIndex = CadenceParserRULE_statement
 	return p
 }
 
@@ -5821,7 +5821,7 @@ func NewStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_statement
+	p.RuleIndex = CadenceParserRULE_statement
 
 	return p
 }
@@ -5937,20 +5937,20 @@ func (s *StatementContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 }
 
 func (s *StatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterStatement(s)
 	}
 }
 
 func (s *StatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitStatement(s)
 	}
 }
 
 func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitStatement(s)
 
 	default:
@@ -5958,9 +5958,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Statement() (localctx IStatementContext) {
+func (p *CadenceParser) Statement() (localctx IStatementContext) {
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 66, StrictusParserRULE_statement)
+	p.EnterRule(localctx, 66, CadenceParserRULE_statement)
 
 	defer func() {
 		p.ExitRule()
@@ -6075,7 +6075,7 @@ type ReturnStatementContext struct {
 func NewEmptyReturnStatementContext() *ReturnStatementContext {
 	var p = new(ReturnStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_returnStatement
+	p.RuleIndex = CadenceParserRULE_returnStatement
 	return p
 }
 
@@ -6087,7 +6087,7 @@ func NewReturnStatementContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_returnStatement
+	p.RuleIndex = CadenceParserRULE_returnStatement
 
 	return p
 }
@@ -6095,7 +6095,7 @@ func NewReturnStatementContext(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *ReturnStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ReturnStatementContext) Return() antlr.TerminalNode {
-	return s.GetToken(StrictusParserReturn, 0)
+	return s.GetToken(CadenceParserReturn, 0)
 }
 
 func (s *ReturnStatementContext) Expression() IExpressionContext {
@@ -6117,20 +6117,20 @@ func (s *ReturnStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 }
 
 func (s *ReturnStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterReturnStatement(s)
 	}
 }
 
 func (s *ReturnStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitReturnStatement(s)
 	}
 }
 
 func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitReturnStatement(s)
 
 	default:
@@ -6138,9 +6138,9 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *StrictusParser) ReturnStatement() (localctx IReturnStatementContext) {
+func (p *CadenceParser) ReturnStatement() (localctx IReturnStatementContext) {
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 68, StrictusParserRULE_returnStatement)
+	p.EnterRule(localctx, 68, CadenceParserRULE_returnStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6161,7 +6161,7 @@ func (p *StrictusParser) ReturnStatement() (localctx IReturnStatementContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(434)
-		p.Match(StrictusParserReturn)
+		p.Match(CadenceParserReturn)
 	}
 	p.SetState(437)
 	p.GetErrorHandler().Sync(p)
@@ -6201,7 +6201,7 @@ type BreakStatementContext struct {
 func NewEmptyBreakStatementContext() *BreakStatementContext {
 	var p = new(BreakStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_breakStatement
+	p.RuleIndex = CadenceParserRULE_breakStatement
 	return p
 }
 
@@ -6213,7 +6213,7 @@ func NewBreakStatementContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_breakStatement
+	p.RuleIndex = CadenceParserRULE_breakStatement
 
 	return p
 }
@@ -6221,7 +6221,7 @@ func NewBreakStatementContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *BreakStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BreakStatementContext) Break() antlr.TerminalNode {
-	return s.GetToken(StrictusParserBreak, 0)
+	return s.GetToken(CadenceParserBreak, 0)
 }
 
 func (s *BreakStatementContext) GetRuleContext() antlr.RuleContext {
@@ -6233,20 +6233,20 @@ func (s *BreakStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *BreakStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBreakStatement(s)
 	}
 }
 
 func (s *BreakStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBreakStatement(s)
 	}
 }
 
 func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBreakStatement(s)
 
 	default:
@@ -6254,9 +6254,9 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) BreakStatement() (localctx IBreakStatementContext) {
+func (p *CadenceParser) BreakStatement() (localctx IBreakStatementContext) {
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 70, StrictusParserRULE_breakStatement)
+	p.EnterRule(localctx, 70, CadenceParserRULE_breakStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6277,7 +6277,7 @@ func (p *StrictusParser) BreakStatement() (localctx IBreakStatementContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(439)
-		p.Match(StrictusParserBreak)
+		p.Match(CadenceParserBreak)
 	}
 
 	return localctx
@@ -6302,7 +6302,7 @@ type ContinueStatementContext struct {
 func NewEmptyContinueStatementContext() *ContinueStatementContext {
 	var p = new(ContinueStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_continueStatement
+	p.RuleIndex = CadenceParserRULE_continueStatement
 	return p
 }
 
@@ -6314,7 +6314,7 @@ func NewContinueStatementContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_continueStatement
+	p.RuleIndex = CadenceParserRULE_continueStatement
 
 	return p
 }
@@ -6322,7 +6322,7 @@ func NewContinueStatementContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *ContinueStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ContinueStatementContext) Continue() antlr.TerminalNode {
-	return s.GetToken(StrictusParserContinue, 0)
+	return s.GetToken(CadenceParserContinue, 0)
 }
 
 func (s *ContinueStatementContext) GetRuleContext() antlr.RuleContext {
@@ -6334,20 +6334,20 @@ func (s *ContinueStatementContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *ContinueStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterContinueStatement(s)
 	}
 }
 
 func (s *ContinueStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitContinueStatement(s)
 	}
 }
 
 func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitContinueStatement(s)
 
 	default:
@@ -6355,9 +6355,9 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) ContinueStatement() (localctx IContinueStatementContext) {
+func (p *CadenceParser) ContinueStatement() (localctx IContinueStatementContext) {
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 72, StrictusParserRULE_continueStatement)
+	p.EnterRule(localctx, 72, CadenceParserRULE_continueStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6378,7 +6378,7 @@ func (p *StrictusParser) ContinueStatement() (localctx IContinueStatementContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(441)
-		p.Match(StrictusParserContinue)
+		p.Match(CadenceParserContinue)
 	}
 
 	return localctx
@@ -6431,7 +6431,7 @@ type IfStatementContext struct {
 func NewEmptyIfStatementContext() *IfStatementContext {
 	var p = new(IfStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_ifStatement
+	p.RuleIndex = CadenceParserRULE_ifStatement
 	return p
 }
 
@@ -6443,7 +6443,7 @@ func NewIfStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_ifStatement
+	p.RuleIndex = CadenceParserRULE_ifStatement
 
 	return p
 }
@@ -6469,7 +6469,7 @@ func (s *IfStatementContext) SetThen(v IBlockContext) { s.then = v }
 func (s *IfStatementContext) SetAlt(v IBlockContext) { s.alt = v }
 
 func (s *IfStatementContext) If() antlr.TerminalNode {
-	return s.GetToken(StrictusParserIf, 0)
+	return s.GetToken(CadenceParserIf, 0)
 }
 
 func (s *IfStatementContext) AllBlock() []IBlockContext {
@@ -6516,7 +6516,7 @@ func (s *IfStatementContext) VariableDeclaration() IVariableDeclarationContext {
 }
 
 func (s *IfStatementContext) Else() antlr.TerminalNode {
-	return s.GetToken(StrictusParserElse, 0)
+	return s.GetToken(CadenceParserElse, 0)
 }
 
 func (s *IfStatementContext) IfStatement() IIfStatementContext {
@@ -6538,20 +6538,20 @@ func (s *IfStatementContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 }
 
 func (s *IfStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterIfStatement(s)
 	}
 }
 
 func (s *IfStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitIfStatement(s)
 	}
 }
 
 func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitIfStatement(s)
 
 	default:
@@ -6559,9 +6559,9 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *StrictusParser) IfStatement() (localctx IIfStatementContext) {
+func (p *CadenceParser) IfStatement() (localctx IIfStatementContext) {
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 74, StrictusParserRULE_ifStatement)
+	p.EnterRule(localctx, 74, CadenceParserRULE_ifStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6582,13 +6582,13 @@ func (p *StrictusParser) IfStatement() (localctx IIfStatementContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(443)
-		p.Match(StrictusParserIf)
+		p.Match(CadenceParserIf)
 	}
 	p.SetState(446)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserT__2, StrictusParserT__5, StrictusParserMinus, StrictusParserAmpersand, StrictusParserNegate, StrictusParserMove, StrictusParserOpenParen, StrictusParserFun, StrictusParserTrue, StrictusParserFalse, StrictusParserNil, StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral, StrictusParserStringLiteral:
+	case CadenceParserT__2, CadenceParserT__5, CadenceParserMinus, CadenceParserAmpersand, CadenceParserNegate, CadenceParserMove, CadenceParserOpenParen, CadenceParserFun, CadenceParserTrue, CadenceParserFalse, CadenceParserNil, CadenceParserFrom, CadenceParserCreate, CadenceParserDestroy, CadenceParserIdentifier, CadenceParserDecimalLiteral, CadenceParserBinaryLiteral, CadenceParserOctalLiteral, CadenceParserHexadecimalLiteral, CadenceParserInvalidNumberLiteral, CadenceParserStringLiteral:
 		{
 			p.SetState(444)
 
@@ -6597,7 +6597,7 @@ func (p *StrictusParser) IfStatement() (localctx IIfStatementContext) {
 			localctx.(*IfStatementContext).testExpression = _x
 		}
 
-	case StrictusParserLet, StrictusParserVar:
+	case CadenceParserLet, CadenceParserVar:
 		{
 			p.SetState(445)
 
@@ -6622,19 +6622,19 @@ func (p *StrictusParser) IfStatement() (localctx IIfStatementContext) {
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 34, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(449)
-			p.Match(StrictusParserElse)
+			p.Match(CadenceParserElse)
 		}
 		p.SetState(452)
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case StrictusParserIf:
+		case CadenceParserIf:
 			{
 				p.SetState(450)
 				p.IfStatement()
 			}
 
-		case StrictusParserT__2:
+		case CadenceParserT__2:
 			{
 				p.SetState(451)
 
@@ -6671,7 +6671,7 @@ type WhileStatementContext struct {
 func NewEmptyWhileStatementContext() *WhileStatementContext {
 	var p = new(WhileStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_whileStatement
+	p.RuleIndex = CadenceParserRULE_whileStatement
 	return p
 }
 
@@ -6683,7 +6683,7 @@ func NewWhileStatementContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_whileStatement
+	p.RuleIndex = CadenceParserRULE_whileStatement
 
 	return p
 }
@@ -6691,7 +6691,7 @@ func NewWhileStatementContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *WhileStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *WhileStatementContext) While() antlr.TerminalNode {
-	return s.GetToken(StrictusParserWhile, 0)
+	return s.GetToken(CadenceParserWhile, 0)
 }
 
 func (s *WhileStatementContext) Expression() IExpressionContext {
@@ -6723,20 +6723,20 @@ func (s *WhileStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *WhileStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterWhileStatement(s)
 	}
 }
 
 func (s *WhileStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitWhileStatement(s)
 	}
 }
 
 func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitWhileStatement(s)
 
 	default:
@@ -6744,9 +6744,9 @@ func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) WhileStatement() (localctx IWhileStatementContext) {
+func (p *CadenceParser) WhileStatement() (localctx IWhileStatementContext) {
 	localctx = NewWhileStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 76, StrictusParserRULE_whileStatement)
+	p.EnterRule(localctx, 76, CadenceParserRULE_whileStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6767,7 +6767,7 @@ func (p *StrictusParser) WhileStatement() (localctx IWhileStatementContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(456)
-		p.Match(StrictusParserWhile)
+		p.Match(CadenceParserWhile)
 	}
 	{
 		p.SetState(457)
@@ -6800,7 +6800,7 @@ type EmitStatementContext struct {
 func NewEmptyEmitStatementContext() *EmitStatementContext {
 	var p = new(EmitStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_emitStatement
+	p.RuleIndex = CadenceParserRULE_emitStatement
 	return p
 }
 
@@ -6812,7 +6812,7 @@ func NewEmitStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_emitStatement
+	p.RuleIndex = CadenceParserRULE_emitStatement
 
 	return p
 }
@@ -6820,7 +6820,7 @@ func NewEmitStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *EmitStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EmitStatementContext) Emit() antlr.TerminalNode {
-	return s.GetToken(StrictusParserEmit, 0)
+	return s.GetToken(CadenceParserEmit, 0)
 }
 
 func (s *EmitStatementContext) Identifier() IIdentifierContext {
@@ -6852,20 +6852,20 @@ func (s *EmitStatementContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *EmitStatementContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterEmitStatement(s)
 	}
 }
 
 func (s *EmitStatementContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitEmitStatement(s)
 	}
 }
 
 func (s *EmitStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitEmitStatement(s)
 
 	default:
@@ -6873,9 +6873,9 @@ func (s *EmitStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) EmitStatement() (localctx IEmitStatementContext) {
+func (p *CadenceParser) EmitStatement() (localctx IEmitStatementContext) {
 	localctx = NewEmitStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 78, StrictusParserRULE_emitStatement)
+	p.EnterRule(localctx, 78, CadenceParserRULE_emitStatement)
 
 	defer func() {
 		p.ExitRule()
@@ -6896,7 +6896,7 @@ func (p *StrictusParser) EmitStatement() (localctx IEmitStatementContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(460)
-		p.Match(StrictusParserEmit)
+		p.Match(CadenceParserEmit)
 	}
 	{
 		p.SetState(461)
@@ -6929,7 +6929,7 @@ type VariableDeclarationContext struct {
 func NewEmptyVariableDeclarationContext() *VariableDeclarationContext {
 	var p = new(VariableDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_variableDeclaration
+	p.RuleIndex = CadenceParserRULE_variableDeclaration
 	return p
 }
 
@@ -6941,7 +6941,7 @@ func NewVariableDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_variableDeclaration
+	p.RuleIndex = CadenceParserRULE_variableDeclaration
 
 	return p
 }
@@ -7007,20 +7007,20 @@ func (s *VariableDeclarationContext) ToStringTree(ruleNames []string, recog antl
 }
 
 func (s *VariableDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterVariableDeclaration(s)
 	}
 }
 
 func (s *VariableDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitVariableDeclaration(s)
 	}
 }
 
 func (s *VariableDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitVariableDeclaration(s)
 
 	default:
@@ -7028,9 +7028,9 @@ func (s *VariableDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *StrictusParser) VariableDeclaration() (localctx IVariableDeclarationContext) {
+func (p *CadenceParser) VariableDeclaration() (localctx IVariableDeclarationContext) {
 	localctx = NewVariableDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 80, StrictusParserRULE_variableDeclaration)
+	p.EnterRule(localctx, 80, CadenceParserRULE_variableDeclaration)
 	var _la int
 
 	defer func() {
@@ -7062,10 +7062,10 @@ func (p *StrictusParser) VariableDeclaration() (localctx IVariableDeclarationCon
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserT__4 {
+	if _la == CadenceParserT__4 {
 		{
 			p.SetState(466)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(467)
@@ -7104,7 +7104,7 @@ type AssignmentContext struct {
 func NewEmptyAssignmentContext() *AssignmentContext {
 	var p = new(AssignmentContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_assignment
+	p.RuleIndex = CadenceParserRULE_assignment
 	return p
 }
 
@@ -7116,7 +7116,7 @@ func NewAssignmentContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_assignment
+	p.RuleIndex = CadenceParserRULE_assignment
 
 	return p
 }
@@ -7185,20 +7185,20 @@ func (s *AssignmentContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *AssignmentContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterAssignment(s)
 	}
 }
 
 func (s *AssignmentContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitAssignment(s)
 	}
 }
 
 func (s *AssignmentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitAssignment(s)
 
 	default:
@@ -7206,9 +7206,9 @@ func (s *AssignmentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Assignment() (localctx IAssignmentContext) {
+func (p *CadenceParser) Assignment() (localctx IAssignmentContext) {
 	localctx = NewAssignmentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 82, StrictusParserRULE_assignment)
+	p.EnterRule(localctx, 82, CadenceParserRULE_assignment)
 	var _la int
 
 	defer func() {
@@ -7236,7 +7236,7 @@ func (p *StrictusParser) Assignment() (localctx IAssignmentContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == StrictusParserT__5 || _la == StrictusParserT__11 {
+	for _la == CadenceParserT__5 || _la == CadenceParserT__11 {
 		{
 			p.SetState(474)
 			p.ExpressionAccess()
@@ -7291,7 +7291,7 @@ type SwapContext struct {
 func NewEmptySwapContext() *SwapContext {
 	var p = new(SwapContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_swap
+	p.RuleIndex = CadenceParserRULE_swap
 	return p
 }
 
@@ -7303,7 +7303,7 @@ func NewSwapContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokin
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_swap
+	p.RuleIndex = CadenceParserRULE_swap
 
 	return p
 }
@@ -7350,20 +7350,20 @@ func (s *SwapContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 }
 
 func (s *SwapContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterSwap(s)
 	}
 }
 
 func (s *SwapContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitSwap(s)
 	}
 }
 
 func (s *SwapContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitSwap(s)
 
 	default:
@@ -7371,9 +7371,9 @@ func (s *SwapContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Swap() (localctx ISwapContext) {
+func (p *CadenceParser) Swap() (localctx ISwapContext) {
 	localctx = NewSwapContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 84, StrictusParserRULE_swap)
+	p.EnterRule(localctx, 84, CadenceParserRULE_swap)
 
 	defer func() {
 		p.ExitRule()
@@ -7401,7 +7401,7 @@ func (p *StrictusParser) Swap() (localctx ISwapContext) {
 	}
 	{
 		p.SetState(484)
-		p.Match(StrictusParserT__7)
+		p.Match(CadenceParserT__7)
 	}
 	{
 		p.SetState(485)
@@ -7433,7 +7433,7 @@ type TransferContext struct {
 func NewEmptyTransferContext() *TransferContext {
 	var p = new(TransferContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_transfer
+	p.RuleIndex = CadenceParserRULE_transfer
 	return p
 }
 
@@ -7445,7 +7445,7 @@ func NewTransferContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_transfer
+	p.RuleIndex = CadenceParserRULE_transfer
 
 	return p
 }
@@ -7453,7 +7453,7 @@ func NewTransferContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 func (s *TransferContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TransferContext) Move() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMove, 0)
+	return s.GetToken(CadenceParserMove, 0)
 }
 
 func (s *TransferContext) GetRuleContext() antlr.RuleContext {
@@ -7465,20 +7465,20 @@ func (s *TransferContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 }
 
 func (s *TransferContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterTransfer(s)
 	}
 }
 
 func (s *TransferContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitTransfer(s)
 	}
 }
 
 func (s *TransferContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitTransfer(s)
 
 	default:
@@ -7486,9 +7486,9 @@ func (s *TransferContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Transfer() (localctx ITransferContext) {
+func (p *CadenceParser) Transfer() (localctx ITransferContext) {
 	localctx = NewTransferContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 86, StrictusParserRULE_transfer)
+	p.EnterRule(localctx, 86, CadenceParserRULE_transfer)
 	var _la int
 
 	defer func() {
@@ -7512,7 +7512,7 @@ func (p *StrictusParser) Transfer() (localctx ITransferContext) {
 		p.SetState(487)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == StrictusParserT__8 || _la == StrictusParserMove) {
+		if !(_la == CadenceParserT__8 || _la == CadenceParserMove) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -7542,7 +7542,7 @@ type ExpressionContext struct {
 func NewEmptyExpressionContext() *ExpressionContext {
 	var p = new(ExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_expression
+	p.RuleIndex = CadenceParserRULE_expression
 	return p
 }
 
@@ -7554,7 +7554,7 @@ func NewExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_expression
+	p.RuleIndex = CadenceParserRULE_expression
 
 	return p
 }
@@ -7580,20 +7580,20 @@ func (s *ExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *ExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterExpression(s)
 	}
 }
 
 func (s *ExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitExpression(s)
 	}
 }
 
 func (s *ExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitExpression(s)
 
 	default:
@@ -7601,9 +7601,9 @@ func (s *ExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Expression() (localctx IExpressionContext) {
+func (p *CadenceParser) Expression() (localctx IExpressionContext) {
 	localctx = NewExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 88, StrictusParserRULE_expression)
+	p.EnterRule(localctx, 88, CadenceParserRULE_expression)
 
 	defer func() {
 		p.ExitRule()
@@ -7663,7 +7663,7 @@ type ConditionalExpressionContext struct {
 func NewEmptyConditionalExpressionContext() *ConditionalExpressionContext {
 	var p = new(ConditionalExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_conditionalExpression
+	p.RuleIndex = CadenceParserRULE_conditionalExpression
 	return p
 }
 
@@ -7675,7 +7675,7 @@ func NewConditionalExpressionContext(parser antlr.Parser, parent antlr.ParserRul
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_conditionalExpression
+	p.RuleIndex = CadenceParserRULE_conditionalExpression
 
 	return p
 }
@@ -7701,7 +7701,7 @@ func (s *ConditionalExpressionContext) OrExpression() IOrExpressionContext {
 }
 
 func (s *ConditionalExpressionContext) Optional() antlr.TerminalNode {
-	return s.GetToken(StrictusParserOptional, 0)
+	return s.GetToken(CadenceParserOptional, 0)
 }
 
 func (s *ConditionalExpressionContext) AllExpression() []IExpressionContext {
@@ -7736,20 +7736,20 @@ func (s *ConditionalExpressionContext) ToStringTree(ruleNames []string, recog an
 }
 
 func (s *ConditionalExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterConditionalExpression(s)
 	}
 }
 
 func (s *ConditionalExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitConditionalExpression(s)
 	}
 }
 
 func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitConditionalExpression(s)
 
 	default:
@@ -7757,9 +7757,9 @@ func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *StrictusParser) ConditionalExpression() (localctx IConditionalExpressionContext) {
+func (p *CadenceParser) ConditionalExpression() (localctx IConditionalExpressionContext) {
 	localctx = NewConditionalExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 90, StrictusParserRULE_conditionalExpression)
+	p.EnterRule(localctx, 90, CadenceParserRULE_conditionalExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -7788,7 +7788,7 @@ func (p *StrictusParser) ConditionalExpression() (localctx IConditionalExpressio
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 37, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(492)
-			p.Match(StrictusParserOptional)
+			p.Match(CadenceParserOptional)
 		}
 		{
 			p.SetState(493)
@@ -7799,7 +7799,7 @@ func (p *StrictusParser) ConditionalExpression() (localctx IConditionalExpressio
 		}
 		{
 			p.SetState(494)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(495)
@@ -7833,7 +7833,7 @@ type OrExpressionContext struct {
 func NewEmptyOrExpressionContext() *OrExpressionContext {
 	var p = new(OrExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_orExpression
+	p.RuleIndex = CadenceParserRULE_orExpression
 	return p
 }
 
@@ -7845,7 +7845,7 @@ func NewOrExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_orExpression
+	p.RuleIndex = CadenceParserRULE_orExpression
 
 	return p
 }
@@ -7881,20 +7881,20 @@ func (s *OrExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *OrExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterOrExpression(s)
 	}
 }
 
 func (s *OrExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitOrExpression(s)
 	}
 }
 
 func (s *OrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitOrExpression(s)
 
 	default:
@@ -7902,18 +7902,18 @@ func (s *OrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) OrExpression() (localctx IOrExpressionContext) {
+func (p *CadenceParser) OrExpression() (localctx IOrExpressionContext) {
 	return p.orExpression(0)
 }
 
-func (p *StrictusParser) orExpression(_p int) (localctx IOrExpressionContext) {
+func (p *CadenceParser) orExpression(_p int) (localctx IOrExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewOrExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IOrExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 92
-	p.EnterRecursionRule(localctx, 92, StrictusParserRULE_orExpression, _p)
+	p.EnterRecursionRule(localctx, 92, CadenceParserRULE_orExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -7951,7 +7951,7 @@ func (p *StrictusParser) orExpression(_p int) (localctx IOrExpressionContext) {
 			}
 			_prevctx = localctx
 			localctx = NewOrExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_orExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_orExpression)
 			p.SetState(502)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -7959,7 +7959,7 @@ func (p *StrictusParser) orExpression(_p int) (localctx IOrExpressionContext) {
 			}
 			{
 				p.SetState(503)
-				p.Match(StrictusParserT__9)
+				p.Match(CadenceParserT__9)
 			}
 			{
 				p.SetState(504)
@@ -7994,7 +7994,7 @@ type AndExpressionContext struct {
 func NewEmptyAndExpressionContext() *AndExpressionContext {
 	var p = new(AndExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_andExpression
+	p.RuleIndex = CadenceParserRULE_andExpression
 	return p
 }
 
@@ -8006,7 +8006,7 @@ func NewAndExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_andExpression
+	p.RuleIndex = CadenceParserRULE_andExpression
 
 	return p
 }
@@ -8042,20 +8042,20 @@ func (s *AndExpressionContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *AndExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterAndExpression(s)
 	}
 }
 
 func (s *AndExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitAndExpression(s)
 	}
 }
 
 func (s *AndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitAndExpression(s)
 
 	default:
@@ -8063,18 +8063,18 @@ func (s *AndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) AndExpression() (localctx IAndExpressionContext) {
+func (p *CadenceParser) AndExpression() (localctx IAndExpressionContext) {
 	return p.andExpression(0)
 }
 
-func (p *StrictusParser) andExpression(_p int) (localctx IAndExpressionContext) {
+func (p *CadenceParser) andExpression(_p int) (localctx IAndExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewAndExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IAndExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 94
-	p.EnterRecursionRule(localctx, 94, StrictusParserRULE_andExpression, _p)
+	p.EnterRecursionRule(localctx, 94, CadenceParserRULE_andExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -8112,7 +8112,7 @@ func (p *StrictusParser) andExpression(_p int) (localctx IAndExpressionContext) 
 			}
 			_prevctx = localctx
 			localctx = NewAndExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_andExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_andExpression)
 			p.SetState(513)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8120,7 +8120,7 @@ func (p *StrictusParser) andExpression(_p int) (localctx IAndExpressionContext) 
 			}
 			{
 				p.SetState(514)
-				p.Match(StrictusParserT__10)
+				p.Match(CadenceParserT__10)
 			}
 			{
 				p.SetState(515)
@@ -8155,7 +8155,7 @@ type EqualityExpressionContext struct {
 func NewEmptyEqualityExpressionContext() *EqualityExpressionContext {
 	var p = new(EqualityExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_equalityExpression
+	p.RuleIndex = CadenceParserRULE_equalityExpression
 	return p
 }
 
@@ -8167,7 +8167,7 @@ func NewEqualityExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_equalityExpression
+	p.RuleIndex = CadenceParserRULE_equalityExpression
 
 	return p
 }
@@ -8213,20 +8213,20 @@ func (s *EqualityExpressionContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 func (s *EqualityExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterEqualityExpression(s)
 	}
 }
 
 func (s *EqualityExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitEqualityExpression(s)
 	}
 }
 
 func (s *EqualityExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitEqualityExpression(s)
 
 	default:
@@ -8234,18 +8234,18 @@ func (s *EqualityExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *StrictusParser) EqualityExpression() (localctx IEqualityExpressionContext) {
+func (p *CadenceParser) EqualityExpression() (localctx IEqualityExpressionContext) {
 	return p.equalityExpression(0)
 }
 
-func (p *StrictusParser) equalityExpression(_p int) (localctx IEqualityExpressionContext) {
+func (p *CadenceParser) equalityExpression(_p int) (localctx IEqualityExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewEqualityExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IEqualityExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 96
-	p.EnterRecursionRule(localctx, 96, StrictusParserRULE_equalityExpression, _p)
+	p.EnterRecursionRule(localctx, 96, CadenceParserRULE_equalityExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -8283,7 +8283,7 @@ func (p *StrictusParser) equalityExpression(_p int) (localctx IEqualityExpressio
 			}
 			_prevctx = localctx
 			localctx = NewEqualityExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_equalityExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_equalityExpression)
 			p.SetState(524)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8326,7 +8326,7 @@ type RelationalExpressionContext struct {
 func NewEmptyRelationalExpressionContext() *RelationalExpressionContext {
 	var p = new(RelationalExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_relationalExpression
+	p.RuleIndex = CadenceParserRULE_relationalExpression
 	return p
 }
 
@@ -8338,7 +8338,7 @@ func NewRelationalExpressionContext(parser antlr.Parser, parent antlr.ParserRule
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_relationalExpression
+	p.RuleIndex = CadenceParserRULE_relationalExpression
 
 	return p
 }
@@ -8384,20 +8384,20 @@ func (s *RelationalExpressionContext) ToStringTree(ruleNames []string, recog ant
 }
 
 func (s *RelationalExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterRelationalExpression(s)
 	}
 }
 
 func (s *RelationalExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitRelationalExpression(s)
 	}
 }
 
 func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitRelationalExpression(s)
 
 	default:
@@ -8405,18 +8405,18 @@ func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *StrictusParser) RelationalExpression() (localctx IRelationalExpressionContext) {
+func (p *CadenceParser) RelationalExpression() (localctx IRelationalExpressionContext) {
 	return p.relationalExpression(0)
 }
 
-func (p *StrictusParser) relationalExpression(_p int) (localctx IRelationalExpressionContext) {
+func (p *CadenceParser) relationalExpression(_p int) (localctx IRelationalExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewRelationalExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IRelationalExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 98
-	p.EnterRecursionRule(localctx, 98, StrictusParserRULE_relationalExpression, _p)
+	p.EnterRecursionRule(localctx, 98, CadenceParserRULE_relationalExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -8454,7 +8454,7 @@ func (p *StrictusParser) relationalExpression(_p int) (localctx IRelationalExpre
 			}
 			_prevctx = localctx
 			localctx = NewRelationalExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_relationalExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_relationalExpression)
 			p.SetState(536)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8497,7 +8497,7 @@ type NilCoalescingExpressionContext struct {
 func NewEmptyNilCoalescingExpressionContext() *NilCoalescingExpressionContext {
 	var p = new(NilCoalescingExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_nilCoalescingExpression
+	p.RuleIndex = CadenceParserRULE_nilCoalescingExpression
 	return p
 }
 
@@ -8509,7 +8509,7 @@ func NewNilCoalescingExpressionContext(parser antlr.Parser, parent antlr.ParserR
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_nilCoalescingExpression
+	p.RuleIndex = CadenceParserRULE_nilCoalescingExpression
 
 	return p
 }
@@ -8527,7 +8527,7 @@ func (s *NilCoalescingExpressionContext) FailableDowncastingExpression() IFailab
 }
 
 func (s *NilCoalescingExpressionContext) NilCoalescing() antlr.TerminalNode {
-	return s.GetToken(StrictusParserNilCoalescing, 0)
+	return s.GetToken(CadenceParserNilCoalescing, 0)
 }
 
 func (s *NilCoalescingExpressionContext) NilCoalescingExpression() INilCoalescingExpressionContext {
@@ -8549,20 +8549,20 @@ func (s *NilCoalescingExpressionContext) ToStringTree(ruleNames []string, recog 
 }
 
 func (s *NilCoalescingExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterNilCoalescingExpression(s)
 	}
 }
 
 func (s *NilCoalescingExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitNilCoalescingExpression(s)
 	}
 }
 
 func (s *NilCoalescingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitNilCoalescingExpression(s)
 
 	default:
@@ -8570,9 +8570,9 @@ func (s *NilCoalescingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *StrictusParser) NilCoalescingExpression() (localctx INilCoalescingExpressionContext) {
+func (p *CadenceParser) NilCoalescingExpression() (localctx INilCoalescingExpressionContext) {
 	localctx = NewNilCoalescingExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 100, StrictusParserRULE_nilCoalescingExpression)
+	p.EnterRule(localctx, 100, CadenceParserRULE_nilCoalescingExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -8601,7 +8601,7 @@ func (p *StrictusParser) NilCoalescingExpression() (localctx INilCoalescingExpre
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 42, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(546)
-			p.Match(StrictusParserNilCoalescing)
+			p.Match(CadenceParserNilCoalescing)
 		}
 		{
 			p.SetState(547)
@@ -8632,7 +8632,7 @@ type FailableDowncastingExpressionContext struct {
 func NewEmptyFailableDowncastingExpressionContext() *FailableDowncastingExpressionContext {
 	var p = new(FailableDowncastingExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_failableDowncastingExpression
+	p.RuleIndex = CadenceParserRULE_failableDowncastingExpression
 	return p
 }
 
@@ -8644,7 +8644,7 @@ func NewFailableDowncastingExpressionContext(parser antlr.Parser, parent antlr.P
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_failableDowncastingExpression
+	p.RuleIndex = CadenceParserRULE_failableDowncastingExpression
 
 	return p
 }
@@ -8672,7 +8672,7 @@ func (s *FailableDowncastingExpressionContext) FailableDowncastingExpression() I
 }
 
 func (s *FailableDowncastingExpressionContext) FailableDowncasting() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFailableDowncasting, 0)
+	return s.GetToken(CadenceParserFailableDowncasting, 0)
 }
 
 func (s *FailableDowncastingExpressionContext) TypeAnnotation() ITypeAnnotationContext {
@@ -8694,20 +8694,20 @@ func (s *FailableDowncastingExpressionContext) ToStringTree(ruleNames []string, 
 }
 
 func (s *FailableDowncastingExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFailableDowncastingExpression(s)
 	}
 }
 
 func (s *FailableDowncastingExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFailableDowncastingExpression(s)
 	}
 }
 
 func (s *FailableDowncastingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFailableDowncastingExpression(s)
 
 	default:
@@ -8715,18 +8715,18 @@ func (s *FailableDowncastingExpressionContext) Accept(visitor antlr.ParseTreeVis
 	}
 }
 
-func (p *StrictusParser) FailableDowncastingExpression() (localctx IFailableDowncastingExpressionContext) {
+func (p *CadenceParser) FailableDowncastingExpression() (localctx IFailableDowncastingExpressionContext) {
 	return p.failableDowncastingExpression(0)
 }
 
-func (p *StrictusParser) failableDowncastingExpression(_p int) (localctx IFailableDowncastingExpressionContext) {
+func (p *CadenceParser) failableDowncastingExpression(_p int) (localctx IFailableDowncastingExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewFailableDowncastingExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IFailableDowncastingExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 102
-	p.EnterRecursionRule(localctx, 102, StrictusParserRULE_failableDowncastingExpression, _p)
+	p.EnterRecursionRule(localctx, 102, CadenceParserRULE_failableDowncastingExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -8764,7 +8764,7 @@ func (p *StrictusParser) failableDowncastingExpression(_p int) (localctx IFailab
 			}
 			_prevctx = localctx
 			localctx = NewFailableDowncastingExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_failableDowncastingExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_failableDowncastingExpression)
 			p.SetState(553)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8772,7 +8772,7 @@ func (p *StrictusParser) failableDowncastingExpression(_p int) (localctx IFailab
 			}
 			{
 				p.SetState(554)
-				p.Match(StrictusParserFailableDowncasting)
+				p.Match(CadenceParserFailableDowncasting)
 			}
 			{
 				p.SetState(555)
@@ -8807,7 +8807,7 @@ type ConcatenatingExpressionContext struct {
 func NewEmptyConcatenatingExpressionContext() *ConcatenatingExpressionContext {
 	var p = new(ConcatenatingExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_concatenatingExpression
+	p.RuleIndex = CadenceParserRULE_concatenatingExpression
 	return p
 }
 
@@ -8819,7 +8819,7 @@ func NewConcatenatingExpressionContext(parser antlr.Parser, parent antlr.ParserR
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_concatenatingExpression
+	p.RuleIndex = CadenceParserRULE_concatenatingExpression
 
 	return p
 }
@@ -8847,7 +8847,7 @@ func (s *ConcatenatingExpressionContext) ConcatenatingExpression() IConcatenatin
 }
 
 func (s *ConcatenatingExpressionContext) Ampersand() antlr.TerminalNode {
-	return s.GetToken(StrictusParserAmpersand, 0)
+	return s.GetToken(CadenceParserAmpersand, 0)
 }
 
 func (s *ConcatenatingExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -8859,20 +8859,20 @@ func (s *ConcatenatingExpressionContext) ToStringTree(ruleNames []string, recog 
 }
 
 func (s *ConcatenatingExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterConcatenatingExpression(s)
 	}
 }
 
 func (s *ConcatenatingExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitConcatenatingExpression(s)
 	}
 }
 
 func (s *ConcatenatingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitConcatenatingExpression(s)
 
 	default:
@@ -8880,18 +8880,18 @@ func (s *ConcatenatingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *StrictusParser) ConcatenatingExpression() (localctx IConcatenatingExpressionContext) {
+func (p *CadenceParser) ConcatenatingExpression() (localctx IConcatenatingExpressionContext) {
 	return p.concatenatingExpression(0)
 }
 
-func (p *StrictusParser) concatenatingExpression(_p int) (localctx IConcatenatingExpressionContext) {
+func (p *CadenceParser) concatenatingExpression(_p int) (localctx IConcatenatingExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewConcatenatingExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IConcatenatingExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 104
-	p.EnterRecursionRule(localctx, 104, StrictusParserRULE_concatenatingExpression, _p)
+	p.EnterRecursionRule(localctx, 104, CadenceParserRULE_concatenatingExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -8929,7 +8929,7 @@ func (p *StrictusParser) concatenatingExpression(_p int) (localctx IConcatenatin
 			}
 			_prevctx = localctx
 			localctx = NewConcatenatingExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_concatenatingExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_concatenatingExpression)
 			p.SetState(564)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8937,7 +8937,7 @@ func (p *StrictusParser) concatenatingExpression(_p int) (localctx IConcatenatin
 			}
 			{
 				p.SetState(565)
-				p.Match(StrictusParserAmpersand)
+				p.Match(CadenceParserAmpersand)
 			}
 			{
 				p.SetState(566)
@@ -8972,7 +8972,7 @@ type AdditiveExpressionContext struct {
 func NewEmptyAdditiveExpressionContext() *AdditiveExpressionContext {
 	var p = new(AdditiveExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_additiveExpression
+	p.RuleIndex = CadenceParserRULE_additiveExpression
 	return p
 }
 
@@ -8984,7 +8984,7 @@ func NewAdditiveExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_additiveExpression
+	p.RuleIndex = CadenceParserRULE_additiveExpression
 
 	return p
 }
@@ -9030,20 +9030,20 @@ func (s *AdditiveExpressionContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 func (s *AdditiveExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterAdditiveExpression(s)
 	}
 }
 
 func (s *AdditiveExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitAdditiveExpression(s)
 	}
 }
 
 func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitAdditiveExpression(s)
 
 	default:
@@ -9051,18 +9051,18 @@ func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *StrictusParser) AdditiveExpression() (localctx IAdditiveExpressionContext) {
+func (p *CadenceParser) AdditiveExpression() (localctx IAdditiveExpressionContext) {
 	return p.additiveExpression(0)
 }
 
-func (p *StrictusParser) additiveExpression(_p int) (localctx IAdditiveExpressionContext) {
+func (p *CadenceParser) additiveExpression(_p int) (localctx IAdditiveExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewAdditiveExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IAdditiveExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 106
-	p.EnterRecursionRule(localctx, 106, StrictusParserRULE_additiveExpression, _p)
+	p.EnterRecursionRule(localctx, 106, CadenceParserRULE_additiveExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -9100,7 +9100,7 @@ func (p *StrictusParser) additiveExpression(_p int) (localctx IAdditiveExpressio
 			}
 			_prevctx = localctx
 			localctx = NewAdditiveExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_additiveExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_additiveExpression)
 			p.SetState(575)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -9143,7 +9143,7 @@ type MultiplicativeExpressionContext struct {
 func NewEmptyMultiplicativeExpressionContext() *MultiplicativeExpressionContext {
 	var p = new(MultiplicativeExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_multiplicativeExpression
+	p.RuleIndex = CadenceParserRULE_multiplicativeExpression
 	return p
 }
 
@@ -9155,7 +9155,7 @@ func NewMultiplicativeExpressionContext(parser antlr.Parser, parent antlr.Parser
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_multiplicativeExpression
+	p.RuleIndex = CadenceParserRULE_multiplicativeExpression
 
 	return p
 }
@@ -9201,20 +9201,20 @@ func (s *MultiplicativeExpressionContext) ToStringTree(ruleNames []string, recog
 }
 
 func (s *MultiplicativeExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterMultiplicativeExpression(s)
 	}
 }
 
 func (s *MultiplicativeExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitMultiplicativeExpression(s)
 	}
 }
 
 func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitMultiplicativeExpression(s)
 
 	default:
@@ -9222,18 +9222,18 @@ func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *StrictusParser) MultiplicativeExpression() (localctx IMultiplicativeExpressionContext) {
+func (p *CadenceParser) MultiplicativeExpression() (localctx IMultiplicativeExpressionContext) {
 	return p.multiplicativeExpression(0)
 }
 
-func (p *StrictusParser) multiplicativeExpression(_p int) (localctx IMultiplicativeExpressionContext) {
+func (p *CadenceParser) multiplicativeExpression(_p int) (localctx IMultiplicativeExpressionContext) {
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 	_parentState := p.GetState()
 	localctx = NewMultiplicativeExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IMultiplicativeExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 108
-	p.EnterRecursionRule(localctx, 108, StrictusParserRULE_multiplicativeExpression, _p)
+	p.EnterRecursionRule(localctx, 108, CadenceParserRULE_multiplicativeExpression, _p)
 
 	defer func() {
 		p.UnrollRecursionContexts(_parentctx)
@@ -9271,7 +9271,7 @@ func (p *StrictusParser) multiplicativeExpression(_p int) (localctx IMultiplicat
 			}
 			_prevctx = localctx
 			localctx = NewMultiplicativeExpressionContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, StrictusParserRULE_multiplicativeExpression)
+			p.PushNewRecursionContext(localctx, _startState, CadenceParserRULE_multiplicativeExpression)
 			p.SetState(587)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -9314,7 +9314,7 @@ type UnaryExpressionContext struct {
 func NewEmptyUnaryExpressionContext() *UnaryExpressionContext {
 	var p = new(UnaryExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_unaryExpression
+	p.RuleIndex = CadenceParserRULE_unaryExpression
 	return p
 }
 
@@ -9326,7 +9326,7 @@ func NewUnaryExpressionContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_unaryExpression
+	p.RuleIndex = CadenceParserRULE_unaryExpression
 
 	return p
 }
@@ -9385,20 +9385,20 @@ func (s *UnaryExpressionContext) ToStringTree(ruleNames []string, recog antlr.Re
 }
 
 func (s *UnaryExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterUnaryExpression(s)
 	}
 }
 
 func (s *UnaryExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitUnaryExpression(s)
 	}
 }
 
 func (s *UnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitUnaryExpression(s)
 
 	default:
@@ -9406,9 +9406,9 @@ func (s *UnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *StrictusParser) UnaryExpression() (localctx IUnaryExpressionContext) {
+func (p *CadenceParser) UnaryExpression() (localctx IUnaryExpressionContext) {
 	localctx = NewUnaryExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 110, StrictusParserRULE_unaryExpression)
+	p.EnterRule(localctx, 110, CadenceParserRULE_unaryExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -9488,7 +9488,7 @@ type PrimaryExpressionContext struct {
 func NewEmptyPrimaryExpressionContext() *PrimaryExpressionContext {
 	var p = new(PrimaryExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_primaryExpression
+	p.RuleIndex = CadenceParserRULE_primaryExpression
 	return p
 }
 
@@ -9500,7 +9500,7 @@ func NewPrimaryExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_primaryExpression
+	p.RuleIndex = CadenceParserRULE_primaryExpression
 
 	return p
 }
@@ -9556,20 +9556,20 @@ func (s *PrimaryExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *PrimaryExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterPrimaryExpression(s)
 	}
 }
 
 func (s *PrimaryExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitPrimaryExpression(s)
 	}
 }
 
 func (s *PrimaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitPrimaryExpression(s)
 
 	default:
@@ -9577,9 +9577,9 @@ func (s *PrimaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
+func (p *CadenceParser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 	localctx = NewPrimaryExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 112, StrictusParserRULE_primaryExpression)
+	p.EnterRule(localctx, 112, CadenceParserRULE_primaryExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -9652,7 +9652,7 @@ type ComposedExpressionContext struct {
 func NewEmptyComposedExpressionContext() *ComposedExpressionContext {
 	var p = new(ComposedExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_composedExpression
+	p.RuleIndex = CadenceParserRULE_composedExpression
 	return p
 }
 
@@ -9664,7 +9664,7 @@ func NewComposedExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_composedExpression
+	p.RuleIndex = CadenceParserRULE_composedExpression
 
 	return p
 }
@@ -9713,20 +9713,20 @@ func (s *ComposedExpressionContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 func (s *ComposedExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterComposedExpression(s)
 	}
 }
 
 func (s *ComposedExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitComposedExpression(s)
 	}
 }
 
 func (s *ComposedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitComposedExpression(s)
 
 	default:
@@ -9734,9 +9734,9 @@ func (s *ComposedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *StrictusParser) ComposedExpression() (localctx IComposedExpressionContext) {
+func (p *CadenceParser) ComposedExpression() (localctx IComposedExpressionContext) {
 	localctx = NewComposedExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 114, StrictusParserRULE_composedExpression)
+	p.EnterRule(localctx, 114, CadenceParserRULE_composedExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -9800,7 +9800,7 @@ type PrimaryExpressionSuffixContext struct {
 func NewEmptyPrimaryExpressionSuffixContext() *PrimaryExpressionSuffixContext {
 	var p = new(PrimaryExpressionSuffixContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_primaryExpressionSuffix
+	p.RuleIndex = CadenceParserRULE_primaryExpressionSuffix
 	return p
 }
 
@@ -9812,7 +9812,7 @@ func NewPrimaryExpressionSuffixContext(parser antlr.Parser, parent antlr.ParserR
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_primaryExpressionSuffix
+	p.RuleIndex = CadenceParserRULE_primaryExpressionSuffix
 
 	return p
 }
@@ -9848,20 +9848,20 @@ func (s *PrimaryExpressionSuffixContext) ToStringTree(ruleNames []string, recog 
 }
 
 func (s *PrimaryExpressionSuffixContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterPrimaryExpressionSuffix(s)
 	}
 }
 
 func (s *PrimaryExpressionSuffixContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitPrimaryExpressionSuffix(s)
 	}
 }
 
 func (s *PrimaryExpressionSuffixContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitPrimaryExpressionSuffix(s)
 
 	default:
@@ -9869,9 +9869,9 @@ func (s *PrimaryExpressionSuffixContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *StrictusParser) PrimaryExpressionSuffix() (localctx IPrimaryExpressionSuffixContext) {
+func (p *CadenceParser) PrimaryExpressionSuffix() (localctx IPrimaryExpressionSuffixContext) {
 	localctx = NewPrimaryExpressionSuffixContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 116, StrictusParserRULE_primaryExpressionSuffix)
+	p.EnterRule(localctx, 116, CadenceParserRULE_primaryExpressionSuffix)
 
 	defer func() {
 		p.ExitRule()
@@ -9893,14 +9893,14 @@ func (p *StrictusParser) PrimaryExpressionSuffix() (localctx IPrimaryExpressionS
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserT__5, StrictusParserT__11:
+	case CadenceParserT__5, CadenceParserT__11:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(619)
 			p.ExpressionAccess()
 		}
 
-	case StrictusParserOpenParen:
+	case CadenceParserOpenParen:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(620)
@@ -9933,7 +9933,7 @@ type EqualityOpContext struct {
 func NewEmptyEqualityOpContext() *EqualityOpContext {
 	var p = new(EqualityOpContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_equalityOp
+	p.RuleIndex = CadenceParserRULE_equalityOp
 	return p
 }
 
@@ -9945,7 +9945,7 @@ func NewEqualityOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_equalityOp
+	p.RuleIndex = CadenceParserRULE_equalityOp
 
 	return p
 }
@@ -9953,11 +9953,11 @@ func NewEqualityOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *EqualityOpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EqualityOpContext) Equal() antlr.TerminalNode {
-	return s.GetToken(StrictusParserEqual, 0)
+	return s.GetToken(CadenceParserEqual, 0)
 }
 
 func (s *EqualityOpContext) Unequal() antlr.TerminalNode {
-	return s.GetToken(StrictusParserUnequal, 0)
+	return s.GetToken(CadenceParserUnequal, 0)
 }
 
 func (s *EqualityOpContext) GetRuleContext() antlr.RuleContext {
@@ -9969,20 +9969,20 @@ func (s *EqualityOpContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *EqualityOpContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterEqualityOp(s)
 	}
 }
 
 func (s *EqualityOpContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitEqualityOp(s)
 	}
 }
 
 func (s *EqualityOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitEqualityOp(s)
 
 	default:
@@ -9990,9 +9990,9 @@ func (s *EqualityOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) EqualityOp() (localctx IEqualityOpContext) {
+func (p *CadenceParser) EqualityOp() (localctx IEqualityOpContext) {
 	localctx = NewEqualityOpContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 118, StrictusParserRULE_equalityOp)
+	p.EnterRule(localctx, 118, CadenceParserRULE_equalityOp)
 	var _la int
 
 	defer func() {
@@ -10016,7 +10016,7 @@ func (p *StrictusParser) EqualityOp() (localctx IEqualityOpContext) {
 		p.SetState(623)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == StrictusParserEqual || _la == StrictusParserUnequal) {
+		if !(_la == CadenceParserEqual || _la == CadenceParserUnequal) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -10046,7 +10046,7 @@ type RelationalOpContext struct {
 func NewEmptyRelationalOpContext() *RelationalOpContext {
 	var p = new(RelationalOpContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_relationalOp
+	p.RuleIndex = CadenceParserRULE_relationalOp
 	return p
 }
 
@@ -10058,7 +10058,7 @@ func NewRelationalOpContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_relationalOp
+	p.RuleIndex = CadenceParserRULE_relationalOp
 
 	return p
 }
@@ -10066,19 +10066,19 @@ func NewRelationalOpContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *RelationalOpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *RelationalOpContext) Less() antlr.TerminalNode {
-	return s.GetToken(StrictusParserLess, 0)
+	return s.GetToken(CadenceParserLess, 0)
 }
 
 func (s *RelationalOpContext) Greater() antlr.TerminalNode {
-	return s.GetToken(StrictusParserGreater, 0)
+	return s.GetToken(CadenceParserGreater, 0)
 }
 
 func (s *RelationalOpContext) LessEqual() antlr.TerminalNode {
-	return s.GetToken(StrictusParserLessEqual, 0)
+	return s.GetToken(CadenceParserLessEqual, 0)
 }
 
 func (s *RelationalOpContext) GreaterEqual() antlr.TerminalNode {
-	return s.GetToken(StrictusParserGreaterEqual, 0)
+	return s.GetToken(CadenceParserGreaterEqual, 0)
 }
 
 func (s *RelationalOpContext) GetRuleContext() antlr.RuleContext {
@@ -10090,20 +10090,20 @@ func (s *RelationalOpContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *RelationalOpContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterRelationalOp(s)
 	}
 }
 
 func (s *RelationalOpContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitRelationalOp(s)
 	}
 }
 
 func (s *RelationalOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitRelationalOp(s)
 
 	default:
@@ -10111,9 +10111,9 @@ func (s *RelationalOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) RelationalOp() (localctx IRelationalOpContext) {
+func (p *CadenceParser) RelationalOp() (localctx IRelationalOpContext) {
 	localctx = NewRelationalOpContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 120, StrictusParserRULE_relationalOp)
+	p.EnterRule(localctx, 120, CadenceParserRULE_relationalOp)
 	var _la int
 
 	defer func() {
@@ -10137,7 +10137,7 @@ func (p *StrictusParser) RelationalOp() (localctx IRelationalOpContext) {
 		p.SetState(625)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserLess)|(1<<StrictusParserGreater)|(1<<StrictusParserLessEqual)|(1<<StrictusParserGreaterEqual))) != 0) {
+		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserLess)|(1<<CadenceParserGreater)|(1<<CadenceParserLessEqual)|(1<<CadenceParserGreaterEqual))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -10167,7 +10167,7 @@ type AdditiveOpContext struct {
 func NewEmptyAdditiveOpContext() *AdditiveOpContext {
 	var p = new(AdditiveOpContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_additiveOp
+	p.RuleIndex = CadenceParserRULE_additiveOp
 	return p
 }
 
@@ -10179,7 +10179,7 @@ func NewAdditiveOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_additiveOp
+	p.RuleIndex = CadenceParserRULE_additiveOp
 
 	return p
 }
@@ -10187,11 +10187,11 @@ func NewAdditiveOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *AdditiveOpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AdditiveOpContext) Plus() antlr.TerminalNode {
-	return s.GetToken(StrictusParserPlus, 0)
+	return s.GetToken(CadenceParserPlus, 0)
 }
 
 func (s *AdditiveOpContext) Minus() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMinus, 0)
+	return s.GetToken(CadenceParserMinus, 0)
 }
 
 func (s *AdditiveOpContext) GetRuleContext() antlr.RuleContext {
@@ -10203,20 +10203,20 @@ func (s *AdditiveOpContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *AdditiveOpContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterAdditiveOp(s)
 	}
 }
 
 func (s *AdditiveOpContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitAdditiveOp(s)
 	}
 }
 
 func (s *AdditiveOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitAdditiveOp(s)
 
 	default:
@@ -10224,9 +10224,9 @@ func (s *AdditiveOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) AdditiveOp() (localctx IAdditiveOpContext) {
+func (p *CadenceParser) AdditiveOp() (localctx IAdditiveOpContext) {
 	localctx = NewAdditiveOpContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 122, StrictusParserRULE_additiveOp)
+	p.EnterRule(localctx, 122, CadenceParserRULE_additiveOp)
 	var _la int
 
 	defer func() {
@@ -10250,7 +10250,7 @@ func (p *StrictusParser) AdditiveOp() (localctx IAdditiveOpContext) {
 		p.SetState(627)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == StrictusParserPlus || _la == StrictusParserMinus) {
+		if !(_la == CadenceParserPlus || _la == CadenceParserMinus) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -10280,7 +10280,7 @@ type MultiplicativeOpContext struct {
 func NewEmptyMultiplicativeOpContext() *MultiplicativeOpContext {
 	var p = new(MultiplicativeOpContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_multiplicativeOp
+	p.RuleIndex = CadenceParserRULE_multiplicativeOp
 	return p
 }
 
@@ -10292,7 +10292,7 @@ func NewMultiplicativeOpContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_multiplicativeOp
+	p.RuleIndex = CadenceParserRULE_multiplicativeOp
 
 	return p
 }
@@ -10300,15 +10300,15 @@ func NewMultiplicativeOpContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *MultiplicativeOpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *MultiplicativeOpContext) Mul() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMul, 0)
+	return s.GetToken(CadenceParserMul, 0)
 }
 
 func (s *MultiplicativeOpContext) Div() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDiv, 0)
+	return s.GetToken(CadenceParserDiv, 0)
 }
 
 func (s *MultiplicativeOpContext) Mod() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMod, 0)
+	return s.GetToken(CadenceParserMod, 0)
 }
 
 func (s *MultiplicativeOpContext) GetRuleContext() antlr.RuleContext {
@@ -10320,20 +10320,20 @@ func (s *MultiplicativeOpContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 func (s *MultiplicativeOpContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterMultiplicativeOp(s)
 	}
 }
 
 func (s *MultiplicativeOpContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitMultiplicativeOp(s)
 	}
 }
 
 func (s *MultiplicativeOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitMultiplicativeOp(s)
 
 	default:
@@ -10341,9 +10341,9 @@ func (s *MultiplicativeOpContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *StrictusParser) MultiplicativeOp() (localctx IMultiplicativeOpContext) {
+func (p *CadenceParser) MultiplicativeOp() (localctx IMultiplicativeOpContext) {
 	localctx = NewMultiplicativeOpContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 124, StrictusParserRULE_multiplicativeOp)
+	p.EnterRule(localctx, 124, CadenceParserRULE_multiplicativeOp)
 	var _la int
 
 	defer func() {
@@ -10367,7 +10367,7 @@ func (p *StrictusParser) MultiplicativeOp() (localctx IMultiplicativeOpContext) 
 		p.SetState(629)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserMul)|(1<<StrictusParserDiv)|(1<<StrictusParserMod))) != 0) {
+		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserMul)|(1<<CadenceParserDiv)|(1<<CadenceParserMod))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -10397,7 +10397,7 @@ type UnaryOpContext struct {
 func NewEmptyUnaryOpContext() *UnaryOpContext {
 	var p = new(UnaryOpContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_unaryOp
+	p.RuleIndex = CadenceParserRULE_unaryOp
 	return p
 }
 
@@ -10409,7 +10409,7 @@ func NewUnaryOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_unaryOp
+	p.RuleIndex = CadenceParserRULE_unaryOp
 
 	return p
 }
@@ -10417,15 +10417,15 @@ func NewUnaryOpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *UnaryOpContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *UnaryOpContext) Minus() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMinus, 0)
+	return s.GetToken(CadenceParserMinus, 0)
 }
 
 func (s *UnaryOpContext) Negate() antlr.TerminalNode {
-	return s.GetToken(StrictusParserNegate, 0)
+	return s.GetToken(CadenceParserNegate, 0)
 }
 
 func (s *UnaryOpContext) Move() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMove, 0)
+	return s.GetToken(CadenceParserMove, 0)
 }
 
 func (s *UnaryOpContext) GetRuleContext() antlr.RuleContext {
@@ -10437,20 +10437,20 @@ func (s *UnaryOpContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 }
 
 func (s *UnaryOpContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterUnaryOp(s)
 	}
 }
 
 func (s *UnaryOpContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitUnaryOp(s)
 	}
 }
 
 func (s *UnaryOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitUnaryOp(s)
 
 	default:
@@ -10458,9 +10458,9 @@ func (s *UnaryOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) UnaryOp() (localctx IUnaryOpContext) {
+func (p *CadenceParser) UnaryOp() (localctx IUnaryOpContext) {
 	localctx = NewUnaryOpContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 126, StrictusParserRULE_unaryOp)
+	p.EnterRule(localctx, 126, CadenceParserRULE_unaryOp)
 	var _la int
 
 	defer func() {
@@ -10484,7 +10484,7 @@ func (p *StrictusParser) UnaryOp() (localctx IUnaryOpContext) {
 		p.SetState(631)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserMinus)|(1<<StrictusParserNegate)|(1<<StrictusParserMove))) != 0) {
+		if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserMinus)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -10514,7 +10514,7 @@ type PrimaryExpressionStartContext struct {
 func NewEmptyPrimaryExpressionStartContext() *PrimaryExpressionStartContext {
 	var p = new(PrimaryExpressionStartContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_primaryExpressionStart
+	p.RuleIndex = CadenceParserRULE_primaryExpressionStart
 	return p
 }
 
@@ -10526,7 +10526,7 @@ func NewPrimaryExpressionStartContext(parser antlr.Parser, parent antlr.ParserRu
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_primaryExpressionStart
+	p.RuleIndex = CadenceParserRULE_primaryExpressionStart
 
 	return p
 }
@@ -10582,20 +10582,20 @@ func (s *PrimaryExpressionStartContext) ToStringTree(ruleNames []string, recog a
 }
 
 func (s *PrimaryExpressionStartContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterPrimaryExpressionStart(s)
 	}
 }
 
 func (s *PrimaryExpressionStartContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitPrimaryExpressionStart(s)
 	}
 }
 
 func (s *PrimaryExpressionStartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitPrimaryExpressionStart(s)
 
 	default:
@@ -10603,9 +10603,9 @@ func (s *PrimaryExpressionStartContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionStartContext) {
+func (p *CadenceParser) PrimaryExpressionStart() (localctx IPrimaryExpressionStartContext) {
 	localctx = NewPrimaryExpressionStartContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 128, StrictusParserRULE_primaryExpressionStart)
+	p.EnterRule(localctx, 128, CadenceParserRULE_primaryExpressionStart)
 
 	defer func() {
 		p.ExitRule()
@@ -10627,28 +10627,28 @@ func (p *StrictusParser) PrimaryExpressionStart() (localctx IPrimaryExpressionSt
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserFrom, StrictusParserCreate, StrictusParserDestroy, StrictusParserIdentifier:
+	case CadenceParserFrom, CadenceParserCreate, CadenceParserDestroy, CadenceParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(633)
 			p.IdentifierExpression()
 		}
 
-	case StrictusParserT__2, StrictusParserT__5, StrictusParserMinus, StrictusParserTrue, StrictusParserFalse, StrictusParserNil, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral, StrictusParserStringLiteral:
+	case CadenceParserT__2, CadenceParserT__5, CadenceParserMinus, CadenceParserTrue, CadenceParserFalse, CadenceParserNil, CadenceParserDecimalLiteral, CadenceParserBinaryLiteral, CadenceParserOctalLiteral, CadenceParserHexadecimalLiteral, CadenceParserInvalidNumberLiteral, CadenceParserStringLiteral:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(634)
 			p.LiteralExpression()
 		}
 
-	case StrictusParserFun:
+	case CadenceParserFun:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(635)
 			p.FunctionExpression()
 		}
 
-	case StrictusParserOpenParen:
+	case CadenceParserOpenParen:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(636)
@@ -10681,7 +10681,7 @@ type CreateExpressionContext struct {
 func NewEmptyCreateExpressionContext() *CreateExpressionContext {
 	var p = new(CreateExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_createExpression
+	p.RuleIndex = CadenceParserRULE_createExpression
 	return p
 }
 
@@ -10693,7 +10693,7 @@ func NewCreateExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_createExpression
+	p.RuleIndex = CadenceParserRULE_createExpression
 
 	return p
 }
@@ -10701,7 +10701,7 @@ func NewCreateExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *CreateExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *CreateExpressionContext) Create() antlr.TerminalNode {
-	return s.GetToken(StrictusParserCreate, 0)
+	return s.GetToken(CadenceParserCreate, 0)
 }
 
 func (s *CreateExpressionContext) Identifier() IIdentifierContext {
@@ -10733,20 +10733,20 @@ func (s *CreateExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 func (s *CreateExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterCreateExpression(s)
 	}
 }
 
 func (s *CreateExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitCreateExpression(s)
 	}
 }
 
 func (s *CreateExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitCreateExpression(s)
 
 	default:
@@ -10754,9 +10754,9 @@ func (s *CreateExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *StrictusParser) CreateExpression() (localctx ICreateExpressionContext) {
+func (p *CadenceParser) CreateExpression() (localctx ICreateExpressionContext) {
 	localctx = NewCreateExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 130, StrictusParserRULE_createExpression)
+	p.EnterRule(localctx, 130, CadenceParserRULE_createExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -10777,7 +10777,7 @@ func (p *StrictusParser) CreateExpression() (localctx ICreateExpressionContext) 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(639)
-		p.Match(StrictusParserCreate)
+		p.Match(CadenceParserCreate)
 	}
 	{
 		p.SetState(640)
@@ -10810,7 +10810,7 @@ type DestroyExpressionContext struct {
 func NewEmptyDestroyExpressionContext() *DestroyExpressionContext {
 	var p = new(DestroyExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_destroyExpression
+	p.RuleIndex = CadenceParserRULE_destroyExpression
 	return p
 }
 
@@ -10822,7 +10822,7 @@ func NewDestroyExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_destroyExpression
+	p.RuleIndex = CadenceParserRULE_destroyExpression
 
 	return p
 }
@@ -10830,7 +10830,7 @@ func NewDestroyExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *DestroyExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *DestroyExpressionContext) Destroy() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDestroy, 0)
+	return s.GetToken(CadenceParserDestroy, 0)
 }
 
 func (s *DestroyExpressionContext) Expression() IExpressionContext {
@@ -10852,20 +10852,20 @@ func (s *DestroyExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *DestroyExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDestroyExpression(s)
 	}
 }
 
 func (s *DestroyExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDestroyExpression(s)
 	}
 }
 
 func (s *DestroyExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDestroyExpression(s)
 
 	default:
@@ -10873,9 +10873,9 @@ func (s *DestroyExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) DestroyExpression() (localctx IDestroyExpressionContext) {
+func (p *CadenceParser) DestroyExpression() (localctx IDestroyExpressionContext) {
 	localctx = NewDestroyExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 132, StrictusParserRULE_destroyExpression)
+	p.EnterRule(localctx, 132, CadenceParserRULE_destroyExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -10896,7 +10896,7 @@ func (p *StrictusParser) DestroyExpression() (localctx IDestroyExpressionContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(643)
-		p.Match(StrictusParserDestroy)
+		p.Match(CadenceParserDestroy)
 	}
 	{
 		p.SetState(644)
@@ -10925,7 +10925,7 @@ type ReferenceExpressionContext struct {
 func NewEmptyReferenceExpressionContext() *ReferenceExpressionContext {
 	var p = new(ReferenceExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_referenceExpression
+	p.RuleIndex = CadenceParserRULE_referenceExpression
 	return p
 }
 
@@ -10937,7 +10937,7 @@ func NewReferenceExpressionContext(parser antlr.Parser, parent antlr.ParserRuleC
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_referenceExpression
+	p.RuleIndex = CadenceParserRULE_referenceExpression
 
 	return p
 }
@@ -10945,7 +10945,7 @@ func NewReferenceExpressionContext(parser antlr.Parser, parent antlr.ParserRuleC
 func (s *ReferenceExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ReferenceExpressionContext) Ampersand() antlr.TerminalNode {
-	return s.GetToken(StrictusParserAmpersand, 0)
+	return s.GetToken(CadenceParserAmpersand, 0)
 }
 
 func (s *ReferenceExpressionContext) Expression() IExpressionContext {
@@ -10959,7 +10959,7 @@ func (s *ReferenceExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *ReferenceExpressionContext) Downcasting() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDowncasting, 0)
+	return s.GetToken(CadenceParserDowncasting, 0)
 }
 
 func (s *ReferenceExpressionContext) FullType() IFullTypeContext {
@@ -10981,20 +10981,20 @@ func (s *ReferenceExpressionContext) ToStringTree(ruleNames []string, recog antl
 }
 
 func (s *ReferenceExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterReferenceExpression(s)
 	}
 }
 
 func (s *ReferenceExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitReferenceExpression(s)
 	}
 }
 
 func (s *ReferenceExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitReferenceExpression(s)
 
 	default:
@@ -11002,9 +11002,9 @@ func (s *ReferenceExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *StrictusParser) ReferenceExpression() (localctx IReferenceExpressionContext) {
+func (p *CadenceParser) ReferenceExpression() (localctx IReferenceExpressionContext) {
 	localctx = NewReferenceExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 134, StrictusParserRULE_referenceExpression)
+	p.EnterRule(localctx, 134, CadenceParserRULE_referenceExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -11025,7 +11025,7 @@ func (p *StrictusParser) ReferenceExpression() (localctx IReferenceExpressionCon
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(646)
-		p.Match(StrictusParserAmpersand)
+		p.Match(CadenceParserAmpersand)
 	}
 	{
 		p.SetState(647)
@@ -11033,7 +11033,7 @@ func (p *StrictusParser) ReferenceExpression() (localctx IReferenceExpressionCon
 	}
 	{
 		p.SetState(648)
-		p.Match(StrictusParserDowncasting)
+		p.Match(CadenceParserDowncasting)
 	}
 	{
 		p.SetState(649)
@@ -11062,7 +11062,7 @@ type IdentifierExpressionContext struct {
 func NewEmptyIdentifierExpressionContext() *IdentifierExpressionContext {
 	var p = new(IdentifierExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_identifierExpression
+	p.RuleIndex = CadenceParserRULE_identifierExpression
 	return p
 }
 
@@ -11074,7 +11074,7 @@ func NewIdentifierExpressionContext(parser antlr.Parser, parent antlr.ParserRule
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_identifierExpression
+	p.RuleIndex = CadenceParserRULE_identifierExpression
 
 	return p
 }
@@ -11100,20 +11100,20 @@ func (s *IdentifierExpressionContext) ToStringTree(ruleNames []string, recog ant
 }
 
 func (s *IdentifierExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterIdentifierExpression(s)
 	}
 }
 
 func (s *IdentifierExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitIdentifierExpression(s)
 	}
 }
 
 func (s *IdentifierExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitIdentifierExpression(s)
 
 	default:
@@ -11121,9 +11121,9 @@ func (s *IdentifierExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *StrictusParser) IdentifierExpression() (localctx IIdentifierExpressionContext) {
+func (p *CadenceParser) IdentifierExpression() (localctx IIdentifierExpressionContext) {
 	localctx = NewIdentifierExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 136, StrictusParserRULE_identifierExpression)
+	p.EnterRule(localctx, 136, CadenceParserRULE_identifierExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -11169,7 +11169,7 @@ type LiteralExpressionContext struct {
 func NewEmptyLiteralExpressionContext() *LiteralExpressionContext {
 	var p = new(LiteralExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_literalExpression
+	p.RuleIndex = CadenceParserRULE_literalExpression
 	return p
 }
 
@@ -11181,7 +11181,7 @@ func NewLiteralExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_literalExpression
+	p.RuleIndex = CadenceParserRULE_literalExpression
 
 	return p
 }
@@ -11207,20 +11207,20 @@ func (s *LiteralExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *LiteralExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterLiteralExpression(s)
 	}
 }
 
 func (s *LiteralExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitLiteralExpression(s)
 	}
 }
 
 func (s *LiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitLiteralExpression(s)
 
 	default:
@@ -11228,9 +11228,9 @@ func (s *LiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) LiteralExpression() (localctx ILiteralExpressionContext) {
+func (p *CadenceParser) LiteralExpression() (localctx ILiteralExpressionContext) {
 	localctx = NewLiteralExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 138, StrictusParserRULE_literalExpression)
+	p.EnterRule(localctx, 138, CadenceParserRULE_literalExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -11283,7 +11283,7 @@ type FunctionExpressionContext struct {
 func NewEmptyFunctionExpressionContext() *FunctionExpressionContext {
 	var p = new(FunctionExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_functionExpression
+	p.RuleIndex = CadenceParserRULE_functionExpression
 	return p
 }
 
@@ -11295,7 +11295,7 @@ func NewFunctionExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_functionExpression
+	p.RuleIndex = CadenceParserRULE_functionExpression
 
 	return p
 }
@@ -11307,7 +11307,7 @@ func (s *FunctionExpressionContext) GetReturnType() ITypeAnnotationContext { ret
 func (s *FunctionExpressionContext) SetReturnType(v ITypeAnnotationContext) { s.returnType = v }
 
 func (s *FunctionExpressionContext) Fun() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFun, 0)
+	return s.GetToken(CadenceParserFun, 0)
 }
 
 func (s *FunctionExpressionContext) ParameterList() IParameterListContext {
@@ -11349,20 +11349,20 @@ func (s *FunctionExpressionContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 func (s *FunctionExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterFunctionExpression(s)
 	}
 }
 
 func (s *FunctionExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitFunctionExpression(s)
 	}
 }
 
 func (s *FunctionExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitFunctionExpression(s)
 
 	default:
@@ -11370,9 +11370,9 @@ func (s *FunctionExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *StrictusParser) FunctionExpression() (localctx IFunctionExpressionContext) {
+func (p *CadenceParser) FunctionExpression() (localctx IFunctionExpressionContext) {
 	localctx = NewFunctionExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 140, StrictusParserRULE_functionExpression)
+	p.EnterRule(localctx, 140, CadenceParserRULE_functionExpression)
 	var _la int
 
 	defer func() {
@@ -11394,7 +11394,7 @@ func (p *StrictusParser) FunctionExpression() (localctx IFunctionExpressionConte
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(655)
-		p.Match(StrictusParserFun)
+		p.Match(CadenceParserFun)
 	}
 	{
 		p.SetState(656)
@@ -11404,10 +11404,10 @@ func (p *StrictusParser) FunctionExpression() (localctx IFunctionExpressionConte
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserT__4 {
+	if _la == CadenceParserT__4 {
 		{
 			p.SetState(657)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 		{
 			p.SetState(658)
@@ -11445,7 +11445,7 @@ type NestedExpressionContext struct {
 func NewEmptyNestedExpressionContext() *NestedExpressionContext {
 	var p = new(NestedExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_nestedExpression
+	p.RuleIndex = CadenceParserRULE_nestedExpression
 	return p
 }
 
@@ -11457,7 +11457,7 @@ func NewNestedExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_nestedExpression
+	p.RuleIndex = CadenceParserRULE_nestedExpression
 
 	return p
 }
@@ -11465,7 +11465,7 @@ func NewNestedExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *NestedExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NestedExpressionContext) OpenParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserOpenParen, 0)
+	return s.GetToken(CadenceParserOpenParen, 0)
 }
 
 func (s *NestedExpressionContext) Expression() IExpressionContext {
@@ -11479,7 +11479,7 @@ func (s *NestedExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *NestedExpressionContext) CloseParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserCloseParen, 0)
+	return s.GetToken(CadenceParserCloseParen, 0)
 }
 
 func (s *NestedExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -11491,20 +11491,20 @@ func (s *NestedExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 func (s *NestedExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterNestedExpression(s)
 	}
 }
 
 func (s *NestedExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitNestedExpression(s)
 	}
 }
 
 func (s *NestedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitNestedExpression(s)
 
 	default:
@@ -11512,9 +11512,9 @@ func (s *NestedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *StrictusParser) NestedExpression() (localctx INestedExpressionContext) {
+func (p *CadenceParser) NestedExpression() (localctx INestedExpressionContext) {
 	localctx = NewNestedExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 142, StrictusParserRULE_nestedExpression)
+	p.EnterRule(localctx, 142, CadenceParserRULE_nestedExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -11535,7 +11535,7 @@ func (p *StrictusParser) NestedExpression() (localctx INestedExpressionContext) 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(663)
-		p.Match(StrictusParserOpenParen)
+		p.Match(CadenceParserOpenParen)
 	}
 	{
 		p.SetState(664)
@@ -11543,7 +11543,7 @@ func (p *StrictusParser) NestedExpression() (localctx INestedExpressionContext) 
 	}
 	{
 		p.SetState(665)
-		p.Match(StrictusParserCloseParen)
+		p.Match(CadenceParserCloseParen)
 	}
 
 	return localctx
@@ -11568,7 +11568,7 @@ type ExpressionAccessContext struct {
 func NewEmptyExpressionAccessContext() *ExpressionAccessContext {
 	var p = new(ExpressionAccessContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_expressionAccess
+	p.RuleIndex = CadenceParserRULE_expressionAccess
 	return p
 }
 
@@ -11580,7 +11580,7 @@ func NewExpressionAccessContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_expressionAccess
+	p.RuleIndex = CadenceParserRULE_expressionAccess
 
 	return p
 }
@@ -11616,20 +11616,20 @@ func (s *ExpressionAccessContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 func (s *ExpressionAccessContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterExpressionAccess(s)
 	}
 }
 
 func (s *ExpressionAccessContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitExpressionAccess(s)
 	}
 }
 
 func (s *ExpressionAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitExpressionAccess(s)
 
 	default:
@@ -11637,9 +11637,9 @@ func (s *ExpressionAccessContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *StrictusParser) ExpressionAccess() (localctx IExpressionAccessContext) {
+func (p *CadenceParser) ExpressionAccess() (localctx IExpressionAccessContext) {
 	localctx = NewExpressionAccessContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 144, StrictusParserRULE_expressionAccess)
+	p.EnterRule(localctx, 144, CadenceParserRULE_expressionAccess)
 
 	defer func() {
 		p.ExitRule()
@@ -11661,14 +11661,14 @@ func (p *StrictusParser) ExpressionAccess() (localctx IExpressionAccessContext) 
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserT__11:
+	case CadenceParserT__11:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(667)
 			p.MemberAccess()
 		}
 
-	case StrictusParserT__5:
+	case CadenceParserT__5:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(668)
@@ -11701,7 +11701,7 @@ type MemberAccessContext struct {
 func NewEmptyMemberAccessContext() *MemberAccessContext {
 	var p = new(MemberAccessContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_memberAccess
+	p.RuleIndex = CadenceParserRULE_memberAccess
 	return p
 }
 
@@ -11713,7 +11713,7 @@ func NewMemberAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_memberAccess
+	p.RuleIndex = CadenceParserRULE_memberAccess
 
 	return p
 }
@@ -11739,20 +11739,20 @@ func (s *MemberAccessContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *MemberAccessContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterMemberAccess(s)
 	}
 }
 
 func (s *MemberAccessContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitMemberAccess(s)
 	}
 }
 
 func (s *MemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitMemberAccess(s)
 
 	default:
@@ -11760,9 +11760,9 @@ func (s *MemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) MemberAccess() (localctx IMemberAccessContext) {
+func (p *CadenceParser) MemberAccess() (localctx IMemberAccessContext) {
 	localctx = NewMemberAccessContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 146, StrictusParserRULE_memberAccess)
+	p.EnterRule(localctx, 146, CadenceParserRULE_memberAccess)
 
 	defer func() {
 		p.ExitRule()
@@ -11783,7 +11783,7 @@ func (p *StrictusParser) MemberAccess() (localctx IMemberAccessContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(671)
-		p.Match(StrictusParserT__11)
+		p.Match(CadenceParserT__11)
 	}
 	{
 		p.SetState(672)
@@ -11812,7 +11812,7 @@ type BracketExpressionContext struct {
 func NewEmptyBracketExpressionContext() *BracketExpressionContext {
 	var p = new(BracketExpressionContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_bracketExpression
+	p.RuleIndex = CadenceParserRULE_bracketExpression
 	return p
 }
 
@@ -11824,7 +11824,7 @@ func NewBracketExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_bracketExpression
+	p.RuleIndex = CadenceParserRULE_bracketExpression
 
 	return p
 }
@@ -11860,20 +11860,20 @@ func (s *BracketExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *BracketExpressionContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBracketExpression(s)
 	}
 }
 
 func (s *BracketExpressionContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBracketExpression(s)
 	}
 }
 
 func (s *BracketExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBracketExpression(s)
 
 	default:
@@ -11881,9 +11881,9 @@ func (s *BracketExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) BracketExpression() (localctx IBracketExpressionContext) {
+func (p *CadenceParser) BracketExpression() (localctx IBracketExpressionContext) {
 	localctx = NewBracketExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 148, StrictusParserRULE_bracketExpression)
+	p.EnterRule(localctx, 148, CadenceParserRULE_bracketExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -11904,7 +11904,7 @@ func (p *StrictusParser) BracketExpression() (localctx IBracketExpressionContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(674)
-		p.Match(StrictusParserT__5)
+		p.Match(CadenceParserT__5)
 	}
 	p.SetState(677)
 	p.GetErrorHandler().Sync(p)
@@ -11924,7 +11924,7 @@ func (p *StrictusParser) BracketExpression() (localctx IBracketExpressionContext
 	}
 	{
 		p.SetState(679)
-		p.Match(StrictusParserT__6)
+		p.Match(CadenceParserT__6)
 	}
 
 	return localctx
@@ -11949,7 +11949,7 @@ type InvocationContext struct {
 func NewEmptyInvocationContext() *InvocationContext {
 	var p = new(InvocationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_invocation
+	p.RuleIndex = CadenceParserRULE_invocation
 	return p
 }
 
@@ -11961,7 +11961,7 @@ func NewInvocationContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_invocation
+	p.RuleIndex = CadenceParserRULE_invocation
 
 	return p
 }
@@ -11969,11 +11969,11 @@ func NewInvocationContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *InvocationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *InvocationContext) OpenParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserOpenParen, 0)
+	return s.GetToken(CadenceParserOpenParen, 0)
 }
 
 func (s *InvocationContext) CloseParen() antlr.TerminalNode {
-	return s.GetToken(StrictusParserCloseParen, 0)
+	return s.GetToken(CadenceParserCloseParen, 0)
 }
 
 func (s *InvocationContext) AllArgument() []IArgumentContext {
@@ -12008,20 +12008,20 @@ func (s *InvocationContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *InvocationContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterInvocation(s)
 	}
 }
 
 func (s *InvocationContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitInvocation(s)
 	}
 }
 
 func (s *InvocationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitInvocation(s)
 
 	default:
@@ -12029,9 +12029,9 @@ func (s *InvocationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
+func (p *CadenceParser) Invocation() (localctx IInvocationContext) {
 	localctx = NewInvocationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 150, StrictusParserRULE_invocation)
+	p.EnterRule(localctx, 150, CadenceParserRULE_invocation)
 	var _la int
 
 	defer func() {
@@ -12053,13 +12053,13 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(681)
-		p.Match(StrictusParserOpenParen)
+		p.Match(CadenceParserOpenParen)
 	}
 	p.SetState(690)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserAmpersand)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(StrictusParserFun-38))|(1<<(StrictusParserTrue-38))|(1<<(StrictusParserFalse-38))|(1<<(StrictusParserNil-38))|(1<<(StrictusParserFrom-38))|(1<<(StrictusParserCreate-38))|(1<<(StrictusParserDestroy-38))|(1<<(StrictusParserIdentifier-38))|(1<<(StrictusParserDecimalLiteral-38))|(1<<(StrictusParserBinaryLiteral-38))|(1<<(StrictusParserOctalLiteral-38))|(1<<(StrictusParserHexadecimalLiteral-38))|(1<<(StrictusParserInvalidNumberLiteral-38))|(1<<(StrictusParserStringLiteral-38)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__2)|(1<<CadenceParserT__5)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(CadenceParserFun-38))|(1<<(CadenceParserTrue-38))|(1<<(CadenceParserFalse-38))|(1<<(CadenceParserNil-38))|(1<<(CadenceParserFrom-38))|(1<<(CadenceParserCreate-38))|(1<<(CadenceParserDestroy-38))|(1<<(CadenceParserIdentifier-38))|(1<<(CadenceParserDecimalLiteral-38))|(1<<(CadenceParserBinaryLiteral-38))|(1<<(CadenceParserOctalLiteral-38))|(1<<(CadenceParserHexadecimalLiteral-38))|(1<<(CadenceParserInvalidNumberLiteral-38))|(1<<(CadenceParserStringLiteral-38)))) != 0) {
 		{
 			p.SetState(682)
 			p.Argument()
@@ -12068,10 +12068,10 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(683)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(684)
@@ -12086,7 +12086,7 @@ func (p *StrictusParser) Invocation() (localctx IInvocationContext) {
 	}
 	{
 		p.SetState(692)
-		p.Match(StrictusParserCloseParen)
+		p.Match(CadenceParserCloseParen)
 	}
 
 	return localctx
@@ -12111,7 +12111,7 @@ type ArgumentContext struct {
 func NewEmptyArgumentContext() *ArgumentContext {
 	var p = new(ArgumentContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_argument
+	p.RuleIndex = CadenceParserRULE_argument
 	return p
 }
 
@@ -12123,7 +12123,7 @@ func NewArgumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_argument
+	p.RuleIndex = CadenceParserRULE_argument
 
 	return p
 }
@@ -12159,20 +12159,20 @@ func (s *ArgumentContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 }
 
 func (s *ArgumentContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterArgument(s)
 	}
 }
 
 func (s *ArgumentContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitArgument(s)
 	}
 }
 
 func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitArgument(s)
 
 	default:
@@ -12180,9 +12180,9 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Argument() (localctx IArgumentContext) {
+func (p *CadenceParser) Argument() (localctx IArgumentContext) {
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 152, StrictusParserRULE_argument)
+	p.EnterRule(localctx, 152, CadenceParserRULE_argument)
 
 	defer func() {
 		p.ExitRule()
@@ -12211,7 +12211,7 @@ func (p *StrictusParser) Argument() (localctx IArgumentContext) {
 		}
 		{
 			p.SetState(695)
-			p.Match(StrictusParserT__4)
+			p.Match(CadenceParserT__4)
 		}
 
 	}
@@ -12242,7 +12242,7 @@ type LiteralContext struct {
 func NewEmptyLiteralContext() *LiteralContext {
 	var p = new(LiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_literal
+	p.RuleIndex = CadenceParserRULE_literal
 	return p
 }
 
@@ -12254,7 +12254,7 @@ func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_literal
+	p.RuleIndex = CadenceParserRULE_literal
 
 	return p
 }
@@ -12330,20 +12330,20 @@ func (s *LiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 }
 
 func (s *LiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterLiteral(s)
 	}
 }
 
 func (s *LiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitLiteral(s)
 	}
 }
 
 func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitLiteral(s)
 
 	default:
@@ -12351,9 +12351,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Literal() (localctx ILiteralContext) {
+func (p *CadenceParser) Literal() (localctx ILiteralContext) {
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 154, StrictusParserRULE_literal)
+	p.EnterRule(localctx, 154, CadenceParserRULE_literal)
 
 	defer func() {
 		p.ExitRule()
@@ -12375,42 +12375,42 @@ func (p *StrictusParser) Literal() (localctx ILiteralContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserMinus, StrictusParserDecimalLiteral, StrictusParserBinaryLiteral, StrictusParserOctalLiteral, StrictusParserHexadecimalLiteral, StrictusParserInvalidNumberLiteral:
+	case CadenceParserMinus, CadenceParserDecimalLiteral, CadenceParserBinaryLiteral, CadenceParserOctalLiteral, CadenceParserHexadecimalLiteral, CadenceParserInvalidNumberLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(701)
 			p.IntegerLiteral()
 		}
 
-	case StrictusParserTrue, StrictusParserFalse:
+	case CadenceParserTrue, CadenceParserFalse:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(702)
 			p.BooleanLiteral()
 		}
 
-	case StrictusParserT__5:
+	case CadenceParserT__5:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(703)
 			p.ArrayLiteral()
 		}
 
-	case StrictusParserT__2:
+	case CadenceParserT__2:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(704)
 			p.DictionaryLiteral()
 		}
 
-	case StrictusParserStringLiteral:
+	case CadenceParserStringLiteral:
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(705)
 			p.StringLiteral()
 		}
 
-	case StrictusParserNil:
+	case CadenceParserNil:
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(706)
@@ -12443,7 +12443,7 @@ type BooleanLiteralContext struct {
 func NewEmptyBooleanLiteralContext() *BooleanLiteralContext {
 	var p = new(BooleanLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_booleanLiteral
+	p.RuleIndex = CadenceParserRULE_booleanLiteral
 	return p
 }
 
@@ -12455,7 +12455,7 @@ func NewBooleanLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_booleanLiteral
+	p.RuleIndex = CadenceParserRULE_booleanLiteral
 
 	return p
 }
@@ -12463,11 +12463,11 @@ func NewBooleanLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *BooleanLiteralContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BooleanLiteralContext) True() antlr.TerminalNode {
-	return s.GetToken(StrictusParserTrue, 0)
+	return s.GetToken(CadenceParserTrue, 0)
 }
 
 func (s *BooleanLiteralContext) False() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFalse, 0)
+	return s.GetToken(CadenceParserFalse, 0)
 }
 
 func (s *BooleanLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -12479,20 +12479,20 @@ func (s *BooleanLiteralContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *BooleanLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBooleanLiteral(s)
 	}
 }
 
 func (s *BooleanLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBooleanLiteral(s)
 	}
 }
 
 func (s *BooleanLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBooleanLiteral(s)
 
 	default:
@@ -12500,9 +12500,9 @@ func (s *BooleanLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) BooleanLiteral() (localctx IBooleanLiteralContext) {
+func (p *CadenceParser) BooleanLiteral() (localctx IBooleanLiteralContext) {
 	localctx = NewBooleanLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 156, StrictusParserRULE_booleanLiteral)
+	p.EnterRule(localctx, 156, CadenceParserRULE_booleanLiteral)
 	var _la int
 
 	defer func() {
@@ -12526,7 +12526,7 @@ func (p *StrictusParser) BooleanLiteral() (localctx IBooleanLiteralContext) {
 		p.SetState(709)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == StrictusParserTrue || _la == StrictusParserFalse) {
+		if !(_la == CadenceParserTrue || _la == CadenceParserFalse) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -12556,7 +12556,7 @@ type NilLiteralContext struct {
 func NewEmptyNilLiteralContext() *NilLiteralContext {
 	var p = new(NilLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_nilLiteral
+	p.RuleIndex = CadenceParserRULE_nilLiteral
 	return p
 }
 
@@ -12568,7 +12568,7 @@ func NewNilLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_nilLiteral
+	p.RuleIndex = CadenceParserRULE_nilLiteral
 
 	return p
 }
@@ -12576,7 +12576,7 @@ func NewNilLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *NilLiteralContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NilLiteralContext) Nil() antlr.TerminalNode {
-	return s.GetToken(StrictusParserNil, 0)
+	return s.GetToken(CadenceParserNil, 0)
 }
 
 func (s *NilLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -12588,20 +12588,20 @@ func (s *NilLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *NilLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterNilLiteral(s)
 	}
 }
 
 func (s *NilLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitNilLiteral(s)
 	}
 }
 
 func (s *NilLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitNilLiteral(s)
 
 	default:
@@ -12609,9 +12609,9 @@ func (s *NilLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) NilLiteral() (localctx INilLiteralContext) {
+func (p *CadenceParser) NilLiteral() (localctx INilLiteralContext) {
 	localctx = NewNilLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 158, StrictusParserRULE_nilLiteral)
+	p.EnterRule(localctx, 158, CadenceParserRULE_nilLiteral)
 
 	defer func() {
 		p.ExitRule()
@@ -12632,7 +12632,7 @@ func (p *StrictusParser) NilLiteral() (localctx INilLiteralContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(711)
-		p.Match(StrictusParserNil)
+		p.Match(CadenceParserNil)
 	}
 
 	return localctx
@@ -12657,7 +12657,7 @@ type StringLiteralContext struct {
 func NewEmptyStringLiteralContext() *StringLiteralContext {
 	var p = new(StringLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_stringLiteral
+	p.RuleIndex = CadenceParserRULE_stringLiteral
 	return p
 }
 
@@ -12669,7 +12669,7 @@ func NewStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_stringLiteral
+	p.RuleIndex = CadenceParserRULE_stringLiteral
 
 	return p
 }
@@ -12677,7 +12677,7 @@ func NewStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *StringLiteralContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *StringLiteralContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserStringLiteral, 0)
+	return s.GetToken(CadenceParserStringLiteral, 0)
 }
 
 func (s *StringLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -12689,20 +12689,20 @@ func (s *StringLiteralContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 func (s *StringLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterStringLiteral(s)
 	}
 }
 
 func (s *StringLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitStringLiteral(s)
 	}
 }
 
 func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitStringLiteral(s)
 
 	default:
@@ -12710,9 +12710,9 @@ func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *StrictusParser) StringLiteral() (localctx IStringLiteralContext) {
+func (p *CadenceParser) StringLiteral() (localctx IStringLiteralContext) {
 	localctx = NewStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 160, StrictusParserRULE_stringLiteral)
+	p.EnterRule(localctx, 160, CadenceParserRULE_stringLiteral)
 
 	defer func() {
 		p.ExitRule()
@@ -12733,7 +12733,7 @@ func (p *StrictusParser) StringLiteral() (localctx IStringLiteralContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(713)
-		p.Match(StrictusParserStringLiteral)
+		p.Match(CadenceParserStringLiteral)
 	}
 
 	return localctx
@@ -12758,7 +12758,7 @@ type IntegerLiteralContext struct {
 func NewEmptyIntegerLiteralContext() *IntegerLiteralContext {
 	var p = new(IntegerLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_integerLiteral
+	p.RuleIndex = CadenceParserRULE_integerLiteral
 	return p
 }
 
@@ -12770,7 +12770,7 @@ func NewIntegerLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_integerLiteral
+	p.RuleIndex = CadenceParserRULE_integerLiteral
 
 	return p
 }
@@ -12788,7 +12788,7 @@ func (s *IntegerLiteralContext) PositiveIntegerLiteral() IPositiveIntegerLiteral
 }
 
 func (s *IntegerLiteralContext) Minus() antlr.TerminalNode {
-	return s.GetToken(StrictusParserMinus, 0)
+	return s.GetToken(CadenceParserMinus, 0)
 }
 
 func (s *IntegerLiteralContext) GetRuleContext() antlr.RuleContext {
@@ -12800,20 +12800,20 @@ func (s *IntegerLiteralContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 func (s *IntegerLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterIntegerLiteral(s)
 	}
 }
 
 func (s *IntegerLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitIntegerLiteral(s)
 	}
 }
 
 func (s *IntegerLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitIntegerLiteral(s)
 
 	default:
@@ -12821,9 +12821,9 @@ func (s *IntegerLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
+func (p *CadenceParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 	localctx = NewIntegerLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 162, StrictusParserRULE_integerLiteral)
+	p.EnterRule(localctx, 162, CadenceParserRULE_integerLiteral)
 	var _la int
 
 	defer func() {
@@ -12847,10 +12847,10 @@ func (p *StrictusParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == StrictusParserMinus {
+	if _la == CadenceParserMinus {
 		{
 			p.SetState(715)
-			p.Match(StrictusParserMinus)
+			p.Match(CadenceParserMinus)
 		}
 
 	}
@@ -12881,7 +12881,7 @@ type PositiveIntegerLiteralContext struct {
 func NewEmptyPositiveIntegerLiteralContext() *PositiveIntegerLiteralContext {
 	var p = new(PositiveIntegerLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_positiveIntegerLiteral
+	p.RuleIndex = CadenceParserRULE_positiveIntegerLiteral
 	return p
 }
 
@@ -12893,7 +12893,7 @@ func NewPositiveIntegerLiteralContext(parser antlr.Parser, parent antlr.ParserRu
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_positiveIntegerLiteral
+	p.RuleIndex = CadenceParserRULE_positiveIntegerLiteral
 
 	return p
 }
@@ -12931,24 +12931,24 @@ func (s *BinaryLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *BinaryLiteralContext) BinaryLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserBinaryLiteral, 0)
+	return s.GetToken(CadenceParserBinaryLiteral, 0)
 }
 
 func (s *BinaryLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterBinaryLiteral(s)
 	}
 }
 
 func (s *BinaryLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitBinaryLiteral(s)
 	}
 }
 
 func (s *BinaryLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitBinaryLiteral(s)
 
 	default:
@@ -12975,24 +12975,24 @@ func (s *OctalLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *OctalLiteralContext) OctalLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserOctalLiteral, 0)
+	return s.GetToken(CadenceParserOctalLiteral, 0)
 }
 
 func (s *OctalLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterOctalLiteral(s)
 	}
 }
 
 func (s *OctalLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitOctalLiteral(s)
 	}
 }
 
 func (s *OctalLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitOctalLiteral(s)
 
 	default:
@@ -13019,24 +13019,24 @@ func (s *InvalidNumberLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *InvalidNumberLiteralContext) InvalidNumberLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserInvalidNumberLiteral, 0)
+	return s.GetToken(CadenceParserInvalidNumberLiteral, 0)
 }
 
 func (s *InvalidNumberLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterInvalidNumberLiteral(s)
 	}
 }
 
 func (s *InvalidNumberLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitInvalidNumberLiteral(s)
 	}
 }
 
 func (s *InvalidNumberLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitInvalidNumberLiteral(s)
 
 	default:
@@ -13063,24 +13063,24 @@ func (s *DecimalLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *DecimalLiteralContext) DecimalLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDecimalLiteral, 0)
+	return s.GetToken(CadenceParserDecimalLiteral, 0)
 }
 
 func (s *DecimalLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDecimalLiteral(s)
 	}
 }
 
 func (s *DecimalLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDecimalLiteral(s)
 	}
 }
 
 func (s *DecimalLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDecimalLiteral(s)
 
 	default:
@@ -13107,24 +13107,24 @@ func (s *HexadecimalLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *HexadecimalLiteralContext) HexadecimalLiteral() antlr.TerminalNode {
-	return s.GetToken(StrictusParserHexadecimalLiteral, 0)
+	return s.GetToken(CadenceParserHexadecimalLiteral, 0)
 }
 
 func (s *HexadecimalLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterHexadecimalLiteral(s)
 	}
 }
 
 func (s *HexadecimalLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitHexadecimalLiteral(s)
 	}
 }
 
 func (s *HexadecimalLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitHexadecimalLiteral(s)
 
 	default:
@@ -13132,9 +13132,9 @@ func (s *HexadecimalLiteralContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *StrictusParser) PositiveIntegerLiteral() (localctx IPositiveIntegerLiteralContext) {
+func (p *CadenceParser) PositiveIntegerLiteral() (localctx IPositiveIntegerLiteralContext) {
 	localctx = NewPositiveIntegerLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 164, StrictusParserRULE_positiveIntegerLiteral)
+	p.EnterRule(localctx, 164, CadenceParserRULE_positiveIntegerLiteral)
 
 	defer func() {
 		p.ExitRule()
@@ -13156,44 +13156,44 @@ func (p *StrictusParser) PositiveIntegerLiteral() (localctx IPositiveIntegerLite
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case StrictusParserDecimalLiteral:
+	case CadenceParserDecimalLiteral:
 		localctx = NewDecimalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(720)
-			p.Match(StrictusParserDecimalLiteral)
+			p.Match(CadenceParserDecimalLiteral)
 		}
 
-	case StrictusParserBinaryLiteral:
+	case CadenceParserBinaryLiteral:
 		localctx = NewBinaryLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(721)
-			p.Match(StrictusParserBinaryLiteral)
+			p.Match(CadenceParserBinaryLiteral)
 		}
 
-	case StrictusParserOctalLiteral:
+	case CadenceParserOctalLiteral:
 		localctx = NewOctalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(722)
-			p.Match(StrictusParserOctalLiteral)
+			p.Match(CadenceParserOctalLiteral)
 		}
 
-	case StrictusParserHexadecimalLiteral:
+	case CadenceParserHexadecimalLiteral:
 		localctx = NewHexadecimalLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(723)
-			p.Match(StrictusParserHexadecimalLiteral)
+			p.Match(CadenceParserHexadecimalLiteral)
 		}
 
-	case StrictusParserInvalidNumberLiteral:
+	case CadenceParserInvalidNumberLiteral:
 		localctx = NewInvalidNumberLiteralContext(p, localctx)
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(724)
-			p.Match(StrictusParserInvalidNumberLiteral)
+			p.Match(CadenceParserInvalidNumberLiteral)
 		}
 
 	default:
@@ -13222,7 +13222,7 @@ type ArrayLiteralContext struct {
 func NewEmptyArrayLiteralContext() *ArrayLiteralContext {
 	var p = new(ArrayLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_arrayLiteral
+	p.RuleIndex = CadenceParserRULE_arrayLiteral
 	return p
 }
 
@@ -13234,7 +13234,7 @@ func NewArrayLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_arrayLiteral
+	p.RuleIndex = CadenceParserRULE_arrayLiteral
 
 	return p
 }
@@ -13273,20 +13273,20 @@ func (s *ArrayLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recog
 }
 
 func (s *ArrayLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterArrayLiteral(s)
 	}
 }
 
 func (s *ArrayLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitArrayLiteral(s)
 	}
 }
 
 func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitArrayLiteral(s)
 
 	default:
@@ -13294,9 +13294,9 @@ func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
+func (p *CadenceParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	localctx = NewArrayLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 166, StrictusParserRULE_arrayLiteral)
+	p.EnterRule(localctx, 166, CadenceParserRULE_arrayLiteral)
 	var _la int
 
 	defer func() {
@@ -13318,13 +13318,13 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(727)
-		p.Match(StrictusParserT__5)
+		p.Match(CadenceParserT__5)
 	}
 	p.SetState(736)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserAmpersand)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(StrictusParserFun-38))|(1<<(StrictusParserTrue-38))|(1<<(StrictusParserFalse-38))|(1<<(StrictusParserNil-38))|(1<<(StrictusParserFrom-38))|(1<<(StrictusParserCreate-38))|(1<<(StrictusParserDestroy-38))|(1<<(StrictusParserIdentifier-38))|(1<<(StrictusParserDecimalLiteral-38))|(1<<(StrictusParserBinaryLiteral-38))|(1<<(StrictusParserOctalLiteral-38))|(1<<(StrictusParserHexadecimalLiteral-38))|(1<<(StrictusParserInvalidNumberLiteral-38))|(1<<(StrictusParserStringLiteral-38)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__2)|(1<<CadenceParserT__5)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(CadenceParserFun-38))|(1<<(CadenceParserTrue-38))|(1<<(CadenceParserFalse-38))|(1<<(CadenceParserNil-38))|(1<<(CadenceParserFrom-38))|(1<<(CadenceParserCreate-38))|(1<<(CadenceParserDestroy-38))|(1<<(CadenceParserIdentifier-38))|(1<<(CadenceParserDecimalLiteral-38))|(1<<(CadenceParserBinaryLiteral-38))|(1<<(CadenceParserOctalLiteral-38))|(1<<(CadenceParserHexadecimalLiteral-38))|(1<<(CadenceParserInvalidNumberLiteral-38))|(1<<(CadenceParserStringLiteral-38)))) != 0) {
 		{
 			p.SetState(728)
 			p.Expression()
@@ -13333,10 +13333,10 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(729)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(730)
@@ -13351,7 +13351,7 @@ func (p *StrictusParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	}
 	{
 		p.SetState(738)
-		p.Match(StrictusParserT__6)
+		p.Match(CadenceParserT__6)
 	}
 
 	return localctx
@@ -13376,7 +13376,7 @@ type DictionaryLiteralContext struct {
 func NewEmptyDictionaryLiteralContext() *DictionaryLiteralContext {
 	var p = new(DictionaryLiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_dictionaryLiteral
+	p.RuleIndex = CadenceParserRULE_dictionaryLiteral
 	return p
 }
 
@@ -13388,7 +13388,7 @@ func NewDictionaryLiteralContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_dictionaryLiteral
+	p.RuleIndex = CadenceParserRULE_dictionaryLiteral
 
 	return p
 }
@@ -13427,20 +13427,20 @@ func (s *DictionaryLiteralContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 func (s *DictionaryLiteralContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDictionaryLiteral(s)
 	}
 }
 
 func (s *DictionaryLiteralContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDictionaryLiteral(s)
 	}
 }
 
 func (s *DictionaryLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDictionaryLiteral(s)
 
 	default:
@@ -13448,9 +13448,9 @@ func (s *DictionaryLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *StrictusParser) DictionaryLiteral() (localctx IDictionaryLiteralContext) {
+func (p *CadenceParser) DictionaryLiteral() (localctx IDictionaryLiteralContext) {
 	localctx = NewDictionaryLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 168, StrictusParserRULE_dictionaryLiteral)
+	p.EnterRule(localctx, 168, CadenceParserRULE_dictionaryLiteral)
 	var _la int
 
 	defer func() {
@@ -13472,13 +13472,13 @@ func (p *StrictusParser) DictionaryLiteral() (localctx IDictionaryLiteralContext
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(740)
-		p.Match(StrictusParserT__2)
+		p.Match(CadenceParserT__2)
 	}
 	p.SetState(749)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<StrictusParserT__2)|(1<<StrictusParserT__5)|(1<<StrictusParserMinus)|(1<<StrictusParserAmpersand)|(1<<StrictusParserNegate)|(1<<StrictusParserMove)|(1<<StrictusParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(StrictusParserFun-38))|(1<<(StrictusParserTrue-38))|(1<<(StrictusParserFalse-38))|(1<<(StrictusParserNil-38))|(1<<(StrictusParserFrom-38))|(1<<(StrictusParserCreate-38))|(1<<(StrictusParserDestroy-38))|(1<<(StrictusParserIdentifier-38))|(1<<(StrictusParserDecimalLiteral-38))|(1<<(StrictusParserBinaryLiteral-38))|(1<<(StrictusParserOctalLiteral-38))|(1<<(StrictusParserHexadecimalLiteral-38))|(1<<(StrictusParserInvalidNumberLiteral-38))|(1<<(StrictusParserStringLiteral-38)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__2)|(1<<CadenceParserT__5)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-38)&-(0x1f+1)) == 0 && ((1<<uint((_la-38)))&((1<<(CadenceParserFun-38))|(1<<(CadenceParserTrue-38))|(1<<(CadenceParserFalse-38))|(1<<(CadenceParserNil-38))|(1<<(CadenceParserFrom-38))|(1<<(CadenceParserCreate-38))|(1<<(CadenceParserDestroy-38))|(1<<(CadenceParserIdentifier-38))|(1<<(CadenceParserDecimalLiteral-38))|(1<<(CadenceParserBinaryLiteral-38))|(1<<(CadenceParserOctalLiteral-38))|(1<<(CadenceParserHexadecimalLiteral-38))|(1<<(CadenceParserInvalidNumberLiteral-38))|(1<<(CadenceParserStringLiteral-38)))) != 0) {
 		{
 			p.SetState(741)
 			p.DictionaryEntry()
@@ -13487,10 +13487,10 @@ func (p *StrictusParser) DictionaryLiteral() (localctx IDictionaryLiteralContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == StrictusParserT__1 {
+		for _la == CadenceParserT__1 {
 			{
 				p.SetState(742)
-				p.Match(StrictusParserT__1)
+				p.Match(CadenceParserT__1)
 			}
 			{
 				p.SetState(743)
@@ -13505,7 +13505,7 @@ func (p *StrictusParser) DictionaryLiteral() (localctx IDictionaryLiteralContext
 	}
 	{
 		p.SetState(751)
-		p.Match(StrictusParserT__3)
+		p.Match(CadenceParserT__3)
 	}
 
 	return localctx
@@ -13544,7 +13544,7 @@ type DictionaryEntryContext struct {
 func NewEmptyDictionaryEntryContext() *DictionaryEntryContext {
 	var p = new(DictionaryEntryContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_dictionaryEntry
+	p.RuleIndex = CadenceParserRULE_dictionaryEntry
 	return p
 }
 
@@ -13556,7 +13556,7 @@ func NewDictionaryEntryContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_dictionaryEntry
+	p.RuleIndex = CadenceParserRULE_dictionaryEntry
 
 	return p
 }
@@ -13603,20 +13603,20 @@ func (s *DictionaryEntryContext) ToStringTree(ruleNames []string, recog antlr.Re
 }
 
 func (s *DictionaryEntryContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterDictionaryEntry(s)
 	}
 }
 
 func (s *DictionaryEntryContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitDictionaryEntry(s)
 	}
 }
 
 func (s *DictionaryEntryContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitDictionaryEntry(s)
 
 	default:
@@ -13624,9 +13624,9 @@ func (s *DictionaryEntryContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *StrictusParser) DictionaryEntry() (localctx IDictionaryEntryContext) {
+func (p *CadenceParser) DictionaryEntry() (localctx IDictionaryEntryContext) {
 	localctx = NewDictionaryEntryContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 170, StrictusParserRULE_dictionaryEntry)
+	p.EnterRule(localctx, 170, CadenceParserRULE_dictionaryEntry)
 
 	defer func() {
 		p.ExitRule()
@@ -13654,7 +13654,7 @@ func (p *StrictusParser) DictionaryEntry() (localctx IDictionaryEntryContext) {
 	}
 	{
 		p.SetState(754)
-		p.Match(StrictusParserT__4)
+		p.Match(CadenceParserT__4)
 	}
 	{
 		p.SetState(755)
@@ -13686,7 +13686,7 @@ type IdentifierContext struct {
 func NewEmptyIdentifierContext() *IdentifierContext {
 	var p = new(IdentifierContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_identifier
+	p.RuleIndex = CadenceParserRULE_identifier
 	return p
 }
 
@@ -13698,7 +13698,7 @@ func NewIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_identifier
+	p.RuleIndex = CadenceParserRULE_identifier
 
 	return p
 }
@@ -13706,19 +13706,19 @@ func NewIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *IdentifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *IdentifierContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(StrictusParserIdentifier, 0)
+	return s.GetToken(CadenceParserIdentifier, 0)
 }
 
 func (s *IdentifierContext) From() antlr.TerminalNode {
-	return s.GetToken(StrictusParserFrom, 0)
+	return s.GetToken(CadenceParserFrom, 0)
 }
 
 func (s *IdentifierContext) Create() antlr.TerminalNode {
-	return s.GetToken(StrictusParserCreate, 0)
+	return s.GetToken(CadenceParserCreate, 0)
 }
 
 func (s *IdentifierContext) Destroy() antlr.TerminalNode {
-	return s.GetToken(StrictusParserDestroy, 0)
+	return s.GetToken(CadenceParserDestroy, 0)
 }
 
 func (s *IdentifierContext) GetRuleContext() antlr.RuleContext {
@@ -13730,20 +13730,20 @@ func (s *IdentifierContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 func (s *IdentifierContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterIdentifier(s)
 	}
 }
 
 func (s *IdentifierContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitIdentifier(s)
 	}
 }
 
 func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitIdentifier(s)
 
 	default:
@@ -13751,9 +13751,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Identifier() (localctx IIdentifierContext) {
+func (p *CadenceParser) Identifier() (localctx IIdentifierContext) {
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 172, StrictusParserRULE_identifier)
+	p.EnterRule(localctx, 172, CadenceParserRULE_identifier)
 	var _la int
 
 	defer func() {
@@ -13777,7 +13777,7 @@ func (p *StrictusParser) Identifier() (localctx IIdentifierContext) {
 		p.SetState(757)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(StrictusParserFrom-57))|(1<<(StrictusParserCreate-57))|(1<<(StrictusParserDestroy-57))|(1<<(StrictusParserIdentifier-57)))) != 0) {
+		if !(((_la-57)&-(0x1f+1)) == 0 && ((1<<uint((_la-57)))&((1<<(CadenceParserFrom-57))|(1<<(CadenceParserCreate-57))|(1<<(CadenceParserDestroy-57))|(1<<(CadenceParserIdentifier-57)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -13807,7 +13807,7 @@ type EosContext struct {
 func NewEmptyEosContext() *EosContext {
 	var p = new(EosContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = StrictusParserRULE_eos
+	p.RuleIndex = CadenceParserRULE_eos
 	return p
 }
 
@@ -13819,7 +13819,7 @@ func NewEosContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoking
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = StrictusParserRULE_eos
+	p.RuleIndex = CadenceParserRULE_eos
 
 	return p
 }
@@ -13827,7 +13827,7 @@ func NewEosContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoking
 func (s *EosContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EosContext) EOF() antlr.TerminalNode {
-	return s.GetToken(StrictusParserEOF, 0)
+	return s.GetToken(CadenceParserEOF, 0)
 }
 
 func (s *EosContext) GetRuleContext() antlr.RuleContext {
@@ -13839,20 +13839,20 @@ func (s *EosContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) st
 }
 
 func (s *EosContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.EnterEos(s)
 	}
 }
 
 func (s *EosContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(StrictusListener); ok {
+	if listenerT, ok := listener.(CadenceListener); ok {
 		listenerT.ExitEos(s)
 	}
 }
 
 func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case StrictusVisitor:
+	case CadenceVisitor:
 		return t.VisitEos(s)
 
 	default:
@@ -13860,9 +13860,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *StrictusParser) Eos() (localctx IEosContext) {
+func (p *CadenceParser) Eos() (localctx IEosContext) {
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 174, StrictusParserRULE_eos)
+	p.EnterRule(localctx, 174, CadenceParserRULE_eos)
 
 	defer func() {
 		p.ExitRule()
@@ -13887,14 +13887,14 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(759)
-			p.Match(StrictusParserT__0)
+			p.Match(CadenceParserT__0)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(760)
-			p.Match(StrictusParserEOF)
+			p.Match(CadenceParserEOF)
 		}
 
 	case 3:
@@ -13918,7 +13918,7 @@ func (p *StrictusParser) Eos() (localctx IEosContext) {
 	return localctx
 }
 
-func (p *StrictusParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
+func (p *CadenceParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
 	switch ruleIndex {
 	case 13:
 		var t *SpecialFunctionDeclarationContext = nil
@@ -14016,7 +14016,7 @@ func (p *StrictusParser) Sempred(localctx antlr.RuleContext, ruleIndex, predInde
 	}
 }
 
-func (p *StrictusParser) SpecialFunctionDeclaration_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) SpecialFunctionDeclaration_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 0:
 		return !localctx.(*SpecialFunctionDeclarationContext).functionBlockRequired || localctx.(*SpecialFunctionDeclarationContext).b != nil
@@ -14026,7 +14026,7 @@ func (p *StrictusParser) SpecialFunctionDeclaration_Sempred(localctx antlr.RuleC
 	}
 }
 
-func (p *StrictusParser) FunctionDeclaration_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) FunctionDeclaration_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 1:
 		return !localctx.(*FunctionDeclarationContext).functionBlockRequired || localctx.(*FunctionDeclarationContext).b != nil
@@ -14036,7 +14036,7 @@ func (p *StrictusParser) FunctionDeclaration_Sempred(localctx antlr.RuleContext,
 	}
 }
 
-func (p *StrictusParser) FullType_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) FullType_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 2:
 		return p.noWhitespace()
@@ -14049,7 +14049,7 @@ func (p *StrictusParser) FullType_Sempred(localctx antlr.RuleContext, predIndex 
 	}
 }
 
-func (p *StrictusParser) ReturnStatement_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) ReturnStatement_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 4:
 		return !p.lineTerminatorAhead()
@@ -14059,7 +14059,7 @@ func (p *StrictusParser) ReturnStatement_Sempred(localctx antlr.RuleContext, pre
 	}
 }
 
-func (p *StrictusParser) OrExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) OrExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 5:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14069,7 +14069,7 @@ func (p *StrictusParser) OrExpression_Sempred(localctx antlr.RuleContext, predIn
 	}
 }
 
-func (p *StrictusParser) AndExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) AndExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 6:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14079,7 +14079,7 @@ func (p *StrictusParser) AndExpression_Sempred(localctx antlr.RuleContext, predI
 	}
 }
 
-func (p *StrictusParser) EqualityExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) EqualityExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 7:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14089,7 +14089,7 @@ func (p *StrictusParser) EqualityExpression_Sempred(localctx antlr.RuleContext, 
 	}
 }
 
-func (p *StrictusParser) RelationalExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) RelationalExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 8:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14099,7 +14099,7 @@ func (p *StrictusParser) RelationalExpression_Sempred(localctx antlr.RuleContext
 	}
 }
 
-func (p *StrictusParser) FailableDowncastingExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) FailableDowncastingExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 9:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14109,7 +14109,7 @@ func (p *StrictusParser) FailableDowncastingExpression_Sempred(localctx antlr.Ru
 	}
 }
 
-func (p *StrictusParser) ConcatenatingExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) ConcatenatingExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 10:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14119,7 +14119,7 @@ func (p *StrictusParser) ConcatenatingExpression_Sempred(localctx antlr.RuleCont
 	}
 }
 
-func (p *StrictusParser) AdditiveExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) AdditiveExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 11:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14129,7 +14129,7 @@ func (p *StrictusParser) AdditiveExpression_Sempred(localctx antlr.RuleContext, 
 	}
 }
 
-func (p *StrictusParser) MultiplicativeExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) MultiplicativeExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 12:
 		return p.Precpred(p.GetParserRuleContext(), 1)
@@ -14139,7 +14139,7 @@ func (p *StrictusParser) MultiplicativeExpression_Sempred(localctx antlr.RuleCon
 	}
 }
 
-func (p *StrictusParser) Eos_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CadenceParser) Eos_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	switch predIndex {
 	case 13:
 		return p.lineTerminatorAhead()

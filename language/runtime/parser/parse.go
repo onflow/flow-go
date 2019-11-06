@@ -57,7 +57,7 @@ func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException,
 func ParseProgram(code string) (program *ast.Program, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.Program()
 		},
 	)
@@ -77,7 +77,7 @@ func ParseProgram(code string) (program *ast.Program, inputIsComplete bool, err 
 func ParseExpression(code string) (expression ast.Expression, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.Expression()
 		},
 	)
@@ -97,7 +97,7 @@ func ParseExpression(code string) (expression ast.Expression, inputIsComplete bo
 func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.ReplInput()
 		},
 	)
@@ -111,16 +111,16 @@ func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, e
 
 func parse(
 	code string,
-	parse func(*StrictusParser) antlr.ParserRuleContext,
+	parse func(*CadenceParser) antlr.ParserRuleContext,
 ) (
 	result ast.Repr,
 	inputIsComplete bool,
 	errors []error,
 ) {
 	input := antlr.NewInputStream(code)
-	lexer := NewStrictusLexer(input)
+	lexer := NewCadenceLexer(input)
 	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
+	parser := NewCadenceParser(stream)
 	// diagnostics, for debugging only:
 	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 	listener := new(errorListener)

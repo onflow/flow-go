@@ -8,7 +8,7 @@ import "strings"
 // due to a programming error in the runtime.
 //
 // NOTE: this error is not used for errors because of bugs in a user-provided program.
-// For program errors, see execution/strictus/interpreter/errors.go
+// For program errors, see interpreter/errors.go
 //
 type UnreachableError struct{}
 
