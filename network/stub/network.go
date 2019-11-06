@@ -100,6 +100,13 @@ func (mn *Network) FlushAllExcept(shouldBlock func(*PendingMessage) bool) {
 		if shouldBlock(m) {
 			return nil
 		}
+
+		// m.TargetIDs might be empty, which means the message is supposed to be broadcasted to
+		// every single node.
+		// In this case, the flush would need to go through multiple rounds until there is no
+		// pending message left in the buffer after each round.
+		// TODO: check if the message is to broadcast to all, and if is, then trigger another
+		// round of flushing.
 		return mn.sendToAllTargets(m)
 	})
 }

@@ -14,6 +14,22 @@ type PendingMessage struct {
 	TargetIDs []string
 }
 
+// IsOneToAll returns whether a pending message is supposed to be sent to all other nodes
+// in the network
+func (p *PendingMessage) IsOneToAll() bool {
+	return len(p.TargetIDs) == 0
+}
+
+// IsOneToOne returns whether a pending message is supposed to be sent to another
+func (p *PendingMessage) IsOneToOne() bool {
+	return len(p.TargetIDs) == 1
+}
+
+// IsOneToMany returns whether a pending message is supposed to be sent to multiple nodes
+func (p *PendingMessage) IsOneToMany() bool {
+	return len(p.TargetIDs) > 1
+}
+
 // Buffer buffers all the pending messages to be sent over the mock network from one node to a list of nodes
 type Buffer struct {
 	sync.Mutex
@@ -39,19 +55,12 @@ func (b *Buffer) Save(from string, engineID uint8, event interface{}, targetIDs 
 	})
 }
 
-// Flush recursively delivers the pending messages until the buffer is empty
+// Flush delivers the pending messages in the buffer
 func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
-	for {
-		toSend := b.takeAll()
+	toSend := b.takeAll()
 
-		// This check is necessary to exit the endless forloop
-		if len(toSend) == 0 {
-			return
-		}
-
-		for _, msg := range toSend {
-			sendOne(msg)
-		}
+	for _, msg := range toSend {
+		sendOne(msg)
 	}
 }
 
