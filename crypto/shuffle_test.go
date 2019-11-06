@@ -8,8 +8,8 @@ import (
 func TestFisherYatesShuffle(t *testing.T) {
 	listSize := 1000
 	subsetSize := 20
-	seed, _ := SeedPrep([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-	shuffledlist := FisherYatesShuffle2(listSize, subsetSize, seed)
+	seed := []uint64{1, 2, 3, 4, 5, 6}
+	shuffledlist := FisherYatesShuffle(listSize, subsetSize, seed)
 	if len(shuffledlist) != subsetSize {
 		t.Error(fmt.Sprintf("FisherYates returned a list with a wrong size"))
 	}
