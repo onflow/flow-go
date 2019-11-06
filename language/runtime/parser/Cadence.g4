@@ -1,4 +1,4 @@
-grammar Strictus;
+grammar Cadence;
 
 // for handling optional semicolons between statement, see also `eos` rule
 
@@ -14,7 +14,7 @@ grammar Strictus;
     // token stream a token exists on the Hidden channel which
     // either is a line terminator, or is a multi line comment that
     // contains a line terminator.
-    func (p *StrictusParser) lineTerminatorAhead() bool {
+    func (p *CadenceParser) lineTerminatorAhead() bool {
         // Get the token ahead of the current index.
         possibleIndexEosToken := p.GetCurrentToken().GetTokenIndex() - 1
         ahead := p.GetTokenStream().Get(possibleIndexEosToken)
@@ -24,12 +24,12 @@ grammar Strictus;
             return true
         }
 
-        if ahead.GetTokenType() == StrictusParserTerminator {
+        if ahead.GetTokenType() == CadenceParserTerminator {
             // There is definitely a line terminator ahead.
             return true
         }
 
-        if ahead.GetTokenType() == StrictusParserWS {
+        if ahead.GetTokenType() == CadenceParserWS {
             // Get the token ahead of the current whitespaces.
             possibleIndexEosToken = p.GetCurrentToken().GetTokenIndex() - 2
             ahead = p.GetTokenStream().Get(possibleIndexEosToken)
@@ -40,13 +40,13 @@ grammar Strictus;
         _type := ahead.GetTokenType()
 
         // Check if the token is, or contains a line terminator.
-        return (_type == StrictusParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
-            (_type == StrictusParserTerminator)
+        return (_type == CadenceParserBlockComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
+            (_type == CadenceParserTerminator)
     }
 
-    func (p *StrictusParser) noWhitespace() bool {
+    func (p *CadenceParser) noWhitespace() bool {
     	index := p.GetCurrentToken().GetTokenIndex()
-    	return p.GetTokenStream().Get(index-1).GetTokenType() != StrictusParserWS
+    	return p.GetTokenStream().Get(index-1).GetTokenType() != CadenceParserWS
     }
 }
 

@@ -1,4 +1,4 @@
-// Code generated from parser/Strictus.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from parser/Cadence.g4 by ANTLR 4.7.2. DO NOT EDIT.
 
 package parser
 
@@ -298,7 +298,7 @@ var lexerRuleNames = []string{
 	"LineComment",
 }
 
-type StrictusLexer struct {
+type CadenceLexer struct {
 	*antlr.BaseLexer
 	channelNames []string
 	modeNames    []string
@@ -313,9 +313,9 @@ func init() {
 	}
 }
 
-func NewStrictusLexer(input antlr.CharStream) *StrictusLexer {
+func NewCadenceLexer(input antlr.CharStream) *CadenceLexer {
 
-	l := new(StrictusLexer)
+	l := new(CadenceLexer)
 
 	l.BaseLexer = antlr.NewBaseLexer(input)
 	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA, antlr.NewPredictionContextCache())
@@ -325,82 +325,82 @@ func NewStrictusLexer(input antlr.CharStream) *StrictusLexer {
 	l.RuleNames = lexerRuleNames
 	l.LiteralNames = lexerLiteralNames
 	l.SymbolicNames = lexerSymbolicNames
-	l.GrammarFileName = "Strictus.g4"
+	l.GrammarFileName = "Cadence.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
 	return l
 }
 
-// StrictusLexer tokens.
+// CadenceLexer tokens.
 const (
-	StrictusLexerT__0                 = 1
-	StrictusLexerT__1                 = 2
-	StrictusLexerT__2                 = 3
-	StrictusLexerT__3                 = 4
-	StrictusLexerT__4                 = 5
-	StrictusLexerT__5                 = 6
-	StrictusLexerT__6                 = 7
-	StrictusLexerT__7                 = 8
-	StrictusLexerT__8                 = 9
-	StrictusLexerT__9                 = 10
-	StrictusLexerT__10                = 11
-	StrictusLexerT__11                = 12
-	StrictusLexerEqual                = 13
-	StrictusLexerUnequal              = 14
-	StrictusLexerLess                 = 15
-	StrictusLexerGreater              = 16
-	StrictusLexerLessEqual            = 17
-	StrictusLexerGreaterEqual         = 18
-	StrictusLexerPlus                 = 19
-	StrictusLexerMinus                = 20
-	StrictusLexerMul                  = 21
-	StrictusLexerDiv                  = 22
-	StrictusLexerMod                  = 23
-	StrictusLexerAmpersand            = 24
-	StrictusLexerNegate               = 25
-	StrictusLexerMove                 = 26
-	StrictusLexerOptional             = 27
-	StrictusLexerNilCoalescing        = 28
-	StrictusLexerDowncasting          = 29
-	StrictusLexerFailableDowncasting  = 30
-	StrictusLexerOpenParen            = 31
-	StrictusLexerCloseParen           = 32
-	StrictusLexerTransaction          = 33
-	StrictusLexerStruct               = 34
-	StrictusLexerResource             = 35
-	StrictusLexerContract             = 36
-	StrictusLexerInterface            = 37
-	StrictusLexerFun                  = 38
-	StrictusLexerEvent                = 39
-	StrictusLexerEmit                 = 40
-	StrictusLexerPre                  = 41
-	StrictusLexerPost                 = 42
-	StrictusLexerPub                  = 43
-	StrictusLexerPubSet               = 44
-	StrictusLexerReturn               = 45
-	StrictusLexerBreak                = 46
-	StrictusLexerContinue             = 47
-	StrictusLexerLet                  = 48
-	StrictusLexerVar                  = 49
-	StrictusLexerIf                   = 50
-	StrictusLexerElse                 = 51
-	StrictusLexerWhile                = 52
-	StrictusLexerTrue                 = 53
-	StrictusLexerFalse                = 54
-	StrictusLexerNil                  = 55
-	StrictusLexerImport               = 56
-	StrictusLexerFrom                 = 57
-	StrictusLexerCreate               = 58
-	StrictusLexerDestroy              = 59
-	StrictusLexerIdentifier           = 60
-	StrictusLexerDecimalLiteral       = 61
-	StrictusLexerBinaryLiteral        = 62
-	StrictusLexerOctalLiteral         = 63
-	StrictusLexerHexadecimalLiteral   = 64
-	StrictusLexerInvalidNumberLiteral = 65
-	StrictusLexerStringLiteral        = 66
-	StrictusLexerWS                   = 67
-	StrictusLexerTerminator           = 68
-	StrictusLexerBlockComment         = 69
-	StrictusLexerLineComment          = 70
+	CadenceLexerT__0                 = 1
+	CadenceLexerT__1                 = 2
+	CadenceLexerT__2                 = 3
+	CadenceLexerT__3                 = 4
+	CadenceLexerT__4                 = 5
+	CadenceLexerT__5                 = 6
+	CadenceLexerT__6                 = 7
+	CadenceLexerT__7                 = 8
+	CadenceLexerT__8                 = 9
+	CadenceLexerT__9                 = 10
+	CadenceLexerT__10                = 11
+	CadenceLexerT__11                = 12
+	CadenceLexerEqual                = 13
+	CadenceLexerUnequal              = 14
+	CadenceLexerLess                 = 15
+	CadenceLexerGreater              = 16
+	CadenceLexerLessEqual            = 17
+	CadenceLexerGreaterEqual         = 18
+	CadenceLexerPlus                 = 19
+	CadenceLexerMinus                = 20
+	CadenceLexerMul                  = 21
+	CadenceLexerDiv                  = 22
+	CadenceLexerMod                  = 23
+	CadenceLexerAmpersand            = 24
+	CadenceLexerNegate               = 25
+	CadenceLexerMove                 = 26
+	CadenceLexerOptional             = 27
+	CadenceLexerNilCoalescing        = 28
+	CadenceLexerDowncasting          = 29
+	CadenceLexerFailableDowncasting  = 30
+	CadenceLexerOpenParen            = 31
+	CadenceLexerCloseParen           = 32
+	CadenceLexerTransaction          = 33
+	CadenceLexerStruct               = 34
+	CadenceLexerResource             = 35
+	CadenceLexerContract             = 36
+	CadenceLexerInterface            = 37
+	CadenceLexerFun                  = 38
+	CadenceLexerEvent                = 39
+	CadenceLexerEmit                 = 40
+	CadenceLexerPre                  = 41
+	CadenceLexerPost                 = 42
+	CadenceLexerPub                  = 43
+	CadenceLexerPubSet               = 44
+	CadenceLexerReturn               = 45
+	CadenceLexerBreak                = 46
+	CadenceLexerContinue             = 47
+	CadenceLexerLet                  = 48
+	CadenceLexerVar                  = 49
+	CadenceLexerIf                   = 50
+	CadenceLexerElse                 = 51
+	CadenceLexerWhile                = 52
+	CadenceLexerTrue                 = 53
+	CadenceLexerFalse                = 54
+	CadenceLexerNil                  = 55
+	CadenceLexerImport               = 56
+	CadenceLexerFrom                 = 57
+	CadenceLexerCreate               = 58
+	CadenceLexerDestroy              = 59
+	CadenceLexerIdentifier           = 60
+	CadenceLexerDecimalLiteral       = 61
+	CadenceLexerBinaryLiteral        = 62
+	CadenceLexerOctalLiteral         = 63
+	CadenceLexerHexadecimalLiteral   = 64
+	CadenceLexerInvalidNumberLiteral = 65
+	CadenceLexerStringLiteral        = 66
+	CadenceLexerWS                   = 67
+	CadenceLexerTerminator           = 68
+	CadenceLexerBlockComment         = 69
+	CadenceLexerLineComment          = 70
 )
