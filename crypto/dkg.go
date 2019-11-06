@@ -33,7 +33,8 @@ type DKGstate interface {
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ReceiveDKGMsg processes a new DKG message received by the current node
-	ReceiveDKGMsg(int, DKGmsg) *DKGoutput
+	// orig is the message origin index
+	ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput
 	// Running returns the running state of the DKG protocol
 	Running() bool
 }

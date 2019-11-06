@@ -82,7 +82,6 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 		return nil, nil, nil,
 			cryptoError{"two timeouts should be set before ending dkg"}
 	}
-	//fmt.Println(s.currentIndex, len(s.complaints), s.disqualified)
 	s.running = false
 	// check if a complaint has remained without an answer
 	// a leader is disqualified if a complaint was never answered
@@ -94,7 +93,6 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 			}
 		}
 	}
-	//fmt.Println(s.currentIndex, len(s.complaints), s.disqualified)
 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid

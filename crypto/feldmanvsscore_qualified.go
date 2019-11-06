@@ -84,6 +84,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) (DKGresult
 			received:       true,
 			answerReceived: false,
 		}
+		log.Error("complaint (share)")
 		return valid, []DKGToSend{toSend}
 	}
 	return valid, nil
@@ -108,7 +109,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKG
 	}
 
 	// temporary log
-	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
+	log.Infof("%d Receiving vector from %d\n", s.currentIndex, origin)
 	log.Debugf("the vector is %d\n", data)
 
 	// read the verification vector
@@ -144,6 +145,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) (DKG
 			received:       true,
 			answerReceived: false,
 		}
+		log.Error("complaint (vector)")
 		return valid, []DKGToSend{toSend}
 	}
 	return valid, nil
@@ -195,6 +197,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) (DKGre
 				data:      data,
 			}
 			s.complaints[origin].answerReceived = true
+			log.Error("answer complaint")
 			return valid, []DKGToSend{toSend}
 		}
 		return valid, nil
@@ -222,6 +225,9 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 
 	// first byte encodes the complainee
 	complainer := index(data[0])
+	if int(complainer) >= s.size {
+		return invalid
+	}
 
 	c, ok := s.complaints[complainer]
 	// if the complaint is new, add it

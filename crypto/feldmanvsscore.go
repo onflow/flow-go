@@ -134,7 +134,7 @@ func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
-	/*if x == 2 || x == 3 {
+	/*if x == 2 {
 		dest[2] = 255
 	}*/
 }

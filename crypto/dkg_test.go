@@ -28,8 +28,8 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 	log.Infof("%d Sending to %d:\n", orig, dest)
 	log.Debug(msg)
 	/*msgBytes, _ := msg.(DKGmsg)
-	if orig == 0 && (dest == 1 || dest == 2 || dest == 3) {
-		msgBytes[4] = 255
+	if orig < 2 && (dest < 4) {
+		msgBytes[8] = 255
 	}*/
 	newMsg := &toProcess{orig, msgType, msg}
 	chans[dest] <- newMsg
@@ -38,7 +38,7 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 // This is a testing function
 // it simulates broadcasting a message from one node to all nodes
 func broadcast(orig int, msgType int, msg interface{}, chans []chan *toProcess) {
-	log.Infof("%d Broadcasting:", orig)
+	log.Debugf("%d Broadcasting:", orig)
 	log.Debug(msg)
 	newMsg := &toProcess{orig, msgType, msg}
 	for i := 0; i < len(chans); i++ {
@@ -89,9 +89,6 @@ func dkgRunChan(current int, dkg []DKGstate, chans []chan *toProcess,
 // It processes the output of a the DKG library
 func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 	chans []chan *toProcess, t *testing.T) {
-	if out == nil {
-		fmt.Println("AAAAH")
-	}
 	assert.Nil(t, out.err, "DKG output error")
 	assert.Equal(t, out.result, valid, "Result computed by %d is not correct", current)
 
@@ -105,7 +102,7 @@ func (out *DKGoutput) processDkgOutput(current int, dkg []DKGstate,
 }
 
 //-----------------------------------------------------------------------------
-// Testing Feldman VSS with the qualified system by simulating a network of n nodes
+// Testing Feldman VSS with the qualification system by simulating a network of n nodes
 func TestFeldmanVSSQual(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS with complaints starts")
@@ -167,7 +164,7 @@ func TestFeldmanVSSQual(t *testing.T) {
 			} else {
 				groupPKBytes, _ = groupPK.Encode()
 			}
-			//fmt.Println("PK", groupPKBytes)
+			fmt.Println("PK", groupPKBytes)
 		} else {
 			tempPK = <-pkChan
 			if tempPK == nil {
@@ -228,7 +225,7 @@ func TestFeldmanVSSSimple(t *testing.T) {
 			} else {
 				groupPKBytes, _ = groupPK.Encode()
 			}
-			//fmt.Println("PK", groupPKBytes)
+			fmt.Println("PK", groupPKBytes)
 		} else {
 			tempPK = <-pkChan
 			if tempPK == nil {
@@ -266,7 +263,7 @@ func TestJointFeldman(t *testing.T) {
 	}
 	// create the node channels
 	for i := 0; i < n; i++ {
-		chans[i] = make(chan *toProcess, 10)
+		chans[i] = make(chan *toProcess, 5*n)
 		go dkgRunChan(i, dkg, chans, pkChan, sync, t, 0)
 	}
 	// start DKG in all nodes
@@ -275,7 +272,6 @@ func TestJointFeldman(t *testing.T) {
 		out := dkg[current].StartDKG(seed)
 		out.processDkgOutput(current, dkg, chans, t)
 	}
-
 	// sync the first timeout at all nodes and start the second phase
 	for i := 0; i < n; i++ {
 		<-sync
@@ -304,7 +300,7 @@ func TestJointFeldman(t *testing.T) {
 			} else {
 				groupPKBytes, _ = groupPK.Encode()
 			}
-			//fmt.Println("PK", groupPKBytes)
+			fmt.Println("PK", groupPKBytes)
 		} else {
 			tempPK = <-pkChan
 			if tempPK == nil {

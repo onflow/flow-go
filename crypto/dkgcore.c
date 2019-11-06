@@ -139,4 +139,9 @@ int verifyshare(const bn_st* x, const ep2_st* y) {
     return (ep2_cmp(&res, (ep2_st*)y) == RLC_EQ);
 }
 
+void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
 
+}
+void sumPointG2Vector(ep2_st* jointx, ep2_st* x, int len){
+    
+}
