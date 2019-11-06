@@ -241,7 +241,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
 					ExpectedOperation: ast.TransferOperationMove,
-					Pos:               transfer.Pos,
+					Range:             ast.NewRangeFromPositioned(transfer),
 				},
 			)
 		}
@@ -251,7 +251,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
 					ExpectedOperation: ast.TransferOperationCopy,
-					Pos:               transfer.Pos,
+					Range:             ast.NewRangeFromPositioned(transfer),
 				},
 			)
 		}

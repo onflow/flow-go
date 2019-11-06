@@ -475,7 +475,8 @@ func (e *MissingInitializerError) StartPosition() ast.Position {
 }
 
 func (e *MissingInitializerError) EndPosition() ast.Position {
-	return e.FirstFieldPos
+	length := len(e.FirstFieldName)
+	return e.FirstFieldPos.Shifted(length - 1)
 }
 
 // NotDeclaredMemberError
@@ -963,7 +964,7 @@ func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
 type IncorrectTransferOperationError struct {
 	ActualOperation   ast.TransferOperation
 	ExpectedOperation ast.TransferOperation
-	Pos               ast.Position
+	ast.Range
 }
 
 func (e *IncorrectTransferOperationError) Error() string {
@@ -974,14 +975,6 @@ func (e *IncorrectTransferOperationError) Error() string {
 }
 
 func (*IncorrectTransferOperationError) isSemanticError() {}
-
-func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
-	return e.Pos
-}
 
 // InvalidConstructionError
 
