@@ -24,15 +24,3 @@ func (er *ExecutionReceipt) Encode() []byte {
 	}
 	return b.Bytes()
 }
-
-// CanonicalEncoding returns the encoded canonical execution receipt as bytes.
-func (er *ExecutionReceipt) CanonicalEncoding() []byte {
-	// TODO (Ramtin) add more fields here
-	return nil
-}
-
-// Hash generates hash of the execution receipt
-func (er *ExecutionReceipt) Hash() crypto.Hash {
-	// TODO
-	return []byte("ExecutionReceiptHash")
-}
