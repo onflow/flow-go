@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func readFile(path string) []byte {
+func ReadFile(path string) []byte {
 	contents, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
@@ -19,13 +19,39 @@ func readFile(path string) []byte {
 }
 
 // Returns a nonce value that is guaranteed to be unique.
-var getNonce = func() func() uint64 {
+var GetNonce = func() func() uint64 {
 	var nonce uint64
 	return func() uint64 {
 		nonce++
 		return nonce
 	}
 }()
+
+// func getAddressFromEvent(event flow.Event) flow.Address {
+// 	addressI := event.Values["address"].([]interface{})
+// 	addressBytes := make([]byte, len(addressI))
+// 	for i, addressByte := range addressI {
+// 		addressBytes[i] = byte(addressByte.(float64))
+// 	}
+// 	return flow.BytesToAddress(addressBytes)
+// }
+
+// func waitForSeal(ctx context.Context, c *client.Client, hash crypto.Hash) *flow.Transaction {
+// 	txResp, err := c.GetTransaction(ctx, hash)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	for txResp.Status != flow.TransactionSealed {
+// 		time.Sleep(time.Second)
+// 		fmt.Print(".")
+// 		txResp, err = c.GetTransaction(ctx, hash)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 	}
+// 	fmt.Println()
+// 	return txResp
+// }
 
 // Returns a emulator object for testing
 func newEmulator() *emulator.EmulatedBlockchain {
@@ -38,7 +64,7 @@ func newEmulator() *emulator.EmulatedBlockchain {
 // Then submits the transaction to the emulator
 // shouldRevert parameter indicates whether the transaction should fail or not
 // This function asserts the correct result and commits the block if it passed
-func signAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testing.T, shouldRevert bool) {
+func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testing.T, shouldRevert bool) {
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.Nil(t, err)
