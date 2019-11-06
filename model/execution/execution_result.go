@@ -1,11 +1,9 @@
 package execution
 
 import (
-	"bytes"
-	"encoding/gob"
-
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 type ExecutionResult struct {
@@ -16,31 +14,32 @@ type ExecutionResult struct {
 	Signatures                  []crypto.Signature
 }
 
-// Encode implements the crypto.Encoder interface.
-func (er *ExecutionResult) Encode() []byte {
-	var b bytes.Buffer
-	e := gob.NewEncoder(&b)
-	if err := e.Encode(er); err != nil {
-		panic(err)
-	}
-	return b.Bytes()
-}
-
-// CanonicalEncoding returns the encoded canonical execution receipt as bytes.
-func (er *ExecutionResult) CanonicalEncoding() []byte {
-	var items []interface{}
-	items = append(items, er.PreviousExecutionResultHash)
-	items = append(items, er.BlockHash)
-	items = append(items, er.FinalStateCommitment)
-	for _, chunk := range er.Chunks {
-		items = append(items, chunk.Hash())
-	}
-	b, _ := rlp.EncodeToBytes(items)
-	return b
-}
-
-// Hash computes the hash over the necessary transaction data.
+// Hash returns the canonical hash of this execution result.
 func (er *ExecutionResult) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	return hasher.ComputeHash(er.CanonicalEncoding())
+	return hash.DefaultHasher.ComputeHash(er.Encode())
+}
+
+// Encode returns the canonical encoding of this execution result.
+func (er *ExecutionResult) Encode() []byte {
+	w := WrapExecutionResult(*er)
+	return encoding.DefaultEncoder.MustEncode(&w)
+}
+
+type ExecutionResultWrapper struct {
+	PreviousExecutionResultHash crypto.Hash
+	BlockHash                   crypto.Hash
+	FinalStateCommitment        StateCommitment
+	Chunks                      []chunkWrapper
+}
+
+func WrapExecutionResult(er ExecutionResult) ExecutionResultWrapper {
+	chunks := make([]chunkWrapper, len(er.Chunks))
+	for i, ck := range er.Chunks {
+		chunks[i] = WrapChunk(ck)
+	}
+	return ExecutionResultWrapper{
+		PreviousExecutionResultHash: er.PreviousExecutionResultHash,
+		BlockHash:                   er.BlockHash,
+		FinalStateCommitment:        er.FinalStateCommitment,
+		Chunks:                      chunks}
 }

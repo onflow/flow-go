@@ -40,18 +40,17 @@ func FisherYatesShuffle(seed []uint64, subset int, items []exec.Chunk) []exec.Ch
 	for i := 0; i < subset; i++ {
 		// choose index uniformly in [i, N-1]
 		r := i + rand.IntN(N-i)
-		items[r], items[i] = items[i], items[r]
+		selectedchunks[r], selectedchunks[i] = selectedchunks[i], selectedchunks[r]
 	}
-	// seed is the proof
-	return items[:subset]
-
+	return selectedchunks[:subset]
 }
 
 // ChunkSelfSelect provides a way to select a subset of chunks based on verifier's key
 func ChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, sk crypto.PrivateKey) (selectedchunks []exec.Chunk, proof []byte, err error) {
 	// hasher Hasher
 	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	proof, err = sk.Sign(er.Hash(), hasher)
+	temp := er.Hash()
+	proof, err = sk.Sign(temp, hasher)
 	if err != nil {
 		return nil, nil, errors.New("failed to load hasher")
 	}
@@ -68,7 +67,8 @@ func VerifyChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, pk crypt
 	if err != nil {
 		return false, errors.New("failed to load hasher")
 	}
-	result, err := pk.Verify(proof, er.Hash(), hasher)
+	temp := er.Hash()
+	result, err := pk.Verify(proof, temp, hasher)
 	if !result {
 		return false, nil
 	}

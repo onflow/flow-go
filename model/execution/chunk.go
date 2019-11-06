@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // Chunk is a collection of transactions, we assume Tx content correctness and orders in block has been verfied by Chunk builder
@@ -33,23 +34,32 @@ func (c *Chunk) String() string {
 	}
 }
 
-// CanonicalEncoding returns the encoded canonical chunk as bytes.
-func (c *Chunk) CanonicalEncoding() []byte {
-	var items []interface{}
-	items = append(items, c.TotalGasSpent)
-	items = append(items, c.StartState)
-	if c.FirstTxInTheNextChunk != nil {
-		items = append(items, c.FirstTxInTheNextChunk.Hash())
-	}
-	for _, tx := range c.Transactions {
-		items = append(items, tx.Hash())
-	}
-	b, _ := rlp.EncodeToBytes(items)
-	return b
+// Hash returns the canonical hash of this chunk.
+func (c *Chunk) Hash() crypto.Hash {
+	return hash.DefaultHasher.ComputeHash(c.Encode())
 }
 
-// Hash generates hash for the given chunk
-func (c *Chunk) Hash() crypto.Hash {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	return hasher.ComputeHash(c.CanonicalEncoding())
+// Encode returns the canonical encoding of this chunk.
+func (c *Chunk) Encode() []byte {
+	w := WrapChunk(*c)
+	return encoding.DefaultEncoder.MustEncode(&w)
+}
+
+type chunkWrapper struct {
+	Transactions    []flow.TransactionWrapper
+	TotalGasSpent   uint64
+	StartState      StateCommitment
+	FirstTxGasSpent uint64 // T0
+}
+
+func WrapChunk(c Chunk) chunkWrapper {
+	transactions := make([]flow.TransactionWrapper, len(c.Transactions))
+	for i, tx := range c.Transactions {
+		transactions[i] = flow.WrapTransaction(tx)
+	}
+	return chunkWrapper{
+		Transactions:    transactions,
+		TotalGasSpent:   c.TotalGasSpent,
+		StartState:      c.StartState,
+		FirstTxGasSpent: c.FirstTxGasSpent}
 }
