@@ -23,7 +23,7 @@ type Chunk struct {
 func (c *Chunk) String() string {
 	switch len(c.Transactions) {
 	case 0:
-		return fmt.Sprintf("An empty chunk")
+		return "An empty chunk"
 	case 1:
 		return fmt.Sprintf("Chunk %v includes a transaction (TotalGasSpent: %v):\n %v",
 			c.Hash(), c.TotalGasSpent, c.Transactions[0].Hash())
