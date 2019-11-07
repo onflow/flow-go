@@ -3043,24 +3043,17 @@ func TestInterpretNonOptionalNilComparison(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       let x: Int = 1
       let y = x == nil
+      let z = nil == x
    `)
 
 	assert.Equal(t,
 		interpreter.BoolValue(false),
 		inter.Globals["y"].Value,
 	)
-}
-
-func TestInterpretNonOptionalNilComparisonSwapped(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: Int = 1
-      let y = nil == x
-   `)
 
 	assert.Equal(t,
 		interpreter.BoolValue(false),
-		inter.Globals["y"].Value,
+		inter.Globals["z"].Value,
 	)
 }
 

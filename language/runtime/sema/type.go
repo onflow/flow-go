@@ -1585,9 +1585,22 @@ func IsConcatenatableType(ty Type) bool {
 }
 
 func IsEquatableType(ty Type) bool {
-	return IsSubType(ty, &StringType{}) ||
+
+	// TODO: add support for arrays and dictionaries
+	// TODO: add support for composites that are equatable
+
+	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntType{})
+		IsSubType(ty, &IntType{}) {
+
+		return true
+	}
+
+	if optionalType, ok := ty.(*OptionalType); ok {
+		return IsEquatableType(optionalType.Type)
+	}
+
+	return false
 }
 
 // UnwrapOptionalType returns the type if it is not an optional type,
@@ -1603,45 +1616,40 @@ func UnwrapOptionalType(ty Type) Type {
 	}
 }
 
-func AreCompatibleEqualityTypes(leftType, rightType Type) bool {
-	unwrappedLeft := UnwrapOptionalType(leftType)
-	unwrappedRight := UnwrapOptionalType(rightType)
+func AreCompatibleEquatableTypes(leftType, rightType Type) bool {
+	unwrappedLeftType := UnwrapOptionalType(leftType)
+	unwrappedRightType := UnwrapOptionalType(rightType)
 
-	if unwrappedLeft.Equal(unwrappedRight) {
+	leftIsEquatable := IsEquatableType(unwrappedLeftType)
+	rightIsEquatable := IsEquatableType(unwrappedRightType)
+
+	if unwrappedLeftType.Equal(unwrappedRightType) &&
+		leftIsEquatable && rightIsEquatable {
+
 		return true
 	}
 
-	if _, ok := unwrappedLeft.(*NeverType); ok {
-		return true
-	}
+	// The types are equatable if this is a comparison with `nil`,
+	// which has type `Never?`
 
-	if _, ok := unwrappedRight.(*NeverType); ok {
+	if IsNilType(leftType) || IsNilType(rightType) {
 		return true
 	}
 
 	return false
 }
 
-func IsValidEqualityType(ty Type) bool {
-	if IsSubType(ty, &BoolType{}) {
-		return true
+// IsNilType returns true if the given type is the type of `nil`, i.e. `Never?`.
+//
+func IsNilType(ty Type) bool {
+	optionalType, ok := ty.(*OptionalType)
+	if !ok {
+		return false
 	}
 
-	if IsSubType(ty, &IntegerType{}) {
-		return true
+	if _, ok := optionalType.Type.(*NeverType); !ok {
+		return false
 	}
 
-	if IsSubType(ty, &StringType{}) {
-		return true
-	}
-
-	if IsSubType(ty, &CharacterType{}) {
-		return true
-	}
-
-	if _, ok := ty.(*OptionalType); ok {
-		return true
-	}
-
-	return false
+	return true
 }

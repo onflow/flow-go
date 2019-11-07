@@ -1200,6 +1200,8 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	left = interpreter.unbox(left)
 	right = interpreter.unbox(right)
 
+	// TODO: add support for arrays and dictionaries
+
 	switch left := left.(type) {
 	case IntegerValue:
 		// NOTE: might be NilValue
@@ -1225,8 +1227,8 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 		return left.Equal(right)
 
 	case CompositeValue:
-		_, ok := right.(NilValue)
-		return BoolValue(!ok)
+		// TODO: call `equals` if RHS is composite
+		return false
 	}
 
 	panic(&errors.UnreachableError{})
