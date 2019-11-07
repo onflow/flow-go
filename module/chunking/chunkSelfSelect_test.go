@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-
 func TestSeedPrep(t *testing.T) {
 	seed, _ := SeedPrep([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	if seed[0] != uint64(72623859790382856) || seed[1] != uint64(651345242494996240) {
@@ -22,9 +21,19 @@ func TestSeedPrep(t *testing.T) {
 
 func TestChunkSelectAndVerify(t *testing.T) {
 	var ChunkTotalGasSpent = []uint64{100, 200, 100, 200, 100, 200}
-	var chunks []exec.Chunk
+	chunks := make([]exec.Chunk, len(ChunkTotalGasSpent))
 	for i, totalGas := range ChunkTotalGasSpent {
-		chunks = append(chunks, exec.Chunk{Transactions: []flow.Transaction{flow.Transaction{Script: []byte("script"), ReferenceBlockHash: []byte("blockhash"), Nonce: uint64(i), ComputeLimit: uint64(1000)}}, TotalGasSpent: totalGas})
+		tx := flow.Transaction{
+			Script:             []byte("script"),
+			ReferenceBlockHash: []byte("blockhash"),
+			Nonce:              uint64(i),
+			ComputeLimit:       uint64(1000),
+		}
+		chunk := exec.Chunk{
+			Transactions:  []flow.Transaction{tx},
+			TotalGasSpent: totalGas,
+		}
+		chunks[i] = chunk
 	}
 	ratio := 0.5
 	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, []byte{1, 2, 3, 4})
