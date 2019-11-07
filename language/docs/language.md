@@ -108,8 +108,8 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared, it cannot be redeclared
-or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
+The names of the variable or constant declarations in each scope must be unique. 
+Declaring another variable or constant with a name that is already declared in the current scope is invalid, regardless of kind or type.
 
 ```cadence
 // Declare a constant named `a`.
