@@ -1,6 +1,7 @@
 package sctest
 
 import (
+	"crypto/rand"
 	"io/ioutil"
 	"testing"
 
@@ -26,6 +27,18 @@ var GetNonce = func() func() uint64 {
 		return nonce
 	}
 }()
+
+func randomKey() flow.AccountPrivateKey {
+	seed := make([]byte, 40)
+	rand.Read(seed)
+
+	privateKey, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256, seed)
+	if err != nil {
+		panic(err)
+	}
+
+	return privateKey
+}
 
 // func getAddressFromEvent(event flow.Event) flow.Address {
 // 	addressI := event.Values["address"].([]interface{})

@@ -21,11 +21,11 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 
 			var collection: <-NFTCollection <- createCollection(token: <-tokenA)
 
-			//collection.deposit(token: <-tokenB, id: 2)
+			// collection.deposit(token: <-tokenB, id: 2)
 
-			if collection.idExists(tokenID: 1) == false {
-				panic("Token ID doesn't exist!")
-			}
+			// if collection.idExists(tokenID: 1) == false {
+			// 	panic("Token ID doesn't exist!")
+			// }
 
 			var collectionA: <-NFTCollection? <- collection
 			

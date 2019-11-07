@@ -28,12 +28,12 @@ resource interface INFTCollection {
     // variable size array of NFT conforming tokens
     pub var ownedNFTs: <-{Int: NFT}
 
-    // pub fun transfer(recipient: &NFTCollection, tokenID: Int) {
-    //     pre {
-    //         self.ownedNFTs[tokenID] != nil:
-    //             "Token ID to transfer does not exist!"
-    //     }
-    // }
+    pub fun transfer(recipient: &NFTCollection, tokenID: Int) {
+        pre {
+            self.ownedNFTs[tokenID] != nil:
+                "Token ID to transfer does not exist!"
+        }
+    }
 
     pub fun deposit(token: <-NFT?, id: Int): Void {
         pre {
@@ -64,6 +64,18 @@ resource NFTCollection: INFTCollection {
         self.ownedNFTs[id] <-> newToken
 
         destroy newToken
+    }
+
+    // takes a reference to another user's NFT collection,
+    // takes the NFT out of this collection, and deposits it
+    // in the reference's collection
+    pub fun transfer(recipient: &NFTCollection, tokenID: Int): Void {
+        // remove the token from the array
+        let sentNFT: <-NFT? <- self.ownedNFTs.remove(key: tokenID)
+
+        // deposit it in the recipient's account
+        recipient.deposit(token: <-sentNFT, id: tokenID)
+
     }
 
     pub fun idExists(tokenID: Int): Bool {
@@ -111,16 +123,3 @@ fun createCollection(token: <-NFT): <-NFTCollection {
 
 // }
 
-
-    // takes a reference to another user's NFT collection,
-    // takes the NFT out of this collection, and deposits it
-    // in the reference's collection
-    // pub fun transfer(recipient: &NFTCollection, tokenID: Int): Void {
-    //     // remove the token from the array
-    //     //
-    //     let sentNFT: <-NFT? <- self.ownedNFTs.remove(key: tokenID)
-
-    //     // deposit it in the recipient's account
-    //     recipient.deposit(token: <-sentNFT, id: tokenID)
-
-    // }
