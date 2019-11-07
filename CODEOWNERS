@@ -17,9 +17,7 @@
 /engine/execution @turbolent
 
 # Verification Stream
-/internal/roles/verify @ramtinms
-/cmd/verify @ramtinms
-/proto/services/verify @ramtinms
+/module/chunking @ramtinms
 
 # Observation Stream
 /cmd/observation @psiemens
