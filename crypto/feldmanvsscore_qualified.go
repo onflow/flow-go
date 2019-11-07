@@ -27,6 +27,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() []DKGToSend {
 			received:       true,
 			answerReceived: false,
 		}
+		log.Error("complaint (timeout)")
 		return []DKGToSend{toSend}
 	}
 	return []DKGToSend{}

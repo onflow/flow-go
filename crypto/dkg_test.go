@@ -28,8 +28,11 @@ func send(orig int, dest int, msgType int, msg interface{}, chans []chan *toProc
 	log.Infof("%d Sending to %d:\n", orig, dest)
 	log.Debug(msg)
 	/*msgBytes, _ := msg.(DKGmsg)
-	if orig < 2 && (dest < 4) {
+	if orig == 0 && (dest < 3) {
 		msgBytes[8] = 255
+	}*/
+	/*if orig == 0 && (dest == 3) {
+		return
 	}*/
 	newMsg := &toProcess{orig, msgType, msg}
 	chans[dest] <- newMsg
@@ -216,7 +219,7 @@ func TestFeldmanVSSSimple(t *testing.T) {
 	// this loop synchronizes the main thread to end all DKGs
 	var tempPK, groupPK PublicKey
 	var tempPKBytes, groupPKBytes []byte
-	// TODO: check the reconstructed key is equal to a_0
+
 	for i := 0; i < n; i++ {
 		if i == 0 {
 			groupPK = <-pkChan

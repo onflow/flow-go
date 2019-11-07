@@ -132,6 +132,8 @@ void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     }
 }
 
+// returns 1 if g2^x = y, where g2 is the generatot of G2
+// returns 0 otherwise
 int verifyshare(const bn_st* x, const ep2_st* y) {
     ep2_st res;
     ep2_new(res);
@@ -139,9 +141,28 @@ int verifyshare(const bn_st* x, const ep2_st* y) {
     return (ep2_cmp(&res, (ep2_st*)y) == RLC_EQ);
 }
 
+// computes the sum of the array elements x and writes the sum in jointx
+// the sum is computed in Zr
 void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
-
+    bn_st r;
+    bn_new(&r); 
+    g2_get_ord(&r);
+    bn_set_dig(jointx, 0);
+    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
+    for (int i=0; i<len; i++) {
+        bn_add(jointx, jointx, &x[i]);
+        if (bn_cmp(jointx, &r) == RLC_GT) 
+            bn_sub(jointx, jointx, &r);
+    }
+    bn_free(&r);
 }
-void sumPointG2Vector(ep2_st* jointx, ep2_st* x, int len){
-    
+
+// computes the sum of the array elements y and writes the sum in jointy
+// the sum is computed in G2
+void sumPointG2Vector(ep2_st* jointy, ep2_st* y, int len){
+    ep2_set_infty(jointy);
+    for (int i=0; i<len; i++){
+        ep2_add_projc(jointy, jointy, &y[i]);
+    }
+    ep2_norm(jointy, jointy);
 }
