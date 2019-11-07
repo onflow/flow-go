@@ -81,29 +81,29 @@ module FPL-COMMON-SYNTAX
                          | InterfaceFunDecl
                          | "init" "(" Formals ")"
   syntax InterfaceFieldDecl ::= "var" Ident ":" Type
-                              | "var" Ident ":" Type "{" AccessorContracts "}"
+                              | "var" Ident ":" Type "{" AccessorGuards "}"
                               | "let" Ident ":" Type
-                              | "let" Ident ":" Type "{" AccessorContracts "}"
+                              | "let" Ident ":" Type "{" AccessorGuards "}"
                               |       Ident ":" Type
-                              |       Ident ":" Type "{" AccessorContracts "}"
+                              |       Ident ":" Type "{" AccessorGuards "}"
 
-  rule (var  Ident : Type)::InterfaceFieldDecl => var Ident : Type { .AccessorContracts } [macro]
-  rule (let  Ident : Type)::InterfaceFieldDecl => let Ident : Type { .AccessorContracts } [macro]
-  rule      (Ident : Type)::InterfaceFieldDecl =>     Ident : Type { .AccessorContracts } [macro]
+  rule (var  Ident : Type)::InterfaceFieldDecl => var Ident : Type { .AccessorGuards } [macro]
+  rule (let  Ident : Type)::InterfaceFieldDecl => let Ident : Type { .AccessorGuards } [macro]
+  rule      (Ident : Type)::InterfaceFieldDecl =>     Ident : Type { .AccessorGuards } [macro]
 
   syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")"
-                            | "fun" Ident "(" Formals ")"           ContractBlock
+                            | "fun" Ident "(" Formals ")"           GuardBlock
                             | "fun" Ident "(" Formals ")" ":" Annot
-                            | "fun" Ident "(" Formals ")" ":" Annot ContractBlock
+                            | "fun" Ident "(" Formals ")" ":" Annot GuardBlock
 
-  rule fun Ident ( Formals )                      => fun Ident ( Formals ) : Void {} [macro]
-  rule fun Ident ( Formals ) Block::ContractBlock => fun Ident ( Formals ) : Void Block [macro]
-  rule fun Ident ( Formals ) : Annot              => fun Ident ( Formals ) : Annot {} [macro]
+  rule fun Ident ( Formals )                   => fun Ident ( Formals ) : Void {} [macro]
+  rule fun Ident ( Formals ) Block::GuardBlock => fun Ident ( Formals ) : Void Block [macro]
+  rule fun Ident ( Formals ) : Annot           => fun Ident ( Formals ) : Annot {} [macro]
 
-  syntax AccessorContracts ::= List{AccessorContract,""}
-  syntax AccessorContract ::=
-     "get"               ContractBlock
-   | "set" "(" Ident ")" ContractBlock
+  syntax AccessorGuards ::= List{AccessorGuard,""}
+  syntax AccessorGuard ::=
+     "get"               GuardBlock
+   | "set" "(" Ident ")" GuardBlock
 
   syntax ImplBody ::= List{ImplItemAccess,";"}
   syntax ImplItemAccess ::= Access ImplItem
@@ -142,12 +142,12 @@ module FPL-COMMON-SYNTAX
   syntax Formals ::= List{Formal,","} [klabel(formals)]
 
   syntax FunBody ::= "{" Block "}"
-                   | "{" Contract Block "}"
-  syntax Contract ::= "pre" "{" Conditions "}"
-                    | "post" "{" Conditions "}"
-                    | "pre" "{" Conditions "}" "post" "{" Conditions "}"
-  syntax ContractBlock ::= "{" Contract "}"
-                         | "{" "}"
+                   | "{" Guards Block "}"
+  syntax Guards ::= "pre" "{" Conditions "}"
+                  | "post" "{" Conditions "}"
+                  | "pre" "{" Conditions "}" "post" "{" Conditions "}"
+  syntax GuardBlock ::= "{" Guards "}"
+                      | "{" "}"
 
   rule { B } ::FunBody => { pre { .Conditions } post { .Conditions } B } ::FunBody [macro]
 
@@ -340,7 +340,7 @@ module FPL-FUN-ENV
   imports FPL-COMMON-SYNTAX
   imports MAP
 
-  syntax Val ::= funDef(args: Formals, result: Type, contract: Contract, body: Block, env: Map)
+  syntax Val ::= funDef(args: Formals, result: Type, guards: Guards, body: Block, env: Map)
 endmodule
 
 module FPL-PANIC
@@ -608,7 +608,7 @@ module FPL-FUNCTIONS
   imports FPL-TYPING
   imports FPL-VARIABLE-DECLARATION
 
-  rule <k> declare(fun F:Ident ( Fs ) : T { _::Contract _ }) => . ... </k>
+  rule <k> declare(fun F:Ident ( Fs ) : T { _::Guards _ }) => . ... </k>
        <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
 
   rule <k> initialize(fun F:Ident ( Fs ) : T { C B }) => . ... </k>
