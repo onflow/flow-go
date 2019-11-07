@@ -46,21 +46,7 @@ pub resource interface Receiver {
 
 pub resource Vault: Provider, Receiver {
 
-    pub var balance: Int //{
-    //     get {
-    //         post {
-    //             result >= 0:
-    //                 "Balances are always non-negative"
-    //         }
-    //     } 
-    //     set(newBalance) {
-    //         pre {
-    //             newBalance >= 0:
-    //                 "Balances are always non-negative"
-    //         }
-    //         self.balance = newBalance
-    //     }
-    // }
+    pub var balance: Int 
 
     pub fun withdraw(amount: Int): <-Vault {
         self.balance = self.balance - amount

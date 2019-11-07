@@ -4,13 +4,9 @@
 // so that no matter what type of functionality users want to bake into their account representation of tokens
 // they still use this interface and can implement other interfaces that are based on this
 
-import IFungibleToken from "fungible_interfaces.bpl"
+// this contract assumes that public means fully public and that the auth keyword exists
 
-import IMintableToken from "fungible_interfaces.bpl"
-
-import IApprovalToken from "fungible_interfaces.bpl"
-
-import ITokenContract from "fungible_interfaces.bpl"
+import IFungibleToken, IMintableToken, IApprovalToken, ITokenContract from "fungible_interfaces.bpl"
 
 
 // This is the actual implementation of the Token contract
@@ -48,7 +44,7 @@ pub contract BasicToken: IMintableToken, IApprovalToken {
 
         // the owner keyword means that only the account that this resource is
         // stored in can access this method
-        owner fun transfer(recipient: &BasicToken.Tokens, amount: Int) {
+        auth fun transfer(recipient: &BasicToken.Tokens, amount: Int) {
             self.balance = self.balance - amount
             let newTokens: Tokens <- create Tokens(balance: amount)
             recipient.deposit(tokens: newTokens)
@@ -60,7 +56,7 @@ pub contract BasicToken: IMintableToken, IApprovalToken {
         }
 
         // creates a  approval resource and sends it to the approved
-        owner fun approve(recipient: Address, amount: UInt, time: UInt) {
+        auth fun approve(recipient: Address, amount: UInt, time: UInt) {
             let newApproval <- create Approval(approved_tokens: self, amount: amount, time: time)
 
             // need to figure out how to write to another accounts storage so they don't have to withdraw it
@@ -81,7 +77,7 @@ pub contract BasicToken: IMintableToken, IApprovalToken {
     // This function should only be callable by the original token owner because they deployed
     // the contract to their account, but didn't publish the contract interface that would allow
     // external accounts to call this function
-    owner fun mint(recipient: &BasicToken.Tokens, amount: Int): Void {
+    auth fun mint(recipient: &BasicToken.Tokens, amount: Int): Void {
         self.totalSupply = self.totalSupply + amount
         let newTokens: Tokens <- create Tokens(balance: amount)
         recipient.deposit(tokens: newTokens)
