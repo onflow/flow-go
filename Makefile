@@ -75,7 +75,12 @@ cmd/flow/flow: cli cmd crypto model proto sdk
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)" .
+	./utils/scripts/docker-build.sh cmd/flow/emulator/Dockerfile gcr.io/dl-flow/emulator $(SHORT_COMMIT)
+
+# 	docker build -f cmd/flow/emulator/Dockerfile \
+# 		-t gcr.io/dl-flow/emulator:latest \
+# 		-t "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)" \
+# 		-t "gcr.io/dl-flow/emulator:$(VERSION)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
