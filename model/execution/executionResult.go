@@ -21,7 +21,7 @@ func (er *ExecutionResult) Hash() crypto.Hash {
 
 // Encode returns the canonical encoding of this execution result.
 func (er *ExecutionResult) Encode() []byte {
-	w := WrapExecutionResult(*er)
+	w := wrapExecutionResult(*er)
 	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
@@ -32,10 +32,10 @@ type ExecutionResultWrapper struct {
 	Chunks                      []chunkWrapper
 }
 
-func WrapExecutionResult(er ExecutionResult) ExecutionResultWrapper {
+func wrapExecutionResult(er ExecutionResult) ExecutionResultWrapper {
 	chunks := make([]chunkWrapper, len(er.Chunks))
 	for i, ck := range er.Chunks {
-		chunks[i] = WrapChunk(ck)
+		chunks[i] = wrapChunk(ck)
 	}
 	return ExecutionResultWrapper{
 		PreviousExecutionResultHash: er.PreviousExecutionResultHash,

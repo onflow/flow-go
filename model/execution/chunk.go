@@ -29,9 +29,16 @@ func (c *Chunk) String() string {
 		return fmt.Sprintf("Chunk %v includes a transaction (TotalGasSpent: %v):\n %v",
 			c.Hash(), c.TotalGasSpent, c.Transactions[0].Hash())
 	default:
-		return fmt.Sprintf("Chunk %v includes %v transactions (TotalGasSpent: %v):\n %v\n ...\n %v  ", c.Hash(),
-			len(c.Transactions), c.TotalGasSpent, c.Transactions[0].Hash(),
-			c.Transactions[len(c.Transactions)-1].Hash())
+		firstTx := c.Transactions[0]
+		lastTx := c.Transactions[len(c.Transactions)-1]
+		return fmt.Sprintf(
+			"Chunk %v includes %v transactions (TotalGasSpent: %v):\n %v\n ...\n %v",
+			c.Hash(),
+			len(c.Transactions),
+			c.TotalGasSpent,
+			firstTx.Hash(),
+			lastTx.Hash(),
+		)
 	}
 }
 
@@ -42,7 +49,7 @@ func (c *Chunk) Hash() crypto.Hash {
 
 // Encode returns the canonical encoding of this chunk.
 func (c *Chunk) Encode() []byte {
-	w := WrapChunk(*c)
+	w := wrapChunk(*c)
 	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
@@ -53,7 +60,7 @@ type chunkWrapper struct {
 	FirstTxGasSpent uint64 // T0
 }
 
-func WrapChunk(c Chunk) chunkWrapper {
+func wrapChunk(c Chunk) chunkWrapper {
 	transactions := make([]flow.TransactionWrapper, len(c.Transactions))
 	for i, tx := range c.Transactions {
 		transactions[i] = flow.WrapTransaction(tx)
