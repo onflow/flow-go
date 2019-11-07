@@ -83,20 +83,20 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		conf.HTTPPort = defaultHTTPPort
 	}
 
-	newServer := grpc.NewServer()
+	grpcServer := grpc.NewServer()
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
 			logger:     logger,
 			eventStore: eventStore,
 		},
-		grpcServer: newServer,
+		grpcServer: grpcServer,
 		config:     conf,
 		logger:     logger,
 	}
 
 	if conf.GRPCDebug {
-		reflection.Register(newServer)
+		reflection.Register(grpcServer)
 	}
 
 	address := server.backend.blockchain.RootAccountAddress()

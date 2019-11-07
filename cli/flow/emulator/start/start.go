@@ -21,7 +21,7 @@ type Config struct {
 	BlockInterval time.Duration `default:"5s" flag:"interval,i" info:"time between minted blocks"`
 	RootKey       string        `flag:"root-key" info:"root account key"`
 	Init          bool          `default:"false" flag:"init" info:"whether to initialize a new account profile"`
-	GRPCDebug     bool          `default:"false" flag:"grpc-debug" info:"Enable gRPC server reflection for debugging purposes\n Search grpc_cli for more"`
+	GRPCDebug     bool          `default:"false" flag:"grpc-debug" info:"enable gRPC server reflection for debugging with grpc_cli"`
 }
 
 var (
