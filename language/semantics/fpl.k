@@ -149,6 +149,8 @@ module FPL-COMMON-SYNTAX
   syntax GuardBlock ::= "{" Guards "}"
                       | "{" "}"
 
+  // any place in the AST where guards are allowed is normalized to
+  // have both pre and post conditions, each possibly an empty list
   rule { B } ::FunBody => { pre { .Conditions } post { .Conditions } B } ::FunBody [macro]
 
   rule {} => { pre { .Conditions } post { .Conditions } } [macro]
@@ -324,6 +326,11 @@ endmodule
 module FPL-ENV
   imports INT-SYNTAX
 
+  // the variable environment `<env/>` for execution
+  // records the type of each identifier and whether it
+  // is a mutable ("var") binding.
+  // The actual values are kept in a store indexed by `loc`
+  // to allow for shadowing in nested scopes.
   syntax Type
   syntax Mutability ::= "let" | "var"
   syntax EnvEntry ::= env(mut: Mutability, t: Type, loc: Int)
@@ -477,10 +484,16 @@ module FPL-CONFIGURATION
   configuration
     <k> declare($PGM:Pgm) ~> initialize($PGM:Pgm) </k>
     <scope> global </scope>
+      // scope tracks the context of the current code
     <env> .Map </env>
+      // env records the variable name in scope
     <store> .Map </store>
+      // values of variables are kept in the store so shadowing
+      // can be handled by modifying and restoring the <env>
     <fstack> .List </fstack>
+      // function call stack
     <lstack> .List </lstack>
+      // records surrounding loops to support break/continue
 endmodule
 
 module FPL-VARIABLE-DECLARATION
