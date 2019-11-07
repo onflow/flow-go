@@ -12,7 +12,10 @@ import (
 )
 
 const (
-	EnvPrefix  = "FLOW"
+	EnvPrefix = "FLOW"
+)
+
+var (
 	ConfigPath = "flow.json"
 )
 
