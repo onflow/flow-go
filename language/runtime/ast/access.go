@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=Access
 
@@ -22,5 +24,5 @@ func (s Access) Keyword() string {
 		return "pub(set)"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

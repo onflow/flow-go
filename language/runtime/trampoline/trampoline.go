@@ -1,6 +1,8 @@
 package trampoline
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 // Based on "Stackless Scala With Free" by Rúnar Óli Bjarnason:
 // http://blog.higher-order.com/assets/trampolines.pdf
@@ -139,7 +141,7 @@ func (m FlatMap) Resume() interface{} {
 		panic("FlatMap is not a valid subroutine. Use the FlatMap function to construct proper FlatMap structures.")
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (m FlatMap) Map(f func(interface{}) interface{}) Trampoline {

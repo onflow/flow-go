@@ -1056,7 +1056,7 @@ func init() {
 
 		// check type is not accidentally redeclared
 		if _, ok := baseTypes[typeName]; ok {
-			panic(&errors.UnreachableError{})
+			panic(errors.NewUnreachableError())
 		}
 
 		baseTypes[typeName] = ty

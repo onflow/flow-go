@@ -40,7 +40,7 @@ func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
 		return common.DeclarationKindContract
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 // FieldDeclaration

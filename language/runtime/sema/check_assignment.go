@@ -73,7 +73,7 @@ func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
 	case *InterfaceType:
 		members = containerType.Members
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	fieldName := memberExpression.Identifier.Identifier

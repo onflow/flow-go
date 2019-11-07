@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=ControlStatement
 
@@ -20,5 +22,5 @@ func (s ControlStatement) Symbol() string {
 		return "continue"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

@@ -637,7 +637,7 @@ func (checker *Checker) checkMemberIdentifier(
 func (checker *Checker) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 	// NOTE: field type is already checked when determining composite function in `compositeType`
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 // checkUnknownSpecialFunctions checks that the special function declarations

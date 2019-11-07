@@ -357,7 +357,7 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		case ast.AddressLocation:
 			location = AddressLocation(astLocation)
 		default:
-			panic(&runtimeErrors.UnreachableError{})
+			panic(runtimeErrors.NewUnreachableError())
 		}
 		script, err := runtimeInterface.ResolveImport(location)
 		if err != nil {
@@ -647,7 +647,7 @@ func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) int
 		case interpreter.NilValue:
 			break
 		default:
-			panic(&runtimeErrors.UnreachableError{})
+			panic(runtimeErrors.NewUnreachableError())
 		}
 
 		// TODO: fix controller

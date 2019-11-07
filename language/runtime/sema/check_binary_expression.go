@@ -179,7 +179,7 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 		return &BoolType{}
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (checker *Checker) checkBinaryExpressionEquality(
