@@ -50,7 +50,6 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 			)
 
 		case BinaryOperationKindEquality:
-
 			return checker.checkBinaryExpressionEquality(
 				expression, operation, operationKind,
 				leftType, rightType,
@@ -84,7 +83,6 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 
 		switch operationKind {
 		case BinaryOperationKindBooleanLogic:
-
 			return checker.checkBinaryExpressionBooleanLogic(
 				expression, operation, operationKind,
 				leftType, rightType,
@@ -189,15 +187,14 @@ func (checker *Checker) checkBinaryExpressionEquality(
 	leftType, rightType Type,
 	leftIsInvalid, rightIsInvalid, anyInvalid bool,
 ) (resultType Type) {
-	// check both types are equal, and boolean subtypes or integer subtypes
 
 	resultType = &BoolType{}
 
-	if !anyInvalid &&
-		leftType != nil &&
-		!(IsValidEqualityType(leftType) &&
-			AreCompatibleEqualityTypes(leftType, rightType)) {
+	if anyInvalid {
+		return
+	}
 
+	if !AreCompatibleEquatableTypes(leftType, rightType) {
 		checker.report(
 			&InvalidBinaryOperandsError{
 				Operation: operation,

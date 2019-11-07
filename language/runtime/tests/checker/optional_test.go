@@ -1,10 +1,12 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -112,16 +114,7 @@ func TestCheckNonOptionalNilComparisonSwapped(t *testing.T) {
 	_, err := ParseAndCheck(t, `
      let x: Int = 1
      let y = nil == x
-   `)
-
-	assert.Nil(t, err)
-}
-
-func TestCheckNestedOptionalNilComparison(t *testing.T) {
-
-	_, err := ParseAndCheck(t, `
-     let x: Int?? = 1
-     let y = x == nil
+     let z = x == nil
    `)
 
 	assert.Nil(t, err)
@@ -169,6 +162,60 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+}
+
+func TestCheckCompositeNilEquality(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		// TODO: add support for contracts
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		_, err := ParseAndCheck(t, fmt.Sprintf(`
+          %[1]s X {}
+
+          let x: %[2]sX? %[3]s %[4]s X()
+
+          let a = x == nil
+          let b = nil == x
+        `,
+			kind.Keyword(),
+			kind.Annotation(),
+			kind.TransferOperator(),
+			kind.ConstructionKeyword(),
+		))
+
+		assert.Nil(t, err)
+	}
+}
+
+func TestCheckInvalidCompositeNilEquality(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		// TODO: add support for contracts
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		_, err := ParseAndCheck(t, fmt.Sprintf(`
+          %[1]s X {}
+
+          let x: %[2]sX? %[3]s %[4]s X()
+          let y: %[2]sX? %[3]s nil
+
+          let a = x == y
+        `,
+			kind.Keyword(),
+			kind.Annotation(),
+			kind.TransferOperator(),
+			kind.ConstructionKeyword(),
+		))
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+	}
 }
 
 func TestCheckInvalidNonOptionalReturn(t *testing.T) {
