@@ -5,7 +5,6 @@ type ChunkHeader struct {
 	StartState               StateCommitment
 	T0                       uint64 // Computation Consumption of the first transaction
 	StartingTransactionIndex uint32
-	BlockNumber              uint32
 	ComputationConsumption   uint64
 }
 

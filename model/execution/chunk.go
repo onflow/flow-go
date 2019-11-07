@@ -9,7 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-// Chunk is a collection of transactions, we assume Tx content correctness and orders in block has been verfied by Chunk builder
+// Chunk is a collection of transactions, we assume Tx content correctness and
+// orders in block has been verfied by Chunk builder.
 type Chunk struct {
 	Transactions                  []flow.Transaction
 	TotalGasSpent                 uint64
