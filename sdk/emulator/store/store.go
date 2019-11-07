@@ -1,8 +1,7 @@
 package store
 
 import (
-	"crypto"
-
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
