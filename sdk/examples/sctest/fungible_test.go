@@ -40,7 +40,7 @@ func TestCreateToken(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, true)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Should be able to create token", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestCreateToken(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 
 	t.Run("Should be able to create multiple tokens and store them in an array", func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestCreateToken(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 }
 
@@ -85,7 +85,7 @@ func TestTransfers(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(tx, b, t, false)
+	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	t.Run("Should be able to withdraw tokens from a vault", func(t *testing.T) {
 		tx := flow.Transaction{
@@ -96,7 +96,7 @@ func TestTransfers(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vaults balance is correct
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 0, 7))
@@ -115,7 +115,7 @@ func TestTransfers(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vault's balance is correct
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 1, 12))

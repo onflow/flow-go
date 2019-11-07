@@ -43,7 +43,7 @@ func TestCreateNFT(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, true)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Should be able to create token", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestCreateNFT(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 
 	// Assert that the account's collection is correct
@@ -83,7 +83,7 @@ func TestTransferNFT(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(tx, b, t, false)
+	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that the account's collection is correct
 	// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1))
@@ -105,29 +105,7 @@ func TestTransferNFT(t *testing.T) {
 		ScriptAccounts: []flow.Address{bastianAddress},
 	}
 
-	sig1, err := keys.SignTransaction(tx, b.RootKey())
-	assert.Nil(t, err)
-
-	sig2, err := keys.SignTransaction(tx, bastianPrivateKey)
-	assert.Nil(t, err)
-
-	tx.AddSignature(b.RootAccountAddress(), sig1)
-	tx.AddSignature(bastianAddress, sig2)
-
-	err = b.SubmitTransaction(tx)
-
-	// transfer an NFT
-	// t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
-	// 	tx := flow.Transaction{
-	// 		Script:         GenerateTransferScript(contractAddr, bastianAddress, 1),
-	// 		Nonce:          GetNonce(),
-	// 		ComputeLimit:   20,
-	// 		PayerAccount:   b.RootAccountAddress(),
-	// 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-	// 	}
-
-	// 	SignAndSubmit(tx, b, t, false)
-	// })
+	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
 	// transfer an NFT
 	t.Run("Should be able to withdraw an NFT and deposit to another accounts collection", func(t *testing.T) {
@@ -139,7 +117,7 @@ func TestTransferNFT(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the account's collection is correct
 		// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1))
@@ -147,4 +125,23 @@ func TestTransferNFT(t *testing.T) {
 		// 	t.Log(err.Error())
 		// }
 	})
+
+	// transfer an NFT
+	// t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
+	// 	tx := flow.Transaction{
+	// 		Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 2),
+	// 		Nonce:          GetNonce(),
+	// 		ComputeLimit:   20,
+	// 		PayerAccount:   b.RootAccountAddress(),
+	// 		ScriptAccounts: []flow.Address{bastianAddress},
+	// 	}
+
+	// 	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
+
+	// 	// Assert that the account's collection is correct
+	// 	// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1))
+	// 	// if !assert.Nil(t, err) {
+	// 	// 	t.Log(err.Error())
+	// 	// }
+	// })
 }

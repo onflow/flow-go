@@ -6,8 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Creates a script that instantiates a new Vault instance
-// and stores it in memory.
+// GenerateCreateTokenScript creates a script that instantiates
+// a new Vault instance and stores it in memory.
 // balance is an argument to the Vault constructor.
 // The Vault must have been deployed already.
 func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byte {
@@ -24,6 +24,10 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance))
 }
 
+// GenerateCreateThreeTokensArrayScript creates a script
+// that creates three new vault instances, stores them
+// in an array of vaults, and then stores the array
+// to the storage of the signer's account
 func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance int, bal2 int, bal3 int) []byte {
 	template := `
 		import Vault, createVault from 0x%s
@@ -45,7 +49,8 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance, bal2, bal3))
 }
 
-// Creates a script that withdraws tokens from a vault
+// GenerateWithdrawScript creates a script that withdraws
+// tokens from a vault and destroys the tokens
 func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdrawAmount int) []byte {
 	template := `
 		import Vault from 0x%s
@@ -65,8 +70,9 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), vaultNumber, withdrawAmount))
 }
 
-// Creates a script that withdraws tokens from a vault
-// and deposits them to another vault
+// GenerateWithdrawDepositScript creates a script
+// that withdraws tokens from a vault and deposits
+// them to another vault
 func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumber int, depositVaultNumber int, withdrawAmount int) []byte {
 	template := `
 		import Vault from 0x%s
@@ -87,8 +93,9 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), withdrawVaultNumber, withdrawAmount, depositVaultNumber))
 }
 
-// Creates a script that retrieves an Vault from storage and makes assertions
-// about its properties. If these assertions fail, the script panics.
+// GenerateInspectVaultScript creates a script that retrieves a
+// Vault from the array in storage and makes assertionsabout
+// its balance. If these assertions fail, the script panics.
 func GenerateInspectVaultScript(nftCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
 	template := `
 		import Vault from 0x%s

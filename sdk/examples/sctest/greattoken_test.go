@@ -41,7 +41,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, true)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, true)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 }
 
@@ -86,7 +86,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(createMinterTx, b, t, false)
+	SignAndSubmit(createMinterTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Mint the first NFT
 	mintTx := flow.Transaction{
@@ -97,7 +97,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(mintTx, b, t, false)
+	SignAndSubmit(mintTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
 	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
@@ -112,7 +112,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(mintTx2, b, t, false)
+	SignAndSubmit(mintTx2, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
 	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))

@@ -6,10 +6,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Creates a script that instantiates a new NFT instance,
-// then creates an NFT collection instance,
-// and stores the NFT in the collection
-// then stores the collection in memory
+// GenerateCreateNFTScript Creates a script that instantiates a new
+// NFT instance, then creates an NFT collection instance, stores the
+// NFT in the collection, stores the collection in memory, then stores a
+// reference to the collection. It also makes sure that the token exists
+// in the collection after it has been added to.
 // The id must be greater than zero
 func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	template := `
@@ -38,26 +39,8 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	return []byte(fmt.Sprintf(template, tokenAddr, id))
 }
 
-// Creates a script that withdraws tokens from a vault
-// and deposits them to another vault
-func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, transferNFTID int) []byte {
-	template := `
-		import NFT, NFTCollection from 0x%s
-
-		fun main(acct: Account) {
-			let recipient = getAccount("%s")
-
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
-			let depositRef = recipient.storage[&NFTCollection] ?? panic("missing deposit reference")
-
-			collectionRef.transfer(recipient: depositRef, tokenID: %d)
-		}`
-
-	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
-}
-
-// Creates a script that withdraws tokens from a vault
-// and deposits them to another vault
+// GenerateDepositScript creates a script that withdraws an NFT token
+// from a collection and deposits it to another collection
 func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, transferNFTID int) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
@@ -77,8 +60,26 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
 }
 
-// Creates a script that retrieves an NFT collection from storage and makes assertions
-// about the NFT IDs that it contains
+// GenerateTransferScript Creates a script that transfers an NFT
+// to another vault
+func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, transferNFTID int) []byte {
+	template := `
+		import NFT, NFTCollection from 0x%s
+
+		fun main(acct: Account) {
+			let recipient = getAccount("%s")
+
+			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
+			let depositRef = recipient.storage[&NFTCollection] ?? panic("missing deposit reference")
+
+			collectionRef.transfer(recipient: depositRef, tokenID: %d)
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
+}
+
+// GenerateInspectCollectionScript creates a script that retrieves an NFT collection
+// from storage and makes assertions about the NFT IDs that it contains
 func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID int) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
