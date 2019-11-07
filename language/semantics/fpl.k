@@ -1,0 +1,904 @@
+module FPL-TYPE-ANNOTATION
+  syntax Type
+  syntax Annot ::= Type | noAnnot()
+
+endmodule
+
+module FPL-TYPE-ANNOTATION-PROGRAM-PARSING
+  syntax Type
+  syntax Annot ::= Type
+endmodule
+
+module FPL-COMMON-SYNTAX
+  /* This module defines most of the Flow AST,
+     containing all productions whose actual syntax can be
+     used in K rules without ambiguity.
+
+     The remaining constructs are given their actual syntax for
+     parsing programs in FPL-SYNTAX and a syntax that can be used
+     in semantic rules in FPL-RULE-SYNTAX
+   */
+  imports FPL-TYPE-ANNOTATION
+  imports UNSIGNED-INT-SYNTAX
+  imports BOOL-SYNTAX
+
+  syntax Ident
+  syntax FPLString
+  syntax IntLit
+
+  syntax Definition ::=
+     FunDef
+   | VarDef
+   | "struct" Ident ":" TypeIds "{" CompositeItems "}"
+   | "struct" Ident             "{" CompositeItems "}"
+   | "resource" Ident ":" TypeIds "{" CompositeItems "}"
+   | "resource" Ident             "{" CompositeItems "}"
+   | "interface" Ident "{" InterfaceItems "}"
+   // should there be separate "struct interface" and "resource interface"?
+   | "impl" TypeId "for" TypeId "{" ImplBody "}"
+//   | "using" TypeId "from" AddressLiteral
+  syntax TopDefinition ::=
+     Definition
+   | "import" ImportSource
+   | "import" TypeIds "from" ImportSource
+
+  rule struct Ident { Items } => struct Ident : .TypeIds { Items } [macro]
+  rule resource Ident { Items } => resource Ident : .TypeIds { Items } [macro]
+
+  syntax Transaction ::=
+     "transaction" "{"
+        Fields
+        "prepare" "(" Formals ")" "{" Block "}"
+        "execute" "{" Block "}"
+        "post" "{" Conditions "}"
+     "}"
+  syntax Fields ::= List{FieldDecl,""}
+
+  syntax FileName ::= FPLString
+  syntax ImportSource ::= IntLit | FPLString
+
+  syntax FunDef ::= "fun" Ident "(" Formals ")"           FunBody
+                  | "fun" Ident "(" Formals ")" ":" Annot FunBody
+
+  syntax Ident ::= "Void" [token]
+
+  rule fun Ident ( Formals ) Body::FunBody => fun Ident ( Formals ) : Void Body [macro]
+
+  syntax CompositeItems ::= List{CompositeItemAccess,""}
+  syntax CompositeItemAccess ::= Access CompositeItem
+                               | CompositeItem
+  syntax CompositeItem ::= Definition
+                         | FieldDecl
+                         | "init" "(" Formals ")" FunBody
+  syntax Access ::= "pub" "(" "set" ")"
+                  | "pub"
+
+  syntax InterfaceItems ::= List{InterfaceItemAccess,""}
+  syntax InterfaceItemAccess ::= Access InterfaceItem
+                               | InterfaceItem
+  syntax InterfaceItem ::= Definition
+                         | InterfaceFieldDecl
+                         | InterfaceFunDecl
+                         | "init" "(" Formals ")"
+  syntax InterfaceFieldDecl ::= "var" Ident ":" Type
+                              | "var" Ident ":" Type "{" AccessorGuards "}"
+                              | "let" Ident ":" Type
+                              | "let" Ident ":" Type "{" AccessorGuards "}"
+                              |       Ident ":" Type
+                              |       Ident ":" Type "{" AccessorGuards "}"
+
+  rule (var  Ident : Type)::InterfaceFieldDecl => var Ident : Type { .AccessorGuards } [macro]
+  rule (let  Ident : Type)::InterfaceFieldDecl => let Ident : Type { .AccessorGuards } [macro]
+  rule      (Ident : Type)::InterfaceFieldDecl =>     Ident : Type { .AccessorGuards } [macro]
+
+  syntax InterfaceFunDecl ::= "fun" Ident "(" Formals ")"
+                            | "fun" Ident "(" Formals ")"           GuardBlock
+                            | "fun" Ident "(" Formals ")" ":" Annot
+                            | "fun" Ident "(" Formals ")" ":" Annot GuardBlock
+
+  rule fun Ident ( Formals )                   => fun Ident ( Formals ) : Void {} [macro]
+  rule fun Ident ( Formals ) Block::GuardBlock => fun Ident ( Formals ) : Void Block [macro]
+  rule fun Ident ( Formals ) : Annot           => fun Ident ( Formals ) : Annot {} [macro]
+
+  syntax AccessorGuards ::= List{AccessorGuard,""}
+  syntax AccessorGuard ::=
+     "get"               GuardBlock
+   | "set" "(" Ident ")" GuardBlock
+
+  syntax ImplBody ::= List{ImplItemAccess,";"}
+  syntax ImplItemAccess ::= Access ImplItem
+                          | ImplItem
+  syntax ImplItem ::= Definition
+                    | FunDef
+                    | FieldDecl // must be a synthetic field
+
+  syntax FieldDecl ::=
+     "let" Ident ":" Type
+   | "var" Ident ":" Type
+   | "synthetic" Ident "{" AccessorDefs "}"
+  syntax AccessorDefs ::= List{AccessorDef,""}
+  syntax AccessorDef ::= "get"               FunBody
+                       | "set" "(" Ident ")" FunBody
+  // Nesting left out for now
+
+  syntax VarDef ::=
+     "let" Ident            "=" Exp
+   | "let" Ident ":" Annot  "=" Exp
+   | "let" Ident           "<-" Exp
+   | "let" Ident ":" Annot "<-" Exp
+   | "var" Ident            "=" Exp
+   | "var" Ident ":" Annot  "=" Exp
+   | "var" Ident           "<-" Exp
+   | "var" Ident ":" Annot "<-" Exp
+
+  rule (let Ident  = Exp)::VarDef => let Ident : noAnnot()  = Exp [macro]
+  rule  let Ident <- Exp          => let Ident : noAnnot() <- Exp [macro]
+  rule (var Ident  = Exp)::VarDef => var Ident : noAnnot()  = Exp [macro]
+  rule  var Ident <- Exp          => var Ident : noAnnot() <- Exp [macro]
+
+  syntax Formal ::= Ident Ident ":" Type
+                  |       Ident ":" Type
+  rule (I : T)::Formal => I I : T [macro]
+  syntax Formals ::= List{Formal,","} [klabel(formals)]
+
+  syntax FunBody ::= "{" Block "}"
+                   | "{" Guards Block "}"
+  syntax Guards ::= "pre" "{" Conditions "}"
+                  | "post" "{" Conditions "}"
+                  | "pre" "{" Conditions "}" "post" "{" Conditions "}"
+  syntax GuardBlock ::= "{" Guards "}"
+                      | "{" "}"
+
+  // any place in the AST where guards are allowed is normalized to
+  // have both pre and post conditions, each possibly an empty list
+  rule { B } ::FunBody => { pre { .Conditions } post { .Conditions } B } ::FunBody [macro]
+
+  rule {} => { pre { .Conditions } post { .Conditions } } [macro]
+  rule pre { Cond } => pre { Cond } post { .Conditions } [macro]
+  rule post { Cond } => pre { .Conditions } post { Cond } [macro]
+
+  syntax Conditions ::= NeList{Condition,""}
+  syntax Condition ::= Exp
+                     | Exp ":" FPLString
+
+  syntax Stmt ::= VarDef
+                | FunDef
+                | Path "=" Exp
+                | Path "<-" Exp
+                | Exp
+                // Deploy?
+                // Publish?
+                | IfStmt
+                | "while" Exp "{" Block "}"
+                | "continue"
+                | "break"
+                | "return"
+                | "return" Exp [strict]
+
+  syntax IfStmt ::= "if" IfCond "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" "{" Block "}"
+                  | "if" IfCond "{" Block "}" "else" IfStmt
+
+  rule if Cond { Block } => if Cond { Block } else { .Block } [macro]
+  rule if Cond { Block } else If => if Cond { Block } else { If } [macro]
+
+  syntax IfCond ::= Exp
+                  | "let" Ident "=" Exp
+                  | "var" Ident "=" Exp
+  syntax Block ::= List{Stmt,";"}
+
+  syntax Path ::= Ident
+                | "self"
+                | Path "[" Exp "]" [klabel(index)]
+                | Path "." Ident [klabel(field)]
+                | "(" Path ")" [bracket]
+
+  syntax left lval
+
+  syntax Exp ::= IntLit [klabel(intLit), avoid, symbol, function]
+               | FPLString
+               | Path
+               | "nil"
+               | Bool
+               | "(" Exp ")" [bracket]
+               | "[" Exps "]"        [strict(1)]
+               | "[" Type "]"               // type-indexed collections
+               | "{" DictEntries "}" [strict(1)]
+               | "fun" "(" Formals ")" FunBody
+               | "fun" "(" Formals ")" ":" Annot FunBody
+               | Exp "[" Exp "]" [lval, seqstrict, klabel(index)]
+               | Exp "." Ident    [lval, klabel(field)] // field access
+               | Ident "(" Actuals ")" [strict(2), klabel(call)]
+               | Exp "." Ident "(" Actuals ")"
+               | TypeId "(" Actuals ")" [klabel(call)]          // struct creation
+               | "create" TypeId "(" Actuals ")" // resource creation
+               > non-assoc:
+                 "-" Exp       [strict]
+               | "!" Exp       [strict]
+               > left:
+                 Exp "*" Exp   [seqstrict]
+               | Exp "&*" Exp  [seqstrict]
+               | Exp "/" Exp   [seqstrict]
+               | Exp "&/" Exp  [seqstrict]
+               | Exp "%" Exp   [seqstrict]
+               > left: Exp "+" Exp   [seqstrict]
+               | Exp "&+" Exp  [seqstrict]
+               | Exp "-" Exp   [seqstrict]
+               | Exp "&-" Exp  [seqstrict]
+               > left:
+                 Exp "?" "?" Exp  [strict(1)]
+               | Exp "as?" Exp [seqstrict]
+               > left:
+                 Exp "==" Exp  [seqstrict]
+               | Exp "!=" Exp  [seqstrict]
+               | Exp "<" Exp   [seqstrict]
+               | Exp "<=" Exp  [seqstrict]
+               | Exp ">" Exp   [seqstrict]
+               | Exp ">=" Exp  [seqstrict]
+               > left:
+                 Exp "&&" Exp  [strict(1)]
+               | Exp "||" Exp  [strict(1)]
+               > Exp "?" Exp ":" Exp [right,strict(1)]
+  syntax Exps ::= List{Exp,","}      [seqstrict, hybrid, klabel(exps)]
+  rule isKResult(.Exps) => true
+
+  rule fun ( Formals ) { Body } => fun ( Formals ) : Void { Body } [macro]
+
+  syntax DictEntries ::= List{DictEntry,","} [seqstrict]
+  syntax DictEntry ::= Exp ":" Exp [seqstrict]
+
+  syntax KResult
+  syntax Actual ::= Ident ":" Exp [hybrid, strict(2)]
+                  | Exp
+  syntax Actuals ::= List{Actual,","} [seqstrict, klabel(actuals), hybrid]
+  rule isKResult(.Actuals) => true
+
+  syntax TypeId ::= Ident // plus fully qualified names
+  syntax TypeIds ::= List{TypeId,","}
+
+  syntax Type ::= Ident
+                | "Self"
+                | "(" "(" Types ")" ":" Type ")"
+                | Type "?"
+                | "[" Type "]"
+                | "[" Type ";" IntLit "]"
+                | Type "[" Type "]"
+                > "@" Type
+  syntax Types ::= List{Type,","}
+
+  syntax Pgm ::= List{TopDefinition,";"}
+endmodule
+
+module FPL-TOKENS
+  /* This modules defines the lexical syntax of
+     tokens that we need for parsing programs, but
+     but must not be parsed in K rules, to
+     avoid ambiguity with K syntax
+   */
+  imports FPL-COMMON-SYNTAX
+  syntax IntLit ::=
+     r"-?0x[0-9a-fA-F]([_0-9a-fA-F]*[0-9a-fA-F])?" [token]
+   | r"-?0o[0-7]([_0-7]*[0-7])?" [token]
+   | r"-?0b[01]([_01]*[01])?" [token]
+   | r"-?[0-9]+_[_0-9]*[0-9]" [token]
+   | r"-?[0-9]+" [token]
+   | Int [token]
+  syntax Ident ::=
+     r"[_a-zA-Z][_a-zA-Z0-9]*" [token,autoReject]
+  syntax FPLString ::=
+     r"[\\\"](([^\"\\n\\r\\\\])|([\\\\][0\\\\tnr\"'])|([\\\\]u\\{[0-9a-fA-F]+\\}))*[\\\"]" [token]
+endmodule
+
+module FPL-SYNTAX
+  /* This module defines the concrete syntax available in programs */
+  imports FPL-COMMON-SYNTAX
+  imports FPL-TOKENS
+endmodule
+
+module FPL-SCOPES
+    syntax Val
+    syntax Scope ::= "global" | local(Val)
+
+    syntax Pgm
+    syntax KItem ::= declare(Pgm) | initialize(Pgm)
+endmodule
+
+module FPL-VALUES
+  imports BOOL-SYNTAX
+  imports INT-SYNTAX
+  imports STRING-SYNTAX
+  imports LIST
+
+  syntax Type ::= "[" Type ";" Int "]"
+  syntax Array ::= array(List)
+  syntax Val ::= Int | Bool | unit() | Array
+  syntax TypedVal ::= v(Val, Type)
+  syntax Exp ::= TypedVal
+  syntax KResult ::= TypedVal | Int | Array // for constant expressions
+  syntax FPLString ::= String
+  syntax Exp ::= Val
+
+  syntax Vals ::= List{Val,","} [klabel(exps)]
+  syntax Exps ::= Vals
+
+endmodule
+
+module FPL-ENV
+  imports INT-SYNTAX
+
+  // the variable environment `<env/>` for execution
+  // records the type of each identifier and whether it
+  // is a mutable ("var") binding.
+  // The actual values are kept in a store indexed by `loc`
+  // to allow for shadowing in nested scopes.
+  syntax Type
+  syntax Mutability ::= "let" | "var"
+  syntax EnvEntry ::= env(mut: Mutability, t: Type, loc: Int)
+endmodule
+
+module FPL-STACK
+  imports MAP
+
+  syntax Scope
+  syntax Frame ::= frame(code:K, env: Map, scope: Scope, loop: List)
+endmodule
+
+module FPL-FUN-ENV
+  imports FPL-COMMON-SYNTAX
+  imports MAP
+
+  syntax Val ::= funDef(args: Formals, result: Type, guards: Guards, body: Block, env: Map)
+endmodule
+
+module FPL-PANIC
+  imports FPL-CONFIGURATION
+
+  syntax Exp ::= panic(String)
+
+  rule <k> panic(_) ~> (_:KItem ~> _ => .K) </k>
+endmodule
+
+module FPL-TYPING
+  imports FPL-CONFIGURATION
+  imports FPL-ENV
+  imports FPL-FUN-ENV
+  imports FPL-PANIC
+
+  syntax Type ::= type(Exp) [function]
+                | #type(Exp) [function]
+                | infer(Type) [function]
+  syntax Ident ::= "Bool" [token]
+                 | "Int8" [token]
+                 | "Int16" [token]
+                 | "Int32" [token]
+                 | "Int64" [token]
+                 | "UInt8" [token]
+                 | "UInt16" [token]
+                 | "UInt32" [token]
+                 | "UInt64" [token]
+                 | "Int" [token]
+
+  syntax Ident ::= "IntLit" [token]
+
+  syntax Ident ::= "length" [token] | "x" [token] | "y" [token] | "at" [token]
+                 | "concat" [token] | "contains" [token] | "append" [token]
+                 | "insert" [token] | "remove" [token] | "removeFirst" [token]
+                 | "removeLast" [token]
+
+  rule type(E) => infer(#type(E))
+  rule infer(IntLit) => Int
+  rule infer([T]) => [infer(T)::Type]
+  rule infer([T;N::Int]) => [infer(T);N]
+  rule infer(T) => T [owise]
+
+  rule #type(I:Int) => IntLit
+  rule #type(B:Bool) => Bool
+  rule [[ #type(X:Ident) => T ]]
+       <env>... X |-> env(... t: T) ...</env>
+  rule [[ #type(X:Ident(_)) => R ]]
+       <env>... X |-> env(... t: ((_): R)) ...</env>
+  rule #type([ E, .Exps ]) => [ #type(E) ]
+  rule #type([ E1, E2, Es ]) => type([ E1 ], [ E2, Es ])
+  rule #type(E1 [ E2 ]) => elementType(#type(E1))
+  rule #type(E . F) => fieldType(#type(E), F)
+  rule #type(E . F(_)) => returnType(fieldType(#type(E), F))
+  rule #type(- E => E)
+  rule #type(! _) => Bool
+  rule #type(E1 * E2) => type(E1, E2)
+  rule #type(E1 &* E2) => type(E1, E2)
+  rule #type(E1 / E2) => type(E1, E2)
+  rule #type(E1 % E2) => type(E1, E2)
+  rule #type(E1 + E2) => type(E1, E2)
+  rule #type(E1 &+ E2) => type(E1, E2)
+  rule #type(E1 - E2) => type(E1, E2)
+  rule #type(E1 &- E2) => type(E1, E2)
+  rule #type(_ && _) => Bool
+  rule #type(_ || _) => Bool
+  rule #type(_ == _) => Bool
+  rule #type(_ != _) => Bool
+  rule #type(_ < _) => Bool
+  rule #type(_ <= _) => Bool
+  rule #type(_ > _) => Bool
+  rule #type(_ >= _) => Bool
+  rule #type(_ ? E1 : E2) => type(E1, E2)
+
+  syntax Type ::= fieldType(Type, Ident) [function]
+  rule fieldType([_] #Or [_;_::Int], length) => Int
+  rule fieldType(([_] #Or [_;_::Int]) #as T, concat) => ((T): T)
+  rule fieldType([T] #Or [T;_::Int], contains) => ((T): Bool)
+  rule fieldType([T] #Or [T;_::Int], append) => ((T): Void)
+  rule fieldType([T] #Or [T;_::Int], insert) => ((Int, T): Void)
+  rule fieldType([T] #Or [T;_::Int], remove) => ((Int): T)
+  rule fieldType([T] #Or [T;_::Int], removeFirst) => ((.Types): T)
+  rule fieldType([T] #Or [T;_::Int], removeLast) => ((.Types): T)
+
+  syntax Type ::= type(Exp, Exp) [function]
+                | #type(Type, Type) [function]
+                | elementType(Type) [function]
+                | returnType(Type) [function]
+
+  rule type(E1, E2) => #type(#type(E1), #type(E2))
+  rule #type(IntLit, T) => T
+  rule #type(T, IntLit) => T
+  rule #type(T, T) => T
+
+  rule elementType([T]) => T
+  rule elementType([T;_::Int]) => T
+
+  rule returnType(((_): T)) => T
+
+  syntax Int ::= "pow8" | "pow16" | "pow32" | "pow64"
+  rule pow8 => 256 [macro]
+  rule pow16 => 65536 [macro]
+  rule pow32 => 4294967296 [macro]
+  rule pow64 => 18446744073709551616 [macro]
+
+  syntax Int ::= "min8" | "min16" | "min32" | "min64"
+  rule min8 => -128 [macro]
+  rule min16 => -32768 [macro]
+  rule min32 => -2147483648 [macro]
+  rule min64 => -9223372036854775808 [macro]
+
+  syntax Exp ::= check(TypedVal) [function]
+  rule check(v(V, T)) => #fun(V' => #if V' ==K v(V, T) #then v(V, T) #else panic("Integer overflow") #fi)(chop(v(V, T)))
+
+  syntax Exp ::= chop(TypedVal) [function]
+  rule chop(v(I, Int)) => v(I, Int)
+  rule chop(v(I, UInt8)) => v(I modInt pow8, UInt8)
+  rule chop(v(I, UInt16)) => v(I modInt pow16, UInt16)
+  rule chop(v(I, UInt32)) => v(I modInt pow32, UInt32)
+  rule chop(v(I, UInt64)) => v(I modInt pow64, UInt64)
+  rule chop(v(I, Int8)) => v((I -Int min8) modInt pow8 +Int min8, Int8)
+  rule chop(v(I, Int16)) => v((I -Int min16) modInt pow16 +Int min16, Int16)
+  rule chop(v(I, Int32)) => v((I -Int min32) modInt pow32 +Int min32, Int32)
+  rule chop(v(I, Int64)) => v((I -Int min64) modInt pow64 +Int min64, Int64)
+endmodule
+
+module FPL-CONFIGURATION
+  imports DOMAINS
+  imports FPL-COMMON-SYNTAX
+  imports FPL-SCOPES
+  imports FPL-VALUES
+  imports FPL-STACK
+
+  configuration
+    <k> declare($PGM:Pgm) ~> initialize($PGM:Pgm) </k>
+    <scope> global </scope>
+      // scope tracks the context of the current code
+    <env> .Map </env>
+      // env records the variable name in scope
+    <store> .Map </store>
+      // values of variables are kept in the store so shadowing
+      // can be handled by modifying and restoring the <env>
+    <fstack> .List </fstack>
+      // function call stack
+    <lstack> .List </lstack>
+      // records surrounding loops to support break/continue
+endmodule
+
+module FPL-VARIABLE-DECLARATION
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  context initialize(let _ : _ = HOLE)
+    requires notBool isVal(HOLE)
+  context initialize(var _ : _ = HOLE)
+    requires notBool isVal(HOLE)
+
+  rule <k> initialize(let X : _ = (V:Val => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+  rule <k> initialize(var X : _ = (V:Val => v(V, T))) ... </k>
+       <env>... X |-> env(... t: T) ...</env>
+
+  rule <k> declare(let X : T:Type = E) => . ... </k>
+       <env> Rho => Rho [ X <- env(let, T, !L:Int) ] </env>
+  rule <k> declare(var X : T:Type = E) => . ... </k>
+       <env> Rho => Rho [ X <- env(var, T, !L:Int) ] </env>
+
+  rule <k> initialize(let X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+  rule <k> initialize(var X : _ = v(V, _)) => . ... </k>
+       <env>... X |-> env(_, _, L:Int) ...</env>
+       <store>... .Map => L |-> V ...</store>
+
+  rule <k> declare(let _ : (noAnnot() => type(E)) = E) ... </k>
+  rule <k> declare(var _ : (noAnnot() => type(E)) = E) ... </k>
+
+  rule <k> X:Ident => v(V, T) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
+
+  rule <k> X:Ident => panic("Declaration not initialized yet") ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
+
+  rule <k> declare(X ; Y ; Z) => declare(X) ~> declare(Y ; Z) ... </k>
+  rule <k> declare(.Pgm) => . ... </k>
+  rule <k> initialize(X ; Y ; Z) => initialize(X) ~> initialize(Y ; Z) ... </k>
+  rule <k> initialize(.Pgm) => . ... </k>
+
+  rule <k> (let X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+  rule <k> (var X : T = E) #as D::Definition => declare(D) ~> initialize(D) ... </k>
+
+  syntax Path ::= loc(Path)
+  syntax Path ::= Loc
+  syntax Loc ::= loc(Int, List, Type)
+  syntax KResult ::= Loc
+
+  context (HOLE::Path => loc(HOLE)) = _
+
+  rule <k> loc(X:Ident) => loc(loc(L, .List, T)) ... </k>
+       <env>... X |-> env(... t: T, loc: L) ...</env>
+  context loc((HOLE::Path => loc(HOLE)) [ _ ])
+  context loc(loc(_, _, _) [ HOLE ] )
+  rule loc(loc(_, _, _) [ v(I:Int, _) => I ] )
+  rule loc(loc(L, Idx, T) [ I:Int ]) => loc(loc(L, Idx ListItem(I), elementType(T)))
+
+  context loc(_, _, _) = HOLE
+
+  rule <k> loc(L, Idx, _) = (V':Val #Or v(V':Val, _)) => . ... </k>
+       <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
+    requires isValid(V, Idx)
+  rule <k> loc(L, Idx, _) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
+       <store>... L |-> V ...</store>
+    requires notBool isValid(V, Idx)
+
+  syntax Bool ::= isValid(Val, List) [function]
+  rule isValid(_, .List) => true
+  rule isValid(array(L::List), ListItem(I:Int) Idx) => I >=Int 0 andBool I <Int size(L) andBool isValid({L [ I ]}:>Val, Idx)
+
+  syntax Val ::= updateLoc(List, Val, Val) [function]
+  rule updateLoc(.List, _, V) => V
+  rule updateLoc(ListItem(I:Int) L, array(V:List), V') => array(V [ I <- updateLoc(L, {V [ I ]}:>Val, V') ])
+
+  syntax Val ::= getLoc(List, Val) [function]
+  rule getLoc(.List, V) => V
+  rule getLoc(ListItem(I:Int) L, array(V:List)) => getLoc(L, {V [ I ]}:>Val)
+
+endmodule
+
+module FPL-STMTS
+  imports FPL-CONFIGURATION
+
+  rule .Block => .K
+  rule E:Exp ; B::Block => expressionStmt(E) ~> B
+  rule S; B::Block => S ~> B requires notBool isExp(S)
+
+  syntax Stmt ::= expressionStmt(Exp) [strict]
+  rule expressionStmt(_:Int) => .
+  rule expressionStmt(v(...)) => .
+
+  context if HOLE:Exp { _ } else { _ }
+  rule if v(true, _) { B } else { _ } => B
+  rule if v(false, _) { _ } else { B } => B
+
+  rule while E { B } => loop(if E { loopBody(B) } else { break })
+  syntax Stmt ::= loopBody(Block)
+  rule loopBody(B) => B ~> continue
+
+  syntax Stmt ::= loop(Stmt)
+  rule <k> loop(Stmt) ~> K => Stmt </k>
+       <env> Rho </env>
+       <fstack> FS </fstack>
+       <lstack> .List => ListItem(loopState(Rho, K, Stmt, FS)) ... </lstack>
+
+  syntax LoopFrame ::= loopState(Map, K, Stmt, List)
+
+  rule <k> break ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, K, _, FS)) => .List ...</lstack>
+  rule <k> continue ~> _ => K </k>
+       <env> _ => Rho </env>
+       <fstack> _ => FS </fstack>
+       <lstack> ListItem(loopState(Rho, _, K, FS)) ...</lstack>
+endmodule
+
+module FPL-FUNCTIONS
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
+
+  rule <k> declare(fun F:Ident ( Fs ) : T { _::Guards _ }) => . ... </k>
+       <env> Rho => Rho [ F <- env(let, ((types(Fs)): T), !L:Int) ] </env>
+
+  rule <k> initialize(fun F:Ident ( Fs ) : T { C B }) => . ... </k>
+       <env> (_::Map F |-> env(... loc: L)) #as Rho </env>
+       <store>... .Map => L |-> funDef(Fs, T, C, B, Rho) ...</store>
+
+  syntax Types ::= types(Formals) [function]
+  rule types(.Formals) => .Types
+  rule types(_ _ : T, Fs) => T, types(Fs)
+
+  syntax Bool ::= checkLabels(Formals,Actuals) [function]
+  rule checkLabels(.Formals, .Actuals) => true
+  rule checkLabels(((Lbl _ : _), FS), ((ArgLbl : _), AS)) => checkLabels(FS,AS)
+    requires Lbl ==K ArgLbl
+  rule checkLabels(((Lbl _ : _), FS), (_::Exp, AS)) => checkLabels(FS,AS)
+    requires Lbl ==K #token("_","Ident")
+  rule checkLabels(_,_) => false [owise]
+
+  syntax Block ::= initArgs(Formals,Actuals) [function]
+  syntax Stmt ::= initArg(Formal,Actual) [function]
+  rule initArgs(.Formals, .Actuals) => .Block
+  rule initArgs((F, FS), (A, AS)) => initArg(F,A) ; initArgs(FS,AS)
+
+  rule initArg((Lbl Name : T), (ArgLbl : X)) => let Name : T = X
+  rule initArg((NoLbl Name : T), X) => let Name : T = X
+    requires NoLbl ==K #token("_","Ident")
+
+  rule <k> (F:Ident)(_::Actuals) => panic("Declaration not initialized yet") ... </k>
+       <env>... F |-> env(... loc: L) ...</env>
+       <store> S </store>
+    requires notBool L in_keys(S)
+
+  rule <k> (F:Ident)(Args) => call v(V, T) (Args) ... </k>
+       <env>... F |-> env(... t: T, loc: L) ...</env>
+       <store>... L |-> V ...</store>
+    requires isKResult(Args)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident
+  context HOLE . _::Ident requires notBool isPath(HOLE)
+
+  context (HOLE::Path => loc(HOLE)) . _::Ident ( _::Actuals )
+  context E . _::Ident ( HOLE::Actuals ) requires isKResult(E)
+  context HOLE . _::Ident ( _::Actuals ) requires notBool isPath(HOLE)
+
+  rule <k> V . F:Ident (Args) => call V . F (Args) ... </k>
+    requires isKResult(Args) andBool isKResult(V)
+
+  syntax Exp ::= "call" Exp "(" Actuals ")" [strict(1)]
+
+  rule <k> (call v(funDef(... args: Params, body: B, env: Rho') #as V, _) (Args) ~> K) => initArgs(Params, Args) ~> B:Block</k>
+       <env> Rho => Rho' </env>
+       <scope> Scope => local(V) </scope>
+       <fstack> .List => ListItem(frame(K, Rho, Scope, LS)) ...</fstack>
+       <lstack> LS => .List </lstack>
+  rule <k> return => return v(unit(), Void) ... </k>
+  rule <k> return X:TypedVal ~> _ => X ~> K </k>
+       <env> _ => Rho </env>
+       <scope> _ => Scope </scope>
+       <fstack> ListItem(frame(K, Rho, Scope, LS)) => .List ...</fstack>
+       <lstack> _ => LS </lstack>
+  rule <k> return V:Val => return v(V, T) ... </k>
+       <scope> local(funDef(... result: T)) </scope>
+
+endmodule
+
+module FPL-ARITHMETIC
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+
+  rule intLit(I::IntLit) => processIntLit(replaceAll(IntLit2String(I), "_", ""))
+  syntax String ::= IntLit2String(IntLit) [function, hook(STRING.token2string)]
+  syntax Int ::= processIntLit(String) [function]
+  rule processIntLit(Neg::String) => 0 -Int processIntLit(substrString(Neg, 1, lengthString(Neg)))
+    requires substrString(Neg, 0, 1) ==String "-"
+  rule processIntLit(Hex::String) => String2Base(substrString(Hex, 2, lengthString(Hex)), 16)
+    requires lengthString(Hex) >=Int 2 andBool substrString(Hex, 0, 2) ==String "0x"
+  rule processIntLit(Oct::String) => String2Base(substrString(Oct, 2, lengthString(Oct)), 8)
+    requires lengthString(Oct) >=Int 2 andBool substrString(Oct, 0, 2) ==String "0o"
+  rule processIntLit(Bin::String) => String2Base(substrString(Bin, 2, lengthString(Bin)), 2)
+    requires lengthString(Bin) >=Int 2 andBool substrString(Bin, 0, 2) ==String "0b"
+  rule processIntLit(Dec::String) => String2Int(Dec) [owise]
+
+  rule [ T::Type ; I::IntLit ] => [ T ; {intLit(I)}:>Int ] [macro]
+
+  syntax Exp ::= intExp(Exp, Exp)
+  rule intExp(L, R)
+    => ((L * R)
+   #Or ((L &* R)
+   #Or ((L / R)
+   #Or ((L &/ R)
+   #Or ((L % R)
+   #Or ((L + R)
+   #Or ((L &+ R)
+   #Or ((L - R)
+   #Or ((L &- R)
+   #Or ((L == R)
+   #Or ((L != R)
+   #Or ((L < R)
+   #Or ((L <= R)
+   #Or ((L > R)
+   #Or (L >= R)))))))))))))))::Exp [macro]
+
+  rule <k> intExp(I1:Int, v(I2, T)) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+  rule <k> intExp(v(I1, T), I2:Int) #as O::Exp => fillExp(v(I1, T), v(I2, T), O) ... </k>
+
+  syntax Exp ::= fillExp(TypedVal, TypedVal, Exp) [function]
+  rule fillExp(L, R, _ * _) => L * R
+  rule fillExp(L, R, _ &* _) => L &* R
+  rule fillExp(L, R, _ / _) => L / R
+  rule fillExp(L, R, _ &/ _) => L &/ R
+  rule fillExp(L, R, _ % _) => L % R
+  rule fillExp(L, R, _ + _) => L + R
+  rule fillExp(L, R, _ &+ _) => L &+ R
+  rule fillExp(L, R, _ - _) => L - R
+  rule fillExp(L, R, _ &- _) => L &- R
+  rule fillExp(L, R, _ == _) => L == R
+  rule fillExp(L, R, _ != _) => L != R
+  rule fillExp(L, R, _ < _) => L < R
+  rule fillExp(L, R, _ <= _) => L <= R
+  rule fillExp(L, R, _ > _) => L > R
+  rule fillExp(L, R, _ >= _) => L >= R
+
+  rule <k> B:Bool => v(B, Bool) ... </k>
+
+  rule <k> - I:Int => 0 -Int I ... </k>
+  rule <k> - v(I, T) => v(0 -Int I, T) ... </k>
+
+  rule <k> ! v(B, T) => v(notBool B, T) ... </k>
+
+  rule <k> I1  * I2 => I1 *Int I2 ... </k>
+  rule <k> I1 &* I2 => I1 *Int I2 ... </k>
+  rule <k> I1  / I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1 &/ I2 => I1 /Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  % I2 => I1 %Int I2 ... </k> requires I2 =/=Int 0
+  rule <k> I1  + I2 => I1 +Int I2 ... </k>
+  rule <k> I1 &+ I2 => I1 +Int I2 ... </k>
+  rule <k> (I1  - I2)::Exp => I1 -Int I2 ... </k>
+  rule <k> I1 &- I2 => I1 -Int I2 ... </k>
+  rule <k> I1 == I2 => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> I1 != I2 => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> I1 < I2 => v(I1 <Int I2, Bool) ... </k>
+  rule <k> I1 <= I2 => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> I1 > I2 => v(I1 >Int I2, Bool) ... </k>
+  rule <k> I1 >= I2 => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(I1, T)  * v(I2, T) => check(v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T) &* v(I2, T) => chop (v(I1 *Int I2, T)) ... </k>
+  rule <k> v(I1, T)  / v(I2, T) => check(v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T) &/ v(I2, T) => chop (v(I1 /Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  % v(I2, T) => check(v(I1 %Int I2, T)) ... </k> requires I2 =/=Int 0
+  rule <k> v(I1, T)  + v(I2, T) => check(v(I1 +Int I2, T)) ... </k>
+  rule <k> v(I1, T) &+ v(I2, T) => chop (v(I1 +Int I2, T)) ... </k>
+  rule <k> (v(I1, T)  - v(I2, T))::Exp => check(v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, T) &- v(I2, T) => chop (v(I1 -Int I2, T)) ... </k>
+  rule <k> v(I1, _) == v(I2, _) => v(I1 ==Int I2, Bool) ... </k>
+  rule <k> v(I1, _) != v(I2, _) => v(I1 =/=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) < v(I2, T) => v(I1 <Int I2, Bool) ... </k>
+  rule <k> v(I1, T) <= v(I2, T) => v(I1 <=Int I2, Bool) ... </k>
+  rule <k> v(I1, T) > v(I2, T) => v(I1 >Int I2, Bool) ... </k>
+  rule <k> v(I1, T) >= v(I2, T) => v(I1 >=Int I2, Bool) ... </k>
+
+  rule <k> v(B1, _) == v(B2, _) => v(B1 ==Bool B2, Bool) ... </k>
+  rule <k> v(B1, _) != v(B2, _) => v(B1 =/=Bool B2, Bool) ... </k>
+
+  rule <k> v(true, T) && E => E ... </k>
+  rule <k> v(false, T) && _ => v(false, Bool) ... </k>
+  rule <k> v(true, T) || E => v(true, Bool) ... </k>
+  rule <k> v(false, T) || E => E ... </k>
+
+  rule v(true, T) ? E1 : E2 => giveType(E1, type(E1, E2))
+  rule v(false, T) ? E1 : E2 => giveType(E2, type(E1, E2))
+
+  syntax Exp ::= giveType(Exp, Type) [strict(1)]
+  rule giveType(v(...) #as V, _) => V
+  rule giveType(I:Int, IntLit) => I
+  rule giveType(I:Int, T) => v(I, T) requires T =/=K IntLit
+
+endmodule
+
+module FPL-ARRAYS
+  imports FPL-CONFIGURATION
+  imports FPL-TYPING
+  imports FPL-VARIABLE-DECLARATION
+
+  rule [ Vs ] => array(arrayLit(Vs))
+    requires isKResult(Vs)
+  syntax List ::= arrayLit(Exps) [function]
+  rule arrayLit(.Vals) => .List
+  rule arrayLit(V:Val, Vs) => ListItem(V) arrayLit(Vs)
+  rule arrayLit(v(V, _), Vs) => ListItem(V) arrayLit(Vs)
+
+  rule (_::Exp [ v(I:Int, _) => I ])::Exp
+  rule (v(array(L::List), [T]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+    requires I >=Int 0 andBool I <Int size(L)
+  rule (v(array(L::List), [T ; _:Int ]) [ I:Int ])::Exp => v({L [ I ]}:>Val, T)
+    requires I >=Int 0 andBool I <Int size(L)
+  rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
+    requires I <Int 0 orBool I >=Int size(L)
+
+  rule <k> loc(Loc, Idx, [_] #Or [_;_::Int]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V </store>
+  rule loc(L, Idx, ([_] #Or [_;_::Int]) #as T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
+  rule loc(L, Idx, [T] #Or [T;_::Int]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
+  rule v(array(L::List), _) . length => v(size(L), Int)
+  rule v(array(L::List), T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, concat, x), .Map), ((T): T))
+  rule v(array(L::List), [T]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, contains, x), .Map), ((T): Bool))
+  rule loc(L, Idx, [T]) . append => v(funDef(#token("_", "Ident") x: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, append, x), .Map), ((T): Void))
+  rule loc(L, Idx, [T]) . insert => v(funDef(at x: Int, #token("_", "Ident") y: T, Void, pre { .Conditions }, arrayBuiltin(L, Idx, insert, x, y), .Map), ((Int, T): Void))
+  rule loc(L, Idx, [T]) . remove => v(funDef(at x: Int, T, pre { .Conditions }, return arrayBuiltin(L, Idx, remove, x), .Map), ((Int): T))
+  rule loc(L, Idx, [T]) . removeFirst => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeFirst, .Exps), .Map), ((.Types): T))
+  rule loc(L, Idx, [T]) . removeLast => v(funDef(.Formals, T, pre { .Conditions }, return arrayBuiltin(L, Idx, removeLast, .Exps), .Map), ((.Types): T))
+
+  syntax Exp ::= arrayBuiltin(List, Ident, Exps) [strict(3)]
+  rule arrayBuiltin(L, concat, v(array(L2), _)) => array(L L2)
+  rule arrayBuiltin(L, contains, v(V, _)) => V in L
+
+  syntax Exp ::= arrayBuiltin(Int, List, Ident, Exps) [strict(4)]
+  rule <k> arrayBuiltin(Loc, Idx, concat, v(array(L2), _)) => #fun(array(L) => array(L L2))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, contains, v(V', _)) => #fun(array(L) => V' in L)(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V ... </store>
+  rule <k> arrayBuiltin(Loc, Idx, append, v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(L ListItem(V')))(getLoc(Idx, V)))) ...</store>
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), v(V', _)) => v(unit(), Void) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) ListItem(V') range(L, At, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, insert, v(At, _), _) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => getLoc(Idx ListItem(At), V) ... </k>
+       <store>... Loc |-> (V => updateLoc(Idx, V, #fun(array(L) => array(range(L, 0, size(L) -Int At) range(L, At +Int 1, 0)))(getLoc(Idx, V)))) ...</store>
+    requires At >=Int 0 andBool At <Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx, remove, v(At, _)) => panic("Array indexing out of bounds") ... </k>
+       <store>... Loc |-> V ... </store>
+    requires At <Int 0 orBool At >=Int #fun(array(L) => size(L))(getLoc(Idx, V))
+  rule <k> arrayBuiltin(Loc, Idx::List, removeFirst, .Exps) => arrayBuiltin(Loc, Idx, remove, v(0, Int)) ... </k>
+  rule <k> arrayBuiltin(Loc, Idx, removeLast, .Exps) => arrayBuiltin(Loc, Idx, remove, v(#fun(array(L) => size(L) -Int 1)(getLoc(Idx, V)), Int)) ... </k>
+       <store>... Loc |-> V ...</store>
+endmodule
+
+module FPL
+  imports FPL-CONFIGURATION
+  imports FPL-VARIABLE-DECLARATION
+  imports FPL-STMTS
+  imports FPL-FUNCTIONS
+  imports FPL-ARITHMETIC
+  imports FPL-ARRAYS
+
+  rule T::TopDefinition ; Ts::Pgm => T ~> Ts
+endmodule
+
+module FPL-TESTING-COMMON-SYNTAX
+  imports FPL-COMMON-SYNTAX
+  syntax Definition ::= "assert" Exp [strict]
+endmodule
+
+module FPL-TESTING-SYNTAX
+  imports FPL-SYNTAX
+  imports FPL-TESTING-COMMON-SYNTAX
+endmodule
+
+module FPL-TESTING
+  imports FPL
+  imports FPL-TESTING-COMMON-SYNTAX
+
+  rule <k> initialize(assert E) => assert E ... </k>
+  rule <k> assert v(true, Bool) => . ... </k>
+  rule <k> declare(assert _) => . ... </k>
+
+  rule <k> .K #Or panic(_) </k>
+       <scope> Scope => global </scope>
+       <env> E => .Map </env>
+       <store> State => .Map </store>
+       <fstack> FS => .List </fstack>
+       <lstack> LS => .List </lstack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool FS =/=K .List orBool LS =/=K .List
+
+  rule <k> panic(S::String => "") </k>
+    requires S =/=String ""
+endmodule
