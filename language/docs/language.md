@@ -2824,7 +2824,8 @@ let example = GetterExample(balance: 10)
 // `example.balance` is `10`
 
 example.balance = -50
-// `example.balance` is `-50` internally, but while reading value, getter returns `0` instead.
+// The stored value of the field `example` is `-50` internally,
+// though `example.balance` is `0` because the getter for `balance` returns `0` instead.
 ```
 
 Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses.
