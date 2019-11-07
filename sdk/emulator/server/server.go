@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
+	"google.golang.org/grpc/reflection"
 )
 
 // EmulatorServer is a local server that runs a Flow Emulator instance.
@@ -41,6 +42,7 @@ type Config struct {
 	HTTPPort       int
 	BlockInterval  time.Duration
 	RootAccountKey *flow.AccountPrivateKey
+	GRPCDebug      bool
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
@@ -81,15 +83,20 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		conf.HTTPPort = defaultHTTPPort
 	}
 
+	newServer := grpc.NewServer()
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
 			logger:     logger,
 			eventStore: eventStore,
 		},
-		grpcServer: grpc.NewServer(),
+		grpcServer: newServer,
 		config:     conf,
 		logger:     logger,
+	}
+
+	if conf.GRPCDebug {
+		reflection.Register(newServer)
 	}
 
 	address := server.backend.blockchain.RootAccountAddress()
