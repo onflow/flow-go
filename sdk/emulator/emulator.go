@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
-	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -514,42 +513,6 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []flow.Event) {
 	for _, event := range events {
 		b.onEventEmitted(event, 0, nil)
 	}
-}
-
-// createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(
-	ws *state.WorldState,
-	customPrivateKey *flow.AccountPrivateKey,
-) (flow.Account, flow.AccountPrivateKey) {
-	var privateKey flow.AccountPrivateKey
-
-	if customPrivateKey == nil {
-		var err error
-		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
-			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		privateKey = *customPrivateKey
-	}
-
-	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
-	publicKeyBytes, _ := flow.EncodeAccountPublicKey(publicKey)
-
-	registers := ws.Registers.NewView()
-
-	runtimeContext := execution.NewRuntimeContext(registers)
-	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{publicKeyBytes},
-		[]byte{},
-	)
-
-	ws.SetRegisters(registers.UpdatedRegisters())
-
-	account := runtimeContext.GetAccount(accountAddress)
-
-	return *account, privateKey
 }
 
 // createAccount creates an account with the given private key and injects it
