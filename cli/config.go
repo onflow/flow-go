@@ -100,10 +100,11 @@ func LoadConfig() *Config {
 	f, err := os.Open(ConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			fmt.Printf("Emulator config file %s does not exist. Please initialize first\n", ConfigPath)
+		} else {
+			fmt.Printf("Failed to open project configuration in %s\n", ConfigPath)
 		}
 
-		fmt.Printf("Failed to open project configuration in %s\n", ConfigPath)
 		os.Exit(1)
 	}
 

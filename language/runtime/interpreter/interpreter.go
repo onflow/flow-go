@@ -617,7 +617,7 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 
 func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
 	// NOTE: see visitFunctionBlock
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType sema.Type) Trampoline {
@@ -794,7 +794,7 @@ func (interpreter *Interpreter) VisitIfStatement(statement *ast.IfStatement) ast
 	case *ast.VariableDeclaration:
 		return interpreter.visitIfStatementWithVariableDeclaration(test, statement.Then, statement.Else)
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
@@ -945,7 +945,7 @@ func (interpreter *Interpreter) visitAssignmentValue(target ast.Expression, valu
 		return interpreter.visitMemberExpressionAssignment(target, value)
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) Trampoline {
@@ -977,7 +977,7 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 				return Done{}
 
 			default:
-				panic(&errors.UnreachableError{})
+				panic(errors.NewUnreachableError())
 			}
 		})
 }
@@ -1200,6 +1200,8 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	left = interpreter.unbox(left)
 	right = interpreter.unbox(right)
 
+	// TODO: add support for arrays and dictionaries
+
 	switch left := left.(type) {
 	case IntegerValue:
 		// NOTE: might be NilValue
@@ -1210,7 +1212,7 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 		return left.Equal(right)
 
 	case BoolValue:
-		return BoolValue(left == right)
+		return left == right
 
 	case NilValue:
 		_, ok := right.(NilValue)
@@ -1223,9 +1225,13 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 			return false
 		}
 		return left.Equal(right)
+
+	case CompositeValue:
+		// TODO: call `equals` if RHS is composite
+		return false
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpression) ast.Repr {
@@ -1378,7 +1384,7 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 				return Done{Result: result}
 
 			default:
-				panic(&errors.UnreachableError{})
+				panic(errors.NewUnreachableError())
 			}
 		})
 }
@@ -1864,7 +1870,7 @@ func (interpreter *Interpreter) compositeFunction(
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
 	// fields can't be interpreted
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {

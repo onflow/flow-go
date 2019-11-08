@@ -1058,7 +1058,7 @@ func (e *ResourceUseAfterInvalidationError) Error() string {
 	case wasDestroyed:
 		return "use of destroyed resource"
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
@@ -1073,7 +1073,7 @@ func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
 	case wasDestroyed:
 		message = "resource used here after being destroyed"
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	if e.InLoop {

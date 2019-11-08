@@ -380,7 +380,7 @@ func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface
 		return common.CompositeKindContract
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
@@ -650,7 +650,7 @@ func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
 	} else if isPostCondition {
 		kind = ast.ConditionKindPost
 	} else {
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	test := ctx.test.Accept(v).(ast.Expression)
@@ -808,7 +808,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	} else if ctx.testDeclaration != nil {
 		test = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
 	} else {
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	then := ctx.then.Accept(v).(*ast.Block)
@@ -1173,7 +1173,7 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 		return ast.OperationMove
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -1194,7 +1194,7 @@ func (v *ProgramVisitor) VisitComposedExpression(ctx *ComposedExpressionContext)
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
 		default:
-			panic(&errors.UnreachableError{})
+			panic(errors.NewUnreachableError())
 		}
 	}
 
@@ -1221,7 +1221,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 		}
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
@@ -1479,7 +1479,7 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 		}
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitNilLiteral(ctx *NilLiteralContext) interface{} {
@@ -1572,7 +1572,7 @@ func parseHex(b byte) rune {
 		return c - 'A' + 10
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
@@ -1692,7 +1692,7 @@ func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 		return ast.OperationUnequal
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
@@ -1712,7 +1712,7 @@ func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{}
 		return ast.OperationGreaterEqual
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
@@ -1724,7 +1724,7 @@ func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
@@ -1740,5 +1740,5 @@ func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) int
 		return ast.OperationMod
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

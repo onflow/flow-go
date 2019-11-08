@@ -222,12 +222,12 @@ func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 			},
 		)
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
 func (v StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 // ArrayValue
@@ -413,12 +413,12 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 			},
 		)
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
 func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 // IntegerValue
@@ -1216,7 +1216,7 @@ func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, va
 		delete(v, key)
 		return
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
@@ -1287,12 +1287,12 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 		)
 
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
 func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 type DictionaryEntryValues struct {
@@ -1515,7 +1515,7 @@ func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange 
 			LocationRange: locationRange,
 		})
 	default:
-		panic(errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 

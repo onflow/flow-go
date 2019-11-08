@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=OperandSide
 
@@ -20,5 +22,5 @@ func (s OperandSide) Name() string {
 		return "right"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

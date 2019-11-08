@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=TransferOperation
 
@@ -20,5 +22,5 @@ func (k TransferOperation) Operator() string {
 		return "<-"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

@@ -41,3 +41,31 @@ func NewRand(seed []uint64) (*Rand, error) {
 	}
 	return rand, nil
 }
+
+// RandomPermutationSubset implements Fisher-Yates Shuffle (inside-outside) on a slice of ints with
+// size n using the given seed s and returns a subset m of it
+func RandomPermutationSubset(n int, m int, s []uint64) ([]int, error) {
+	items, err := RandomPermutation(n, s)
+	if err != nil {
+		return nil, err
+	}
+	return items[:m], nil
+}
+
+// RandomPermutation implements Fisher-Yates Shuffle (inside-outside) on a slice of ints with
+// size n using the given seed s and returns the slice
+func RandomPermutation(n int, s []uint64) ([]int, error) {
+	items := make([]int, n)
+	rand, err := NewRand(s)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < n; i++ {
+		j := rand.IntN(i + 1)
+		if j != i {
+			items[i] = items[j]
+		}
+		items[j] = i
+	}
+	return items, nil
+}

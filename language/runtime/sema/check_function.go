@@ -276,7 +276,7 @@ func (checker *Checker) declareParameters(
 
 func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
 	// NOTE: see visitFunctionBlock
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (checker *Checker) visitFunctionBlock(

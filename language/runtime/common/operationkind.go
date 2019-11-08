@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=OperationKind
 
@@ -23,5 +25,5 @@ func (k OperationKind) Name() string {
 		return "ternary"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
