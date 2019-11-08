@@ -617,7 +617,7 @@ let b = a ?? 2
 let c = 1 ?? 2
 ```
 
-The type of the right-hand side of the operator (the alternative value) must be compatible
+The type of the right-hand side of the operator (the alternative value) must be a subtype
 with the left-hand side, i.e. the right-hand side of the operator must
 be the non-optional or optional type matching the type of the left-hand side.
 
