@@ -38,46 +38,42 @@ func (s *JointFeldmanState) init() {
 }
 
 // StartDKG starts running a DKG
-func (s *JointFeldmanState) StartDKG(seed []byte) *DKGoutput {
-	if !s.jointRunning {
-		for i := index(0); int(i) < s.size; i++ {
-			if i != s.currentIndex {
-				s.fvss[i].running = false
-				s.fvss[i].StartDKG(seed)
-			}
-		}
-		//fmt.Println(s.currentIndex, s.fvss[s.currentIndex].leaderIndex, s.fvss[s.currentIndex].currentIndex)
-		s.fvss[s.currentIndex].running = false
-		out := s.fvss[s.currentIndex].StartDKG(seed)
-		s.jointRunning = true
-		return out
-	}
-	return &DKGoutput{valid, nil, nil}
-}
-
-// NextTimeout set the next timeout of the protocol if any timeout applies
-func (s *JointFeldmanState) NextTimeout() *DKGoutput {
-	out := &DKGoutput{
-		result: valid,
-		action: []DKGToSend{},
-		err:    nil,
-	}
-
-	if !s.jointRunning {
-		out.err = cryptoError{"dkg protocol is not running"}
-		return out
+func (s *JointFeldmanState) StartDKG(seed []byte) error {
+	if s.jointRunning {
+		return cryptoError{"dkg is already running"}
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
-		loopOut := s.fvss[i].NextTimeout()
-		if loopOut.err != nil {
-			out.err = cryptoError{"next timeout has failed"}
-		}
-		if loopOut.action != nil {
-			out.action = append(out.action, loopOut.action...)
+		if i != s.currentIndex {
+			s.fvss[i].running = false
+			err := s.fvss[i].StartDKG(seed)
+			if err != nil {
+				return cryptoError{"error when starting dkg"}
+			}
 		}
 	}
-	return out
+	s.fvss[s.currentIndex].running = false
+	err := s.fvss[s.currentIndex].StartDKG(seed)
+	if err != nil {
+		return err
+	}
+	s.jointRunning = true
+	return nil
+}
+
+// NextTimeout set the next timeout of the protocol if any timeout applies
+func (s *JointFeldmanState) NextTimeout() error {
+	if !s.jointRunning {
+		return cryptoError{"dkg protocol is not running"}
+	}
+
+	for i := index(0); int(i) < s.size; i++ {
+		err := s.fvss[i].NextTimeout()
+		if err != nil {
+			return cryptoError{"next timeout has failed"}
+		}
+	}
+	return nil
 }
 
 // EndDKG ends a DKG protocol, the public data and node private key are finalized
@@ -100,6 +96,7 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 			for _, c := range s.fvss[i].complaints {
 				if c.received && !c.answerReceived {
 					s.fvss[i].disqualified = true
+					s.processor.Blacklist(i)
 					disqualifiedTotal++
 					break
 				}
@@ -140,27 +137,17 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 }
 
 // ReceiveDKGMsg processes a new DKG message received by the current node
-func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
-	out := &DKGoutput{
-		result: valid,
-		action: []DKGToSend{},
-		err:    nil,
-	}
-
+func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		out.result = invalid
-		return out
+		return cryptoError{"dkg protocol is not running"}
 	}
 	for i := index(0); int(i) < s.size; i++ {
-		loopOut := s.fvss[i].ReceiveDKGMsg(orig, msg)
-		if loopOut.err != nil {
-			out.err = cryptoError{"receive dkg message has failed"}
-		}
-		if loopOut.action != nil {
-			out.action = append(out.action, loopOut.action...)
+		err := s.fvss[i].ReceiveDKGMsg(orig, msg)
+		if err != nil {
+			return cryptoError{"receive dkg message has failed"}
 		}
 	}
-	return out
+	return nil
 }
 
 // Running returns the running state of Joint Feldman protocol

@@ -30,12 +30,8 @@ func TestJointFeldman(t *testing.T) {
 		})
 		// create DKG in all nodes
 		var err error
-		processors[current].dkg, err = NewDKG(JointFeldman, n, current, 0)
+		processors[current].dkg, err = NewDKG(JointFeldman, n, current, &processors[current], 0)
 		assert.Nil(t, err)
-		if err != nil {
-			log.Error(err.Error())
-			return
-		}
 	}
 
 	// create the node channels
@@ -46,8 +42,8 @@ func TestJointFeldman(t *testing.T) {
 	// start DKG in all nodes
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
-		out := processors[current].dkg.StartDKG(seed)
-		out.processDkgOutput(&processors[current], t)
+		err := processors[current].dkg.StartDKG(seed)
+		assert.Nil(t, err)
 	}
 	// sync the first timeout at all nodes and start the second phase
 	for i := 0; i < n; i++ {

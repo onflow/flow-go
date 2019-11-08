@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
+func (s *feldmanVSSstate) generateShares(seed []byte) {
 	seedRelic(seed)
 	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
@@ -21,15 +21,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 		_G2scalarGenMult(&s.A[i], &s.a[i])
 	}
 
-	// prepare the DKGToSend slice and compute the shares
-	out := &DKGoutput{
-		result: valid,
-		err:    nil,
-	}
-
-	// s.size-1 DKGToSend to be sent to the other nodes
-	// One DKGToSend to be broadcasted
-	out.action = make([]DKGToSend, s.size)
+	// compute the shares
 	for i := index(1); int(i) <= s.size; i++ {
 		// the leader own share
 		if i-1 == s.currentIndex {
@@ -42,42 +34,39 @@ func (s *feldmanVSSstate) generateShares(seed []byte) *DKGoutput {
 			continue
 		}
 		// the other node shares
-		toSend := &(out.action[indexOrder(s.currentIndex, i-1)])
-		toSend.broadcast = false
-		toSend.dest = int(i - 1)
-
 		data := make([]byte, shareSize+1)
 		data[0] = byte(FeldmanVSSshare)
 		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
-		toSend.data = DKGmsg(data)
+		s.processor.Send(int(i-1), data)
 	}
-	// prepare the DKGToSend to be broadcasted
-	toBroadcast := &(out.action[s.size-1])
-	toBroadcast.broadcast = true
+	// broadcast the vector
 	vectorSize := verifVectorSize * (s.threshold + 1)
 	data := make([]byte, vectorSize+1)
 	data[0] = byte(FeldmanVSSVerifVec)
 	writeVerifVector(data[1:], s.A)
-	toBroadcast.data = DKGmsg(data)
+	s.processor.Broadcast(data)
 
 	s.AReceived = true
 	s.xReceived = true
-	return out
+	s.validKey = true
 }
 
-func (s *feldmanVSSstate) receiveShare(origin index, data []byte) DKGresult {
+func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	// only accept private shares from the leader.
 	if origin != s.leaderIndex {
-		return invalid
+		return
 	}
 
 	if s.xReceived {
-		return invalid
+		s.processor.FlagMisbehavior(int(origin), duplicated)
+		return
 	}
 
 	if (len(data)) != shareSize {
-		return invalid
+		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		return
 	}
+
 	// temporary log
 	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
 	log.Debugf("the share is %d\n", data)
@@ -90,21 +79,22 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) DKGresult {
 
 	s.xReceived = true
 	if s.AReceived {
-		return s.verifyShare()
+		s.validKey = s.verifyShare()
 	}
-	return valid
 }
 
-func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) DKGresult {
+func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	// only accept the verification vector from the leader.
 	if origin != s.leaderIndex {
-		return invalid
+		return
 	}
 	if s.AReceived {
-		return invalid
+		s.processor.FlagMisbehavior(int(origin), duplicated)
+		return
 	}
 	if verifVectorSize*(s.threshold+1) != len(data) {
-		return invalid
+		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		return
 	}
 
 	// temporary log
@@ -119,9 +109,8 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) DKGresul
 
 	s.AReceived = true
 	if s.xReceived {
-		return s.verifyShare()
+		s.validKey = s.verifyShare()
 	}
-	return valid
 }
 
 // ZrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
@@ -157,13 +146,10 @@ func readVerifVector(A []pointG2, src []byte) {
 	)
 }
 
-func (s *feldmanVSSstate) verifyShare() DKGresult {
+func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	if C.verifyshare((*C.bn_st)(&s.x),
-		(*C.ep2_st)(&s.y[s.currentIndex])) == 1 {
-		return valid
-	}
-	return invalid
+	return C.verifyshare((*C.bn_st)(&s.x),
+		(*C.ep2_st)(&s.y[s.currentIndex])) == 1
 }
 
 // computePublicKeys computes the nodes public keys from the verification vector

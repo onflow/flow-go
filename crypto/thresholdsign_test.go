@@ -23,8 +23,8 @@ func tsDkgRunChan(n int, proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving DKG from %d:", proc.current, newMsg.orig)
-			out := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.msg.(DKGmsg))
-			out.processDkgOutput(proc, t)
+			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.msg)
+			assert.Nil(t, err)
 
 		// if timeout, finalize DKG and sign the share
 		case <-time.After(time.Second):
@@ -57,7 +57,7 @@ func tsRunChan(proc *testDKGProcessor, tsSync chan int, t *testing.T) {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Infof("%d Receiving TS from %d:", proc.current, newMsg.orig)
 			verif, thresholdSignature, err := proc.ts.ReceiveThresholdSignatureMsg(
-				newMsg.orig, newMsg.msg.(Signature))
+				newMsg.orig, newMsg.msg)
 			assert.Nil(t, err)
 			assert.True(t, verif,
 				"the signature share sent from %d to %d is not correct", newMsg.orig,
@@ -103,7 +103,8 @@ func TestThresholdSignature(t *testing.T) {
 		})
 		// create DKG in all nodes
 		var err error
-		processors[current].dkg, err = NewDKG(FeldmanVSS, n, current, lead)
+		processors[current].dkg, err = NewDKG(FeldmanVSS, n, current,
+			&processors[current], lead)
 		assert.Nil(t, err)
 		if err != nil {
 			log.Error(err.Error())
@@ -119,8 +120,8 @@ func TestThresholdSignature(t *testing.T) {
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
-		out := processors[current].dkg.StartDKG(seed)
-		out.processDkgOutput(&processors[current], t)
+		err := processors[current].dkg.StartDKG(seed)
+		assert.Nil(t, err)
 	}
 
 	// this loop synchronizes the main thread to end DKG

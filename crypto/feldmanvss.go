@@ -24,6 +24,8 @@ type feldmanVSSstate struct {
 	xReceived bool
 	// Public keys of the group nodes, the vector size is (n)
 	y []pointG2
+	// true if the private share is valid
+	validKey bool
 }
 
 func (s *feldmanVSSstate) init() {
@@ -37,57 +39,44 @@ func (s *feldmanVSSstate) init() {
 	s.AReceived = false
 }
 
-func (s *feldmanVSSstate) StartDKG(seed []byte) *DKGoutput {
-	if !s.running {
-		s.running = true
-		// Generate shares if necessary
-		if s.leaderIndex == s.currentIndex {
-			return s.generateShares(seed)
-		}
+func (s *feldmanVSSstate) StartDKG(seed []byte) error {
+	if s.running {
+		return cryptoError{"dkg is already running"}
 	}
-	out := &DKGoutput{
-		result: valid,
-		err:    nil,
+
+	s.running = true
+	// Generate shares if necessary
+	if s.leaderIndex == s.currentIndex {
+		s.generateShares(seed)
 	}
-	return out
+	return nil
 }
 
 func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
+	if !s.running {
+		return nil, nil, nil, cryptoError{"dkg is not running"}
+	}
 	s.running = false
-	errorString := ""
+	if !s.validKey {
+		return nil, nil, nil, cryptoError{"keys are not correct"}
+	}
 	// private key of the current node
-	var x PrivateKey
-	if s.xReceived {
-		x = &PrKeyBLS_BLS12381{
-			alg:    s.blsContext, // signer algo
-			scalar: s.x,          // the private share
-		}
-	} else {
-		errorString += "The private key is missing\n"
+	x := &PrKeyBLS_BLS12381{
+		alg:    s.blsContext, // signer algo
+		scalar: s.x,          // the private share
 	}
 
 	// Group public key
-	var Y PublicKey
-	if s.AReceived {
-		Y = &PubKeyBLS_BLS12381{
-			point: s.A[0],
-		}
-	} else {
-		errorString += "The group public key is missing\n"
+	Y := &PubKeyBLS_BLS12381{
+		point: s.A[0],
 	}
+
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
-	if s.y != nil {
-		for i, p := range s.y {
-			y[i] = &PubKeyBLS_BLS12381{
-				point: p,
-			}
+	for i, p := range s.y {
+		y[i] = &PubKeyBLS_BLS12381{
+			point: p,
 		}
-	} else {
-		errorString += "The nodes public keys are missing\n"
-	}
-	if errorString != "" {
-		return x, Y, y, cryptoError{errorString}
 	}
 	return x, Y, y, nil
 }
@@ -99,32 +88,33 @@ const (
 	verifVectorSize = PubKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
-	out := &DKGoutput{
-		action: []DKGToSend{},
-		err:    nil,
+func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
+	if !s.running {
+		return cryptoError{"dkg is not running"}
+	}
+	if orig >= s.Size() {
+		return cryptoError{"wrong input"}
 	}
 
-	if !s.running || orig >= s.Size() || len(msg) == 0 {
-		out.result = invalid
-		return out
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, wrongFormat)
+		return nil
 	}
 
 	// In case a broadcasted message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
-		out.result = valid
-		return out
+		return nil
 	}
 
 	// msg = |tag| Data |
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result = s.receiveShare(index(orig), msg[1:])
+		s.receiveShare(index(orig), msg[1:])
 	case FeldmanVSSVerifVec:
-		out.result = s.receiveVerifVector(index(orig), msg[1:])
+		s.receiveVerifVector(index(orig), msg[1:])
 	default:
-		out.result = invalid
+		s.processor.FlagMisbehavior(orig, wrongFormat)
 	}
-	return out
+	return nil
 }

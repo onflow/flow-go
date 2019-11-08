@@ -27,14 +27,14 @@ type DKGstate interface {
 	// Threshold returns the threshold value t
 	Threshold() int
 	// StartDKG starts running a DKG
-	StartDKG(seed []byte) *DKGoutput
+	StartDKG(seed []byte) error
 	// NextTimeout set the next timeout of the protocol if any timeout applies
-	NextTimeout() *DKGoutput
+	NextTimeout() error
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ReceiveDKGMsg processes a new DKG message received by the current node
 	// orig is the message origin index
-	ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput
+	ReceiveDKGMsg(orig int, msg []byte) error
 	// Running returns the running state of the DKG protocol
 	Running() bool
 }
@@ -53,7 +53,8 @@ func optimalThreshold(size int) int {
 // NewDKG creates a new instance of a DKG protocol.
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
-func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate, error) {
+func NewDKG(dkg DKGType, size int, currentIndex int,
+	processor DKGprocessor, leaderIndex int) (DKGstate, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", DKGMinSize, DKGMaxSize)}
 	}
@@ -68,6 +69,7 @@ func NewDKG(dkg DKGType, size int, currentIndex int, leaderIndex int) (DKGstate,
 		size:         size,
 		threshold:    threshold,
 		currentIndex: index(currentIndex),
+		processor:    processor,
 	}
 	switch dkg {
 	case FeldmanVSS:
@@ -109,6 +111,8 @@ type dkgCommon struct {
 	currentIndex index
 	// running is true when the DKG protocol is runnig, is false otherwise
 	running bool
+	// processes the action of the DKG interface outputs
+	processor DKGprocessor
 }
 
 // Running returns the running state of the DKG protocol
@@ -128,12 +132,9 @@ func (s *dkgCommon) Threshold() int {
 
 // NextTimeout sets the next protocol timeout if there is any
 // this function should be overwritten by any protocol that uses timeouts
-func (s *dkgCommon) NextTimeout() *DKGoutput {
-	return &DKGoutput{invalid, nil, nil}
+func (s *dkgCommon) NextTimeout() error {
+	return nil
 }
-
-// DKGmsg is the data sent in any DKG communication
-type DKGmsg []byte
 
 // dkgMsgTag is the type used to encode message tags
 type dkgMsgTag byte
@@ -145,12 +146,6 @@ const (
 	FeldmanVSSComplaintAnswer
 )
 
-type DKGToSend struct {
-	broadcast bool   // true if it's a broadcasted message, false otherwise
-	dest      int    // if broadcast is false, dest is the destination index
-	data      DKGmsg // data to be sent, including a tag
-}
-
 // DKGresult is the supported type for the return values
 type DKGresult int
 
@@ -159,13 +154,6 @@ const (
 	valid
 	invalid
 )
-
-// DKGoutput is the outtput type of any DKG fucntion
-type DKGoutput struct {
-	result DKGresult
-	action []DKGToSend
-	err    error
-}
 
 // maps the interval [1..c-1,c+1..n] into [1..n-1]
 func indexOrder(current index, loop index) index {
@@ -179,13 +167,19 @@ func indexOrder(current index, loop index) index {
 // an instance of a DKGactor is needed for each DKG to exectute its outputs
 type DKGprocessor interface {
 	// sends a private message to a destination
-	Send(dest int, data DKGmsg)
+	Send(dest int, data []byte)
 	// broadcasts a message to all dkg nodes
 	// This function needs to make sure all nodes have received the same message
-	Broadcast(data DKGmsg)
+	Broadcast(data []byte)
 	// flags that a node is misbehaving (deserves slashing)
 	// This function needs to be called by all nodes
 	Blacklist(node int)
 	// flags that a node is misbehaving (but can't be slashed)
-	FlagMisbehavior(node int)
+	FlagMisbehavior(node int, log string)
 }
+
+const (
+	wrongFormat   = "wrong message format"
+	duplicated    = "message type is duplicated"
+	wrongProtocol = "message is not compliant with the protocol"
+)

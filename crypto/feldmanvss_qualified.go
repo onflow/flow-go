@@ -40,16 +40,9 @@ func (s *feldmanVSSQualState) init() {
 }
 
 // sets the next protocol timeout
-func (s *feldmanVSSQualState) NextTimeout() *DKGoutput {
-	out := &DKGoutput{
-		result: valid,
-		action: []DKGToSend{},
-		err:    nil,
-	}
-
+func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		out.err = cryptoError{"dkg protocol is not running"}
-		return out
+		return cryptoError{"dkg protocol is not running"}
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
@@ -58,18 +51,17 @@ func (s *feldmanVSSQualState) NextTimeout() *DKGoutput {
 		} else {
 			s.sharesTimeout = true
 		}
-		return out
+		return nil
 	}
 	if !s.sharesTimeout && !s.complaintsTimeout {
-		out.action = s.setSharesTimeout()
-		return out
+		s.setSharesTimeout()
+		return nil
 	}
 	if s.sharesTimeout && !s.complaintsTimeout {
 		s.setComplaintsTimeout()
-		return out
+		return nil
 	}
-	out.err = cryptoError{"next timeout would be to end DKG protocol"}
-	return out
+	return cryptoError{"next timeout should be to end DKG protocol"}
 }
 
 // EndDKG ends the protocol and returns the keys
@@ -89,6 +81,7 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 		for _, c := range s.complaints {
 			if c.received && !c.answerReceived {
 				s.disqualified = true
+				s.processor.Blacklist(int(s.leaderIndex))
 				break
 			}
 		}
@@ -124,40 +117,41 @@ const (
 	complainAnswerSize = 1 + PrKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg DKGmsg) *DKGoutput {
-	out := &DKGoutput{
-		result: invalid,
-		action: []DKGToSend{},
-		err:    nil,
+func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg []byte) error {
+	if !s.running {
+		return cryptoError{"dkg is not running"}
+	}
+	if orig >= s.Size() {
+		return cryptoError{"wrong input"}
 	}
 
-	if !s.running || orig >= s.Size() || len(msg) == 0 {
-		out.result = invalid
-		return out
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, wrongFormat)
+		return nil
 	}
 
 	// In case a broadcasted message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
-		out.result = valid
-		return out
+		return nil
 	}
 
 	// if leader is already disqualified, ignore the message
 	if s.disqualified {
-		return out
+		return nil
 	}
 
 	switch dkgMsgTag(msg[0]) {
 	case FeldmanVSSshare:
-		out.result, out.action = s.receiveShare(index(orig), msg[1:])
+		s.receiveShare(index(orig), msg[1:])
 	case FeldmanVSSVerifVec:
-		out.result, out.action = s.receiveVerifVector(index(orig), msg[1:])
+		s.receiveVerifVector(index(orig), msg[1:])
 	case FeldmanVSSComplaint:
-		out.result, out.action = s.receiveComplaint(index(orig), msg[1:])
+		s.receiveComplaint(index(orig), msg[1:])
 	case FeldmanVSSComplaintAnswer:
-		out.result = s.receiveComplaintAnswer(index(orig), msg[1:])
+		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
+		s.processor.FlagMisbehavior(orig, wrongFormat)
 	}
-	return out
+	return nil
 }
