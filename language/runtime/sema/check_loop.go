@@ -10,7 +10,9 @@ func (checker *Checker) VisitWhileStatement(statement *ast.WhileStatement) ast.R
 	testExpression := statement.Test
 	testType := testExpression.Accept(checker).(Type)
 
-	if !IsSubType(testType, &BoolType{}) {
+	if !testType.IsInvalidType() &&
+		!IsSubType(testType, &BoolType{}) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},

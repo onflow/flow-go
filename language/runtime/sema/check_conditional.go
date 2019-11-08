@@ -78,7 +78,9 @@ func (checker *Checker) visitConditional(
 ) {
 	testType := test.Accept(checker).(Type)
 
-	if !IsSubType(testType, &BoolType{}) {
+	if !testType.IsInvalidType() &&
+		!IsSubType(testType, &BoolType{}) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},

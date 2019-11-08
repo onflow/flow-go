@@ -21,7 +21,9 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 		// TODO: find common super type?
 		if elementType == nil {
 			elementType = valueType
-		} else if !IsSubType(valueType, elementType) {
+		} else if !valueType.IsInvalidType() &&
+			!IsSubType(valueType, elementType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: elementType,
