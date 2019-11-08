@@ -37,6 +37,29 @@ func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 	assert.Contains(t, syntaxError.Message, "extraneous input")
 }
 
+func TestParseInvalidIncompleteStringLiteral(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+	    let = "Hello, World!
+	`)
+
+	assert.Nil(t, actual)
+
+	assert.IsType(t, parser.Error{}, err)
+
+	errors := err.(parser.Error).Errors
+	assert.Len(t, errors, 3)
+
+	syntaxError := errors[0].(*parser.SyntaxError)
+
+	assert.Equal(t,
+		Position{Offset: 27, Line: 2, Column: 11},
+		syntaxError.Pos,
+	)
+
+	assert.Contains(t, syntaxError.Message, "token recognition error")
+}
+
 func TestParseNames(t *testing.T) {
 
 	names := map[string]bool{
