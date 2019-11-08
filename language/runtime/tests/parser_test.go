@@ -53,7 +53,7 @@ func TestParseInvalidIncompleteStringLiteral(t *testing.T) {
 	syntaxError := errors[0].(*parser.SyntaxError)
 
 	assert.Equal(t,
-		Position{Offset: 27, Line: 2, Column: 11},
+		Position{Offset: 26, Line: 2, Column: 11},
 		syntaxError.Pos,
 	)
 
