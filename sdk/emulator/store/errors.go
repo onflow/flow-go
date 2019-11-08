@@ -1,9 +1,9 @@
 package store
 
-// NotFoundError is an error returned when a resource cannot be found.
-type NotFoundError struct{}
+// ErrNotFound is an error returned when a resource cannot be found.
+type ErrNotFound struct{}
 
-func (e NotFoundError) Error() string {
+func (e ErrNotFound) Error() string {
 	return "emulator/store: could not find resource"
 }
 

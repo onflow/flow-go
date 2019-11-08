@@ -11,10 +11,14 @@ import (
 // Store defines the storage layer for persistent chain state.
 //
 // This includes finalized blocks and transactions, and the resultant register
-// states and emitted events.
+// states and emitted events. It does not include pending state, such as pending
+// transactions and register states.
 //
-// This does not include pending state, such as pending transactions and
-// register states.
+// Implementations must distinguish between not found errors and errors with
+// the underlying storage by returning an instance of store.ErrNotFound if a
+// resource cannot be found.
+//
+// Implementations must be safe for use by multiple goroutines.
 type Store interface {
 	GetBlockByHash(crypto.Hash) (eflow.Block, error)
 	GetBlockByNumber(blockNumber uint64) (eflow.Block, error)
