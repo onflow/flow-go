@@ -12,12 +12,15 @@ import (
 // The Vault must have been deployed already.
 func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byte {
 	template := `
-		import Vault, createVault from 0x%s
+		import Vault, createVault, Receiver, Provider from 0x%s
 
 		fun main(acct: Account) {
 			var vaultA: <-Vault? <- createVault(initialBalance: %d)
 			
 			acct.storage[Vault] <-> vaultA
+
+			acct.storage[&Receiver] = &acct.storage[Vault] as Receiver
+			acct.storage[&Provider] = &acct.storage[Vault] as Provider
 
 			destroy vaultA
 		}`
@@ -93,10 +96,100 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), withdrawVaultNumber, withdrawAmount, depositVaultNumber))
 }
 
+// GenerateDepositVaultScript creates a script that withdraws an tokens from an account
+// and deposits it to another account's vault
+func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
+	template := `
+		import Vault, Provider, Receiver from 0x%s
+
+		fun main(acct: Account) {
+			let recipient = getAccount("%s")
+
+			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+
+			let tokens <- providerRef.withdraw(amount: %d)
+
+			receiverRef.deposit(from: <-tokens)
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), amount))
+}
+
+// GenerateTransferVaultScript creates a script that withdraws an tokens from an account
+// and deposits it to another account's vault
+func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
+	template := `
+		import Vault, Provider, Receiver from 0x%s
+
+		fun main(acct: Account) {
+			let recipient = getAccount("%s")
+
+			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+
+			providerRef.transfer(to: receiverRef, amount: %d)
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), amount))
+}
+
+// GenerateInvalidTransferSenderScript creates a script that trys to do a transfer from a receiver reference, which is invalid
+func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
+	template := `
+		import Vault, Provider, Receiver from 0x%s
+
+		fun main(acct: Account) {
+			let recipient = getAccount("%s")
+
+			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+
+			receiverRef.transfer(to: receiverRef, amount: %d)
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), amount))
+}
+
+// GenerateInvalidTransferReceiverScript creates a script that trys to do a transfer from a receiver reference, which is invalid
+func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
+	template := `
+		import Vault, Provider, Receiver from 0x%s
+
+		fun main(acct: Account) {
+			let recipient = getAccount("%s")
+
+			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+
+			providerRef.transfer(to: providerRef, amount: %d)
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), amount))
+}
+
 // GenerateInspectVaultScript creates a script that retrieves a
 // Vault from the array in storage and makes assertionsabout
 // its balance. If these assertions fail, the script panics.
-func GenerateInspectVaultScript(nftCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
+func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBalance int) []byte {
+	template := `
+		import Vault, Receiver from 0x%s
+
+		fun main() {
+			let acct = getAccount("%s")
+			let vaultRef = acct.storage[&Receiver] ?? panic("missing Receiver reference")
+			if vaultRef.getBalance() != %d {
+				panic("incorrect Balance!")
+			}
+		}`
+
+	return []byte(fmt.Sprintf(template, tokenCodeAddr, userAddr, expectedBalance))
+}
+
+// GenerateInspectVaultArrayScript creates a script that retrieves a
+// Vault from the array in storage and makes assertionsabout
+// its balance. If these assertions fail, the script panics.
+func GenerateInspectVaultArrayScript(tokenCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
 	template := `
 		import Vault from 0x%s
 
@@ -113,5 +206,5 @@ func GenerateInspectVaultScript(nftCodeAddr, userAddr flow.Address, vaultNumber 
 			destroy storedVaults
 		}`
 
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, vaultNumber, expectedBalance))
+	return []byte(fmt.Sprintf(template, tokenCodeAddr, userAddr, vaultNumber, expectedBalance))
 }

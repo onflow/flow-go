@@ -1,8 +1,3 @@
-// TODO:
-// - How to get current total supply?
-// - How to "instantiate" `Faucet` and `ApprovableProvider` for `DeteToken`?
-
-
 pub resource interface Provider {
 
     pub fun withdraw(amount: Int): <-Vault {
@@ -15,6 +10,8 @@ pub resource interface Provider {
                 "Incorrect amount returned"
         }
     }
+
+    pub fun transfer(to: &Receiver, amount: Int)
 }
 
 pub resource interface Receiver {
@@ -42,39 +39,54 @@ pub resource interface Receiver {
                 "Incorrect amount removed"
         }
     }
+
+    pub fun getBalance(): Int
 }
 
 pub resource Vault: Provider, Receiver {
 
+    // keeps track of the total balance of the accounts tokens
     pub var balance: Int 
 
+    init(balance: Int) {
+        self.balance = balance
+    }
+
+    // withdraw subracts amount from the vaults balance and 
+    // returns a vault object with the subtracted balance
     pub fun withdraw(amount: Int): <-Vault {
         self.balance = self.balance - amount
         return <-create Vault(balance: amount)
     }
 
-    // pub fun transfer(to: &Vault, amount: Int) {
-    //     pre {
-    //         amount <= self.balance:
-    //             "Insufficient funds"
-    //     }
-    //     post {
-    //         self.balance == before(self.balance) - amount:
-    //             "Incorrect amount removed"
-    //     }
-    //     self.balance = self.balance - amount
-    //     to.deposit(from: <-create Vault(balance: amount))
-    // }
+    // transfer combines withdraw and deposit into one function call
+    pub fun transfer(to: &Receiver, amount: Int) {
+        pre {
+            amount <= self.balance:
+                "Insufficient funds"
+        }
+        post {
+            self.balance == before(self.balance) - amount:
+                "Incorrect amount removed"
+        }
+        to.deposit(from: <-self.withdraw(amount: amount))
+    }
 
+    // deposit takes a vault object as a parameter and adds
+    // its balance to the balance of the Account's vault, then
+    // destroys the sent vault because its balance has been consumed
     pub fun deposit(from: <-Vault) {
         self.balance = self.balance + from.balance
         destroy from
     }
 
-    init(balance: Int) {
-        self.balance = balance
+    // getBalance returns the balance of the vault
+    pub fun getBalance(): Int {
+        return self.balance
     }
 }
+
+
 
 fun createVault(initialBalance: Int): <- Vault {
     return <-create Vault(balance: initialBalance)
