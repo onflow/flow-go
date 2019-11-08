@@ -29,8 +29,8 @@ func (b *Block) Hash() crypto.Hash {
 }
 
 // GenesisBlock returns the genesis block for an emulated blockchain.
-func GenesisBlock() *Block {
-	return &Block{
+func GenesisBlock() Block {
+	return Block{
 		Number:            0,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
