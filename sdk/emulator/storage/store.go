@@ -1,6 +1,6 @@
 // Package store defines the interface and implementations for interacting with
 // persistent chain state.
-package store
+package storage
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"

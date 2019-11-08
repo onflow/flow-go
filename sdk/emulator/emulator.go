@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/store"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
@@ -30,7 +30,7 @@ import (
 // world state.
 type EmulatedBlockchain struct {
 	// Finalized chain state: blocks, transactions, registers, events
-	storage store.Store
+	storage storage.Store
 
 	// Mutex protecting pending register state and txPool
 	mu sync.RWMutex
@@ -71,7 +71,7 @@ func NewEmulatedBlockchain(opts Options) *EmulatedBlockchain {
 	// merge user-provided options with default options
 	opts = mergeOptions(DefaultOptions, opts)
 
-	storage := store.NewMemStore()
+	storage := storage.NewMemStore()
 	initialState := make(flow.Registers)
 	txPool := make(map[string]*flow.Transaction)
 
@@ -222,7 +222,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	}
 
 	if _, err := b.storage.GetTransaction(tx.Hash()); err != nil {
-		if errors.Is(err, store.ErrNotFound{}) {
+		if errors.Is(err, storage.ErrNotFound{}) {
 			return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 		} else {
 			return fmt.Errorf("Failed to check storage for transaction %w", err)

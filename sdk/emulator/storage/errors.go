@@ -1,4 +1,4 @@
-package store
+package storage
 
 // ErrNotFound is an error returned when a resource cannot be found.
 type ErrNotFound struct{}
