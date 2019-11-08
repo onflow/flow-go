@@ -184,14 +184,14 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vaults' balances are correct
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 	})
 
 	t.Run("Should fail when trying to call functions that are not exposed with the interface", func(t *testing.T) {
@@ -244,14 +244,14 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, true)
 
 		// Assert that the vaults' balances have not changed after all the fails
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 
 	})
 
@@ -268,13 +268,13 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
 		// Assert that the vaults' balances are correct
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 14))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 6))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 14))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 6))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 	})
 }
