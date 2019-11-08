@@ -70,7 +70,7 @@ ci: install-tools generate check-generated-code lint-sdk test
 install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
 
-cmd/flow/flow: cli cmd crypto model proto sdk
+cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find proto -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
 	    -ldflags \
 	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
