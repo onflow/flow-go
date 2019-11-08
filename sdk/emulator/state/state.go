@@ -5,12 +5,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // WorldState represents the current state of the blockchain.
 type WorldState struct {
-	Blocks            map[string]*eflow.Block
+	Blocks            map[string]*types.Block
 	blocksMutex       sync.RWMutex
 	Blockchain        []crypto.Hash
 	blockchainMutex   sync.RWMutex
@@ -24,13 +24,13 @@ type WorldState struct {
 
 // NewWorldState instantiates a new state object with a genesis block.
 func NewWorldState() *WorldState {
-	blocks := make(map[string]*eflow.Block)
+	blocks := make(map[string]*types.Block)
 	blockchain := make([]crypto.Hash, 0)
 	transactions := make(map[string]*flow.Transaction)
 	registers := make(flow.Registers)
 
-	genesis := eflow.GenesisBlock()
-	blocks[string(genesis.Hash())] = genesis
+	genesis := types.GenesisBlock()
+	blocks[string(genesis.Hash())] = &genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
@@ -48,7 +48,7 @@ func (ws *WorldState) Hash() crypto.Hash {
 }
 
 // GetLatestBlock gets the most recent block in the blockchain.
-func (ws *WorldState) GetLatestBlock() *eflow.Block {
+func (ws *WorldState) GetLatestBlock() *types.Block {
 	ws.blockchainMutex.RLock()
 	defer ws.blockchainMutex.RUnlock()
 
@@ -59,7 +59,7 @@ func (ws *WorldState) GetLatestBlock() *eflow.Block {
 }
 
 // GetBlockByHash gets a block by hash.
-func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *eflow.Block {
+func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *types.Block {
 	ws.blocksMutex.RLock()
 	defer ws.blocksMutex.RUnlock()
 
@@ -71,7 +71,7 @@ func (ws *WorldState) GetBlockByHash(hash crypto.Hash) *eflow.Block {
 }
 
 // GetBlockByNumber gets a block by number.
-func (ws *WorldState) GetBlockByNumber(number uint64) *eflow.Block {
+func (ws *WorldState) GetBlockByNumber(number uint64) *types.Block {
 	ws.blockchainMutex.RLock()
 	defer ws.blockchainMutex.RUnlock()
 
@@ -111,7 +111,7 @@ func (ws *WorldState) SetRegisters(registers flow.Registers) {
 }
 
 // InsertBlock adds a new block to the blockchain.
-func (ws *WorldState) InsertBlock(block *eflow.Block) {
+func (ws *WorldState) InsertBlock(block *types.Block) {
 	ws.blockchainMutex.Lock()
 	ws.blocksMutex.Lock()
 	defer ws.blocksMutex.Unlock()
