@@ -1368,7 +1368,7 @@ a = 2
 ```
 
 The left-hand side of the assignment operand must be an identifier.
-For arrays and dictionaries, followed by one or more index or access expressions.
+For arrays and dictionaries, this identifier can be followed by one or more index or access expressions.
 
 ```cadence,file=assignment-numbers.cdc
 // Declare an array of integers.
