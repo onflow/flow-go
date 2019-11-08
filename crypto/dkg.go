@@ -174,3 +174,18 @@ func indexOrder(current index, loop index) index {
 	}
 	return loop - 1
 }
+
+// DKGactor is an interface that implements the DKG output actions
+// an instance of a DKGactor is needed for each DKG to exectute its outputs
+type DKGprocessor interface {
+	// sends a private message to a destination
+	Send(dest int, data DKGmsg)
+	// broadcasts a message to all dkg nodes
+	// This function needs to make sure all nodes have received the same message
+	Broadcast(data DKGmsg)
+	// flags that a node is misbehaving (deserves slashing)
+	// This function needs to be called by all nodes
+	Blacklist(node int)
+	// flags that a node is misbehaving (but can't be slashed)
+	FlagMisbehavior(node int)
+}
