@@ -53,11 +53,13 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 
 			let nft <- collectionRef.withdraw(tokenID: %d)
 
-			depositRef.deposit(token: <-nft)
+			//collectionRef.deposit(token: <-nft)
 
-			if depositRef.idExists(tokenID: 1) == false {
+			if collectionRef.idExists(tokenID: 1) == false {
 				panic("Token ID doesn't exist!")
 			}
+
+			destroy nft
 
 		}`
 
