@@ -11,11 +11,11 @@ import (
 func TestRuntimeLogger(t *testing.T) {
 	loggedMessages := make([]string, 0)
 
-	b := emulator.NewEmulatedBlockchain(emulator.Options{
-		OnLogMessage: func(msg string) {
+	b := emulator.NewEmulatedBlockchain(emulator.WithMessageLogger(
+		func(msg string) {
 			loggedMessages = append(loggedMessages, msg)
 		},
-	})
+	))
 
 	script := []byte(`
 		fun main() {

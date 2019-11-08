@@ -15,7 +15,7 @@ import (
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
@@ -43,7 +43,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 // TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	t.Run("EmptyTransaction", func(t *testing.T) {
 		// Create empty transaction (no required fields)
@@ -137,7 +137,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	accountAddress := b.RootAccountAddress()
 
@@ -165,7 +165,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	tx1 := flow.Transaction{
 		Script:             []byte("invalid script"),
@@ -192,7 +192,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	privateKeyA := b.RootKey()
 
@@ -257,7 +257,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b := emulator.NewEmulatedBlockchain()
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
 
@@ -281,7 +281,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidAccount", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b := emulator.NewEmulatedBlockchain()
 
 		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
 
@@ -305,7 +305,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyPair", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b := emulator.NewEmulatedBlockchain()
 
 		// use key-pair that does not exist on root account
 		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -330,7 +330,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("KeyWeights", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b := emulator.NewEmulatedBlockchain()
 
 		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
@@ -382,7 +382,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MissingScriptSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b := emulator.NewEmulatedBlockchain()
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
 
@@ -408,11 +408,11 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MultipleAccounts", func(t *testing.T) {
 		loggedMessages := make([]string, 0)
 
-		b := emulator.NewEmulatedBlockchain(emulator.Options{
-			OnLogMessage: func(msg string) {
+		b := emulator.NewEmulatedBlockchain(emulator.WithMessageLogger(
+			func(msg string) {
 				loggedMessages = append(loggedMessages, msg)
 			},
-		})
+		))
 
 		privateKeyA := b.RootKey()
 
@@ -458,7 +458,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 }
 
 func TestGetTransaction(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	eventsScript := `
 		event MyEvent(x: Int)

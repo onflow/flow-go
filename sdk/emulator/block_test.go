@@ -11,7 +11,7 @@ import (
 )
 
 func TestCommitBlock(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),

@@ -55,38 +55,68 @@ type EmulatedBlockchain struct {
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-// Options is a set of configuration options for an emulated blockchain.
-type Options struct {
-	RootAccountKey *flow.AccountPrivateKey
+// Config is a set of configuration options for an emulated blockchain.
+type Config struct {
+	RootAccountKey flow.AccountPrivateKey
 	OnLogMessage   func(string)
 	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-// DefaultOptions is the default configuration for an emulated blockchain.
+// defaultConfig is the default configuration for an emulated blockchain.
 // NOTE: Instantiated in init function
-var DefaultOptions Options
+var defaultConfig Config
+
+// Option is a function applying a change to the emulator config.
+type Option func(*Config)
+
+// WithRootKey sets the root key.
+func WithRootAccountKey(rootKey flow.AccountPrivateKey) Option {
+	return func(c *Config) {
+		c.RootAccountKey = rootKey
+	}
+}
+
+// WithMessageLogger sets the onLogMessage handler function.
+func WithMessageLogger(onLogMessage func(string)) Option {
+	return func(c *Config) {
+		c.OnLogMessage = onLogMessage
+	}
+}
+
+// TODO remove
+func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash crypto.Hash)) Option {
+	return func(c *Config) {
+		c.OnEventEmitted = emitter
+	}
+}
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain(opts Options) *EmulatedBlockchain {
+func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	storage := storage.NewMemStore()
 	initialState := make(flow.Registers)
 	txPool := make(map[string]*flow.Transaction)
 
+	// apply options to the default config
+	config := defaultConfig
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	// create the root account
-	rootAccount := createAccount(initialState, *opts.RootAccountKey)
+	rootAccount := createAccount(initialState, config.RootAccountKey)
 
 	b := &EmulatedBlockchain{
 		storage:            storage,
 		pendingState:       initialState,
 		txPool:             txPool,
-		onEventEmitted:     opts.OnEventEmitted,
+		onEventEmitted:     config.OnEventEmitted,
 		rootAccountAddress: rootAccount.Address,
-		rootAccountKey:     *opts.RootAccountKey,
+		rootAccountKey:     config.RootAccountKey,
 		lastCreatedAccount: rootAccount,
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(interpreterRuntime, opts.OnLogMessage)
+	computer := execution.NewComputer(interpreterRuntime, config.OnLogMessage)
 	b.computer = computer
 
 	return b
@@ -462,7 +492,7 @@ func init() {
 		panic("Failed to generate default root key: " + err.Error())
 	}
 
-	DefaultOptions.OnLogMessage = func(string) {}
-	DefaultOptions.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
-	DefaultOptions.RootAccountKey = &defaultRootKey
+	defaultConfig.OnLogMessage = func(string) {}
+	defaultConfig.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
+	defaultConfig.RootAccountKey = defaultRootKey
 }
