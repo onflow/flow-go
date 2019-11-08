@@ -29,3 +29,25 @@ func TestRand(t *testing.T) {
 		t.Error(fmt.Sprintf("something wrong with the random generator. stdev %v, mean %v", stdev, mean))
 	}
 }
+
+func TestRandomPermutationSubset(t *testing.T) {
+	listSize := 1000
+	subsetSize := 20
+	seed := []uint64{1, 2, 3, 4, 5, 6}
+	shuffledlist, err := RandomPermutationSubset(listSize, subsetSize, seed)
+	if err != nil {
+		t.Error(fmt.Sprintf("RandomPermutationSubset returned an error"))
+
+	}
+	if len(shuffledlist) != subsetSize {
+		t.Error(fmt.Sprintf("RandomPermutationSubset returned a list with a wrong size"))
+	}
+	// check for repetition
+	has := make(map[int]bool)
+	for i := range shuffledlist {
+		if _, ok := has[shuffledlist[i]]; ok {
+			t.Error(fmt.Sprintf("dupplicated item in the results returned by RandomPermutationSubset"))
+		}
+		has[shuffledlist[i]] = true
+	}
+}
