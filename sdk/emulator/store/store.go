@@ -1,20 +1,33 @@
+// Package store defines the interface and implementations for interacting with
+// persistent chain state.
 package store
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
+// Store defines the storage layer for persistent chain state.
+//
+// This includes finalized blocks and transactions, and the resultant register
+// states and emitted events.
+//
+// This does not include pending state, such as pending transactions and
+// register states.
 type Store interface {
-	GetBlockByHash(crypto.Hash) (flow.Block, error)
-	GetBlockByNumber(blockNumber uint64) (flow.Block, error)
-	GetLatestBlock() (flow.Block, error)
+	GetBlockByHash(crypto.Hash) (eflow.Block, error)
+	GetBlockByNumber(blockNumber uint64) (eflow.Block, error)
+	GetLatestBlock() (eflow.Block, error)
 
-	InsertBlock(flow.Block) error
+	InsertBlock(eflow.Block) error
 
 	GetTransaction(crypto.Hash) (flow.Transaction, error)
 	InsertTransaction(flow.Transaction) error
 
-	GetRegistersView(blockNumber uint64) flow.RegistersView
+	GetRegistersView(blockNumber uint64) (flow.RegistersView, error)
 	SetRegisters(blockNumber uint64, registers flow.Registers) error
+
+	GetEvents(blockNumber uint64, eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
+	InsertEvents(blockNumber uint64, events ...flow.Event) error
 }

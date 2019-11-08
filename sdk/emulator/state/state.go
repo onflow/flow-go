@@ -30,7 +30,7 @@ func NewWorldState() *WorldState {
 	registers := make(flow.Registers)
 
 	genesis := eflow.GenesisBlock()
-	blocks[string(genesis.Hash())] = genesis
+	blocks[string(genesis.Hash())] = &genesis
 	blockchain = append(blockchain, genesis.Hash())
 
 	return &WorldState{
