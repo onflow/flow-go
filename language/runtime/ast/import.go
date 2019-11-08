@@ -60,6 +60,18 @@ type Location interface {
 	ID() LocationID
 }
 
+func LocationsMatch(first, second Location) bool {
+	if first == nil && second == nil {
+		return true
+	}
+
+	if (first == nil && second != nil) || (first != nil && second == nil) {
+		return false
+	}
+
+	return first.ID() == second.ID()
+}
+
 // LocationID
 
 type LocationID string

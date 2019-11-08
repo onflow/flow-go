@@ -37,7 +37,8 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 
 	// Check that the created resource is declared in the same location
 
-	if compositeType.Location.ID() != checker.Location.ID() {
+	if !ast.LocationsMatch(compositeType.Location, checker.Location) {
+
 		checker.report(
 			&CreateImportedResourceError{
 				Type:  compositeType,
