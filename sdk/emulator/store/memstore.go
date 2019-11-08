@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // memStore implements the Store interface with an in-memory store.
@@ -14,7 +14,7 @@ type memStore struct {
 	// Maps block hashes to block numbers
 	blockHashToNumber map[string]uint64
 	// Finalized blocks indexed by block number
-	blocks []eflow.Block
+	blocks []types.Block
 	// Finalized transactions by hash
 	transactions map[string]flow.Transaction
 	// Register states by block number
@@ -28,42 +28,42 @@ func NewMemStore() Store {
 	return memStore{
 		mu:                  sync.RWMutex{},
 		blockHashToNumber:   make(map[string]uint64),
-		blocks:              []eflow.Block{eflow.GenesisBlock()},
+		blocks:              []types.Block{types.GenesisBlock()},
 		transactions:        make(map[string]flow.Transaction),
 		registers:           make(map[uint64]flow.Registers),
 		eventsByBlockNumber: make(map[uint64][]flow.Event),
 	}
 }
 
-func (s memStore) GetBlockByHash(hash crypto.Hash) (eflow.Block, error) {
+func (s memStore) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	blockNumber := s.blockHashToNumber[hash.Hex()]
 	if blockNumber > s.blockHeight() {
-		return eflow.Block{}, NotFoundError{}
+		return types.Block{}, NotFoundError{}
 	}
 	return s.blocks[int(blockNumber)], nil
 }
 
-func (s memStore) GetBlockByNumber(blockNumber uint64) (eflow.Block, error) {
+func (s memStore) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if blockNumber > s.blockHeight() {
-		return eflow.Block{}, NotFoundError{}
+		return types.Block{}, NotFoundError{}
 	}
 	return s.blocks[int(blockNumber)], nil
 }
 
-func (s memStore) GetLatestBlock() (eflow.Block, error) {
+func (s memStore) GetLatestBlock() (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.getLatestBlock(), nil
 }
 
-func (s memStore) InsertBlock(block eflow.Block) error {
+func (s memStore) InsertBlock(block types.Block) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -152,7 +152,7 @@ func (s memStore) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 }
 
 // Returns the block most recently appended to the chain.
-func (s memStore) getLatestBlock() eflow.Block {
+func (s memStore) getLatestBlock() types.Block {
 	return s.blocks[len(s.blocks)-1]
 }
 

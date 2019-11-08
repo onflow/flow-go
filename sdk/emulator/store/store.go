@@ -5,7 +5,7 @@ package store
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	eflow "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // Store defines the storage layer for persistent chain state.
@@ -16,11 +16,11 @@ import (
 // This does not include pending state, such as pending transactions and
 // register states.
 type Store interface {
-	GetBlockByHash(crypto.Hash) (eflow.Block, error)
-	GetBlockByNumber(blockNumber uint64) (eflow.Block, error)
-	GetLatestBlock() (eflow.Block, error)
+	GetBlockByHash(crypto.Hash) (types.Block, error)
+	GetBlockByNumber(blockNumber uint64) (types.Block, error)
+	GetLatestBlock() (types.Block, error)
 
-	InsertBlock(eflow.Block) error
+	InsertBlock(types.Block) error
 
 	GetTransaction(crypto.Hash) (flow.Transaction, error)
 	InsertTransaction(flow.Transaction) error
