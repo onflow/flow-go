@@ -83,7 +83,7 @@ func tsRunChan(proc *testDKGProcessor, tsSync chan int, t *testing.T) {
 // Testing Threshold Signature
 // keys are generated using simple Feldman VSS
 func TestThresholdSignature(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5

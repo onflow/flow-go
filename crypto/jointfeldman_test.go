@@ -3,7 +3,6 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -12,7 +11,7 @@ import (
 
 // Testing JointFeldman by simulating a network of n nodes
 func TestJointFeldman(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 	log.Debug("Feldman VSS with complaints starts")
 	// number of nodes to test
 	n := 5
@@ -73,7 +72,7 @@ func TestJointFeldman(t *testing.T) {
 			} else {
 				groupPKBytes, _ = groupPK.Encode()
 			}
-			fmt.Println("PK", groupPKBytes)
+			log.Error("PK", groupPKBytes)
 		} else {
 			tempPK = <-pkChan
 			if tempPK == nil {

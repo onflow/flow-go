@@ -38,7 +38,14 @@ void _ep2_print(char* s, ep2_st* p) {
 
 // seeds relic PRG
 void _seed_relic(byte* seed, int len) {
+    #if RAND == HASHD
+    // instantiate a new DRBG
+    ctx_t *ctx = core_get();
+    ctx->seeded = 0;
     rand_seed(seed, len);
+    #else
+    rand_seed(seed, len);
+    #endif
 }
 
 // generates a random number less than the order r
