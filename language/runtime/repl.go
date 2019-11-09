@@ -2,9 +2,11 @@ package runtime
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
@@ -16,12 +18,27 @@ type REPL struct {
 }
 
 func NewREPL(onError func(error), onResult func(interpreter.Value)) (*REPL, error) {
-	checker, err := sema.NewChecker(nil, REPLLocation{})
+
+	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
+
+	checker, err := sema.NewChecker(
+		nil,
+		REPLLocation{},
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	inter, err := interpreter.NewInterpreter(checker)
+	values := standardLibraryFunctions.ToValues()
+
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(values),
+	)
 	if err != nil {
 		return nil, err
 	}
