@@ -719,6 +719,27 @@ func TestParseAndCheckProgram(t *testing.T) {
 	})
 }
 
+func TestRuntimeSyntaxError(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+      fun main(account: Account): String {
+          return "Hello World!
+      }
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		getSigningAccounts: func() []flow.Address {
+			return []flow.Address{[20]byte{42}}
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
+
+	assert.Error(t, err)
+}
+
 func TestRuntimeStorageChanges(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
