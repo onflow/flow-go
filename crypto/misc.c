@@ -42,10 +42,8 @@ void _seed_relic(byte* seed, int len) {
     // instantiate a new DRBG
     ctx_t *ctx = core_get();
     ctx->seeded = 0;
-    rand_seed(seed, len);
-    #else
-    rand_seed(seed, len);
     #endif
+    rand_seed(seed, len);
 }
 
 // generates a random number less than the order r

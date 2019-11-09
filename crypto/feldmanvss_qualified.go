@@ -155,3 +155,16 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg []byte) error {
 	}
 	return nil
 }
+
+func (s *feldmanVSSQualState) Disqualify(node int) error {
+	if !s.running {
+		return cryptoError{"dkg is not running"}
+	}
+	if node >= s.Size() {
+		return cryptoError{"wrong input"}
+	}
+	if index(node) == s.leaderIndex {
+		s.disqualified = true
+	}
+	return nil
+}

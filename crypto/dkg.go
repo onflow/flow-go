@@ -37,6 +37,11 @@ type DKGstate interface {
 	ReceiveDKGMsg(orig int, msg []byte) error
 	// Running returns the running state of the DKG protocol
 	Running() bool
+	// Disqualify forces a node to get disqualified
+	// for a reason outside of the DKG protocol
+	// The caller should make sure all honest nodes call this function,
+	// otherwise, the protocol will be broken
+	Disqualify(node int) error
 }
 
 // index is the node index type used as participants ID

@@ -155,3 +155,16 @@ func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg []byte) error {
 func (s *JointFeldmanState) Running() bool {
 	return s.jointRunning
 }
+
+func (s *JointFeldmanState) Disqualify(node int) error {
+	if !s.jointRunning {
+		return cryptoError{"dkg is not running"}
+	}
+	for i := 0; i < s.size; i++ {
+		err := s.fvss[i].Disqualify(node)
+		if err != nil {
+			return cryptoError{"disqualif has failed"}
+		}
+	}
+	return nil
+}
