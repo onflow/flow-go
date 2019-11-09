@@ -2,8 +2,11 @@ package execute
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/logrusorgru/aurora"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
@@ -24,7 +27,11 @@ func RunREPL() {
 			PrettyPrintError(err, replFilename, map[string]string{replFilename: code})
 		},
 		func(value interpreter.Value) {
-			fmt.Printf("%s\n", value)
+			if _, isVoid := value.(*interpreter.VoidValue); isVoid || value == nil {
+				return
+			}
+
+			println(colorizeResult(value))
 		},
 	)
 
@@ -75,3 +82,6 @@ func printWelcome() {
 	fmt.Printf("Welcome to Cadence!\n%s\n\n", assistanceMessage)
 }
 
+func colorizeResult(value interpreter.Value) string {
+	return aurora.Colorize(fmt.Sprint(value), aurora.YellowFg|aurora.BrightFg).String()
+}
