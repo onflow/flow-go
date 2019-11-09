@@ -185,14 +185,20 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transacti
 func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	registers := b.pendingState
-	runtimeContext := execution.NewRuntimeContext(registers.NewView())
-	account := runtimeContext.GetAccount(address)
-	if account == nil {
+
+	acct := b.getAccount(address)
+	if acct == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
+	return acct, nil
+}
 
-	return account, nil
+// Returns the account for the given address, or nil if the account does not
+// exist.
+func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
+	registers := b.pendingState
+	runtimeContext := execution.NewRuntimeContext(registers.NewView())
+	return runtimeContext.GetAccount(address)
 }
 
 // TODO: Implement
@@ -219,12 +225,13 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if _, err := b.storage.GetTransaction(tx.Hash()); err != nil {
-		if errors.Is(err, storage.ErrNotFound{}) {
-			return &ErrDuplicateTransaction{TxHash: tx.Hash()}
-		} else {
-			return fmt.Errorf("Failed to check storage for transaction %w", err)
-		}
+	_, err := b.storage.GetTransaction(tx.Hash())
+	if err == nil {
+		// Found the transaction, this is a dupe
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	} else if !errors.Is(err, storage.ErrNotFound{}) {
+		// Error in the storage provider
+		return fmt.Errorf("failed to check storage for transaction %w", err)
 	}
 
 	if err := b.verifySignatures(tx); err != nil {
@@ -301,7 +308,6 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 			tx.Status = flow.TransactionSealed
 		}
 	}
-	b.txPool = make(map[string]*flow.Transaction)
 
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
@@ -315,10 +321,20 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 		TransactionHashes: txHashes,
 	}
 
+	for _, tx := range b.txPool {
+		if err := b.storage.InsertTransaction(*tx); err != nil {
+			// TODO: bubble up error
+			panic(err)
+		}
+	}
+
 	if err := b.storage.InsertBlock(*block); err != nil {
 		// TODO: Bubble up error
 		panic(err)
 	}
+
+	// reset tx pool
+	b.txPool = make(map[string]*flow.Transaction)
 
 	return block
 }
@@ -393,18 +409,19 @@ func (b *EmulatedBlockchain) CreateAccount(
 	return b.LastCreatedAccount().Address, nil
 }
 
-// verifyAccountSignature verifies that an account signature is valid for the account and given message.
+// verifyAccountSignature verifies that an account signature is valid for the
+// account and given message.
 //
 // If the signature is valid, this function returns the associated account key.
 //
-// An error is returned if the account does not contain a public key that correctly verifies the signature
-// against the given message.
+// An error is returned if the account does not contain a public key that
+// correctly verifies the signature against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig flow.AccountSignature,
 	message []byte,
 ) (accountPublicKey flow.AccountPublicKey, err error) {
-	account, err := b.GetAccount(accountSig.Account)
-	if err != nil {
+	account := b.getAccount(accountSig.Account)
+	if account == nil {
 		return accountPublicKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
@@ -439,8 +456,8 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 		if event.Type == flow.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
 
-			account, err := b.GetAccount(accountAddress)
-			if err != nil {
+			account := b.getAccount(accountAddress)
+			if account == nil {
 				panic("failed to get newly-created account")
 			}
 

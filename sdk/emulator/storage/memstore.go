@@ -84,7 +84,7 @@ func (s memStore) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
 	if !ok {
 		return flow.Transaction{}, ErrNotFound{}
 	}
-	return tx, ErrNotFound{}
+	return tx, nil
 }
 
 func (s memStore) InsertTransaction(tx flow.Transaction) error {

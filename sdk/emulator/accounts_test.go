@@ -181,11 +181,11 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("EventEmitted", func(t *testing.T) {
 		var lastEvent flow.Event
 
-		b := emulator.NewEmulatedBlockchain(emulator.Config{
-			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
+		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
+			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				lastEvent = event
 			},
-		})
+		))
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
