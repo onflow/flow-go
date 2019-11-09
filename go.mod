@@ -6,6 +6,7 @@ require (
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/dchest/siphash v1.2.1
+	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/gogo/protobuf v1.2.1

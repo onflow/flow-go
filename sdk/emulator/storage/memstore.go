@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
+// TODO: move this to its own package
 // memStore implements the Store interface with an in-memory store.
 type memStore struct {
 	mu sync.RWMutex
