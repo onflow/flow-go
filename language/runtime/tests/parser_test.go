@@ -14,6 +14,30 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 )
 
+func TestParseReplInput(t *testing.T) {
+
+	actual, _, err := parser.ParseReplInput(`
+        struct X {}; let x = X(); x
+    `)
+
+	assert.Nil(t, err)
+	require.IsType(t, []interface{}{}, actual)
+
+	require.Len(t, actual, 3)
+	assert.IsType(t, &CompositeDeclaration{}, actual[0])
+	assert.IsType(t, &VariableDeclaration{}, actual[1])
+	assert.IsType(t, &ExpressionStatement{}, actual[2])
+}
+
+func TestParseInvalidProgramWithRest(t *testing.T) {
+	actual, _, err := parser.ParseProgram(`
+	    .asd
+	`)
+
+	assert.Nil(t, actual)
+	assert.IsType(t, parser.Error{}, err)
+}
+
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -5999,4 +6023,129 @@ func TestParseReference(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, actual)
+}
+
+func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        struct Kitty { let id: Int ; init(id: Int) { self.id = id } }
+    `)
+
+	assert.Nil(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&CompositeDeclaration{
+				CompositeKind: common.CompositeKindStructure,
+				Identifier: Identifier{
+					Identifier: "Kitty",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
+				},
+				Conformances: []*NominalType{},
+				Members: &Members{
+					Fields: []*FieldDeclaration{
+						{
+							VariableKind: VariableKindConstant,
+							Identifier: Identifier{
+								Identifier: "id",
+								Pos:        Position{Offset: 28, Line: 2, Column: 27},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 32, Line: 2, Column: 31},
+									},
+								},
+								StartPos: Position{Offset: 32, Line: 2, Column: 31},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
+								EndPos:   Position{Offset: 34, Line: 2, Column: 33},
+							},
+						},
+					},
+					SpecialFunctions: []*SpecialFunctionDeclaration{
+						{
+							DeclarationKind: common.DeclarationKindInitializer,
+							FunctionDeclaration: &FunctionDeclaration{
+								Identifier: Identifier{
+									Identifier: "init",
+									Pos:        Position{Offset: 38, Line: 2, Column: 37},
+								},
+								ParameterList: &ParameterList{
+									Parameters: []*Parameter{
+										{
+											Identifier: Identifier{
+												Identifier: "id",
+												Pos:        Position{Offset: 43, Line: 2, Column: 42},
+											},
+											TypeAnnotation: &TypeAnnotation{
+												Type: &NominalType{
+													Identifier: Identifier{
+														Identifier: "Int",
+														Pos:        Position{Offset: 47, Line: 2, Column: 46},
+													},
+												},
+												StartPos: Position{Offset: 47, Line: 2, Column: 46},
+											},
+											Range: Range{
+												StartPos: Position{Offset: 43, Line: 2, Column: 42},
+												EndPos:   Position{Offset: 47, Line: 2, Column: 46},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 42, Line: 2, Column: 41},
+										EndPos:   Position{Offset: 50, Line: 2, Column: 49},
+									},
+								},
+								FunctionBlock: &FunctionBlock{
+									Block: &Block{
+										Statements: []Statement{
+											&AssignmentStatement{
+												Target: &MemberExpression{
+													Expression: &IdentifierExpression{
+														Identifier: Identifier{
+															Identifier: "self",
+															Pos:        Position{Offset: 54, Line: 2, Column: 53},
+														},
+													},
+													Identifier: Identifier{
+														Identifier: "id",
+														Pos:        Position{Offset: 59, Line: 2, Column: 58},
+													},
+												},
+												Transfer: &Transfer{
+													Operation: TransferOperationCopy,
+													Pos:       Position{Offset: 62, Line: 2, Column: 61},
+												},
+												Value: &IdentifierExpression{
+													Identifier: Identifier{
+														Identifier: "id",
+														Pos:        Position{Offset: 64, Line: 2, Column: 63},
+													},
+												},
+											},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 52, Line: 2, Column: 51},
+											EndPos:   Position{Offset: 67, Line: 2, Column: 66},
+										},
+									},
+								},
+								StartPos: Position{Offset: 38, Line: 2, Column: 37},
+							},
+						},
+					},
+				},
+				Range: Range{
+					StartPos: Position{Offset: 9, Line: 2, Column: 8},
+					EndPos:   Position{Offset: 69, Line: 2, Column: 68},
+				},
+			},
+		},
+	}
+
+	assert.IsType(t, expected, actual)
 }

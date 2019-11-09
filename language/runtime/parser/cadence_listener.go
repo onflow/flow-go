@@ -13,6 +13,15 @@ type CadenceListener interface {
 	// EnterReplInput is called when entering the replInput production.
 	EnterReplInput(c *ReplInputContext)
 
+	// EnterReplElement is called when entering the replElement production.
+	EnterReplElement(c *ReplElementContext)
+
+	// EnterReplStatement is called when entering the replStatement production.
+	EnterReplStatement(c *ReplStatementContext)
+
+	// EnterReplDeclaration is called when entering the replDeclaration production.
+	EnterReplDeclaration(c *ReplDeclarationContext)
+
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
@@ -288,6 +297,15 @@ type CadenceListener interface {
 
 	// ExitReplInput is called when exiting the replInput production.
 	ExitReplInput(c *ReplInputContext)
+
+	// ExitReplElement is called when exiting the replElement production.
+	ExitReplElement(c *ReplElementContext)
+
+	// ExitReplStatement is called when exiting the replStatement production.
+	ExitReplStatement(c *ReplStatementContext)
+
+	// ExitReplDeclaration is called when exiting the replDeclaration production.
+	ExitReplDeclaration(c *ReplDeclarationContext)
 
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)

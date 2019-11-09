@@ -64,7 +64,7 @@ func (r *REPL) check(element ast.Element, code string) bool {
 }
 
 func (r *REPL) Accept(code string) (inputIsComplete bool) {
-	var result interface{}
+	var result []interface{}
 	var err error
 	result, inputIsComplete, err = parser.ParseReplInput(code)
 
@@ -79,25 +79,31 @@ func (r *REPL) Accept(code string) (inputIsComplete bool) {
 
 	r.checker.ResetErrors()
 
-	switch typedResult := result.(type) {
-	case *ast.Program:
-		if !r.check(typedResult, code) {
-			return
-		}
+	for _, element := range result {
 
-		r.checker.Program = typedResult
+		switch typedElement := element.(type) {
+		case ast.Declaration:
+			program := &ast.Program{
+				Declarations: []ast.Declaration{typedElement},
+			}
 
-		r.execute(typedResult)
-
-	case []ast.Statement:
-		r.checker.Program = nil
-
-		for _, statement := range typedResult {
-			if !r.check(statement, code) {
+			if !r.check(program, code) {
 				return
 			}
 
-			r.execute(statement)
+			r.execute(typedElement)
+
+		case ast.Statement:
+			r.checker.Program = nil
+
+			if !r.check(typedElement, code) {
+				return
+			}
+
+			r.execute(typedElement)
+
+		default:
+			panic(errors.NewUnreachableError())
 		}
 	}
 
