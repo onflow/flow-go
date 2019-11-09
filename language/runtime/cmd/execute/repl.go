@@ -44,6 +44,12 @@ func RunREPL() {
 			lineNumber += 1
 		}()
 
+		if code == "" && strings.HasPrefix(line, ".") {
+			handleCommand(line)
+			code = ""
+			return
+		}
+
 		code += line + "\n"
 
 		inputIsComplete := repl.Accept(code)
@@ -75,8 +81,28 @@ func RunREPL() {
 	prompt.New(executor, suggest, options...).Run()
 }
 
+const helpMessage = `
+Enter declarations and statements to evaluate them.
+Commands are prefixed with a dot. Valid commands are:
+
+.exit     Exit the interpreter
+.help     Print this help message
+
+Press ^C to abort current expression, ^D to exit
+`
 
 const assistanceMessage = `Type '.help' for assistance.`
+
+func handleCommand(command string) {
+	switch command {
+	case ".exit":
+		os.Exit(0)
+	case ".help":
+		println(helpMessage)
+	default:
+		println(colorizeError(fmt.Sprintf("Unknown command. %s", assistanceMessage)))
+	}
+}
 
 func printWelcome() {
 	fmt.Printf("Welcome to Cadence!\n%s\n\n", assistanceMessage)
@@ -84,4 +110,8 @@ func printWelcome() {
 
 func colorizeResult(value interpreter.Value) string {
 	return aurora.Colorize(fmt.Sprint(value), aurora.YellowFg|aurora.BrightFg).String()
+}
+
+func colorizeError(message string) string {
+	return aurora.Colorize(message, aurora.RedFg|aurora.BrightFg|aurora.BoldFm).String()
 }
