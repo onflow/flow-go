@@ -12,6 +12,8 @@ import (
 const replFilename = "REPL"
 
 func RunREPL() {
+	printWelcome()
+
 	lineNumber := 1
 	lineIsContinuation := false
 	code := ""
@@ -65,3 +67,11 @@ func RunREPL() {
 	}
 	prompt.New(executor, suggest, options...).Run()
 }
+
+
+const assistanceMessage = `Type '.help' for assistance.`
+
+func printWelcome() {
+	fmt.Printf("Welcome to Cadence!\n%s\n\n", assistanceMessage)
+}
+
