@@ -1049,6 +1049,7 @@ func init() {
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&AddressType{},
 	}
 
 	for _, ty := range types {
@@ -1470,6 +1471,45 @@ func (t *ReferenceType) IndexingType() Type {
 		return nil
 	}
 	return referencedType.IndexingType()
+}
+
+// AddressType represents the address type
+type AddressType struct{}
+
+func (*AddressType) isType() {}
+
+func (*AddressType) String() string {
+	return "Address"
+}
+
+func (*AddressType) Equal(other Type) bool {
+	_, ok := other.(*AddressType)
+	return ok
+}
+
+func (*AddressType) IsResourceType() bool {
+	return false
+}
+
+func (*AddressType) IsInvalidType() bool {
+	return false
+}
+
+var AddressTypeMin = big.NewInt(0)
+var AddressTypeMax *big.Int
+
+func init() {
+	AddressTypeMax = big.NewInt(2)
+	AddressTypeMax.Exp(AddressTypeMax, big.NewInt(160), nil)
+	AddressTypeMax.Sub(AddressTypeMax, big.NewInt(1))
+}
+
+func (*AddressType) Min() *big.Int {
+	return AddressTypeMin
+}
+
+func (*AddressType) Max() *big.Int {
+	return AddressTypeMax
 }
 
 // IsSubType determines if the given subtype is a subtype
