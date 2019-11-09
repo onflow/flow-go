@@ -1,4 +1,4 @@
-package store
+package storage
 
 import (
 	"sync"
@@ -41,7 +41,7 @@ func (s memStore) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 
 	blockNumber := s.blockHashToNumber[hash.Hex()]
 	if blockNumber > s.blockHeight() {
-		return types.Block{}, NotFoundError{}
+		return types.Block{}, ErrNotFound{}
 	}
 	return s.blocks[int(blockNumber)], nil
 }
@@ -51,7 +51,7 @@ func (s memStore) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	defer s.mu.RUnlock()
 
 	if blockNumber > s.blockHeight() {
-		return types.Block{}, NotFoundError{}
+		return types.Block{}, ErrNotFound{}
 	}
 	return s.blocks[int(blockNumber)], nil
 }
@@ -82,9 +82,9 @@ func (s memStore) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
 
 	tx, ok := s.transactions[txHash.Hex()]
 	if !ok {
-		return flow.Transaction{}, NotFoundError{}
+		return flow.Transaction{}, ErrNotFound{}
 	}
-	return tx, NotFoundError{}
+	return tx, nil
 }
 
 func (s memStore) InsertTransaction(tx flow.Transaction) error {
@@ -100,7 +100,7 @@ func (s memStore) GetRegistersView(blockNumber uint64) (flow.RegistersView, erro
 	defer s.mu.RUnlock()
 
 	if blockNumber > s.blockHeight() {
-		return flow.RegistersView{}, NotFoundError{}
+		return flow.RegistersView{}, ErrNotFound{}
 	}
 	return *s.registers[blockNumber].NewView(), nil
 }

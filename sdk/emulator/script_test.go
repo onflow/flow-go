@@ -47,3 +47,8 @@ func TestExecuteScript(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 }
+
+func TestExecuteScriptAtBlockNumber(t *testing.T) {
+	// TODO
+	// Test that scripts can be executed at different block heights
+}

@@ -44,7 +44,7 @@ func randomKey() flow.AccountPrivateKey {
 
 // newEmulator returns a emulator object for testing
 func newEmulator() *emulator.EmulatedBlockchain {
-	return emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
+	return emulator.NewEmulatedBlockchain(emulator.Options{
 		OnLogMessage: func(msg string) {},
 	})
 }

@@ -1,14 +1,17 @@
 package emulator
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
-	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -16,73 +19,86 @@ import (
 
 // EmulatedBlockchain simulates a blockchain for testing purposes.
 //
-// An emulated blockchain contains a versioned world state store and a pending transaction pool
-// for granular state update tests.
+// An emulated blockchain contains a versioned world state store and a pending
+// transaction pool for granular state update tests.
 //
-// The intermediate world state is stored after each transaction is executed and can be used
-// to check the output of a single transaction.
+// The intermediate world state is stored after each transaction is executed
+// and can be used to check the output of a single transaction.
 //
-// The final world state is committed after each block. An index of committed world states is maintained
-// to allow a test to seek to a previously committed world state.
+// The final world state is committed after each block. An index of committed
+// world states is maintained to allow a test to seek to a previously committed
+// world state.
 type EmulatedBlockchain struct {
-	// worldStates is a mapping of committed world states (updated after CommitBlock)
-	worldStates map[string][]byte
-	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
-	intermediateWorldStates map[string][]byte
-	// pendingWorldState is the current working world state
-	pendingWorldState *state.WorldState
-	// txPool is a pool of pending transactions waiting to be committed (already executed)
-	txPool             map[string]*flow.Transaction
-	mut                sync.RWMutex
-	computer           *execution.Computer
+	// Finalized chain state: blocks, transactions, registers, events
+	storage storage.Store
+
+	// Mutex protecting pending register state and txPool
+	mu sync.RWMutex
+	// The current working register state, up-to-date with all transactions
+	// in the txPool.
+	pendingState flow.Registers
+	// Pool of transactions that have been executed, but not finalized
+	txPool map[string]*flow.Transaction
+
+	// The runtime context used to execute transactions and scripts
+	computer *execution.Computer
+
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
 	lastCreatedAccount flow.Account
-	onEventEmitted     func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
+
+	// TODO: Remove this
+	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
+	intermediateWorldStates map[string][]byte
+
+	// TODO: store events in storage
+	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-// EmulatedBlockchainOptions is a set of configuration options for an emulated blockchain.
-type EmulatedBlockchainOptions struct {
+// Options is a set of configuration options for an emulated blockchain.
+type Options struct {
 	RootAccountKey *flow.AccountPrivateKey
 	OnLogMessage   func(string)
 	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // DefaultOptions is the default configuration for an emulated blockchain.
-var DefaultOptions = EmulatedBlockchainOptions{
-	OnLogMessage:   func(string) {},
-	OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {},
-}
+// NOTE: Instantiated in init function
+var DefaultOptions Options
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
-	// merge user-provided options with default options
-	opt = mergeOptions(DefaultOptions, opt)
-
-	worldStates := make(map[string][]byte)
-	intermediateWorldStates := make(map[string][]byte)
+func NewEmulatedBlockchain(opts Options) *EmulatedBlockchain {
+	storage := storage.NewMemStore()
+	initialState := make(flow.Registers)
 	txPool := make(map[string]*flow.Transaction)
-	ws := state.NewWorldState()
 
-	worldStates[string(ws.Hash())] = ws.Encode()
-
-	b := &EmulatedBlockchain{
-		worldStates:             worldStates,
-		intermediateWorldStates: intermediateWorldStates,
-		pendingWorldState:       ws,
-		txPool:                  txPool,
-		onEventEmitted:          opt.OnEventEmitted,
+	// TODO: remove
+	if opts.OnEventEmitted == nil {
+		opts.OnEventEmitted = DefaultOptions.OnEventEmitted
+	}
+	if opts.OnLogMessage == nil {
+		opts.OnLogMessage = DefaultOptions.OnLogMessage
 	}
 
-	runtime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(runtime, opt.OnLogMessage)
+	// create the root account
+	if opts.RootAccountKey == nil {
+		opts.RootAccountKey = DefaultOptions.RootAccountKey
+	}
+	rootAccount := createAccount(initialState, *opts.RootAccountKey)
 
+	b := &EmulatedBlockchain{
+		storage:            storage,
+		pendingState:       initialState,
+		txPool:             txPool,
+		onEventEmitted:     opts.OnEventEmitted,
+		rootAccountAddress: rootAccount.Address,
+		rootAccountKey:     *opts.RootAccountKey,
+		lastCreatedAccount: rootAccount,
+	}
+
+	interpreterRuntime := runtime.NewInterpreterRuntime()
+	computer := execution.NewComputer(interpreterRuntime, opts.OnLogMessage)
 	b.computer = computer
-	rootAccount, rootAccountKey := createRootAccount(ws, opt.RootAccountKey)
-
-	b.rootAccountAddress = rootAccount.Address
-	b.rootAccountKey = rootAccountKey
-	b.lastCreatedAccount = rootAccount
 
 	return b
 }
@@ -99,99 +115,86 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 
 // GetLatestBlock gets the latest sealed block.
 func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
-	return b.pendingWorldState.GetLatestBlock()
+	block, err := b.storage.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+	return &block
 }
 
 // GetBlockByHash gets a block by hash.
 func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, error) {
-	block := b.pendingWorldState.GetBlockByHash(hash)
-	if block == nil {
+	block, err := b.storage.GetBlockByHash(hash)
+	if err != nil {
+		// TODO: consolidate emulator/storage errors
 		return nil, &ErrBlockNotFound{BlockHash: hash}
 	}
 
-	return block, nil
+	return &block, nil
 }
 
 // GetBlockByNumber gets a block by number.
 func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
-	block := b.pendingWorldState.GetBlockByNumber(number)
-	if block == nil {
+	block, err := b.storage.GetBlockByNumber(number)
+	if err != nil {
+		// TODO: consolidate emualator/storage errors
 		return nil, &ErrBlockNotFound{BlockNum: number}
 	}
 
-	return block, nil
+	return &block, nil
 }
 
 // GetTransaction gets an existing transaction by hash.
 //
 // First looks in pending txPool, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transaction, error) {
-	b.mut.RLock()
-	defer b.mut.RUnlock()
-
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	if tx, ok := b.txPool[string(txHash)]; ok {
 		return tx, nil
 	}
 
-	tx := b.pendingWorldState.GetTransaction(txHash)
-	if tx == nil {
-		return nil, &ErrTransactionNotFound{TxHash: txHash}
-	}
-
-	return tx, nil
-}
-
-// GetTransactionAtVersion gets an existing transaction by hash at a specified state.
-func (b *EmulatedBlockchain) GetTransactionAtVersion(txHash, version crypto.Hash) (*flow.Transaction, error) {
-	ws, err := b.getWorldStateAtVersion(version)
+	tx, err := b.storage.GetTransaction(txHash)
 	if err != nil {
-		return nil, err
-	}
-
-	tx := ws.GetTransaction(txHash)
-	if tx == nil {
 		return nil, &ErrTransactionNotFound{TxHash: txHash}
 	}
 
-	return tx, nil
+	return &tx, nil
 }
 
 // GetAccount gets account information associated with an address identifier.
 func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, error) {
-	registers := b.pendingWorldState.Registers.NewView()
-	runtimeContext := execution.NewRuntimeContext(registers)
-	account := runtimeContext.GetAccount(address)
-	if account == nil {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	acct := b.getAccount(address)
+	if acct == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
-
-	return account, nil
+	return acct, nil
 }
 
-// GetAccountAtVersion gets account information associated with an address identifier at a specified state.
-func (b *EmulatedBlockchain) GetAccountAtVersion(address flow.Address, version crypto.Hash) (*flow.Account, error) {
-	ws, err := b.getWorldStateAtVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	registers := ws.Registers.NewView()
-	runtimeContext := execution.NewRuntimeContext(registers)
-	account := runtimeContext.GetAccount(address)
-	if account == nil {
-		return nil, &ErrAccountNotFound{Address: address}
-	}
-
-	return account, nil
+// Returns the account for the given address, or nil if the account does not
+// exist.
+func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
+	registers := b.pendingState
+	runtimeContext := execution.NewRuntimeContext(registers.NewView())
+	return runtimeContext.GetAccount(address)
 }
 
-// SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
+// TODO: Implement
+func GetAccountAtBlock(address flow.Address, blockNumber uint64) (flow.Account, error) {
+	panic("not implemented")
+}
+
+// SubmitTransaction sends a transaction to the network that is immediately
+// executed (updates pending blockchain state).
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
 func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
-	b.mut.Lock()
-	defer b.mut.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	// TODO: add more invalid transaction checks
 	missingFields := tx.MissingFields()
@@ -203,8 +206,13 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
+	_, err := b.storage.GetTransaction(tx.Hash())
+	if err == nil {
+		// Found the transaction, this is a dupe
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	} else if !errors.Is(err, storage.ErrNotFound{}) {
+		// Error in the storage provider
+		return fmt.Errorf("failed to check storage for transaction %w", err)
 	}
 
 	if err := b.verifySignatures(tx); err != nil {
@@ -212,75 +220,58 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	}
 
 	tx.Status = flow.TransactionPending
-
 	b.txPool[string(tx.Hash())] = &tx
-	b.pendingWorldState.InsertTransaction(&tx)
 
-	registers := b.pendingWorldState.Registers.NewView()
+	registers := b.pendingState.NewView()
 
 	events, err := b.computer.ExecuteTransaction(registers, tx)
 	if err != nil {
-		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionReverted)
-
-		b.updatePendingWorldStates(tx.Hash())
-
+		tx.Status = flow.TransactionReverted
 		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
 	}
 
-	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
-	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionFinalized)
-	b.pendingWorldState.UpdateTransactionEvents(tx.Hash(), events)
+	// Update pending state with registers changed during transaction execution
+	b.pendingState.MergeWith(registers.UpdatedRegisters())
 
-	b.updatePendingWorldStates(tx.Hash())
+	// Update the transaction's status and events
+	// NOTE: this updates txPool state because txPool stores pointers
+	tx.Status = flow.TransactionFinalized
+	tx.Events = events
 
 	// TODO: improve the pending block, provide all block information
-	prevBlock := b.pendingWorldState.GetLatestBlock()
+	prevBlock, err := b.storage.GetLatestBlock()
+	if err != nil {
+		return fmt.Errorf("Failed to get latest block: %w", err)
+	}
 	blockNumber := prevBlock.Number + 1
 
+	// TODO: remove this. Instead we are storing events in storage, they
+	// TODO: should be stored there when the block is committed
 	b.emitTransactionEvents(events, blockNumber, tx.Hash())
 
 	return nil
 }
 
-func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
-	if _, exists := b.intermediateWorldStates[string(txHash)]; exists {
-		return
-	}
-
-	bytes := b.pendingWorldState.Encode()
-	b.intermediateWorldStates[string(txHash)] = bytes
-}
-
 // ExecuteScript executes a read-only script against the world state and returns the result.
 func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
-	registers := b.pendingWorldState.Registers.NewView()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	registers := b.pendingState.NewView()
 	value, events, err := b.computer.ExecuteScript(registers, script)
 	if err != nil {
 		return nil, err
 	}
 
+	// TODO: decide how to handle script events
 	b.emitScriptEvents(events)
 
 	return value, nil
 }
 
-// ExecuteScriptAtVersion executes a read-only script against a specified world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
-	ws, err := b.getWorldStateAtVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	registers := ws.Registers.NewView()
-
-	value, events, err := b.computer.ExecuteScript(registers, script)
-	if err != nil {
-		return nil, err
-	}
-
-	b.emitScriptEvents(events)
-
-	return value, nil
+// TODO: implement
+func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, error) {
+	panic("not implemented")
 }
 
 // CommitBlock takes all pending transactions and commits them into a block.
@@ -288,19 +279,22 @@ func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypt
 // Note: this clears the pending transaction pool and indexes the committed blockchain
 // state for testing purposes.
 func (b *EmulatedBlockchain) CommitBlock() *types.Block {
-	b.mut.Lock()
-	defer b.mut.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
 		txHashes = append(txHashes, tx.Hash())
-		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != flow.TransactionReverted {
-			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), flow.TransactionSealed)
+		if tx.Status != flow.TransactionReverted {
+			tx.Status = flow.TransactionSealed
 		}
 	}
-	b.txPool = make(map[string]*flow.Transaction)
 
-	prevBlock := b.pendingWorldState.GetLatestBlock()
+	prevBlock, err := b.storage.GetLatestBlock()
+	if err != nil {
+		// TODO: Bubble up error
+		panic(err)
+	}
 	block := &types.Block{
 		Number:            prevBlock.Number + 1,
 		Timestamp:         time.Now(),
@@ -308,46 +302,22 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 		TransactionHashes: txHashes,
 	}
 
-	b.pendingWorldState.InsertBlock(block)
-	b.commitWorldState(block.Hash())
+	for _, tx := range b.txPool {
+		if err := b.storage.InsertTransaction(*tx); err != nil {
+			// TODO: bubble up error
+			panic(err)
+		}
+	}
+
+	if err := b.storage.InsertBlock(*block); err != nil {
+		// TODO: Bubble up error
+		panic(err)
+	}
+
+	// reset tx pool
+	b.txPool = make(map[string]*flow.Transaction)
 
 	return block
-}
-
-// SeekToState rewinds the blockchain state to a previously committed history.
-//
-// Note that this only seeks to a committed world state (not intermediate world state)
-// and this clears all pending transactions in txPool.
-func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-
-	if bytes, ok := b.worldStates[string(hash)]; ok {
-		ws := state.Decode(bytes)
-		b.pendingWorldState = ws
-		b.txPool = make(map[string]*flow.Transaction)
-	}
-}
-
-func (b *EmulatedBlockchain) getWorldStateAtVersion(wsHash crypto.Hash) (*state.WorldState, error) {
-	if wsBytes, ok := b.worldStates[string(wsHash)]; ok {
-		return state.Decode(wsBytes), nil
-	}
-
-	if wsBytes, ok := b.intermediateWorldStates[string(wsHash)]; ok {
-		return state.Decode(wsBytes), nil
-	}
-
-	return nil, &ErrInvalidStateVersion{Version: wsHash}
-}
-
-func (b *EmulatedBlockchain) commitWorldState(blockHash crypto.Hash) {
-	if _, exists := b.worldStates[string(blockHash)]; exists {
-		return
-	}
-
-	bytes := b.pendingWorldState.Encode()
-	b.worldStates[string(blockHash)] = bytes
 }
 
 // LastCreatedAccount returns the last account that was created in the blockchain.
@@ -420,18 +390,19 @@ func (b *EmulatedBlockchain) CreateAccount(
 	return b.LastCreatedAccount().Address, nil
 }
 
-// verifyAccountSignature verifies that an account signature is valid for the account and given message.
+// verifyAccountSignature verifies that an account signature is valid for the
+// account and given message.
 //
 // If the signature is valid, this function returns the associated account key.
 //
-// An error is returned if the account does not contain a public key that correctly verifies the signature
-// against the given message.
+// An error is returned if the account does not contain a public key that
+// correctly verifies the signature against the given message.
 func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig flow.AccountSignature,
 	message []byte,
 ) (accountPublicKey flow.AccountPublicKey, err error) {
-	account, err := b.GetAccount(accountSig.Account)
-	if err != nil {
+	account := b.getAccount(accountSig.Account)
+	if account == nil {
 		return accountPublicKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
@@ -456,6 +427,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 	}
 }
 
+// TODO remove this in favor of storing events in emulator
 // emitTransactionEvents emits events that occurred during a transaction execution.
 //
 // This function parses AccountCreated events to update the lastCreatedAccount field.
@@ -465,8 +437,8 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 		if event.Type == flow.EventAccountCreated {
 			accountAddress := event.Values["address"].(flow.Address)
 
-			account, err := b.GetAccount(accountAddress)
-			if err != nil {
+			account := b.getAccount(accountAddress)
+			if account == nil {
 				panic("failed to get newly-created account")
 			}
 
@@ -484,52 +456,41 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []flow.Event) {
 	}
 }
 
-// createRootAccount creates a new root account and commits it to the world state.
-func createRootAccount(
-	ws *state.WorldState,
-	customPrivateKey *flow.AccountPrivateKey,
-) (flow.Account, flow.AccountPrivateKey) {
-	var privateKey flow.AccountPrivateKey
-
-	if customPrivateKey == nil {
-		var err error
-		privateKey, err = keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
-			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		privateKey = *customPrivateKey
+// createAccount creates an account with the given private key and injects it
+// into the given state, bypassing the need for a transaction.
+func createAccount(registers flow.Registers, privateKey flow.AccountPrivateKey) flow.Account {
+	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
+	publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
+	if err != nil {
+		panic(err)
 	}
 
-	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
-	publicKeyBytes, _ := flow.EncodeAccountPublicKey(publicKey)
-
-	registers := ws.Registers.NewView()
-
-	runtimeContext := execution.NewRuntimeContext(registers)
-	accountAddress, _ := runtimeContext.CreateAccount(
+	view := registers.NewView()
+	runtimeContext := execution.NewRuntimeContext(view)
+	accountAddress, err := runtimeContext.CreateAccount(
 		[][]byte{publicKeyBytes},
 		[]byte{},
 	)
+	if err != nil {
+		panic(err)
+	}
 
-	ws.SetRegisters(registers.UpdatedRegisters())
+	registers.MergeWith(view.UpdatedRegisters())
 
 	account := runtimeContext.GetAccount(accountAddress)
-
-	return *account, privateKey
+	return *account
 }
 
-// mergeOptions merges the values of two EmulatedBlockchainOptions structs.
-// TODO: this will be removed after improvements are made to the way EmulatedBlockchain is configured
-func mergeOptions(optA, optB EmulatedBlockchainOptions) EmulatedBlockchainOptions {
-	if optB.OnLogMessage == nil {
-		optB.OnLogMessage = optA.OnLogMessage
+func init() {
+	// Initialize default emulator options
+	defaultRootKey, err := keys.GeneratePrivateKey(
+		keys.ECDSA_P256_SHA3_256,
+		[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
+	if err != nil {
+		panic("Failed to generate default root key: " + err.Error())
 	}
 
-	if optB.OnEventEmitted == nil {
-		optB.OnEventEmitted = optA.OnEventEmitted
-	}
-
-	return optB
+	DefaultOptions.OnLogMessage = func(string) {}
+	DefaultOptions.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
+	DefaultOptions.RootAccountKey = &defaultRootKey
 }
