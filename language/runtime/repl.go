@@ -126,3 +126,23 @@ func (r *REPL) Accept(code string) (inputIsComplete bool) {
 
 	return
 }
+
+func (r *REPL) Suggestions() (result []struct{ Name, Description string }) {
+	names := map[string]string{}
+
+	for name, variable := range r.checker.GlobalValues {
+		if names[name] != "" {
+			continue
+		}
+		names[name] = variable.Type.String()
+	}
+
+	for name, description := range names {
+		result = append(result, struct{ Name, Description string }{
+			Name:        name,
+			Description: description,
+		})
+	}
+
+	return
+}

@@ -69,8 +69,21 @@ func RunREPL() {
 		code = ""
 	}
 
-	suggest := func(document prompt.Document) []prompt.Suggest {
-		return nil
+	suggest := func(d prompt.Document) []prompt.Suggest {
+		if len(d.GetWordBeforeCursor()) == 0 {
+			return nil
+		}
+
+		suggests := []prompt.Suggest{}
+
+		for _, suggestion := range repl.Suggestions() {
+			suggests = append(suggests, prompt.Suggest{
+				Text:        suggestion.Name,
+				Description: suggestion.Description,
+			})
+		}
+
+		return prompt.FilterHasPrefix(suggests, d.GetWordBeforeCursor(), false)
 	}
 
 	changeLivePrefix := func() (string, bool) {
