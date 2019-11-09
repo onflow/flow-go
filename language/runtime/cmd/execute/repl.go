@@ -50,6 +50,13 @@ func RunREPL() {
 			return
 		}
 
+		// Prefix the code with empty lines,
+		// so that error messages match current line number
+
+		for i := 1; i < lineNumber; i++ {
+			code = "\n" + code
+		}
+
 		code += line + "\n"
 
 		inputIsComplete := repl.Accept(code)
