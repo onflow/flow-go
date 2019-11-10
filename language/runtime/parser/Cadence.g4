@@ -267,8 +267,12 @@ emitStatement
     : Emit identifier invocation
     ;
 
+// Variable declarations might be of the form `let|var <- x <- y`
+//
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)? transfer expression
+    : variableKind identifier (':' typeAnnotation)?
+      leftTransfer=transfer leftExpression=expression
+      (rightTransfer=transfer rightExpression=expression)?
     ;
 
 // NOTE: we allow any kind of transfer, i.e. moves, but ensure

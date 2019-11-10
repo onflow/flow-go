@@ -761,31 +761,45 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	expressionResult := ctx.Expression().Accept(v)
-	if expressionResult == nil {
+	// Parse the left expression and the left transfer (required)
+
+	leftExpressionResult := ctx.leftExpression.Accept(v)
+	if leftExpressionResult == nil {
 		return nil
 	}
-	expression := expressionResult.(ast.Expression)
-	var typeAnnotation *ast.TypeAnnotation
+	leftExpression := leftExpressionResult.(ast.Expression)
 
+	var typeAnnotation *ast.TypeAnnotation
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext != nil {
-		if x, ok := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation); ok {
-			typeAnnotation = x
-		}
+		typeAnnotation, _ = typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
 	}
 
-	transfer := ctx.Transfer().Accept(v).(*ast.Transfer)
+	leftTransfer := ctx.leftTransfer.Accept(v).(*ast.Transfer)
+
+	// Parse the right transfer and the right expression (optional)
+
+	var rightTransfer *ast.Transfer
+	var rightExpression ast.Expression
+
+	if ctx.rightExpression != nil && ctx.rightTransfer != nil {
+		rightTransfer = ctx.rightTransfer.Accept(v).(*ast.Transfer)
+
+		rightExpressionResult := ctx.rightExpression.Accept(v)
+		rightExpression = rightExpressionResult.(ast.Expression)
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.VariableDeclaration{
 		IsConstant:     isConstant,
 		Identifier:     identifier,
-		Value:          expression,
+		Value:          leftExpression,
 		TypeAnnotation: typeAnnotation,
-		Transfer:       transfer,
+		Transfer:       leftTransfer,
 		StartPos:       startPosition,
+		SecondTransfer: rightTransfer,
+		SecondValue:    rightExpression,
 	}
 }
 
