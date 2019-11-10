@@ -5512,3 +5512,77 @@ func TestInterpretInvalidForwardReferenceCall(t *testing.T) {
         `)
 	})
 }
+
+func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource R {
+          let id: Int
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      fun test(): <-[R?] {
+          let x <- create R(id: 1)
+          var ys <- {"r": <-create R(id: 2)}
+          // NOTE: nested move is valid here
+          let z <- ys["r"] <- x
+
+          // NOTE: nested move is invalid here
+          let r <- ys.remove(key: "r")
+
+          destroy ys
+
+          return <-[<-z, <-r]
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	require.IsType(t,
+		interpreter.ArrayValue{},
+		value,
+	)
+
+	values := *value.(interpreter.ArrayValue).Values
+
+	require.IsType(t,
+		interpreter.SomeValue{},
+		values[0],
+	)
+
+	firstValue := values[0].(interpreter.SomeValue).Value
+
+	require.IsType(t,
+		interpreter.CompositeValue{},
+		firstValue,
+	)
+
+	firstResource := firstValue.(interpreter.CompositeValue)
+
+	assert.Equal(t,
+		firstResource.GetField("id"),
+		interpreter.NewIntValue(2),
+	)
+
+	require.IsType(t,
+		interpreter.SomeValue{},
+		values[1],
+	)
+
+	secondValue := values[1].(interpreter.SomeValue).Value
+
+	require.IsType(t,
+		interpreter.CompositeValue{},
+		secondValue,
+	)
+
+	secondResource := secondValue.(interpreter.CompositeValue)
+
+	assert.Equal(t,
+		secondResource.GetField("id"),
+		interpreter.NewIntValue(1),
+	)
+}

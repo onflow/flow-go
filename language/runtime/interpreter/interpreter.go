@@ -44,6 +44,13 @@ var emptyFunctionType = &sema.FunctionType{
 	},
 }
 
+//
+
+type getterSetter struct {
+	get func() Value
+	set func(Value)
+}
+
 // StatementTrampoline
 
 type StatementTrampoline struct {
@@ -873,11 +880,13 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 // VisitVariableDeclaration first visits the declaration's value,
 // then declares the variable with the name bound to the value
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
+
+	targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
+	valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+	secondValueType := interpreter.Checker.Elaboration.VariableDeclarationSecondValueTypes[declaration]
+
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-
-			valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
-			targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
 
 			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
 
@@ -886,8 +895,17 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 				valueCopy,
 			)
 
-			// NOTE: ignore result, so it does *not* act like a return-statement
-			return Done{}
+			if declaration.SecondValue == nil {
+				// NOTE: ignore result, so it does *not* act like a return-statement
+				return Done{}
+			}
+
+			return interpreter.visitAssignment(
+				declaration.Value,
+				valueType,
+				declaration.SecondValue,
+				secondValueType,
+			)
 		})
 }
 
@@ -899,63 +917,97 @@ func (interpreter *Interpreter) declareVariable(identifier string, value Value) 
 }
 
 func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
-	return assignment.Value.Accept(interpreter).(Trampoline).
+	targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
+	valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
+
+	target := assignment.Target
+	value := assignment.Value
+
+	return interpreter.visitAssignment(target, targetType, value, valueType)
+}
+
+func (interpreter *Interpreter) visitAssignment(
+	target ast.Expression, targetType sema.Type,
+	value ast.Expression, valueType sema.Type,
+) Trampoline {
+
+	// First evaluate the target, which results in a getter/setter function pair
+	return interpreter.assignmentGetterSetter(target).
 		FlatMap(func(result interface{}) Trampoline {
+			getterSetter := result.(getterSetter)
 
-			valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
-			targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
+			// Finally, evaluate the value, and assign it using the setter function
+			return value.Accept(interpreter).(Trampoline).
+				FlatMap(func(result interface{}) Trampoline {
+					valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
+					getterSetter.set(valueCopy)
 
-			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
-
-			return interpreter.visitAssignmentValue(assignment.Target, valueCopy)
+					// NOTE: no result, so it does *not* act like a return-statement
+					return Done{}
+				})
 		})
 }
 
 func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	// Evaluate the left expression
-	return swap.Left.Accept(interpreter).(Trampoline).
+	return interpreter.assignmentGetterSetter(swap.Left).
 		FlatMap(func(result interface{}) Trampoline {
-			leftValue := result.(Value)
+			leftGetterSetter := result.(getterSetter)
+			leftValue := leftGetterSetter.get()
 
 			// Evaluate the right expression
-			return swap.Right.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					rightValue := result.(Value)
+			return interpreter.assignmentGetterSetter(swap.Right).
+				Then(func(result interface{}) {
+					rightGetterSetter := result.(getterSetter)
+					rightValue := rightGetterSetter.get()
 
-					// Assign the right-hand side value to the left-hand side
-					return interpreter.visitAssignmentValue(swap.Left, rightValue).
-						FlatMap(func(_ interface{}) Trampoline {
-
-							// Assign the left-hand side value to the right-hand side
-							return interpreter.visitAssignmentValue(swap.Right, leftValue)
-						})
+					// Assign right value to left target
+					// and left value to right target
+					leftGetterSetter.set(rightValue)
+					rightGetterSetter.set(leftValue)
 				})
 		})
 }
 
-func (interpreter *Interpreter) visitAssignmentValue(target ast.Expression, value Value) Trampoline {
+// assignmentGetterSetter returns a getter/setter function pair
+// for the target expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) assignmentGetterSetter(target ast.Expression) Trampoline {
 	switch target := target.(type) {
 	case *ast.IdentifierExpression:
-		return interpreter.visitIdentifierExpressionAssignment(target, value)
+		return interpreter.identifierExpressionGetterSetter(target)
 
 	case *ast.IndexExpression:
-		return interpreter.visitIndexExpressionAssignment(target, value)
+		return interpreter.indexExpressionGetterSetter(target)
 
 	case *ast.MemberExpression:
-		return interpreter.visitMemberExpressionAssignment(target, value)
+		return interpreter.memberExpressionGetterSetter(target)
 	}
 
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) Trampoline {
+// identifierExpressionGetterSetter returns a getter/setter function pair
+// for the target identifier expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.IdentifierExpression) Trampoline {
 	variable := interpreter.findVariable(target.Identifier.Identifier)
-	variable.Value = value
-	// NOTE: no result, so it does *not* act like a return-statement
-	return Done{}
+	return Done{
+		Result: getterSetter{
+			get: func() Value {
+				return variable.Value
+			},
+			set: func(value Value) {
+				variable.Value = value
+			},
+		},
+	}
 }
 
-func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
+// indexExpressionGetterSetter returns a getter/setter function pair
+// for the target index expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExpression) Trampoline {
 	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
@@ -964,17 +1016,31 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(target)
-						typedResult.Set(interpreter, locationRange, indexingValue, value)
-
-						// NOTE: no result, so it does *not* act like a return-statement
-						return Done{}
+						return Done{
+							Result: getterSetter{
+								get: func() Value {
+									return typedResult.Get(interpreter, locationRange, indexingValue)
+								},
+								set: func(value Value) {
+									typedResult.Set(interpreter, locationRange, indexingValue, value)
+								},
+							},
+						}
 					})
 
 			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
 				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
-				interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
-				return Done{}
+				return Done{
+					Result: getterSetter{
+						get: func() Value {
+							return interpreter.readStored(typedResult.Identifier, key)
+						},
+						set: func(value Value) {
+							interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
+						},
+					},
+				}
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -982,15 +1048,25 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		})
 }
 
-func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
+// memberExpressionGetterSetter returns a getter/setter function pair
+// for the target member expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) memberExpressionGetterSetter(target *ast.MemberExpression) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(MemberAccessibleValue)
 			locationRange := interpreter.locationRange(target)
-			structure.SetMember(interpreter, locationRange, target.Identifier.Identifier, value)
-
-			// NOTE: no result, so it does *not* act like a return-statement
-			return Done{}
+			identifier := target.Identifier.Identifier
+			return Done{
+				Result: getterSetter{
+					get: func() Value {
+						return structure.GetMember(interpreter, locationRange, identifier)
+					},
+					set: func(value Value) {
+						structure.SetMember(interpreter, locationRange, identifier, value)
+					},
+				},
+			}
 		})
 }
 

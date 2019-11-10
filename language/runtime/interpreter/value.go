@@ -1145,6 +1145,10 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	return nil
 }
 
+func (v CompositeValue) GetField(name string) Value {
+	return (*v.Fields)[name]
+}
+
 // DictionaryValue
 
 type DictionaryValue map[interface{}]Value
