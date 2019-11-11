@@ -66,6 +66,10 @@ lint-sdk:
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test
 
+.PHONY: docker-ci
+docker-ci:
+	docker run -it -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:latest make ci
+
 .PHONY: install-cli
 install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
