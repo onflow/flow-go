@@ -215,3 +215,16 @@ func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 
 	assert.Nil(t, err)
 }
+
+func TestCheckInvalidAddressDecimal(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        let a: Address = 1
+        let b = Address(2)
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+}

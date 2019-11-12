@@ -287,7 +287,7 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 			return true
 
 		} else if IsSubType(unwrappedTargetType, &AddressType{}) {
-			checker.checkAddressLiteral(typedExpression, unwrappedTargetType)
+			checker.checkAddressLiteral(typedExpression)
 
 			return true
 		}
@@ -345,12 +345,21 @@ func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integ
 }
 
 // checkAddressLiteral checks that the value of the integer literal
-// fits into the range of an address (160 bits / 20 bytes)
+// fits into the range of an address (160 bits / 20 bytes),
+// and is hexadecimal
 //
-func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression, addressType Type) {
-	ranged := addressType.(Ranged)
+func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression) {
+	ranged := &AddressType{}
 	rangeMin := ranged.Min()
 	rangeMax := ranged.Max()
+
+	if expression.Base != 16 {
+		checker.report(
+			&InvalidAddressLiteralError{
+				Range: ast.NewRangeFromPositioned(expression),
+			},
+		)
+	}
 
 	if checker.checkRange(expression.Value, rangeMin, rangeMax) {
 		return
