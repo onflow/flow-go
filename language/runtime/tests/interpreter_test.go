@@ -3187,116 +3187,182 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
 func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var branch = 0
+
       fun test(x: Int?): Int {
           if var y = x {
+              branch = 1
               return y
           } else {
+              branch = 2
               return 0
           }
       }
     `)
 
-	value, err := inter.Invoke("test", big.NewInt(2))
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.NewIntValue(2),
-		value,
-	)
+	t.Run("2", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(2))
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(1),
+			inter.Globals["branch"].Value,
+		)
+	})
 
-	value, err = inter.Invoke("test", nil)
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.NewIntValue(0),
-		value,
-	)
+	t.Run("nil", func(t *testing.T) {
+		value, err := inter.Invoke("test", nil)
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.NewIntValue(0),
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			inter.Globals["branch"].Value,
+		)
+	})
 }
 
 func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var branch = 0
+
       fun test(x: Int?): Int {
           if var y = x {
+              branch = 1
               return y
           }
+          branch = 2
           return 0
       }
     `)
 
-	value, err := inter.Invoke("test", big.NewInt(2))
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.NewIntValue(2),
-		value,
-	)
+	t.Run("2", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(2))
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(1),
+			inter.Globals["branch"].Value,
+		)
+	})
 
-	value, err = inter.Invoke("test", nil)
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.NewIntValue(0),
-		value,
-	)
+	t.Run("nil", func(t *testing.T) {
+		value, err := inter.Invoke("test", nil)
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.NewIntValue(0),
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			inter.Globals["branch"].Value,
+		)
+
+	})
 }
 
 func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var branch = 0
+
       fun test(x: Int??): Int? {
           if var y = x {
+              branch = 1
               return y
           } else {
+              branch = 2
               return 0
           }
       }
     `)
 
-	value, err := inter.Invoke("test", big.NewInt(2))
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(2),
-		},
-		value,
-	)
+	t.Run("2", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(2))
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.SomeValue{
+				Value: interpreter.NewIntValue(2),
+			},
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(1),
+			inter.Globals["branch"].Value,
+		)
+	})
 
-	value, err = inter.Invoke("test", nil)
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(0),
-		},
-		value,
-	)
+	t.Run("nil", func(t *testing.T) {
+		value, err := inter.Invoke("test", nil)
+		assert.Nil(t, err)
+		assert.Equal(t,
+			interpreter.SomeValue{
+				Value: interpreter.NewIntValue(0),
+			},
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			inter.Globals["branch"].Value,
+		)
+	})
 }
 
 func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      var branch = 0
+
       fun test(x: Int??): Int? {
           if var y: Int? = x {
+              branch = 1
               return y
           } else {
+              branch = 2
               return 0
           }
       }
     `)
 
-	value, err := inter.Invoke("test", big.NewInt(2))
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(2),
-		},
-		value,
-	)
+	t.Run("2", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(2))
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.SomeValue{
+				Value: interpreter.NewIntValue(2),
+			},
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(1),
+			inter.Globals["branch"].Value,
+		)
 
-	value, err = inter.Invoke("test", nil)
-	assert.Nil(t, err)
-	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(0),
-		},
-		value,
-	)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		value, err := inter.Invoke("test", nil)
+		require.Nil(t, err)
+		assert.Equal(t,
+			interpreter.SomeValue{
+				Value: interpreter.NewIntValue(0),
+			},
+			value,
+		)
+		assert.Equal(t,
+			interpreter.NewIntValue(2),
+			inter.Globals["branch"].Value,
+		)
+	})
 }
 
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
@@ -4308,7 +4374,7 @@ func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T
     `)
 
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.Int8Value(1),
 		inter.Globals["x"].Value,
 	)
 }
@@ -4321,7 +4387,7 @@ func TestInterpretIntegerLiteralTypeConversionInVariableDeclarationOptional(t *t
 
 	assert.Equal(t,
 		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(1),
+			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
 	)
@@ -4337,7 +4403,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.Int8Value(1),
 		inter.Globals["x"].Value,
 	)
 
@@ -4345,7 +4411,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewIntValue(2),
+		interpreter.Int8Value(2),
 		inter.Globals["x"].Value,
 	)
 }
@@ -4361,7 +4427,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
 
 	assert.Equal(t,
 		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(1),
+			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
 	)
@@ -4371,7 +4437,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
 
 	assert.Equal(t,
 		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(2),
+			Value: interpreter.Int8Value(2),
 		},
 		inter.Globals["x"].Value,
 	)
@@ -4387,7 +4453,7 @@ func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.
     `)
 
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.Int8Value(1),
 		inter.Globals["x"].Value,
 	)
 }
@@ -4403,7 +4469,7 @@ func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *
 
 	assert.Equal(t,
 		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(1),
+			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
 	)
@@ -4420,7 +4486,7 @@ func TestInterpretIntegerLiteralTypeConversionInReturn(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewIntValue(1),
+		interpreter.Int8Value(1),
 		value,
 	)
 }
@@ -4437,7 +4503,7 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t,
 		interpreter.SomeValue{
-			Value: interpreter.NewIntValue(1),
+			Value: interpreter.Int8Value(1),
 		},
 		value,
 	)
@@ -5511,4 +5577,28 @@ func TestInterpretInvalidForwardReferenceCall(t *testing.T) {
           }
         `)
 	})
+}
+
+func TestInterpreterIntegerConversions(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x: Int8 = 100
+      let y = Int8(90) + Int8(10)
+      let z = y == x
+    `)
+
+	assert.Equal(t,
+		interpreter.Int8Value(100),
+		inter.Globals["x"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Int8Value(100),
+		inter.Globals["y"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["z"].Value,
+	)
 }

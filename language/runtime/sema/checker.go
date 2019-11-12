@@ -102,6 +102,8 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 		Elaboration:         NewElaboration(),
 	}
 
+	checker.declareBaseValues()
+
 	for _, option := range options {
 		err := option(checker)
 		if err != nil {
@@ -115,6 +117,13 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 	}
 
 	return checker, nil
+}
+
+func (checker *Checker) declareBaseValues() {
+	for name, declaration := range BaseValues {
+		checker.declareValue(name, declaration)
+		checker.declareGlobalValue(name)
+	}
 }
 
 func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
