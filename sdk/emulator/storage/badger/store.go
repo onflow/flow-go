@@ -193,13 +193,16 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 }
 
 // getTx returns a getter function bound to the input transaction that can be
-// used to get values from Badger. The getter function checks for key-not-found
-// errors and wraps them in storage.ErrNotFound.
+// used to get values from Badger.
+//
+// The getter function checks for key-not-found errors and wraps them in
+// storage.NotFound in order to comply with the storage.Store interface.
 //
 // This saves a few lines of converting a badger.Item to []byte.
 func getTx(txn *badger.Txn) func([]byte) ([]byte, error) {
 	return func(key []byte) ([]byte, error) {
-		// Badger returns an "item" upon GETs
+		// Badger returns an "item" upon GETs, we need to copy the actual value
+		// from the item and return it.
 		item, err := txn.Get(key)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
@@ -227,39 +230,4 @@ func getLatestBlockNumberTx(txn *badger.Txn) (uint64, error) {
 	}
 
 	return blockNumber, nil
-}
-
-// The following *Key functions return keys to use when reading/writing values
-// to Badger. The key name includes how it is indexed.
-
-const (
-	blockKeyPrefix          = "block_by_number"
-	blockHashIndexKeyPrefix = "block_hash_to_number"
-	transactionKeyPrefix    = "transaction_by_hash"
-	registersKeyPrefix      = "registers_by_block_number"
-	eventsKeyPrefix         = "events_by_block_number"
-)
-
-func blockKey(blockNumber uint64) []byte {
-	return []byte(fmt.Sprintf("%s-%d", blockKeyPrefix, blockNumber))
-}
-
-func blockHashIndexKey(blockHash crypto.Hash) []byte {
-	return []byte(fmt.Sprintf("%s-%s", blockHashIndexKeyPrefix, blockHash.Hex()))
-}
-
-func latestBlockKey() []byte {
-	return []byte("latest_block_number")
-}
-
-func transactionKey(txHash crypto.Hash) []byte {
-	return []byte(fmt.Sprintf("%s-%s", transactionKeyPrefix, txHash.Hex()))
-}
-
-func registersKey(blockNumber uint64) []byte {
-	return []byte(fmt.Sprintf("%s-%d", registersKeyPrefix, blockNumber))
-}
-
-func eventsKey(blockNumber uint64) []byte {
-	return []byte(fmt.Sprintf("%s-%d", eventsKeyPrefix, blockNumber))
 }
