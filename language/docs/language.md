@@ -3638,8 +3638,8 @@ Instead, consider using [interfaces](#interfaces).
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
 
 In Flow and Cadence, there are two types of access control
-    1. Access control between accounts using capability security.  Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  This means that nothing is truly public by default.  Other accounts can not read or write the objects in an account unless the owner of the account has granted them access by providing references to the objects.
-    2. Access control within programs using `private` and `public` keywords.  Assuming the caller has a valid reference that satisfies the first type of access control, these keywords further govern how access is controlled.  
+- 1. Access control between accounts using capability security.  Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  This means that nothing is truly public by default.  Other accounts can not read or write the objects in an account unless the owner of the account has granted them access by providing references to the objects.
+- 2. Access control within programs using `private` and `public` keywords.  Assuming the caller has a valid reference that satisfies the first type of access control, these keywords further govern how access is controlled.  
 
 The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.
 
