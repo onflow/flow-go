@@ -449,6 +449,14 @@ func NewIntValue(value int64) IntValue {
 	return IntValue{Int: big.NewInt(value)}
 }
 
+func ConvertInt(value Value) Value {
+	if intValue, ok := value.(IntValue); ok {
+		return IntValue{Int: big.NewInt(0).Set(intValue.Int)}
+	} else {
+		return NewIntValue(int64(value.(IntegerValue).IntValue()))
+	}
+}
+
 func (v IntValue) isValue() {}
 
 func (v IntValue) Copy() Value {
@@ -588,6 +596,10 @@ func (v Int8Value) Equal(other Value) BoolValue {
 	return v == other.(Int8Value)
 }
 
+func ConvertInt8(value Value) Value {
+	return Int8Value(value.(IntegerValue).IntValue())
+}
+
 // Int16Value
 
 type Int16Value int16
@@ -648,6 +660,10 @@ func (v Int16Value) GreaterEqual(other IntegerValue) BoolValue {
 
 func (v Int16Value) Equal(other Value) BoolValue {
 	return v == other.(Int16Value)
+}
+
+func ConvertInt16(value Value) Value {
+	return Int16Value(value.(IntegerValue).IntValue())
 }
 
 // Int32Value
@@ -712,6 +728,10 @@ func (v Int32Value) Equal(other Value) BoolValue {
 	return v == other.(Int32Value)
 }
 
+func ConvertInt32(value Value) Value {
+	return Int32Value(value.(IntegerValue).IntValue())
+}
+
 // Int64Value
 
 type Int64Value int64
@@ -772,6 +792,10 @@ func (v Int64Value) GreaterEqual(other IntegerValue) BoolValue {
 
 func (v Int64Value) Equal(other Value) BoolValue {
 	return v == other.(Int64Value)
+}
+
+func ConvertInt64(value Value) Value {
+	return Int64Value(value.(IntegerValue).IntValue())
 }
 
 // UInt8Value
@@ -836,6 +860,10 @@ func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == other.(UInt8Value)
 }
 
+func ConvertUInt8(value Value) Value {
+	return UInt8Value(value.(IntegerValue).IntValue())
+}
+
 // UInt16Value
 
 type UInt16Value uint16
@@ -895,6 +923,10 @@ func (v UInt16Value) GreaterEqual(other IntegerValue) BoolValue {
 
 func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == other.(UInt16Value)
+}
+
+func ConvertUInt16(value Value) Value {
+	return UInt16Value(value.(IntegerValue).IntValue())
 }
 
 // UInt32Value
@@ -959,6 +991,10 @@ func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == other.(UInt32Value)
 }
 
+func ConvertUInt32(value Value) Value {
+	return UInt32Value(value.(IntegerValue).IntValue())
+}
+
 // UInt64Value
 
 type UInt64Value uint64
@@ -1019,6 +1055,10 @@ func (v UInt64Value) GreaterEqual(other IntegerValue) BoolValue {
 
 func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == other.(UInt64Value)
+}
+
+func ConvertUInt64(value Value) Value {
+	return UInt64Value(value.(IntegerValue).IntValue())
 }
 
 // CompositeValue

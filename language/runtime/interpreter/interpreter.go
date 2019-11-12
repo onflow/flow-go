@@ -210,6 +210,8 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		SubInterpreters:     map[ast.LocationID]*Interpreter{},
 	}
 
+	interpreter.defineBaseFunctions()
+
 	for _, option := range options {
 		err := option(interpreter)
 		if err != nil {
@@ -471,7 +473,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		}
 	}
 
-	boxedArguments := make([]Value, len(arguments))
+	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
 		parameterType := parameterTypeAnnotations[i].Type
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
@@ -480,10 +482,10 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 				Value: variableValue,
 			}
 		}
-		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
+		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(boxedArguments, LocationPosition{})
+	trampoline = function.invoke(preparedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
@@ -773,7 +775,7 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 			valueType := interpreter.Checker.Elaboration.ReturnStatementValueTypes[statement]
 			returnType := interpreter.Checker.Elaboration.ReturnStatementReturnTypes[statement]
 
-			value = interpreter.box(value, valueType, returnType)
+			value = interpreter.convertAndBox(value, valueType, returnType)
 
 			return functionReturn{value}
 		})
@@ -879,7 +881,7 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 			valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
 			targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
 
-			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
+			valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
 				declaration.Identifier.Identifier,
@@ -905,7 +907,7 @@ func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.Assignm
 			valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
 			targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
 
-			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
+			valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 
 			return interpreter.visitAssignmentValue(assignment.Target, valueCopy)
 		})
@@ -1170,8 +1172,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 							rightType := interpreter.Checker.Elaboration.BinaryExpressionRightTypes[expression]
 							resultType := interpreter.Checker.Elaboration.BinaryExpressionResultTypes[expression]
 
-							// NOTE: important to box both any and optional
-							return interpreter.box(value, rightType, resultType)
+							// NOTE: important to convert both any and optional
+							return interpreter.convertAndBox(value, rightType, resultType)
 						})
 				}
 
@@ -1310,7 +1312,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 			copies := make([]Value, len(*values.Values))
 			for i, argument := range *values.Values {
 				argumentType := argumentTypes[i]
-				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
+				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
 			return Done{Result: NewArrayValue(copies...)}
@@ -1328,13 +1330,13 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
 				entryType := entryTypes[i]
 
-				key := interpreter.copyAndBox(
+				key := interpreter.copyAndConvert(
 					dictionaryEntryValues.Key,
 					entryType.KeyType,
 					dictionaryType.KeyType,
 				)
 
-				value := interpreter.copyAndBox(
+				value := interpreter.copyAndConvert(
 					dictionaryEntryValues.Value,
 					entryType.ValueType,
 					dictionaryType.ValueType,
@@ -1345,7 +1347,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 
 				// TODO: panic for duplicate keys?
 
-				// NOTE: important to box in optional, as assignment to dictionary
+				// NOTE: important to convert in optional, as assignment to dictionary
 				// is always considered as an optional
 
 				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
@@ -1427,7 +1429,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					for i, argument := range *arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndBox(argument, argumentType, parameterType)
+						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
 					}
 
 					// TODO: optimize: only potentially used by host-functions
@@ -1873,17 +1875,52 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
+func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetType sema.Type) Value {
 	if valueType == nil || !valueType.IsResourceType() {
 		value = value.Copy()
 	}
-	return interpreter.box(value, valueType, targetType)
+	return interpreter.convertAndBox(value, valueType, targetType)
 }
 
-// box boxes a value in optionals and any value, if necessary
-func (interpreter *Interpreter) box(value Value, valueType, targetType sema.Type) Value {
+// convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary
+func (interpreter *Interpreter) convertAndBox(value Value, valueType, targetType sema.Type) Value {
+	value = interpreter.convert(value, valueType, targetType)
 	value, valueType = interpreter.boxOptional(value, valueType, targetType)
 	return interpreter.boxAny(value, valueType, targetType)
+}
+
+func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.Type) Value {
+	if valueType == nil {
+		return value
+	}
+
+	if _, valueIsOptional := valueType.(*sema.OptionalType); valueIsOptional {
+		return value
+	}
+
+	unwrappedTargetType := sema.UnwrapOptionalType(targetType)
+	switch unwrappedTargetType.(type) {
+	case *sema.IntType:
+		return ConvertInt(value)
+	case *sema.Int8Type:
+		return ConvertInt8(value)
+	case *sema.Int16Type:
+		return ConvertInt16(value)
+	case *sema.Int32Type:
+		return ConvertInt32(value)
+	case *sema.Int64Type:
+		return ConvertInt64(value)
+	case *sema.UInt8Type:
+		return ConvertUInt8(value)
+	case *sema.UInt16Type:
+		return ConvertUInt16(value)
+	case *sema.UInt32Type:
+		return ConvertUInt32(value)
+	case *sema.UInt64Type:
+		return ConvertUInt64(value)
+	default:
+		return value
+	}
 }
 
 // boxOptional boxes a value in optionals, if necessary
@@ -1918,7 +1955,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
 	switch targetType := targetType.(type) {
 	case *sema.AnyType:
-		// no need to box already boxed value
+		// no need to convert already boxed value
 		if _, ok := value.(AnyValue); ok {
 			return value
 		}
@@ -2010,8 +2047,14 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 			// set variables for all imported values
 			for name, variable := range variables {
+
 				// don't import predeclared values
 				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+					continue
+				}
+
+				// don't import base values
+				if _, ok := sema.BaseValues[name]; ok {
 					continue
 				}
 
@@ -2147,4 +2190,32 @@ func (interpreter *Interpreter) readStored(storageIdentifier string, key string)
 
 func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
 	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
+}
+
+var converters = map[string]func(Value) Value{
+	"Int":    ConvertInt,
+	"Int8":   ConvertInt8,
+	"Int16":  ConvertInt16,
+	"Int32":  ConvertInt32,
+	"Int64":  ConvertInt64,
+	"UInt8":  ConvertUInt8,
+	"UInt16": ConvertUInt16,
+	"UInt32": ConvertUInt32,
+	"UInt64": ConvertUInt64,
+}
+
+func (interpreter *Interpreter) defineBaseFunctions() {
+	for name, converter := range converters {
+		err := interpreter.ImportValue(
+			name,
+			HostFunctionValue{
+				Function: func(arguments []Value, location LocationPosition) Trampoline {
+					return Done{Result: converter(arguments[0])}
+				},
+			},
+		)
+		if err != nil {
+			panic(errors.NewUnreachableError())
+		}
+	}
 }
