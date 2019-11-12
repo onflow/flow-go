@@ -75,7 +75,7 @@
             },
             "type":  {
               "title": "Type annotation type",
-              "description": "The move annotation type (required)",
+              "description": "The annotated type (required)",
               "$ref": "#/definitions/type"
             }
           },
@@ -99,7 +99,7 @@
       "type": "object",
       "properties": {
         "$type": { "const": "array" },
-        "elements": {
+        "elementType": {
           "title": "Element Type",
           "description": "The type of the elements (required)",
           "$ref": "#/definitions/type"
@@ -110,25 +110,25 @@
           "type": "integer",
         }
       },
-      "required": ["$type", "elements"]
+      "required": ["$type", "elementType"]
     },
     "dictionaryType": {
       "title": "Dictionary Type",
       "type": "object",
       "properties": {
         "$type": { "const": "dictionary" },
-        "key": {
+        "keyType": {
           "title": "Key Type",
           "description": "The key type (required)",
           "$ref": "#/definitions/type"
         },
-        "value": {
+        "valueType": {
           "title": "Element Type",
           "description": "The value type (required)",
           "$ref": "#/definitions/type"
         }
       },
-      "required": ["$type", "key", "value"]
+      "required": ["$type", "keyType", "valueType"]
     }
   }
 }
