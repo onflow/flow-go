@@ -964,6 +964,7 @@ func (t *FunctionType) InvocationFunctionType() *FunctionType {
 }
 
 func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
