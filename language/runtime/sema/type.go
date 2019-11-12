@@ -945,6 +945,7 @@ func (t *ConstantSizedType) IndexingType() Type {
 type InvokableType interface {
 	Type
 	InvocationFunctionType() *FunctionType
+	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
 // FunctionType
@@ -960,6 +961,9 @@ func (*FunctionType) isType() {}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
+}
+
+func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
 }
 
 func (t *FunctionType) String() string {
@@ -1023,6 +1027,18 @@ type SpecialFunctionType struct {
 	*FunctionType
 }
 
+// CheckedFunctionType is the the type representing a function that checks the arguments,
+// e.g., integer functions
+
+type CheckedFunctionType struct {
+	*FunctionType
+	ArgumentExpressionsCheck func(checker *Checker, argumentExpressions []ast.Expression)
+}
+
+func (t *CheckedFunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	t.ArgumentExpressionsCheck(checker, argumentExpressions)
+}
+
 // baseTypes are the nominal types available in programs
 
 var baseTypes map[string]Type
@@ -1060,6 +1076,86 @@ func init() {
 		}
 
 		baseTypes[typeName] = ty
+	}
+}
+
+// baseValues are the values available in programs
+
+var BaseValues map[string]ValueDeclaration
+
+type baseFunction struct {
+	name           string
+	invokableType  InvokableType
+	argumentLabels []string
+}
+
+func (f baseFunction) ValueDeclarationType() Type {
+	return f.invokableType
+}
+
+func (baseFunction) ValueDeclarationKind() common.DeclarationKind {
+	return common.DeclarationKindFunction
+}
+
+func (baseFunction) ValueDeclarationPosition() ast.Position {
+	return ast.Position{}
+}
+
+func (baseFunction) ValueDeclarationIsConstant() bool {
+	return true
+}
+
+func (f baseFunction) ValueDeclarationArgumentLabels() []string {
+	return f.argumentLabels
+}
+
+func init() {
+	BaseValues = map[string]ValueDeclaration{}
+	initIntegerFunctions()
+	// TODO: address type
+}
+
+func initIntegerFunctions() {
+	integerTypes := []Type{
+		&IntType{},
+		&Int8Type{},
+		&Int16Type{},
+		&Int32Type{},
+		&Int64Type{},
+		&UInt8Type{},
+		&UInt16Type{},
+		&UInt32Type{},
+		&UInt64Type{},
+	}
+
+	for _, integerType := range integerTypes {
+		typeName := integerType.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := BaseValues[typeName]; ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		BaseValues[typeName] = baseFunction{
+			name: typeName,
+			invokableType: &CheckedFunctionType{
+				FunctionType: &FunctionType{
+					ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+					ReturnTypeAnnotation:     &TypeAnnotation{Type: integerType},
+				},
+				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
+			},
+		}
+	}
+}
+
+func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
+	return func(checker *Checker, argumentExpressions []ast.Expression) {
+		intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+		if !ok {
+			return
+		}
+		checker.checkIntegerLiteral(intExpression, integerType)
 	}
 }
 
@@ -1591,7 +1687,7 @@ func IsEquatableType(ty Type) bool {
 
 	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntType{}) {
+		IsSubType(ty, &IntegerType{}) {
 
 		return true
 	}
