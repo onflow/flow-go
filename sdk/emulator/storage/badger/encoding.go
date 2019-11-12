@@ -36,6 +36,18 @@ func decodeBlock(block *types.Block, from []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(block)
 }
 
+func encodeUint64(v uint64) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(&v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func decodeUint64(v *uint64, from []byte) error {
+	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(v)
+}
+
 func encodeRegisters(registers flow.Registers) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(&registers); err != nil {
