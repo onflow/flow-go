@@ -141,6 +141,11 @@ func (checker *Checker) importValues(
 			continue
 		}
 
+		// don't import base values
+		if _, ok := BaseValues[name]; ok {
+			continue
+		}
+
 		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
