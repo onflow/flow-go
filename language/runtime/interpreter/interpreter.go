@@ -1923,6 +1923,8 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 		return ConvertUInt32(value)
 	case *sema.UInt64Type:
 		return ConvertUInt64(value)
+	case *sema.AddressType:
+		return ConvertAddress(value)
 	default:
 		return value
 	}
@@ -2198,15 +2200,16 @@ func (interpreter *Interpreter) writeStored(storageIdentifier string, key string
 }
 
 var converters = map[string]func(Value) Value{
-	"Int":    ConvertInt,
-	"Int8":   ConvertInt8,
-	"Int16":  ConvertInt16,
-	"Int32":  ConvertInt32,
-	"Int64":  ConvertInt64,
-	"UInt8":  ConvertUInt8,
-	"UInt16": ConvertUInt16,
-	"UInt32": ConvertUInt32,
-	"UInt64": ConvertUInt64,
+	"Int":     ConvertInt,
+	"Int8":    ConvertInt8,
+	"Int16":   ConvertInt16,
+	"Int32":   ConvertInt32,
+	"Int64":   ConvertInt64,
+	"UInt8":   ConvertUInt8,
+	"UInt16":  ConvertUInt16,
+	"UInt32":  ConvertUInt32,
+	"UInt64":  ConvertUInt64,
+	"Address": ConvertAddress,
 }
 
 func (interpreter *Interpreter) defineBaseFunctions() {
