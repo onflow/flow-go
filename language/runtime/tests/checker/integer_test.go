@@ -84,12 +84,13 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 		t.Run(ty.String(), func(t *testing.T) {
 
 			code := fmt.Sprintf(`
-                let min: %s = %s
-                let max: %s = %s
+                let min: %[1]s = %[2]s
+                let max: %[1]s = %[3]s
+                let a = %[1]s(%[2]s)
+                let b = %[1]s(%[3]s)
             `,
 				ty.String(),
 				ty.(sema.Ranged).Min(),
-				ty.String(),
 				ty.(sema.Ranged).Max(),
 			)
 
@@ -116,36 +117,42 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let minMinusOne: %s = %s
+                let minMinusOne: %[1]s = %[2]s
+                let minMinusOne2 = %[1]s(%[2]s)
             `,
 				ty.String(),
 				big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1)),
 			))
 
-			errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
 				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
 			} else {
 				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
 			}
 		})
 
 		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let maxPlusOne: %s = %s
+                let maxPlusOne: %[1]s = %[2]s
+                let maxPlusOne2 = %[1]s(%[2]s)
             `,
 				ty.String(),
 				big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1)),
 			))
 
-			errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
 				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
 			} else {
 				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
 			}
 		})
 	}
