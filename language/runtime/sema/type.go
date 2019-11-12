@@ -1113,7 +1113,7 @@ func (f baseFunction) ValueDeclarationArgumentLabels() []string {
 func init() {
 	BaseValues = map[string]ValueDeclaration{}
 	initIntegerFunctions()
-	// TODO: address type
+	initAddressFunction()
 }
 
 func initIntegerFunctions() {
@@ -1147,6 +1147,33 @@ func initIntegerFunctions() {
 				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
 			},
 		}
+	}
+}
+
+func initAddressFunction() {
+	addressType := &AddressType{}
+	typeName := addressType.String()
+
+	// check type is not accidentally redeclared
+	if _, ok := BaseValues[typeName]; ok {
+		panic(errors.NewUnreachableError())
+	}
+
+	BaseValues[typeName] = baseFunction{
+		name: typeName,
+		invokableType: &CheckedFunctionType{
+			FunctionType: &FunctionType{
+				ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+				ReturnTypeAnnotation:     &TypeAnnotation{Type: addressType},
+			},
+			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
+				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+				if !ok {
+					return
+				}
+				checker.checkAddressLiteral(intExpression)
+			},
+		},
 	}
 }
 
