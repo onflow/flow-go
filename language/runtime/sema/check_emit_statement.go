@@ -28,7 +28,8 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 
 	// Check that the emitted event is declared in the same location
 
-	if eventType.Location.ID() != checker.Location.ID() {
+	if !ast.LocationsMatch(eventType.Location, checker.Location) {
+
 		checker.report(
 			&EmitImportedEventError{
 				Type:  ty,

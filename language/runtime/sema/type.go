@@ -1428,7 +1428,7 @@ func (t *ReferenceType) IsResourceType() bool {
 }
 
 func (t *ReferenceType) IsInvalidType() bool {
-	return false
+	return t.Type.IsInvalidType()
 }
 
 func (t *ReferenceType) HasMembers() bool {

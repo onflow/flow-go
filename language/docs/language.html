@@ -324,18 +324,18 @@
       <section>
         <h2 id="constants-and-variable-declarations"><a href="#constants-and-variable-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Constants and Variable Declarations</h2>
         <p>
-          Constants and variables are declarations that bind a value to a name.
-          Constants can only be initialized with a value and cannot be reassigned afterwards.
-          Variables can be initialized with a value and can be reassigned later.
-          Declarations are valid in any scope, including the global scope.
+          Constants and variables are declarations that bind a value and <a href="#type-safety">type</a> to an identifier.
+          Constants are initialized with a value and cannot be reassigned afterwards.
+          Variables are initialized with a value and can be reassigned later.
+          Declarations can be created in any scope, including the global scope.
         </p>
         <p>
-          Constant means that the <em>name</em> is constant, not the <em>value</em> –
-          the value may still be changed if it allows it, i.e. is mutable.
+          Constant means that the <em>identifier's</em> association is constant, not the <em>value</em> itself –
+          the value may still be changed if is mutable.
         </p>
         <p>
           Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword.
-          The keywords are followed by the name, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
+          The keywords are followed by the identifier, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
         </p>
         <pre><code class="language-cadence,file=constants-and-variables.cdc"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -359,9 +359,7 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
 </span></code></pre>
         <p>
-          Once a constant or variable is declared,
-          it cannot be redeclared with the same name,
-          with a different type,
+          Once a constant or variable is declared, it cannot be redeclared
           or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
         </p>
         <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant named `a`.</span><span>
@@ -437,9 +435,8 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> smallIntegerWithAnnotation: Int8 = </span><span style="color: #09885A">1</span><span>
 </span></code></pre>
         <p>
-          If a type annotation is provided, the initial value must be of this type,
-          and new values assigned to variables must match the declaration's explicit type
-          or the type that was inferred when the variable was declared.
+          If a type annotation is provided, the initial value must be of this type.
+          All new values assigned to variables must match its type.
           This type safety is explained in more detail in a <a href="#type-safety">separate section</a>.
         </p>
         <pre><code class="language-cadence"><span style="color: #008000">// Invalid: declare a variable with an explicit type `Bool`,</span><span>
@@ -612,7 +609,7 @@
         <section>
           <h3 id="integers"><a href="#integers" aria-hidden="true"><span class="icon icon-link"></span></a>Integers</h3>
           <p>
-            Integers are whole numbers without a fractional part.
+            Integers are numbers without a fractional part.
             They are either <em>signed</em> (positive, zero, or negative) or <em>unsigned</em> (positive or zero)
             and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
           </p>
@@ -643,7 +640,7 @@
 </span></code></pre>
           <p>
             Integer literals are <a href="#type-inference">inferred</a> to have type <code>Int</code>,
-            or if the literal occurrs in a position that expects an explicit type,
+            or if the literal occurs in a position that expects an explicit type,
             e.g. in a variable declaration with an explicit type annotation.
           </p>
           <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> someNumber = </span><span style="color: #09885A">123</span><span>
@@ -652,7 +649,7 @@
 </span></code></pre>
           <p>Negative integers are encoded in two's complement representation.</p>
           <p>
-            Integer types are not converted automatically. Types most be explicitly converted,
+            Integer types are not converted automatically. Types must be explicitly converted,
             which can be done by calling the constructor of the type with the integer type.
           </p>
           <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int8 = </span><span style="color: #09885A">1</span><span>
@@ -852,8 +849,8 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
             <p>
-              The type of the right-hand side of the operator (the alternative value) must be a subtype
-              of the type of the left-hand side, i.e. the right-hand side of the operator must
+              The type of the right-hand side of the operator (the alternative value) must be compatible
+              with the left-hand side, i.e. the right-hand side of the operator must
               be the non-optional or optional type matching the type of the left-hand side.
             </p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant with an optional integer type.</span><span>
@@ -1603,8 +1600,8 @@
 </span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
           <p>
-            The left-hand side of the assignment opera must be an identifier,
-            followed by one or more index or access expressions.
+            The left-hand side of the assignment operand must be an identifier.
+            For arrays and dictionaries, followed by one or more index or access expressions.
           </p>
           <pre><code class="language-cadence,file=assignment-numbers.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -2327,7 +2324,7 @@
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
           <p>
             The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
-            The condition must be boolean and the braces are required.
+            The condition expression must be Bool
             The braces are required and not optional.
             Parentheses around the condition are optional.
           </p>
@@ -2725,7 +2722,7 @@
             All fields <strong>must</strong> be initialized in the initializer, exactly once.
           </p>
           <p>
-            Having to provide intitial values in the initializer might seem restrictive,
+            Having to provide initial values in the initializer might seem restrictive,
             but this ensures that all fields are always initialized in one location, the initializer,
             and the initialization order is clear.
           </p>
@@ -2746,7 +2743,7 @@
             <li>
               <p>
                 <strong>Constant fields</strong> are also stored in the composite value,
-                but after they have been inititalized with a value they <strong>cannot</strong> have new values assigned to them afterwards.
+                but after they have been initialized with a value they <strong>cannot</strong> have new values assigned to them afterwards.
                 A constant field must be initialized exactly once.
               </p>
               <p>Constant fields are declared using the <code>let</code> keyword.</p>
@@ -2807,7 +2804,7 @@
 </span><span style="color: #008000">// Both fields are initialized through the initializer.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The public access modifier `pub` is used in this example to allow</span><span>
-</span><span style="color: #008000">// thes fields to be read in outer scopes. Fields can also be declared</span><span>
+</span><span style="color: #008000">// the fields to be read in outer scopes. Fields can also be declared</span><span>
 </span><span style="color: #008000">// private so they cannot be accessed in outer scopes.</span><span>
 </span><span style="color: #008000">// Access control will be explained in a later section.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2888,7 +2885,7 @@
         </section>
         <section>
           <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
-          <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written. Assignments are not allowed at all in getters and setters.</p>
+          <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.<br>Only certain assignments are allowed in getters and setters.</p>
           <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
           <p>Getters are declared using the <code>get</code> keyword. Getters have no parameters and their return type is implicitly the type of the field.</p>
           <pre><code class="language-cadence,file=composite-data-type-field-getter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
@@ -2919,7 +2916,7 @@
 </span><span style="color: #008000">// `example.balance` is `10`</span><span>
 </span><span>
 </span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
-</span><span style="color: #008000">// `example.balance` is `0`. Without the getter it would be `-50`.</span><span>
+</span><span style="color: #008000">// `example.balance` is `-50` internally, but while reading value, getter returns `0` instead.</span><span>
 </span></code></pre>
           <p>
             Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses.
@@ -3132,7 +3129,7 @@
 </span><span style="color: #008000">// Invalid: Assign a value of type `B` to the variable.</span><span>
 </span><span style="color: #008000">// Even though types `A` and `B` have the same declarations,</span><span>
 </span><span style="color: #008000">// a function with the same name and type, the types' names differ,</span><span>
-</span><span style="color: #008000">// so they are not compatbile.</span><span>
+</span><span style="color: #008000">// so they are not compatible.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">something = B()</span><span>
 </span><span>
@@ -3224,7 +3221,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Move* the resource value to a new constant.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3277,7 +3274,7 @@
 </span></code></pre>
             <p>
               To make it explicit that the type is moved, it must be prefixed with <code>&#x3C;-</code> in all type annotations,
-              e.g. for variable declarations, parametes, or return types.
+              e.g. for variable declarations, parameters, or return types.
             </p>
             <pre><code class="language-cadence,file=resource-type-annotation.cdc"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3430,7 +3427,7 @@
           </section>
           <section>
             <h4 id="nested-resources"><a href="#nested-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Nested Resources</h4>
-            <p>Fields in composite data types behave diffently when they have a resource type.</p>
+            <p>Fields in composite data types behave differently when they have a resource type.</p>
             <p>
               If a resource type has fields that have a resource type it <strong>must</strong> declare a destructor,
               which <strong>must</strong> invalidate all resource fields, i.e. move or destroy them.
