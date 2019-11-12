@@ -163,7 +163,7 @@ func TestTransferNFT(t *testing.T) {
 	// transfer an NFT
 	t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
 		tx := flow.Transaction{
-			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 2),
+			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
