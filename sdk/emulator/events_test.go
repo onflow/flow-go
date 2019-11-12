@@ -19,11 +19,11 @@ func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
 		events := make([]flow.Event, 0)
 
-		b := emulator.NewEmulatedBlockchain(emulator.Options{
-			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
+		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
+			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
-		})
+		))
 
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
@@ -63,11 +63,11 @@ func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromScript", func(t *testing.T) {
 		events := make([]flow.Event, 0)
 
-		b := emulator.NewEmulatedBlockchain(emulator.Options{
-			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
+		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
+			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 				events = append(events, event)
 			},
-		})
+		))
 
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
@@ -93,12 +93,18 @@ func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromAccount", func(t *testing.T) {
 		events := make([]flow.Event, 0)
 
-		b := emulator.NewEmulatedBlockchain(emulator.Options{
-			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				events = append(events, event)
-			},
-			OnLogMessage: func(msg string) { fmt.Println("LOG:", msg) },
-		})
+		b := emulator.NewEmulatedBlockchain(
+			emulator.WithEventEmitter(
+				func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
+					events = append(events, event)
+				},
+			),
+			emulator.WithMessageLogger(
+				func(msg string) {
+					fmt.Println("LOG:", msg)
+				},
+			),
+		)
 
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
