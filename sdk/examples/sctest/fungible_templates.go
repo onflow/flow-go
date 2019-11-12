@@ -178,7 +178,7 @@ func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBa
 		fun main() {
 			let acct = getAccount("%s")
 			let vaultRef = acct.storage[&Receiver] ?? panic("missing Receiver reference")
-			if vaultRef.getBalance() != %d {
+			if vaultRef.balance != %d {
 				panic("incorrect Balance!")
 			}
 		}`

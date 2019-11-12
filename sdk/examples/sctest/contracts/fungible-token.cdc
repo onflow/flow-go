@@ -39,8 +39,6 @@ pub resource interface Receiver {
                 "Incorrect amount removed"
         }
     }
-
-    pub fun getBalance(): Int
 }
 
 pub resource Vault: Provider, Receiver {
@@ -52,7 +50,7 @@ pub resource Vault: Provider, Receiver {
         self.balance = balance
     }
 
-    // withdraw subracts amount from the vaults balance and 
+    // withdraw subtracts amount from the vaults balance and 
     // returns a vault object with the subtracted balance
     pub fun withdraw(amount: Int): <-Vault {
         self.balance = self.balance - amount
@@ -79,11 +77,6 @@ pub resource Vault: Provider, Receiver {
         self.balance = self.balance + from.balance
         destroy from
     }
-
-    // getBalance returns the balance of the vault
-    pub fun getBalance(): Int {
-        return self.balance
-    }
 }
 
 
@@ -91,22 +84,3 @@ pub resource Vault: Provider, Receiver {
 fun createVault(initialBalance: Int): <- Vault {
     return <-create Vault(balance: initialBalance)
 }
-
-
-// fun main() {
-//     let vaultA <- create Vault(balance: 10)
-//     let vaultB <- create Vault(balance: 0)
-
-//     let vaultC <- vaultA.withdraw(amount: 7)
-
-//     vaultB.deposit(from: <-vaultC)
-
-//     //vaultB.transfer(to: &vaultA, amount: 1)
-
-//     log(vaultA.balance)
-//     log(vaultB.balance)
-//     //log(vaultC.balance)
-
-//     destroy vaultA
-//     destroy vaultB
-// }
