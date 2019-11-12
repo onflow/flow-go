@@ -1899,6 +1899,11 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	}
 
 	unwrappedTargetType := sema.UnwrapOptionalType(targetType)
+
+	if valueType.Equal(unwrappedTargetType) {
+		return value
+	}
+
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
 		return ConvertInt(value)
