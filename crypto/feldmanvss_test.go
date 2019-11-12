@@ -90,17 +90,16 @@ func dkgRunChan(proc *testDKGProcessor,
 			assert.Nil(t, err)
 		// if timeout, stop and finalize
 		case <-time.After(time.Second):
-			if phase == 0 {
+			switch phase {
+			case 0:
 				log.Infof("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
-			}
-			if phase == 1 {
+			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
-			}
-			if phase == 2 {
+			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
 				_, pk, _, err := proc.dkg.EndDKG()
 				assert.Nil(t, err, "end dkg error should be nil")
