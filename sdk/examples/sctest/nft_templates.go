@@ -18,11 +18,8 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte
 
 		fun main(acct: Account) {
 			var tokenA: <-NFT <- createNFT(id: %d)
-			//var tokenB: <-NFT? <- createNFT(id: 2)
 
 			var collection: <-NFTCollection <- createCollection(token: <-tokenA)
-
-			// collection.deposit(token: <-tokenB, id: 2)
 
 			if collection.idExists(tokenID: %d) == false {
 				panic("Token ID doesn't exist!")
@@ -53,14 +50,7 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 
 			let nft <- collectionRef.withdraw(tokenID: %d)
 
-			//collectionRef.deposit(token: <-nft)
-
-			if collectionRef.idExists(tokenID: 1) == false {
-				panic("Token ID doesn't exist!")
-			}
-
-			destroy nft
-
+			depositRef.deposit(token: <-nft)
 		}`
 
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
@@ -86,7 +76,7 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 
 // GenerateInspectCollectionScript creates a script that retrieves an NFT collection
 // from storage and makes assertions about the NFT IDs that it contains
-func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID int) []byte {
+func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist string) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
 
@@ -94,10 +84,30 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 			let acct = getAccount("%s")
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
 
-			if collectionRef.idExists(tokenID: %d) == false {
+			if collectionRef.idExists(tokenID: %d) != %s {
 				panic("Token ID doesn't exist!")
 			}
 		}`
 
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID))
+	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
+}
+
+// GenerateInspectCollectionScript creates a script that retrieves an NFT collection
+// from storage and makes assertions about the NFT IDs that it contains
+func GenerateInspectCollectionDictionaryScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist string) []byte {
+	template := `
+		import NFT, NFTCollection from 0x%s
+
+		fun main() {
+			let acct = getAccount("%s")
+			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
+
+			if collectionRef.ownedNFTs[%d] == nil {
+				if %s {
+					panic("Token ID doesn't exist!")
+				}
+			}
+		}`
+
+	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
 }

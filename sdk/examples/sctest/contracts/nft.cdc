@@ -80,13 +80,14 @@ resource NFTCollection: INFTCollection {
     // deposit takes a NFT and adds it to the collections dictionary
     // and adds the ID to the id array
     pub fun deposit(token: <-NFT): Void {
-        let id = token.id
+        let id: Int = token.id
+
         // add the id to the array
         self.idArray.append(id)
         
         var newToken: <-NFT? <- token
 
-        // add the new token to the array
+        // add the new token to the dictionary
         self.ownedNFTs[id] <-> newToken
 
         destroy newToken
@@ -106,12 +107,17 @@ resource NFTCollection: INFTCollection {
 
     // idExists checks to see if a NFT with the given ID exists in the collection
     pub fun idExists(tokenID: Int): Bool {
+        if self.idArray.length == 0 {
+            return false
+        }
+
         var exists = false
         var i = 0
 
         while i < self.idArray.length {
             if (self.idArray[i] == tokenID) {
                 exists = true
+                break
             }
             i = i + 1
         }
