@@ -5300,12 +5300,16 @@ func TestInterpretReferenceUse(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as R
-              ref.x = 1
-              let x1 = ref.x
-              ref.setX(2)
-              let x2 = ref.x
-              return [x1, x2]
+              let ref1 = &storage[R] as R
+              let ref2 = &storage[R] as R
+
+              ref1.x = 1
+              let x1 = ref1.x
+              ref1.setX(2)
+              let x2 = ref1.x
+
+              let x3 = ref2.x
+              return [x1, x2, x3]
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -5333,6 +5337,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 	assert.Equal(t,
 		interpreter.NewArrayValue(
 			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(2),
 		),
 		value,
