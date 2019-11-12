@@ -472,7 +472,7 @@ func NewIntValue(value int64) IntValue {
 
 func ConvertInt(value Value) Value {
 	if intValue, ok := value.(IntValue); ok {
-		return IntValue{Int: big.NewInt(0).Set(intValue.Int)}
+		return intValue.Copy()
 	} else {
 		return NewIntValue(int64(value.(IntegerValue).IntValue()))
 	}
