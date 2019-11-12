@@ -50,8 +50,8 @@ func (s Store) GetLatestBlock() (types.Block, error) {
 }
 
 func (s Store) InsertBlock(block types.Block) error {
-	s.db.Update(func(txn *badger.Txn) error {
-		txn.Set(blockKey(block.Number), []byte{})
+	return s.db.Update(func(txn *badger.Txn) error {
+		return txn.Set(blockKey(block.Number), []byte{})
 	})
 }
 

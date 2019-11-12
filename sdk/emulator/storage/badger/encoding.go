@@ -9,10 +9,7 @@ import (
 )
 
 func init() {
-	//gob.Register(flow.Transaction{})
-	//gob.Register(flow.Block{})
-	//gob.Register(flow.Registers{})
-	//gob.Register(flow.EventList{})
+	gob.Register(flow.Address{})
 }
 
 func encodeTransaction(tx flow.Transaction) ([]byte, error) {
@@ -35,7 +32,7 @@ func encodeBlock(block types.Block) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func decodeBlock(block *flow.Block, from []byte) error {
+func decodeBlock(block *types.Block, from []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(block)
 }
 

@@ -34,7 +34,7 @@ func AddressFixture() flow.Address {
 func AccountSignatureFixture() flow.AccountSignature {
 	return flow.AccountSignature{
 		Account:   AddressFixture(),
-		Signature: []byte{},
+		Signature: []byte{1, 2, 3, 4},
 	}
 }
 
@@ -84,5 +84,19 @@ func EventFixture() flow.Event {
 			"from": flow.ZeroAddress,
 			"id":   1,
 		},
+	}
+}
+
+func HashFixture(size int) crypto.Hash {
+	hash := make(crypto.Hash, size)
+	for i := 0; i < size; i++ {
+		hash[i] = byte(i)
+	}
+	return hash
+}
+
+func RegistersFixture() flow.Registers {
+	return flow.Registers{
+		"key": []byte("value"),
 	}
 }
