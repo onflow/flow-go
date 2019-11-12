@@ -2213,14 +2213,18 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 	for name, converter := range converters {
 		err := interpreter.ImportValue(
 			name,
-			HostFunctionValue{
-				Function: func(arguments []Value, location LocationPosition) Trampoline {
-					return Done{Result: converter(arguments[0])}
-				},
-			},
+			interpreter.newConverterFunction(converter),
 		)
 		if err != nil {
 			panic(errors.NewUnreachableError())
 		}
+	}
+}
+
+func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
+	return HostFunctionValue{
+		Function: func(arguments []Value, location LocationPosition) Trampoline {
+			return Done{Result: converter(arguments[0])}
+		},
 	}
 }
