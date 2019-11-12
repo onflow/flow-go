@@ -895,7 +895,7 @@ let arrays: [[Int16; 3]; 2] = [
 ]
 
 // Declare a variable length array of integers
-var vArray: [Int] = []
+var variableLengthArray: [Int] = []
 ```
 
 Array types are covariant in their element types.
@@ -1202,7 +1202,8 @@ This is safe because dictionaries are value types and not reference types.
 
 #### Dictionary Access
 
-To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+To get the value for a specific key from a dictionary, the access syntax can be used: 
+The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
 Accessing a key returns an [optional](#optionals):
 If the key is found in the dictionary, the value for the given key is returned,
@@ -3638,8 +3639,14 @@ Instead, consider using [interfaces](#interfaces).
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
 
 In Flow and Cadence, there are two types of access control
-- 1. Access control between accounts using capability security.  Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  This means that nothing is truly public by default.  Other accounts can not read or write the objects in an account unless the owner of the account has granted them access by providing references to the objects.
-- 2. Access control within programs using `private` and `public` keywords.  Assuming the caller has a valid reference that satisfies the first type of access control, these keywords further govern how access is controlled.  
+- 1. Access control between accounts using capability security.  
+Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  
+This means that nothing is truly public by default.  
+Other accounts can not read or write the objects in an account 
+unless the owner of the account has granted them access by providing references to the objects.
+- 2. Access control within programs using `private` and `public` keywords.  
+Assuming the caller has a valid reference that satisfies the first type of access control, 
+these keywords further govern how access is controlled.  
 
 The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.
 
@@ -4546,7 +4553,7 @@ the `as` keyword, and the type through which the stored location should be acces
 let nameRef: &Name = &account.storage[Name] as Name
 ```
 
-The storage location must be a subtype of the given type that is after `as`.
+The storage location must be a subtype of the type given after the `as` keyword.
 
 References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
@@ -4888,7 +4895,7 @@ resource ExampleToken: FungibleToken {
 
     pub fun withdraw(amount: Int): <-ExampleToken {
         self.balance = self.balance - amount
-        return create ExampleToken(balance: amount)
+        return <-create ExampleToken(balance: amount)
     }
 
     pub fun deposit(token: <-ExampleToken) {
@@ -4896,9 +4903,10 @@ resource ExampleToken: FungibleToken {
         destroy token
     }
 
-    // transfer combines withdraw and deposit into one function call
+    // The function `transfer` combines the functions `withdraw` and `deposit` 
+    // into a single function call
     pub fun transfer(to: &Receiver, amount: Int) {
-        // deposit the tokens that withdraw creates into the 
+        // Deposit the tokens that withdraw creates into the 
         // recipient's account using their deposit reference
         to.deposit(from: <-self.withdraw(amount: amount))
     }
@@ -4940,13 +4948,13 @@ transaction {
 		
         // Store the new token in storage by swapping it with whatever
         // is in the existing location.
-        igner.storage[ExampleToken] <-> tokenA
+        signer.storage[ExampleToken] <-> tokenA
 
         // create references to the stored `ExampleToken`.
         // `Receiver` is for external calls.
         // `Provider` is for internal calls by the owner.
-        acct.storage[&Receiver] = &acct.storage[ExampleToken] as Receiver
-        acct.storage[&Provider] = &acct.storage[ExampleToken] as Provider
+        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
+        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
 
         // destroy the empty swapped resource
         destroy tokenA
@@ -4979,7 +4987,7 @@ import ExampleToken, Provider, Receiver from 0x42
 //
 transaction {
 
-    let providerRef
+    let providerRef: &Provider
 
     prepare(signer: Account) {
 
@@ -5013,7 +5021,7 @@ transaction {
         // from their account and deposits it to the receiver's account 
         // using the reference to their deposit function.
         //
-        providerRef.transfer(to: receiverRef, amount: 5)
+        self.providerRef.transfer(to: receiverRef, amount: 5)
     }
 }
 ```
