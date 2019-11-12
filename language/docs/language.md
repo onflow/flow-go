@@ -893,6 +893,9 @@ let arrays: [[Int16; 3]; 2] = [
     [1, 2, 3],
     [4, 5, 6]
 ]
+
+// Declare a variable length array of integers
+var vArray: [Int] = []
 ```
 
 Array types are covariant in their element types.
@@ -3633,6 +3636,13 @@ Instead, consider using [interfaces](#interfaces).
 > 🚧 Status: Access control is not implemented yet.
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
+
+In Flow and Cadence, there are two types of access control
+    1. Access control between accounts using capability security.  Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  This means that nothing is truly public by default.  Other accounts can not read or write the objects in an account unless the owner of the account has granted them access by providing references to the objects.
+    2. Access control within programs using `private` and `public` keywords.  Assuming the caller has a valid reference that satisfies the first type of access control, these keywords further govern how access is controlled.  
+
+The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.
+
 Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
 - **Private** means the declaration is only accessible/visible in the current and inner scopes.
@@ -4517,43 +4527,37 @@ account.storage[Counter] <-> counter
 ## Storage References
 
 It is possible to create references to **storage locations**.
-References allow access to stored values and restricting the access to the stored value.
+References allow access to stored values.  A reference can be used to read or 
+call fields and methods of stored values without having to move or call the fields
+and methods on the storage location directly.
 
-For example, a user might want to share a reference to a token stored in their account,
-but limit the access and only allow reads of certain fields and calls to certain functions,
-but not expose all functionality of the token.
+References are **copied**, i.e. they are value types.  Any number of references to 
+a storage location can be created and used, but only by the account that owns
+the location being referenced.
 
-Note that references are **not** referencing stored values –
+Note that references are **not** referencing stored values – 
+A reference cannot be used to directly modify a value it references, and
 if the value stored in the references location is moved or removed,
 the reference is not updated and it becomes invalid.
 
 References are created by using the `&` operator, followed by the storage location,
 the `as` keyword, and the type through which the stored location should be accessed.
+```cadence,file=reference-ex.cdc
+let nameRef: &Name = &account.storage[Name] as Name
+```
 
-The storage location must be a subtype of the given type.
-
-References are **copied**, i.e. they are value types.
+The storage location must be a subtype of the given type that is after `as`.
 
 References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
 
+
 ```cadence,file=storage-reference.cdc
 
-// Declare a resource interface `HasCount`.
+// Declare a resource named `Counter`
 //
-resource interface HasCount {
-
-    // Require implementations of the interface to provide
-    // a field named `count` which can be publicly read.
-    //
-    pub var count: Int
-}
-
-// Declare a resource named `Counter` that conforms
-// to the resource interface `HasCount`.
-//
-resource Counter: HasCount {
+resource Counter: {
     pub var count: Int
 
     pub init(count: Int) {
@@ -4592,6 +4596,33 @@ counterReference.count  // is `42`
 counterReference.increment()
 
 counterReference.count  // is `43`
+```
+
+### Reference-Based Access Control
+
+As was mentioned before, access to stored objects is governed by the
+tenets of [Capability Security](https://en.wikipedia.org/wiki/Capability-based_security).  This
+means that if an account wants to be able to access another account's
+stored objects, it must have a valid reference to that object.  
+
+Access to stored objects can be restricted by using interfaces.  When storing a reference,
+it can be stored as an interface so that only the fields and methods that the interface
+specifies are able to be called by those who have a reference.  
+
+Based on the above example, a user could use an interface to restrict access to only
+the `count` field.
+
+```cadence,file=storage-access-control.cdc
+
+// Declare a resource interface `HasCount`.
+//
+resource interface HasCount {
+
+    // Require implementations of the interface to provide
+    // a field named `count` which can be publicly read.
+    //
+    pub var count: Int
+}
 
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
@@ -4612,6 +4643,7 @@ limitedReference.count  // is `43`
 //
 limitedReference.increment()
 ```
+
 
 ## Events
 
@@ -4663,6 +4695,7 @@ and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
+First, the transaction can import any number of types from external accounts using the import syntax.
 
 Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
@@ -4731,6 +4764,8 @@ pub resource interface Provider {
                 "incorrect amount returned"
         }
     }
+
+    pub fun transfer(to: &Receiver, amount: Int)
 }
 
 pub resource interface Receiver {
@@ -4783,6 +4818,17 @@ pub resource interface FungibleToken: Provider, Receiver {
                 "the amount must be added to the balance"
         }
     }
+
+    pub fun transfer(to: &Receiver, amount: Int) {
+        pre {
+            amount <= self.balance:
+                "Insufficient funds"
+        }
+        post {
+            self.balance == before(self.balance) - amount:
+                "Incorrect amount removed"
+        }
+    }
 }
 ```
 
@@ -4796,19 +4842,6 @@ and the string literal for the path of the file which contains the code of the t
      also see below for version referring to deployed code with an address
 -->
 
-The prepare phase can use the signing account's `deploy` function to deploy types.
-
-This essentially stores the types in the account's `types` object so it can be used again.
-
-A second layer of access control manages which user has access to stored values.
-
-When deploying code to an account, it is private by default,
-just like fields and functions within the resources, i.e. it can only be imported
-by code in the same account.
-
-The `publish` operator can be used to make deployed types publicly available to other accounts.
-
-After a type is published it can be imported by other code.
 
 ```cadence,file=deploy-resource-interface.cdc
 // Import the resource interface type `FungibleToken`
@@ -4822,15 +4855,10 @@ import FungibleToken from "FungibleToken.cdc"
 transaction {
 
     prepare(signer: Account) {
-        // Deploy the code for the resource interface type `FungibleToken`
+        // Store the code for the resource interface type `FungibleToken`
         // in the signing account.
         //
-        signer.deploy(FungibleToken)
-
-        // Make the deployed type publicly available, so anyone can import
-        // resource interface type `FungibleToken` from the signing account.
-        //
-        publish signer.types[FungibleToken]
+        signer.storage[FungibleToken] = FungibleToken
     }
 }
 ```
@@ -4852,21 +4880,28 @@ import FungibleToken from 0x23
 //
 resource ExampleToken: FungibleToken {
 
-        pub var balance: Int
+    pub var balance: Int
 
-        init(balance: Int) {
-            self.balance = balance
-        }
+    init(balance: Int) {
+        self.balance = balance
+    }
 
-        pub fun withdraw(amount: Int): <-ExampleToken {
-            self.balance = self.balance - amount
-            return create ExampleToken(balance: amount)
-        }
+    pub fun withdraw(amount: Int): <-ExampleToken {
+        self.balance = self.balance - amount
+        return create ExampleToken(balance: amount)
+    }
 
-        pub fun deposit(token: <-ExampleToken) {
-            self.balance = self.balance + token.balance
-            destroy token
-        }
+    pub fun deposit(token: <-ExampleToken) {
+        self.balance = self.balance + token.balance
+        destroy token
+    }
+
+    // transfer combines withdraw and deposit into one function call
+    pub fun transfer(to: &Receiver, amount: Int) {
+        // deposit the tokens that withdraw creates into the 
+        // recipient's account using their deposit reference
+        to.deposit(from: <-self.withdraw(amount: amount))
+    }
 }
 
 // Declare a function that lets any user create an example token
@@ -4877,101 +4912,60 @@ fun newEmptyExampleToken(): <-ExampleToken {
 }
 ```
 
-Again, the type must be deployed and published.
-
-```cadence,file=deploy-example-token.cdc
-import ExampleToken from "ExampleToken.cdc"
-
-// Run a transaction which deploys the code for the resource type `ExampleToken`
-// and makes the deployed type publicly available by publishing it.
-//
-transaction {
-
-    prepare(signer: Account) {
-        signer.deploy(ExampleToken)
-        publish signer.types[ExampleToken]
-    }
-}
-```
-
-Now, the resource type `ExampleToken` is deployed to the account
-and published so that anyone who wants to use it
-or interact with it can easily do so by importing it from the account.
-
-### Using Deployed Code
+Again, the type must be stored in the owners account.
 
 Once code is deployed, it can be used in other code and in transactions.
 
-In many scenarios, publishing a stored value might be necessary,
-because any user should have access all public functionality of the type.
-
-In most situations though it is important to expose only a subset of the functionality
+In most situations it is important to expose only a subset of the functionality
 of the stored values, because some of the functionality should only be available to the owner.
 
 The following transaction creates an empty token and stores it in the signer's account.
-This allows the owner to withdraw and deposit. As this functionality should not be available
-to anyone else, the token is not published.
+This allows the owner to withdraw and deposit. 
 
 However, the deposit function should be available to anyone. To achieve this,
 an additional reference to the token is created, stored, and published,
 which has the type `Receiver`, i.e. it only exposes the `deposit` function.
 
-```cadence,file=setup-transaction.cdc
-// Import the resource interface types `Receiver` and `Provider`,
-// which were deployed above, in this example to the account with address 0x23.
-//
-import Receiver, Provider from 0x23
+```cadence,file=deploy-example-token.cdc
+// import the `ExampleToken`, `newEmptyExampleToken`, `Receiver`, and `Provider` from the account who created them
+import ExampleToken, newEmptyExampleToken, Receiver, Provider from 0x42
 
-// Import the resource type `ExampleToken` and the function `newEmptyExampleToken`,
-// which were deployed above, in this example to the account with address 0x42.
-//
-import ExampleToken, newEmptyExampleToken from 0x42
-
-// Run a transaction which creates a new example token for the signing account
-// and sets up references to it for allowing withdrawals for the owner
-// and deposits from anyone.
+// Run a transaction which stored the code and an instance for the resource type `ExampleToken`
 //
 transaction {
 
     prepare(signer: Account) {
-        // Create a new example token for the signing account.
-        //
-        // NOTE: the token is not published, so that only the owner can access it.
-        //
-        var exampleToken: ExampleToken? <- newEmptyExampleToken()
-        signer.storage[ExampleToken] <-> exampleToken
+        // Create a new token as an optional.
+        var tokenA: <-ExampleToken? <- newEmptyExampleToken()
+		
+        // Store the new token in storage by swapping it with whatever
+        // is in the existing location.
+        igner.storage[ExampleToken] <-> tokenA
 
-        // `exampleToken` now contains the previously stored token, if any.
-        //
-        // In this example it is simply destroyed, because it is assumed
-        // there was no prior stored token.
-        //
-        destroy exampleToken
+        // create references to the stored `ExampleToken`.
+        // `Receiver` is for external calls.
+        // `Provider` is for internal calls by the owner.
+        acct.storage[&Receiver] = &acct.storage[ExampleToken] as Receiver
+        acct.storage[&Provider] = &acct.storage[ExampleToken] as Provider
 
-        // Store a reference to the token as a provider in the signing account,
-        // so the owner can use it to withdraw tokens.
-        //
-        // NOTE: the provider is not published, so that only the owner can access it.
-        //
-        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
-
-        // Store a reference to the token as a receiver in the signing account
-        // and publish it, so anyone can use it to deposit tokens.
-        //
-        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
-        publish signer.storage[&Receiver]
+        // destroy the empty swapped resource
+        destroy tokenA
     }
 }
 ```
+
+Now, the resource type `ExampleToken` is stored in the account
+and its `Receiver` interface is available so that anyone can
+interact with it by importing it from the account.
 
 Once an account is prepared in such a way, transactions can be run that deposit
 tokens into the account.
 
 ```cadence,file=send-transaction.cdc
-// Import the resource type `ExampleToken`,
+// Import the resource type `ExampleToken`, `Provider`, and `Receiver`
 // in this example deployed to the account with address 0x42.
 //
-import ExampleToken from 0x42
+import ExampleToken, Provider, Receiver from 0x42
 
 // Execute a transaction which sends five coins from one account to another.
 //
@@ -4980,12 +4974,12 @@ import ExampleToken from 0x42
 // available for the recipient account.
 //
 // Only a signature from the sender is required.
-// No signature from the recipient is required, as the receiver
+// No signature from the recipient is required, as the receiver reference
 // is published/publicly available (if it exists for the recipient).
 //
 transaction {
 
-    let sentFunds: <-ExampleToken
+    let providerRef
 
     prepare(signer: Account) {
 
@@ -4997,13 +4991,7 @@ transaction {
         // If the signer's account has no provider reference stored in it,
         // or it is not published, abort the transaction.
         //
-        let provider = signer.storage[&Provider] ?? panic("Signer has no provider")
-
-        // Withdraw 5 tokens from the provider by calling the provider's
-        // `withdraw` function, and move the tokens to the field `sentFunds`,
-        // so they can be deposited in the execute phase below.
-        //
-        self.sentFunds <- provider.withdraw(amount: 5)
+        providerRef = signer.storage[&Provider] ?? panic("Signer has no provider")
     }
 
     execute {
@@ -5019,13 +5007,13 @@ transaction {
         // If the recipient's account has no receiver reference stored in it,
         // or it is not published, abort the transaction.
         //
-        let receiver = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
+        let receiverRef = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
 
-        // Deposit the amount withdrawn from the signer's provider/token
-        // into the recipient's receiver/token.
-        // (It was withdrawn in the preparation phase above).
+        // Call the provider's transfer function which withdraws 5 tokens 
+        // from their account and deposits it to the receiver's account 
+        // using the reference to their deposit function.
         //
-        receiver.deposit(token: <-self.sentFunds)
+        providerRef.transfer(to: receiverRef, amount: 5)
     }
 }
 ```
