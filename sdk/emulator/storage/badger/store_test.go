@@ -252,6 +252,53 @@ func TestEvents(t *testing.T) {
 	})
 }
 
+func TestPersistence(t *testing.T) {
+	store, dir := setupStore(t)
+	defer func() {
+		require.Nil(t, store.Close())
+		require.Nil(t, os.RemoveAll(dir))
+	}()
+
+	block := types.Block{Number: 1}
+	tx := unittest.TransactionFixture()
+	events := []flow.Event{unittest.EventFixture()}
+	registers := unittest.RegistersFixture()
+
+	// insert some stuff to to the store
+	err := store.InsertBlock(block)
+	assert.Nil(t, err)
+	err = store.InsertTransaction(tx)
+	assert.Nil(t, err)
+	err = store.InsertEvents(block.Number, events...)
+	assert.Nil(t, err)
+	err = store.SetRegisters(block.Number, registers)
+
+	// close the store
+	err = store.Close()
+	assert.Nil(t, err)
+
+	// create a new store with the same database directory
+	store, err = badger.New(dir)
+	require.Nil(t, err)
+
+	// should be able to retrieve what we stored
+	gotBlock, err := store.GetLatestBlock()
+	assert.Nil(t, err)
+	assert.Equal(t, block, gotBlock)
+
+	gotTx, err := store.GetTransaction(tx.Hash())
+	assert.Nil(t, err)
+	assert.Equal(t, tx, gotTx)
+
+	gotEvents, err := store.GetEvents("", block.Number, block.Number)
+	assert.Nil(t, err)
+	assert.Equal(t, events, gotEvents)
+
+	gotRegisters, err := store.GetRegistersView(block.Number)
+	assert.Nil(t, err)
+	assert.Equal(t, registers.NewView(), &gotRegisters)
+}
+
 // setupStore creates a temporary directory for the Badger and creates a
 // badger.Store instance. The caller is responsible for closing the store
 // and deleting the temporary directory.
