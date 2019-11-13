@@ -168,17 +168,52 @@ func (s Store) SetRegisters(blockNumber uint64, registers flow.Registers) error 
 	})
 }
 
-// TODO
-func (s Store) GetEvents(blockNumber uint64, eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events []flow.Event, err error) {
+	// set up an iterator over all events
 	iterOpts := badger.DefaultIteratorOptions
 	iterOpts.Prefix = []byte(eventsKeyPrefix)
 
-	s.db.View(func(txn *badger.Txn) error {
+	err = s.db.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(iterOpts)
-		_ = iter
+		defer iter.Close()
+		// seek the iterator to the start block
+		iter.Seek(eventsKey(startBlock))
+		// create a buffer for copying events, this is reused for each block
+		eventBuf := make([]byte, 256)
+
+		for iter.Rewind(); iter.Valid(); iter.Next() {
+			item := iter.Item()
+			// ensure the events are within the block number range
+			blockNumber := blockNumberFromEventsKey(item.Key())
+			if blockNumber < startBlock || blockNumber > endBlock {
+				break
+			}
+
+			// decode the events from this block
+			encEvents, err := item.ValueCopy(eventBuf)
+			if err != nil {
+				return err
+			}
+			var blockEvents flow.EventList
+			if err := decodeEventList(&blockEvents, encEvents); err != nil {
+				return err
+			}
+
+			if eventType == "" {
+				// if no type filter specified, add all block events
+				events = append(events, blockEvents...)
+			} else {
+				// otherwise filter by event type
+				for _, event := range blockEvents {
+					if event.Type == eventType {
+						events = append(events, event)
+					}
+				}
+			}
+		}
 		return nil
 	})
-	return nil, nil
+	return
 }
 
 func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {

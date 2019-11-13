@@ -32,6 +32,6 @@ type Store interface {
 	GetRegistersView(blockNumber uint64) (flow.RegistersView, error)
 	SetRegisters(blockNumber uint64, registers flow.Registers) error
 
-	GetEvents(blockNumber uint64, eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
+	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	InsertEvents(blockNumber uint64, events ...flow.Event) error
 }

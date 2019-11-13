@@ -45,3 +45,9 @@ func registersKey(blockNumber uint64) []byte {
 func eventsKey(blockNumber uint64) []byte {
 	return []byte(fmt.Sprintf("%s-%032d", eventsKeyPrefix, blockNumber))
 }
+
+func blockNumberFromEventsKey(key []byte) uint64 {
+	var blockNumber uint64
+	_, _ = fmt.Sscanf(string(key), eventsKeyPrefix+"-%032d", &blockNumber)
+	return blockNumber
+}

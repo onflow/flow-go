@@ -114,7 +114,7 @@ func (s memStore) SetRegisters(blockNumber uint64, registers flow.Registers) err
 	return nil
 }
 
-func (s memStore) GetEvents(blockNumber uint64, eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (s memStore) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
