@@ -62,13 +62,13 @@ func TestBlocks(t *testing.T) {
 	assert.Nil(t, err)
 
 	t.Run("should be able to get inserted block", func(t *testing.T) {
-		t.Run("GetBlockByHash", func(t *testing.T) {
+		t.Run("GetBlockByNumber", func(t *testing.T) {
 			block, err := store.GetBlockByNumber(block1.Number)
 			assert.Nil(t, err)
 			assert.Equal(t, block1, block)
 		})
 
-		t.Run("GetBlockByNumber", func(t *testing.T) {
+		t.Run("GetBlockByHash", func(t *testing.T) {
 			block, err := store.GetBlockByHash(block1.Hash())
 			assert.Nil(t, err)
 			assert.Equal(t, block1, block)
