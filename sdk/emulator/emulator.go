@@ -314,6 +314,12 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 		panic(err)
 	}
 
+	if err := b.storage.SetRegisters(block.Number, b.pendingState); err != nil {
+		// TODO: Bubble up error
+		// TODO: Store registers more efficiently
+		panic(err)
+	}
+
 	// reset tx pool
 	b.txPool = make(map[string]*flow.Transaction)
 
