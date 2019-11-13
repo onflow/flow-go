@@ -3,8 +3,10 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"math/big"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
+	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 )
 
@@ -119,4 +122,73 @@ func TestGetEvents(t *testing.T) {
 		assert.Equal(t, resEvents[0].Type, mintType)
 		assert.Equal(t, resEvents[1].Type, transferType)
 	})
+}
+
+func TestBackend(t *testing.T) {
+
+	//wrapper which manages mock lifecycle
+	withMocks := func(sut func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi)) func(t *testing.T) {
+		return func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			api := mocks.NewMockEmulatedBlockchainApi(mockCtrl)
+
+			backend := server.NewBackend(
+				api,
+				events.NewMemStore(),
+				log.New(),
+			)
+
+			sut(t, backend, api)
+		}
+	}
+
+	t.Run("ExecuteScript", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi) {
+		sampleScriptText := []byte("hey I'm so totally uninterpretable script text with unicode ć, ń, ó, ś, ź")
+		executionScriptRequest := observation.ExecuteScriptRequest{
+			Script: sampleScriptText,
+		}
+
+		api.EXPECT().
+			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil).
+			Times(1)
+
+		response, err := backend.ExecuteScript(context.TODO(), &executionScriptRequest)
+
+		assert.Nil(t, err)
+
+		//TODO likely to be refactored with a proper serialization/ABI implemented
+		assert.Equal(t, "*big.Int", response.Type)
+		assert.Equal(t, []uint8("2137"), response.Value)
+	}))
+
+	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi) {
+
+		initialAddressBytes := []byte{0, 1, 2, 3, 4, 5}
+		address := flow.BytesToAddress(initialAddressBytes)
+
+		account := flow.Account{
+			Address: address,
+			Balance: 2137,
+			Code:    nil,
+			Keys:    nil,
+		}
+
+		api.EXPECT().
+			GetAccount(address).
+			Return(&account, nil).
+			Times(1)
+
+		request := observation.GetAccountRequest{
+			Address: initialAddressBytes,
+		}
+		response, err := backend.GetAccount(context.TODO(), &request)
+
+		assert.Nil(t, err)
+
+		assert.Equal(t, address.Bytes(), response.Account.Address)
+		assert.Equal(t, uint64(2137), response.Account.Balance)
+	}))
+
 }
