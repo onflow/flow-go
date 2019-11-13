@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
+
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -88,7 +90,7 @@ func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash 
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
-	storage := storage.NewMemStore()
+	storage := memstore.New()
 	initialState := make(flow.Registers)
 	txPool := make(map[string]*flow.Transaction)
 
@@ -132,6 +134,7 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
 	block, err := b.storage.GetLatestBlock()
 	if err != nil {
+		// TODO
 		panic(err)
 	}
 	return &block
@@ -141,8 +144,10 @@ func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
 func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, error) {
 	block, err := b.storage.GetBlockByHash(hash)
 	if err != nil {
-		// TODO: consolidate emulator/storage errors
-		return nil, &ErrBlockNotFound{BlockHash: hash}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrBlockNotFound{BlockHash: hash}
+		}
+		return nil, &ErrStorage{err}
 	}
 
 	return &block, nil
@@ -152,8 +157,10 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, err
 func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
 	block, err := b.storage.GetBlockByNumber(number)
 	if err != nil {
-		// TODO: consolidate emualator/storage errors
-		return nil, &ErrBlockNotFound{BlockNum: number}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrBlockNotFound{BlockNum: number}
+		}
+		return nil, err
 	}
 
 	return &block, nil
@@ -171,7 +178,10 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transacti
 
 	tx, err := b.storage.GetTransaction(txHash)
 	if err != nil {
-		return nil, &ErrTransactionNotFound{TxHash: txHash}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrTransactionNotFound{TxHash: txHash}
+		}
+		return nil, &ErrStorage{err}
 	}
 
 	return &tx, nil
