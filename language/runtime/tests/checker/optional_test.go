@@ -230,3 +230,15 @@ func TestCheckInvalidNonOptionalReturn(t *testing.T) {
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
+
+func TestCheckInvalidOptionalIntegerConversion(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      let x: Int8? = 1
+      let y: Int16? = x
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}

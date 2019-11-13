@@ -22,15 +22,19 @@ func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 
 			// TODO: add support for non-structure / non-resource declarations
 
+			// NOTE: two redeclaration errors: one for type, one for function
+
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
-				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
-			default:
 				errs := ExpectCheckerErrors(t, err, 2)
 				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+				assert.IsType(t, &sema.RedeclarationError{}, errs[1])
+
+			default:
+				errs := ExpectCheckerErrors(t, err, 3)
+				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+				assert.IsType(t, &sema.RedeclarationError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
 			}
 		})
 	}
