@@ -240,7 +240,7 @@ func TestEvents(t *testing.T) {
 	})
 }
 
-// setStore creates a temporary directory for the Badger and creates a
+// setupStore creates a temporary directory for the Badger and creates a
 // badger.Store instance. The caller is responsible for closing the store
 // and deleting the temporary directory.
 func setupStore(t *testing.T) (storage.Store, string) {
