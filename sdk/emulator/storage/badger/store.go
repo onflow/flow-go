@@ -12,10 +12,6 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-type Config struct {
-	Path string
-}
-
 // Store is an embedded storage implementation using Badger as the underlying
 // persistent key-value store.
 type Store struct {
@@ -23,10 +19,10 @@ type Store struct {
 }
 
 // New returns a new Badger Store.
-func New(config *Config) (storage.Store, error) {
-	db, err := badger.Open(badger.DefaultOptions(config.Path))
+func New(path string) (Store, error) {
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
-		return nil, fmt.Errorf("could not open database: %w", err)
+		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
 	return Store{db}, nil
 }
@@ -97,7 +93,7 @@ func (s Store) InsertBlock(block types.Block) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		// get latest block number
 		latestBlockNumber, err := getLatestBlockNumberTx(txn)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 			return err
 		}
 
@@ -176,12 +172,12 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 	err = s.db.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(iterOpts)
 		defer iter.Close()
-		// seek the iterator to the start block
-		iter.Seek(eventsKey(startBlock))
 		// create a buffer for copying events, this is reused for each block
 		eventBuf := make([]byte, 256)
 
-		for iter.Rewind(); iter.Valid(); iter.Next() {
+		// seek the iterator to the start block before the loop
+		iter.Seek(eventsKey(startBlock))
+		for ; iter.Valid(); iter.Next() {
 			item := iter.Item()
 			// ensure the events are within the block number range
 			blockNumber := blockNumberFromEventsKey(item.Key())
@@ -225,6 +221,12 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(eventsKey(blockNumber), encEvents)
 	})
+}
+
+// Close closes the underlying Badger database. It is necessary to close
+// a Store before exiting to ensure all writes are persisted to disk.
+func (s Store) Close() error {
+	return s.db.Close()
 }
 
 // getTx returns a getter function bound to the input transaction that can be
