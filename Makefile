@@ -55,6 +55,7 @@ generate-mocks:
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainApi
+	GO111MODULE=on mockgen -destination=sdk/emulator/events/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/events Store
 
 
 .PHONY: check-generated-code
