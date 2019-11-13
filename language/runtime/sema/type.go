@@ -265,13 +265,10 @@ func (*StringType) HasMembers() bool {
 
 func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
-	case "length":
-		return NewMemberForType(t, "length", Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
-		})
 	case "concat":
-		return NewMemberForType(t, "concat", Member{
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&StringType{},
@@ -282,7 +279,9 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 			},
 		})
 	case "slice":
-		return NewMemberForType(t, "slice", Member{
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntType{},
@@ -293,6 +292,12 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 				),
 			},
 			ArgumentLabels: []string{"from", "upTo"},
+		})
+	case "length":
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 	default:
 		return nil
@@ -663,7 +668,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		elementType := t.ElementType(false)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					elementType,
@@ -698,7 +704,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		typeAnnotation := NewTypeAnnotation(t)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					typeAnnotation,
@@ -717,7 +724,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		elementType := t.ElementType(false)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntegerType{},
@@ -741,7 +749,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntegerType{},
@@ -764,7 +773,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -783,7 +793,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -818,7 +829,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		}
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					elementType,
@@ -831,8 +843,9 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 	case "length":
 		return NewMemberForType(t, field, Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 
 	default:
@@ -1236,9 +1249,10 @@ func (t *CompositeType) IsInvalidType() bool {
 // Member
 
 type Member struct {
-	Type           Type
-	VariableKind   ast.VariableKind
-	ArgumentLabels []string
+	Type            Type
+	DeclarationKind common.DeclarationKind
+	VariableKind    ast.VariableKind
+	ArgumentLabels  []string
 }
 
 // NewMemberForType initializes a new member type and panics if the member declaration is invalid.
@@ -1359,13 +1373,15 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 	switch field {
 	case "length":
 		return NewMemberForType(t, field, Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 
 	case "insert":
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					t.KeyType,
@@ -1381,8 +1397,9 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 		})
 
 	case "remove":
-		return NewMemberForType(t, "remove", Member{
-			VariableKind: ast.VariableKindConstant,
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					t.KeyType,

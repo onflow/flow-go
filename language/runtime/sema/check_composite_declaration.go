@@ -383,8 +383,9 @@ func (checker *Checker) membersAndOrigins(
 		identifier := field.Identifier.Identifier
 
 		members[identifier] = &Member{
-			Type:         fieldType,
-			VariableKind: field.VariableKind,
+			DeclarationKind: common.DeclarationKindField,
+			Type:            fieldType,
+			VariableKind:    field.VariableKind,
 		}
 
 		origins[identifier] =
@@ -411,9 +412,10 @@ func (checker *Checker) membersAndOrigins(
 		identifier := function.Identifier.Identifier
 
 		members[identifier] = &Member{
-			Type:           functionType,
-			VariableKind:   ast.VariableKindConstant,
-			ArgumentLabels: argumentLabels,
+			DeclarationKind: common.DeclarationKindFunction,
+			Type:            functionType,
+			VariableKind:    ast.VariableKindConstant,
+			ArgumentLabels:  argumentLabels,
 		}
 
 		origins[identifier] =
