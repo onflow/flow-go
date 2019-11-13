@@ -1549,3 +1549,31 @@ func (e *CreateImportedResourceError) Error() string {
 }
 
 func (*CreateImportedResourceError) isSemanticError() {}
+
+// NonResourceTypeError
+
+type NonResourceTypeError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceTypeError) Error() string {
+	return fmt.Sprintf(
+		"expected resource type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceTypeError) isSemanticError() {}
+
+// InvalidAssignmentTargetError
+
+type InvalidAssignmentTargetError struct {
+	ast.Range
+}
+
+func (e *InvalidAssignmentTargetError) Error() string {
+	return "cannot assign to expression"
+}
+
+func (*InvalidAssignmentTargetError) isSemanticError() {}

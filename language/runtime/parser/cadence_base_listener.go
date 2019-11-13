@@ -103,8 +103,7 @@ func (s *BaseCadenceListener) EnterSpecialFunctionDeclaration(ctx *SpecialFuncti
 }
 
 // ExitSpecialFunctionDeclaration is called when production specialFunctionDeclaration is exited.
-func (s *BaseCadenceListener) ExitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {
-}
+func (s *BaseCadenceListener) ExitSpecialFunctionDeclaration(ctx *SpecialFunctionDeclarationContext) {}
 
 // EnterFunctionDeclaration is called when production functionDeclaration is entered.
 func (s *BaseCadenceListener) EnterFunctionDeclaration(ctx *FunctionDeclarationContext) {}
