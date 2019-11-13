@@ -20,7 +20,10 @@ import (
 
 func TestBlocks(t *testing.T) {
 	store, dir := setupStore(t)
-	defer require.Nil(t, os.RemoveAll(dir))
+	defer func() {
+		require.Nil(t, store.Close())
+		require.Nil(t, os.RemoveAll(dir))
+	}()
 
 	block1 := types.Block{
 		Number: 1,
@@ -94,7 +97,10 @@ func TestBlocks(t *testing.T) {
 
 func TestTransactions(t *testing.T) {
 	store, dir := setupStore(t)
-	defer require.Nil(t, os.RemoveAll(dir))
+	defer func() {
+		require.Nil(t, store.Close())
+		require.Nil(t, os.RemoveAll(dir))
+	}()
 
 	tx := unittest.TransactionFixture()
 
@@ -119,7 +125,10 @@ func TestTransactions(t *testing.T) {
 
 func TestRegisters(t *testing.T) {
 	store, dir := setupStore(t)
-	defer require.Nil(t, os.RemoveAll(dir))
+	defer func() {
+		require.Nil(t, store.Close())
+		require.Nil(t, os.RemoveAll(dir))
+	}()
 
 	var blockNumber uint64 = 1
 	registers := unittest.RegistersFixture()
@@ -145,7 +154,10 @@ func TestRegisters(t *testing.T) {
 
 func TestEvents(t *testing.T) {
 	store, dir := setupStore(t)
-	defer require.Nil(t, os.RemoveAll(dir))
+	defer func() {
+		require.Nil(t, store.Close())
+		require.Nil(t, os.RemoveAll(dir))
+	}()
 
 	t.Run("should be able to insert events", func(t *testing.T) {
 		events := []flow.Event{unittest.EventFixture()}
@@ -243,7 +255,7 @@ func TestEvents(t *testing.T) {
 // setupStore creates a temporary directory for the Badger and creates a
 // badger.Store instance. The caller is responsible for closing the store
 // and deleting the temporary directory.
-func setupStore(t *testing.T) (storage.Store, string) {
+func setupStore(t *testing.T) (badger.Store, string) {
 	dir, err := ioutil.TempDir("", "badger-test")
 	require.Nil(t, err)
 

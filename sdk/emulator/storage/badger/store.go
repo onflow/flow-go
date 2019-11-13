@@ -19,10 +19,10 @@ type Store struct {
 }
 
 // New returns a new Badger Store.
-func New(path string) (storage.Store, error) {
+func New(path string) (Store, error) {
 	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
-		return nil, fmt.Errorf("could not open database: %w", err)
+		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
 	return Store{db}, nil
 }
@@ -221,6 +221,12 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(eventsKey(blockNumber), encEvents)
 	})
+}
+
+// Close closes the underlying Badger database. It is necessary to close
+// a Store before exiting to ensure all writes are persisted to disk.
+func (s Store) Close() error {
+	return s.db.Close()
 }
 
 // getTx returns a getter function bound to the input transaction that can be
