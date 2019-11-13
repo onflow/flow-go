@@ -1,6 +1,6 @@
-# Bamboo Programming Language Documentation
+# Cadence Programming Language Documentation
 
-The documentation for the Bamboo Programming Language is available as
+The documentation for the Cadence Programming Language is available as
 
   - [PDF](https://github.com/dapperlabs/flow-go/blob/master/language/docs/language.pdf) (recommended; ensure to download and view in a PDF viewer)
   - [HTML](https://github.com/dapperlabs/flow-go/blob/master/language/docs/language.html)
