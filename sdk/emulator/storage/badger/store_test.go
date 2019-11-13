@@ -19,12 +19,8 @@ import (
 )
 
 func TestBlocks(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.Nil(t, err)
+	store, dir := setupStore(t)
 	defer require.Nil(t, os.RemoveAll(dir))
-
-	store, err := badger.New(&badger.Config{Path: dir})
-	require.Nil(t, err)
 
 	block1 := types.Block{
 		Number: 1,
@@ -62,7 +58,7 @@ func TestBlocks(t *testing.T) {
 	})
 
 	// insert block 1
-	err = store.InsertBlock(block1)
+	err := store.InsertBlock(block1)
 	assert.Nil(t, err)
 
 	t.Run("should be able to get inserted block", func(t *testing.T) {
@@ -97,12 +93,8 @@ func TestBlocks(t *testing.T) {
 }
 
 func TestTransactions(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.Nil(t, err)
+	store, dir := setupStore(t)
 	defer require.Nil(t, os.RemoveAll(dir))
-
-	store, err := badger.New(&badger.Config{Path: dir})
-	require.Nil(t, err)
 
 	tx := unittest.TransactionFixture()
 
@@ -126,12 +118,8 @@ func TestTransactions(t *testing.T) {
 }
 
 func TestRegisters(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.Nil(t, err)
+	store, dir := setupStore(t)
 	defer require.Nil(t, os.RemoveAll(dir))
-
-	store, err := badger.New(&badger.Config{Path: dir})
-	require.Nil(t, err)
 
 	var blockNumber uint64 = 1
 	registers := unittest.RegistersFixture()
@@ -156,12 +144,8 @@ func TestRegisters(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	dir, err := ioutil.TempDir("", "badger-test")
-	require.Nil(t, err)
+	store, dir := setupStore(t)
 	defer require.Nil(t, os.RemoveAll(dir))
-
-	store, err := badger.New(&badger.Config{Path: dir})
-	require.Nil(t, err)
 
 	t.Run("should be able to insert events", func(t *testing.T) {
 		events := []flow.Event{unittest.EventFixture()}
@@ -254,4 +238,17 @@ func TestEvents(t *testing.T) {
 			})
 		})
 	})
+}
+
+// setStore creates a temporary directory for the Badger and creates a
+// badger.Store instance. The caller is responsible for closing the store
+// and deleting the temporary directory.
+func setupStore(t *testing.T) (storage.Store, string) {
+	dir, err := ioutil.TempDir("", "badger-test")
+	require.Nil(t, err)
+
+	store, err := badger.New(&badger.Config{Path: dir})
+	require.Nil(t, err)
+
+	return store, dir
 }
