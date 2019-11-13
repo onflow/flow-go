@@ -58,12 +58,12 @@ func TestEncodeRegisters(t *testing.T) {
 }
 
 func TestEncodeEventList(t *testing.T) {
-	eventList := flow.EventList{unittest.EventFixture()}
-	data, err := encodeEventList(eventList)
+	eventList := []flow.Event{unittest.EventFixture()}
+	data, err := encodeEvents(eventList)
 	require.Nil(t, err)
 
-	var decodedEventList flow.EventList
-	err = decodeEventList(&decodedEventList, data)
+	var decodedEventList []flow.Event
+	err = decodeEvents(&decodedEventList, data)
 	require.Nil(t, err)
 	assert.Equal(t, eventList, decodedEventList)
 }

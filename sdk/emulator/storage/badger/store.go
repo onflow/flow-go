@@ -194,8 +194,8 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 			if err != nil {
 				return err
 			}
-			var blockEvents flow.EventList
-			if err := decodeEventList(&blockEvents, encEvents); err != nil {
+			var blockEvents []flow.Event
+			if err := decodeEvents(&blockEvents, encEvents); err != nil {
 				return err
 			}
 
@@ -217,7 +217,7 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 }
 
 func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
-	encEvents, err := encodeEventList(events)
+	encEvents, err := encodeEvents(events)
 	if err != nil {
 		return err
 	}

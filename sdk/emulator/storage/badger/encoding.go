@@ -60,14 +60,14 @@ func decodeRegisters(registers *flow.Registers, from []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(registers)
 }
 
-func encodeEventList(eventList flow.EventList) ([]byte, error) {
+func encodeEvents(events []flow.Event) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(&eventList); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(&events); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func decodeEventList(eventList *flow.EventList, from []byte) error {
-	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(eventList)
+func decodeEvents(events *[]flow.Event, from []byte) error {
+	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(events)
 }
