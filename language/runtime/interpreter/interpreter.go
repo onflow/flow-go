@@ -1974,6 +1974,11 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	}
 
 	unwrappedTargetType := sema.UnwrapOptionalType(targetType)
+
+	if valueType.Equal(unwrappedTargetType) {
+		return value
+	}
+
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
 		return ConvertInt(value)
@@ -1993,6 +1998,8 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 		return ConvertUInt32(value)
 	case *sema.UInt64Type:
 		return ConvertUInt64(value)
+	case *sema.AddressType:
+		return ConvertAddress(value)
 	default:
 		return value
 	}
@@ -2268,29 +2275,34 @@ func (interpreter *Interpreter) writeStored(storageIdentifier string, key string
 }
 
 var converters = map[string]func(Value) Value{
-	"Int":    ConvertInt,
-	"Int8":   ConvertInt8,
-	"Int16":  ConvertInt16,
-	"Int32":  ConvertInt32,
-	"Int64":  ConvertInt64,
-	"UInt8":  ConvertUInt8,
-	"UInt16": ConvertUInt16,
-	"UInt32": ConvertUInt32,
-	"UInt64": ConvertUInt64,
+	"Int":     ConvertInt,
+	"Int8":    ConvertInt8,
+	"Int16":   ConvertInt16,
+	"Int32":   ConvertInt32,
+	"Int64":   ConvertInt64,
+	"UInt8":   ConvertUInt8,
+	"UInt16":  ConvertUInt16,
+	"UInt32":  ConvertUInt32,
+	"UInt64":  ConvertUInt64,
+	"Address": ConvertAddress,
 }
 
 func (interpreter *Interpreter) defineBaseFunctions() {
 	for name, converter := range converters {
 		err := interpreter.ImportValue(
 			name,
-			HostFunctionValue{
-				Function: func(arguments []Value, location LocationPosition) Trampoline {
-					return Done{Result: converter(arguments[0])}
-				},
-			},
+			interpreter.newConverterFunction(converter),
 		)
 		if err != nil {
 			panic(errors.NewUnreachableError())
 		}
+	}
+}
+
+func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
+	return HostFunctionValue{
+		Function: func(arguments []Value, location LocationPosition) Trampoline {
+			return Done{Result: converter(arguments[0])}
+		},
 	}
 }

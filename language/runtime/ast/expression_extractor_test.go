@@ -73,7 +73,10 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 		Left: &IdentifierExpression{
 			Identifier{Identifier: "x"},
 		},
-		Right: &IntExpression{Value: big.NewInt(1)},
+		Right: &IntExpression{
+			Value: big.NewInt(1),
+			Base:  10,
+		},
 	}
 
 	extractor := &ExpressionExtractor{
@@ -99,7 +102,10 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 			ExtractedExpressions: []ExtractedExpression{
 				{
 					Identifier: Identifier{Identifier: newIdentifier},
-					Expression: &IntExpression{Value: big.NewInt(1)},
+					Expression: &IntExpression{
+						Value: big.NewInt(1),
+						Base:  10,
+					},
 				},
 			},
 		},

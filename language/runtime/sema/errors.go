@@ -870,6 +870,18 @@ func (e *InvalidIntegerLiteralRangeError) Error() string {
 
 func (*InvalidIntegerLiteralRangeError) isSemanticError() {}
 
+// InvalidAddressLiteralError
+
+type InvalidAddressLiteralError struct {
+	ast.Range
+}
+
+func (e *InvalidAddressLiteralError) Error() string {
+	return "invalid address"
+}
+
+func (*InvalidAddressLiteralError) isSemanticError() {}
+
 // MissingReturnStatementError
 
 type MissingReturnStatementError struct {

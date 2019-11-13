@@ -1379,7 +1379,8 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 
 	withoutUnderscores := strings.Replace(text, "_", "", -1)
 
-	value, ok := big.NewInt(0).SetString(withoutUnderscores, kind.Base())
+	base := kind.Base()
+	value, ok := big.NewInt(0).SetString(withoutUnderscores, base)
 	if !ok {
 		v.report(
 			&InvalidIntegerLiteralError{
@@ -1397,6 +1398,7 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 
 	return &ast.IntExpression{
 		Value: value,
+		Base:  base,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,

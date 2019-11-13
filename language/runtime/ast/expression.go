@@ -107,6 +107,7 @@ func (e *StringExpression) String() string {
 
 type IntExpression struct {
 	Value *big.Int
+	Base  int
 	Range
 }
 
