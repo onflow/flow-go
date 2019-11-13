@@ -47,19 +47,14 @@ type Config struct {
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
 func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
-	options := emulator.DefaultOptions
 
-	if conf.RootAccountKey != nil {
-		options.RootAccountKey = conf.RootAccountKey
-	}
-
-	options.OnLogMessage = func(msg string) {
+	messageLogger := func(msg string) {
 		logger.Debug(msg)
 	}
 
 	eventStore := events.NewMemStore()
 
-	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
+	eventEmitter := func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
 		logger.
 			WithField("eventType", event.Type).
 			Infof("🔔  Event emitted: %s", event)
@@ -69,6 +64,14 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		if err != nil {
 			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
 		}
+	}
+
+	options := []emulator.Option{
+		emulator.WithRuntimeLogger(messageLogger),
+		emulator.WithEventEmitter(eventEmitter),
+	}
+	if conf.RootAccountKey != nil {
+		options = append(options, emulator.WithRootAccountKey(*conf.RootAccountKey))
 	}
 
 	if conf.BlockInterval == 0 {
@@ -86,7 +89,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	grpcServer := grpc.NewServer()
 	server := &EmulatorServer{
 		backend: &Backend{
-			blockchain: emulator.NewEmulatedBlockchain(options),
+			blockchain: emulator.NewEmulatedBlockchain(options...),
 			logger:     logger,
 			eventStore: eventStore,
 		},

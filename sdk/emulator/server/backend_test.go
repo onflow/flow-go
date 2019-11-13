@@ -18,7 +18,7 @@ import (
 
 func TestPing(t *testing.T) {
 	ctx := context.Background()
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 	server := server.NewBackend(b, events.NewMemStore(), log.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
@@ -29,7 +29,7 @@ func TestPing(t *testing.T) {
 func TestGetEvents(t *testing.T) {
 	ctx := context.Background()
 	eventStore := events.NewMemStore()
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 	server := server.NewBackend(b, eventStore, log.New())
 
 	// Add some events

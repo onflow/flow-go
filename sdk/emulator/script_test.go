@@ -13,7 +13,7 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b := emulator.NewEmulatedBlockchain()
 
 	accountAddress := b.RootAccountAddress()
 
