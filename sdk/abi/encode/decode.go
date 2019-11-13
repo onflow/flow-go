@@ -38,7 +38,7 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	case types.Composite:
 		return e.DecodeComposite(x)
 	default:
-		return nil, fmt.Errorf("unsupported value: %T, %v", t, t)
+		return nil, fmt.Errorf("unsupported type: %T", t)
 	}
 
 	return nil, nil
