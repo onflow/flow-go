@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 )
@@ -11,6 +12,10 @@ const (
 	// AddressLength is the size of an account address.
 	AddressLength = 20
 )
+
+func init() {
+	gob.Register(Address{})
+}
 
 // Address represents the 20 byte address of an account.
 type Address [AddressLength]byte

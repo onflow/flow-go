@@ -67,7 +67,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}
 
 	options := []emulator.Option{
-		emulator.WithMessageLogger(messageLogger),
+		emulator.WithRuntimeLogger(messageLogger),
 		emulator.WithEventEmitter(eventEmitter),
 	}
 	if conf.RootAccountKey != nil {
