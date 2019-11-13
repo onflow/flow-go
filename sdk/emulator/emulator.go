@@ -47,10 +47,6 @@ type EmulatedBlockchain struct {
 	rootAccountKey     flow.AccountPrivateKey
 	lastCreatedAccount flow.Account
 
-	// TODO: Remove this
-	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
-	intermediateWorldStates map[string][]byte
-
 	// TODO: store events in storage
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
