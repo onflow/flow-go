@@ -247,7 +247,7 @@ func setupStore(t *testing.T) (storage.Store, string) {
 	dir, err := ioutil.TempDir("", "badger-test")
 	require.Nil(t, err)
 
-	store, err := badger.New(&badger.Config{Path: dir})
+	store, err := badger.New(dir)
 	require.Nil(t, err)
 
 	return store, dir

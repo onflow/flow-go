@@ -12,10 +12,6 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-type Config struct {
-	Path string
-}
-
 // Store is an embedded storage implementation using Badger as the underlying
 // persistent key-value store.
 type Store struct {
@@ -23,8 +19,8 @@ type Store struct {
 }
 
 // New returns a new Badger Store.
-func New(config *Config) (storage.Store, error) {
-	db, err := badger.Open(badger.DefaultOptions(config.Path))
+func New(path string) (storage.Store, error) {
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		return nil, fmt.Errorf("could not open database: %w", err)
 	}
