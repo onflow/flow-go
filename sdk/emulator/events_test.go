@@ -99,7 +99,7 @@ func TestEventEmitted(t *testing.T) {
 					events = append(events, event)
 				},
 			),
-			emulator.WithMessageLogger(
+			emulator.WithRuntimeLogger(
 				func(msg string) {
 					fmt.Println("LOG:", msg)
 				},

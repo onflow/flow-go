@@ -58,7 +58,7 @@ type EmulatedBlockchain struct {
 // Config is a set of configuration options for an emulated blockchain.
 type Config struct {
 	RootAccountKey flow.AccountPrivateKey
-	OnLogMessage   func(string)
+	RuntimeLogger  func(string)
 	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
@@ -76,10 +76,10 @@ func WithRootAccountKey(rootKey flow.AccountPrivateKey) Option {
 	}
 }
 
-// WithMessageLogger sets the onLogMessage handler function.
-func WithMessageLogger(onLogMessage func(string)) Option {
+// WithRuntimeLogger sets the runtime logger handler function.
+func WithRuntimeLogger(logger func(string)) Option {
 	return func(c *Config) {
-		c.OnLogMessage = onLogMessage
+		c.RuntimeLogger = logger
 	}
 }
 
@@ -116,7 +116,7 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(interpreterRuntime, config.OnLogMessage)
+	computer := execution.NewComputer(interpreterRuntime, config.RuntimeLogger)
 	b.computer = computer
 
 	return b
@@ -509,7 +509,7 @@ func init() {
 		panic("Failed to generate default root key: " + err.Error())
 	}
 
-	defaultConfig.OnLogMessage = func(string) {}
+	defaultConfig.RuntimeLogger = func(string) {}
 	defaultConfig.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
 	defaultConfig.RootAccountKey = defaultRootKey
 }
