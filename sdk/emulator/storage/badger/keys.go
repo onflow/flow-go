@@ -46,6 +46,7 @@ func eventsKey(blockNumber uint64) []byte {
 	return []byte(fmt.Sprintf("%s-%032d", eventsKeyPrefix, blockNumber))
 }
 
+// blockNumberFromEventsKey recovers the block number from an event key.
 func blockNumberFromEventsKey(key []byte) uint64 {
 	var blockNumber uint64
 	_, _ = fmt.Sscanf(string(key), eventsKeyPrefix+"-%032d", &blockNumber)
