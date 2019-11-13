@@ -30,8 +30,6 @@ type Event struct {
 	Index uint
 }
 
-type EventList []Event
-
 // String returns the string representation of this event.
 func (e Event) String() string {
 	var values strings.Builder

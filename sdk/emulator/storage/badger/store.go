@@ -97,7 +97,7 @@ func (s Store) InsertBlock(block types.Block) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		// get latest block number
 		latestBlockNumber, err := getLatestBlockNumberTx(txn)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 			return err
 		}
 
@@ -176,12 +176,12 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 	err = s.db.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(iterOpts)
 		defer iter.Close()
-		// seek the iterator to the start block
-		iter.Seek(eventsKey(startBlock))
 		// create a buffer for copying events, this is reused for each block
 		eventBuf := make([]byte, 256)
 
-		for iter.Rewind(); iter.Valid(); iter.Next() {
+		// seek the iterator to the start block before the loop
+		iter.Seek(eventsKey(startBlock))
+		for ; iter.Valid(); iter.Next() {
 			item := iter.Item()
 			// ensure the events are within the block number range
 			blockNumber := blockNumberFromEventsKey(item.Key())
