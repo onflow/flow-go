@@ -26,7 +26,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 			answerReceived: false,
 		}
 		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
-		log.Error("complaint (timeout)")
+		log.Info("complaint (timeout)")
 		s.processor.Broadcast(data)
 	}
 }
@@ -83,7 +83,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			received:       true,
 			answerReceived: false,
 		}
-		log.Error("complaint (share)")
+		log.Info("complaint (share)")
 		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
 		s.processor.Broadcast(data)
 	}
@@ -144,7 +144,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 			received:       true,
 			answerReceived: false,
 		}
-		log.Error("complaint (vector)")
+		log.Info("complaint (vector)")
 		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
 		s.processor.Broadcast(data)
 	}
@@ -203,7 +203,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 			data[1] = byte(origin)
 			ZrPolynomialImage(data[2:], s.a, origin+1, nil)
 			s.complaints[origin].answerReceived = true
-			log.Error("answer complaint")
+			log.Info("answer complaint")
 			s.processor.Broadcast(data)
 		}
 		return

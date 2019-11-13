@@ -118,10 +118,6 @@ func TestThresholdSignature_FeldmanVSS(t *testing.T) {
 		processors[current].dkg, err = NewDKG(FeldmanVSS, n, current,
 			&processors[current], lead)
 		assert.Nil(t, err)
-		if err != nil {
-			log.Error(err.Error())
-			return
-		}
 	}
 
 	// create the node (buffered) communication channels
@@ -184,10 +180,6 @@ func TestThresholdSignature_JointFeldman(t *testing.T) {
 		processors[current].dkg, err = NewDKG(JointFeldman, n, current,
 			&processors[current], lead)
 		assert.Nil(t, err)
-		if err != nil {
-			log.Error(err.Error())
-			return
-		}
 	}
 
 	// create the node (buffered) communication channels
