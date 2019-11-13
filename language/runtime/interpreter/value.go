@@ -280,6 +280,30 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 	return result
 }
 
+func (v ArrayValue) GobEncode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(v.Values)
+	if err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+func (v *ArrayValue) GobDecode(buf []byte) error {
+	r := bytes.NewBuffer(buf)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&v.Values)
+	if err != nil {
+		return err
+	}
+	// NOTE: ensure the `Values` slice is properly allocated
+	if v.Values == nil {
+		v.Values = new([]Value)
+	}
+	return nil
+}
+
 func (v ArrayValue) ToGoValue() interface{} {
 	values := make([]interface{}, len(*v.Values))
 
