@@ -8,10 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
-func init() {
-	gob.Register(flow.Address{})
-}
-
 func encodeTransaction(tx flow.Transaction) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(&tx); err != nil {
