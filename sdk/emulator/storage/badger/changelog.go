@@ -32,7 +32,6 @@ func (c changelist) search(n uint64) uint64 {
 		return notFound
 	}
 	// This will return the lowest index where the block number is >n.
-	// If no such block number exists (ie n <= B for all B), then returns n.
 	// What we want is the index directly BEFORE this.
 	foundIndex := sort.Search(c.Len(), func(i int) bool {
 		return c.list[i] > n
