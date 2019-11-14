@@ -7,11 +7,13 @@ import (
 )
 
 const (
-	blockKeyPrefix          = "block_by_number"
-	blockHashIndexKeyPrefix = "block_hash_to_number"
-	transactionKeyPrefix    = "transaction_by_hash"
-	ledgerKeyPrefix         = "ledger_by_block_number"
-	eventsKeyPrefix         = "events_by_block_number"
+	blockKeyPrefix           = "block_by_number"
+	blockHashIndexKeyPrefix  = "block_hash_to_number"
+	transactionKeyPrefix     = "transaction_by_hash"
+	ledgerKeyPrefix          = "ledger_by_block_number" // TODO remove
+	eventsKeyPrefix          = "events_by_block_number"
+	ledgerChangelogKeyPrefix = "ledger_changelog_by_register_id"
+	ledgerValueKeyPrefix     = "ledger_value_by_block_number_register_id"
 )
 
 // The following *Key functions return keys to use when reading/writing values
@@ -38,12 +40,21 @@ func transactionKey(txHash crypto.Hash) []byte {
 	return []byte(fmt.Sprintf("%s-%s", transactionKeyPrefix, txHash.Hex()))
 }
 
+func eventsKey(blockNumber uint64) []byte {
+	return []byte(fmt.Sprintf("%s-%032d", eventsKeyPrefix, blockNumber))
+}
+
+// TODO remove this
 func ledgerKey(blockNumber uint64) []byte {
 	return []byte(fmt.Sprintf("%s-%032d", ledgerKeyPrefix, blockNumber))
 }
 
-func eventsKey(blockNumber uint64) []byte {
-	return []byte(fmt.Sprintf("%s-%032d", eventsKeyPrefix, blockNumber))
+func ledgerChangelogKey(registerID string) []byte {
+	return []byte(fmt.Sprintf("%s-%s", ledgerChangelogKeyPrefix, registerID))
+}
+
+func ledgerValueKey(blockNumber uint64, registerID string) []byte {
+	return []byte(fmt.Sprintf("%s-%s-%032d", ledgerValueKeyPrefix, registerID, blockNumber))
 }
 
 // blockNumberFromEventsKey recovers the block number from an event key.
