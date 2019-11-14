@@ -2,11 +2,11 @@ package emulator_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -36,7 +36,7 @@ func TestExecuteScript(t *testing.T) {
 	// Sample call (value is 0)
 	value, err := b.ExecuteScript([]byte(callScript))
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(0), value)
+	assert.Equal(t, values.Int(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx)
@@ -45,5 +45,5 @@ func TestExecuteScript(t *testing.T) {
 	// Sample call (value is 2)
 	value, err = b.ExecuteScript([]byte(callScript))
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(2), value)
+	assert.Equal(t, values.Int(2), value)
 }
