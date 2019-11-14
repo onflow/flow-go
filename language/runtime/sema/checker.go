@@ -256,7 +256,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 				},
 			)
 		}
-	} else {
+	} else if !valueType.IsInvalidType() {
 		if transfer.Operation == ast.TransferOperationMove {
 			checker.report(
 				&IncorrectTransferOperationError{
