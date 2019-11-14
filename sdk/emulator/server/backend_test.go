@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestPing(t *testing.T) {
@@ -162,7 +163,7 @@ func TestBackend(t *testing.T) {
 			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil).
 			Times(1)
 
-		response, err := backend.ExecuteScript(context.TODO(), &executionScriptRequest)
+		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
 
 		assert.Nil(t, err)
 
@@ -173,37 +174,29 @@ func TestBackend(t *testing.T) {
 
 	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
 
-		initialAddressBytes := []byte{0, 1, 2, 3, 4, 5}
-		address := flow.BytesToAddress(initialAddressBytes)
-
-		account := flow.Account{
-			Address: address,
-			Balance: 2137,
-			Code:    nil,
-			Keys:    nil,
-		}
+		account := unittest.AccountFixture()
 
 		api.EXPECT().
-			GetAccount(address).
+			GetAccount(account.Address).
 			Return(&account, nil).
 			Times(1)
 
 		request := observation.GetAccountRequest{
-			Address: initialAddressBytes,
+			Address: account.Address.Bytes(),
 		}
-		response, err := backend.GetAccount(context.TODO(), &request)
+		response, err := backend.GetAccount(context.Background(), &request)
 
 		assert.Nil(t, err)
 
-		assert.Equal(t, address.Bytes(), response.Account.Address)
-		assert.Equal(t, uint64(2137), response.Account.Balance)
+		assert.Equal(t, account.Address.Bytes(), response.Account.Address)
+		assert.Equal(t, account.Balance, response.Account.Balance)
 	}))
 
 	t.Run("GetEvents fails with wrong block numbers", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
 
 		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-		response, err := backend.GetEvents(context.TODO(), &observation.GetEventsRequest{
+		response, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{
 			Type:       "SomeEvents",
 			StartBlock: 37,
 			EndBlock:   21,
@@ -212,8 +205,8 @@ func TestBackend(t *testing.T) {
 		assert.Nil(t, response)
 
 		grpcError, ok := status.FromError(err)
+		require.True(t, ok)
 
-		assert.True(t, ok)
 		assert.Equal(t, grpcError.Code(), codes.InvalidArgument)
 	}))
 
@@ -222,31 +215,25 @@ func TestBackend(t *testing.T) {
 		eventType := "SomeEvents"
 
 		eventsToReturn := []flow.Event{
-			{
-				TxHash: nil,
-				Type:   eventType,
-				Values: nil,
-				Index:  0,
-			},
-			{
-				TxHash: nil,
-				Type:   eventType,
-				Values: nil,
-				Index:  1,
-			}}
+			unittest.EventFixture(func(e *flow.Event) {
+				e.Index = 0
+			}),
+			unittest.EventFixture(func(e *flow.Event) {
+				e.Index = 1
+			})}
 
 		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(eventsToReturn, nil).Times(1)
 
 		startBlock := 21
 		endBlock := 37
 
-		response, err := backend.GetEvents(context.TODO(), &observation.GetEventsRequest{
+		response, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{
 			Type:       eventType,
 			StartBlock: uint64(startBlock),
 			EndBlock:   uint64(endBlock),
 		})
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.NotNil(t, response)
 
@@ -275,7 +262,7 @@ func TestBackend(t *testing.T) {
 			Return(&block).
 			Times(1)
 
-		response, err := backend.GetLatestBlock(context.TODO(), &observation.GetLatestBlockRequest{})
+		response, err := backend.GetLatestBlock(context.Background(), &observation.GetLatestBlockRequest{})
 
 		assert.NoError(t, err)
 		assert.NotNil(t, response)
@@ -292,14 +279,14 @@ func TestBackend(t *testing.T) {
 			Return(nil, &emulator.ErrTransactionNotFound{}).
 			Times(1)
 
-		response, err := backend.GetTransaction(context.TODO(), &observation.GetTransactionRequest{
+		response, err := backend.GetTransaction(context.Background(), &observation.GetTransactionRequest{
 			Hash: bytes,
 		})
 
 		assert.Error(t, err)
 
 		grpcError, ok := status.FromError(err)
-		assert.True(t, ok)
+		require.True(t, ok)
 
 		assert.Equal(t, codes.NotFound, grpcError.Code())
 
@@ -310,27 +297,17 @@ func TestBackend(t *testing.T) {
 
 		txEventType := "TxEvent"
 
-		tx := flow.Transaction{
-			Script:             nil,
-			ReferenceBlockHash: nil,
-			Nonce:              2137,
-			ComputeLimit:       2,
-			PayerAccount:       flow.Address{},
-			ScriptAccounts:     nil,
-			Signatures:         nil,
-			Status:             flow.TransactionSealed,
-			Events:             nil,
-		}
+		tx := unittest.TransactionFixture(func(t *flow.Transaction) {
+			t.Status = flow.TransactionSealed
+		})
 
 		txHash := tx.Hash()
 
 		txEvents := []flow.Event{
-			{
-				TxHash: txHash,
-				Type:   txEventType,
-				Values: nil,
-				Index:  0,
-			},
+			unittest.EventFixture(func(e *flow.Event) {
+				e.TxHash = txHash
+				e.Type = txEventType
+			}),
 		}
 
 		tx.Events = txEvents
@@ -340,7 +317,7 @@ func TestBackend(t *testing.T) {
 			Return(&tx, nil).
 			Times(1)
 
-		response, err := backend.GetTransaction(context.TODO(), &observation.GetTransactionRequest{
+		response, err := backend.GetTransaction(context.Background(), &observation.GetTransactionRequest{
 			Hash: txHash,
 		})
 
@@ -361,7 +338,7 @@ func TestBackend(t *testing.T) {
 
 	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
 
-		response, err := backend.Ping(context.TODO(), &observation.PingRequest{})
+		response, err := backend.Ping(context.Background(), &observation.PingRequest{})
 
 		assert.NoError(t, err)
 		assert.NotNil(t, response)
@@ -369,7 +346,7 @@ func TestBackend(t *testing.T) {
 
 	t.Run("SendTransaction with nil tx", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
 
-		response, err := backend.SendTransaction(context.TODO(), &observation.SendTransactionRequest{
+		response, err := backend.SendTransaction(context.Background(), &observation.SendTransactionRequest{
 			Transaction: nil,
 		})
 
@@ -377,7 +354,7 @@ func TestBackend(t *testing.T) {
 		assert.Nil(t, response)
 
 		grpcError, ok := status.FromError(err)
-		assert.True(t, ok)
+		require.True(t, ok)
 
 		assert.Equal(t, codes.InvalidArgument, grpcError.Code())
 
@@ -414,7 +391,7 @@ func TestBackend(t *testing.T) {
 				Status: 0,
 			},
 		}
-		response, err := backend.SendTransaction(context.TODO(), &requestTx)
+		response, err := backend.SendTransaction(context.Background(), &requestTx)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, response)
@@ -444,13 +421,13 @@ func TestBackend(t *testing.T) {
 				Status:             0,
 			},
 		}
-		response, err := backend.SendTransaction(context.TODO(), &requestTx)
+		response, err := backend.SendTransaction(context.Background(), &requestTx)
 
 		assert.Error(t, err)
 		assert.Nil(t, response)
 
 		grpcError, ok := status.FromError(err)
-		assert.True(t, ok)
+		require.True(t, ok)
 
 		assert.Equal(t, codes.InvalidArgument, grpcError.Code())
 

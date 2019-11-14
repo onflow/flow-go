@@ -41,7 +41,7 @@ type EmulatedBlockchain struct {
 	onEventEmitted     func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-type EmulatedBlockchainApi interface {
+type EmulatedBlockchainAPI interface {
 	RootAccountAddress() flow.Address
 	RootKey() flow.AccountPrivateKey
 	GetLatestBlock() *types.Block
