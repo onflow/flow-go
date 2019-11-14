@@ -3,7 +3,7 @@
 kompiled: fpl-kompiled/timestamp
 
 fpl-kompiled/timestamp: fpl.k
-	kompile fpl.k --backend llvm --main-module FPL-TESTING -ccopt -g
+	kompile fpl.k --backend haskell --main-module FPL-TESTING
 
 test: kompiled
 	tests/run_tests.sh
