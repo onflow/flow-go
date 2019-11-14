@@ -95,8 +95,8 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func RegistersFixture() flow.Registers {
-	return flow.Registers{
+func LedgerFixture() flow.Ledger {
+	return flow.Ledger{
 		"key": []byte("value"),
 	}
 }

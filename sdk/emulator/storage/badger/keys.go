@@ -10,7 +10,7 @@ const (
 	blockKeyPrefix          = "block_by_number"
 	blockHashIndexKeyPrefix = "block_hash_to_number"
 	transactionKeyPrefix    = "transaction_by_hash"
-	registersKeyPrefix      = "registers_by_block_number"
+	ledgerKeyPrefix         = "ledger_by_block_number"
 	eventsKeyPrefix         = "events_by_block_number"
 )
 
@@ -38,8 +38,8 @@ func transactionKey(txHash crypto.Hash) []byte {
 	return []byte(fmt.Sprintf("%s-%s", transactionKeyPrefix, txHash.Hex()))
 }
 
-func registersKey(blockNumber uint64) []byte {
-	return []byte(fmt.Sprintf("%s-%032d", registersKeyPrefix, blockNumber))
+func ledgerKey(blockNumber uint64) []byte {
+	return []byte(fmt.Sprintf("%s-%032d", ledgerKeyPrefix, blockNumber))
 }
 
 func eventsKey(blockNumber uint64) []byte {

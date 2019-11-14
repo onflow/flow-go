@@ -29,8 +29,8 @@ type Store interface {
 	GetTransaction(crypto.Hash) (flow.Transaction, error)
 	InsertTransaction(flow.Transaction) error
 
-	GetRegistersView(blockNumber uint64) (flow.RegistersView, error)
-	SetRegisters(blockNumber uint64, registers flow.Registers) error
+	GetLedgerView(blockNumber uint64) (flow.LedgerView, error)
+	SetLedger(blockNumber uint64, ledger flow.Ledger) error
 
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	InsertEvents(blockNumber uint64, events ...flow.Event) error

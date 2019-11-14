@@ -29,7 +29,7 @@ func TestKeyOrdering(t *testing.T) {
 	t.Run("registers key", func(t *testing.T) {
 		var keys [][]byte
 		for _, num := range nums {
-			keys = append(keys, registersKey(num))
+			keys = append(keys, ledgerKey(num))
 		}
 		for i := 0; i < len(keys)-1; i++ {
 			// lower index keys should be considered less

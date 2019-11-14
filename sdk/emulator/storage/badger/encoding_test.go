@@ -46,15 +46,15 @@ func TestEncodeBlock(t *testing.T) {
 	assert.True(t, block.Timestamp.Equal(decodedBlock.Timestamp))
 }
 
-func TestEncodeRegisters(t *testing.T) {
-	registers := unittest.RegistersFixture()
-	data, err := encodeRegisters(registers)
+func TestEncodeLedger(t *testing.T) {
+	ledgers := unittest.LedgerFixture()
+	data, err := encodeLedger(ledgers)
 	require.Nil(t, err)
 
-	var decodedRegisters flow.Registers
-	err = decodeRegisters(&decodedRegisters, data)
+	var decodedRegisters flow.Ledger
+	err = decodeLedger(&decodedRegisters, data)
 	require.Nil(t, err)
-	assert.Equal(t, registers, decodedRegisters)
+	assert.Equal(t, ledgers, decodedRegisters)
 }
 
 func TestEncodeEventList(t *testing.T) {
