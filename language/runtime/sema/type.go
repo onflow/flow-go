@@ -1,7 +1,6 @@
 package sema
 
 import (
-	"encoding/gob"
 	"fmt"
 	"math"
 	"math/big"
@@ -946,6 +945,7 @@ func (t *ConstantSizedType) IndexingType() Type {
 type InvokableType interface {
 	Type
 	InvocationFunctionType() *FunctionType
+	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
 // FunctionType
@@ -961,6 +961,10 @@ func (*FunctionType) isType() {}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
+}
+
+func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
@@ -1024,6 +1028,18 @@ type SpecialFunctionType struct {
 	*FunctionType
 }
 
+// CheckedFunctionType is the the type representing a function that checks the arguments,
+// e.g., integer functions
+
+type CheckedFunctionType struct {
+	*FunctionType
+	ArgumentExpressionsCheck func(checker *Checker, argumentExpressions []ast.Expression)
+}
+
+func (t *CheckedFunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	t.ArgumentExpressionsCheck(checker, argumentExpressions)
+}
+
 // baseTypes are the nominal types available in programs
 
 var baseTypes map[string]Type
@@ -1050,6 +1066,7 @@ func init() {
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&AddressType{},
 	}
 
 	for _, ty := range types {
@@ -1057,10 +1074,117 @@ func init() {
 
 		// check type is not accidentally redeclared
 		if _, ok := baseTypes[typeName]; ok {
-			panic(&errors.UnreachableError{})
+			panic(errors.NewUnreachableError())
 		}
 
 		baseTypes[typeName] = ty
+	}
+}
+
+// baseValues are the values available in programs
+
+var BaseValues map[string]ValueDeclaration
+
+type baseFunction struct {
+	name           string
+	invokableType  InvokableType
+	argumentLabels []string
+}
+
+func (f baseFunction) ValueDeclarationType() Type {
+	return f.invokableType
+}
+
+func (baseFunction) ValueDeclarationKind() common.DeclarationKind {
+	return common.DeclarationKindFunction
+}
+
+func (baseFunction) ValueDeclarationPosition() ast.Position {
+	return ast.Position{}
+}
+
+func (baseFunction) ValueDeclarationIsConstant() bool {
+	return true
+}
+
+func (f baseFunction) ValueDeclarationArgumentLabels() []string {
+	return f.argumentLabels
+}
+
+func init() {
+	BaseValues = map[string]ValueDeclaration{}
+	initIntegerFunctions()
+	initAddressFunction()
+}
+
+func initIntegerFunctions() {
+	integerTypes := []Type{
+		&IntType{},
+		&Int8Type{},
+		&Int16Type{},
+		&Int32Type{},
+		&Int64Type{},
+		&UInt8Type{},
+		&UInt16Type{},
+		&UInt32Type{},
+		&UInt64Type{},
+	}
+
+	for _, integerType := range integerTypes {
+		typeName := integerType.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := BaseValues[typeName]; ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		BaseValues[typeName] = baseFunction{
+			name: typeName,
+			invokableType: &CheckedFunctionType{
+				FunctionType: &FunctionType{
+					ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+					ReturnTypeAnnotation:     &TypeAnnotation{Type: integerType},
+				},
+				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
+			},
+		}
+	}
+}
+
+func initAddressFunction() {
+	addressType := &AddressType{}
+	typeName := addressType.String()
+
+	// check type is not accidentally redeclared
+	if _, ok := BaseValues[typeName]; ok {
+		panic(errors.NewUnreachableError())
+	}
+
+	BaseValues[typeName] = baseFunction{
+		name: typeName,
+		invokableType: &CheckedFunctionType{
+			FunctionType: &FunctionType{
+				ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+				ReturnTypeAnnotation:     &TypeAnnotation{Type: addressType},
+			},
+			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
+				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+				if !ok {
+					return
+				}
+				checker.checkAddressLiteral(intExpression)
+			},
+		},
+	}
+}
+
+func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
+	return func(checker *Checker, argumentExpressions []ast.Expression) {
+		intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+		if !ok {
+			return
+		}
+		checker.checkIntegerLiteral(intExpression, integerType)
 	}
 }
 
@@ -1429,7 +1553,7 @@ func (t *ReferenceType) IsResourceType() bool {
 }
 
 func (t *ReferenceType) IsInvalidType() bool {
-	return false
+	return t.Type.IsInvalidType()
 }
 
 func (t *ReferenceType) HasMembers() bool {
@@ -1471,6 +1595,45 @@ func (t *ReferenceType) IndexingType() Type {
 		return nil
 	}
 	return referencedType.IndexingType()
+}
+
+// AddressType represents the address type
+type AddressType struct{}
+
+func (*AddressType) isType() {}
+
+func (*AddressType) String() string {
+	return "Address"
+}
+
+func (*AddressType) Equal(other Type) bool {
+	_, ok := other.(*AddressType)
+	return ok
+}
+
+func (*AddressType) IsResourceType() bool {
+	return false
+}
+
+func (*AddressType) IsInvalidType() bool {
+	return false
+}
+
+var AddressTypeMin = big.NewInt(0)
+var AddressTypeMax *big.Int
+
+func init() {
+	AddressTypeMax = big.NewInt(2)
+	AddressTypeMax.Exp(AddressTypeMax, big.NewInt(160), nil)
+	AddressTypeMax.Sub(AddressTypeMax, big.NewInt(1))
+}
+
+func (*AddressType) Min() *big.Int {
+	return AddressTypeMin
+}
+
+func (*AddressType) Max() *big.Int {
+	return AddressTypeMax
 }
 
 // IsSubType determines if the given subtype is a subtype
@@ -1586,9 +1749,22 @@ func IsConcatenatableType(ty Type) bool {
 }
 
 func IsEquatableType(ty Type) bool {
-	return IsSubType(ty, &StringType{}) ||
+
+	// TODO: add support for arrays and dictionaries
+	// TODO: add support for composites that are equatable
+
+	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntType{})
+		IsSubType(ty, &IntegerType{}) {
+
+		return true
+	}
+
+	if optionalType, ok := ty.(*OptionalType); ok {
+		return IsEquatableType(optionalType.Type)
+	}
+
+	return false
 }
 
 // UnwrapOptionalType returns the type if it is not an optional type,
@@ -1604,73 +1780,40 @@ func UnwrapOptionalType(ty Type) Type {
 	}
 }
 
-func AreCompatibleEqualityTypes(leftType, rightType Type) bool {
-	unwrappedLeft := UnwrapOptionalType(leftType)
-	unwrappedRight := UnwrapOptionalType(rightType)
+func AreCompatibleEquatableTypes(leftType, rightType Type) bool {
+	unwrappedLeftType := UnwrapOptionalType(leftType)
+	unwrappedRightType := UnwrapOptionalType(rightType)
 
-	if unwrappedLeft.Equal(unwrappedRight) {
+	leftIsEquatable := IsEquatableType(unwrappedLeftType)
+	rightIsEquatable := IsEquatableType(unwrappedRightType)
+
+	if unwrappedLeftType.Equal(unwrappedRightType) &&
+		leftIsEquatable && rightIsEquatable {
+
 		return true
 	}
 
-	if _, ok := unwrappedLeft.(*NeverType); ok {
-		return true
-	}
+	// The types are equatable if this is a comparison with `nil`,
+	// which has type `Never?`
 
-	if _, ok := unwrappedRight.(*NeverType); ok {
-		return true
-	}
-
-	return false
-}
-
-func IsValidEqualityType(ty Type) bool {
-	if IsSubType(ty, &BoolType{}) {
-		return true
-	}
-
-	if IsSubType(ty, &IntegerType{}) {
-		return true
-	}
-
-	if IsSubType(ty, &StringType{}) {
-		return true
-	}
-
-	if IsSubType(ty, &CharacterType{}) {
-		return true
-	}
-
-	if _, ok := ty.(*OptionalType); ok {
+	if IsNilType(leftType) || IsNilType(rightType) {
 		return true
 	}
 
 	return false
 }
 
-////
+// IsNilType returns true if the given type is the type of `nil`, i.e. `Never?`.
+//
+func IsNilType(ty Type) bool {
+	optionalType, ok := ty.(*OptionalType)
+	if !ok {
+		return false
+	}
 
-func init() {
-	gob.Register(&AnyType{})
-	gob.Register(&NeverType{})
-	gob.Register(&VoidType{})
-	gob.Register(&InvalidType{})
-	gob.Register(&OptionalType{})
-	gob.Register(&BoolType{})
-	gob.Register(&StringType{})
-	gob.Register(&IntegerType{})
-	gob.Register(&IntType{})
-	gob.Register(&Int8Type{})
-	gob.Register(&Int16Type{})
-	gob.Register(&Int32Type{})
-	gob.Register(&Int64Type{})
-	gob.Register(&UInt8Type{})
-	gob.Register(&UInt16Type{})
-	gob.Register(&UInt32Type{})
-	gob.Register(&UInt64Type{})
-	gob.Register(&DictionaryType{})
-	gob.Register(&VariableSizedType{})
-	gob.Register(&ConstantSizedType{})
-	gob.Register(&FunctionType{})
-	gob.Register(&CompositeType{})
-	gob.Register(&InterfaceType{})
+	if _, ok := optionalType.Type.(*NeverType); !ok {
+		return false
+	}
+
+	return true
 }

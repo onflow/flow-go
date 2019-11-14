@@ -23,13 +23,23 @@ func (l *errorListener) SyntaxError(
 	message string,
 	e antlr.RecognitionException,
 ) {
-	offendingToken := offendingSymbol.(antlr.Token)
 
-	if l.isIncompleteInputException(e, offendingToken) {
+	if l.isIncompleteInputException(e, offendingSymbol) {
 		l.inputIsIncomplete = true
 	}
 
-	position := ast.PositionFromToken(offendingToken)
+	var offset int
+	if token, ok := offendingSymbol.(*antlr.CommonToken); ok {
+		offset = token.GetStart()
+	} else if e != nil {
+		offset = e.GetInputStream().Index()
+	}
+
+	position := ast.Position{
+		Offset: offset,
+		Line:   line,
+		Column: column,
+	}
 
 	l.syntaxErrors = append(l.syntaxErrors,
 		&SyntaxError{
@@ -39,7 +49,7 @@ func (l *errorListener) SyntaxError(
 	)
 }
 
-func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException, offendingToken antlr.Token) bool {
+func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException, offendingSymbol interface{}) bool {
 	switch e.(type) {
 	case *antlr.InputMisMatchException, *antlr.NoViableAltException:
 		break
@@ -47,8 +57,10 @@ func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException,
 		return false
 	}
 
-	if offendingToken.GetTokenType() != antlr.TokenEOF {
-		return false
+	if offendingToken, ok := offendingSymbol.(antlr.Token); ok {
+		if offendingToken.GetTokenType() != antlr.TokenEOF {
+			return false
+		}
 	}
 
 	return true
@@ -57,7 +69,7 @@ func (l *errorListener) isIncompleteInputException(e antlr.RecognitionException,
 func ParseProgram(code string) (program *ast.Program, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.Program()
 		},
 	)
@@ -77,7 +89,7 @@ func ParseProgram(code string) (program *ast.Program, inputIsComplete bool, err 
 func ParseExpression(code string) (expression ast.Expression, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.Expression()
 		},
 	)
@@ -94,10 +106,10 @@ func ParseExpression(code string) (expression ast.Expression, inputIsComplete bo
 	return program, inputIsComplete, err
 }
 
-func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, err error) {
+func ParseReplInput(code string) (replInput []interface{}, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
-		func(parser *StrictusParser) antlr.ParserRuleContext {
+		func(parser *CadenceParser) antlr.ParserRuleContext {
 			return parser.ReplInput()
 		},
 	)
@@ -106,27 +118,40 @@ func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, e
 		err = Error{errors}
 	}
 
-	return result, inputIsComplete, err
+	elements, ok := result.([]interface{})
+	if !ok {
+		return nil, inputIsComplete, err
+	}
+
+	return elements, inputIsComplete, err
 }
 
 func parse(
 	code string,
-	parse func(*StrictusParser) antlr.ParserRuleContext,
+	parse func(*CadenceParser) antlr.ParserRuleContext,
 ) (
 	result ast.Repr,
 	inputIsComplete bool,
 	errors []error,
 ) {
 	input := antlr.NewInputStream(code)
-	lexer := NewStrictusLexer(input)
-	stream := antlr.NewCommonTokenStream(lexer, 0)
-	parser := NewStrictusParser(stream)
-	// diagnostics, for debugging only:
-	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
+
 	listener := new(errorListener)
+
+	lexer := NewCadenceLexer(input)
+	// remove the lexer's default console error listener
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(listener)
+
+	stream := antlr.NewCommonTokenStream(lexer, 0)
+
+	parser := NewCadenceParser(stream)
 	// remove the default console error listener
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(listener)
+
+	// for debugging only (to get diagnostics):
+	// parser.AddErrorListener(antlr.NewDiagnosticErrorListener(true))
 
 	appendParseErrors := func() {
 		inputIsComplete = !listener.inputIsIncomplete

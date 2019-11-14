@@ -14,7 +14,7 @@ import (
 )
 
 type ProgramVisitor struct {
-	*BaseStrictusVisitor
+	*BaseCadenceVisitor
 	parseErrors []error
 }
 
@@ -40,6 +40,22 @@ func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitReplInput(ctx *ReplInputContext) interface{} {
+	var elements []interface{}
+	for _, elementCtx := range ctx.AllReplElement() {
+		elements = append(elements, elementCtx.Accept(v))
+	}
+	return elements
+}
+
+func (v *ProgramVisitor) VisitReplElement(ctx *ReplElementContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReplDeclaration(ctx *ReplDeclarationContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReplStatement(ctx *ReplStatementContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
@@ -380,7 +396,7 @@ func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface
 		return common.CompositeKindContract
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
@@ -650,7 +666,7 @@ func (v *ProgramVisitor) VisitCondition(ctx *ConditionContext) interface{} {
 	} else if isPostCondition {
 		kind = ast.ConditionKindPost
 	} else {
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	test := ctx.test.Accept(v).(ast.Expression)
@@ -761,31 +777,45 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	expressionResult := ctx.Expression().Accept(v)
-	if expressionResult == nil {
+	// Parse the left expression and the left transfer (required)
+
+	leftExpressionResult := ctx.leftExpression.Accept(v)
+	if leftExpressionResult == nil {
 		return nil
 	}
-	expression := expressionResult.(ast.Expression)
-	var typeAnnotation *ast.TypeAnnotation
+	leftExpression := leftExpressionResult.(ast.Expression)
 
+	var typeAnnotation *ast.TypeAnnotation
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext != nil {
-		if x, ok := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation); ok {
-			typeAnnotation = x
-		}
+		typeAnnotation, _ = typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
 	}
 
-	transfer := ctx.Transfer().Accept(v).(*ast.Transfer)
+	leftTransfer := ctx.leftTransfer.Accept(v).(*ast.Transfer)
+
+	// Parse the right transfer and the right expression (optional)
+
+	var rightTransfer *ast.Transfer
+	var rightExpression ast.Expression
+
+	if ctx.rightExpression != nil && ctx.rightTransfer != nil {
+		rightTransfer = ctx.rightTransfer.Accept(v).(*ast.Transfer)
+
+		rightExpressionResult := ctx.rightExpression.Accept(v)
+		rightExpression = rightExpressionResult.(ast.Expression)
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.VariableDeclaration{
 		IsConstant:     isConstant,
 		Identifier:     identifier,
-		Value:          expression,
+		Value:          leftExpression,
 		TypeAnnotation: typeAnnotation,
-		Transfer:       transfer,
+		Transfer:       leftTransfer,
 		StartPos:       startPosition,
+		SecondTransfer: rightTransfer,
+		SecondValue:    rightExpression,
 	}
 }
 
@@ -808,7 +838,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	} else if ctx.testDeclaration != nil {
 		test = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
 	} else {
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	then := ctx.then.Accept(v).(*ast.Block)
@@ -1173,7 +1203,7 @@ func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
 		return ast.OperationMove
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -1194,7 +1224,7 @@ func (v *ProgramVisitor) VisitComposedExpression(ctx *ComposedExpressionContext)
 		case ast.AccessExpression:
 			result = v.wrapPartialAccessExpression(result, partialExpression)
 		default:
-			panic(&errors.UnreachableError{})
+			panic(errors.NewUnreachableError())
 		}
 	}
 
@@ -1221,7 +1251,7 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 		}
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
@@ -1365,7 +1395,8 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 
 	withoutUnderscores := strings.Replace(text, "_", "", -1)
 
-	value, ok := big.NewInt(0).SetString(withoutUnderscores, kind.Base())
+	base := kind.Base()
+	value, ok := big.NewInt(0).SetString(withoutUnderscores, base)
 	if !ok {
 		v.report(
 			&InvalidIntegerLiteralError{
@@ -1383,6 +1414,7 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 
 	return &ast.IntExpression{
 		Value: value,
+		Base:  base,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -1479,7 +1511,7 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 		}
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitNilLiteral(ctx *NilLiteralContext) interface{} {
@@ -1572,7 +1604,7 @@ func parseHex(b byte) rune {
 		return c - 'A' + 10
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
@@ -1692,7 +1724,7 @@ func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
 		return ast.OperationUnequal
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
@@ -1712,7 +1744,7 @@ func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{}
 		return ast.OperationGreaterEqual
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
@@ -1724,7 +1756,7 @@ func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
 		return ast.OperationMinus
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
@@ -1740,5 +1772,5 @@ func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) int
 		return ast.OperationMod
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

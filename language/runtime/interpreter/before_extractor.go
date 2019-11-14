@@ -37,7 +37,7 @@ func (BeforeExtractor) ExtractInvocation(
 			// which do not have exactly one argument
 
 			if len(expression.Arguments) != 1 {
-				panic(&errors.UnreachableError{})
+				panic(errors.NewUnreachableError())
 			}
 
 			// rewrite the argument

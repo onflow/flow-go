@@ -71,16 +71,16 @@ Mutli-line comments are balanced.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind a value to a name.
-Constants can only be initialized with a value and cannot be reassigned afterwards.
-Variables can be initialized with a value and can be reassigned later.
-Declarations are valid in any scope, including the global scope.
+Constants and variables are declarations that bind a value and [type](#type-safety) to an identifier.
+Constants are initialized with a value and cannot be reassigned afterwards.
+Variables are initialized with a value and can be reassigned later.
+Declarations can be created in any scope, including the global scope.
 
-Constant means that the *name* is constant, not the *value* –
-the value may still be changed if it allows it, i.e. is mutable.
+Constant means that the *identifier's* association is constant, not the *value* itself –
+the value may still be changed if is mutable. 
 
 Constants are declared using the `let` keyword. Variables are declared using the `var` keyword.
-The keywords are followed by the name, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
+The keywords are followed by the identifier, an optional [type annotation](#type-annotations), an equals sign `=`, and the initial value.
 
 ```cadence,file=constants-and-variables.cdc
 // Declare a constant named `a`.
@@ -108,10 +108,8 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-Once a constant or variable is declared,
-it cannot be redeclared with the same name,
-with a different type,
-or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
+The names of the variable or constant declarations in each scope must be unique. 
+Declaring another variable or constant with a name that is already declared in the current scope is invalid, regardless of kind or type.
 
 ```cadence
 // Declare a constant named `a`.
@@ -194,9 +192,8 @@ let integerWithoutAnnotation = 1
 let smallIntegerWithAnnotation: Int8 = 1
 ```
 
-If a type annotation is provided, the initial value must be of this type,
-and new values assigned to variables must match the declaration's explicit type
-or the type that was inferred when the variable was declared.
+If a type annotation is provided, the initial value must be of this type.
+All new values assigned to variables must match its type.
 This type safety is explained in more detail in a [separate section](#type-safety).
 
 ```cadence
@@ -348,7 +345,7 @@ let binaryNumber = 0b10_11_01
 
 ### Integers
 
-Integers are whole numbers without a fractional part.
+Integers are numbers without a fractional part.
 They are either *signed* (positive, zero, or negative) or *unsigned* (positive or zero)
 and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
@@ -383,7 +380,7 @@ let veryLargeNumber: Int = 10000000000000000000000000000000
 ```
 
 Integer literals are [inferred](#type-inference) to have type `Int`,
-or if the literal occurrs in a position that expects an explicit type,
+or if the literal occurs in a position that expects an explicit type,
 e.g. in a variable declaration with an explicit type annotation.
 
 ```cadence
@@ -394,7 +391,7 @@ let someNumber = 123
 
 Negative integers are encoded in two's complement representation.
 
-Integer types are not converted automatically. Types most be explicitly converted,
+Integer types are not converted automatically. Types must be explicitly converted,
 which can be done by calling the constructor of the type with the integer type.
 
 ```cadence
@@ -621,7 +618,7 @@ let c = 1 ?? 2
 ```
 
 The type of the right-hand side of the operator (the alternative value) must be a subtype
-of the type of the left-hand side, i.e. the right-hand side of the operator must
+of the type of left-hand side, i.e. the right-hand side of the operator must
 be the non-optional or optional type matching the type of the left-hand side.
 
 ```cadence
@@ -896,6 +893,9 @@ let arrays: [[Int16; 3]; 2] = [
     [1, 2, 3],
     [4, 5, 6]
 ]
+
+// Declare a variable length array of integers
+var variableLengthArray: [Int] = []
 ```
 
 Array types are covariant in their element types.
@@ -1202,7 +1202,8 @@ This is safe because dictionaries are value types and not reference types.
 
 #### Dictionary Access
 
-To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
+To get the value for a specific key from a dictionary, the access syntax can be used: 
+The dictionary is followed by an opening square bracket `[`, the key, and ends with a closing square bracket `]`.
 
 Accessing a key returns an [optional](#optionals):
 If the key is found in the dictionary, the value for the given key is returned,
@@ -1370,8 +1371,8 @@ let a = 1
 a = 2
 ```
 
-The left-hand side of the assignment opera must be an identifier,
-followed by one or more index or access expressions.
+The left-hand side of the assignment operand must be an identifier.
+For arrays and dictionaries, this identifier can be followed by one or more index or access expressions.
 
 ```cadence,file=assignment-numbers.cdc
 // Declare an array of integers.
@@ -2187,7 +2188,7 @@ Control flow statements control the flow of execution in a function.
 If-statements allow a certain piece of code to be executed only when a given condition is true.
 
 The if-statement starts with the `if` keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
-The condition must be boolean and the braces are required.
+The condition expression must be Bool
 The braces are required and not optional.
 Parentheses around the condition are optional.
 
@@ -2640,7 +2641,7 @@ However, the initial values for fields are set in the initializer,
 **not** in the field declaration.
 All fields **must** be initialized in the initializer, exactly once.
 
-Having to provide intitial values in the initializer might seem restrictive,
+Having to provide initial values in the initializer might seem restrictive,
 but this ensures that all fields are always initialized in one location, the initializer,
 and the initialization order is clear.
 
@@ -2659,7 +2660,7 @@ The initializer always follows any fields.
 There are three kinds of fields:
 
 - **Constant fields** are also stored in the composite value,
-  but after they have been inititalized with a value they **cannot** have new values assigned to them afterwards.
+  but after they have been initialized with a value they **cannot** have new values assigned to them afterwards.
   A constant field must be initialized exactly once.
 
   Constant fields are declared using the `let` keyword.
@@ -2695,7 +2696,7 @@ Fields can be read (if they are constant or variable) and set (if they are varia
 // Both fields are initialized through the initializer.
 //
 // The public access modifier `pub` is used in this example to allow
-// thes fields to be read in outer scopes. Fields can also be declared
+// the fields to be read in outer scopes. Fields can also be declared
 // private so they cannot be accessed in outer scopes.
 // Access control will be explained in a later section.
 //
@@ -2791,7 +2792,8 @@ struct Token {
 
 ### Composite Data Type Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  Assignments are not allowed at all in getters and setters.
+Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.  
+Only certain assignments are allowed in getters and setters.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
@@ -2826,7 +2828,8 @@ let example = GetterExample(balance: 10)
 // `example.balance` is `10`
 
 example.balance = -50
-// `example.balance` is `0`. Without the getter it would be `-50`.
+// The stored value of the field `example` is `-50` internally,
+// though `example.balance` is `0` because the getter for `balance` returns `0` instead.
 ```
 
 Setters are declared using the `set` keyword, followed by the name for the new value enclosed in parentheses.
@@ -3049,7 +3052,7 @@ var something: A = A()
 // Invalid: Assign a value of type `B` to the variable.
 // Even though types `A` and `B` have the same declarations,
 // a function with the same name and type, the types' names differ,
-// so they are not compatbile.
+// so they are not compatible.
 //
 something = B()
 
@@ -3142,7 +3145,7 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`.
 //
-let a: <-SomeResource <- SomeResource(value: 0)
+let a: <-SomeResource <- create SomeResource(value: 0)
 
 // *Move* the resource value to a new constant.
 //
@@ -3199,7 +3202,7 @@ d.value
 ```
 
 To make it explicit that the type is moved, it must be prefixed with `<-` in all type annotations,
-e.g. for variable declarations, parametes, or return types.
+e.g. for variable declarations, parameters, or return types.
 
 ```cadence,file=resource-type-annotation.cdc
 // Declare a constant with an explicit type annotation.
@@ -3369,7 +3372,7 @@ destroy res
 
 #### Nested Resources
 
-Fields in composite data types behave diffently when they have a resource type.
+Fields in composite data types behave differently when they have a resource type.
 
 If a resource type has fields that have a resource type it **must** declare a destructor,
 which **must** invalidate all resource fields, i.e. move or destroy them.
@@ -3634,6 +3637,19 @@ Instead, consider using [interfaces](#interfaces).
 > 🚧 Status: Access control is not implemented yet.
 
 Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
+
+In Flow and Cadence, there are two types of access control
+- 1. Access control between accounts using capability security.  
+Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.  
+This means that nothing is truly public by default.  
+Other accounts can not read or write the objects in an account 
+unless the owner of the account has granted them access by providing references to the objects.
+- 2. Access control within programs using `private` and `public` keywords.  
+Assuming the caller has a valid reference that satisfies the first type of access control, 
+these keywords further govern how access is controlled.  
+
+The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.
+
 Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
 
 - **Private** means the declaration is only accessible/visible in the current and inner scopes.
@@ -4518,43 +4534,37 @@ account.storage[Counter] <-> counter
 ## Storage References
 
 It is possible to create references to **storage locations**.
-References allow access to stored values and restricting the access to the stored value.
+References allow access to stored values.  A reference can be used to read or 
+call fields and methods of stored values without having to move or call the fields
+and methods on the storage location directly.
 
-For example, a user might want to share a reference to a token stored in their account,
-but limit the access and only allow reads of certain fields and calls to certain functions,
-but not expose all functionality of the token.
+References are **copied**, i.e. they are value types.  Any number of references to 
+a storage location can be created and used, but only by the account that owns
+the location being referenced.
 
-Note that references are **not** referencing stored values –
+Note that references are **not** referencing stored values – 
+A reference cannot be used to directly modify a value it references, and
 if the value stored in the references location is moved or removed,
 the reference is not updated and it becomes invalid.
 
 References are created by using the `&` operator, followed by the storage location,
 the `as` keyword, and the type through which the stored location should be accessed.
+```cadence,file=reference-ex.cdc
+let nameRef: &Name = &account.storage[Name] as Name
+```
 
-The storage location must be a subtype of the given type.
-
-References are **copied**, i.e. they are value types.
+The storage location must be a subtype of the type given after the `as` keyword.
 
 References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`, if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
 
+
 ```cadence,file=storage-reference.cdc
 
-// Declare a resource interface `HasCount`.
+// Declare a resource named `Counter`
 //
-resource interface HasCount {
-
-    // Require implementations of the interface to provide
-    // a field named `count` which can be publicly read.
-    //
-    pub var count: Int
-}
-
-// Declare a resource named `Counter` that conforms
-// to the resource interface `HasCount`.
-//
-resource Counter: HasCount {
+resource Counter: {
     pub var count: Int
 
     pub init(count: Int) {
@@ -4593,6 +4603,33 @@ counterReference.count  // is `42`
 counterReference.increment()
 
 counterReference.count  // is `43`
+```
+
+### Reference-Based Access Control
+
+As was mentioned before, access to stored objects is governed by the
+tenets of [Capability Security](https://en.wikipedia.org/wiki/Capability-based_security).  This
+means that if an account wants to be able to access another account's
+stored objects, it must have a valid reference to that object.  
+
+Access to stored objects can be restricted by using interfaces.  When storing a reference,
+it can be stored as an interface so that only the fields and methods that the interface
+specifies are able to be called by those who have a reference.  
+
+Based on the above example, a user could use an interface to restrict access to only
+the `count` field.
+
+```cadence,file=storage-access-control.cdc
+
+// Declare a resource interface `HasCount`.
+//
+resource interface HasCount {
+
+    // Require implementations of the interface to provide
+    // a field named `count` which can be publicly read.
+    //
+    pub var count: Int
+}
 
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
@@ -4613,6 +4650,7 @@ limitedReference.count  // is `43`
 //
 limitedReference.increment()
 ```
+
 
 ## Events
 
@@ -4664,6 +4702,7 @@ and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
+First, the transaction can import any number of types from external accounts using the import syntax.
 
 Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
@@ -4732,6 +4771,8 @@ pub resource interface Provider {
                 "incorrect amount returned"
         }
     }
+
+    pub fun transfer(to: &Receiver, amount: Int)
 }
 
 pub resource interface Receiver {
@@ -4784,6 +4825,17 @@ pub resource interface FungibleToken: Provider, Receiver {
                 "the amount must be added to the balance"
         }
     }
+
+    pub fun transfer(to: &Receiver, amount: Int) {
+        pre {
+            amount <= self.balance:
+                "Insufficient funds"
+        }
+        post {
+            self.balance == before(self.balance) - amount:
+                "Incorrect amount removed"
+        }
+    }
 }
 ```
 
@@ -4797,19 +4849,6 @@ and the string literal for the path of the file which contains the code of the t
      also see below for version referring to deployed code with an address
 -->
 
-The prepare phase can use the signing account's `deploy` function to deploy types.
-
-This essentially stores the types in the account's `types` object so it can be used again.
-
-A second layer of access control manages which user has access to stored values.
-
-When deploying code to an account, it is private by default,
-just like fields and functions within the resources, i.e. it can only be imported
-by code in the same account.
-
-The `publish` operator can be used to make deployed types publicly available to other accounts.
-
-After a type is published it can be imported by other code.
 
 ```cadence,file=deploy-resource-interface.cdc
 // Import the resource interface type `FungibleToken`
@@ -4823,15 +4862,10 @@ import FungibleToken from "FungibleToken.cdc"
 transaction {
 
     prepare(signer: Account) {
-        // Deploy the code for the resource interface type `FungibleToken`
+        // Store the code for the resource interface type `FungibleToken`
         // in the signing account.
         //
-        signer.deploy(FungibleToken)
-
-        // Make the deployed type publicly available, so anyone can import
-        // resource interface type `FungibleToken` from the signing account.
-        //
-        publish signer.types[FungibleToken]
+        signer.storage[FungibleToken] = FungibleToken
     }
 }
 ```
@@ -4853,21 +4887,29 @@ import FungibleToken from 0x23
 //
 resource ExampleToken: FungibleToken {
 
-        pub var balance: Int
+    pub var balance: Int
 
-        init(balance: Int) {
-            self.balance = balance
-        }
+    init(balance: Int) {
+        self.balance = balance
+    }
 
-        pub fun withdraw(amount: Int): <-ExampleToken {
-            self.balance = self.balance - amount
-            return create ExampleToken(balance: amount)
-        }
+    pub fun withdraw(amount: Int): <-ExampleToken {
+        self.balance = self.balance - amount
+        return <-create ExampleToken(balance: amount)
+    }
 
-        pub fun deposit(token: <-ExampleToken) {
-            self.balance = self.balance + token.balance
-            destroy token
-        }
+    pub fun deposit(token: <-ExampleToken) {
+        self.balance = self.balance + token.balance
+        destroy token
+    }
+
+    // The function `transfer` combines the functions `withdraw` and `deposit` 
+    // into a single function call
+    pub fun transfer(to: &Receiver, amount: Int) {
+        // Deposit the tokens that withdraw creates into the 
+        // recipient's account using their deposit reference
+        to.deposit(from: <-self.withdraw(amount: amount))
+    }
 }
 
 // Declare a function that lets any user create an example token
@@ -4878,101 +4920,60 @@ fun newEmptyExampleToken(): <-ExampleToken {
 }
 ```
 
-Again, the type must be deployed and published.
-
-```cadence,file=deploy-example-token.cdc
-import ExampleToken from "ExampleToken.cdc"
-
-// Run a transaction which deploys the code for the resource type `ExampleToken`
-// and makes the deployed type publicly available by publishing it.
-//
-transaction {
-
-    prepare(signer: Account) {
-        signer.deploy(ExampleToken)
-        publish signer.types[ExampleToken]
-    }
-}
-```
-
-Now, the resource type `ExampleToken` is deployed to the account
-and published so that anyone who wants to use it
-or interact with it can easily do so by importing it from the account.
-
-### Using Deployed Code
+Again, the type must be stored in the owners account.
 
 Once code is deployed, it can be used in other code and in transactions.
 
-In many scenarios, publishing a stored value might be necessary,
-because any user should have access all public functionality of the type.
-
-In most situations though it is important to expose only a subset of the functionality
+In most situations it is important to expose only a subset of the functionality
 of the stored values, because some of the functionality should only be available to the owner.
 
 The following transaction creates an empty token and stores it in the signer's account.
-This allows the owner to withdraw and deposit. As this functionality should not be available
-to anyone else, the token is not published.
+This allows the owner to withdraw and deposit. 
 
 However, the deposit function should be available to anyone. To achieve this,
 an additional reference to the token is created, stored, and published,
 which has the type `Receiver`, i.e. it only exposes the `deposit` function.
 
-```cadence,file=setup-transaction.cdc
-// Import the resource interface types `Receiver` and `Provider`,
-// which were deployed above, in this example to the account with address 0x23.
-//
-import Receiver, Provider from 0x23
+```cadence,file=deploy-example-token.cdc
+// import the `ExampleToken`, `newEmptyExampleToken`, `Receiver`, and `Provider` from the account who created them
+import ExampleToken, newEmptyExampleToken, Receiver, Provider from 0x42
 
-// Import the resource type `ExampleToken` and the function `newEmptyExampleToken`,
-// which were deployed above, in this example to the account with address 0x42.
-//
-import ExampleToken, newEmptyExampleToken from 0x42
-
-// Run a transaction which creates a new example token for the signing account
-// and sets up references to it for allowing withdrawals for the owner
-// and deposits from anyone.
+// Run a transaction which stored the code and an instance for the resource type `ExampleToken`
 //
 transaction {
 
     prepare(signer: Account) {
-        // Create a new example token for the signing account.
-        //
-        // NOTE: the token is not published, so that only the owner can access it.
-        //
-        var exampleToken: ExampleToken? <- newEmptyExampleToken()
-        signer.storage[ExampleToken] <-> exampleToken
+        // Create a new token as an optional.
+        var tokenA: <-ExampleToken? <- newEmptyExampleToken()
+		
+        // Store the new token in storage by swapping it with whatever
+        // is in the existing location.
+        signer.storage[ExampleToken] <-> tokenA
 
-        // `exampleToken` now contains the previously stored token, if any.
-        //
-        // In this example it is simply destroyed, because it is assumed
-        // there was no prior stored token.
-        //
-        destroy exampleToken
-
-        // Store a reference to the token as a provider in the signing account,
-        // so the owner can use it to withdraw tokens.
-        //
-        // NOTE: the provider is not published, so that only the owner can access it.
-        //
+        // create references to the stored `ExampleToken`.
+        // `Receiver` is for external calls.
+        // `Provider` is for internal calls by the owner.
+        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
         signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
 
-        // Store a reference to the token as a receiver in the signing account
-        // and publish it, so anyone can use it to deposit tokens.
-        //
-        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
-        publish signer.storage[&Receiver]
+        // destroy the empty swapped resource
+        destroy tokenA
     }
 }
 ```
+
+Now, the resource type `ExampleToken` is stored in the account
+and its `Receiver` interface is available so that anyone can
+interact with it by importing it from the account.
 
 Once an account is prepared in such a way, transactions can be run that deposit
 tokens into the account.
 
 ```cadence,file=send-transaction.cdc
-// Import the resource type `ExampleToken`,
+// Import the resource type `ExampleToken`, `Provider`, and `Receiver`
 // in this example deployed to the account with address 0x42.
 //
-import ExampleToken from 0x42
+import ExampleToken, Provider, Receiver from 0x42
 
 // Execute a transaction which sends five coins from one account to another.
 //
@@ -4981,12 +4982,12 @@ import ExampleToken from 0x42
 // available for the recipient account.
 //
 // Only a signature from the sender is required.
-// No signature from the recipient is required, as the receiver
+// No signature from the recipient is required, as the receiver reference
 // is published/publicly available (if it exists for the recipient).
 //
 transaction {
 
-    let sentFunds: <-ExampleToken
+    let providerRef: &Provider
 
     prepare(signer: Account) {
 
@@ -4998,13 +4999,7 @@ transaction {
         // If the signer's account has no provider reference stored in it,
         // or it is not published, abort the transaction.
         //
-        let provider = signer.storage[&Provider] ?? panic("Signer has no provider")
-
-        // Withdraw 5 tokens from the provider by calling the provider's
-        // `withdraw` function, and move the tokens to the field `sentFunds`,
-        // so they can be deposited in the execute phase below.
-        //
-        self.sentFunds <- provider.withdraw(amount: 5)
+        providerRef = signer.storage[&Provider] ?? panic("Signer has no provider")
     }
 
     execute {
@@ -5020,13 +5015,13 @@ transaction {
         // If the recipient's account has no receiver reference stored in it,
         // or it is not published, abort the transaction.
         //
-        let receiver = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
+        let receiverRef = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
 
-        // Deposit the amount withdrawn from the signer's provider/token
-        // into the recipient's receiver/token.
-        // (It was withdrawn in the preparation phase above).
+        // Call the provider's transfer function which withdraws 5 tokens 
+        // from their account and deposits it to the receiver's account 
+        // using the reference to their deposit function.
         //
-        receiver.deposit(token: <-self.sentFunds)
+        self.providerRef.transfer(to: receiverRef, amount: 5)
     }
 }
 ```

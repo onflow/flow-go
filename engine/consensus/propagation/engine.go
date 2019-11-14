@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/consensus"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
@@ -29,7 +29,7 @@ type Engine struct {
 	con     network.Conduit  // used to talk to other nodes on the network
 	com     module.Committee // holds the node identity table for the network
 	pool    module.Mempool   // holds guaranteed collections in memory
-	cache   Cache            // holds volatile information on collection exchange
+	cache   *volatile.Cache  // holds volatile information on collection exchange
 	polling time.Duration    // interval at which we poll for mempool contents
 	wg      *sync.WaitGroup  // used to wait on cleanup upon shutdown
 	once    *sync.Once       // used to only close the done channel once
@@ -99,29 +99,6 @@ func (e *Engine) Done() <-chan struct{} {
 	return done
 }
 
-// Identify uniquely identifies the given event within the context of the
-// propagation engine. In this case, it only recognized guaranteed collections
-// and returns the canonical hash of the related collection.
-func (e *Engine) Identify(event interface{}) ([]byte, error) {
-	switch ev := event.(type) {
-	case *collection.GuaranteedCollection:
-		return ev.Hash, nil
-	default:
-		return nil, errors.Errorf("hash not implement for type (%T)", event)
-	}
-}
-
-// Retrieve retrieves the event with the given unique ID, as provided by the
-// identify function. In this case, it only retrieves guaranteed collections
-// using the canonical hash of the related collection.
-func (e *Engine) Retrieve(eventID []byte) (interface{}, error) {
-	coll, err := e.pool.Get(eventID)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get fingerprint from mempool")
-	}
-	return coll, nil
-}
-
 // Submit allows us to submit entities locally to this engine, in a way that
 // doesn't block on engine boundaries. The error is logged internally to the
 // engine in this case.
@@ -172,7 +149,7 @@ Loop:
 			break Loop
 
 		case <-time.After(e.polling):
-			err := e.propagateSnapshotRequest()
+			err := e.PropagateSnapshotRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not request snapshot")
 				continue
@@ -315,7 +292,6 @@ func (e *Engine) onMempoolResponse(originID string, res *consensus.MempoolRespon
 	// TODO: we can check whether we already processed a memory pool response from
 	// this node by checking it against our volatile state
 
-	added := 0
 	var result *multierror.Error
 	for _, coll := range res.Collections {
 		err := e.processGuaranteedCollection(coll)
@@ -323,7 +299,6 @@ func (e *Engine) onMempoolResponse(originID string, res *consensus.MempoolRespon
 			result = multierror.Append(result, err)
 			continue
 		}
-		added++
 	}
 
 	// TODO: we can keep track of which nodes we already received responses from
@@ -332,7 +307,6 @@ func (e *Engine) onMempoolResponse(originID string, res *consensus.MempoolRespon
 	e.log.Info().
 		Str("target_id", originID).
 		Uint64("nonce", res.Nonce).
-		Int("added_collections", added).
 		Uint("mempool_size", e.pool.Size()).
 		Msg("mempool response processed")
 
@@ -348,13 +322,14 @@ func (e *Engine) onGuaranteedCollection(originID string, coll *collection.Guaran
 		Hex("collection_hash", coll.Hash).
 		Msg("fingerprint message received")
 
+	// process the collection, which determines if it's new
 	err := e.processGuaranteedCollection(coll)
 	if err != nil {
 		return errors.Wrap(err, "could not process collection")
 	}
 
 	// then propagate the guaranteed collections to relevant nodes on the network
-	err = e.propagateGuaranteedCollection(coll)
+	err = e.PropagateGuaranteedCollection(coll)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast collection")
 	}
@@ -362,7 +337,6 @@ func (e *Engine) onGuaranteedCollection(originID string, coll *collection.Guaran
 	e.log.Info().
 		Str("origin_id", originID).
 		Hex("collection_hash", coll.Hash).
-		Uint("mempool_size", e.pool.Size()).
 		Msg("guaranteed collection processed")
 
 	return nil
@@ -376,7 +350,7 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 	// which case we don't need to further process it
 	ok := e.pool.Has(coll.Hash)
 	if ok {
-		return nil
+		return errors.New("collection already processed")
 	}
 
 	// TODO: validate the guaranteed collection signature
@@ -390,14 +364,15 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 	return nil
 }
 
-// propagateGuaranteedCollection will propagate the collection to the relevant
+// PropagateGuaranteedCollection will propagate the collection to the relevant
 // nodes on the network.
-func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+func (e *Engine) PropagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
 
 	// select all the collection nodes on the network as our targets
+	me := e.com.Me().NodeID
 	identities := e.com.Select().
-		Filter(filter.Role("consensus")).
-		Filter(filter.Not(filter.NodeID(e.com.Me().NodeID)))
+		Filter(identity.Role(identity.Consensus)).
+		Filter(identity.Not(identity.NodeID(me)))
 
 	// send the guaranteed collection to all consensus identities
 	targetIDs := identities.NodeIDs()
@@ -416,12 +391,12 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 
 // propagateSnapshotRequest will propagate a memory pool snapshot request to the
 // relevant nodes on the network.
-func (e *Engine) propagateSnapshotRequest() error {
+func (e *Engine) PropagateSnapshotRequest() error {
 
 	// select all the consensus nodes on the network to request snapshot
 	identities := e.com.Select().
-		Filter(filter.Role("consensus")).
-		Filter(filter.Not(filter.NodeID(e.com.Me().NodeID)))
+		Filter(identity.Role(identity.Consensus)).
+		Filter(identity.Not(identity.NodeID(e.com.Me().NodeID)))
 
 	// send the snapshot request to the selected nodes
 	hash := e.pool.Hash()

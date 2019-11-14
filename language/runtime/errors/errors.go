@@ -1,6 +1,10 @@
 package errors
 
-import "strings"
+import (
+	"fmt"
+	"runtime/debug"
+	"strings"
+)
 
 // UnreachableError
 
@@ -8,12 +12,18 @@ import "strings"
 // due to a programming error in the runtime.
 //
 // NOTE: this error is not used for errors because of bugs in a user-provided program.
-// For program errors, see execution/strictus/interpreter/errors.go
+// For program errors, see interpreter/errors.go
 //
-type UnreachableError struct{}
+type UnreachableError struct {
+	Stack []byte
+}
 
-func (UnreachableError) Error() string {
-	return "unreachable"
+func (e UnreachableError) Error() string {
+	return fmt.Sprintf("unreachable\n%s", e.Stack)
+}
+
+func NewUnreachableError() *UnreachableError {
+	return &UnreachableError{Stack: debug.Stack()}
 }
 
 // SecondaryError

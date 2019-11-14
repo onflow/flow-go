@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=ExpressionKind
 
@@ -20,5 +22,5 @@ func (k ExpressionKind) Name() string {
 		return "destroy"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

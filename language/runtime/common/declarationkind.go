@@ -1,6 +1,8 @@
 package common
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=DeclarationKind
 
@@ -74,7 +76,7 @@ func (k DeclarationKind) Name() string {
 		return "result"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (k DeclarationKind) Keywords() string {
@@ -111,5 +113,5 @@ func (k DeclarationKind) Keywords() string {
 		return "result"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

@@ -1,6 +1,8 @@
 package sema
 
-import "github.com/dapperlabs/flow-go/language/runtime/errors"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
+)
 
 //go:generate stringer -type=ResourceInvalidationKind
 
@@ -20,5 +22,5 @@ func (k ResourceInvalidationKind) Name() string {
 		return "destroy"
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

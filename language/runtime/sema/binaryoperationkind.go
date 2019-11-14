@@ -53,5 +53,5 @@ func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
 		return BinaryOperationKindConcatenation
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

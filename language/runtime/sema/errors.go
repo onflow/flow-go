@@ -475,7 +475,8 @@ func (e *MissingInitializerError) StartPosition() ast.Position {
 }
 
 func (e *MissingInitializerError) EndPosition() ast.Position {
-	return e.FirstFieldPos
+	length := len(e.FirstFieldName)
+	return e.FirstFieldPos.Shifted(length - 1)
 }
 
 // NotDeclaredMemberError
@@ -869,6 +870,18 @@ func (e *InvalidIntegerLiteralRangeError) Error() string {
 
 func (*InvalidIntegerLiteralRangeError) isSemanticError() {}
 
+// InvalidAddressLiteralError
+
+type InvalidAddressLiteralError struct {
+	ast.Range
+}
+
+func (e *InvalidAddressLiteralError) Error() string {
+	return "invalid address"
+}
+
+func (*InvalidAddressLiteralError) isSemanticError() {}
+
 // MissingReturnStatementError
 
 type MissingReturnStatementError struct {
@@ -963,7 +976,7 @@ func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
 type IncorrectTransferOperationError struct {
 	ActualOperation   ast.TransferOperation
 	ExpectedOperation ast.TransferOperation
-	Pos               ast.Position
+	ast.Range
 }
 
 func (e *IncorrectTransferOperationError) Error() string {
@@ -974,14 +987,6 @@ func (e *IncorrectTransferOperationError) Error() string {
 }
 
 func (*IncorrectTransferOperationError) isSemanticError() {}
-
-func (e *IncorrectTransferOperationError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *IncorrectTransferOperationError) EndPosition() ast.Position {
-	return e.Pos
-}
 
 // InvalidConstructionError
 
@@ -1065,7 +1070,7 @@ func (e *ResourceUseAfterInvalidationError) Error() string {
 	case wasDestroyed:
 		return "use of destroyed resource"
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 }
 
@@ -1080,7 +1085,7 @@ func (e *ResourceUseAfterInvalidationError) SecondaryError() string {
 	case wasDestroyed:
 		message = "resource used here after being destroyed"
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	if e.InLoop {
@@ -1556,3 +1561,31 @@ func (e *CreateImportedResourceError) Error() string {
 }
 
 func (*CreateImportedResourceError) isSemanticError() {}
+
+// NonResourceTypeError
+
+type NonResourceTypeError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceTypeError) Error() string {
+	return fmt.Sprintf(
+		"expected resource type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceTypeError) isSemanticError() {}
+
+// InvalidAssignmentTargetError
+
+type InvalidAssignmentTargetError struct {
+	ast.Range
+}
+
+func (e *InvalidAssignmentTargetError) Error() string {
+	return "cannot assign to expression"
+}
+
+func (*InvalidAssignmentTargetError) isSemanticError() {}

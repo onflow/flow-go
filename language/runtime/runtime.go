@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"bytes"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -357,7 +356,7 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		case ast.AddressLocation:
 			location = AddressLocation(astLocation)
 		default:
-			panic(&runtimeErrors.UnreachableError{})
+			panic(runtimeErrors.NewUnreachableError())
 		}
 		script, err := runtimeInterface.ResolveImport(location)
 		if err != nil {
@@ -520,14 +519,19 @@ func (r *interpreterRuntime) executeScript(
 		}
 	}
 
+	interpreterRuntimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
 	inter, err := interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
 			r.emitEvent(eventValue, runtimeInterface)
 		}),
-		interpreter.WithStorageReadHandler(r.storageReadHandler(runtimeInterface)),
-		interpreter.WithStorageWriteHandler(r.storageWriteHandler(runtimeInterface)),
+		interpreter.WithStorageReadHandler(interpreterRuntimeStorage.readValue),
+		interpreter.WithStorageWriteHandler(interpreterRuntimeStorage.writeValue),
+		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+			return indexingType.String()
+		}),
 	)
 	if err != nil {
 		return nil, Error{[]error{err}}
@@ -547,6 +551,9 @@ func (r *interpreterRuntime) executeScript(
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
+
+	// Write back all stored values, which were actually just cached, back into storage
+	interpreterRuntimeStorage.writeCached()
 
 	return value.ToGoValue(), nil
 }
@@ -598,66 +605,8 @@ func accountValue(address flow.Address) interpreter.Value {
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(address.String()),
-			"storage": interpreter.StorageValue{Identifier: address},
+			"storage": interpreter.StorageValue{Identifier: address.String()},
 		},
-	}
-}
-
-func (r *interpreterRuntime) storageReadHandler(runtimeInterface Interface) interpreter.StorageReadHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type) interpreter.OptionalValue {
-		address := storageIdentifier.(flow.Address)
-		key := []byte(keyType.String())
-
-		// TODO: fix controller
-		storedData, err := runtimeInterface.GetValue(address.Bytes(), []byte{}, key)
-		if err != nil {
-			panic(err)
-		}
-
-		var storedValue interpreter.Value
-		if len(storedData) == 0 {
-			return interpreter.NilValue{}
-		}
-
-		decoder := gob.NewDecoder(bytes.NewReader(storedData))
-		err = decoder.Decode(&storedValue)
-		if err != nil {
-			panic(err)
-		}
-
-		return interpreter.SomeValue{
-			Value: storedValue,
-		}
-	}
-}
-
-func (r *interpreterRuntime) storageWriteHandler(runtimeInterface Interface) interpreter.StorageWriteHandlerFunc {
-	return func(_ *interpreter.Interpreter, storageIdentifier interface{}, keyType sema.Type, value interpreter.OptionalValue) {
-		address := storageIdentifier.(flow.Address)
-		key := []byte(keyType.String())
-
-		var newData []byte
-		switch typedValue := value.(type) {
-		case interpreter.SomeValue:
-			var newStoredData bytes.Buffer
-			encoder := gob.NewEncoder(&newStoredData)
-			err := encoder.Encode(&typedValue.Value)
-			if err != nil {
-				panic(err)
-			}
-			newData = newStoredData.Bytes()
-			break
-		case interpreter.NilValue:
-			break
-		default:
-			panic(&runtimeErrors.UnreachableError{})
-		}
-
-		// TODO: fix controller
-		err := runtimeInterface.SetValue(address.Bytes(), []byte{}, key, newData)
-		if err != nil {
-			panic(err)
-		}
 	}
 }
 

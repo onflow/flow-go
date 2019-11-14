@@ -1,4 +1,9 @@
-REVISION := $(shell git rev-parse --short HEAD)
+# The short Git commit hash
+SHORT_COMMIT := $(shell git rev-parse --short HEAD)
+# The Git commit hash
+COMMIT := $(shell git rev-parse HEAD)
+# The tag of the current commit, otherwise empty
+VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -14,7 +19,8 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
-	GO111MODULE=on go get golang.org/x/lint/golint@master
+	GO111MODULE=on go get golang.org/x/lint/golint@master; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master
 
 .PHONY: test
 test:
@@ -46,6 +52,8 @@ generate-registries:
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
+	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 
 .PHONY: check-generated-code
 check-generated-code:
@@ -58,17 +66,28 @@ lint-sdk:
 .PHONY: ci
 ci: install-tools generate check-generated-code lint-sdk test
 
+.PHONY: docker-ci
+docker-ci:
+	docker run -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:latest make ci
+
 .PHONY: install-cli
 install-cli: crypto/relic/build
 	GO111MODULE=on install ./cmd/flow
 
-cmd/flow/flow: cli cmd crypto model proto sdk
-	GO111MODULE=on go build -o ./cmd/flow/flow ./cmd/flow
+cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find proto -name '*.go') $(shell find sdk -name '*.go')
+	GO111MODULE=on go build \
+	    -ldflags \
+	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+	    -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
-	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(REVISION)" .
+	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)" .
+
+docker-push-emulator:
+	docker push gcr.io/dl-flow/emulator:latest
+	docker push "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)"
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(REVISION)" .
+	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .

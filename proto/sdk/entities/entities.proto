@@ -75,10 +75,11 @@ message AccountSignature {
 }
 
 enum TransactionStatus {
-  STATUS_PENDING = 0;
-  STATUS_FINALIZED = 1;
-  STATUS_REVERTED = 2;
-  STATUS_SEALED = 3;
+  STATUS_UNKNOWN = 0;
+  STATUS_PENDING = 1;
+  STATUS_FINALIZED = 2;
+  STATUS_REVERTED = 3;
+  STATUS_SEALED = 4;
 }
 
 message Transaction {

@@ -12,8 +12,10 @@ import (
 type TransactionStatus int
 
 const (
+	// TransactionStatusUnknown indicates that the transaction status is not known.
+	TransactionStatusUnknown TransactionStatus = iota
 	// TransactionPending is the status of a pending transaction.
-	TransactionPending TransactionStatus = iota
+	TransactionPending
 	// TransactionFinalized is the status of a finalized transaction.
 	TransactionFinalized
 	// TransactionReverted is the status of a reverted transaction.
@@ -63,7 +65,7 @@ func (tx *Transaction) Hash() crypto.Hash {
 
 // Encode returns the canonical encoding of this transaction.
 func (tx *Transaction) Encode() []byte {
-	w := wrapTransaction(*tx)
+	w := WrapTransaction(*tx)
 	return encoding.DefaultEncoder.MustEncode(&w)
 }
 
@@ -107,7 +109,7 @@ func (tx *Transaction) MissingFields() []string {
 	return missingFields
 }
 
-type transactionWrapper struct {
+type TransactionWrapper struct {
 	Script             []byte
 	ReferenceBlockHash []byte
 	Nonce              uint64
@@ -116,13 +118,13 @@ type transactionWrapper struct {
 	ScriptAccounts     [][]byte
 }
 
-func wrapTransaction(tx Transaction) transactionWrapper {
+func WrapTransaction(tx Transaction) TransactionWrapper {
 	scriptAccounts := make([][]byte, len(tx.ScriptAccounts))
 	for i, scriptAccount := range tx.ScriptAccounts {
 		scriptAccounts[i] = scriptAccount.Bytes()
 	}
 
-	w := transactionWrapper{
+	w := TransactionWrapper{
 		Script:             tx.Script,
 		ReferenceBlockHash: tx.ReferenceBlockHash,
 		Nonce:              tx.Nonce,

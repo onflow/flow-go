@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff/hasher"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff/round"
 	"github.com/dapperlabs/flow-go/model/coldstuff"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
@@ -50,8 +50,8 @@ func New(log zerolog.Logger, net module.Network, com module.Committee, pool modu
 
 	// we will round the IDs of all consensus nodes beyond ourselves
 	targets := com.Select().
-		Filter(filter.Role("consensus")).
-		Filter(filter.Not(filter.NodeID(com.Me().NodeID)))
+		Filter(identity.Role(identity.Consensus)).
+		Filter(identity.Not(identity.NodeID(com.Me().NodeID)))
 	if len(targets) < 3 {
 		return nil, errors.Errorf("need at least 3 other consensus nodes (have: %d)", len(targets))
 	}
@@ -329,8 +329,8 @@ func (e *Engine) waitForVotes() error {
 
 			// discard votes that are not by consensus nodes
 			ids := e.com.Select().
-				Filter(filter.Role("consensus")).
-				Filter(filter.NodeID(voterID))
+				Filter(identity.Role("consensus")).
+				Filter(identity.NodeID(voterID))
 			if len(ids) == 0 {
 				log.Warn().Str("voter_id", voterID).Msg("invalid non-consensus vote")
 				continue

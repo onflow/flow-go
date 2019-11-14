@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -214,5 +215,33 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 				assert.IsType(t, expectedErr, errs[i])
 			}
 		})
+	}
+}
+
+func TestCheckInvalidCompositeEquality(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		// TODO: add support for contracts
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		_, err := ParseAndCheck(t, fmt.Sprintf(`
+          %[1]s X {}
+
+          let x1: %[2]sX %[3]s %[4]s X()
+          let x2: %[2]sX %[3]s %[4]s X()
+
+          let a = x1 == x2
+        `,
+			kind.Keyword(),
+			kind.Annotation(),
+			kind.TransferOperator(),
+			kind.ConstructionKeyword(),
+		))
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
 	}
 }

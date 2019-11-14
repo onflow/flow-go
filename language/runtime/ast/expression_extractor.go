@@ -580,7 +580,7 @@ func (extractor *ExpressionExtractor) VisitFunctionExpression(expression *Functi
 
 func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpression) ExpressionExtraction {
 	// NOTE: not supported
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }
 
 func (extractor *ExpressionExtractor) VisitFailableDowncastExpression(expression *FailableDowncastExpression) Repr {

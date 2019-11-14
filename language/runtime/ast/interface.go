@@ -39,5 +39,5 @@ func (d *InterfaceDeclaration) DeclarationKind() common.DeclarationKind {
 		return common.DeclarationKindContractInterface
 	}
 
-	panic(&errors.UnreachableError{})
+	panic(errors.NewUnreachableError())
 }

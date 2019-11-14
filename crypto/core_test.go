@@ -9,6 +9,7 @@ import (
 )
 
 func TestPRGSeeding(t *testing.T) {
+	// 2 keys generated with the same seed should be equal
 	seed := []byte{1, 2, 3, 4}
 	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	assert.Nil(t, err)

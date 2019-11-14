@@ -35,7 +35,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 			},
 		)
 	default:
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	return nil
@@ -46,7 +46,7 @@ func (checker *Checker) VisitConditionalExpression(expression *ast.ConditionalEx
 	thenType, elseType := checker.visitConditional(expression.Test, expression.Then, expression.Else)
 
 	if thenType == nil || elseType == nil {
-		panic(&errors.UnreachableError{})
+		panic(errors.NewUnreachableError())
 	}
 
 	// TODO: improve
@@ -78,7 +78,9 @@ func (checker *Checker) visitConditional(
 ) {
 	testType := test.Accept(checker).(Type)
 
-	if !IsSubType(testType, &BoolType{}) {
+	if !testType.IsInvalidType() &&
+		!IsSubType(testType, &BoolType{}) {
+
 		checker.report(
 			&TypeMismatchError{
 				ExpectedType: &BoolType{},

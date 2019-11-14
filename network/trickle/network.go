@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/trickle"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -108,7 +108,7 @@ func (n *Network) Address() (string, error) {
 	nodeIDs := n.state.Peers().IDs()
 	nodeIDs = append(nodeIDs, n.com.Me().NodeID)
 	nodes := n.com.Select().
-		Filter(filter.Not(filter.NodeID(nodeIDs...)))
+		Filter(identity.Not(identity.NodeID(nodeIDs...)))
 
 	// if we don't have nodes available, we can't do anything
 	if len(nodes) == 0 {
