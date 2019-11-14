@@ -135,12 +135,12 @@ func TestGetEvents(t *testing.T) {
 func TestBackend(t *testing.T) {
 
 	//wrapper which manages mock lifecycle
-	withMocks := func(sut func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore)) func(t *testing.T) {
+	withMocks := func(sut func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore)) func(t *testing.T) {
 		return func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			api := mocks.NewMockEmulatedBlockchainApi(mockCtrl)
+			api := mocks.NewMockEmulatedBlockchainAPI(mockCtrl)
 			events := event_mocks.NewMockStore(mockCtrl)
 
 			backend := server.NewBackend(
@@ -153,7 +153,7 @@ func TestBackend(t *testing.T) {
 		}
 	}
 
-	t.Run("ExecuteScript", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("ExecuteScript", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 		sampleScriptText := []byte("hey I'm so totally uninterpretable script text with unicode ć, ń, ó, ś, ź")
 		executionScriptRequest := observation.ExecuteScriptRequest{
 			Script: sampleScriptText,
@@ -172,7 +172,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, []uint8("2137"), response.Value)
 	}))
 
-	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		account := unittest.AccountFixture()
 
@@ -192,7 +192,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, account.Balance, response.Account.Balance)
 	}))
 
-	t.Run("GetEvents fails with wrong block numbers", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetEvents fails with wrong block numbers", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
@@ -210,7 +210,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, grpcError.Code(), codes.InvalidArgument)
 	}))
 
-	t.Run("GetEvents", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetEvents", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		eventType := "SomeEvents"
 
@@ -247,7 +247,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, uint(1), decodedEvents[1].Index)
 	}))
 
-	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		blockTimestamp := time.Time{}
 		block := types.Block{
@@ -270,7 +270,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, block.Number, response.Block.Number)
 	}))
 
-	t.Run("GetTransaction tx does not exists", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetTransaction tx does not exists", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		bytes := []byte{2, 2, 2, 2}
 
@@ -293,7 +293,7 @@ func TestBackend(t *testing.T) {
 		assert.Nil(t, response)
 	}))
 
-	t.Run("GetTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("GetTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		txEventType := "TxEvent"
 
@@ -336,7 +336,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, txEventType, decodedEvents[0].Type)
 	}))
 
-	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		response, err := backend.Ping(context.Background(), &observation.PingRequest{})
 
@@ -344,7 +344,7 @@ func TestBackend(t *testing.T) {
 		assert.NotNil(t, response)
 	}))
 
-	t.Run("SendTransaction with nil tx", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("SendTransaction with nil tx", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		response, err := backend.SendTransaction(context.Background(), &observation.SendTransactionRequest{
 			Transaction: nil,
@@ -360,7 +360,7 @@ func TestBackend(t *testing.T) {
 
 	}))
 
-	t.Run("SendTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("SendTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		var capturedTx flow.Transaction
 
@@ -403,7 +403,7 @@ func TestBackend(t *testing.T) {
 		assert.True(t, capturedTx.Hash().Equal(response.Hash))
 	}))
 
-	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainApi, events *event_mocks.MockStore) {
+	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).
