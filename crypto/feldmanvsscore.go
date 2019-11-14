@@ -6,9 +6,6 @@ package crypto
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
 // #include "dkg_include.h"
 import "C"
-import (
-	log "github.com/sirupsen/logrus"
-)
 
 func (s *feldmanVSSstate) generateShares(seed []byte) {
 	seedRelic(seed)
@@ -35,14 +32,14 @@ func (s *feldmanVSSstate) generateShares(seed []byte) {
 		}
 		// the-other-node shares
 		data := make([]byte, shareSize+1)
-		data[0] = byte(FeldmanVSSshare)
+		data[0] = byte(feldmanVSSshare)
 		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		s.processor.Send(int(i-1), data)
 	}
 	// broadcast the vector
 	vectorSize := verifVectorSize * (s.threshold + 1)
 	data := make([]byte, vectorSize+1)
-	data[0] = byte(FeldmanVSSVerifVec)
+	data[0] = byte(feldmanVSSVerifVec)
 	writeVerifVector(data[1:], s.A)
 	s.processor.Broadcast(data)
 
@@ -66,10 +63,6 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 		s.processor.FlagMisbehavior(int(origin), wrongFormat)
 		return
 	}
-
-	// temporary log
-	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
-	log.Debugf("the share is %d\n", data)
 
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
@@ -96,10 +89,6 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 		s.processor.FlagMisbehavior(int(origin), wrongFormat)
 		return
 	}
-
-	// temporary log
-	log.Debugf("%d Receiving vector from %d\n", s.currentIndex, origin)
-	log.Debugf("the vector is %d\n", data)
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
 	readVerifVector(s.A, data)
@@ -123,9 +112,6 @@ func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
-	/*if x == 2 {
-		dest[2] = 255
-	}*/
 }
 
 // writeVerifVector exports a vector A into an array of bytes

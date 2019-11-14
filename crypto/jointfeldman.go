@@ -2,8 +2,6 @@
 
 package crypto
 
-import log "github.com/sirupsen/logrus"
-
 // Implements Joint Feldman protocol using BLS set up on BLS381 curve.
 // the protocol runs (n) parallel instances of Feldman vss with the complaints system
 // Private keys are Zr elements while public keys are G2 elements
@@ -108,7 +106,6 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	s.jointRunning = false
 
 	// check failing dkg
-	log.Infof("node %d has disqualified %d other nodes", s.currentIndex, disqualifiedTotal)
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
 			cryptoError{"DKG has failed because the diqualified nodes number is high"}

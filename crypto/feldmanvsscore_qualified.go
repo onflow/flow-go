@@ -7,10 +7,6 @@ package crypto
 // #include "dkg_include.h"
 import "C"
 
-import (
-	log "github.com/sirupsen/logrus"
-)
-
 func (s *feldmanVSSQualState) setSharesTimeout() {
 	s.sharesTimeout = true
 	// if verif vector is not received, disqualify the leader
@@ -25,8 +21,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 			received:       true,
 			answerReceived: false,
 		}
-		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
-		log.Info("complaint (timeout)")
+		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
 		s.processor.Broadcast(data)
 	}
 }
@@ -62,9 +57,6 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		s.processor.FlagMisbehavior(int(origin), wrongFormat)
 		return
 	}
-	// temporary log
-	log.Debugf("%d Receiving a share from %d\n", s.currentIndex, origin)
-	log.Debugf("the share is %d\n", data)
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
@@ -82,8 +74,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			received:       true,
 			answerReceived: false,
 		}
-		log.Info("complaint (share)")
-		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
+		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
 		s.processor.Broadcast(data)
 	}
 }
@@ -108,11 +99,6 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		s.processor.FlagMisbehavior(int(origin), wrongFormat)
 		return
 	}
-
-	// temporary log
-	log.Infof("%d Receiving vector from %d\n", s.currentIndex, origin)
-	log.Debugf("the vector is %d\n", data)
-
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
 	readVerifVector(s.A, data)
@@ -143,8 +129,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 			received:       true,
 			answerReceived: false,
 		}
-		log.Info("complaint (vector)")
-		data := []byte{byte(FeldmanVSSComplaint), byte(s.leaderIndex)}
+		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
 		s.processor.Broadcast(data)
 	}
 }
@@ -198,11 +183,10 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		// if the complainee is the current node, prepare an answer
 		if s.currentIndex == s.leaderIndex {
 			data := make([]byte, complainAnswerSize+1)
-			data[0] = byte(FeldmanVSSComplaintAnswer)
+			data[0] = byte(feldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
 			ZrPolynomialImage(data[2:], s.a, origin+1, nil)
 			s.complaints[origin].answerReceived = true
-			log.Info("answer complaint")
 			s.processor.Broadcast(data)
 		}
 		return

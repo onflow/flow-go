@@ -44,7 +44,7 @@ type ThresholdSigner struct {
 // size is the number of participants
 func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", ThresholdMinSize, ThresholdMaxSize)}
+		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
