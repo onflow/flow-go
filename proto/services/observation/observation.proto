@@ -70,8 +70,7 @@ message GetEventsRequest {
 }
 
 message GetEventsResponse {
-    // Contains JSON-encoded array of event objects
-    bytes events_json = 1;
+    repeated flow.sdk.entities.Event events = 1;
 }
 
 
