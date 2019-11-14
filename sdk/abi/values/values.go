@@ -88,3 +88,16 @@ type Dictionary map[Value]Value
 
 func (Dictionary) isValue()                 {}
 func (v Dictionary) ToGoValue() interface{} { panic("not implemented") }
+
+type Event struct {
+	Identifier string
+	Fields     []EventField
+}
+
+func (Event) isValue()                 {}
+func (v Event) ToGoValue() interface{} { panic("not implemented") }
+
+type EventField struct {
+	Identifier string
+	Value      Value
+}

@@ -88,3 +88,14 @@ type Function struct {
 }
 
 func (Function) isType() {}
+
+type Event struct {
+	FieldTypes []EventField
+}
+
+func (Event) isType() {}
+
+type EventField struct {
+	Identifier string
+	Type       Type
+}

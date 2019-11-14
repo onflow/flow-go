@@ -2109,9 +2109,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				ID:       eventType.Identifier,
-				Fields:   fields,
-				Location: interpreter.Checker.Location,
+				Identifier: eventType.Identifier,
+				Fields:     fields,
+				Location:   interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}

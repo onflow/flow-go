@@ -1512,6 +1512,21 @@ type EventType struct {
 
 func (*EventType) isType() {}
 
+func (t *EventType) Export() types.Type {
+	fieldTypes := make([]types.EventField, len(t.Fields))
+
+	for i, field := range t.Fields {
+		fieldTypes[i] = types.EventField{
+			Identifier: field.Identifier,
+			Type:       field.Type.(ExportableType).Export(),
+		}
+	}
+
+	return types.Event{
+		FieldTypes: fieldTypes,
+	}
+}
+
 func (t *EventType) String() string {
 	var fields strings.Builder
 	for i, field := range t.Fields {
