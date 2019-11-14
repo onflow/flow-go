@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/language/runtime/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Value interface {

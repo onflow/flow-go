@@ -7,7 +7,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	"github.com/dapperlabs/flow-go/language/runtime/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Encoder struct {
