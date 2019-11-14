@@ -7,9 +7,9 @@ import (
 	"github.com/magiconair/properties/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/language/runtime/types"
-	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 func TestEncode(t *testing.T) {
