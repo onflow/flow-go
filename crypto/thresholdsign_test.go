@@ -168,7 +168,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 			assert.Nil(t, err)
 
 		// if timeout, finalize DKG and sign the share
-		case <-time.After(time.Second):
+		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended \n", proc.current)

@@ -164,6 +164,9 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	// start DKG in all nodes
 	seed := []byte{1, 2, 3}
 	for current := 0; current < n; current++ {
+		// start dkg could also run in parallel
+		// but they are run sequentially to avoid having non-deterministic
+		// output (the PRG used is common)
 		err := processors[current].dkg.StartDKG(seed)
 		assert.Nil(t, err)
 	}
@@ -198,7 +201,6 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 			} else {
 				tempPKBytes, _ = tempPK.Encode()
 			}
-			//log.Info("PK", tempPKBytes)
 			assert.Equal(t, groupPKBytes, tempPKBytes, "2 group public keys are mismatching")
 		}
 		<-sync
@@ -297,7 +299,7 @@ func dkgRunChan(proc *testDKGProcessor,
 			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
 			assert.Nil(t, err)
 		// if timeout, stop and finalize
-		case <-time.After(time.Second):
+		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended \n", proc.current)
