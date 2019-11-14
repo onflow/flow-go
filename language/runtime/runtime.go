@@ -372,7 +372,8 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 
 	for _, field := range eventValue.Fields {
 		value := field.Value.(interpreter.ExportableValue)
-		values[field.Identifier] = value.ToGoValue()
+		// TODO: return values.Value, not Go primitive type
+		values[field.Identifier] = value.Export().ToGoValue()
 	}
 
 	var eventTypeID string
@@ -555,7 +556,7 @@ func (r *interpreterRuntime) executeScript(
 	// Write back all stored values, which were actually just cached, back into storage
 	interpreterRuntimeStorage.writeCached()
 
-	return value.ToGoValue(), nil
+	return value.Export(), nil
 }
 
 func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {

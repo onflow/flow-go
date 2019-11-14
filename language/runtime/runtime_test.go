@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -104,7 +104,7 @@ func TestRuntimeImport(t *testing.T) {
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), value)
+	assert.Equal(t, values.Int(42), value)
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
@@ -158,7 +158,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), value)
+	assert.Equal(t, values.Int(42), value)
 	assert.Equal(t, `"2a00000000000000000000000000000000000000"`, loggedMessage)
 }
 
@@ -317,7 +317,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 
 	answer, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), answer)
+	assert.Equal(t, values.Int(42), answer)
 }
 
 func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
@@ -359,7 +359,7 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	assert.Nil(t, err)
 
 	result, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
-	assert.Equal(t, big.NewInt(42), result)
+	assert.Equal(t, values.Int(42), result)
 	assert.Nil(t, err)
 }
 
