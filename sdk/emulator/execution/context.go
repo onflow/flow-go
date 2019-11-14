@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -25,7 +26,7 @@ type RuntimeContext struct {
 	signingAccounts []flow.Address
 	logger          LoggerFunc
 	checker         CheckerFunc
-	events          []flow.Event
+	events          []values.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
@@ -34,7 +35,7 @@ func NewRuntimeContext(registers *flow.RegistersView) *RuntimeContext {
 		registers: registers,
 		logger:    func(string) {},
 		checker:   func([]byte, runtime.Location) error { return nil },
-		events:    make([]flow.Event, 0),
+		events:    make([]values.Event, 0),
 	}
 }
 
@@ -65,7 +66,7 @@ func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
 }
 
 // Events returns all events emitted by the runtime to this context.
-func (r *RuntimeContext) Events() []flow.Event {
+func (r *RuntimeContext) Events() []values.Event {
 	return r.events
 }
 
@@ -330,7 +331,7 @@ func (r *RuntimeContext) Log(message string) {
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
-func (r *RuntimeContext) EmitEvent(event flow.Event) {
+func (r *RuntimeContext) EmitEvent(event values.Event) {
 	r.events = append(r.events, event)
 }
 

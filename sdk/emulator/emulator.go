@@ -7,6 +7,8 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	abitypes "github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -463,6 +465,16 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {
+
+			t := abitypes.Event{
+				FieldTypes: abitypes.EventField{
+					Identifier: "address",
+					Type:       abitypes.Address,
+				}
+			}
+
+			eventValue, err := encode.Decode(nil, event.Payload)
+
 			accountAddress := event.Values["address"].(flow.Address)
 
 			account, err := b.GetAccount(accountAddress)

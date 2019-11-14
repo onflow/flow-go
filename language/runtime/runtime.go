@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 func init() {
@@ -41,7 +42,7 @@ type Interface interface {
 	// Log logs a string.
 	Log(string)
 	// EmitEvent is called when an event is emitted by the runtime.
-	EmitEvent(flow.Event)
+	EmitEvent(values.Event)
 }
 
 type Error struct {
@@ -368,31 +369,23 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
 func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtimeInterface Interface) {
-	values := make(map[string]interface{})
+	event := eventValue.Export().(values.Event)
 
-	for _, field := range eventValue.Fields {
-		value := field.Value.(interpreter.ExportableValue)
-		// TODO: return values.Value, not Go primitive type
-		values[field.Identifier] = value.Export().ToGoValue()
-	}
+	var identifier string
 
-	var eventTypeID string
-
+	// TODO: can this be generalized for all types
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
-		eventTypeID = fmt.Sprintf("account.%s.%s", location, eventValue.ID)
+		identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
 	case TransactionLocation:
-		eventTypeID = fmt.Sprintf("tx.%s.%s", location, eventValue.ID)
+		identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
 	case ScriptLocation:
-		eventTypeID = fmt.Sprintf("script.%s.%s", location, eventValue.ID)
+		identifier = fmt.Sprintf("script.%s.%s", location, eventValue.Identifier)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
 
-	event := flow.Event{
-		Type:   eventTypeID,
-		Values: values,
-	}
+	event.Identifier = identifier
 
 	runtimeInterface.EmitEvent(event)
 }
@@ -400,20 +393,23 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	values ...interface{},
+	fieldValues ...interface{},
 ) {
-	eventTypeID := fmt.Sprintf("flow.%s", eventType.Identifier)
+	fields := make([]values.EventField, len(fieldValues))
 
-	valueMap := make(map[string]interface{})
-
-	for i, value := range values {
+	for i, value := range fieldValues {
 		field := eventType.Fields[i]
-		valueMap[field.Identifier] = value
+		fields[i] = values.EventField{
+			Identifier: field.Identifier,
+			Value:      value.(interpreter.ExportableValue).Export(),
+		}
 	}
 
-	event := flow.Event{
-		Type:   eventTypeID,
-		Values: valueMap,
+	identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
+
+	event := values.Event{
+		Identifier: identifier,
+		Fields:     fields,
 	}
 
 	runtimeInterface.EmitEvent(event)

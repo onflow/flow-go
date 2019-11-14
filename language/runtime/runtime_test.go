@@ -22,7 +22,7 @@ type testRuntimeInterface struct {
 	updateAccountCode  func(address flow.Address, code []byte) (err error)
 	getSigningAccounts func() []flow.Address
 	log                func(string)
-	emitEvent          func(flow.Event)
+	emitEvent          func(values.Event)
 }
 
 func (i *testRuntimeInterface) ResolveImport(location Location) ([]byte, error) {
@@ -64,7 +64,7 @@ func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
 }
 
-func (i *testRuntimeInterface) EmitEvent(event flow.Event) {
+func (i *testRuntimeInterface) EmitEvent(event values.Event) {
 	i.emitEvent(event)
 }
 
