@@ -99,3 +99,7 @@ type EventField struct {
 	Identifier string
 	Type       Type
 }
+
+type Address struct{}
+
+func (Address) isType() {}

@@ -101,3 +101,13 @@ type EventField struct {
 	Identifier string
 	Value      Value
 }
+
+type Address [20]byte
+
+func (Address) isValue()                 {}
+func (v Address) ToGoValue() interface{} { return [20]byte(v) }
+
+type Bytes []byte
+
+func (Bytes) isValue()                 {}
+func (v Bytes) ToGoValue() interface{} { return []byte(v) }
