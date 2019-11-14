@@ -106,15 +106,19 @@ func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, t
 }
 
 func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
-	if ctx.Pub() != nil {
+	switch {
+	case ctx.Priv() != nil:
+		return ast.AccessPrivate
+
+	case ctx.Pub() != nil:
 		return ast.AccessPublic
-	}
 
-	if ctx.PubSet() != nil {
+	case ctx.PubSet() != nil:
 		return ast.AccessPublicSettable
-	}
 
-	return ast.AccessNotSpecified
+	default:
+		return ast.AccessNotSpecified
+	}
 }
 
 func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
@@ -368,19 +372,19 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 }
 
 func (v *ProgramVisitor) VisitCompositeKind(ctx *CompositeKindContext) interface{} {
-	if ctx.Struct() != nil {
+	switch {
+	case ctx.Struct() != nil:
 		return common.CompositeKindStructure
-	}
 
-	if ctx.Resource() != nil {
+	case ctx.Resource() != nil:
 		return common.CompositeKindResource
-	}
 
-	if ctx.Contract() != nil {
+	case ctx.Contract() != nil:
 		return common.CompositeKindContract
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
@@ -756,6 +760,8 @@ func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) i
 }
 
 func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
+
 	variableKind := ctx.VariableKind().Accept(v).(ast.VariableKind)
 	isConstant := variableKind == ast.VariableKindConstant
 
@@ -792,6 +798,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.VariableDeclaration{
+		Access:         access,
 		IsConstant:     isConstant,
 		Identifier:     identifier,
 		Value:          leftExpression,
@@ -804,15 +811,16 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 }
 
 func (v *ProgramVisitor) VisitVariableKind(ctx *VariableKindContext) interface{} {
-	if ctx.Let() != nil {
+	switch {
+	case ctx.Let() != nil:
 		return ast.VariableKindConstant
-	}
 
-	if ctx.Var() != nil {
+	case ctx.Var() != nil:
 		return ast.VariableKindVariable
-	}
 
-	return ast.VariableKindNotSpecified
+	default:
+		return ast.VariableKindNotSpecified
+	}
 }
 
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
@@ -1174,20 +1182,19 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 }
 
 func (v *ProgramVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
-
-	if ctx.Negate() != nil {
+	switch {
+	case ctx.Negate() != nil:
 		return ast.OperationNegate
-	}
 
-	if ctx.Minus() != nil {
+	case ctx.Minus() != nil:
 		return ast.OperationMinus
-	}
 
-	if ctx.Move() != nil {
+	case ctx.Move() != nil:
 		return ast.OperationMove
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
@@ -1700,61 +1707,62 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitEqualityOp(ctx *EqualityOpContext) interface{} {
-	if ctx.Equal() != nil {
+	switch {
+	case ctx.Equal() != nil:
 		return ast.OperationEqual
-	}
 
-	if ctx.Unequal() != nil {
+	case ctx.Unequal() != nil:
 		return ast.OperationUnequal
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (v *ProgramVisitor) VisitRelationalOp(ctx *RelationalOpContext) interface{} {
-	if ctx.Less() != nil {
+	switch {
+	case ctx.Less() != nil:
 		return ast.OperationLess
-	}
 
-	if ctx.Greater() != nil {
+	case ctx.Greater() != nil:
 		return ast.OperationGreater
-	}
 
-	if ctx.LessEqual() != nil {
+	case ctx.LessEqual() != nil:
 		return ast.OperationLessEqual
-	}
 
-	if ctx.GreaterEqual() != nil {
+	case ctx.GreaterEqual() != nil:
 		return ast.OperationGreaterEqual
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (v *ProgramVisitor) VisitAdditiveOp(ctx *AdditiveOpContext) interface{} {
-	if ctx.Plus() != nil {
+	switch {
+	case ctx.Plus() != nil:
 		return ast.OperationPlus
-	}
 
-	if ctx.Minus() != nil {
+	case ctx.Minus() != nil:
 		return ast.OperationMinus
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (v *ProgramVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext) interface{} {
-	if ctx.Mul() != nil {
+	switch {
+	case ctx.Mul() != nil:
 		return ast.OperationMul
-	}
 
-	if ctx.Div() != nil {
+	case ctx.Div() != nil:
 		return ast.OperationDiv
-	}
 
-	if ctx.Mod() != nil {
+	case ctx.Mod() != nil:
 		return ast.OperationMod
-	}
 
-	panic(errors.NewUnreachableError())
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
