@@ -17,6 +17,15 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#replInput.
 	VisitReplInput(ctx *ReplInputContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#replElement.
+	VisitReplElement(ctx *ReplElementContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#replStatement.
+	VisitReplStatement(ctx *ReplStatementContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#replDeclaration.
+	VisitReplDeclaration(ctx *ReplDeclarationContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 

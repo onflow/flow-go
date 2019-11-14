@@ -1242,6 +1242,24 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	return nil
 }
 
+func (v CompositeValue) String() string {
+	var builder strings.Builder
+	builder.WriteString(v.Identifier)
+	builder.WriteString("(")
+	i := 0
+	for name, value := range *v.Fields {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(name)
+		builder.WriteString(": ")
+		builder.WriteString(fmt.Sprint(value))
+		i += 1
+	}
+	builder.WriteString(")")
+	return builder.String()
+}
+
 func (v CompositeValue) GetField(name string) Value {
 	return (*v.Fields)[name]
 }

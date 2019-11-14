@@ -40,6 +40,22 @@ func (v *ProgramVisitor) VisitProgram(ctx *ProgramContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitReplInput(ctx *ReplInputContext) interface{} {
+	var elements []interface{}
+	for _, elementCtx := range ctx.AllReplElement() {
+		elements = append(elements, elementCtx.Accept(v))
+	}
+	return elements
+}
+
+func (v *ProgramVisitor) VisitReplElement(ctx *ReplElementContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReplDeclaration(ctx *ReplDeclarationContext) interface{} {
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReplStatement(ctx *ReplStatementContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
