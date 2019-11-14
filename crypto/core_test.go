@@ -4,7 +4,21 @@ package crypto
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestPRGSeeding(t *testing.T) {
+	// 2 keys generated with the same seed should be equal
+	seed := []byte{1, 2, 3, 4}
+	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	assert.Nil(t, err)
+	pk1Bytes, _ := sk1.PublicKey().Encode()
+	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	assert.Nil(t, err)
+	pk2Bytes, _ := sk2.PublicKey().Encode()
+	assert.Equal(t, pk1Bytes, pk2Bytes)
+}
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
