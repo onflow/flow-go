@@ -123,7 +123,7 @@ func TestTransactions(t *testing.T) {
 	})
 }
 
-func TestRegisters(t *testing.T) {
+func TestLedger(t *testing.T) {
 	store, dir := setupStore(t)
 	defer func() {
 		require.Nil(t, store.Close())
@@ -131,23 +131,23 @@ func TestRegisters(t *testing.T) {
 	}()
 
 	var blockNumber uint64 = 1
-	registers := unittest.RegistersFixture()
+	ledger := unittest.LedgerFixture()
 
 	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.GetRegistersView(blockNumber)
+		_, err := store.GetLedgerView(blockNumber)
 		if assert.Error(t, err) {
 			assert.IsType(t, storage.ErrNotFound{}, err)
 		}
 	})
 
-	t.Run("should be able set registers", func(t *testing.T) {
-		err := store.SetRegisters(blockNumber, registers)
+	t.Run("should be able set ledger", func(t *testing.T) {
+		err := store.SetLedger(blockNumber, ledger)
 		assert.NoError(t, err)
 
-		t.Run("Should be to get set registers", func(t *testing.T) {
-			view, err := store.GetRegistersView(blockNumber)
+		t.Run("Should be to get set ledger", func(t *testing.T) {
+			view, err := store.GetLedgerView(blockNumber)
 			assert.NoError(t, err)
-			assert.Equal(t, registers.NewView(), &view)
+			assert.Equal(t, ledger.NewView(), &view)
 		})
 	})
 }
@@ -262,7 +262,7 @@ func TestPersistence(t *testing.T) {
 	block := types.Block{Number: 1}
 	tx := unittest.TransactionFixture()
 	events := []flow.Event{unittest.EventFixture()}
-	registers := unittest.RegistersFixture()
+	ledger := unittest.LedgerFixture()
 
 	// insert some stuff to to the store
 	err := store.InsertBlock(block)
@@ -271,7 +271,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	err = store.InsertEvents(block.Number, events...)
 	assert.NoError(t, err)
-	err = store.SetRegisters(block.Number, registers)
+	err = store.SetLedger(block.Number, ledger)
 
 	// close the store
 	err = store.Close()
@@ -294,9 +294,9 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, events, gotEvents)
 
-	gotRegisters, err := store.GetRegistersView(block.Number)
+	gotLedger, err := store.GetLedgerView(block.Number)
 	assert.NoError(t, err)
-	assert.Equal(t, registers.NewView(), &gotRegisters)
+	assert.Equal(t, ledger.NewView(), &gotLedger)
 }
 
 // setupStore creates a temporary directory for the Badger and creates a

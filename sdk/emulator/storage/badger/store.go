@@ -136,31 +136,31 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	})
 }
 
-func (s Store) GetRegistersView(blockNumber uint64) (view flow.RegistersView, err error) {
+func (s Store) GetLedgerView(blockNumber uint64) (view flow.LedgerView, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
-		encRegisters, err := getTx(txn)(registersKey(blockNumber))
+		encLedger, err := getTx(txn)(ledgerKey(blockNumber))
 		if err != nil {
 			return err
 		}
 
-		var registers flow.Registers
-		if err := decodeRegisters(&registers, encRegisters); err != nil {
+		var ledger flow.Ledger
+		if err := decodeLedger(&ledger, encLedger); err != nil {
 			return err
 		}
-		view = *registers.NewView()
+		view = *ledger.NewView()
 		return nil
 	})
 	return
 }
 
-func (s Store) SetRegisters(blockNumber uint64, registers flow.Registers) error {
-	encRegisters, err := encodeRegisters(registers)
+func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
+	encLedger, err := encodeLedger(ledger)
 	if err != nil {
 		return err
 	}
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(registersKey(blockNumber), encRegisters)
+		return txn.Set(ledgerKey(blockNumber), encLedger)
 	})
 }
 

@@ -20,8 +20,8 @@ type Store struct {
 	blocks []types.Block
 	// Finalized transactions by hash
 	transactions map[string]flow.Transaction
-	// Register states by block number
-	registers map[uint64]flow.Registers
+	// Ledger states by block number
+	ledger map[uint64]flow.Ledger
 	// Stores events by block number
 	eventsByBlockNumber map[uint64][]flow.Event
 }
@@ -39,7 +39,7 @@ func New() Store {
 		blockHashToNumber:   make(map[string]uint64),
 		blocks:              []types.Block{types.GenesisBlock()},
 		transactions:        make(map[string]flow.Transaction),
-		registers:           make(map[uint64]flow.Registers),
+		ledger:              make(map[uint64]flow.Ledger),
 		eventsByBlockNumber: make(map[uint64][]flow.Event),
 	}
 }
@@ -103,21 +103,21 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-func (s Store) GetRegistersView(blockNumber uint64) (flow.RegistersView, error) {
+func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if blockNumber > s.blockHeight() {
-		return flow.RegistersView{}, storage.ErrNotFound{}
+		return flow.LedgerView{}, storage.ErrNotFound{}
 	}
-	return *s.registers[blockNumber].NewView(), nil
+	return *s.ledger[blockNumber].NewView(), nil
 }
 
-func (s Store) SetRegisters(blockNumber uint64, registers flow.Registers) error {
+func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.registers[blockNumber] = registers
+	s.ledger[blockNumber] = ledger
 	return nil
 }
 

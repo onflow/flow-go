@@ -38,7 +38,7 @@ type EmulatedBlockchain struct {
 	mu sync.RWMutex
 	// The current working register state, up-to-date with all transactions
 	// in the txPool.
-	pendingState flow.Registers
+	pendingState flow.Ledger
 	// Pool of transactions that have been executed, but not finalized
 	txPool map[string]*flow.Transaction
 
@@ -91,7 +91,7 @@ func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	storage := memstore.New()
-	initialState := make(flow.Registers)
+	initialState := make(flow.Ledger)
 	txPool := make(map[string]*flow.Transaction)
 
 	// apply options to the default config
@@ -201,8 +201,8 @@ func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, er
 // Returns the account for the given address, or nil if the account does not
 // exist.
 func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
-	registers := b.pendingState
-	runtimeContext := execution.NewRuntimeContext(registers.NewView())
+	ledger := b.pendingState
+	runtimeContext := execution.NewRuntimeContext(ledger.NewView())
 	return runtimeContext.GetAccount(address)
 }
 
@@ -246,16 +246,16 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	tx.Status = flow.TransactionPending
 	b.txPool[string(tx.Hash())] = &tx
 
-	registers := b.pendingState.NewView()
+	ledger := b.pendingState.NewView()
 
-	events, err := b.computer.ExecuteTransaction(registers, tx)
+	events, err := b.computer.ExecuteTransaction(ledger, tx)
 	if err != nil {
 		tx.Status = flow.TransactionReverted
 		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
 	}
 
-	// Update pending state with registers changed during transaction execution
-	b.pendingState.MergeWith(registers.UpdatedRegisters())
+	// Update pending state with ledger changed during transaction execution
+	b.pendingState.MergeWith(ledger.Updated())
 
 	// Update the transaction's status and events
 	// NOTE: this updates txPool state because txPool stores pointers
@@ -281,8 +281,8 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	registers := b.pendingState.NewView()
-	value, events, err := b.computer.ExecuteScript(registers, script)
+	ledger := b.pendingState.NewView()
+	value, events, err := b.computer.ExecuteScript(ledger, script)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 		return nil, &ErrStorage{err}
 	}
 
-	if err := b.storage.SetRegisters(block.Number, b.pendingState); err != nil {
+	if err := b.storage.SetLedger(block.Number, b.pendingState); err != nil {
 		return nil, &ErrStorage{err}
 	}
 
@@ -483,14 +483,14 @@ func (b *EmulatedBlockchain) emitScriptEvents(events []flow.Event) {
 
 // createAccount creates an account with the given private key and injects it
 // into the given state, bypassing the need for a transaction.
-func createAccount(registers flow.Registers, privateKey flow.AccountPrivateKey) flow.Account {
+func createAccount(ledger flow.Ledger, privateKey flow.AccountPrivateKey) flow.Account {
 	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 	publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
 		panic(err)
 	}
 
-	view := registers.NewView()
+	view := ledger.NewView()
 	runtimeContext := execution.NewRuntimeContext(view)
 	accountAddress, err := runtimeContext.CreateAccount(
 		[][]byte{publicKeyBytes},
@@ -500,7 +500,7 @@ func createAccount(registers flow.Registers, privateKey flow.AccountPrivateKey) 
 		panic(err)
 	}
 
-	registers.MergeWith(view.UpdatedRegisters())
+	ledger.MergeWith(view.Updated())
 
 	account := runtimeContext.GetAccount(accountAddress)
 	return *account

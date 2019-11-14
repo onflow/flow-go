@@ -44,16 +44,16 @@ func decodeUint64(v *uint64, from []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(v)
 }
 
-func encodeRegisters(registers flow.Registers) ([]byte, error) {
+func encodeLedger(ledger flow.Ledger) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(&registers); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(&ledger); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func decodeRegisters(registers *flow.Registers, from []byte) error {
-	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(registers)
+func decodeLedger(ledger *flow.Ledger, from []byte) error {
+	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(ledger)
 }
 
 func encodeEvents(events []flow.Event) ([]byte, error) {
