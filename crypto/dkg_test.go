@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -139,8 +140,7 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	// number of nodes to test
 	n := len(processors)
 	lead := 0
-	pkChan := make(chan PublicKey)
-	sync := make(chan int)
+	var sync sync.WaitGroup
 
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
@@ -155,55 +155,34 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 		phase = 2
 	}
 
-	// start listening on the channels
-	for i := 0; i < n; i++ {
-		go dkgRunChan(&processors[i], pkChan, sync, t, phase)
-	}
-	phase++
-
 	// start DKG in all nodes
+	// start listening on the channels
 	seed := []byte{1, 2, 3}
+	sync.Add(n)
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
 		// output (the PRG used is common)
 		err := processors[current].dkg.StartDKG(seed)
 		assert.Nil(t, err)
+		go dkgRunChan(&processors[current], &sync, t, phase)
 	}
+	phase++
 
 	// sync the two timeouts and start the next phase
 	for ; phase <= 2; phase++ {
+		sync.Wait()
+		sync.Add(n)
 		for i := 0; i < n; i++ {
-			<-sync
-		}
-		for i := 0; i < n; i++ {
-			go dkgRunChan(&processors[i], pkChan, sync, t, phase)
+			go dkgRunChan(&processors[i], &sync, t, phase)
 		}
 	}
 
-	// this loop synchronizes the main thread to end all DKGs
-	var tempPK, groupPK PublicKey
-	var tempPKBytes, groupPKBytes []byte
-
-	for i := 0; i < n; i++ {
-		if i == 0 {
-			groupPK = <-pkChan
-			if groupPK == nil {
-				groupPKBytes = []byte{}
-			} else {
-				groupPKBytes, _ = groupPK.Encode()
-			}
-			log.Info("PK", groupPKBytes)
-		} else {
-			tempPK = <-pkChan
-			if tempPK == nil {
-				tempPKBytes = []byte{}
-			} else {
-				tempPKBytes, _ = tempPK.Encode()
-			}
-			assert.Equal(t, groupPKBytes, tempPKBytes, "2 group public keys are mismatching")
-		}
-		<-sync
+	// synchronize the main thread to end all DKGs
+	sync.Wait()
+	log.Info("PK", processors[0].pkBytes)
+	for i := 1; i < n; i++ {
+		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
 	}
 }
 
@@ -214,6 +193,7 @@ type testDKGProcessor struct {
 	chans     []chan *message
 	msgType   int
 	ts        *ThresholdSigner // only used when testing a threshold signature
+	pkBytes   []byte
 	malicious bool
 }
 
@@ -287,11 +267,9 @@ func (proc *testDKGProcessor) FlagMisbehavior(node int, logData string) {
 
 // This is a testing function
 // It simulates processing incoming messages by a node
+// it assumes proc.dkg is already running
 func dkgRunChan(proc *testDKGProcessor,
-	pkChan chan PublicKey, sync chan int, t *testing.T, phase int) {
-	// wait till DKG starts
-	for proc.dkg.Running() == false {
-	}
+	sync *sync.WaitGroup, t *testing.T, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
@@ -313,9 +291,13 @@ func dkgRunChan(proc *testDKGProcessor,
 				log.Infof("%d dkg ended \n", proc.current)
 				_, pk, _, err := proc.dkg.EndDKG()
 				assert.Nil(t, err, "end dkg error should be nil")
-				pkChan <- pk
+				if pk == nil {
+					proc.pkBytes = []byte{}
+				} else {
+					proc.pkBytes, _ = pk.Encode()
+				}
 			}
-			sync <- 0
+			sync.Done()
 			return
 		}
 	}

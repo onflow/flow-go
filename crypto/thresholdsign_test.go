@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -23,9 +24,7 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 	// number of nodes to test
 	n := 5
 	lead := 0
-	pkChan := make(chan PublicKey)
-	dkgSync := make(chan int)
-	tsSync := make(chan int)
+	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
 
@@ -46,37 +45,30 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 	// create the node (buffered) communication channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *message, 2*n)
-		go tsDkgRunChan(&processors[i], pkChan, dkgSync, t, 2)
 	}
 	// start DKG in all nodes
 	seed := []byte{1, 2, 3}
+	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
 		assert.Nil(t, err)
+		go tsDkgRunChan(&processors[current], &sync, t, 2)
 	}
 
-	// this loop synchronizes the main thread to end DKG
-	var pkTemp, groupPK []byte
-	for i := 0; i < n; i++ {
-		if i == 0 {
-			groupPK, _ = (<-pkChan).Encode()
-			log.Info("PK", groupPK)
-		} else {
-			pkTemp, _ = (<-pkChan).Encode()
-			assert.Equal(t, groupPK, pkTemp)
-		}
-		<-dkgSync
+	// synchronize the main thread to end DKG
+	sync.Wait()
+	for i := 1; i < n; i++ {
+		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
 	}
 
 	// Start TS
 	log.Info("TS starts")
+	sync.Add(n)
 	for i := 0; i < n; i++ {
-		go tsRunChan(&processors[i], tsSync, t)
+		go tsRunChan(&processors[i], &sync, t)
 	}
-	// this loop synchronizes the main thread to end TS
-	for i := 1; i < n; i++ {
-		<-tsSync
-	}
+	// synchronize the main thread to end TS
+	sync.Wait()
 }
 
 func testThresholdSignatureJointFeldman(t *testing.T) {
@@ -85,9 +77,7 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	// number of nodes to test
 	n := 5
 	lead := 0
-	pkChan := make(chan PublicKey)
-	dkgSync := make(chan int)
-	tsSync := make(chan int)
+	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
 
@@ -108,58 +98,48 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	// create the node (buffered) communication channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *message, 2*n)
-		go tsDkgRunChan(&processors[i], pkChan, dkgSync, t, 0)
 	}
 	// start DKG in all nodes but the leader
 	seed := []byte{1, 2, 3}
+	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
 		assert.Nil(t, err)
+		go tsDkgRunChan(&processors[current], &sync, t, 0)
 	}
 
 	// sync the 2 timeouts at all nodes and start the next phase
 	for phase := 1; phase <= 2; phase++ {
+		sync.Wait()
+		sync.Add(n)
 		for i := 0; i < n; i++ {
-			<-dkgSync
-		}
-		for i := 0; i < n; i++ {
-			go tsDkgRunChan(&processors[i], pkChan, dkgSync, t, phase)
+			go tsDkgRunChan(&processors[i], &sync, t, phase)
 		}
 	}
 
-	// this loop synchronizes the main thread to end DKG
-	var pkTemp, groupPK []byte
-	for i := 0; i < n; i++ {
-		if i == 0 {
-			groupPK, _ = (<-pkChan).Encode()
-			log.Info("PK", groupPK)
-		} else {
-			pkTemp, _ = (<-pkChan).Encode()
-			assert.Equal(t, groupPK, pkTemp)
-		}
-		<-dkgSync
+	// synchronize the main thread to end DKG
+	sync.Wait()
+	for i := 1; i < n; i++ {
+		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
 	}
 
 	// Start TS
 	log.Info("TS starts")
+	sync.Add(n)
 	for i := 0; i < n; i++ {
-		go tsRunChan(&processors[i], tsSync, t)
+		go tsRunChan(&processors[i], &sync, t)
 	}
-	// this loop synchronizes the main thread to end TS
-	for i := 1; i < n; i++ {
-		<-tsSync
-	}
+	// synchronize the main thread to end TS
+	sync.Wait()
 }
 
 var messageToSign = []byte{1, 2, 3}
 
 // This is a testing function
 // It simulates processing incoming messages by a node during DKG
+// It assumes proc.dkg is already running
 func tsDkgRunChan(proc *testDKGProcessor,
-	pkChan chan PublicKey, dkgSync chan int, t *testing.T, phase int) {
-	// wait till DKG starts
-	for proc.dkg.Running() == false {
-	}
+	sync *sync.WaitGroup, t *testing.T, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
@@ -185,14 +165,18 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				assert.NotNil(t, groupPK)
 				assert.NotNil(t, nodesPK)
 				assert.Nil(t, err, "End dkg failed: %v\n", err)
-				pkChan <- groupPK
+				if groupPK == nil {
+					proc.pkBytes = []byte{}
+				} else {
+					proc.pkBytes, _ = groupPK.Encode()
+				}
 				n := proc.dkg.Size()
 				proc.ts, err = NewThresholdSigner(n, SHA3_384)
 				assert.Nil(t, err)
 				proc.ts.SetKeys(sk, groupPK, nodesPK)
 				proc.ts.SetMessageToSign(messageToSign)
 			}
-			dkgSync <- 0
+			sync.Done()
 			return
 		}
 	}
@@ -200,7 +184,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 
 // This is a testing function
 // It simulates processing incoming messages by a node during TS
-func tsRunChan(proc *testDKGProcessor, tsSync chan int, t *testing.T) {
+func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	// Sign a share and broadcast it
 	sighShare, _ := proc.ts.SignShare()
 	proc.msgType = tsType
@@ -227,7 +211,7 @@ func tsRunChan(proc *testDKGProcessor, tsSync chan int, t *testing.T) {
 
 		// if timeout, finalize TS
 		case <-time.After(time.Second):
-			tsSync <- 0
+			sync.Done()
 			return
 		}
 	}
