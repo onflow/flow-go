@@ -109,9 +109,9 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
 
 	// msg = |tag| Data |
 	switch dkgMsgTag(msg[0]) {
-	case FeldmanVSSshare:
+	case feldmanVSSshare:
 		s.receiveShare(index(orig), msg[1:])
-	case FeldmanVSSVerifVec:
+	case feldmanVSSVerifVec:
 		s.receiveVerifVector(index(orig), msg[1:])
 	default:
 		s.processor.FlagMisbehavior(orig, wrongFormat)

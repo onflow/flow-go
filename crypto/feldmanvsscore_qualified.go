@@ -37,7 +37,6 @@ func (s *feldmanVSSQualState) setComplaintsTimeout() {
 	// regardless of the answers.
 	// (at this point, all answered complaints should have been already received)
 	// (i.e there is no complaint with (!c.received && c.answerReceived)
-	// TODO: sanity check and return an error?
 	if len(s.complaints) > s.threshold {
 		s.disqualified = true
 		s.processor.Blacklist(int(s.leaderIndex))
@@ -78,7 +77,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			return
 		}
 		// otherwise, build a complaint to broadcast and add it to the local
-		// complaints map
+		// complaint map
 		s.complaints[s.currentIndex] = &complaint{
 			received:       true,
 			answerReceived: false,

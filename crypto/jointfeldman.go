@@ -61,7 +61,7 @@ func (s *JointFeldmanState) StartDKG(seed []byte) error {
 	return nil
 }
 
-// NextTimeout set the next timeout of the protocol if any timeout applies
+// NextTimeout sets the next timeout of the protocol if any timeout applies
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
 		return cryptoError{"dkg protocol is not running"}

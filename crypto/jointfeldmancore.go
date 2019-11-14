@@ -7,6 +7,7 @@ package crypto
 // #include "dkg_include.h"
 import "C"
 
+// sum up the 3 type of keys from all qualified leaders
 func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2, []pointG2) {
 	qualifiedx, qualifiedPubKey, qualifiedy := s.getQualifiedKeys(qualified)
 
@@ -27,6 +28,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 	return &jointx, &jointPublicKey, jointy
 }
 
+// get the 3 type of keys from all qualified leaders
 func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2, [][]pointG2) {
 	qualifiedx := make([]scalar, 0, qualified)
 	qualifiedPubKey := make([]pointG2, 0, qualified)

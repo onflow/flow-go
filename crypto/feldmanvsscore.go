@@ -23,7 +23,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) {
 
 	// compute the shares
 	for i := index(1); int(i) <= s.size; i++ {
-		// the leader own share
+		// the-leader-own share
 		if i-1 == s.currentIndex {
 			xdata := make([]byte, shareSize)
 			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
@@ -33,7 +33,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) {
 			)
 			continue
 		}
-		// the other node shares
+		// the-other-node shares
 		data := make([]byte, shareSize+1)
 		data[0] = byte(FeldmanVSSshare)
 		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
@@ -128,8 +128,8 @@ func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 	}*/
 }
 
-// writeVerifVector exports A vector into a slice of bytes
-// assuming the slice length matches the vector length
+// writeVerifVector exports a vector A into an array of bytes
+// assuming the array length matches the vector length
 func writeVerifVector(dest []byte, A []pointG2) {
 	C.ep2_vector_write_bin((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(&A[0]),
@@ -137,7 +137,7 @@ func writeVerifVector(dest []byte, A []pointG2) {
 	)
 }
 
-// readVerifVector imports A vector from a slice of bytes,
+// readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) {
 	C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
@@ -152,7 +152,7 @@ func (s *feldmanVSSstate) verifyShare() bool {
 		(*C.ep2_st)(&s.y[s.currentIndex])) == 1
 }
 
-// computePublicKeys computes the nodes public keys from the verification vector
+// computePublicKeys extracts the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 //  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {

@@ -12,12 +12,12 @@ type feldmanVSSQualState struct {
 	// complaints received against the leader:
 	// the key is the origin of the complaint
 	// a complaint will be created if a complaint message or an answer was
-	// broadcasted, a complaint will only be checked only when both the
+	// broadcasted, a complaint will be checked only when both the
 	// complaint message and the answer were broadcasted
 	complaints map[index]*complaint
 	// is the leader disqualified
 	disqualified bool
-	// Timeout to receive shares and verification vectors
+	// Timeout to receive shares and verification vector
 	// - if a share is not received before this timeout a complaint will be formed
 	// - if the verification is not received before this timeout,
 	// leader is disqualified
@@ -65,7 +65,7 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 }
 
 // EndDKG ends the protocol and returns the keys
-// This is also a timeout to receiving all complaints answers
+// This is also a timeout to receiving all complaint answers
 func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, cryptoError{"dkg protocol is not running"}
@@ -142,13 +142,13 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg []byte) error {
 	}
 
 	switch dkgMsgTag(msg[0]) {
-	case FeldmanVSSshare:
+	case feldmanVSSshare:
 		s.receiveShare(index(orig), msg[1:])
-	case FeldmanVSSVerifVec:
+	case feldmanVSSVerifVec:
 		s.receiveVerifVector(index(orig), msg[1:])
-	case FeldmanVSSComplaint:
+	case feldmanVSSComplaint:
 		s.receiveComplaint(index(orig), msg[1:])
-	case FeldmanVSSComplaintAnswer:
+	case feldmanVSSComplaintAnswer:
 		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
 		s.processor.FlagMisbehavior(orig, wrongFormat)

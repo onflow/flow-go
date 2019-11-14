@@ -15,7 +15,8 @@ type DKGType int
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	FeldmanVSS DKGType = iota
-	// FeldmanVSS is Feldman Verifiable Secret Sharing using complaints for disqualification
+	// FeldmanVSS is Feldman Verifiable Secret Sharing using a complaint
+	// system to qualify/disqualify the leader
 	FeldmanVSSQual
 	// Joint Feldman (Pedersen)
 	JointFeldman
@@ -28,19 +29,19 @@ type DKGstate interface {
 	Threshold() int
 	// StartDKG starts running a DKG
 	StartDKG(seed []byte) error
-	// NextTimeout set the next timeout of the protocol if any timeout applies
-	NextTimeout() error
-	// EndDKG ends a DKG protocol, the public data and node private key are finalized
-	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// ReceiveDKGMsg processes a new DKG message received by the current node
 	// orig is the message origin index
 	ReceiveDKGMsg(orig int, msg []byte) error
+	// EndDKG ends a DKG protocol, the public data and node private key are finalized
+	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
+	// NextTimeout set the next timeout of the protocol if any timeout applies
+	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
 	// Disqualify forces a node to get disqualified
 	// for a reason outside of the DKG protocol
 	// The caller should make sure all honest nodes call this function,
-	// otherwise, the protocol will be broken
+	// otherwise, the protocol can be broken
 	Disqualify(node int) error
 }
 
@@ -61,11 +62,11 @@ func optimalThreshold(size int) int {
 func NewDKG(dkg DKGType, size int, currentIndex int,
 	processor DKGprocessor, leaderIndex int) (DKGstate, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
-		return nil, cryptoError{fmt.Sprintf("Size should be between %d and %d.", DKGMinSize, DKGMaxSize)}
+		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", DKGMinSize, DKGMaxSize)}
 	}
 
 	if currentIndex >= size || leaderIndex >= size {
-		return nil, cryptoError{fmt.Sprintf("Indexes of current and leader nodes must be in the correct range.")}
+		return nil, cryptoError{fmt.Sprintf("indices of current and leader nodes must be in the correct range")}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -105,7 +106,7 @@ func NewDKG(dkg DKGType, size int, currentIndex int,
 		log.Debugf("new dkg my index %d\n", jf.currentIndex)
 		return jf, nil
 	default:
-		return nil, cryptoError{fmt.Sprintf("The Distributed Key Generation %d is not supported.", dkg)}
+		return nil, cryptoError{fmt.Sprintf("the Distributed Key Generation %d is not supported", dkg)}
 	}
 }
 
@@ -114,13 +115,14 @@ type dkgCommon struct {
 	size         int
 	threshold    int
 	currentIndex index
-	// running is true when the DKG protocol is runnig, is false otherwise
+	// running is true when the DKG protocol is running, is false otherwise
 	running bool
 	// processes the action of the DKG interface outputs
 	processor DKGprocessor
 }
 
 // Running returns the running state of the DKG protocol
+// The state is equal to true when the DKG protocol is running, and is equal to false otherwise.
 func (s *dkgCommon) Running() bool {
 	return s.running
 }
@@ -135,7 +137,7 @@ func (s *dkgCommon) Threshold() int {
 	return s.threshold
 }
 
-// NextTimeout sets the next protocol timeout if there is any
+// NextTimeout sets the next protocol timeout if there is any.
 // this function should be overwritten by any protocol that uses timeouts
 func (s *dkgCommon) NextTimeout() error {
 	return nil
@@ -145,31 +147,14 @@ func (s *dkgCommon) NextTimeout() error {
 type dkgMsgTag byte
 
 const (
-	FeldmanVSSshare dkgMsgTag = iota
-	FeldmanVSSVerifVec
-	FeldmanVSSComplaint
-	FeldmanVSSComplaintAnswer
+	feldmanVSSshare dkgMsgTag = iota
+	feldmanVSSVerifVec
+	feldmanVSSComplaint
+	feldmanVSSComplaintAnswer
 )
-
-// DKGresult is the supported type for the return values
-type DKGresult int
-
-const (
-	nonApplicable DKGresult = iota
-	valid
-	invalid
-)
-
-// maps the interval [1..c-1,c+1..n] into [1..n-1]
-func indexOrder(current index, loop index) index {
-	if loop < current {
-		return loop
-	}
-	return loop - 1
-}
 
 // DKGactor is an interface that implements the DKG output actions
-// an instance of a DKGactor is needed for each DKG to exectute its outputs
+// an instance of a DKGactor is needed for each DKG
 type DKGprocessor interface {
 	// sends a private message to a destination
 	Send(dest int, data []byte)
@@ -177,7 +162,6 @@ type DKGprocessor interface {
 	// This function needs to make sure all nodes have received the same message
 	Broadcast(data []byte)
 	// flags that a node is misbehaving (deserves slashing)
-	// This function needs to be called by all nodes
 	Blacklist(node int)
 	// flags that a node is misbehaving (but can't be slashed)
 	FlagMisbehavior(node int, log string)
