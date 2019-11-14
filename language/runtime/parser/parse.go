@@ -106,7 +106,7 @@ func ParseExpression(code string) (expression ast.Expression, inputIsComplete bo
 	return program, inputIsComplete, err
 }
 
-func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, err error) {
+func ParseReplInput(code string) (replInput []interface{}, inputIsComplete bool, err error) {
 	result, inputIsComplete, errors := parse(
 		code,
 		func(parser *CadenceParser) antlr.ParserRuleContext {
@@ -118,7 +118,12 @@ func ParseReplInput(code string) (replInput interface{}, inputIsComplete bool, e
 		err = Error{errors}
 	}
 
-	return result, inputIsComplete, err
+	elements, ok := result.([]interface{})
+	if !ok {
+		return nil, inputIsComplete, err
+	}
+
+	return elements, inputIsComplete, err
 }
 
 func parse(
