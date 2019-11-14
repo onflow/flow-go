@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	log "github.com/sirupsen/logrus"
@@ -28,6 +33,7 @@ type EmulatorServer struct {
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
+	store      badger.Store
 }
 
 const (
@@ -43,10 +49,12 @@ type Config struct {
 	BlockInterval  time.Duration
 	RootAccountKey *flow.AccountPrivateKey
 	GRPCDebug      bool
+	// DBPath is the path to the Badger database on disk
+	DBPath string
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
-func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
+func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *EmulatorServer {
 
 	messageLogger := func(msg string) {
 		logger.Debug(msg)
@@ -69,6 +77,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	options := []emulator.Option{
 		emulator.WithRuntimeLogger(messageLogger),
 		emulator.WithEventEmitter(eventEmitter),
+		emulator.WithStore(store),
 	}
 	if conf.RootAccountKey != nil {
 		options = append(options, emulator.WithRootAccountKey(*conf.RootAccountKey))
@@ -96,6 +105,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		grpcServer: grpcServer,
 		config:     conf,
 		logger:     logger,
+		store:      store,
 	}
 
 	if conf.GRPCDebug {
@@ -162,7 +172,14 @@ func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emulatorServer := NewEmulatorServer(logger, config)
+	store, err := badger.New(config.DBPath)
+	if err != nil {
+		logger.WithError(err).Fatal("☠️  Failed to set up Emulator server")
+	}
+
+	emulatorServer := NewEmulatorServer(logger, store, config)
+	defer emulatorServer.cleanup()
+	go emulatorServer.handleSIGTERM()
 
 	logger.
 		WithField("port", config.Port).
@@ -187,4 +204,21 @@ func StartServer(logger *log.Logger, config *Config) {
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")
 	}
+}
+
+// cleanup cleans up the server.
+// This MUST be called before the server process terminates.
+func (e *EmulatorServer) cleanup() {
+	if err := e.store.Close(); err != nil {
+		e.logger.WithError(err).Error("Cleanup failed: could not close store")
+	}
+}
+
+// handleSIGTERM waits for a SIGTERM, then cleans up the server's resources.
+// This should be run as a goroutine.
+func (e *EmulatorServer) handleSIGTERM() {
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGTERM)
+	<-c
+	e.cleanup()
 }
