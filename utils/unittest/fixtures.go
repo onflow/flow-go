@@ -79,10 +79,12 @@ func AccountPublicKeyFixture() flow.AccountPublicKey {
 func EventFixture() flow.Event {
 	return flow.Event{
 		Type: "Transfer",
-		Values: map[string]interface{}{
-			"to":   flow.ZeroAddress,
-			"from": flow.ZeroAddress,
-			"id":   1,
-		},
+		// TODO: create proper fixture
+		// Values: map[string]interface{}{
+		// 	"to":   flow.ZeroAddress,
+		// 	"from": flow.ZeroAddress,
+		// 	"id":   1,
+		// },
+		Payload: []byte{},
 	}
 }
