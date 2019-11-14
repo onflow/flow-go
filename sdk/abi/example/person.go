@@ -1,18 +1,17 @@
 package example
 
 import (
-	"github.com/dapperlabs/flow-go/language/runtime/types"
-	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Person interface {
 	FullName() string
-	Type() types.Type
 	Value() values.Value
 }
 
-var personType types.Type = types.Composite{
+var PersonType types.Type = types.Composite{
 	FieldTypes: []types.Type{types.String{}},
 }
 
@@ -21,7 +20,7 @@ func EncodePerson(p Person) ([]byte, error) {
 }
 
 func DecodePerson(b []byte) (Person, error) {
-	v, err := encode.Decode(personType, b)
+	v, err := encode.Decode(PersonType, b)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +29,7 @@ func DecodePerson(b []byte) (Person, error) {
 }
 
 type person struct {
-	values.Composite
+	value values.Composite
 }
 
 func newPersonFromValue(v values.Value) Person {
@@ -39,13 +38,9 @@ func newPersonFromValue(v values.Value) Person {
 }
 
 func (p person) FullName() string {
-	return string(p.Fields[0].(values.String))
-}
-
-func (p person) Type() types.Type {
-	return personType
+	return string(p.value.Fields[0].(values.String))
 }
 
 func (p person) Value() values.Value {
-	return p
+	return p.value
 }
