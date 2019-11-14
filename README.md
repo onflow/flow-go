@@ -126,10 +126,11 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
+
 | Collection  | [Peter Siemens](https://github.com/psiemens) | [/engine/collection](/engine/collection) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/engine/consensus](/engine/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/engine/execution](/engine/execution) |
-| Verification | [Moar Zamski](https://github.com/pazams) | [/engine/verification](/engine/verification) |
+| Verification | [Moar Zamski](https://github.com/pazams) [Ramtin Seraj](https://github.com/ramtinms)| [/engine/verification](/engine/verification) |
 | Observation | [Peter Siemens](https://github.com/psiemens)     | [/engine/observation](/engine/observation) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/networking/gossip](/networking/gossip) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/crypto](/crypto) |
