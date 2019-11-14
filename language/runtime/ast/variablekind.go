@@ -24,3 +24,14 @@ func (k VariableKind) Name() string {
 
 	panic(errors.NewUnreachableError())
 }
+
+func (k VariableKind) Keyword() string {
+	switch k {
+	case VariableKindVariable:
+		return "var"
+	case VariableKindConstant:
+		return "let"
+	}
+
+	panic(errors.NewUnreachableError())
+}

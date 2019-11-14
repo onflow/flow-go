@@ -896,3 +896,38 @@ func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
 func (checker *Checker) ResetErrors() {
 	checker.errors = nil
 }
+
+func (checker *Checker) checkDeclarationAccessModifier(
+	access ast.Access,
+	declarationKind common.DeclarationKind,
+	startPos ast.Position,
+	isConstant bool,
+) {
+	isLocal := checker.functionActivations.IsLocal()
+
+	// Constant cannot be set, so allowing writes makes little sense
+
+	if (isLocal && access != ast.AccessNotSpecified) ||
+		(!isLocal && isConstant && access == ast.AccessPublicSettable) {
+
+		checker.report(
+			&InvalidAccessModifierError{
+				Access:          access,
+				DeclarationKind: declarationKind,
+				Pos:             startPos,
+			},
+		)
+	}
+}
+
+func (checker *Checker) checkFieldsAccess(fields []*ast.FieldDeclaration) {
+	for _, field := range fields {
+		isConstant := field.VariableKind == ast.VariableKindConstant
+		checker.checkDeclarationAccessModifier(
+			field.Access,
+			field.DeclarationKind(),
+			field.StartPos,
+			isConstant,
+		)
+	}
+}

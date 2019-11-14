@@ -231,6 +231,7 @@ func (v *ProgramVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface
 }
 
 func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
@@ -239,6 +240,7 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.CompositeDeclaration{
+		Access:        access,
 		CompositeKind: kind,
 		Identifier:    identifier,
 		Conformances:  conformances,
@@ -371,12 +373,14 @@ func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDec
 }
 
 func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	members := ctx.Members().Accept(v).(*ast.Members)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
+		Access:        access,
 		CompositeKind: kind,
 		Identifier:    identifier,
 		Members:       members,

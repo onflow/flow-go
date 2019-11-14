@@ -8,6 +8,7 @@ import (
 // InterfaceDeclaration
 
 type InterfaceDeclaration struct {
+	Access        Access
 	CompositeKind common.CompositeKind
 	Identifier    Identifier
 	Members       *Members
