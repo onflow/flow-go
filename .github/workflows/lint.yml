@@ -1,0 +1,15 @@
+name: Lint
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: morphy2k/revive-action@v1.0.1
+      with:
+        config: revive.toml
+      env:
+        # GitHub token for annotations
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
