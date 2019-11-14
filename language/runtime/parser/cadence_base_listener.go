@@ -32,6 +32,24 @@ func (s *BaseCadenceListener) EnterReplInput(ctx *ReplInputContext) {}
 // ExitReplInput is called when production replInput is exited.
 func (s *BaseCadenceListener) ExitReplInput(ctx *ReplInputContext) {}
 
+// EnterReplElement is called when production replElement is entered.
+func (s *BaseCadenceListener) EnterReplElement(ctx *ReplElementContext) {}
+
+// ExitReplElement is called when production replElement is exited.
+func (s *BaseCadenceListener) ExitReplElement(ctx *ReplElementContext) {}
+
+// EnterReplStatement is called when production replStatement is entered.
+func (s *BaseCadenceListener) EnterReplStatement(ctx *ReplStatementContext) {}
+
+// ExitReplStatement is called when production replStatement is exited.
+func (s *BaseCadenceListener) ExitReplStatement(ctx *ReplStatementContext) {}
+
+// EnterReplDeclaration is called when production replDeclaration is entered.
+func (s *BaseCadenceListener) EnterReplDeclaration(ctx *ReplDeclarationContext) {}
+
+// ExitReplDeclaration is called when production replDeclaration is exited.
+func (s *BaseCadenceListener) ExitReplDeclaration(ctx *ReplDeclarationContext) {}
+
 // EnterDeclaration is called when production declaration is entered.
 func (s *BaseCadenceListener) EnterDeclaration(ctx *DeclarationContext) {}
 

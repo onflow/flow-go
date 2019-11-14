@@ -55,8 +55,20 @@ program
     ;
 
 replInput
-    : program
-    | statements
+    : replElement* EOF
+    ;
+
+replElement
+    : replDeclaration
+    | replStatement
+    ;
+
+replStatement
+    : statement eos
+    ;
+
+replDeclaration
+    : declaration ';'?
     ;
 
 declaration
@@ -101,7 +113,7 @@ interfaceDeclaration
     ;
 
 members[bool functionBlockRequired]
-    : member[functionBlockRequired]*
+    : (member[functionBlockRequired] ';'?)*
     ;
 
 member[bool functionBlockRequired]

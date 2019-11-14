@@ -14,6 +14,30 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 )
 
+func TestParseReplInput(t *testing.T) {
+
+	actual, _, err := parser.ParseReplInput(`
+        struct X {}; let x = X(); x
+    `)
+
+	assert.Nil(t, err)
+	require.IsType(t, []interface{}{}, actual)
+
+	require.Len(t, actual, 3)
+	assert.IsType(t, &CompositeDeclaration{}, actual[0])
+	assert.IsType(t, &VariableDeclaration{}, actual[1])
+	assert.IsType(t, &ExpressionStatement{}, actual[2])
+}
+
+func TestParseInvalidProgramWithRest(t *testing.T) {
+	actual, _, err := parser.ParseProgram(`
+	    .asd
+	`)
+
+	assert.Nil(t, actual)
+	assert.IsType(t, parser.Error{}, err)
+}
+
 func TestParseInvalidIncompleteConstKeyword(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -6075,67 +6099,127 @@ func TestParseReference(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseAccessModifiers(t *testing.T) {
+func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
 
-	type declaration struct {
-		name, code string
-	}
+	actual, _, err := parser.ParseProgram(`
+        struct Kitty { let id: Int ; init(id: Int) { self.id = id } }
+    `)
 
-	declarations := []declaration{
-		{"variable", "%s var test = 1"},
-		{"constant", "%s let test = 1"},
-		{"function", "%s fun test() {}"},
-	}
+	assert.Nil(t, err)
 
-	for _, compositeKind := range common.CompositeKinds {
-		for _, isInterface := range []bool{true, false} {
-
-			interfaceKeyword := ""
-			if isInterface {
-				interfaceKeyword = "interface"
-			}
-
-			formatName := func(name string) string {
-				return fmt.Sprintf(
-					"%s %s %s",
-					compositeKind.Keyword(),
-					interfaceKeyword,
-					name,
-				)
-			}
-
-			formatCode := func(format string) string {
-				return fmt.Sprintf(format, compositeKind.Keyword(), interfaceKeyword)
-			}
-
-			declarations = append(declarations,
-				declaration{
-					formatName("itself"),
-					formatCode("%%s %s %s Test {}"),
+	expected := &Program{
+		Declarations: []Declaration{
+			&CompositeDeclaration{
+				CompositeKind: common.CompositeKindStructure,
+				Identifier: Identifier{
+					Identifier: "Kitty",
+					Pos:        Position{Offset: 16, Line: 2, Column: 15},
 				},
-				declaration{
-					formatName("field"),
-					formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
+				Conformances: []*NominalType{},
+				Members: &Members{
+					Fields: []*FieldDeclaration{
+						{
+							VariableKind: VariableKindConstant,
+							Identifier: Identifier{
+								Identifier: "id",
+								Pos:        Position{Offset: 28, Line: 2, Column: 27},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 32, Line: 2, Column: 31},
+									},
+								},
+								StartPos: Position{Offset: 32, Line: 2, Column: 31},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 24, Line: 2, Column: 23},
+								EndPos:   Position{Offset: 34, Line: 2, Column: 33},
+							},
+						},
+					},
+					SpecialFunctions: []*SpecialFunctionDeclaration{
+						{
+							DeclarationKind: common.DeclarationKindInitializer,
+							FunctionDeclaration: &FunctionDeclaration{
+								Identifier: Identifier{
+									Identifier: "init",
+									Pos:        Position{Offset: 38, Line: 2, Column: 37},
+								},
+								ParameterList: &ParameterList{
+									Parameters: []*Parameter{
+										{
+											Identifier: Identifier{
+												Identifier: "id",
+												Pos:        Position{Offset: 43, Line: 2, Column: 42},
+											},
+											TypeAnnotation: &TypeAnnotation{
+												Type: &NominalType{
+													Identifier: Identifier{
+														Identifier: "Int",
+														Pos:        Position{Offset: 47, Line: 2, Column: 46},
+													},
+												},
+												StartPos: Position{Offset: 47, Line: 2, Column: 46},
+											},
+											Range: Range{
+												StartPos: Position{Offset: 43, Line: 2, Column: 42},
+												EndPos:   Position{Offset: 47, Line: 2, Column: 46},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 42, Line: 2, Column: 41},
+										EndPos:   Position{Offset: 50, Line: 2, Column: 49},
+									},
+								},
+								FunctionBlock: &FunctionBlock{
+									Block: &Block{
+										Statements: []Statement{
+											&AssignmentStatement{
+												Target: &MemberExpression{
+													Expression: &IdentifierExpression{
+														Identifier: Identifier{
+															Identifier: "self",
+															Pos:        Position{Offset: 54, Line: 2, Column: 53},
+														},
+													},
+													Identifier: Identifier{
+														Identifier: "id",
+														Pos:        Position{Offset: 59, Line: 2, Column: 58},
+													},
+												},
+												Transfer: &Transfer{
+													Operation: TransferOperationCopy,
+													Pos:       Position{Offset: 62, Line: 2, Column: 61},
+												},
+												Value: &IdentifierExpression{
+													Identifier: Identifier{
+														Identifier: "id",
+														Pos:        Position{Offset: 64, Line: 2, Column: 63},
+													},
+												},
+											},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 52, Line: 2, Column: 51},
+											EndPos:   Position{Offset: 67, Line: 2, Column: 66},
+										},
+									},
+								},
+								StartPos: Position{Offset: 38, Line: 2, Column: 37},
+							},
+						},
+					},
 				},
-				declaration{
-					formatName("function"),
-					formatCode("%s %s Test { %%s fun test() {} }"),
+				Range: Range{
+					StartPos: Position{Offset: 9, Line: 2, Column: 8},
+					EndPos:   Position{Offset: 69, Line: 2, Column: 68},
 				},
-			)
-		}
+			},
+		},
 	}
 
-	for _, declaration := range declarations {
-		for _, access := range Accesses {
-			testName := fmt.Sprintf("%s/%s", declaration.name, access)
-			t.Run(testName, func(t *testing.T) {
-				program := fmt.Sprintf(declaration.code, access.Keyword())
-				_, _, err := parser.ParseProgram(program)
-
-				if !assert.Nil(t, err) {
-					println(program)
-				}
-			})
-		}
-	}
+	assert.IsType(t, expected, actual)
 }

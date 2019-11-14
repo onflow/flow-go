@@ -15,6 +15,18 @@ func (v *BaseCadenceVisitor) VisitReplInput(ctx *ReplInputContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitReplElement(ctx *ReplElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitReplStatement(ctx *ReplStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitReplDeclaration(ctx *ReplDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitDeclaration(ctx *DeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
