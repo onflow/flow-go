@@ -37,7 +37,7 @@ func TestPing(t *testing.T) {
 			Times(1)
 
 		err := c.Ping(ctx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("ServerError", func(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSendTransaction(t *testing.T) {
 			Times(1)
 
 		err := c.SendTransaction(ctx, tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestGetLatestBlock(t *testing.T) {
 			Times(1)
 
 		blockHeaderA, err := c.GetLatestBlock(ctx, true)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		blockHeaderB := convert.MessageToBlockHeader(res.GetBlock())
 		assert.Equal(t, *blockHeaderA, blockHeaderB)
@@ -144,7 +144,7 @@ func TestExecuteScript(t *testing.T) {
 			Times(1)
 
 		value, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, value, float64(1))
 	})
 
@@ -199,7 +199,7 @@ func TestGetTransaction(t *testing.T) {
 	events := []flow.Event{unittest.EventFixture()}
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(events)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
 		mockRPC.EXPECT().
@@ -211,7 +211,7 @@ func TestGetTransaction(t *testing.T) {
 			Times(1)
 
 		res, err := c.GetTransaction(ctx, crypto.Hash{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, res.Events, 1)
 		assert.Equal(t, events[0].Type, res.Events[0].Type)
 	})
@@ -250,7 +250,7 @@ func TestGetEvents(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(events)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
 		// Set up the mock to return a mocked event response
@@ -261,7 +261,7 @@ func TestGetEvents(t *testing.T) {
 
 		// The client should pass the response to the client
 		res, err := c.GetEvents(ctx, client.EventQuery{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, len(res), 1)
 		assert.Equal(t, res[0].Type, mockEvent.Type)
 	})
