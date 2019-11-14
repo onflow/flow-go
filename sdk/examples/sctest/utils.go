@@ -57,7 +57,7 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 	// add array of signers to transaction
 	for i := 0; i < len(signing_addresses); i++ {
 		sig, err := keys.SignTransaction(tx, signing_keys[i])
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(signing_addresses[i], sig)
 	}
@@ -70,10 +70,10 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
 	} else {
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 		_, err = b.CommitBlock()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	}
 }

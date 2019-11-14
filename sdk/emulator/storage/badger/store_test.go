@@ -57,40 +57,40 @@ func TestBlocks(t *testing.T) {
 
 	t.Run("should be able to insert block", func(t *testing.T) {
 		err := store.InsertBlock(block1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	// insert block 1
 	err := store.InsertBlock(block1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("should be able to get inserted block", func(t *testing.T) {
 		t.Run("GetBlockByNumber", func(t *testing.T) {
 			block, err := store.GetBlockByNumber(block1.Number)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1, block)
 		})
 
 		t.Run("GetBlockByHash", func(t *testing.T) {
 			block, err := store.GetBlockByHash(block1.Hash())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1, block)
 		})
 
 		t.Run("GetLatestBlock", func(t *testing.T) {
 			block, err := store.GetLatestBlock()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1, block)
 		})
 	})
 
 	// insert block 2
 	err = store.InsertBlock(block2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("Latest block should update", func(t *testing.T) {
 		block, err := store.GetLatestBlock()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, block2, block)
 	})
 }
@@ -113,7 +113,7 @@ func TestTransactions(t *testing.T) {
 
 	t.Run("should be able to insert tx", func(t *testing.T) {
 		err := store.InsertTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted tx", func(t *testing.T) {
 			storedTx, err := store.GetTransaction(tx.Hash())
@@ -142,11 +142,11 @@ func TestRegisters(t *testing.T) {
 
 	t.Run("should be able set registers", func(t *testing.T) {
 		err := store.SetRegisters(blockNumber, registers)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		t.Run("Should be to get set registers", func(t *testing.T) {
 			view, err := store.GetRegistersView(blockNumber)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, registers.NewView(), &view)
 		})
 	})
@@ -164,11 +164,11 @@ func TestEvents(t *testing.T) {
 		var blockNumber uint64 = 1
 
 		err := store.InsertEvents(blockNumber, events...)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted events", func(t *testing.T) {
 			gotEvents, err := store.GetEvents("", blockNumber, blockNumber)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, events, gotEvents)
 		})
 	})
@@ -187,19 +187,19 @@ func TestEvents(t *testing.T) {
 			}
 			eventsByBlock[uint64(i)] = events
 			err := store.InsertEvents(uint64(i), events...)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		t.Run("should be able to query by block", func(t *testing.T) {
 			t.Run("block 1", func(t *testing.T) {
 				gotEvents, err := store.GetEvents("", 1, 1)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, eventsByBlock[1], gotEvents)
 			})
 
 			t.Run("block 2", func(t *testing.T) {
 				gotEvents, err := store.GetEvents("", 2, 2)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, eventsByBlock[2], gotEvents)
 			})
 		})
@@ -207,13 +207,13 @@ func TestEvents(t *testing.T) {
 		t.Run("should be able to query by block interval", func(t *testing.T) {
 			t.Run("block 1->2", func(t *testing.T) {
 				gotEvents, err := store.GetEvents("", 1, 2)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, append(eventsByBlock[1], eventsByBlock[2]...), gotEvents)
 			})
 
 			t.Run("block 5->10", func(t *testing.T) {
 				gotEvents, err := store.GetEvents("", 5, 10)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 
 				var expectedEvents []flow.Event
 				for i := 5; i <= 10; i++ {
@@ -227,7 +227,7 @@ func TestEvents(t *testing.T) {
 			t.Run("type=1, block=1", func(t *testing.T) {
 				// should be one event type=1 in block 1
 				gotEvents, err := store.GetEvents("1", 1, 1)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Len(t, gotEvents, 1)
 				assert.Equal(t, "1", gotEvents[0].Type)
 			})
@@ -235,7 +235,7 @@ func TestEvents(t *testing.T) {
 			t.Run("type=1, block=1->10", func(t *testing.T) {
 				// should be 10 events type=1 in blocks 1->10
 				gotEvents, err := store.GetEvents("1", 1, 10)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Len(t, gotEvents, 10)
 				for _, event := range gotEvents {
 					assert.Equal(t, "1", event.Type)
@@ -245,7 +245,7 @@ func TestEvents(t *testing.T) {
 			t.Run("type=2, block=1", func(t *testing.T) {
 				// should be 0 type=2 events here
 				gotEvents, err := store.GetEvents("2", 1, 1)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Len(t, gotEvents, 0)
 			})
 		})
@@ -266,16 +266,16 @@ func TestPersistence(t *testing.T) {
 
 	// insert some stuff to to the store
 	err := store.InsertBlock(block)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	err = store.InsertTransaction(tx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	err = store.InsertEvents(block.Number, events...)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	err = store.SetRegisters(block.Number, registers)
 
 	// close the store
 	err = store.Close()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// create a new store with the same database directory
 	store, err = badger.New(dir)
@@ -283,19 +283,19 @@ func TestPersistence(t *testing.T) {
 
 	// should be able to retrieve what we stored
 	gotBlock, err := store.GetLatestBlock()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, block, gotBlock)
 
 	gotTx, err := store.GetTransaction(tx.Hash())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, tx, gotTx)
 
 	gotEvents, err := store.GetEvents("", block.Number, block.Number)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, events, gotEvents)
 
 	gotRegisters, err := store.GetRegistersView(block.Number)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, registers.NewView(), &gotRegisters)
 }
 
