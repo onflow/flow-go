@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -34,6 +35,9 @@ type EmulatorServer struct {
 	config     *Config
 	logger     *log.Logger
 	store      badger.Store
+
+	// Wraps the cleanup function to ensure we only run cleanup once
+	cleanupOnce sync.Once
 }
 
 const (
@@ -209,9 +213,11 @@ func StartServer(logger *log.Logger, config *Config) {
 // cleanup cleans up the server.
 // This MUST be called before the server process terminates.
 func (e *EmulatorServer) cleanup() {
-	if err := e.store.Close(); err != nil {
-		e.logger.WithError(err).Error("Cleanup failed: could not close store")
-	}
+	e.cleanupOnce.Do(func() {
+		if err := e.store.Close(); err != nil {
+			e.logger.WithError(err).Error("Cleanup failed: could not close store")
+		}
+	})
 }
 
 // handleSIGTERM waits for a SIGTERM, then cleans up the server's resources.
