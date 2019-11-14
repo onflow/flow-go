@@ -4,11 +4,14 @@ set -o pipefail
 
 function ctrl_c() {
   kill % &> /dev/null
+  kill %kserver &> /dev/null
   printf "\n"
   exit 0
 }
 
 trap ctrl_c INT
+
+kserver &> /dev/null &
 
 export OPAMROOT=/usr/lib/kframework/lib/opamroot
 cd $(dirname $0)
@@ -69,3 +72,5 @@ done
 
 if [ "$FANCY" = true ]; then printf "\e[2K\r"; fi
 echo DONE
+
+kill %kserver &> /dev/null
