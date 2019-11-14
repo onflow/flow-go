@@ -147,7 +147,7 @@ func TestLedger(t *testing.T) {
 		t.Run("Should be to get set ledger", func(t *testing.T) {
 			view, err := store.GetLedgerView(blockNumber)
 			assert.NoError(t, err)
-			assert.Equal(t, registers.NewView(), &view)
+			assert.Equal(t, ledger.NewView(), &view)
 		})
 	})
 }
@@ -294,7 +294,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, events, gotEvents)
 
-  gotLedger, err := store.GetLedgerView(block.Number)
+	gotLedger, err := store.GetLedgerView(block.Number)
 	assert.NoError(t, err)
 	assert.Equal(t, ledger.NewView(), &gotLedger)
 }
