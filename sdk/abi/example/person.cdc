@@ -4,8 +4,4 @@ struct Person {
     init(firstName: String, lastName: String) {
         self.fullName = firstName + " " + lastName
     }
-
-    init(fullName: String) {
-        self.fullName = fullName
-    }
 }

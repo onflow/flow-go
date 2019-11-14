@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,8 +55,8 @@ func TestEventEmitted(t *testing.T) {
 
 		assert.Equal(t, expectedType, events[0].Type)
 		assert.Equal(t, expectedID, events[0].ID())
-		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, 1, events[0].Values["x"])
+		assert.Equal(t, 2, events[0].Values["y"])
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
@@ -86,8 +85,8 @@ func TestEventEmitted(t *testing.T) {
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, events[0].Type)
-		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, 1, events[0].Values["x"])
+		assert.Equal(t, 2, events[0].Values["y"])
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
@@ -147,7 +146,7 @@ func TestEventEmitted(t *testing.T) {
 
 		assert.Equal(t, expectedType, actualEvent.Type)
 		assert.Equal(t, expectedID, actualEvent.ID())
-		assert.Equal(t, big.NewInt(1), actualEvent.Values["x"])
-		assert.Equal(t, big.NewInt(2), actualEvent.Values["y"])
+		assert.Equal(t, 1, actualEvent.Values["x"])
+		assert.Equal(t, 2, actualEvent.Values["y"])
 	})
 }

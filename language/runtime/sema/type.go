@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 type Type interface {
@@ -17,6 +18,10 @@ type Type interface {
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
+}
+
+type ExportableType interface {
+	Export() types.Type
 }
 
 // ValueIndexableType
@@ -41,6 +46,13 @@ type TypeIndexableType interface {
 type TypeAnnotation struct {
 	Move bool
 	Type Type
+}
+
+func (a *TypeAnnotation) Export() types.Annotation {
+	return types.Annotation{
+		IsMove: a.Move,
+		Type:   a.Type.(ExportableType).Export(),
+	}
 }
 
 func (a *TypeAnnotation) String() string {
@@ -120,6 +132,10 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
+func (*VoidType) Export() types.Type {
+	return types.Void{}
+}
+
 func (*VoidType) String() string {
 	return "Void"
 }
@@ -197,6 +213,10 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
+func (*BoolType) Export() types.Type {
+	return types.Bool{}
+}
+
 func (*BoolType) String() string {
 	return "Bool"
 }
@@ -241,6 +261,10 @@ func (*CharacterType) IsInvalidType() bool {
 type StringType struct{}
 
 func (*StringType) isType() {}
+
+func (*StringType) Export() types.Type {
+	return types.String{}
+}
 
 func (*StringType) String() string {
 	return "String"
@@ -353,6 +377,10 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
+func (*IntType) Export() types.Type {
+	return types.Int{}
+}
+
 func (*IntType) String() string {
 	return "Int"
 }
@@ -383,6 +411,10 @@ func (*IntType) Max() *big.Int {
 type Int8Type struct{}
 
 func (*Int8Type) isType() {}
+
+func (*Int8Type) Export() types.Type {
+	return types.Int8{}
+}
 
 func (*Int8Type) String() string {
 	return "Int8"
@@ -417,6 +449,10 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
+func (*Int16Type) Export() types.Type {
+	return types.Int16{}
+}
+
 func (*Int16Type) String() string {
 	return "Int16"
 }
@@ -449,6 +485,10 @@ func (*Int16Type) Max() *big.Int {
 type Int32Type struct{}
 
 func (*Int32Type) isType() {}
+
+func (*Int32Type) Export() types.Type {
+	return types.Int32{}
+}
 
 func (*Int32Type) String() string {
 	return "Int32"
@@ -483,6 +523,10 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
+func (*Int64Type) Export() types.Type {
+	return types.Int64{}
+}
+
 func (*Int64Type) String() string {
 	return "Int64"
 }
@@ -515,6 +559,10 @@ func (*Int64Type) Max() *big.Int {
 type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
+
+func (*UInt8Type) Export() types.Type {
+	return types.Uint8{}
+}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
@@ -549,6 +597,10 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
+func (*UInt16Type) Export() types.Type {
+	return types.Uint16{}
+}
+
 func (*UInt16Type) String() string {
 	return "UInt16"
 }
@@ -582,6 +634,10 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
+func (*UInt32Type) Export() types.Type {
+	return types.Uint32{}
+}
+
 func (*UInt32Type) String() string {
 	return "UInt32"
 }
@@ -614,6 +670,10 @@ func (*UInt32Type) Max() *big.Int {
 type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
+
+func (*UInt64Type) Export() types.Type {
+	return types.Uint64{}
+}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
@@ -848,6 +908,12 @@ type VariableSizedType struct {
 func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
+func (t *VariableSizedType) Export() types.Type {
+	return types.VariableSizedArray{
+		ElementType: t.Type.(ExportableType).Export(),
+	}
+}
+
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
@@ -958,6 +1024,19 @@ type FunctionType struct {
 }
 
 func (*FunctionType) isType() {}
+
+func (t *FunctionType) Export() types.Type {
+	parameterTypeAnnotations := make([]types.Annotation, len(t.ParameterTypeAnnotations))
+
+	for i, annotation := range t.ParameterTypeAnnotations {
+		parameterTypeAnnotations[i] = annotation.Export()
+	}
+
+	return types.Function{
+		ParameterTypeAnnotations: parameterTypeAnnotations,
+		ReturnTypeAnnotation:     t.ReturnTypeAnnotation.Export(),
+	}
+}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
