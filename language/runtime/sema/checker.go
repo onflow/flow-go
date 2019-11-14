@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"math/big"
+
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
@@ -272,12 +274,20 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 	case *ast.IntExpression:
 		unwrappedTargetType := UnwrapOptionalType(targetType)
 
-		// check if literal value fits range can't be checked when target is Never
-		//
-		if IsSubType(unwrappedTargetType, &IntegerType{}) &&
-			!IsSubType(unwrappedTargetType, &NeverType{}) {
+		// If the target type is `Never`, the checks below will be performed
+		// (as `Never` is the subtype of all types), but the checks are not valid
 
+		if IsSubType(unwrappedTargetType, &NeverType{}) {
+			break
+		}
+
+		if IsSubType(unwrappedTargetType, &IntegerType{}) {
 			checker.checkIntegerLiteral(typedExpression, unwrappedTargetType)
+
+			return true
+
+		} else if IsSubType(unwrappedTargetType, &AddressType{}) {
+			checker.checkAddressLiteral(typedExpression)
 
 			return true
 		}
@@ -316,22 +326,55 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 // fits into range of the target integer type
 //
 func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integerType Type) {
-	intRange := integerType.(Ranged)
-	literalValue := expression.Value
-	rangeMin := intRange.Min()
-	rangeMax := intRange.Max()
-	if (rangeMin != nil && literalValue.Cmp(rangeMin) == -1) ||
-		(rangeMax != nil && literalValue.Cmp(rangeMax) == 1) {
+	ranged := integerType.(Ranged)
+	rangeMin := ranged.Min()
+	rangeMax := ranged.Max()
 
+	if checker.checkRange(expression.Value, rangeMin, rangeMax) {
+		return
+	}
+
+	checker.report(
+		&InvalidIntegerLiteralRangeError{
+			ExpectedType:     integerType,
+			ExpectedRangeMin: rangeMin,
+			ExpectedRangeMax: rangeMax,
+			Range:            ast.NewRangeFromPositioned(expression),
+		},
+	)
+}
+
+// checkAddressLiteral checks that the value of the integer literal
+// fits into the range of an address (160 bits / 20 bytes),
+// and is hexadecimal
+//
+func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression) {
+	ranged := &AddressType{}
+	rangeMin := ranged.Min()
+	rangeMax := ranged.Max()
+
+	if expression.Base != 16 {
 		checker.report(
-			&InvalidIntegerLiteralRangeError{
-				ExpectedType:     integerType,
-				ExpectedRangeMin: rangeMin,
-				ExpectedRangeMax: rangeMax,
-				Range:            ast.NewRangeFromPositioned(expression),
+			&InvalidAddressLiteralError{
+				Range: ast.NewRangeFromPositioned(expression),
 			},
 		)
 	}
+
+	if checker.checkRange(expression.Value, rangeMin, rangeMax) {
+		return
+	}
+
+	checker.report(
+		&InvalidAddressLiteralError{
+			Range: ast.NewRangeFromPositioned(expression),
+		},
+	)
+}
+
+func (checker *Checker) checkRange(value, min, max *big.Int) bool {
+	return (min == nil || value.Cmp(min) >= 0) &&
+		(max == nil || value.Cmp(max) <= 0)
 }
 
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {

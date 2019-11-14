@@ -9,6 +9,8 @@ type VariableDeclaration struct {
 	Value          Expression
 	Transfer       *Transfer
 	StartPos       Position
+	SecondTransfer *Transfer
+	SecondValue    Expression
 }
 
 func (v *VariableDeclaration) StartPosition() Position {
