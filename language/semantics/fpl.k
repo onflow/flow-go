@@ -415,14 +415,22 @@ module FPL-TYPING
   rule #type(_ ? E1 : E2) => type(E1, E2)
 
   syntax Type ::= fieldType(Type, Ident) [function]
-  rule fieldType([_] #Or [_;_::Int], length) => Int
-  rule fieldType(([_] #Or [_;_::Int]) #as T, concat) => ((T): T)
-  rule fieldType([T] #Or [T;_::Int], contains) => ((T): Bool)
-  rule fieldType([T] #Or [T;_::Int], append) => ((T): Void)
-  rule fieldType([T] #Or [T;_::Int], insert) => ((Int, T): Void)
-  rule fieldType([T] #Or [T;_::Int], remove) => ((Int): T)
-  rule fieldType([T] #Or [T;_::Int], removeFirst) => ((.Types): T)
-  rule fieldType([T] #Or [T;_::Int], removeLast) => ((.Types): T)
+  rule fieldType([_], length) => Int
+  rule fieldType([_] #as T, concat) => ((T): T)
+  rule fieldType([T], contains) => ((T): Bool)
+  rule fieldType([T], append) => ((T): Void)
+  rule fieldType([T], insert) => ((Int, T): Void)
+  rule fieldType([T], remove) => ((Int): T)
+  rule fieldType([T], removeFirst) => ((.Types): T)
+  rule fieldType([T], removeLast) => ((.Types): T)
+  rule fieldType([_;_::Int], length) => Int
+  rule fieldType([_;_::Int] #as T, concat) => ((T): T)
+  rule fieldType([T;_::Int], contains) => ((T): Bool)
+  rule fieldType([T;_::Int], append) => ((T): Void)
+  rule fieldType([T;_::Int], insert) => ((Int, T): Void)
+  rule fieldType([T;_::Int], remove) => ((Int): T)
+  rule fieldType([T;_::Int], removeFirst) => ((.Types): T)
+  rule fieldType([T;_::Int], removeLast) => ((.Types): T)
 
   syntax Type ::= type(Exp, Exp) [function]
                 | #type(Type, Type) [function]
@@ -550,10 +558,17 @@ module FPL-VARIABLE-DECLARATION
 
   context loc(_, _, _) = HOLE
 
-  rule <k> loc(L, Idx, _) = (V':Val #Or v(V':Val, _)) => . ... </k>
+  rule <k> loc(L, Idx, _) = (V':Val) => . ... </k>
        <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
     requires isValid(V, Idx)
-  rule <k> loc(L, Idx, _) = (_:Val #Or v(_, _)) => panic("Array index out of bounds") ... </k>
+  rule <k> loc(L, Idx, _) = v(V':Val, _) => . ... </k>
+       <store>... L |-> (V => updateLoc(Idx, V, V')) ...</store>
+    requires isValid(V, Idx)
+
+  rule <k> loc(L, Idx, _) = (_:Val) => panic("Array index out of bounds") ... </k>
+       <store>... L |-> V ...</store>
+    requires notBool isValid(V, Idx)
+  rule <k> loc(L, Idx, _) = v(_, _) => panic("Array index out of bounds") ... </k>
        <store>... L |-> V ...</store>
     requires notBool isValid(V, Idx)
 
@@ -798,10 +813,14 @@ module FPL-ARRAYS
   rule (v(array(L::List), _) [ I:Int ])::Exp => panic("Array indexing out of bounds")
     requires I <Int 0 orBool I >=Int size(L)
 
-  rule <k> loc(Loc, Idx, [_] #Or [_;_::Int]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
+  rule <k> loc(Loc, Idx, [_]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
        <store>... Loc |-> V </store>
-  rule loc(L, Idx, ([_] #Or [_;_::Int]) #as T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
-  rule loc(L, Idx, [T] #Or [T;_::Int]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
+  rule <k> loc(Loc, Idx, [_;_::Int]) . length => #fun(array(L) => v(size(L), Int))(getLoc(Idx, V)) ... </k>
+       <store>... Loc |-> V </store>
+  rule loc(L, Idx, ([_] #as T)) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
+  rule loc(L, Idx, ([_;_::Int] #as T)) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, Idx, concat, x), .Map), ((T): T))
+  rule loc(L, Idx, [T]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
+  rule loc(L, Idx, [T;_::Int]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, Idx, contains, x), .Map), ((T): Bool))
   rule v(array(L::List), _) . length => v(size(L), Int)
   rule v(array(L::List), T) . concat => v(funDef(#token("_", "Ident") x: T, T, pre { .Conditions }, return arrayBuiltin(L, concat, x), .Map), ((T): T))
   rule v(array(L::List), [T]) . contains => v(funDef(#token("_", "Ident") x: T, Bool, pre { .Conditions }, return arrayBuiltin(L, contains, x), .Map), ((T): Bool))
@@ -868,7 +887,15 @@ module FPL-TESTING
   rule <k> assert v(true, Bool) => . ... </k>
   rule <k> declare(assert _) => . ... </k>
 
-  rule <k> .K #Or panic(_) </k>
+  rule <k> .K </k>
+       <scope> Scope => global </scope>
+       <env> E => .Map </env>
+       <store> State => .Map </store>
+       <fstack> FS => .List </fstack>
+       <lstack> LS => .List </lstack>
+    requires E =/=K .Map orBool State =/=K .Map orBool Scope =/=K global orBool FS =/=K .List orBool LS =/=K .List
+
+  rule <k> panic(_) </k>
        <scope> Scope => global </scope>
        <env> E => .Map </env>
        <store> State => .Map </store>
