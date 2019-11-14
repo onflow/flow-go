@@ -73,6 +73,7 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
-		b.CommitBlock()
+		_, err = b.CommitBlock()
+		assert.Nil(t, err)
 	}
 }

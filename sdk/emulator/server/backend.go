@@ -85,7 +85,10 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 
 // GetLatestBlock gets the latest sealed block.
 func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	block := b.blockchain.GetLatestBlock()
+	block, err := b.blockchain.GetLatestBlock()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	// create block header for block
 	blockHeader := flow.BlockHeader{

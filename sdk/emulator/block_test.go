@@ -62,7 +62,8 @@ func TestCommitBlock(t *testing.T) {
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 
 	// Commit tx1 and tx2 into new block
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.Nil(t, err)
 
 	// tx1 status becomes TransactionSealed
 	tx, err = b.GetTransaction(tx1.Hash())

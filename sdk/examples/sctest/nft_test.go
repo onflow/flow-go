@@ -22,7 +22,8 @@ func TestNFTDeployment(t *testing.T) {
 	if !assert.Nil(t, err) {
 		t.Log(err.Error())
 	}
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.Nil(t, err)
 }
 
 func TestCreateNFT(t *testing.T) {

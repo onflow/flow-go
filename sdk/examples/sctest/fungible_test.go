@@ -20,7 +20,8 @@ func TestTokenDeployment(t *testing.T) {
 	tokenCode := ReadFile(resourceTokenContractFile)
 	_, err := b.CreateAccount(nil, tokenCode, GetNonce())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.Nil(t, err)
 }
 
 func TestCreateToken(t *testing.T) {

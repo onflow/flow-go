@@ -131,13 +131,12 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
+func (b *EmulatedBlockchain) GetLatestBlock() (*types.Block, error) {
 	block, err := b.storage.GetLatestBlock()
 	if err != nil {
-		// TODO
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
-	return &block
+	return &block, nil
 }
 
 // GetBlockByHash gets a block by hash.
@@ -303,7 +302,7 @@ func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uin
 //
 // Note: this clears the pending transaction pool and indexes the committed blockchain
 // state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() *types.Block {
+func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -317,8 +316,7 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
-		// TODO: Bubble up error
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 	block := &types.Block{
 		Number:            prevBlock.Number + 1,
@@ -329,26 +327,22 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 
 	for _, tx := range b.txPool {
 		if err := b.storage.InsertTransaction(*tx); err != nil {
-			// TODO: bubble up error
-			panic(err)
+			return nil, &ErrStorage{err}
 		}
 	}
 
 	if err := b.storage.InsertBlock(*block); err != nil {
-		// TODO: Bubble up error
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 
 	if err := b.storage.SetRegisters(block.Number, b.pendingState); err != nil {
-		// TODO: Bubble up error
-		// TODO: Store registers more efficiently
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 
 	// reset tx pool
 	b.txPool = make(map[string]*flow.Transaction)
 
-	return block
+	return block, nil
 }
 
 // LastCreatedAccount returns the last account that was created in the blockchain.

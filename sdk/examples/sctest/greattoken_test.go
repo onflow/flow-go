@@ -19,7 +19,8 @@ func TestDeployment(t *testing.T) {
 	nftCode := ReadFile(greatTokenContractFile)
 	_, err := b.CreateAccount(nil, nftCode, GetNonce())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.Nil(t, err)
 }
 
 func TestCreateMinter(t *testing.T) {
