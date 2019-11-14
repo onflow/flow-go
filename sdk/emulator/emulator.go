@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
+
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -46,10 +48,6 @@ type EmulatedBlockchain struct {
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
 	lastCreatedAccount flow.Account
-
-	// TODO: Remove this
-	// intermediateWorldStates is mapping of intermediate world states (updated after SubmitTransaction)
-	intermediateWorldStates map[string][]byte
 
 	// TODO: store events in storage
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
@@ -92,7 +90,7 @@ func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash 
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
-	storage := storage.NewMemStore()
+	storage := memstore.New()
 	initialState := make(flow.Registers)
 	txPool := make(map[string]*flow.Transaction)
 
@@ -133,20 +131,22 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 }
 
 // GetLatestBlock gets the latest sealed block.
-func (b *EmulatedBlockchain) GetLatestBlock() *types.Block {
+func (b *EmulatedBlockchain) GetLatestBlock() (*types.Block, error) {
 	block, err := b.storage.GetLatestBlock()
 	if err != nil {
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
-	return &block
+	return &block, nil
 }
 
 // GetBlockByHash gets a block by hash.
 func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, error) {
 	block, err := b.storage.GetBlockByHash(hash)
 	if err != nil {
-		// TODO: consolidate emulator/storage errors
-		return nil, &ErrBlockNotFound{BlockHash: hash}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrBlockNotFound{BlockHash: hash}
+		}
+		return nil, &ErrStorage{err}
 	}
 
 	return &block, nil
@@ -156,8 +156,10 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, err
 func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
 	block, err := b.storage.GetBlockByNumber(number)
 	if err != nil {
-		// TODO: consolidate emualator/storage errors
-		return nil, &ErrBlockNotFound{BlockNum: number}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrBlockNotFound{BlockNum: number}
+		}
+		return nil, err
 	}
 
 	return &block, nil
@@ -175,7 +177,10 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transacti
 
 	tx, err := b.storage.GetTransaction(txHash)
 	if err != nil {
-		return nil, &ErrTransactionNotFound{TxHash: txHash}
+		if errors.Is(err, storage.ErrNotFound{}) {
+			return nil, &ErrTransactionNotFound{TxHash: txHash}
+		}
+		return nil, &ErrStorage{err}
 	}
 
 	return &tx, nil
@@ -297,7 +302,7 @@ func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uin
 //
 // Note: this clears the pending transaction pool and indexes the committed blockchain
 // state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() *types.Block {
+func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -311,8 +316,7 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
-		// TODO: Bubble up error
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 	block := &types.Block{
 		Number:            prevBlock.Number + 1,
@@ -323,26 +327,22 @@ func (b *EmulatedBlockchain) CommitBlock() *types.Block {
 
 	for _, tx := range b.txPool {
 		if err := b.storage.InsertTransaction(*tx); err != nil {
-			// TODO: bubble up error
-			panic(err)
+			return nil, &ErrStorage{err}
 		}
 	}
 
 	if err := b.storage.InsertBlock(*block); err != nil {
-		// TODO: Bubble up error
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 
 	if err := b.storage.SetRegisters(block.Number, b.pendingState); err != nil {
-		// TODO: Bubble up error
-		// TODO: Store registers more efficiently
-		panic(err)
+		return nil, &ErrStorage{err}
 	}
 
 	// reset tx pool
 	b.txPool = make(map[string]*flow.Transaction)
 
-	return block
+	return block, nil
 }
 
 // LastCreatedAccount returns the last account that was created in the blockchain.

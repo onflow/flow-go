@@ -27,7 +27,7 @@ func TestExecuteScript(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx.AddSignature(accountAddress, sig)
 
@@ -35,16 +35,16 @@ func TestExecuteScript(t *testing.T) {
 
 	// Sample call (value is 0)
 	value, err := b.ExecuteScript([]byte(callScript))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Sample call (value is 2)
 	value, err = b.ExecuteScript([]byte(callScript))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 }
 

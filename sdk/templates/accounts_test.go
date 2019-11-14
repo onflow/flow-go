@@ -24,7 +24,7 @@ func TestCreateAccount(t *testing.T) {
 
 	// create account with no code
 	scriptA, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, []byte{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	expectedScriptA := []byte(`
 		fun main() {
@@ -38,7 +38,7 @@ func TestCreateAccount(t *testing.T) {
 
 	// create account with code
 	scriptB, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, []byte("fun main() {}"))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	expectedScriptB := []byte(`
 		fun main() {

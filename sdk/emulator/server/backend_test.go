@@ -22,7 +22,7 @@ func TestPing(t *testing.T) {
 	server := server.NewBackend(b, events.NewMemStore(), log.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, res.GetAddress(), []byte("pong!"))
 }
 
@@ -70,10 +70,10 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 2,
 			EndBlock:   2,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		var events []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &events)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, events, 0)
 	})
 
@@ -83,10 +83,10 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, resEvents, 1)
 		assert.Equal(t, resEvents[0].Type, transferType)
 		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
@@ -97,10 +97,10 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		// Should get both events
 		assert.Len(t, resEvents, 2)
 	})
@@ -110,10 +110,10 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		var resEvents []flow.Event
 		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, resEvents, 2)
 		// Mint event first, then Transfer
 		assert.Equal(t, resEvents[0].Type, mintType)

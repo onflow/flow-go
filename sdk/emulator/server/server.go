@@ -128,13 +128,16 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			block := b.backend.blockchain.CommitBlock()
-
-			b.logger.WithFields(log.Fields{
-				"blockNum":  block.Number,
-				"blockHash": block.Hash().Hex(),
-				"blockSize": len(block.TransactionHashes),
-			}).Debugf("⛏  Block #%d mined", block.Number)
+			block, err := b.backend.blockchain.CommitBlock()
+			if err != nil {
+				b.logger.WithError(err).Error("Failed to commit block")
+			} else {
+				b.logger.WithFields(log.Fields{
+					"blockNum":  block.Number,
+					"blockHash": block.Hash().Hex(),
+					"blockSize": len(block.TransactionHashes),
+				}).Debugf("⛏  Block #%d mined", block.Number)
+			}
 
 		case <-ctx.Done():
 			return

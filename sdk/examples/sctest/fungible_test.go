@@ -19,8 +19,9 @@ func TestTokenDeployment(t *testing.T) {
 	// Should be able to deploy a contract as a new account with no keys.
 	tokenCode := ReadFile(resourceTokenContractFile)
 	_, err := b.CreateAccount(nil, tokenCode, GetNonce())
-	assert.Nil(t, err)
-	b.CommitBlock()
+	assert.NoError(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 }
 
 func TestCreateToken(t *testing.T) {
@@ -29,7 +30,7 @@ func TestCreateToken(t *testing.T) {
 	// First, deploy the contract
 	tokenCode := ReadFile(resourceTokenContractFile)
 	contractAddr, err := b.CreateAccount(nil, tokenCode, GetNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Vault must be instantiated with a positive balance
 	t.Run("Cannot create token with negative initial balance", func(t *testing.T) {
@@ -56,7 +57,7 @@ func TestCreateToken(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 10))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 	})
@@ -80,7 +81,7 @@ func TestInAccountTransfers(t *testing.T) {
 	// First, deploy the contract
 	tokenCode := ReadFile(resourceTokenContractFile)
 	contractAddr, err := b.CreateAccount(nil, tokenCode, GetNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// then deploy the three tokens to an account
 	tx := flow.Transaction{
@@ -106,7 +107,7 @@ func TestInAccountTransfers(t *testing.T) {
 
 		// Assert that the vaults balance is correct
 		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 0, 7))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 	})
@@ -125,13 +126,13 @@ func TestInAccountTransfers(t *testing.T) {
 
 		// Assert that the vault's balance is correct
 		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 1, 12))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 
 		// Assert that the vault's balance is correct
 		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 2, 13))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 	})
@@ -143,7 +144,7 @@ func TestExternalTransfers(t *testing.T) {
 	// First, deploy the token contract
 	tokenCode := ReadFile(resourceTokenContractFile)
 	contractAddr, err := b.CreateAccount(nil, tokenCode, GetNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// then deploy the tokens to an account
 	tx := flow.Transaction{
@@ -185,11 +186,11 @@ func TestExternalTransfers(t *testing.T) {
 
 		// Assert that the vaults' balances are correct
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 	})
@@ -245,11 +246,11 @@ func TestExternalTransfers(t *testing.T) {
 
 		// Assert that the vaults' balances have not changed after all the fails
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 
@@ -269,11 +270,11 @@ func TestExternalTransfers(t *testing.T) {
 
 		// Assert that the vaults' balances are correct
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 14))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 6))
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 	})
