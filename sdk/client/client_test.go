@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/client"
@@ -270,7 +270,7 @@ func TestGetEvents(t *testing.T) {
 	}
 
 	// encode event payload from mock value
-	eventPayload, _ := encode.Encode(mockEventValue)
+	eventPayload, _ := encoding.Encode(mockEventValue)
 
 	// Set up a mock event response
 	mockEvent := flow.Event{
@@ -302,7 +302,7 @@ func TestGetEvents(t *testing.T) {
 
 		actualEvent := events[0]
 
-		value, err := encode.Decode(mockEventType, actualEvent.Payload)
+		value, err := encoding.Decode(mockEventType, actualEvent.Payload)
 		eventValue := value.(values.Event)
 
 		assert.Equal(t, actualEvent.Type, mockEvent.Type)

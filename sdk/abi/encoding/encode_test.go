@@ -1,4 +1,4 @@
-package encode_test
+package encoding_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/magiconair/properties/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
@@ -27,12 +27,12 @@ func TestEncode(t *testing.T) {
 		},
 	}
 
-	b, err := encode.Encode(value1)
+	b, err := encoding.Encode(value1)
 	require.NoError(t, err)
 
 	t.Logf("Encoded value: %x", b)
 
-	value2, err := encode.Decode(compositeType, b)
+	value2, err := encoding.Decode(compositeType, b)
 	require.NoError(t, err)
 
 	assert.Equal(t, value1, value2)

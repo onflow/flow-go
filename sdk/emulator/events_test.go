@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -69,7 +69,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encode.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
 		assert.Nil(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -107,7 +107,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encode.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
 		assert.Nil(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -172,7 +172,7 @@ func TestEventEmitted(t *testing.T) {
 		// first event is AccountCreated event
 		actualEvent := events[1]
 
-		eventValue, err := encode.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
 		assert.Nil(t, err)
 
 		decodedEvent := eventValue.(values.Event)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -55,7 +55,7 @@ func TestGetEvents(t *testing.T) {
 			Payload: []byte{},
 		}
 
-		transferPayload, _ = encode.Encode(values.Event{
+		transferPayload, _ = encoding.Encode(values.Event{
 			Identifier: transferType,
 			Fields:     []values.Value{toAddress},
 		})
@@ -103,7 +103,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Len(t, resEvents, 1)
 		assert.Equal(t, transferType, resEvents[0].Type)
 
-		value, err := encode.Decode(transferEventType, resEvents[0].Payload)
+		value, err := encoding.Decode(transferEventType, resEvents[0].Payload)
 		require.Nil(t, err)
 
 		event := value.(values.Event)

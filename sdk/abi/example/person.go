@@ -1,7 +1,7 @@
 package example
 
 import (
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
@@ -16,11 +16,11 @@ var PersonType types.Type = types.Composite{
 }
 
 func EncodePerson(p Person) ([]byte, error) {
-	return encode.Encode(p.Value())
+	return encoding.Encode(p.Value())
 }
 
 func DecodePerson(b []byte) (Person, error) {
-	v, err := encode.Decode(PersonType, b)
+	v, err := encoding.Decode(PersonType, b)
 	if err != nil {
 		return nil, err
 	}
