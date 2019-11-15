@@ -31,6 +31,7 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 func (e *Encoder) Encode(v values.Value) error {
+	// TODO: implement remaining types
 	switch x := v.(type) {
 	case values.String:
 		return e.EncodeString(x)

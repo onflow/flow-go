@@ -1,7 +1,6 @@
 package encode_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/magiconair/properties/assert"
@@ -12,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
+// TODO: test remaining types
 func TestEncode(t *testing.T) {
 	compositeType := types.Composite{
 		FieldTypes: []types.Type{
@@ -27,19 +27,13 @@ func TestEncode(t *testing.T) {
 		},
 	}
 
-	var w bytes.Buffer
-	enc := encode.NewEncoder(&w)
+	b, err := encode.Encode(value1)
+	require.NoError(t, err)
 
-	err := enc.Encode(value1)
-	require.Nil(t, err)
+	t.Logf("Encoded value: %x", b)
 
-	t.Logf("Encoded: %x", w.Bytes())
-
-	r := bytes.NewReader(w.Bytes())
-	dec := encode.NewDecoder(r)
-
-	value2, err := dec.Decode(compositeType)
-	require.Nil(t, err)
+	value2, err := encode.Decode(compositeType, b)
+	require.NoError(t, err)
 
 	assert.Equal(t, value1, value2)
 }

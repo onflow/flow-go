@@ -32,6 +32,7 @@ func NewDecoder(r io.Reader) *Decoder {
 }
 
 func (e *Decoder) Decode(t types.Type) (values.Value, error) {
+	// TODO: implement remaining types
 	switch x := t.(type) {
 	case types.String:
 		return e.DecodeString()
