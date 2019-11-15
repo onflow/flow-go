@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -96,10 +95,6 @@ type interpreterRuntime struct {
 // NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
-}
-
-var Uint8ArrayType = types.VariableSizedArray{
-	ElementType: types.Uint8{},
 }
 
 // TODO: improve types
