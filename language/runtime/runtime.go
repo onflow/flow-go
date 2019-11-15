@@ -372,7 +372,7 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 
 	var identifier string
 
-	// TODO: can this be generalized for all types
+	// TODO: can this be generalized for all types?
 	switch location := eventValue.Location.(type) {
 	case ast.AddressLocation:
 		identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
