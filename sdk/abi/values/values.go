@@ -107,6 +107,12 @@ type Address [20]byte
 func (Address) isValue()                 {}
 func (v Address) ToGoValue() interface{} { return [20]byte(v) }
 
+func BytesToAddress(b []byte) Address {
+	var a Address
+	copy(a[:], b)
+	return a
+}
+
 type Bytes []byte
 
 func (Bytes) isValue()                 {}
