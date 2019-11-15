@@ -180,7 +180,7 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 
 			// If no such block exists, this register has never been written to.
 			// Write the register value for this block number and add it to the
-			// Blocks of updated registers.
+			// list of updated registers.
 			if lastChangedBlock == notFound {
 				updatedRegisterIDs = append(updatedRegisterIDs, registerID)
 				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
@@ -191,7 +191,7 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 
 			// This register has been written either at this block an earlier
 			// block. If the register value has changed since the last write,
-			// write the new value and add it to the Blocks of updated registers.
+			// write the new value and add it to the list of updated registers.
 			// If the register value has not changed, we implicitly ignore it.
 			lastValue, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
 			if err != nil {
