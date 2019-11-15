@@ -244,7 +244,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	return nil
 }
 
-// TODO: add functionality for AddTransaction
+// AddTransaction adds a transaction to the current pendingBlock (validates transaction) but holds off on executing it.
 func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
@@ -280,6 +280,7 @@ func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 	return nil
 }
 
+// ExecuteBlock executes the remaing transactions in pendingBlock.
 func (b *EmulatedBlockchain) ExecuteBlock() []error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
@@ -300,6 +301,7 @@ func (b *EmulatedBlockchain) ExecuteBlock() []error {
 	return errors
 }
 
+// ExecuteNextTransaction executes the next indexed transaction in pendingBlock.
 func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
@@ -307,7 +309,9 @@ func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
 	return b.executeTransaction()
 }
 
+// executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs throught the transaction execution.
 func (b *EmulatedBlockchain) executeTransaction() error {
+	// Check if there are remaining txs to be executed
 	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
 		return &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
@@ -315,6 +319,8 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	txHash := b.pendingBlock.TransactionHashes[b.pendingBlock.Index]
 	tx := b.txPool[string(txHash)]
 
+	// Advances the transaction list index (inside a block)
+	// Note: we want to advance the index even if tx reverts
 	b.pendingBlock.Index++
 
 	registers := b.pendingWorldState.Registers.NewView()
@@ -340,9 +346,18 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	return nil
 }
 
-func (b *EmulatedBlockchain) CommitState() *etypes.Block {
+// CommitState takes all executed transactions and commits them into a block.
+//
+// Note: this clears the pending transaction pool and indexes the committed blockchain
+// state for testing purposes.
+func (b *EmulatedBlockchain) CommitState() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
+
+	// If Index > 0, pendingBlock has begun execution (cannot commit state)
+	if b.pendingBlock.Index > 0 {
+		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
+	}
 
 	txHashes := make([]crypto.Hash, 0)
 	for _, tx := range b.txPool {
@@ -359,15 +374,22 @@ func (b *EmulatedBlockchain) CommitState() *etypes.Block {
 	b.pendingWorldState.InsertBlock(b.pendingBlock)
 	b.commitWorldState(b.pendingBlock.Hash())
 
-	committedBlock := b.pendingBlock
-
 	b.pendingBlock = &etypes.Block{
 		Number:            b.pendingBlock.Number + 1,
 		PreviousBlockHash: b.pendingBlock.Hash(),
 		TransactionHashes: make([]crypto.Hash, 0),
 	}
 
-	return committedBlock
+	return nil
+}
+
+// ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
+func (b *EmulatedBlockchain) ExecuteAndCommitBlock() []error {
+	errors := b.ExecuteBlock()
+
+	b.CommitState()
+
+	return errors
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
