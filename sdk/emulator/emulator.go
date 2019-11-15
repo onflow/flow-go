@@ -7,8 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encode"
-	abitypes "github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -466,18 +465,14 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {
 
-			t := abitypes.Event{
-				FieldTypes: abitypes.EventField{
-					Identifier: "address",
-					Type:       abitypes.Address,
-				}
+			event, err := flow.DecodeAccountCreatedEvent(event.Payload)
+			if err != nil {
+				panic("failed to decode AccountCreated event")
 			}
 
-			eventValue, err := encode.Decode(nil, event.Payload)
+			address := event.Address()
 
-			accountAddress := event.Values["address"].(flow.Address)
-
-			account, err := b.GetAccount(accountAddress)
+			account, err := b.GetAccount(address)
 			if err != nil {
 				panic("failed to get newly-created account")
 			}
@@ -521,13 +516,13 @@ func createRootAccount(
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{publicKeyBytes},
+		[]values.Bytes{publicKeyBytes},
 		[]byte{},
 	)
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	account := runtimeContext.GetAccount(accountAddress)
+	account := runtimeContext.GetAccount(flow.Address(accountAddress))
 
 	return *account, privateKey
 }

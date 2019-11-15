@@ -76,7 +76,6 @@ func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
 	events := make([]flow.Event, len(values))
 
 	for i, value := range values {
-
 		payload, err := encode.Encode(value)
 		if err != nil {
 			panic("failed to encode event")
