@@ -7,7 +7,7 @@ resource interface INFT {
     init(newID: Int) {
         pre {
             newID > 0:
-                "ID must be positive!"
+                "NFT ID must be positive!"
         }
     }
 }
@@ -21,10 +21,10 @@ pub resource NFT: INFT {
 }
 
 // possibility for each account with NFTs to have a copy of this resource that they keep their NFTs in
-// they could send one NFT, multiple at a time, or potentially even send the entire collection in one go?
+// they could send one NFT, multiple at a time, or potentially even send the entire collection in one go
 resource interface INFTCollection {
 
-    // variable size array of NFT conforming tokens
+    // dictionary of NFT conforming tokens
     pub var ownedNFTs: <-{Int: NFT}
 
     pub fun transfer(recipient: &NFTCollection, tokenID: Int) {
@@ -45,7 +45,7 @@ resource interface INFTCollection {
 }
 
 resource NFTCollection: INFTCollection { 
-    // variable size dictionary of NFT conforming tokens
+    // dictionary of NFT conforming tokens
     // NFT is a resource type with an `Int` ID field
     pub var ownedNFTs: <-{Int: NFT}
 
@@ -142,7 +142,7 @@ resource NFTCollection: INFTCollection {
     }
 }
 
-fun createNFT(id: Int, str: Int): <-NFT {
+fun createNFT(id: Int): <-NFT {
     return <- create NFT(newID: id)
 }
 

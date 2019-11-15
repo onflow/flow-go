@@ -17,7 +17,7 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
 		fun main(acct: Account) {
-			var tokenA: <-NFT <- createNFT(id: %d, str: 1)
+			var tokenA: <-NFT <- createNFT(id: %d)
 
 			var collection: <-NFTCollection <- createCollection(token: <-tokenA)
 
@@ -124,7 +124,12 @@ func GenerateInspectCollectionArrayScript(nftCodeAddr, userAddr flow.Address) []
 			let acct = getAccount("%s")
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
 
-			log(collectionRef.getOwnedNFTs())
+			let array = collectionRef.getOwnedNFTs()
+
+			if (array.length != 2 || array[1] != 1 || array[0] != 2) {
+				panic("Array is incorrect")
+			}
+			
 		}`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr))
