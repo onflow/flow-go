@@ -28,8 +28,19 @@ func (c changelist) Swap(i, j int) { c.list[i], c.list[j] = c.list[j], c.list[i]
 // Returns notFound if no such block number exists. This relies on the fact
 // that the changelist is kept sorted in ascending order.
 func (c changelist) search(n uint64) uint64 {
-	if len(c.list) == 0 {
+	index := c.searchForIndex(n)
+	if index == -1 {
 		return notFound
+	}
+	return c.list[index]
+}
+
+// searchForIndex finds the index of the highest block number B in the
+// changelist so that B<=n. Returns -1 if no such block number exists. This
+// relies on the fact that the changelist is kept sorted in ascending order.
+func (c changelist) searchForIndex(n uint64) (index int) {
+	if len(c.list) == 0 {
+		return -1
 	}
 	// This will return the lowest index where the block number is >n.
 	// What we want is the index directly BEFORE this.
@@ -39,9 +50,9 @@ func (c changelist) search(n uint64) uint64 {
 
 	if foundIndex == 0 {
 		// All block numbers are >n.
-		return notFound
+		return -1
 	}
-	return c.list[foundIndex-1]
+	return foundIndex - 1
 }
 
 // add adds the block number to the list, ensuring the list remains sorted. If
@@ -51,13 +62,21 @@ func (c *changelist) add(n uint64) {
 		return
 	}
 
-	exists := c.search(n) == n
-	if exists {
+	index := c.searchForIndex(n)
+	if index == -1 {
+		// all blocks in the list are >n, or the list is empty
+		c.list = append([]uint64{n}, c.list...)
 		return
 	}
 
-	c.list = append(c.list, n)
-	sort.Sort(c)
+	lastBlockNumber := c.list[index]
+	if lastBlockNumber == n {
+		// n already exists in the list
+		return
+	}
+
+	// insert n directly after lastBlockNumber
+	c.list = append(c.list[:index+1], append([]uint64{n}, c.list[index+1:]...)...)
 }
 
 // The changelog describes the change history of each register in a ledger.
