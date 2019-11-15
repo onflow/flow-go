@@ -59,10 +59,14 @@ func TestCreateNFT(t *testing.T) {
 	})
 
 	// Assert that the account's collection is correct
-	// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 0))
-	// if !assert.Nil(t, err) {
-	// 	t.Log(err.Error())
-	// }
+	_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, true))
+	if !assert.Nil(t, err) {
+		t.Log(err.Error())
+	}
+
+	// Assert that the account's collection doesn't contain ID 3
+	_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 3, true))
+	assert.Error(t, err)
 
 }
 
@@ -86,10 +90,10 @@ func TestTransferNFT(t *testing.T) {
 	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that the account's collection is correct
-	// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1))
-	// if !assert.Nil(t, err) {
-	// 	t.Log(err.Error())
-	// }
+	_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, true))
+	if !assert.Nil(t, err) {
+		t.Log(err.Error())
+	}
 
 	// create a new account
 	bastianPrivateKey := randomKey()
@@ -120,28 +124,124 @@ func TestTransferNFT(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the account's collection is correct
-		// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 2, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 1, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 2, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		_, err = b.ExecuteScript(GenerateInspectCollectionArrayScript(contractAddr, bastianAddress))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 	})
 
 	// transfer an NFT
-	// t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
-	// 	tx := flow.Transaction{
-	// 		Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 2),
-	// 		Nonce:          GetNonce(),
-	// 		ComputeLimit:   20,
-	// 		PayerAccount:   b.RootAccountAddress(),
-	// 		ScriptAccounts: []flow.Address{bastianAddress},
-	// 	}
+	t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
+		tx := flow.Transaction{
+			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 1),
+			Nonce:          GetNonce(),
+			ComputeLimit:   20,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []flow.Address{bastianAddress},
+		}
 
-	// 	SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
-	// 	// Assert that the account's collection is correct
-	// 	// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1))
-	// 	// if !assert.Nil(t, err) {
-	// 	// 	t.Log(err.Error())
-	// 	// }
-	// })
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+	})
+
+	// transfer an NFT
+	t.Run("Should fail when trying to transfer a token that doesn't exist", func(t *testing.T) {
+		tx := flow.Transaction{
+			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 5),
+			Nonce:          GetNonce(),
+			ComputeLimit:   20,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []flow.Address{bastianAddress},
+		}
+
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, true)
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+	})
 }
