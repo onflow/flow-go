@@ -21,6 +21,10 @@ type String struct{}
 
 func (String) isType() {}
 
+type Bytes struct{}
+
+func (Bytes) isType() {}
+
 type Int struct{}
 
 func (Int) isType() {}
