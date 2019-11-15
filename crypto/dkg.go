@@ -4,8 +4,6 @@ package crypto
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // DKGType is the supported DKG type
@@ -84,7 +82,6 @@ func NewDKG(dkg DKGType, size int, currentIndex int,
 			leaderIndex: index(leaderIndex),
 		}
 		fvss.init()
-		log.Debugf("new dkg my index %d, leader is %d\n", fvss.currentIndex, fvss.leaderIndex)
 		return fvss, nil
 	case FeldmanVSSQual:
 		fvss := &feldmanVSSstate{
@@ -96,14 +93,12 @@ func NewDKG(dkg DKGType, size int, currentIndex int,
 			disqualified:    false,
 		}
 		fvssq.init()
-		log.Debugf("new dkg my index %d, leader is %d\n", fvssq.currentIndex, fvssq.leaderIndex)
 		return fvssq, nil
 	case JointFeldman:
 		jf := &JointFeldmanState{
 			dkgCommon: common,
 		}
 		jf.init()
-		log.Debugf("new dkg my index %d\n", jf.currentIndex)
 		return jf, nil
 	default:
 		return nil, cryptoError{fmt.Sprintf("the Distributed Key Generation %d is not supported", dkg)}
