@@ -84,7 +84,7 @@ type accountCreatedEvent struct {
 }
 
 func (a accountCreatedEvent) Address() Address {
-	return Address(a.Fields[0].Value.(values.Address))
+	return Address(a.Fields[0].(values.Address))
 }
 
 func DecodeAccountCreatedEvent(b []byte) (AccountCreatedEvent, error) {

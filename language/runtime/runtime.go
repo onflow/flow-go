@@ -399,14 +399,10 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	fieldValues ...values.Value,
 ) {
-	fields := make([]values.EventField, len(fieldValues))
+	fields := make([]values.Value, len(fieldValues))
 
 	for i, value := range fieldValues {
-		field := eventType.Fields[i]
-		fields[i] = values.EventField{
-			Identifier: field.Identifier,
-			Value:      value,
-		}
+		fields[i] = value
 	}
 
 	identifier := fmt.Sprintf("flow.%s", eventType.Identifier)

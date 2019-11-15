@@ -95,7 +95,7 @@ func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
 }
 
 func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
-	fields := make([]values.EventField, len(t.FieldTypes))
+	fields := make([]values.Value, len(t.FieldTypes))
 
 	for i, field := range t.FieldTypes {
 		value, err := e.Decode(field.Type)
@@ -103,10 +103,7 @@ func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
 			return values.Event{}, err
 		}
 
-		fields[i] = values.EventField{
-			Identifier: field.Identifier,
-			Value:      value,
-		}
+		fields[i] = value
 	}
 
 	return values.Event{

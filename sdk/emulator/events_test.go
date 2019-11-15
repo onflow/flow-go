@@ -79,8 +79,8 @@ func TestEventEmitted(t *testing.T) {
 
 		assert.Equal(t, expectedType, actualEvent.Type)
 		assert.Equal(t, expectedID, actualEvent.ID())
-		assert.Equal(t, values.Int(1), decodedEvent.Fields[0].Value)
-		assert.Equal(t, values.Int(2), decodedEvent.Fields[1].Value)
+		assert.Equal(t, values.Int(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.Int(2), decodedEvent.Fields[1])
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
@@ -116,8 +116,8 @@ func TestEventEmitted(t *testing.T) {
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
-		assert.Equal(t, values.Int(1), decodedEvent.Fields[0].Value)
-		assert.Equal(t, values.Int(2), decodedEvent.Fields[1].Value)
+		assert.Equal(t, values.Int(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.Int(2), decodedEvent.Fields[1])
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
@@ -182,7 +182,7 @@ func TestEventEmitted(t *testing.T) {
 
 		assert.Equal(t, expectedType, actualEvent.Type)
 		assert.Equal(t, expectedID, actualEvent.ID())
-		assert.Equal(t, values.Int(1), decodedEvent.Fields[0].Value)
-		assert.Equal(t, values.Int(2), decodedEvent.Fields[1].Value)
+		assert.Equal(t, values.Int(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.Int(2), decodedEvent.Fields[1])
 	})
 }

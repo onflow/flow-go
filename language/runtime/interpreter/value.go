@@ -1450,13 +1450,10 @@ type EventValue struct {
 func (EventValue) isValue() {}
 
 func (v EventValue) Export() values.Value {
-	fields := make([]values.EventField, len(v.Fields))
+	fields := make([]values.Value, len(v.Fields))
 
 	for i, field := range v.Fields {
-		fields[i] = values.EventField{
-			Identifier: field.Identifier,
-			Value:      field.Value.(ExportableValue).Export(),
-		}
+		fields[i] = field.Value.(ExportableValue).Export()
 	}
 
 	return values.Event{

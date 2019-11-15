@@ -78,7 +78,7 @@ func (e *Encoder) EncodeComposite(v values.Composite) error {
 
 func (e *Encoder) EncodeEvent(v values.Event) error {
 	for _, field := range v.Fields {
-		if err := e.Encode(field.Value); err != nil {
+		if err := e.Encode(field); err != nil {
 			return err
 		}
 	}

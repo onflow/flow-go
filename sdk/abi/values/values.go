@@ -91,16 +91,11 @@ func (v Dictionary) ToGoValue() interface{} { panic("not implemented") }
 
 type Event struct {
 	Identifier string
-	Fields     []EventField
+	Fields     []Value
 }
 
 func (Event) isValue()                 {}
 func (v Event) ToGoValue() interface{} { panic("not implemented") }
-
-type EventField struct {
-	Identifier string
-	Value      Value
-}
 
 type Address [20]byte
 
