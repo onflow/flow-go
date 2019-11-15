@@ -132,6 +132,8 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
+		// TODO: add access to ValueDeclaration and use declaration's access instead here
+		ast.AccessPublic,
 		declaration.ValueDeclarationKind(),
 		declaration.ValueDeclarationPosition(),
 		declaration.ValueDeclarationIsConstant(),
@@ -153,7 +155,9 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
 		&Variable{
-			Identifier:      identifier.Identifier,
+			Identifier: identifier.Identifier,
+			// TODO: add access to TypeDeclaration and use declaration's access instead here
+			Access:          ast.AccessPublic,
 			DeclarationKind: declaration.TypeDeclarationKind(),
 			IsConstant:      true,
 			Type:            ty,

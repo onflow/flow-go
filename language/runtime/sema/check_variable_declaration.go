@@ -167,6 +167,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 	variable, err := checker.valueActivations.Declare(
 		declaration.Identifier.Identifier,
 		declarationType,
+		declaration.Access,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Pos,
 		declaration.IsConstant,

@@ -77,6 +77,7 @@ func (checker *Checker) declareFunctionDeclaration(
 
 	variable, err := checker.valueActivations.DeclareFunction(
 		declaration.Identifier,
+		declaration.Access,
 		functionType,
 		argumentLabels,
 	)
@@ -254,6 +255,7 @@ func (checker *Checker) declareParameters(
 
 		variable := &Variable{
 			Identifier:      identifier.Identifier,
+			Access:          ast.AccessPublic,
 			DeclarationKind: common.DeclarationKindParameter,
 			IsConstant:      true,
 			Type:            parameterType,

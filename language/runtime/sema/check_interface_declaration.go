@@ -162,6 +162,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		identifier.Identifier,
 		&Variable{
 			Identifier:      identifier.Identifier,
+			Access:          declaration.Access,
 			DeclarationKind: declaration.DeclarationKind(),
 			IsConstant:      true,
 			Type:            interfaceType,

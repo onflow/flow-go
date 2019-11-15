@@ -51,6 +51,7 @@ func (a *ValueActivations) Depth() int {
 func (a *ValueActivations) Declare(
 	identifier string,
 	ty Type,
+	access ast.Access,
 	kind common.DeclarationKind,
 	pos ast.Position,
 	isConstant bool,
@@ -73,6 +74,7 @@ func (a *ValueActivations) Declare(
 	// variable with this name is not declared in current scope, declare it
 	variable = &Variable{
 		Identifier:      identifier,
+		Access:          access,
 		DeclarationKind: kind,
 		IsConstant:      isConstant,
 		Depth:           depth,
@@ -86,12 +88,14 @@ func (a *ValueActivations) Declare(
 
 func (a *ValueActivations) DeclareFunction(
 	identifier ast.Identifier,
+	access ast.Access,
 	invokableType InvokableType,
 	argumentLabels []string,
 ) (*Variable, error) {
 	return a.Declare(
 		identifier.Identifier,
 		invokableType,
+		access,
 		common.DeclarationKindFunction,
 		identifier.Pos,
 		true,
@@ -107,6 +111,7 @@ func (a *ValueActivations) DeclareImplicitConstant(
 	return a.Declare(
 		identifier,
 		ty,
+		ast.AccessPublic,
 		kind,
 		ast.Position{},
 		true,

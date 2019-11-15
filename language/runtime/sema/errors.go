@@ -1589,3 +1589,23 @@ func (e *InvalidAssignmentTargetError) Error() string {
 }
 
 func (*InvalidAssignmentTargetError) isSemanticError() {}
+
+// InvalidAccessError
+
+type InvalidAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAccessError) isSemanticError() {}

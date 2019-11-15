@@ -89,6 +89,7 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 		_, err := checker.valueActivations.Declare(
 			identifier.Identifier,
 			&InvalidType{},
+			ast.AccessPrivate,
 			common.DeclarationKindValue,
 			identifier.Pos,
 			true,
@@ -109,10 +110,10 @@ func (checker *Checker) importValues(
 	importChecker *Checker,
 	missing map[ast.Identifier]bool,
 ) {
-	// TODO: consider access modifiers
-
-	// determine which identifiers are imported /
+	// Determine which identifiers are imported /
 	// which variables need to be declared
+
+	explicitlyImported := map[string]ast.Identifier{}
 
 	var variables map[string]*Variable
 	identifierLength := len(declaration.Identifiers)
@@ -126,6 +127,7 @@ func (checker *Checker) importValues(
 			}
 			variables[name] = variable
 			delete(missing, identifier)
+			explicitlyImported[name] = identifier
 		}
 	} else {
 		variables = importChecker.GlobalValues
@@ -136,19 +138,48 @@ func (checker *Checker) importValues(
 		// TODO: improve position
 		// TODO: allow cross-module variables?
 
-		// don't import predeclared values
+		// Don't import predeclared values
 		if _, ok := importChecker.PredeclaredValues[name]; ok {
 			continue
 		}
 
-		// don't import base values
+		// Don't import base values
 		if _, ok := BaseValues[name]; ok {
 			continue
+		}
+
+		// If the value can't be imported due to restricted access,
+		// report an error, but still import the
+
+		// TODO: handle not-specified access modifier
+
+		// TODO: add option to checker to specify behaviour
+		//   for not-specified access modifier
+
+		if variable.Access == ast.AccessPrivate {
+
+			// If the value was imported explicitly,
+			// report an error
+
+			if identifier, ok := explicitlyImported[name]; ok {
+				checker.report(
+					&InvalidAccessError{
+						Name:              name,
+						RestrictingAccess: variable.Access,
+						DeclarationKind:   variable.DeclarationKind,
+						Range:             ast.NewRangeFromPositioned(identifier),
+					},
+				)
+			} else {
+				// Don't import not explicitly imported private values
+				continue
+			}
 		}
 
 		_, err := checker.valueActivations.Declare(
 			name,
 			variable.Type,
+			variable.Access,
 			variable.DeclarationKind,
 			declaration.LocationPos,
 			true,

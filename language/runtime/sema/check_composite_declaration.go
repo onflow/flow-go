@@ -144,6 +144,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		identifier.Identifier,
 		&Variable{
 			Identifier:      identifier.Identifier,
+			Access:          declaration.Access,
 			DeclarationKind: declaration.DeclarationKind(),
 			IsConstant:      true,
 			Type:            compositeType,
@@ -364,6 +365,7 @@ func (checker *Checker) declareCompositeConstructor(
 
 	_, err := checker.valueActivations.DeclareFunction(
 		compositeDeclaration.Identifier,
+		compositeDeclaration.Access,
 		functionType,
 		argumentLabels,
 	)
@@ -572,6 +574,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 
 	self := &Variable{
 		Identifier:      SelfIdentifier,
+		Access:          ast.AccessPublic,
 		DeclarationKind: common.DeclarationKindSelf,
 		Type:            selfType,
 		IsConstant:      true,
