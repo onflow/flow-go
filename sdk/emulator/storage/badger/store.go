@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -25,6 +26,7 @@ func New(path string) (Store, error) {
 	if err != nil {
 		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
+	// TODO read ledger changelog from disk
 	return Store{db, newChangelog()}, nil
 }
 
@@ -137,64 +139,90 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	})
 }
 
-func (s Store) GetLedgerView(blockNumber uint64) (view flow.LedgerView, err error) {
-	var changelog changelog
-	_ = changelog
-	for key, value := range changelog.registers {
-		_, _ = key, value
-		// find the highest block number in the register's changelog so that
-		//     it is <= blockNumber
-		// get the corresponding value from storage
-		// insert the value to the ledger view
-	}
+func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
+	s.ledgerChangeLog.RLock()
+	defer s.ledgerChangeLog.RUnlock()
 
-	// TODO replace this by implementing above
-	err = s.db.View(func(txn *badger.Txn) error {
-		encLedger, err := getTx(txn)(ledgerKey(blockNumber))
-		if err != nil {
-			return err
-		}
+	ledger := make(flow.Ledger)
 
-		var ledger flow.Ledger
-		if err := decodeLedger(&ledger, encLedger); err != nil {
-			return err
+	err := s.db.View(func(txn *badger.Txn) error {
+		for registerID, clist := range s.ledgerChangeLog.registers {
+			// Get the block at which the register last changed value. If no
+			// such block exists, skip this register.
+			lastChangedBlock := clist.search(blockNumber)
+			if lastChangedBlock == notFound {
+				continue
+			}
+
+			// Get the value of the register and add it to the ledger.
+			value, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
+			if err != nil {
+				return err
+			}
+			ledger[registerID] = value
 		}
-		view = *ledger.NewView()
 		return nil
 	})
-	return
+	return *ledger.NewView(), err
 }
 
 func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
-	// List of register IDs with changed values after this operation
-	var updatedRegisters []string
-	_ = updatedRegisters
-
-	for registerID, value := range ledger {
-		_, _ = registerID, value
-		// get most recent change from changelog [O(lg(k))]
-		// if no change exists:
-		//   - write value
-		//   - update changelog
-		//   - note key
-		// get corresponding value from storage [O(a1)]
-		// if value is different:
-		//   - write value
-		//   - update changelog
-		//   - note key in changelog diff
-		// else:
-		//   - continue
-	}
-	// write each key in the changelog diff (to disk)
-
-	// TODO replace this by implementing above
-	encLedger, err := encodeLedger(ledger)
-	if err != nil {
-		return err
-	}
+	s.ledgerChangeLog.Lock()
+	defer s.ledgerChangeLog.Unlock()
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(ledgerKey(blockNumber), encLedger)
+		// List of register IDs with changed values after this operation
+		var updatedRegisterIDs []string
+
+		for registerID, value := range ledger {
+			// get the block at which this register was most recently changed
+			lastChangedBlock := s.ledgerChangeLog.getMostRecentChange(registerID, blockNumber)
+
+			// If no such block exists, this register has never been written to.
+			// Write the register value for this block number and add it to the
+			// Blocks of updated registers.
+			if lastChangedBlock == notFound {
+				updatedRegisterIDs = append(updatedRegisterIDs, registerID)
+				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
+					return err
+				}
+				continue
+			}
+
+			// This register has been written either at this block an earlier
+			// block. If the register value has changed since the last write,
+			// write the new value and add it to the Blocks of updated registers.
+			// If the register value has not changed, we implicitly ignore it.
+			lastValue, err := getTx(txn)(ledgerValueKey(registerID, blockNumber))
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(value, lastValue) {
+				// the register value has changed - update it.
+				updatedRegisterIDs = append(updatedRegisterIDs, registerID)
+				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
+					return err
+				}
+			}
+		}
+
+		// For each register that changed value as a result of this write,
+		// update its entry in the changelog, and persist the changes to disk.
+		for _, registerID := range updatedRegisterIDs {
+			// update the in-memory changelog
+			s.ledgerChangeLog.addChange(registerID, blockNumber)
+
+			// encode and write the changelist for the register to disk
+			encChangelist, err := encodeChangelist(s.ledgerChangeLog.registers[registerID])
+			if err != nil {
+				return err
+			}
+			if err := txn.Set(ledgerChangelogKey(registerID), encChangelist); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 

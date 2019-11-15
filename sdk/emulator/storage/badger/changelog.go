@@ -9,43 +9,43 @@ import (
 // a given block height.
 const notFound uint64 = ^uint64(0)
 
-// An ordered list of blocks at which a register changed value. This type
+// An ordered list of Blocks at which a register changed value. This type
 // implements sort.Interface for efficient searching and sorting.
 //
 // Users should NEVER interact with the backing slice directly, as it must
 // be kept sorted for lookups to work.
 type changelist struct {
-	list []uint64
+	Blocks []uint64
 }
 
-func (c changelist) Len() int { return len(c.list) }
+func (c changelist) Len() int { return len(c.Blocks) }
 
-func (c changelist) Less(i, j int) bool { return c.list[i] < c.list[j] }
+func (c changelist) Less(i, j int) bool { return c.Blocks[i] < c.Blocks[j] }
 
-func (c changelist) Swap(i, j int) { c.list[i], c.list[j] = c.list[j], c.list[i] }
+func (c changelist) Swap(i, j int) { c.Blocks[i], c.Blocks[j] = c.Blocks[j], c.Blocks[i] }
 
 // search finds the highest block number B in the changelist so that B<=n.
 // Returns notFound if no such block number exists. This relies on the fact
 // that the changelist is kept sorted in ascending order.
 func (c changelist) search(n uint64) uint64 {
-	if len(c.list) == 0 {
+	if len(c.Blocks) == 0 {
 		return notFound
 	}
 	// This will return the lowest index where the block number is >n.
 	// What we want is the index directly BEFORE this.
 	foundIndex := sort.Search(c.Len(), func(i int) bool {
-		return c.list[i] > n
+		return c.Blocks[i] > n
 	})
 
 	if foundIndex == 0 {
 		// All block numbers are >n.
 		return notFound
 	}
-	return c.list[foundIndex-1]
+	return c.Blocks[foundIndex-1]
 }
 
-// add adds the block number to the list, ensuring the list remains sorted. If
-// n already exists in the list, this is a no-op.
+// add adds the block number to the Blocks, ensuring the Blocks remains sorted. If
+// n already exists in the Blocks, this is a no-op.
 func (c *changelist) add(n uint64) {
 	if n == notFound {
 		return
@@ -56,12 +56,12 @@ func (c *changelist) add(n uint64) {
 		return
 	}
 
-	c.list = append(c.list, n)
+	c.Blocks = append(c.Blocks, n)
 	sort.Sort(c)
 }
 
 // The changelog describes the change history of each register in a ledger.
-// For each register, the changelog contains a list of all the block numbers at
+// For each register, the changelog contains a Blocks of all the block numbers at
 // which the register's value changed. This enables quick lookups of the latest
 // register state change for a given block.
 //
@@ -71,7 +71,7 @@ type changelog struct {
 	// Maps register IDs to an ordered slice of all the block numbers at which
 	// the register value changed.
 	registers map[string]changelist
-	// Guards the register list from concurrent writes.
+	// Guards the register Blocks from concurrent writes.
 	sync.RWMutex
 }
 

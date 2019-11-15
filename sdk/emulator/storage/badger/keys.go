@@ -53,7 +53,7 @@ func ledgerChangelogKey(registerID string) []byte {
 	return []byte(fmt.Sprintf("%s-%s", ledgerChangelogKeyPrefix, registerID))
 }
 
-func ledgerValueKey(blockNumber uint64, registerID string) []byte {
+func ledgerValueKey(registerID string, blockNumber uint64) []byte {
 	return []byte(fmt.Sprintf("%s-%s-%032d", ledgerValueKeyPrefix, registerID, blockNumber))
 }
 

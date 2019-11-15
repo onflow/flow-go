@@ -233,7 +233,7 @@ func TestEvents(t *testing.T) {
 			})
 
 			t.Run("type=1, block=1->10", func(t *testing.T) {
-				// should be 10 events type=1 in blocks 1->10
+				// should be 10 events type=1 in Blocks 1->10
 				gotEvents, err := store.GetEvents("1", 1, 10)
 				assert.NoError(t, err)
 				assert.Len(t, gotEvents, 10)
