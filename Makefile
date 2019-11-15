@@ -19,7 +19,7 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
-	GO111MODULE=on go get golang.org/x/lint/golint@master; \
+	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master
 
 .PHONY: test
@@ -63,11 +63,11 @@ check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
 .PHONY: lint-sdk
-lint-sdk:
-	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
+lint:
+	GO111MODULE=on revive -config revive.toml ./...
 
 .PHONY: ci
-ci: install-tools generate check-generated-code lint-sdk test
+ci: install-tools generate check-generated-code lint test
 
 .PHONY: docker-ci
 docker-ci:

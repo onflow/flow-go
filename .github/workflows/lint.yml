@@ -1,0 +1,19 @@
+name: Lint
+
+on: pull_request
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+    - name: Run Revive Action
+      uses: morphy2k/revive-action@v1
+      with:
+        config: revive.toml
+        path: "./..."
+      env:
+        # GitHub token for annotations
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
