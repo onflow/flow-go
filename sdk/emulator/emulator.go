@@ -58,6 +58,7 @@ type Config struct {
 	RootAccountKey flow.AccountPrivateKey
 	RuntimeLogger  func(string)
 	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
+	Store          storage.Store
 }
 
 // defaultConfig is the default configuration for an emulated blockchain.
@@ -81,6 +82,13 @@ func WithRuntimeLogger(logger func(string)) Option {
 	}
 }
 
+// WithStore sets the persistent storage provider.
+func WithStore(store storage.Store) Option {
+	return func(c *Config) {
+		c.Store = store
+	}
+}
+
 // TODO remove
 func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash crypto.Hash)) Option {
 	return func(c *Config) {
@@ -90,7 +98,6 @@ func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash 
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
-	storage := memstore.New()
 	initialState := make(flow.Ledger)
 	txPool := make(map[string]*flow.Transaction)
 
@@ -104,7 +111,7 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	rootAccount := createAccount(initialState, config.RootAccountKey)
 
 	b := &EmulatedBlockchain{
-		storage:            storage,
+		storage:            config.Store,
 		pendingState:       initialState,
 		txPool:             txPool,
 		onEventEmitted:     config.OnEventEmitted,
@@ -518,4 +525,5 @@ func init() {
 	defaultConfig.RuntimeLogger = func(string) {}
 	defaultConfig.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
 	defaultConfig.RootAccountKey = defaultRootKey
+	defaultConfig.Store = memstore.New()
 }
