@@ -107,8 +107,7 @@ func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
 	}
 
 	return values.Event{
-		// TODO: is this field needed?
-		Identifier: "",
+		Identifier: t.Identifier,
 		Fields:     fields,
 	}, nil
 }

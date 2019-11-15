@@ -76,6 +76,7 @@ type Dictionary map[Value]Value
 func (Dictionary) isValue() {}
 
 type Event struct {
+	// TODO: is this field needed here?
 	Identifier string
 	Fields     []Value
 }

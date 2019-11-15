@@ -66,6 +66,7 @@ type AccountCreatedEvent interface {
 }
 
 var AccountCreatedEventType types.Type = types.Event{
+	Identifier: EventAccountCreated,
 	FieldTypes: []types.EventField{
 		{
 			Identifier: "address",
