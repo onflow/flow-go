@@ -20,18 +20,38 @@ import (
 //
 // Implementations must be safe for use by multiple goroutines.
 type Store interface {
+
+	// GetBlockByHash returns the block with the given hash.
 	GetBlockByHash(crypto.Hash) (types.Block, error)
+
+	// GetBlockByNumber returns the block with the given number.
 	GetBlockByNumber(blockNumber uint64) (types.Block, error)
+
+	// GetLatestBlock returns the block with the highest block number.
 	GetLatestBlock() (types.Block, error)
 
+	// InsertBlock inserts a block.
 	InsertBlock(types.Block) error
 
+	// GetTransaction gets the transaction with the given hash.
 	GetTransaction(crypto.Hash) (flow.Transaction, error)
+
+	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
+	// GetLedgerView returns a view into the ledger state at a given block.
 	GetLedgerView(blockNumber uint64) (flow.LedgerView, error)
+
+	// SetLedger updates all registers in the ledger for the given block.
+	// Callers should only include registers in the ledger whose value changed
+	// in the given block to save space.
 	SetLedger(blockNumber uint64, ledger flow.Ledger) error
 
+	// GetEvents returns all events with the given type between startBlock and
+	// endBlock (inclusive). If eventType is empty, returns all events in the
+	// range, regardless of type.
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
+
+	// InsertEvents inserts events for a block.
 	InsertEvents(blockNumber uint64, events ...flow.Event) error
 }
