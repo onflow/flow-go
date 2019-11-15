@@ -31,14 +31,37 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 func (e *Encoder) Encode(v values.Value) error {
-	// TODO: implement remaining types
 	switch x := v.(type) {
+	case values.Void:
+		return e.EncodeVoid()
+	case values.Bool:
+		return e.EncodeBool(x)
 	case values.String:
 		return e.EncodeString(x)
-	case values.Int:
-		return e.EncodeInt(x)
 	case values.Bytes:
 		return e.EncodeBytes(x)
+	case values.Int:
+		return e.EncodeInt(x)
+	case values.Int8:
+		return e.EncodeInt8(x)
+	case values.Int16:
+		return e.EncodeInt16(x)
+	case values.Int32:
+		return e.EncodeInt32(x)
+	case values.Int64:
+		return e.EncodeInt64(x)
+	case values.Uint8:
+		return e.EncodeUint8(x)
+	case values.Uint16:
+		return e.EncodeUint16(x)
+	case values.Uint32:
+		return e.EncodeUint32(x)
+	case values.Uint64:
+		return e.EncodeUint64(x)
+	case values.VariableSizedArray:
+		return e.EncodeVariableSizedArray(x)
+	case values.ConstantSizedArray:
+		return e.EncodeConstantSizedArray(x)
 	case values.Composite:
 		return e.EncodeComposite(x)
 	case values.Event:
@@ -52,6 +75,16 @@ func (e *Encoder) Encode(v values.Value) error {
 	return nil
 }
 
+func (e *Encoder) EncodeVoid() error {
+	// void values are not encoded
+	return nil
+}
+
+func (e *Encoder) EncodeBool(v values.Bool) error {
+	_, err := e.enc.EncodeBool(bool(v))
+	return err
+}
+
 func (e *Encoder) EncodeString(v values.String) error {
 	_, err := e.enc.EncodeString(string(v))
 	return err
@@ -60,6 +93,70 @@ func (e *Encoder) EncodeString(v values.String) error {
 func (e *Encoder) EncodeInt(v values.Int) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
+}
+
+func (e *Encoder) EncodeInt8(v values.Int8) error {
+	_, err := e.enc.EncodeInt(int32(v))
+	return err
+}
+
+func (e *Encoder) EncodeInt16(v values.Int16) error {
+	_, err := e.enc.EncodeInt(int32(v))
+	return err
+}
+
+func (e *Encoder) EncodeInt32(v values.Int32) error {
+	_, err := e.enc.EncodeInt(int32(v))
+	return err
+}
+
+func (e *Encoder) EncodeInt64(v values.Int64) error {
+	_, err := e.enc.EncodeHyper(int64(v))
+	return err
+}
+
+func (e *Encoder) EncodeUint8(v values.Uint8) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+func (e *Encoder) EncodeUint16(v values.Uint16) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+func (e *Encoder) EncodeUint32(v values.Uint32) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+func (e *Encoder) EncodeUint64(v values.Uint64) error {
+	_, err := e.enc.EncodeUhyper(uint64(v))
+	return err
+}
+
+// Reference:
+// 	RFC Section 4.13 - Variable-Length Array
+// 	Unsigned integer length followed by individually XDR encoded array elements
+func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
+	size := uint32(len(v))
+
+	_, err := e.enc.EncodeUint(size)
+	if err != nil {
+		return err
+	}
+
+	return e.EncodeConstantSizedArray(values.ConstantSizedArray(v))
+}
+
+func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
+	for _, value := range v {
+		if err := e.Encode(value); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (e *Encoder) EncodeBytes(v values.Bytes) error {

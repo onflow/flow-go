@@ -68,16 +68,11 @@ type VariableSizedArray struct {
 func (VariableSizedArray) isType() {}
 
 type ConstantSizedArray struct {
+	Size        int
 	ElementType Type
 }
 
 func (ConstantSizedArray) isType() {}
-
-type Composite struct {
-	FieldTypes []Type
-}
-
-func (Composite) isType() {}
 
 type Dictionary struct {
 	KeyType     Type
@@ -85,6 +80,12 @@ type Dictionary struct {
 }
 
 func (Dictionary) isType() {}
+
+type Composite struct {
+	FieldTypes []Type
+}
+
+func (Composite) isType() {}
 
 type Function struct {
 	ParameterTypeAnnotations []Annotation

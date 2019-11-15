@@ -61,15 +61,13 @@ type Uint64 uint64
 
 func (Uint64) isValue() {}
 
-type Array []Value
+type VariableSizedArray []Value
 
-func (Array) isValue() {}
+func (VariableSizedArray) isValue() {}
 
-type Composite struct {
-	Fields []Value
-}
+type ConstantSizedArray []Value
 
-func (Composite) isValue() {}
+func (ConstantSizedArray) isValue() {}
 
 type Dictionary map[Value]Value
 
@@ -80,6 +78,12 @@ type Event struct {
 	Identifier string
 	Fields     []Value
 }
+
+type Composite struct {
+	Fields []Value
+}
+
+func (Composite) isValue() {}
 
 func (Event) isValue() {}
 

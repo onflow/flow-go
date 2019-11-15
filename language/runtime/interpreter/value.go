@@ -282,7 +282,8 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 }
 
 func (v ArrayValue) Export() values.Value {
-	arrayVal := make(values.Array, len(*v.Values))
+	// TODO: how to export constant-sized array?
+	arrayVal := make(values.VariableSizedArray, len(*v.Values))
 
 	for i, value := range *v.Values {
 		arrayVal[i] = value.(ExportableValue).Export()
