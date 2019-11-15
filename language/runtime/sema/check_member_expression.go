@@ -1,6 +1,9 @@
 package sema
 
-import "github.com/dapperlabs/flow-go/language/runtime/ast"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+)
 
 // NOTE: only called if the member expression is *not* an assignment
 //
@@ -119,6 +122,24 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 			identifierEndPosition,
 			origin,
 		)
+
+		// Check that the member access is not to a function of resource type
+		// outside of an invocation of it.
+		//
+		// This would result in a bound method for a resource, which is invalid.
+
+		if !checker.inAssignment &&
+			!checker.inInvocation &&
+			member.DeclarationKind == common.DeclarationKindFunction &&
+			!expressionType.IsInvalidType() &&
+			expressionType.IsResourceType() {
+
+			checker.report(
+				&ResourceMethodBindingError{
+					Range: ast.NewRangeFromPositioned(expression),
+				},
+			)
+		}
 	}
 
 	checker.Elaboration.MemberExpressionMembers[expression] = member

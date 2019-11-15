@@ -7,11 +7,21 @@ import (
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
 
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+	)
+
 	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
 
 	// TODO: also check nested composite members' identifiers
+
+	// NOTE: functions are checked separately
+	checker.checkFieldsAccess(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,

@@ -1589,3 +1589,15 @@ func (e *InvalidAssignmentTargetError) Error() string {
 }
 
 func (*InvalidAssignmentTargetError) isSemanticError() {}
+
+// ResourceMethodBindingError
+
+type ResourceMethodBindingError struct {
+	ast.Range
+}
+
+func (e *ResourceMethodBindingError) Error() string {
+	return "cannot create bound method for resource"
+}
+
+func (*ResourceMethodBindingError) isSemanticError() {}

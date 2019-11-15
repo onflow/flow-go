@@ -107,7 +107,7 @@
         "size": {
           "title": "Array Size",
           "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
-          "type": "integer",
+          "type": "integer"
         }
       },
       "required": ["$type", "elementType"]
