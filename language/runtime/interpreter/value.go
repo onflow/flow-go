@@ -1739,6 +1739,10 @@ func ConvertAddress(value Value) Value {
 
 func (AddressValue) isValue() {}
 
+func (v AddressValue) Export() values.Value {
+	return values.Address(v)
+}
+
 func (v AddressValue) Copy() Value {
 	return v
 }
