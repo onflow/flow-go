@@ -12,6 +12,7 @@ jobs:
     - uses: morphy2k/revive-action@v1.0.1
       with:
         config: revive.toml
+        exclude: "./sdk/client/..."
         # Only include emulator for now
         path: "./sdk/emulator/..."
       env:
