@@ -13,7 +13,7 @@ jobs:
       uses: morphy2k/revive-action@v1
       with:
         config: revive.toml
-        path: "./sdk/emulator/..."
+        path: "./..."
       env:
         # GitHub token for annotations
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
