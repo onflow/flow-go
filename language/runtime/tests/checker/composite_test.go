@@ -1811,8 +1811,8 @@ func TestCheckCompositeFunction(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s X {
-                  fun foo(): ((): %[2]sX) {
-                      return self.bar
+                  fun foo(): %[2]sX {
+                      return %[2]s self.bar()
                   }
 
                   fun bar(): %[2]sX {

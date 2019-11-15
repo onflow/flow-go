@@ -2780,3 +2780,36 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
 
 	assert.Nil(t, err)
 }
+
+func TestCheckInvalidResourceMethodBinding(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test(): ((<-R): Void) {
+          let rs <- [<-create R()]
+          let append = rs.append
+          destroy rs
+          return append
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceMethodBindingError{}, errs[0])
+}
+
+func TestCheckInvalidResourceMethodCall(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let rs <- [<-create R()]
+          rs.append(<-create R())
+          destroy rs
+      }
+    `)
+
+	assert.Nil(t, err)
+}

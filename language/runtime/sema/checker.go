@@ -48,6 +48,8 @@ type Checker struct {
 	seenImports             map[ast.LocationID]bool
 	isChecked               bool
 	inCreate                bool
+	inInvocation            bool
+	inAssignment            bool
 	Elaboration             *Elaboration
 	currentMemberExpression *ast.MemberExpression
 }

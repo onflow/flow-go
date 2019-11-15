@@ -6,10 +6,10 @@ import (
 )
 
 func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-
+	inCreate := checker.inCreate
 	checker.inCreate = true
 	defer func() {
-		checker.inCreate = false
+		checker.inCreate = inCreate
 	}()
 
 	invocation := expression.InvocationExpression

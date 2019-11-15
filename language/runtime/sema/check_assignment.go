@@ -101,6 +101,13 @@ func (checker *Checker) visitAssignmentValueType(
 	valueExpression ast.Expression,
 	valueType Type,
 ) (targetType Type) {
+
+	inAssignment := checker.inAssignment
+	checker.inAssignment = true
+	defer func() {
+		checker.inAssignment = inAssignment
+	}()
+
 	switch target := targetExpression.(type) {
 	case *ast.IdentifierExpression:
 		return checker.visitIdentifierExpressionAssignment(valueExpression, target, valueType)
