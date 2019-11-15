@@ -655,6 +655,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
+		// TODO: convert directly to values.Address
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 		accountAddressValue := values.Address(accountAddress)
 
@@ -687,6 +688,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		}
 
+		// TODO: convert directly to values.Address
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 		accountAddressValue := values.Address(accountAddress)
 
@@ -720,6 +722,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
+		// TODO: convert directly to values.Address
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 		accountAddressValue := values.Address(accountAddress)
 
@@ -746,6 +749,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires the first parameter to be a string"))
 		}
 
+		// TODO: convert directly to values.Address
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
 		accountAddressValue := values.Address(accountAddress)
 
