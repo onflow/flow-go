@@ -112,3 +112,19 @@ type ErrInvalidStateVersion struct {
 func (e *ErrInvalidStateVersion) Error() string {
 	return fmt.Sprintf("World State with version hash %x is invalid", e.Version)
 }
+
+type ErrPendingBlockMidExecution struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockMidExecution) Error() string {
+	return fmt.Sprintf("Pending block with hash %x is currently being executed", e.BlockHash)
+}
+
+type ErrPendingBlockTransactionsExhausted struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockTransactionsExhausted) Error() string {
+	return fmt.Sprintf("Pending block with hash %x contains no more transactions to execute", e.BlockHash)
+}

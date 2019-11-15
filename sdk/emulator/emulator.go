@@ -34,6 +34,7 @@ type EmulatedBlockchain struct {
 	pendingWorldState *state.WorldState
 	// txPool is a pool of pending transactions waiting to be committed (already executed)
 	txPool             map[string]*types.Transaction
+	pendingBlock       *etypes.Block
 	mut                sync.RWMutex
 	computer           *execution.Computer
 	rootAccountAddress types.Address
@@ -63,6 +64,7 @@ func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
 	worldStates := make(map[string][]byte)
 	intermediateWorldStates := make(map[string][]byte)
 	txPool := make(map[string]*types.Transaction)
+	pendingBlock := &etypes.Block{}
 	ws := state.NewWorldState()
 
 	worldStates[string(ws.Hash())] = ws.Encode()
@@ -72,6 +74,7 @@ func NewEmulatedBlockchain(opt EmulatedBlockchainOptions) *EmulatedBlockchain {
 		intermediateWorldStates: intermediateWorldStates,
 		pendingWorldState:       ws,
 		txPool:                  txPool,
+		pendingBlock:            pendingBlock,
 		onEventEmitted:          opt.OnEventEmitted,
 	}
 
@@ -239,6 +242,132 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 	b.emitTransactionEvents(events, blockNumber, tx.Hash())
 
 	return nil
+}
+
+// TODO: add functionality for AddTransaction
+func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
+	// If Index > 0, pendingBlock has begun execution (cannot add anymore txs)
+	if b.pendingBlock.Index > 0 {
+		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	missingFields := tx.MissingFields()
+
+	// TODO: add more invalid transaction checks
+	if len(missingFields) > 0 {
+		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
+	}
+
+	if _, exists := b.txPool[string(tx.Hash())]; exists {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	}
+
+	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
+		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
+	}
+
+	if err := b.verifySignatures(tx); err != nil {
+		return err
+	}
+
+	// Add tx to pendingBlock
+	b.txPool[string(tx.Hash())] = tx
+	b.pendingBlock.AddTransaction(tx.Hash())
+
+	return nil
+}
+
+func (b *EmulatedBlockchain) ExecuteBlock() []error {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
+	errors := make([]error, 0)
+
+	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
+		errors = append(errors, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()})
+	}
+
+	for b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
+		err := b.executeTransaction()
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	return errors
+}
+
+func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
+	return b.executeTransaction()
+}
+
+func (b *EmulatedBlockchain) executeTransaction() error {
+	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
+		return &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	txHash := b.pendingBlock.TransactionHashes[b.pendingBlock.Index]
+	tx := b.txPool[string(txHash)]
+
+	b.pendingBlock.Index++
+
+	registers := b.pendingWorldState.Registers.NewView()
+
+	events, err := b.computer.ExecuteTransaction(registers, tx)
+	if err != nil {
+		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
+
+		b.updatePendingWorldStates(tx.Hash())
+
+		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+	}
+
+	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
+	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
+
+	// TODO: improve the pending block, provide all block information
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+	blockNumber := prevBlock.Number + 1
+
+	b.emitTransactionEvents(events, blockNumber, tx.Hash())
+
+	return nil
+}
+
+func (b *EmulatedBlockchain) CommitState() *etypes.Block {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
+	txHashes := make([]crypto.Hash, 0)
+	for _, tx := range b.txPool {
+		txHashes = append(txHashes, tx.Hash())
+		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != types.TransactionReverted {
+			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+		}
+	}
+
+	b.txPool = make(map[string]*types.Transaction)
+
+	b.pendingBlock.Timestamp = time.Now()
+
+	b.pendingWorldState.InsertBlock(b.pendingBlock)
+	b.commitWorldState(b.pendingBlock.Hash())
+
+	committedBlock := b.pendingBlock
+
+	b.pendingBlock = &etypes.Block{
+		Number:            b.pendingBlock.Number + 1,
+		PreviousBlockHash: b.pendingBlock.Hash(),
+		TransactionHashes: make([]crypto.Hash, 0),
+	}
+
+	return committedBlock
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
