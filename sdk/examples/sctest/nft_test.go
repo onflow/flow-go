@@ -158,6 +158,18 @@ func TestTransferNFT(t *testing.T) {
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, "false"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 2, "false"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 	})
 
 	// transfer an NFT
@@ -173,24 +185,24 @@ func TestTransferNFT(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
 		// Assert that the account's collection is correct
-		// _, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, "true"))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// // Assert that the account's collection is correct
-		// _, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, "true"))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// // Assert that the account's collection is correct
-		// _, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, "false"))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
-		// // Assert that the account's collection is correct
-		// _, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, "false"))
-		// if !assert.Nil(t, err) {
-		// 	t.Log(err.Error())
-		// }
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, "true"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, "true"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, "false"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+		// Assert that the account's collection is correct
+		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, "false"))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
 	})
 }
