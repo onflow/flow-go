@@ -64,7 +64,7 @@ type Runtime interface {
 	//
 	// This function returns an error if the program has errors (e.g syntax errors, type errors),
 	// or if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error)
+	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error)
 
 	// ParseAndCheckProgram parses and checks the given code without executing the program.
 	//
@@ -80,7 +80,7 @@ func NewMockRuntime() Runtime {
 	return &mockRuntime{}
 }
 
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
+func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
 	return nil, nil
 }
 
@@ -410,7 +410,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (interface{}, error) {
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
 	return r.executeScript(script, runtimeInterface, location)
 }
 
@@ -461,7 +461,7 @@ func (r *interpreterRuntime) executeScript(
 	script []byte,
 	runtimeInterface Interface,
 	location Location,
-) (interface{}, error) {
+) (values.Value, error) {
 	functions := r.standardLibraryFunctions(runtimeInterface)
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
@@ -539,7 +539,7 @@ func (r *interpreterRuntime) executeScript(
 		signingAccounts[i] = accountValue(address)
 	}
 
-	value, err := inter.InvokeExportable("main", signingAccounts...)
+	value, err := inter.Invoke("main", signingAccounts...)
 	if err != nil {
 		return nil, Error{[]error{err}}
 	}
@@ -547,7 +547,7 @@ func (r *interpreterRuntime) executeScript(
 	// Write back all stored values, which were actually just cached, back into storage
 	interpreterRuntimeStorage.writeCached()
 
-	return value.Export(), nil
+	return value.(interpreter.ExportableValue).Export(), nil
 }
 
 func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {

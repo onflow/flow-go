@@ -524,25 +524,6 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 	return result.(Value), nil
 }
 
-func (interpreter *Interpreter) InvokeExportable(
-	functionName string,
-	arguments ...interface{},
-) (
-	value ExportableValue,
-	err error,
-) {
-	result, err := interpreter.Invoke(functionName, arguments...)
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil {
-		return nil, nil
-	}
-
-	return result.(ExportableValue), nil
-}
-
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 	interpreter.prepareInterpretation()
 
