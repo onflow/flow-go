@@ -109,13 +109,7 @@ resource NFTCollection: INFTCollection {
 
     // idExists checks to see if a NFT with the given ID exists in the collection
     pub fun idExists(tokenID: Int): Bool {
-        if self.idArray.length == 0 {
-            return false
-        }
-
-        //var exists = false
         var i = 0
-
         while i < self.idArray.length {
             if self.idArray[i] == tokenID {
                 return true
