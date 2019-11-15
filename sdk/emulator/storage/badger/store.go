@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -217,44 +216,11 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 	defer s.ledgerChangeLog.Unlock()
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		// List of register IDs with changed values after this operation
-		var updatedRegisterIDs []string
-
 		for registerID, value := range ledger {
-			// get the block at which this register was most recently changed
-			lastChangedBlock := s.ledgerChangeLog.getMostRecentChange(registerID, blockNumber)
-
-			// If no such block exists, this register has never been written to.
-			// Write the register value for this block number and add it to the
-			// list of updated registers.
-			if lastChangedBlock == notFound {
-				updatedRegisterIDs = append(updatedRegisterIDs, registerID)
-				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
-					return err
-				}
-				continue
-			}
-
-			// This register has been written either at this block an earlier
-			// block. If the register value has changed since the last write,
-			// write the new value and add it to the list of updated registers.
-			// If the register value has not changed, we implicitly ignore it.
-			lastValue, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
-			if err != nil {
+			if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
 				return err
 			}
-			if !bytes.Equal(value, lastValue) {
-				// the register value has changed - update it.
-				updatedRegisterIDs = append(updatedRegisterIDs, registerID)
-				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
-					return err
-				}
-			}
-		}
 
-		// For each register that changed value as a result of this write,
-		// update its entry in the changelog, and persist the changes to disk.
-		for _, registerID := range updatedRegisterIDs {
 			// update the in-memory changelog
 			s.ledgerChangeLog.addChange(registerID, blockNumber)
 
@@ -267,7 +233,6 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 				return err
 			}
 		}
-
 		return nil
 	})
 }
