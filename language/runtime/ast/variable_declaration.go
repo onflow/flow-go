@@ -3,6 +3,7 @@ package ast
 import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type VariableDeclaration struct {
+	Access         Access
 	IsConstant     bool
 	Identifier     Identifier
 	TypeAnnotation *TypeAnnotation

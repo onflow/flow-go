@@ -8,6 +8,13 @@ import (
 
 func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+	)
+
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
@@ -15,6 +22,9 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	// TODO: also check nested composite members' identifiers
 
 	// TODO: also check nested composite fields' type annotations
+
+	// NOTE: functions are checked separately
+	checker.checkFieldsAccess(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,

@@ -86,6 +86,7 @@ importDeclaration
 
 access
     : /* Not specified */
+    | Priv
     | Pub
     | PubSet
     ;
@@ -282,7 +283,7 @@ emitStatement
 // Variable declarations might be of the form `let|var <- x <- y`
 //
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)?
+    : access variableKind identifier (':' typeAnnotation)?
       leftTransfer=transfer leftExpression=expression
       (rightTransfer=transfer rightExpression=expression)?
     ;
@@ -564,6 +565,7 @@ Emit : 'emit' ;
 Pre : 'pre' ;
 Post : 'post' ;
 
+Priv : 'priv' ;
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;
 
