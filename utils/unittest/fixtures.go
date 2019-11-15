@@ -80,11 +80,6 @@ func AccountPublicKeyFixture() flow.AccountPublicKey {
 	}
 }
 
-type NewEventFixture struct {
-	Type  string
-	Index uint
-}
-
 func EventFixture(n ...func(e *flow.Event)) flow.Event {
 
 	event := flow.Event{
