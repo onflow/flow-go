@@ -36,3 +36,18 @@ func (s Access) Keyword() string {
 
 	panic(errors.NewUnreachableError())
 }
+
+func (s Access) Description() string {
+	switch s {
+	case AccessNotSpecified:
+		return "not specified"
+	case AccessPrivate:
+		return "private"
+	case AccessPublic:
+		return "public"
+	case AccessPublicSettable:
+		return "public settable"
+	}
+
+	panic(errors.NewUnreachableError())
+}
