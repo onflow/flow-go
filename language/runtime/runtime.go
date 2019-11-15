@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
@@ -15,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -24,21 +24,21 @@ func init() {
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
-	ResolveImport(Location) ([]byte, error)
+	ResolveImport(Location) (values.Bytes, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
-	GetValue(owner, controller, key []byte) (value []byte, err error)
+	GetValue(owner, controller, key values.Bytes) (value values.Bytes, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
-	SetValue(owner, controller, key, value []byte) (err error)
+	SetValue(owner, controller, key, value values.Bytes) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys [][]byte, code []byte) (address flow.Address, err error)
+	CreateAccount(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(address flow.Address, publicKey []byte) error
+	AddAccountKey(address values.Address, publicKey values.Bytes) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error)
+	RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address flow.Address, code []byte) (err error)
+	UpdateAccountCode(address values.Address, code values.Bytes) (err error)
 	// GetSigningAccounts returns the signing accounts.
-	GetSigningAccounts() []flow.Address
+	GetSigningAccounts() []values.Address
 	// Log logs a string.
 	Log(string)
 	// EmitEvent is called when an event is emitted by the runtime.
@@ -96,6 +96,10 @@ type interpreterRuntime struct {
 // NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
+}
+
+var Uint8ArrayType = types.VariableSizedArray{
+	ElementType: types.Uint8{},
 }
 
 // TODO: improve types
@@ -393,7 +397,7 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	fieldValues ...interface{},
+	fieldValues ...values.Value,
 ) {
 	fields := make([]values.EventField, len(fieldValues))
 
@@ -401,7 +405,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 		field := eventType.Fields[i]
 		fields[i] = values.EventField{
 			Identifier: field.Identifier,
-			Value:      value.(interpreter.ExportableValue).Export(),
+			Value:      value,
 		}
 	}
 
@@ -597,12 +601,14 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 	)
 }
 
-func accountValue(address flow.Address) interpreter.Value {
+func accountValue(address values.Address) interpreter.Value {
+	addressHex := fmt.Sprintf("%x", address)
+
 	return interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
 		Fields: &map[string]interpreter.Value{
-			"address": interpreter.NewStringValue(address.String()),
-			"storage": interpreter.StorageValue{Identifier: address.String()},
+			"address": interpreter.NewStringValue(addressHex),
+			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},
 	}
 }
@@ -615,17 +621,17 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 		}
 
 		pkValues := *pkArray.Values
-		publicKeys := make([][]byte, len(pkValues))
+		publicKeys := make([]values.Bytes, len(pkValues))
 
 		for i, pkVal := range pkValues {
-			publicKey, err := toByteArray(pkVal)
+			publicKey, err := toBytes(pkVal)
 			if err != nil {
 				panic(fmt.Sprintf("createAccount requires the first parameter to be an array of arrays"))
 			}
 			publicKeys[i] = publicKey
 		}
 
-		code, err := toByteArray(arguments[1])
+		code, err := toBytes(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
@@ -637,9 +643,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 
 		r.emitAccountEvent(accountCreatedEventType, runtimeInterface, accountAddress)
 
-		accountID := accountAddress.Bytes()
-
-		result := interpreter.IntValue{Int: big.NewInt(0).SetBytes(accountID)}
+		result := interpreter.AddressValue(accountAddress)
 		return trampoline.Done{Result: result}
 	}
 }
@@ -655,19 +659,20 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the first parameter to be a string"))
 		}
 
-		publicKey, err := toByteArray(arguments[1])
+		publicKey, err := toBytes(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddressValue := values.Address(accountAddress)
 
-		err = runtimeInterface.AddAccountKey(accountAddress, publicKey)
+		err = runtimeInterface.AddAccountKey(accountAddressValue, publicKey)
 		if err != nil {
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountKeyAddedEventType, runtimeInterface, accountAddress, publicKey)
+		r.emitAccountEvent(accountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -692,13 +697,16 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 		}
 
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddressValue := values.Address(accountAddress)
 
-		publicKey, err := runtimeInterface.RemoveAccountKey(accountAddress, index.IntValue())
+		indexValue := index.Export().(values.Int)
+
+		publicKey, err := runtimeInterface.RemoveAccountKey(accountAddressValue, indexValue)
 		if err != nil {
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountKeyRemovedEventType, runtimeInterface, accountAddress, publicKey)
+		r.emitAccountEvent(accountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -716,19 +724,20 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be a string"))
 		}
 
-		code, err := toByteArray(arguments[1])
+		code, err := toBytes(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
 		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddressValue := values.Address(accountAddress)
 
-		err = runtimeInterface.UpdateAccountCode(accountAddress, code)
+		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
 		if err != nil {
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountCodeUpdatedEventType, runtimeInterface, accountAddress, code)
+		r.emitAccountEvent(accountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -741,13 +750,15 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires 1 parameter"))
 		}
 
-		stringValue, ok := arguments[0].(interpreter.StringValue)
+		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
 		if !ok {
-			panic(fmt.Sprintf("getAccount requires the first parameter to be an array"))
+			panic(fmt.Sprintf("getAccount requires the first parameter to be a string"))
 		}
 
-		address := flow.HexToAddress(stringValue.StrValue())
-		account := accountValue(address)
+		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddressValue := values.Address(accountAddress)
+
+		account := accountValue(accountAddressValue)
 
 		return trampoline.Done{Result: account}
 	}
@@ -766,42 +777,22 @@ func (r *interpreterRuntime) getOwnerControllerKey(
 	controller []byte, owner []byte, key []byte,
 ) {
 	var err error
-	owner, err = toByteArray(arguments[0])
+	owner, err = toBytes(arguments[0])
 	if err != nil {
 		panic(fmt.Sprintf("setValue requires the first parameter to be an array"))
 	}
-	controller, err = toByteArray(arguments[1])
+	controller, err = toBytes(arguments[1])
 	if err != nil {
 		panic(fmt.Sprintf("setValue requires the second parameter to be an array"))
 	}
-	key, err = toByteArray(arguments[2])
+	key, err = toBytes(arguments[2])
 	if err != nil {
 		panic(fmt.Sprintf("setValue requires the third parameter to be an array"))
 	}
 	return
 }
 
-func toByteArray(value interpreter.Value) ([]byte, error) {
-	intArray, err := toIntArray(value)
-	if err != nil {
-		return nil, err
-	}
-
-	byteArray := make([]byte, len(intArray))
-
-	for i, intValue := range intArray {
-		// check 0 <= value < 256
-		if !(0 <= intValue && intValue < 256) {
-			return nil, errors.New("array value is not in byte range (0-255)")
-		}
-
-		byteArray[i] = byte(intValue)
-	}
-
-	return byteArray, nil
-}
-
-func toIntArray(value interpreter.Value) ([]int, error) {
+func toBytes(value interpreter.Value) (values.Bytes, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
 		return nil, nil
@@ -817,14 +808,20 @@ func toIntArray(value interpreter.Value) ([]int, error) {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]int, len(*array.Values))
+	result := make([]byte, len(*array.Values))
 	for i, arrayValue := range *array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
 		}
 
-		result[i] = intValue.IntValue()
+		j := intValue.IntValue()
+
+		if !(0 <= j && j < 256) {
+			return nil, errors.New("array value is not in byte range (0-255)")
+		}
+
+		result[i] = byte(j)
 	}
 
 	return result, nil
