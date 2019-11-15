@@ -165,3 +165,12 @@ func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublic
 		Weight:    uint32(a.Weight),
 	}, nil
 }
+
+func EventToMessage(e flow.Event) *entities.Event {
+	return &entities.Event{
+		Type:            e.Type,
+		TransactionHash: e.TxHash,
+		Index:           uint32(e.Index),
+		Payload:         e.Payload,
+	}
+}
