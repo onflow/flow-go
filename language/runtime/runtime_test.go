@@ -206,11 +206,18 @@ func TestRuntimeStorage(t *testing.T) {
 	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
 
-func TestRuntimeStorageMultipleTransactions(t *testing.T) {
+func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	script := []byte(`
+	script1 := []byte(`
+       fun main(account: Account) {
+           log(account.storage[[String]])
+           account.storage[[String]] = []
+       }
+	`)
+
+	script2 := []byte(`
        fun main(account: Account) {
            log(account.storage[[String]])
            account.storage[[String]] = ["A", "B"]
@@ -218,14 +225,14 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	var storedValue values.Bytes
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
 		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValue, nil
+			return storedValues[string(key)], nil
 		},
 		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValue = value
+			storedValues[string(key)] = value
 			return nil
 		},
 		getSigningAccounts: func() []values.Address {
@@ -236,13 +243,165 @@ func TestRuntimeStorageMultipleTransactions(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.Nil(t, err)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.Nil(t, err)
+	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
 
-	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	assert.Equal(t, []string{"nil", `[]`, `[]`, `["A", "B"]`}, loggedMessages)
+}
+
+func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	script1 := []byte(`
+       fun main(account: Account) {
+           log(account.storage[{String: Int}])
+           account.storage[{String: Int}] = {}
+       }
+	`)
+
+	script2 := []byte(`
+       fun main(account: Account) {
+           log(account.storage[{String: Int}])
+           account.storage[{String: Int}] = {"A": 1, "B": 2}
+       }
+	`)
+
+	var loggedMessages []string
+	storedValues := map[string]values.Bytes{}
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	// Assertion is a bit more complex, because dictionary order is not deterministic
+	require.Len(t, loggedMessages, 4)
+	assert.Equal(t, []string{"nil", `{}`, `{}`}, loggedMessages[:3])
+	assert.Contains(t, []string{`{A: 1, B: 2}`, `{B: 2, A: 1}`}, loggedMessages[3])
+}
+
+func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	container := []byte(`
+       resource Container {
+           let values: [Int]
+           init() {
+               self.values = []
+           }
+       }
+
+       fun createContainer(): <-Container {
+           return <-create Container()
+       }
+	`)
+
+	script1 := []byte(`
+	   import "container"
+
+       fun main(account: Account): Int {
+           var container: <-Container? <- createContainer()
+           account.storage[Container] <-> container
+           destroy container
+           let ref = &account.storage[Container] as Container
+           account.storage[&Container] = ref
+           return ref.values.length
+       }
+	`)
+
+	script2 := []byte(`
+	   import "container"
+
+       fun main(account: Account): [Int] {
+          let ref = account.storage[&Container] ?? panic("no container")
+          let length = ref.values.length
+          ref.values.append(1)
+          let length2 = ref.values.length
+          return [length, length2]
+       }
+	`)
+
+	script3 := []byte(`
+	   import "container"
+
+       fun main(account: Account): [Int] {
+          let ref = account.storage[&Container] ?? panic("no container")
+          let length = ref.values.length
+          ref.values.append(2)
+          let length2 = ref.values.length
+          return [length, length2]
+       }
+	`)
+
+	var loggedMessages []string
+	storedValues := map[string]values.Bytes{}
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			switch location {
+			case StringLocation("container"):
+				return container, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script3, runtimeInterface, nil)
+	require.Nil(t, err)
 }
 
 // TestRuntimeStorageMultipleTransactionsStructures tests a function call
@@ -284,7 +443,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	var storedValue values.Bytes
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
 		resolveImport: func(location Location) (bytes values.Bytes, err error) {
@@ -296,10 +455,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 			}
 		},
 		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValue, nil
+			return storedValues[string(key)], nil
 		},
 		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValue = value
+			storedValues[string(key)] = value
 			return nil
 		},
 		getSigningAccounts: func() []values.Address {
@@ -335,14 +494,14 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	var storedValue values.Bytes
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
 		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValue, nil
+			return storedValues[string(key)], nil
 		},
 		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValue = value
+			storedValues[string(key)] = value
 			return nil
 		},
 		getSigningAccounts: func() []values.Address {
@@ -398,7 +557,7 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
       }
     `)
 
-	var storedValue values.Bytes
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
 		resolveImport: func(location Location) (bytes values.Bytes, err error) {
@@ -410,10 +569,10 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 			}
 		},
 		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValue, nil
+			return storedValues[string(key)], nil
 		},
 		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValue = value
+			storedValues[string(key)] = value
 			return nil
 		},
 		getSigningAccounts: func() []values.Address {

@@ -12,6 +12,12 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 
 func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		declaration.IsConstant,
+	)
 	// Determine the type of the initial value of the variable declaration
 	// and save it in the elaboration
 

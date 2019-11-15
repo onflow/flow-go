@@ -6223,3 +6223,66 @@ func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
 
 	assert.IsType(t, expected, actual)
 }
+
+func TestParseAccessModifiers(t *testing.T) {
+
+	type declaration struct {
+		name, code string
+	}
+
+	declarations := []declaration{
+		{"variable", "%s var test = 1"},
+		{"constant", "%s let test = 1"},
+		{"function", "%s fun test() {}"},
+	}
+
+	for _, compositeKind := range common.CompositeKinds {
+		for _, isInterface := range []bool{true, false} {
+
+			interfaceKeyword := ""
+			if isInterface {
+				interfaceKeyword = "interface"
+			}
+
+			formatName := func(name string) string {
+				return fmt.Sprintf(
+					"%s %s %s",
+					compositeKind.Keyword(),
+					interfaceKeyword,
+					name,
+				)
+			}
+
+			formatCode := func(format string) string {
+				return fmt.Sprintf(format, compositeKind.Keyword(), interfaceKeyword)
+			}
+
+			declarations = append(declarations,
+				declaration{
+					formatName("itself"),
+					formatCode("%%s %s %s Test {}"),
+				},
+				declaration{
+					formatName("field"),
+					formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
+				},
+				declaration{
+					formatName("function"),
+					formatCode("%s %s Test { %%s fun test() {} }"),
+				},
+			)
+		}
+	}
+
+	for _, declaration := range declarations {
+		for _, access := range Accesses {
+			testName := fmt.Sprintf("%s/%s", declaration.name, access)
+			t.Run(testName, func(t *testing.T) {
+				program := fmt.Sprintf(declaration.code, access.Keyword())
+				_, _, err := parser.ParseProgram(program)
+
+				assert.Nil(t, err)
+			})
+		}
+	}
+}
