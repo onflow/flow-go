@@ -17,7 +17,7 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
 		fun main(acct: Account) {
-			var tokenA: <-NFT <- createNFT(id: %d)
+			var tokenA: <-NFT <- createNFT(id: %d, str: 1)
 
 			var collection: <-NFTCollection <- createCollection(token: <-tokenA)
 
@@ -75,7 +75,8 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 }
 
 // GenerateInspectCollectionScript creates a script that retrieves an NFT collection
-// from storage and makes assertions about the NFT IDs that it contains
+// from storage and makes assertions about an NFT ID that it contains with the idExists
+// function, which uses an array of IDs
 func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist string) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
@@ -92,8 +93,9 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
 }
 
-// GenerateInspectCollectionScript creates a script that retrieves an NFT collection
-// from storage and makes assertions about the NFT IDs that it contains
+// GenerateInspectCollectionDictionaryScript creates a script that retrieves an NFT collection
+// from storage and makes assertions about the NFT IDs that it contains with the NFT
+// dictionary
 func GenerateInspectCollectionDictionaryScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist string) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
@@ -110,4 +112,20 @@ func GenerateInspectCollectionDictionaryScript(nftCodeAddr, userAddr flow.Addres
 		}`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
+}
+
+// GenerateInspectCollectionScript creates a script that retrieves an NFT collection
+// from storage and returns an array of IDs that the collection contains
+func GenerateInspectCollectionArrayScript(nftCodeAddr, userAddr flow.Address) []byte {
+	template := `
+		import NFT, NFTCollection from 0x%s
+
+		fun main() {
+			let acct = getAccount("%s")
+			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
+
+			log(collectionRef.getOwnedNFTs())
+		}`
+
+	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr))
 }

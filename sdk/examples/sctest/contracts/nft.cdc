@@ -1,14 +1,13 @@
 
 
 resource interface INFT {
-
     // The unique ID that each NFT has
     pub let id: Int
 
     init(newID: Int) {
         pre {
             newID > 0:
-                "NFT ID needs to be positive!"
+                "ID must be positive!"
         }
     }
 }
@@ -35,6 +34,8 @@ resource interface INFTCollection {
         }
     }
 
+    pub fun withdraw(tokenID: Int): <-NFT
+
     pub fun deposit(token: <-NFT): Void {
         pre {
             token.id >= 0:
@@ -44,12 +45,18 @@ resource interface INFTCollection {
 }
 
 resource NFTCollection: INFTCollection { 
-    // variable size array of NFT conforming tokens
+    // variable size dictionary of NFT conforming tokens
     // NFT is a resource type with an `Int` ID field
     pub var ownedNFTs: <-{Int: NFT}
 
     // an array to hold the IDs of all the tokens in the collection
     pub var idArray: [Int]
+
+    // initializer overloading is not supported yet
+    // init () {
+    //     self.idArray = []
+    //     self.ownedNFTs = {}
+    // }
 
     init(firstToken: <-NFT) {
         self.idArray = [firstToken.id]
@@ -135,28 +142,11 @@ resource NFTCollection: INFTCollection {
     }
 }
 
-fun createNFT(id: Int): <-NFT {
+fun createNFT(id: Int, str: Int): <-NFT {
     return <- create NFT(newID: id)
 }
 
 fun createCollection(token: <-NFT): <-NFTCollection {
     return <- create NFTCollection(firstToken: <-token)
 }
-
-
-// fun main() {
-
-//     let tokenA <- create NFT(newID: 1)
-//     let collectionA <- create NFTCollection(firstToken: <-tokenA)
-
-//     let tokenB <- create NFT(newID: 2)
-//     let collectionB <- create NFTCollection(firstToken: <-tokenB)
-
-//     collectionA.transfer(token: &collectionB as NFTCollection, tokenID: 1)
-
-
-//     destroy collectionA
-//     destroy collectionB
-
-// }
 
