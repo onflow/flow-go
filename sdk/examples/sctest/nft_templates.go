@@ -24,14 +24,12 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte
 			if collection.idExists(tokenID: %d) == false {
 				panic("Token ID doesn't exist!")
 			}
-
-			var collectionA: <-NFTCollection? <- collection
 			
-			acct.storage[NFTCollection] <-> collectionA
+			let oldCollection <- acct.storage[NFTCollection] <- collection
 
 			acct.storage[&NFTCollection] = &acct.storage[NFTCollection] as NFTCollection
 
-			destroy collectionA
+			destroy oldCollection
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, id, checkID))
 }

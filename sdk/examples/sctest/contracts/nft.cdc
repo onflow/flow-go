@@ -3,19 +3,16 @@
 resource interface INFT {
     // The unique ID that each NFT has
     pub let id: Int
-
-    init(newID: Int) {
-        pre {
-            newID > 0:
-                "NFT ID must be positive!"
-        }
-    }
 }
 
 pub resource NFT: INFT {
     pub let id: Int
 
     init(newID: Int) {
+        pre {
+            newID > 0:
+                "NFT ID must be positive!"
+        }
         self.id = newID
     }
 }
@@ -74,7 +71,7 @@ resource NFTCollection: INFTCollection {
         // find and remove the ID from the ID array
         var i = 0
         while i < self.idArray.length {
-            if (self.idArray[i] == tokenID) {
+            if self.idArray[i] == tokenID {
                 self.idArray.remove(at: i)
                 break
             }
@@ -91,13 +88,11 @@ resource NFTCollection: INFTCollection {
 
         // add the id to the array
         self.idArray.append(id)
-        
-        var newToken: <-NFT? <- token
 
-        // add the new token to the dictionary
-        self.ownedNFTs[id] <-> newToken
+        // add the new token to the dictionary which removes the old one
+        let oldToken <- self.ownedNFTs[id] <- token
 
-        destroy newToken
+        destroy oldToken
     }
 
     // transfer takes a reference to another user's NFT collection,
@@ -118,18 +113,17 @@ resource NFTCollection: INFTCollection {
             return false
         }
 
-        var exists = false
+        //var exists = false
         var i = 0
 
         while i < self.idArray.length {
-            if (self.idArray[i] == tokenID) {
-                exists = true
-                break
+            if self.idArray[i] == tokenID {
+                return true
             }
             i = i + 1
         }
 
-        return exists
+        return false
     }
 
     // getOwnedNFTs returns an array of the IDs that are in the collection
