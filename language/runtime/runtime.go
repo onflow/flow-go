@@ -392,14 +392,8 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	fieldValues ...values.Value,
+	fields ...values.Value,
 ) {
-	fields := make([]values.Value, len(fieldValues))
-
-	for i, value := range fieldValues {
-		fields[i] = value
-	}
-
 	identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
 
 	event := values.Event{
