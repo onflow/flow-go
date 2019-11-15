@@ -1,0 +1,12 @@
+[
+  {
+    "$type": "function",
+    "name": "fiddle",
+    "parameters": [
+      {
+        "name": "with",
+        "type": "string"
+      }
+    ]
+  }
+]

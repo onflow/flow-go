@@ -1,0 +1,32 @@
+[
+  {
+    "$type": "function",
+    "name": "sqrt",
+    "parameters": [
+      {
+        "name": "d",
+        "label": "divisor",
+        "type": "Int"
+      }
+    ],
+    "returnType": "Int"
+  },
+  {
+    "$type": "function",
+    "name": "dividerProducer",
+    "parameters": [
+      {
+        "name": "d",
+        "label": "divisor",
+        "type": "Int"
+      }
+    ],
+    "returnType": {
+      "$type": "functionType",
+      "parameters": [
+        "Int"
+      ],
+      "returnType": "Int"
+    }
+  }
+]

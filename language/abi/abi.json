@@ -31,9 +31,7 @@
           }
         },
         "returnType": {
-          "title": "Function return type",
-          "description": "The return type of the function (optional; Void if not given)",
-          "$ref": "#/definitions/typeAnnotation"
+          "$ref": "#/definitions/returnType"
         }
       },
       "required": ["$type", "name"]
@@ -87,12 +85,27 @@
       "title": "Type",
       "oneOf": [
         {"$ref": "#/definitions/nominalType"},
-        {"$ref": "#/definitions/arrayType"}
+        {"$ref": "#/definitions/arrayType"},
+        {"$ref": "#/definitions/functionType"}
       ]
     },
     "nominalType": {
       "title": "Nominal Type",
-      "type": "string"
+      "type": "string",
+      "enum": [
+        "string",
+        "Int8",
+        "Int16",
+        "Int32",
+        "Int64",
+        "UInt16",
+        "UInt32",
+        "UInt64",
+        "Int",
+        "Address",
+        "Any",
+        "Bool"
+      ]
     },
     "arrayType": {
       "title": "Array Type",
@@ -111,6 +124,30 @@
         }
       },
       "required": ["$type", "elementType"]
+    },
+    "functionType": {
+      "title": "Function type",
+      "type": "object",
+      "properties": {
+        "$type": {"const": "functionType"},
+        "parameters" : {
+          "$type": {
+            "const": "array"
+          },
+          "items": {
+              "$ref": "#/definitions/typeAnnotation"
+            }
+        },
+        "returnType": {
+          "$ref": "#/definitions/returnType"
+        }
+      },
+      "required": ["$type"]
+    },
+    "returnType": {
+      "title": "Function return type",
+      "description": "The return type of the function (optional; Void if not given)",
+      "$ref": "#/definitions/typeAnnotation"
     },
     "dictionaryType": {
       "title": "Dictionary Type",
