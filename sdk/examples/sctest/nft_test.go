@@ -36,7 +36,7 @@ func TestCreateNFT(t *testing.T) {
 	// Vault must be instantiated with a positive ID
 	t.Run("Cannot create token with negative ID", func(t *testing.T) {
 		tx := flow.Transaction{
-			Script:         GenerateCreateNFTScript(contractAddr, -7, -7),
+			Script:         GenerateCreateNFTScript(contractAddr, -7),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
@@ -48,7 +48,7 @@ func TestCreateNFT(t *testing.T) {
 
 	t.Run("Should be able to create token", func(t *testing.T) {
 		tx := flow.Transaction{
-			Script:         GenerateCreateNFTScript(contractAddr, 1, 1),
+			Script:         GenerateCreateNFTScript(contractAddr, 1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
@@ -80,7 +80,7 @@ func TestTransferNFT(t *testing.T) {
 
 	// then deploy a NFT to the root account
 	tx := flow.Transaction{
-		Script:         GenerateCreateNFTScript(contractAddr, 1, 1),
+		Script:         GenerateCreateNFTScript(contractAddr, 1),
 		Nonce:          GetNonce(),
 		ComputeLimit:   20,
 		PayerAccount:   b.RootAccountAddress(),
@@ -102,7 +102,7 @@ func TestTransferNFT(t *testing.T) {
 
 	// then deploy an NFT to another account
 	tx = flow.Transaction{
-		Script:         GenerateCreateNFTScript(contractAddr, 2, 2),
+		Script:         GenerateCreateNFTScript(contractAddr, 2),
 		Nonce:          GetNonce(),
 		ComputeLimit:   20,
 		PayerAccount:   b.RootAccountAddress(),

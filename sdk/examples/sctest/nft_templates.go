@@ -12,7 +12,7 @@ import (
 // reference to the collection. It also makes sure that the token exists
 // in the collection after it has been added to.
 // The id must be greater than zero
-func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte {
+func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	template := `
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
@@ -31,7 +31,7 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int, checkID int) []byte
 
 			destroy oldCollection
 		}`
-	return []byte(fmt.Sprintf(template, tokenAddr, id, checkID))
+	return []byte(fmt.Sprintf(template, tokenAddr, id, id))
 }
 
 // GenerateDepositScript creates a script that withdraws an NFT token
