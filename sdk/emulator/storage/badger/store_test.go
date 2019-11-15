@@ -124,30 +124,88 @@ func TestTransactions(t *testing.T) {
 }
 
 func TestLedger(t *testing.T) {
-	store, dir := setupStore(t)
-	defer func() {
-		require.Nil(t, store.Close())
-		require.Nil(t, os.RemoveAll(dir))
-	}()
+	t.Run("get/set", func(t *testing.T) {
+		store, dir := setupStore(t)
+		defer func() {
+			require.Nil(t, store.Close())
+			require.Nil(t, os.RemoveAll(dir))
+		}()
 
-	var blockNumber uint64 = 1
-	ledger := unittest.LedgerFixture()
+		var blockNumber uint64 = 1
+		ledger := unittest.LedgerFixture()
 
-	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.GetLedgerView(blockNumber)
-		if assert.Error(t, err) {
-			assert.IsType(t, storage.ErrNotFound{}, err)
-		}
-	})
+		t.Run("should get able to set ledger", func(t *testing.T) {
+			err := store.SetLedger(blockNumber, ledger)
+			assert.NoError(t, err)
+		})
 
-	t.Run("should be able set ledger", func(t *testing.T) {
-		err := store.SetLedger(blockNumber, ledger)
-		assert.NoError(t, err)
-
-		t.Run("Should be to get set ledger", func(t *testing.T) {
+		t.Run("should be to get set ledger", func(t *testing.T) {
 			view, err := store.GetLedgerView(blockNumber)
 			assert.NoError(t, err)
 			assert.Equal(t, ledger.NewView(), &view)
+		})
+	})
+
+	t.Run("versioning", func(t *testing.T) {
+		store, dir := setupStore(t)
+		defer func() {
+			require.Nil(t, store.Close())
+			require.Nil(t, os.RemoveAll(dir))
+		}()
+
+		// Create a list of ledgers, where the ledger at index i has
+		// keys (i+2)-1->(i+2)+1 set.
+		totalBlocks := 10
+		var ledgers []flow.Ledger
+		for i := 2; i < totalBlocks+2; i++ {
+			ledger := make(flow.Ledger)
+			for j := i - 1; j <= i+1; j++ {
+				ledger[fmt.Sprintf("%d", j)] = []byte{byte(j)}
+			}
+			ledgers = append(ledgers, ledger)
+		}
+		require.Equal(t, totalBlocks, len(ledgers))
+
+		// Insert all the ledgers, starting with block 1.
+		// This will result in a ledger state that looks like this:
+		// Block 1: {1: 1, 2: 2, 3: 3}
+		// Block 2: {2: 2, 3: 3, 4: 4}
+		// ...
+		for i, ledger := range ledgers {
+			err := store.SetLedger(uint64(i+1), ledger)
+			require.NoError(t, err)
+		}
+
+		// We didn't insert anything at block 0, so this should be empty.
+		t.Run("should return empty view for block 0", func(t *testing.T) {
+			view, err := store.GetLedgerView(0)
+			require.NoError(t, err)
+			expected := make(flow.Ledger).NewView()
+			assert.Equal(t, *expected, view)
+		})
+
+		// View at block 1 should have keys 1, 2, 3
+		t.Run("should version the first written block", func(t *testing.T) {
+			view, err := store.GetLedgerView(1)
+			require.NoError(t, err)
+			for i := 1; i <= 3; i++ {
+				val, ok := view.Get(fmt.Sprintf("%d", i))
+				assert.True(t, ok)
+				assert.Equal(t, []byte{byte(i)}, val)
+			}
+		})
+
+		// View at block N should have values 1->N+2
+		t.Run("should version the first written block", func(t *testing.T) {
+			for block := 2; block < totalBlocks; block++ {
+				view, err := store.GetLedgerView(uint64(block))
+				require.NoError(t, err)
+				for i := 1; i <= block+2; i++ {
+					val, ok := view.Get(fmt.Sprintf("%d", i))
+					assert.True(t, ok)
+					assert.Equal(t, []byte{byte(i)}, val)
+				}
+			}
 		})
 	})
 }

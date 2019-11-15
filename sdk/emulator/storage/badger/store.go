@@ -193,7 +193,7 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 			// block. If the register value has changed since the last write,
 			// write the new value and add it to the Blocks of updated registers.
 			// If the register value has not changed, we implicitly ignore it.
-			lastValue, err := getTx(txn)(ledgerValueKey(registerID, blockNumber))
+			lastValue, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
 			if err != nil {
 				return err
 			}
