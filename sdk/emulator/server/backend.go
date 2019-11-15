@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -213,8 +214,14 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 	if err != nil {
 		return nil, err
 	}
+
+	eventMessages := make([]*entities.Event, len(events))
+	for i, event := range events {
+		eventMessages[i] = convert.EventToMessage(event)
+	}
+
 	res := observation.GetEventsResponse{
-		EventsJson: buf.Bytes(),
+		Events: eventMessages,
 	}
 
 	return &res, nil

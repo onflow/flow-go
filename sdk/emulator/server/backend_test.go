@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -11,6 +10,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/abi/encode"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
@@ -34,19 +36,33 @@ func TestGetEvents(t *testing.T) {
 
 	// Add some events
 	var (
-		mintType     = "Mint()"
-		transferType = "Transfer(to: Address)"
-		toAddress    = flow.HexToAddress("1234567890123456789012345678901234567890")
+		mintType     = "Mint"
+		transferType = "Transfer"
+		toAddress    = values.Address(flow.HexToAddress("1234567890123456789012345678901234567890"))
+
+		transferEventType types.Type = types.Event{
+			Identifier: transferType,
+			FieldTypes: []types.EventField{
+				{
+					Identifier: "to",
+					Type:       types.Address{},
+				},
+			},
+		}
 
 		ev1 = flow.Event{
-			Type:   mintType,
-			Values: map[string]interface{}{},
+			Type:    mintType,
+			Payload: []byte{},
 		}
+
+		transferPayload, _ = encode.Encode(values.Event{
+			Identifier: transferType,
+			Fields:     []values.Value{toAddress},
+		})
+
 		ev2 = flow.Event{
-			Type: transferType,
-			Values: map[string]interface{}{
-				"to": toAddress.String(),
-			},
+			Type:    transferType,
+			Payload: transferPayload,
 		}
 	)
 
@@ -71,10 +87,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   2,
 		})
 		assert.Nil(t, err)
-		var events []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &events)
-		assert.Nil(t, err)
-		assert.Len(t, events, 0)
+		assert.Len(t, res.GetEvents(), 0)
 	})
 
 	t.Run("should filter by ID", func(t *testing.T) {
@@ -84,12 +97,17 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
+		resEvents := res.GetEvents()
+
 		assert.Len(t, resEvents, 1)
-		assert.Equal(t, resEvents[0].Type, transferType)
-		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
+		assert.Equal(t, transferType, resEvents[0].Type)
+
+		value, err := encode.Decode(transferEventType, resEvents[0].Payload)
+		require.Nil(t, err)
+
+		event := value.(values.Event)
+		assert.Equal(t, toAddress, event.Fields[0])
 	})
 
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
@@ -98,11 +116,9 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
 		// Should get both events
-		assert.Len(t, resEvents, 2)
+		assert.Len(t, res.GetEvents(), 2)
 	})
 
 	t.Run("should preserve event ordering", func(t *testing.T) {
@@ -111,9 +127,8 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
+		resEvents := res.GetEvents()
 		assert.Len(t, resEvents, 2)
 		// Mint event first, then Transfer
 		assert.Equal(t, resEvents[0].Type, mintType)
