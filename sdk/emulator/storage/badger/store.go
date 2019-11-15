@@ -26,8 +26,54 @@ func New(path string) (Store, error) {
 	if err != nil {
 		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
-	// TODO read ledger changelog from disk
-	return Store{db, newChangelog()}, nil
+
+	store := Store{db, newChangelog()}
+	if err = store.setup(); err != nil {
+		return Store{}, err
+	}
+
+	return store, nil
+}
+
+// setup sets up in-memory indexes and prepares the store for use.
+func (s Store) setup() error {
+	s.db.RLock()
+	defer s.db.RUnlock()
+
+	iterOpts := badger.DefaultIteratorOptions
+	// only search for changelog entries
+	iterOpts.Prefix = []byte(ledgerChangelogKeyPrefix)
+	// create a buffer for copying changelists, this is reused for each register
+	clistBuf := make([]byte, 256)
+
+	// read the changelist from disk for each register
+	return s.db.View(func(txn *badger.Txn) error {
+		iter := txn.NewIterator(iterOpts)
+		defer iter.Close()
+
+		for iter.Rewind(); iter.Valid(); iter.Next() {
+			item := iter.Item()
+			registerID := registerIDFromLedgerChangelogKey(item.Key())
+			// ensure the register ID is value
+			if len(registerID) == 0 {
+				return errors.New("found changelist for invalid register ID")
+			}
+
+			// decode the changelist
+			encClist, err := item.ValueCopy(clistBuf)
+			if err != nil {
+				return err
+			}
+			var clist changelist
+			if err := decodeChangelist(&clist, encClist); err != nil {
+				return err
+			}
+
+			// add to the changelog
+			s.ledgerChangeLog.registers[registerID] = clist
+		}
+		return nil
+	})
 }
 
 func (s Store) GetBlockByHash(blockHash crypto.Hash) (block types.Block, err error) {
