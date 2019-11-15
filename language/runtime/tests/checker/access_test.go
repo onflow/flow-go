@@ -300,10 +300,7 @@ func TestCheckLocalVariableDeclarationAccessModifier(t *testing.T) {
 
 	require.Len(t, tests, len(ast.Accesses))
 
-	for _, variableKind := range []ast.VariableKind{
-		ast.VariableKindConstant,
-		ast.VariableKindVariable,
-	} {
+	for _, variableKind := range ast.VariableKinds {
 
 		for _, test := range tests {
 
