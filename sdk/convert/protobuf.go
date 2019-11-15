@@ -166,6 +166,15 @@ func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublic
 	}, nil
 }
 
+func MessageToEvent(m *entities.Event) flow.Event {
+	return flow.Event{
+		Type:    m.GetType(),
+		TxHash:  crypto.BytesToHash(m.GetTransactionHash()),
+		Index:   uint(m.GetIndex()),
+		Payload: m.GetPayload(),
+	}
+}
+
 func EventToMessage(e flow.Event) *entities.Event {
 	return &entities.Event{
 		Type:            e.Type,
