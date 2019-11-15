@@ -36,7 +36,7 @@ type Connection interface {
 	// Send sends a message to the peer through the alive connection.
 	Send(ctx context.Context, msg *ProtocolMessage) error
 	// onClosed takes a callback to be notified when the peer closed the connection
-	onClosed(func()) error
+	OnClosed(func()) error
 	// Close close the connection
 	Close() error
 }
