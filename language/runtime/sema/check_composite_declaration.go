@@ -153,6 +153,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 	conformances := checker.conformances(declaration)
 
 	members, origins := checker.membersAndOrigins(
+		compositeType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		true,
@@ -371,6 +372,7 @@ func (checker *Checker) declareCompositeConstructor(
 }
 
 func (checker *Checker) membersAndOrigins(
+	containerType Type,
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
 	requireVariableKind bool,
@@ -393,6 +395,9 @@ func (checker *Checker) membersAndOrigins(
 		identifier := field.Identifier.Identifier
 
 		members[identifier] = &Member{
+			ContainerType:   containerType,
+			Access:          field.Access,
+			Identifier:      field.Identifier,
 			DeclarationKind: common.DeclarationKindField,
 			Type:            fieldType,
 			VariableKind:    field.VariableKind,
@@ -422,6 +427,9 @@ func (checker *Checker) membersAndOrigins(
 		identifier := function.Identifier.Identifier
 
 		members[identifier] = &Member{
+			ContainerType:   containerType,
+			Access:          function.Access,
+			Identifier:      function.Identifier,
 			DeclarationKind: common.DeclarationKindFunction,
 			Type:            functionType,
 			VariableKind:    ast.VariableKindConstant,

@@ -29,6 +29,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	)
 
 	members, origins := checker.membersAndOrigins(
+		interfaceType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		false,
