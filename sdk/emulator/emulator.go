@@ -275,6 +275,7 @@ func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 
 	// Add tx to pendingBlock
 	b.txPool[string(tx.Hash())] = tx
+	b.pendingWorldState.InsertTransaction(tx)
 	b.pendingBlock.AddTransaction(tx.Hash())
 
 	return nil
@@ -355,15 +356,13 @@ func (b *EmulatedBlockchain) CommitState() error {
 	defer b.mut.Unlock()
 
 	// If Index > 0, pendingBlock has begun execution (cannot commit state)
-	if b.pendingBlock.Index > 0 {
+	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
 		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
-	txHashes := make([]crypto.Hash, 0)
-	for _, tx := range b.txPool {
-		txHashes = append(txHashes, tx.Hash())
-		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != types.TransactionReverted {
-			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
+	for _, txHash := range b.pendingBlock.TransactionHashes {
+		if b.pendingWorldState.GetTransaction(txHash).Status != types.TransactionReverted {
+			b.pendingWorldState.UpdateTransactionStatus(txHash, types.TransactionSealed)
 		}
 	}
 
