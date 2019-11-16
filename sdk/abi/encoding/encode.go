@@ -10,10 +10,12 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
+// An Encoder encodes Cadence values in XDR format.
 type Encoder struct {
 	enc *xdr.Encoder
 }
 
+// Encode returns the XDR-encoded representation of the given value.
 func Encode(v values.Value) ([]byte, error) {
 	var w bytes.Buffer
 	enc := NewEncoder(&w)
@@ -26,10 +28,17 @@ func Encode(v values.Value) ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// NewEncoder initializes an Encoder that will write XDR-encoded bytes to the
+// given io.Writer.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{xdr.NewEncoder(w)}
 }
 
+// Encoder writes the XDR-encoded representation of the given value to this
+// encoder's io.Writer.
+//
+// This function returns an error if the given value type is not supported
+// by this encoder.
 func (e *Encoder) Encode(v values.Value) error {
 	switch x := v.(type) {
 	case values.Void:
@@ -77,69 +86,132 @@ func (e *Encoder) Encode(v values.Value) error {
 	return nil
 }
 
+// EncodeVoid writes the XDR-encoded representation of a void value.
+//
+// Void values are skipped by the encoder because they are empty by
+// definition, but this function still exists in order to support composite
+// types that contain void values.
 func (e *Encoder) EncodeVoid() error {
 	// void values are not encoded
 	return nil
 }
 
+// EncodeBool writes the XDR-encoded representation of a boolean value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.4
+//  RFC Section 4.4 - Boolean
+//  Represented as an XDR encoded enumeration where 0 is false and 1 is true
 func (e *Encoder) EncodeBool(v values.Bool) error {
 	_, err := e.enc.EncodeBool(bool(v))
 	return err
 }
 
+// EncodeString writes the XDR-encoded representation of a string value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.11
+//  RFC Section 4.11 - String
+//  Unsigned integer length followed by bytes zero-padded to a multiple of four
 func (e *Encoder) EncodeString(v values.String) error {
 	_, err := e.enc.EncodeString(string(v))
 	return err
 }
 
+// EncodeInt writes the XDR-encoded representation of an integer value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
+//  RFC Section 4.1 - Integer
+//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt(v values.Int) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
 
+// EncodeInt8 writes the XDR-encoded representation of an int-8 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
+//  RFC Section 4.1 - Integer
+//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt8(v values.Int8) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
 
+// EncodeInt16 writes the XDR-encoded representation of an int-16 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
+//  RFC Section 4.1 - Integer
+//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt16(v values.Int16) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
 
+// EncodeInt32 writes the XDR-encoded representation of an int-32 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
+//  RFC Section 4.1 - Integer
+//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt32(v values.Int32) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
 
+// EncodeInt64 writes the XDR-encoded representation of an int-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Hyper Integer
+//  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
 func (e *Encoder) EncodeInt64(v values.Int64) error {
 	_, err := e.enc.EncodeHyper(int64(v))
 	return err
 }
 
+// EncodeUint8 writes the XDR-encoded representation of a uint-8 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint8(v values.Uint8) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
+// EncodeUint16 writes the XDR-encoded representation of a uint-16 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint16(v values.Uint16) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
+// EncodeUint32 writes the XDR-encoded representation of a uint-32 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint32(v values.Uint32) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
+// EncodeUint64 writes the XDR-encoded representation of a uint-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Unsigned Hyper Integer
+//  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
 func (e *Encoder) EncodeUint64(v values.Uint64) error {
 	_, err := e.enc.EncodeUhyper(uint64(v))
 	return err
 }
 
-// Reference:
-// 	RFC Section 4.13 - Variable-Length Array
-// 	Unsigned integer length followed by individually XDR encoded array elements
+// EncodeVariableSizedArray writes the XDR-encoded representation of a
+// variable-sized array.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.13
+//  RFC Section 4.13 - Variable-Length Array
+//  Unsigned integer length followed by individually XDR-encoded array elements
 func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 	size := uint32(len(v))
 
@@ -151,6 +223,12 @@ func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 	return e.EncodeConstantSizedArray(values.ConstantSizedArray(v))
 }
 
+// EncodeConstantSizedArray writes the XDR-encoded representation of a
+// constant-sized array.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.12
+//  RFC Section 4.12 - Fixed-Length Array
+//  Individually XDR-encoded array elements
 func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
 	for _, value := range v {
 		if err := e.Encode(value); err != nil {
@@ -161,31 +239,47 @@ func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
 	return nil
 }
 
+// EncodeBytes writes the XDR-encoded representation of a byte array.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
 func (e *Encoder) EncodeBytes(v values.Bytes) error {
 	_, err := e.enc.EncodeOpaque(v)
 	return err
 }
 
+// EncodeAddress writes the XDR-encoded representation of an address.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.9
+//  RFC Section 4.9 - Fixed-Length Opaque Data
+//  Fixed-length uninterpreted data zero-padded to a multiple of four
 func (e *Encoder) EncodeAddress(v values.Address) error {
 	_, err := e.enc.EncodeFixedOpaque(v[:])
 	return err
 }
 
+// EncodeDictionary writes the XDR-encoded representation of a dictionary.
+//
+// The size of the dictionary is encoded as a unsigned integer, followed by
+// the dictionary keys, then elements, each represented as individually
+// XDR-encoded array elements.
 func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	size := uint32(len(v))
 
-	// keys and values are encoded as separate fixed-length arrays
+	// size is encoded as an unsigned integer
+	_, err := e.enc.EncodeUint(size)
+	if err != nil {
+		return err
+	}
+
+	// keys and elements are encoded as separate fixed-length arrays
 	keys := make(values.ConstantSizedArray, 0, size)
 	elements := make(values.ConstantSizedArray, 0, size)
 
 	for key, element := range v {
 		keys = append(keys, key)
 		elements = append(elements, element)
-	}
-
-	_, err := e.enc.EncodeUint(size)
-	if err != nil {
-		return err
 	}
 
 	// encode keys
