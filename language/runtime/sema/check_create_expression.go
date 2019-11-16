@@ -6,15 +6,15 @@ import (
 )
 
 func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) ast.Repr {
-
+	inCreate := checker.inCreate
 	checker.inCreate = true
 	defer func() {
-		checker.inCreate = false
+		checker.inCreate = inCreate
 	}()
 
 	invocation := expression.InvocationExpression
 
-	ty := invocation.Accept(checker)
+	ty := invocation.Accept(checker).(Type)
 
 	// Check that the created expression is a resource
 
@@ -23,8 +23,8 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 
 	compositeType, isCompositeType := ty.(*CompositeType)
 
-	if !isCompositeType ||
-		compositeType.Kind != common.CompositeKindResource {
+	if !ty.IsInvalidType() &&
+		(!isCompositeType || compositeType.Kind != common.CompositeKindResource) {
 
 		checker.report(
 			&InvalidConstructionError{

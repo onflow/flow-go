@@ -48,6 +48,8 @@ type Checker struct {
 	seenImports             map[ast.LocationID]bool
 	isChecked               bool
 	inCreate                bool
+	inInvocation            bool
+	inAssignment            bool
 	Elaboration             *Elaboration
 	currentMemberExpression *ast.MemberExpression
 }
@@ -274,7 +276,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 				},
 			)
 		}
-	} else {
+	} else if !valueType.IsInvalidType() {
 		if transfer.Operation == ast.TransferOperationMove {
 			checker.report(
 				&IncorrectTransferOperationError{

@@ -28,6 +28,12 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		checker.inCreate = inCreate
 	}()
 
+	inInvocation := checker.inInvocation
+	checker.inInvocation = true
+	defer func() {
+		checker.inInvocation = inInvocation
+	}()
+
 	// check the invoked expression can be invoked
 
 	invokedExpression := invocationExpression.InvokedExpression
