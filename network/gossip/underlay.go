@@ -4,10 +4,10 @@ import (
 	"context"
 )
 
-// Protocol represents the protocol layer that provides the network implementation for establishing
+// Underlay represents the layer that provides the network implementation for establishing
 // connections with peers, starting a service for accepting incoming connection request, as well
 // as taking callback functions for notifying inbound messages.
-type Protocol interface {
+type Underlay interface {
 	// Handle accepts a callback function which will be called when the server receives a message from
 	// a peer.
 	Handle(onReceive OnReceiveCallback) error
