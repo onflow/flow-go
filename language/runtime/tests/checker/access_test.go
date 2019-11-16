@@ -561,3 +561,275 @@ func TestCheckImportGlobalTypeAccess(t *testing.T) {
 		assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "A")
 	}
 }
+
+func TestCheckCompositeFunctionAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, true},
+	}
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s Test {
+                          %[2]s fun test() {}
+
+                          fun test2() {
+                              self.test()
+                          }
+                      }
+
+                      fun test() {
+                          let test %[3]s %[4]s Test()
+                          test.test()
+                          %[5]s test
+                      }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+				}
+			})
+		}
+	}
+}
+
+func TestCheckInterfaceFunctionAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, true},
+	}
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s interface Test {
+                          %[2]s fun test()
+                      }
+
+                      %[1]s TestImpl: Test {
+                          %[2]s fun test() {}
+
+                          fun test2() {
+                              self.test()
+                          }
+                      }
+
+                      fun test() {
+                          let test: %[3]sTest %[4]s %[5]s TestImpl()
+                          test.test()
+                          %[6]s test
+                      }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+				}
+			})
+		}
+	}
+}
+
+func TestCheckCompositeFieldReadAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, true},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s Test {
+                          %[2]s var test: Int
+
+                          init() {
+                              self.test = 0
+                          }
+
+                          fun test2() {
+                              self.test
+                          }
+                      }
+
+                      fun test() {
+                          let test %[3]s %[4]s Test()
+                          test.test
+                          %[5]s test
+                      }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+				}
+			})
+		}
+	}
+}
+
+func TestCheckInterfaceFieldReadAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, true},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                     %[1]s interface Test {
+                         %[2]s var test: Int
+                     }
+
+                     %[1]s TestImpl: Test {
+                         %[2]s var test: Int
+
+                         init() {
+                             self.test = 0
+                         }
+
+                         fun test2() {
+                             self.test
+                         }
+                     }
+
+                     fun test() {
+                         let test: %[3]sTest %[4]s %[5]s TestImpl()
+                         test.test
+                         %[6]s test
+                     }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+				}
+			})
+		}
+	}
+}

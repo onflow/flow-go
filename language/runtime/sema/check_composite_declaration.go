@@ -8,14 +8,19 @@ import (
 
 func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
+	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
+
+	checker.containerTypes[compositeType] = true
+	defer func() {
+		checker.containerTypes[compositeType] = false
+	}()
+
 	checker.checkDeclarationAccessModifier(
 		declaration.Access,
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
 	)
-
-	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
 
