@@ -40,6 +40,8 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeString(x)
 	case values.Bytes:
 		return e.EncodeBytes(x)
+	case values.Address:
+		return e.EncodeAddress(x)
 	case values.Int:
 		return e.EncodeInt(x)
 	case values.Int8:
@@ -66,8 +68,6 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeComposite(x)
 	case values.Event:
 		return e.EncodeEvent(x)
-	case values.Address:
-		return e.EncodeAddress(x)
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
 	}
@@ -164,6 +164,11 @@ func (e *Encoder) EncodeBytes(v values.Bytes) error {
 	return err
 }
 
+func (e *Encoder) EncodeAddress(v values.Address) error {
+	_, err := e.enc.EncodeFixedOpaque(v[:])
+	return err
+}
+
 func (e *Encoder) EncodeComposite(v values.Composite) error {
 	for _, value := range v.Fields {
 		if err := e.Encode(value); err != nil {
@@ -182,9 +187,4 @@ func (e *Encoder) EncodeEvent(v values.Event) error {
 	}
 
 	return nil
-}
-
-func (e *Encoder) EncodeAddress(v values.Address) error {
-	_, err := e.enc.EncodeFixedOpaque(v[:])
-	return err
 }

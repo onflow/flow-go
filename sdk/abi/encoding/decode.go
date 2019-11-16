@@ -41,6 +41,8 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeString()
 	case types.Bytes:
 		return e.DecodeBytes()
+	case types.Address:
+		return e.DecodeAddress()
 	case types.Int:
 		return e.DecodeInt()
 	case types.Int8:
@@ -61,12 +63,12 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeUint64()
 	case types.VariableSizedArray:
 		return e.DecodeVariableSizedArray(x)
+	case types.ConstantSizedArray:
+		return e.DecodeConstantSizedArray(x)
 	case types.Composite:
 		return e.DecodeComposite(x)
 	case types.Event:
 		return e.DecodeEvent(x)
-	case types.Address:
-		return e.DecodeAddress()
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
 	}
@@ -103,7 +105,20 @@ func (e *Decoder) DecodeBytes() (values.Bytes, error) {
 		return nil, err
 	}
 
+	if b == nil {
+		b = []byte{}
+	}
+
 	return b, nil
+}
+
+func (e *Decoder) DecodeAddress() (values.Address, error) {
+	b, _, err := e.dec.DecodeFixedOpaque(20)
+	if err != nil {
+		return values.Address{}, err
+	}
+
+	return values.BytesToAddress(b), nil
 }
 
 func (e *Decoder) DecodeInt() (values.Int, error) {
@@ -255,13 +270,4 @@ func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
 		Identifier: t.Identifier,
 		Fields:     fields,
 	}, nil
-}
-
-func (e *Decoder) DecodeAddress() (values.Address, error) {
-	b, _, err := e.dec.DecodeFixedOpaque(20)
-	if err != nil {
-		return values.Address{}, err
-	}
-
-	return values.BytesToAddress(b), nil
 }
