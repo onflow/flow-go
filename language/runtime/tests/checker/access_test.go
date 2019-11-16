@@ -501,7 +501,7 @@ func TestCheckImportGlobalValueAccess(t *testing.T) {
 
 		imported, _, err := parser.ParseProgram(test)
 
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		_, err = ParseAndCheckWithOptions(t,
 			`
@@ -522,3 +522,42 @@ func TestCheckImportGlobalValueAccess(t *testing.T) {
 	}
 }
 
+func TestCheckImportGlobalTypeAccess(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		// TODO: add support for contracts
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		// NOTE: only parse, don't check imported program.
+		// will be checked by checker checking importing program
+
+		imported, _, err := parser.ParseProgram(fmt.Sprintf(
+			`
+               priv %[1]s A {}
+               pub %[1]s B {}
+            `,
+			compositeKind.Keyword(),
+		))
+
+		require.Nil(t, err)
+
+		_, err = ParseAndCheckWithOptions(t,
+			`
+               import A, B from "imported"
+            `,
+			ParseAndCheckOptions{
+				ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+					return imported, nil
+				},
+			},
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		require.IsType(t, &sema.InvalidAccessError{}, errs[0])
+		assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "A")
+	}
+}
