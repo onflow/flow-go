@@ -65,6 +65,8 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeVariableSizedArray(x)
 	case types.ConstantSizedArray:
 		return e.DecodeConstantSizedArray(x)
+	case types.Dictionary:
+		return e.DecodeDictionary(x)
 	case types.Composite:
 		return e.DecodeComposite(x)
 	case types.Event:
@@ -237,6 +239,43 @@ func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (values.C
 	}
 
 	return array, nil
+}
+
+func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error) {
+	size, _, err := e.dec.DecodeUint()
+	if err != nil {
+		return nil, err
+	}
+
+	keysType := types.ConstantSizedArray{
+		Size:        int(size),
+		ElementType: t.KeyType,
+	}
+
+	elementsType := types.ConstantSizedArray{
+		Size:        int(size),
+		ElementType: t.ElementType,
+	}
+
+	keys, err := e.DecodeConstantSizedArray(keysType)
+	if err != nil {
+		return nil, err
+	}
+
+	elements, err := e.DecodeConstantSizedArray(elementsType)
+	if err != nil {
+		return nil, err
+	}
+
+	d := make(values.Dictionary)
+
+	for i := 0; i < int(size); i++ {
+		key := keys[i]
+		element := elements[i]
+		d[key] = element
+	}
+
+	return d, nil
 }
 
 func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {

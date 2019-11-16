@@ -1,7 +1,6 @@
 package encoding_test
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -246,21 +245,22 @@ func TestEncodeConstantSizedArray(t *testing.T) {
 	})
 }
 
-// func TestEncodeDictionary(t *testing.T) {
-// 	testAllEncode(t, []encodeTest{
-// 		{
-// 			types.Dictionary{
-// 				KeyType:     types.String{},
-// 				ElementType: types.Int{},
-// 			},
-// 			values.Dictionary{
-// 				values.String("a"): values.Int(1),
-// 				values.String("b"): values.Int(2),
-// 				values.String("c"): values.Int(3),
-// 			},
-// 		},
-// 	})
-// }
+func TestEncodeDictionary(t *testing.T) {
+	// TODO: add more cases
+	testAllEncode(t, []encodeTest{
+		{
+			types.Dictionary{
+				KeyType:     types.String{},
+				ElementType: types.Int{},
+			},
+			values.Dictionary{
+				values.String("a"): values.Int(1),
+				values.String("b"): values.Int(2),
+				values.String("c"): values.Int(3),
+			},
+		},
+	})
+}
 
 func TestEncodeComposite(t *testing.T) {
 	// TODO: add more cases
@@ -312,8 +312,7 @@ func TestEncodeEvent(t *testing.T) {
 
 func testAllEncode(t *testing.T, tests []encodeTest) {
 	for _, test := range tests {
-		name := fmt.Sprintf("%T", test.typ)
-		t.Run(name, func(t *testing.T) {
+		t.Run("", func(t *testing.T) {
 			testEncode(t, test.typ, test.val)
 		})
 	}

@@ -64,6 +64,8 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeVariableSizedArray(x)
 	case values.ConstantSizedArray:
 		return e.EncodeConstantSizedArray(x)
+	case values.Dictionary:
+		return e.EncodeDictionary(x)
 	case values.Composite:
 		return e.EncodeComposite(x)
 	case values.Event:
@@ -167,6 +169,36 @@ func (e *Encoder) EncodeBytes(v values.Bytes) error {
 func (e *Encoder) EncodeAddress(v values.Address) error {
 	_, err := e.enc.EncodeFixedOpaque(v[:])
 	return err
+}
+
+func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
+	size := uint32(len(v))
+
+	// keys and values are encoded as separate fixed-length arrays
+	keys := make(values.ConstantSizedArray, 0, size)
+	elements := make(values.ConstantSizedArray, 0, size)
+
+	for key, element := range v {
+		keys = append(keys, key)
+		elements = append(elements, element)
+	}
+
+	_, err := e.enc.EncodeUint(size)
+	if err != nil {
+		return err
+	}
+
+	// encode keys
+	if err := e.EncodeConstantSizedArray(keys); err != nil {
+		return err
+	}
+
+	// encode elements
+	if err := e.EncodeConstantSizedArray(elements); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *Encoder) EncodeComposite(v values.Composite) error {
