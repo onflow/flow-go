@@ -156,19 +156,14 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		Identifier:    identifier.Identifier,
 	}
 
-	err := checker.typeActivations.Declare(identifier, interfaceType)
-	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(
-		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			Access:          declaration.Access,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            interfaceType,
-			Pos:             &identifier.Pos,
-		},
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		interfaceType,
+		declaration.DeclarationKind(),
+		declaration.Access,
 	)
+	checker.report(err)
+	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 
 	// NOTE: interface type's `InitializerParameterTypeAnnotations` and  `members` fields
 	// are added in `VisitInterfaceDeclaration`.

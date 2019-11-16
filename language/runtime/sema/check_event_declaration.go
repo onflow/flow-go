@@ -47,7 +47,18 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 		ConstructorParameterTypeAnnotations: convertedParameterTypeAnnotations,
 	}
 
-	typeDeclarationErr := checker.typeActivations.Declare(identifier, eventType)
+	// We are assuming access is public because other programs
+	// might want to refer to the event type.
+	// Other programs will still not be able to emit events of the imported type
+
+	const access = ast.AccessPublic
+
+	typeDeclarationVariable, typeDeclarationErr := checker.typeActivations.DeclareType(
+		identifier,
+		eventType,
+		declaration.DeclarationKind(),
+		access,
+	)
 	checker.report(typeDeclarationErr)
 
 	constructorDeclarationErr := checker.declareEventConstructor(declaration, eventType)
@@ -57,22 +68,9 @@ func (checker *Checker) declareEventDeclaration(declaration *ast.EventDeclaratio
 		checker.report(constructorDeclarationErr)
 	}
 
-	// We are assuming access is public because other programs
-	// might want to refer to the event type.
-	// Other programs will still not be able to emit events of the imported type
-
-	const access = ast.AccessPublic
-
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			Access:          access,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            eventType,
-			Pos:             &identifier.Pos,
-		},
+		typeDeclarationVariable,
 	)
 
 	checker.Elaboration.EventDeclarationTypes[declaration] = eventType

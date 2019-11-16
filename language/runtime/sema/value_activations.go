@@ -103,6 +103,23 @@ func (a *ValueActivations) DeclareFunction(
 	)
 }
 
+func (a *ValueActivations) DeclareType(
+	identifier ast.Identifier,
+	ty Type,
+	declarationKind common.DeclarationKind,
+	access ast.Access,
+) (*Variable, error) {
+	return a.Declare(
+		identifier.Identifier,
+		ty,
+		access,
+		declarationKind,
+		identifier.Pos,
+		true,
+		nil,
+	)
+}
+
 func (a *ValueActivations) DeclareImplicitConstant(
 	identifier string,
 	ty Type,

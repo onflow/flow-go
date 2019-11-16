@@ -138,18 +138,16 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		Identifier: identifier.Identifier,
 	}
 
-	err := checker.typeActivations.Declare(identifier, compositeType)
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Access,
+	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			Access:          declaration.Access,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            compositeType,
-			Pos:             &identifier.Pos,
-		},
+		variable,
 	)
 
 	conformances := checker.conformances(declaration)

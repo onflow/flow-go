@@ -86,10 +86,12 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 		)
 
 		// NOTE: declare constant variable with invalid type to silence rest of program
+		const access = ast.AccessPrivate
+
 		_, err := checker.valueActivations.Declare(
 			identifier.Identifier,
 			&InvalidType{},
-			ast.AccessPrivate,
+			access,
 			common.DeclarationKindValue,
 			identifier.Pos,
 			true,
@@ -98,7 +100,12 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 		checker.report(err)
 
 		// NOTE: declare type with invalid type to silence rest of program
-		err = checker.typeActivations.Declare(identifier, &InvalidType{})
+		_, err = checker.typeActivations.DeclareType(
+			identifier,
+			&InvalidType{},
+			common.DeclarationKindType,
+			access,
+		)
 		checker.report(err)
 	}
 
@@ -197,26 +204,26 @@ func (checker *Checker) importTypes(
 	// TODO: consider access modifiers
 
 	// determine which identifiers are imported /
-	// which types need to be declared
+	// which variables need to be declared
 
-	var types map[string]Type
+	var variables map[string]*Variable
 	identifierLength := len(declaration.Identifiers)
 	if identifierLength > 0 {
-		types = make(map[string]Type, identifierLength)
+		variables = make(map[string]*Variable, identifierLength)
 		for _, identifier := range declaration.Identifiers {
 			name := identifier.Identifier
 			ty := importChecker.GlobalTypes[name]
 			if ty == nil {
 				continue
 			}
-			types[name] = ty
+			variables[name] = ty
 			delete(missing, identifier)
 		}
 	} else {
-		types = importChecker.GlobalTypes
+		variables = importChecker.GlobalTypes
 	}
 
-	for name, ty := range types {
+	for name, variable := range variables {
 
 		// TODO: improve position
 		// TODO: allow cross-module types?
@@ -226,11 +233,15 @@ func (checker *Checker) importTypes(
 			continue
 		}
 
-		identifier := ast.Identifier{
-			Identifier: name,
-			Pos:        declaration.LocationPos,
-		}
-		err := checker.typeActivations.Declare(identifier, ty)
+		_, err := checker.typeActivations.Declare(
+			name,
+			variable.Type,
+			variable.Access,
+			variable.DeclarationKind,
+			declaration.LocationPos,
+			true,
+			variable.ArgumentLabels,
+		)
 		checker.report(err)
 	}
 }

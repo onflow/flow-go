@@ -164,8 +164,10 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	// Finally, declare the variable in the current value activation
 
+	identifier := declaration.Identifier.Identifier
+
 	variable, err := checker.valueActivations.Declare(
-		declaration.Identifier.Identifier,
+		identifier,
 		declarationType,
 		declaration.Access,
 		declaration.DeclarationKind(),
@@ -174,5 +176,5 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		nil,
 	)
 	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
+	checker.recordVariableDeclarationOccurrence(identifier, variable)
 }
