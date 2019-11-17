@@ -254,9 +254,18 @@ func TestEncodeDictionary(t *testing.T) {
 				ElementType: types.Int{},
 			},
 			values.Dictionary{
-				values.String("a"): values.Int(1),
-				values.String("b"): values.Int(2),
-				values.String("c"): values.Int(3),
+				values.KeyValuePair{
+					values.String("a"),
+					values.Int(1),
+				},
+				values.KeyValuePair{
+					values.String("b"),
+					values.Int(2),
+				},
+				values.KeyValuePair{
+					values.String("c"),
+					values.Int(3),
+				},
 			},
 		},
 	})

@@ -1338,16 +1338,21 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 }
 
 func (v DictionaryValue) Export() values.Value {
-	values := make(values.Dictionary)
+	d := make(values.Dictionary, 0, len(v))
 
+	// TODO: export with deterministic ordering
+	// TODO: export original key values, not dictionaryKey(key)
 	for key, val := range v {
 		key := key.(ExportableValue).Export()
 		value := val.(ExportableValue).Export()
 
-		values[key] = value
+		d = append(d, values.KeyValuePair{
+			Key:   key,
+			Value: value,
+		})
 	}
 
-	return values
+	return d
 }
 
 func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {

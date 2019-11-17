@@ -274,7 +274,6 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
 func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
-	// TODO: make encoding deterministic
 	size := uint32(len(v))
 
 	// size is encoded as an unsigned integer
@@ -284,12 +283,12 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	}
 
 	// keys and elements are encoded as separate fixed-length arrays
-	keys := make([]values.Value, 0, size)
-	elements := make([]values.Value, 0, size)
+	keys := make([]values.Value, size)
+	elements := make([]values.Value, size)
 
-	for key, element := range v {
-		keys = append(keys, key)
-		elements = append(elements, element)
+	for i, pair := range v {
+		keys[i] = pair.Key
+		elements[i] = pair.Value
 	}
 
 	// encode keys

@@ -261,12 +261,16 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 		return nil, err
 	}
 
-	d := make(values.Dictionary)
+	d := make(values.Dictionary, size)
 
 	for i := 0; i < int(size); i++ {
 		key := keys[i]
 		element := elements[i]
-		d[key] = element
+
+		d[i] = values.KeyValuePair{
+			Key:   key,
+			Value: element,
+		}
 	}
 
 	return d, nil

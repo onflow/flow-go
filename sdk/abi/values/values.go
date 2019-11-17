@@ -69,9 +69,14 @@ type ConstantSizedArray []Value
 
 func (ConstantSizedArray) isValue() {}
 
-type Dictionary map[Value]Value
+type Dictionary []KeyValuePair
 
 func (Dictionary) isValue() {}
+
+type KeyValuePair struct {
+	Key   Value
+	Value Value
+}
 
 type Event struct {
 	// TODO: is this field needed here?
