@@ -3974,17 +3974,6 @@ func TestParseStructureWithConformances(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
-
-	_, _, err := parser.ParseProgram(`
-        struct Test {
-            pub fun getFoo(): Int
-        }
-	`)
-
-	assert.NotNil(t, err)
-}
-
 func TestParsePreAndPostConditions(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`

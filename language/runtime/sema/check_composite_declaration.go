@@ -526,14 +526,25 @@ func (checker *Checker) checkSpecialFunction(
 		checkResourceLoss,
 	)
 
-	if containerKind == ContainerKindInterface &&
-		specialFunction.FunctionBlock != nil {
+	switch containerKind {
+	case ContainerKindInterface:
+		if specialFunction.FunctionBlock != nil {
 
-		checker.checkInterfaceSpecialFunctionBlock(
-			specialFunction.FunctionBlock,
-			containerDeclarationKind,
-			specialFunction.DeclarationKind,
-		)
+			checker.checkInterfaceSpecialFunctionBlock(
+				specialFunction.FunctionBlock,
+				containerDeclarationKind,
+				specialFunction.DeclarationKind,
+			)
+		}
+
+	case ContainerKindComposite:
+		if specialFunction.FunctionBlock == nil {
+			checker.report(
+				&MissingFunctionBodyError{
+					Pos: specialFunction.EndPosition(),
+				},
+			)
+		}
 	}
 }
 
@@ -562,6 +573,14 @@ func (checker *Checker) checkCompositeFunctions(
 				},
 			)
 		}()
+
+		if function.FunctionBlock == nil {
+			checker.report(
+				&MissingFunctionBodyError{
+					Pos: function.EndPosition(),
+				},
+			)
+		}
 	}
 }
 
