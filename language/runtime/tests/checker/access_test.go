@@ -1120,3 +1120,108 @@ func TestCheckInterfaceFieldVariableDeclarationWithSecondValueAccess(t *testing.
 		})
 	}
 }
+
+func TestCheckImportGlobalValueAssignmentAndSwapAccess(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	imported, _, err := parser.ParseProgram(`
+       priv var x = 1
+       pub var y = 2
+    `)
+
+	require.Nil(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		`
+           import x, y from "imported"
+
+           fun test() {
+               x = 3
+               y = 4
+
+               var tempX = 5
+               x <-> tempX
+
+               var tempY = 6
+               y <-> tempY
+           }
+        `,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 5)
+
+	require.IsType(t, &sema.InvalidAccessError{}, errs[0])
+	assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "x")
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+	assert.Equal(t, errs[1].(*sema.AssignmentToConstantError).Name, "x")
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+	assert.Equal(t, errs[2].(*sema.AssignmentToConstantError).Name, "y")
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[3])
+	assert.Equal(t, errs[3].(*sema.AssignmentToConstantError).Name, "x")
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[4])
+	assert.Equal(t, errs[4].(*sema.AssignmentToConstantError).Name, "y")
+}
+
+func TestCheckImportGlobalValueVariableDeclarationWithSecondValueAccess(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	imported, _, err := parser.ParseProgram(`
+       resource R {}
+
+       fun createR(): <-R {
+           return <-create R()
+       }
+
+       priv var x <- createR()
+       pub var y <- createR()
+    `)
+
+	require.Nil(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		`
+           import x, y, createR from "imported"
+
+           fun test() {
+               let oldX <- x <- createR()
+               destroy oldX
+
+               let oldY <- y <- createR()
+               destroy oldY
+           }
+        `,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	errs := ExpectCheckerErrors(t, err, 5)
+
+	require.IsType(t, &sema.InvalidAccessError{}, errs[0])
+	assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "x")
+
+	require.IsType(t, &sema.ResourceCapturingError{}, errs[1])
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+	assert.Equal(t, errs[2].(*sema.AssignmentToConstantError).Name, "x")
+
+	require.IsType(t, &sema.ResourceCapturingError{}, errs[3])
+
+	require.IsType(t, &sema.AssignmentToConstantError{}, errs[4])
+	assert.Equal(t, errs[4].(*sema.AssignmentToConstantError).Name, "y")
+}
