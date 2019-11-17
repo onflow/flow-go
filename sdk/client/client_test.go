@@ -1,7 +1,6 @@
 package client_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -201,16 +200,18 @@ func TestGetTransaction(t *testing.T) {
 	tx := unittest.TransactionFixture()
 
 	events := []flow.Event{unittest.EventFixture()}
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(events)
-	assert.Nil(t, err)
+
+	eventMessages := make([]*entities.Event, len(events))
+	for i, event := range events {
+		eventMessages[i] = convert.EventToMessage(event)
+	}
 
 	t.Run("Success", func(t *testing.T) {
 		mockRPC.EXPECT().
 			GetTransaction(ctx, gomock.Any()).
 			Return(&observation.GetTransactionResponse{
 				Transaction: convert.TransactionToMessage(tx),
-				EventsJson:  buf.Bytes(),
+				Events:      eventMessages,
 			}, nil).
 			Times(1)
 
@@ -227,7 +228,7 @@ func TestGetTransaction(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetTransaction(ctx, crypto.Hash{})
+		_, err := c.GetTransaction(ctx, crypto.Hash{})
 		assert.Error(t, err)
 	})
 }
@@ -278,12 +279,6 @@ func TestGetEvents(t *testing.T) {
 		Payload: eventPayload,
 	}
 
-	events := []flow.Event{mockEvent}
-
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(events)
-	assert.Nil(t, err)
-
 	t.Run("Success", func(t *testing.T) {
 		// Set up the mock to return a mocked event response
 		mockRes := &observation.GetEventsResponse{Events: []*entities.Event{
@@ -319,7 +314,7 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetEvents(ctx, client.EventQuery{})
+		_, err := c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
 }

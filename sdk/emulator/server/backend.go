@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
@@ -126,14 +125,15 @@ func (b *Backend) GetTransaction(ctx context.Context, req *observation.GetTransa
 		Debugf("💵  GetTransaction called")
 
 	txMsg := convert.TransactionToMessage(*tx)
-	var buf bytes.Buffer
-	err = json.NewEncoder(&buf).Encode(tx.Events)
-	if err != nil {
-		return nil, err
+
+	eventMessages := make([]*entities.Event, len(tx.Events))
+	for i, event := range tx.Events {
+		eventMessages[i] = convert.EventToMessage(event)
 	}
+
 	return &observation.GetTransactionResponse{
 		Transaction: txMsg,
-		EventsJson:  buf.Bytes(),
+		Events:      eventMessages,
 	}, nil
 }
 
@@ -208,12 +208,6 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		"endBlock":   req.EndBlock,
 		"results":    len(events),
 	}).Debugf("🎁  GetEvents called")
-
-	var buf bytes.Buffer
-	err = json.NewEncoder(&buf).Encode(events)
-	if err != nil {
-		return nil, err
-	}
 
 	eventMessages := make([]*entities.Event, len(events))
 	for i, event := range events {
