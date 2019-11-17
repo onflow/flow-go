@@ -18,7 +18,7 @@ type Decoder struct {
 
 // Decode returns a Cadence value decoded from its XDR-encoded representation.
 //
-// This function returns and error if the bytes do not match the given type
+// This function returns an error if the bytes do not match the given type
 // definition.
 func Decode(t types.Type, b []byte) (values.Value, error) {
 	r := bytes.NewReader(b)
@@ -41,7 +41,7 @@ func NewDecoder(r io.Reader) *Decoder {
 // Decode reads XDR-encoded bytes from the io.Reader and decodes them to a
 // Cadence value of the given type.
 //
-// This function returns and error if the bytes do not match the given type
+// This function returns an error if the bytes do not match the given type
 // definition.
 func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	switch x := t.(type) {
