@@ -217,6 +217,25 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		)
 	}
 
+	// TODO: add option to checker to specify behaviour
+	//   for not-specified access modifier
+
+	// NOTE: exclude private access to avoid spurious error, because the plain access
+	// of the field already resulted in an invalid access error
+
+	if !checker.isWriteableMember(member) &&
+		member.Access != ast.AccessPrivate {
+
+		checker.report(
+			&InvalidAccessError{
+				Name:              member.Identifier.Identifier,
+				RestrictingAccess: member.Access,
+				DeclarationKind:   member.DeclarationKind,
+				Range:             ast.NewRangeFromPositioned(member.Identifier),
+			},
+		)
+	}
+
 	reportAssignmentToConstant := func() {
 		checker.report(
 			&AssignmentToConstantMemberError{

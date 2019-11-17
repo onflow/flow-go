@@ -833,3 +833,290 @@ func TestCheckInterfaceFieldReadAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckCompositeFieldAssignmentAndSwapAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, false},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s Test {
+                          %[2]s var test: Int
+
+                          init() {
+                              self.test = 0
+                          }
+
+                          fun test2() {
+                              self.test = 1
+                              var temp = 2
+                              self.test <-> temp
+                          }
+                      }
+
+                      fun test() {
+                          let test %[3]s %[4]s Test()
+                          test.test = 3
+                          var temp = 4
+                          test.test <-> temp
+                          %[5]s test
+                      }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 2)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[1])
+
+					// TODO: check line numbers to ensure errors where for outside composite
+				}
+			})
+		}
+	}
+}
+
+func TestCheckInterfaceFieldWriteAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, false},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+		for _, compositeKind := range common.CompositeKinds {
+
+			// TODO: add support for contracts
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
+
+			testName := fmt.Sprintf("%s/%s",
+				compositeKind.Keyword(),
+				test.access.Keyword(),
+			)
+
+			t.Run(testName, func(t *testing.T) {
+
+				_, err := ParseAndCheck(t, fmt.Sprintf(`
+                      %[1]s interface Test {
+                          %[2]s var test: Int
+                      }
+
+                      %[1]s TestImpl: Test {
+                          %[2]s var test: Int
+
+                          init() {
+                              self.test = 0
+                          }
+
+                          fun test2() {
+                               self.test = 1
+                               var temp = 2
+                               self.test <-> temp
+                          }
+                      }
+
+                      fun test() {
+                          let test: %[3]sTest %[4]s %[5]s TestImpl()
+                          test.test = 3
+                          var temp = 4
+                          test.test <-> temp
+                          %[6]s test
+                      }
+	                `,
+					compositeKind.Keyword(),
+					test.access.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+				))
+
+				if test.expectSuccess {
+					assert.Nil(t, err)
+				} else {
+					errs := ExpectCheckerErrors(t, err, 2)
+
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+					assert.IsType(t, &sema.InvalidAccessError{}, errs[1])
+
+					// TODO: check line numbers to ensure errors where for outside composite
+				}
+			})
+		}
+	}
+}
+
+func TestCheckCompositeFieldVariableDeclarationWithSecondValueAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, false},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+
+		t.Run(test.access.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource A {}
+
+                  resource B {
+                      %[1]s var a: <-A
+
+                      init() {
+                          self.a <- create A()
+                      }
+
+                      destroy() {
+                          destroy self.a
+                      }
+
+                      fun test() {
+                          let oldA <- self.a <- create A()
+                          destroy oldA
+                      }
+                  }
+
+                  fun test() {
+                      let b <- create B()
+                      let oldA <- b.a <- create A()
+                      destroy oldA
+                      destroy b
+                  }
+	            `,
+				test.access.Keyword(),
+			))
+
+			if test.expectSuccess {
+				assert.Nil(t, err)
+			} else {
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+
+				// TODO: check line numbers to ensure errors where for outside composite
+			}
+		})
+	}
+}
+
+func TestCheckInterfaceFieldVariableDeclarationWithSecondValueAccess(t *testing.T) {
+
+	type test struct {
+		access        ast.Access
+		expectSuccess bool
+	}
+
+	tests := []test{
+		{ast.AccessNotSpecified, true},
+		{ast.AccessPrivate, false},
+		{ast.AccessPublic, false},
+		{ast.AccessPublicSettable, true},
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for _, test := range tests {
+
+		t.Run(test.access.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+                  resource A {}
+
+                  resource interface B {
+                      %[1]s var a: <-A
+                  }
+
+                  resource BImpl: B {
+                      %[1]s var a: <-A
+
+                      init() {
+                          self.a <- create A()
+                      }
+
+                      destroy() {
+                          destroy self.a
+                      }
+
+                      fun test() {
+                          let oldA <- self.a <- create A()
+                          destroy oldA
+                      }
+                  }
+
+                  fun test() {
+                      let b: <-B <- create BImpl()
+                      let oldA <- b.a <- create A()
+                      destroy oldA
+                      destroy b
+                  }
+	            `,
+				test.access.Keyword(),
+			))
+
+			if test.expectSuccess {
+				assert.Nil(t, err)
+			} else {
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+
+				// TODO: check line numbers to ensure errors where for outside composite
+			}
+		})
+	}
+}
