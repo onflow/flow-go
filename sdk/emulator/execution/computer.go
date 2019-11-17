@@ -56,7 +56,7 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (interface{}, []flow.Event, error) {
+func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (values.Value, []flow.Event, error) {
 	runtimeContext := NewRuntimeContext(registers)
 	runtimeContext.SetLogger(c.onLogMessage)
 

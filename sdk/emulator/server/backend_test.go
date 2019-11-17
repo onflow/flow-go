@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"math/big"
 	"testing"
 	"time"
 
@@ -175,16 +174,16 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil).
+			ExecuteScript(sampleScriptText).Return(values.Int(2137), nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
+		assert.NoError(t, err)
 
-		assert.Nil(t, err)
+		value, err := encoding.Decode(types.Int{}, response.GetValue())
+		assert.NoError(t, err)
 
-		//TODO likely to be refactored with a proper serialization/ABI implemented
-		assert.Equal(t, "*big.Int", response.Type)
-		assert.Equal(t, []uint8("2137"), response.Value)
+		assert.Equal(t, values.Int(2137), value)
 	}))
 
 	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
