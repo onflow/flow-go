@@ -327,16 +327,20 @@ func testAllEncode(t *testing.T, tests []encodeTest) {
 	}
 }
 
+const numTrials = 50
+
 func testEncode(t *testing.T, typ types.Type, val values.Value) {
 	b1, err := encoding.Encode(val)
 	require.NoError(t, err)
 
 	t.Logf("Encoded value: %x", b1)
 
-	// encoding should be deterministic
-	b2, err := encoding.Encode(val)
-	require.NoError(t, err)
-	assert.Equal(t, b1, b2)
+	// encoding should be deterministic, repeat to confirm
+	for i := 0; i < numTrials; i++ {
+		b2, err := encoding.Encode(val)
+		require.NoError(t, err)
+		assert.Equal(t, b1, b2)
+	}
 
 	val2, err := encoding.Decode(typ, b1)
 	require.NoError(t, err)
