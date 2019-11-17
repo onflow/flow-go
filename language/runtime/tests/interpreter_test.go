@@ -5694,3 +5694,101 @@ func TestInterpreterAddressConversion(t *testing.T) {
 		inter.Globals["y"].Value,
 	)
 }
+
+func TestInterpretOptionalChainingFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test(x: 42)
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test()
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	require.IsType(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{},
+	)
+
+	assert.IsType(t,
+		inter.Globals["x2"].Value.(interpreter.SomeValue).Value,
+		interpreter.HostFunctionValue{},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+         struct Test {
+             fun x(): Int {
+                 return 42
+             }
+         }
+
+         let test1: Test? = nil
+         let x1 = test1?.x()
+
+         let test2: Test? = Test()
+         let x2 = test2?.x()
+       `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+	)
+}
