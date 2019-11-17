@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
-// An Encoder encodes Cadence values in XDR format.
+// An Encoder converts Cadence values into XDR-encoded bytes.
 type Encoder struct {
 	enc *xdr.Encoder
 }
@@ -230,6 +230,15 @@ func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
 func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
+	return e.encodeArray(v)
+}
+
+// encodeArray writes the XDR-encoded representation of a constant-sized array.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.12
+//  RFC Section 4.12 - Fixed-Length Array
+//  Individually XDR-encoded array elements
+func (e *Encoder) encodeArray(v []values.Value) error {
 	for _, value := range v {
 		if err := e.Encode(value); err != nil {
 			return err
@@ -261,10 +270,11 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 
 // EncodeDictionary writes the XDR-encoded representation of a dictionary.
 //
-// The size of the dictionary is encoded as a unsigned integer, followed by
+// The size of the dictionary is encoded as an unsigned integer, followed by
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
 func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
+	// TODO: make encoding deterministic
 	size := uint32(len(v))
 
 	// size is encoded as an unsigned integer
@@ -274,8 +284,8 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	}
 
 	// keys and elements are encoded as separate fixed-length arrays
-	keys := make(values.ConstantSizedArray, 0, size)
-	elements := make(values.ConstantSizedArray, 0, size)
+	keys := make([]values.Value, 0, size)
+	elements := make([]values.Value, 0, size)
 
 	for key, element := range v {
 		keys = append(keys, key)
@@ -283,34 +293,28 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	}
 
 	// encode keys
-	if err := e.EncodeConstantSizedArray(keys); err != nil {
+	if err := e.encodeArray(keys); err != nil {
 		return err
 	}
 
 	// encode elements
-	if err := e.EncodeConstantSizedArray(elements); err != nil {
+	if err := e.encodeArray(elements); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// EncodeComposite writes the XDR-encoded representation of a composite value.
+//
+// A composite is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeComposite(v values.Composite) error {
-	for _, value := range v.Fields {
-		if err := e.Encode(value); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return e.encodeArray(v.Fields)
 }
 
+// EncodeEvent writes the XDR-encoded representation of an event.
+//
+// An event is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeEvent(v values.Event) error {
-	for _, field := range v.Fields {
-		if err := e.Encode(field); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return e.encodeArray(v.Fields)
 }

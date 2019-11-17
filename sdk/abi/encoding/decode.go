@@ -227,10 +227,14 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (values.V
 }
 
 func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (values.ConstantSizedArray, error) {
-	array := make(values.ConstantSizedArray, t.Size)
+	return e.decodeArray(t.ElementType, t.Size)
+}
 
-	for i := 0; i < t.Size; i++ {
-		value, err := e.Decode(t.ElementType)
+func (e *Decoder) decodeArray(t types.Type, size int) ([]values.Value, error) {
+	array := make([]values.Value, size)
+
+	for i := 0; i < size; i++ {
+		value, err := e.Decode(t)
 		if err != nil {
 			return nil, err
 		}
@@ -247,22 +251,12 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 		return nil, err
 	}
 
-	keysType := types.ConstantSizedArray{
-		Size:        int(size),
-		ElementType: t.KeyType,
-	}
-
-	elementsType := types.ConstantSizedArray{
-		Size:        int(size),
-		ElementType: t.ElementType,
-	}
-
-	keys, err := e.DecodeConstantSizedArray(keysType)
+	keys, err := e.decodeArray(t.KeyType, int(size))
 	if err != nil {
 		return nil, err
 	}
 
-	elements, err := e.DecodeConstantSizedArray(elementsType)
+	elements, err := e.decodeArray(t.ElementType, int(size))
 	if err != nil {
 		return nil, err
 	}
