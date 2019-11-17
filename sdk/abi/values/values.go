@@ -79,7 +79,7 @@ type KeyValuePair struct {
 }
 
 type Event struct {
-	// TODO: is this field needed here?
+	// TODO: is the Identifier field needed here?
 	Identifier string
 	Fields     []Value
 }

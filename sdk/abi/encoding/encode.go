@@ -34,10 +34,10 @@ func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{xdr.NewEncoder(w)}
 }
 
-// Encoder writes the XDR-encoded representation of the given value to this
+// Encode writes the XDR-encoded representation of the given value to this
 // encoder's io.Writer.
 //
-// This function returns an error if the given value type is not supported
+// This function returns an error if the given value's type is not supported
 // by this encoder.
 func (e *Encoder) Encode(v values.Value) error {
 	switch x := v.(type) {
@@ -113,6 +113,26 @@ func (e *Encoder) EncodeBool(v values.Bool) error {
 //  Unsigned integer length followed by bytes zero-padded to a multiple of four
 func (e *Encoder) EncodeString(v values.String) error {
 	_, err := e.enc.EncodeString(string(v))
+	return err
+}
+
+// EncodeBytes writes the XDR-encoded representation of a byte array.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeBytes(v values.Bytes) error {
+	_, err := e.enc.EncodeOpaque(v)
+	return err
+}
+
+// EncodeAddress writes the XDR-encoded representation of an address.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.9
+//  RFC Section 4.9 - Fixed-Length Opaque Data
+//  Fixed-length uninterpreted data zero-padded to a multiple of four
+func (e *Encoder) EncodeAddress(v values.Address) error {
+	_, err := e.enc.EncodeFixedOpaque(v[:])
 	return err
 }
 
@@ -246,26 +266,6 @@ func (e *Encoder) encodeArray(v []values.Value) error {
 	}
 
 	return nil
-}
-
-// EncodeBytes writes the XDR-encoded representation of a byte array.
-//
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
-//  RFC Section 4.10 - Variable-Length Opaque Data
-//  Unsigned integer length followed by fixed opaque data of that length
-func (e *Encoder) EncodeBytes(v values.Bytes) error {
-	_, err := e.enc.EncodeOpaque(v)
-	return err
-}
-
-// EncodeAddress writes the XDR-encoded representation of an address.
-//
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.9
-//  RFC Section 4.9 - Fixed-Length Opaque Data
-//  Fixed-length uninterpreted data zero-padded to a multiple of four
-func (e *Encoder) EncodeAddress(v values.Address) error {
-	_, err := e.enc.EncodeFixedOpaque(v[:])
-	return err
 }
 
 // EncodeDictionary writes the XDR-encoded representation of a dictionary.
