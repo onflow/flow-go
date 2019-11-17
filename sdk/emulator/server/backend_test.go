@@ -183,7 +183,7 @@ func TestBackend(t *testing.T) {
 
 		assert.Nil(t, err)
 
-		//TODO likely to be refactored with a proper serialization/ABI implemented
+		// TODO likely to be refactored with a proper serialization/ABI implemented
 		assert.Equal(t, "*big.Int", response.Type)
 		assert.Equal(t, []uint8("2137"), response.Value)
 	}))
