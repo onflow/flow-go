@@ -513,7 +513,7 @@ func TestGetTransaction(t *testing.T) {
 		actualEvent := resTx.Events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
