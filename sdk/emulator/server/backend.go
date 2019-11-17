@@ -18,7 +18,7 @@ import (
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
-// required by the Observation GRPC API.
+// required by the Observation API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
 	eventStore events.Store
