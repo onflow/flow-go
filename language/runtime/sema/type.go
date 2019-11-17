@@ -1568,6 +1568,7 @@ func (t *EventType) Export() types.Type {
 	}
 
 	return types.Event{
+		Identifier: t.Identifier,
 		FieldTypes: fieldTypes,
 	}
 }
