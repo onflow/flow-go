@@ -167,10 +167,11 @@ func (c *Client) GetEvents(ctx context.Context, query EventQuery) ([]flow.Event,
 		return nil, err
 	}
 
-	// Events are sent over the wire JSON-encoded.
-	var events []flow.Event
-	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
-		return nil, err
+	eventMessages := res.GetEvents()
+	events := make([]flow.Event, len(eventMessages))
+
+	for i, m := range eventMessages {
+		events[i] = convert.MessageToEvent(m)
 	}
 
 	return events, nil

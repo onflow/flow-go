@@ -1466,12 +1466,25 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID       string
-	Fields   []EventField
-	Location ast.Location
+	Identifier string
+	Fields     []EventField
+	Location   ast.Location
 }
 
 func (EventValue) isValue() {}
+
+func (v EventValue) Export() values.Value {
+	fields := make([]values.Value, len(v.Fields))
+
+	for i, field := range v.Fields {
+		fields[i] = field.Value.(ExportableValue).Export()
+	}
+
+	return values.Event{
+		Identifier: v.Identifier,
+		Fields:     fields,
+	}
+}
 
 func (v EventValue) Copy() Value {
 	fields := make([]EventField, len(v.Fields))
@@ -1483,8 +1496,8 @@ func (v EventValue) Copy() Value {
 	}
 
 	return EventValue{
-		ID:     v.ID,
-		Fields: fields,
+		Identifier: v.Identifier,
+		Fields:     fields,
 	}
 }
 
@@ -1497,7 +1510,7 @@ func (v EventValue) String() string {
 		fields.WriteString(field.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
+	return fmt.Sprintf("%s(%s)", v.Identifier, fields.String())
 }
 
 // EventField
@@ -1746,6 +1759,10 @@ func ConvertAddress(value Value) Value {
 }
 
 func (AddressValue) isValue() {}
+
+func (v AddressValue) Export() values.Value {
+	return values.Address(v)
+}
 
 func (v AddressValue) Copy() Value {
 	return v

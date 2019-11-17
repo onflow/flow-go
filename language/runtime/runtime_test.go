@@ -8,52 +8,51 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type testRuntimeInterface struct {
-	resolveImport      func(Location) ([]byte, error)
-	getValue           func(controller, owner, key []byte) (value []byte, err error)
-	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys [][]byte, code []byte) (address flow.Address, err error)
-	addAccountKey      func(address flow.Address, publicKey []byte) error
-	removeAccountKey   func(address flow.Address, index int) (publicKey []byte, err error)
-	updateAccountCode  func(address flow.Address, code []byte) (err error)
-	getSigningAccounts func() []flow.Address
+	resolveImport      func(Location) (values.Bytes, error)
+	getValue           func(controller, owner, key values.Bytes) (value values.Bytes, err error)
+	setValue           func(controller, owner, key, value values.Bytes) (err error)
+	createAccount      func(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
+	addAccountKey      func(address values.Address, publicKey values.Bytes) error
+	removeAccountKey   func(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	updateAccountCode  func(address values.Address, code values.Bytes) (err error)
+	getSigningAccounts func() []values.Address
 	log                func(string)
-	emitEvent          func(flow.Event)
+	emitEvent          func(values.Event)
 }
 
-func (i *testRuntimeInterface) ResolveImport(location Location) ([]byte, error) {
+func (i *testRuntimeInterface) ResolveImport(location Location) (values.Bytes, error) {
 	return i.resolveImport(location)
 }
 
-func (i *testRuntimeInterface) GetValue(controller, owner, key []byte) (value []byte, err error) {
+func (i *testRuntimeInterface) GetValue(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 	return i.getValue(controller, owner, key)
 }
 
-func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (err error) {
+func (i *testRuntimeInterface) SetValue(controller, owner, key, value values.Bytes) (err error) {
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, code []byte) (address flow.Address, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error) {
 	return i.createAccount(publicKeys, code)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(address flow.Address, publicKey []byte) error {
+func (i *testRuntimeInterface) AddAccountKey(address values.Address, publicKey values.Bytes) error {
 	return i.addAccountKey(address, publicKey)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error) {
+func (i *testRuntimeInterface) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
 	return i.removeAccountKey(address, index)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(address flow.Address, code []byte) (err error) {
+func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
 	return i.updateAccountCode(address, code)
 }
 
-func (i *testRuntimeInterface) GetSigningAccounts() []flow.Address {
+func (i *testRuntimeInterface) GetSigningAccounts() []values.Address {
 	if i.getSigningAccounts == nil {
 		return nil
 	}
@@ -64,7 +63,7 @@ func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
 }
 
-func (i *testRuntimeInterface) EmitEvent(event flow.Event) {
+func (i *testRuntimeInterface) EmitEvent(event values.Event) {
 	i.emitEvent(event)
 }
 
@@ -91,7 +90,7 @@ func TestRuntimeImport(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return importedScript, nil
@@ -117,8 +116,8 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -140,14 +139,14 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	var loggedMessage string
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return nil, nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessage = message
@@ -185,15 +184,15 @@ func TestRuntimeStorage(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -226,18 +225,18 @@ func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -278,18 +277,18 @@ func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -369,10 +368,10 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("container"):
 				return container, nil
@@ -380,15 +379,15 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -444,10 +443,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("deep-thought"):
 				return deepThought, nil
@@ -455,15 +454,15 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -495,18 +494,18 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -558,10 +557,10 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
       }
     `)
 
-	storedValues := map[string][]byte{}
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -569,15 +568,15 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -631,7 +630,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -639,15 +638,15 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -712,7 +711,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -720,15 +719,15 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -807,7 +806,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported1"):
 				return imported1, nil
@@ -817,15 +816,15 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -888,8 +887,8 @@ func TestRuntimeSyntaxError(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -942,7 +941,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -950,15 +949,15 @@ func TestRuntimeStorageChanges(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)

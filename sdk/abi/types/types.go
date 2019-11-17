@@ -4,87 +4,78 @@ type Type interface {
 	isType()
 }
 
+type isAType struct{}
+
+func (isAType) isType() {}
+
 type Annotation struct {
 	IsMove bool
 	Type   Type
 }
 
-type Void struct{}
+type Void struct{ isAType }
 
-func (Void) isType() {}
+type Bool struct{ isAType }
 
-type Bool struct{}
+type String struct{ isAType }
 
-func (Bool) isType() {}
+type Bytes struct{ isAType }
 
-type String struct{}
+type Int struct{ isAType }
 
-func (String) isType() {}
+type Int8 struct{ isAType }
 
-type Int struct{}
+type Int16 struct{ isAType }
 
-func (Int) isType() {}
+type Int32 struct{ isAType }
 
-type Int8 struct{}
+type Int64 struct{ isAType }
 
-func (Int8) isType() {}
+type Uint8 struct{ isAType }
 
-type Int16 struct{}
+type Uint16 struct{ isAType }
 
-func (Int16) isType() {}
+type Uint32 struct{ isAType }
 
-type Int32 struct{}
-
-func (Int32) isType() {}
-
-type Int64 struct{}
-
-func (Int64) isType() {}
-
-type Uint8 struct{}
-
-func (Uint8) isType() {}
-
-type Uint16 struct{}
-
-func (Uint16) isType() {}
-
-type Uint32 struct{}
-
-func (Uint32) isType() {}
-
-type Uint64 struct{}
-
-func (Uint64) isType() {}
+type Uint64 struct{ isAType }
 
 type VariableSizedArray struct {
+	isAType
 	ElementType Type
 }
-
-func (VariableSizedArray) isType() {}
 
 type ConstantSizedArray struct {
+	isAType
 	ElementType Type
 }
 
-func (ConstantSizedArray) isType() {}
-
 type Composite struct {
+	isAType
 	FieldTypes []Type
 }
 
-func (Composite) isType() {}
-
 type Dictionary struct {
+	isAType
 	KeyType     Type
 	ElementType Type
 }
 
-func (Dictionary) isType() {}
-
 type Function struct {
+	isAType
 	ParameterTypeAnnotations []Annotation
 	ReturnTypeAnnotation     Annotation
 }
 
-func (Function) isType() {}
+type Event struct {
+	isAType
+	Identifier string
+	FieldTypes []EventField
+}
+
+type EventField struct {
+	isAType
+	Identifier string
+	Type       Type
+}
+
+type Address struct{ isAType }

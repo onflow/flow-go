@@ -4,6 +4,8 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 // Computer uses a runtime instance to execute transactions and scripts.
@@ -46,11 +48,7 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 		return nil, err
 	}
 
-	events := runtimeContext.Events()
-	for i, _ := range events {
-		events[i].Index = uint(i)
-		events[i].TxHash = tx.Hash()
-	}
+	events := convertEvents(runtimeContext.Events(), tx.Hash())
 
 	return events, nil
 }
@@ -69,5 +67,27 @@ func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (
 		return nil, nil, err
 	}
 
-	return value, runtimeContext.Events(), nil
+	events := convertEvents(runtimeContext.Events(), nil)
+
+	return value, events, nil
+}
+
+func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
+	events := make([]flow.Event, len(values))
+
+	for i, value := range values {
+		payload, err := encoding.Encode(value)
+		if err != nil {
+			panic("failed to encode event")
+		}
+
+		events[i] = flow.Event{
+			Type:    value.Identifier,
+			TxHash:  txHash,
+			Index:   uint(i),
+			Payload: payload,
+		}
+	}
+
+	return events
 }

@@ -18,12 +18,15 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	event_mocks "github.com/dapperlabs/flow-go/sdk/emulator/events/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
-	"github.com/dapperlabs/flow-go/sdk/emulator/types"
+	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -45,19 +48,33 @@ func TestGetEvents(t *testing.T) {
 
 	// Add some events
 	var (
-		mintType     = "Mint()"
-		transferType = "Transfer(to: Address)"
-		toAddress    = flow.HexToAddress("1234567890123456789012345678901234567890")
+		mintType     = "Mint"
+		transferType = "Transfer"
+		toAddress    = values.Address(flow.HexToAddress("1234567890123456789012345678901234567890"))
+
+		transferEventType types.Type = types.Event{
+			Identifier: transferType,
+			FieldTypes: []types.EventField{
+				{
+					Identifier: "to",
+					Type:       types.Address{},
+				},
+			},
+		}
 
 		ev1 = flow.Event{
-			Type:   mintType,
-			Values: map[string]interface{}{},
+			Type:    mintType,
+			Payload: []byte{},
 		}
+
+		transferPayload, _ = encoding.Encode(values.Event{
+			Identifier: transferType,
+			Fields:     []values.Value{toAddress},
+		})
+
 		ev2 = flow.Event{
-			Type: transferType,
-			Values: map[string]interface{}{
-				"to": toAddress.String(),
-			},
+			Type:    transferType,
+			Payload: transferPayload,
 		}
 	)
 
@@ -82,10 +99,7 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   2,
 		})
 		assert.Nil(t, err)
-		var events []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &events)
-		assert.Nil(t, err)
-		assert.Len(t, events, 0)
+		assert.Len(t, res.GetEvents(), 0)
 	})
 
 	t.Run("should filter by ID", func(t *testing.T) {
@@ -95,12 +109,17 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
+		resEvents := res.GetEvents()
+
 		assert.Len(t, resEvents, 1)
-		assert.Equal(t, resEvents[0].Type, transferType)
-		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
+		assert.Equal(t, transferType, resEvents[0].GetType())
+
+		value, err := encoding.Decode(transferEventType, resEvents[0].GetPayload())
+		require.Nil(t, err)
+
+		event := value.(values.Event)
+		assert.Equal(t, toAddress, event.Fields[0])
 	})
 
 	t.Run("should not filter by ID when omitted", func(t *testing.T) {
@@ -109,11 +128,9 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
 		// Should get both events
-		assert.Len(t, resEvents, 2)
+		assert.Len(t, res.GetEvents(), 2)
 	})
 
 	t.Run("should preserve event ordering", func(t *testing.T) {
@@ -122,13 +139,12 @@ func TestGetEvents(t *testing.T) {
 			EndBlock:   3,
 		})
 		assert.Nil(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.Nil(t, err)
+
+		resEvents := res.GetEvents()
 		assert.Len(t, resEvents, 2)
 		// Mint event first, then Transfer
-		assert.Equal(t, resEvents[0].Type, mintType)
-		assert.Equal(t, resEvents[1].Type, transferType)
+		assert.Equal(t, mintType, resEvents[0].GetType())
+		assert.Equal(t, transferType, resEvents[1].GetType())
 	})
 }
 
@@ -167,7 +183,7 @@ func TestBackend(t *testing.T) {
 
 		assert.Nil(t, err)
 
-		//TODO likely to be refactored with a proper serialization/ABI implemented
+		// TODO likely to be refactored with a proper serialization/ABI implemented
 		assert.Equal(t, "*big.Int", response.Type)
 		assert.Equal(t, []uint8("2137"), response.Value)
 	}))
@@ -220,37 +236,34 @@ func TestBackend(t *testing.T) {
 			}),
 			unittest.EventFixture(func(e *flow.Event) {
 				e.Index = 1
-			})}
+			}),
+		}
 
 		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(eventsToReturn, nil).Times(1)
 
-		startBlock := 21
-		endBlock := 37
+		var startBlock uint64 = 21
+		var endBlock uint64 = 37
 
 		response, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{
 			Type:       eventType,
-			StartBlock: uint64(startBlock),
-			EndBlock:   uint64(endBlock),
+			StartBlock: startBlock,
+			EndBlock:   endBlock,
 		})
 
 		assert.NoError(t, err)
-
 		assert.NotNil(t, response)
 
-		var decodedEvents []flow.Event
+		resEvents := response.GetEvents()
 
-		err = json.NewDecoder(bytes.NewReader(response.EventsJson)).Decode(&decodedEvents)
-		assert.NoError(t, err)
-
-		assert.Len(t, decodedEvents, 2)
-		assert.Equal(t, uint(0), decodedEvents[0].Index)
-		assert.Equal(t, uint(1), decodedEvents[1].Index)
+		assert.Len(t, resEvents, 2)
+		assert.EqualValues(t, 0, resEvents[0].GetIndex())
+		assert.EqualValues(t, 1, resEvents[1].GetIndex())
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
 
 		blockTimestamp := time.Time{}
-		block := types.Block{
+		block := etypes.Block{
 			Number:            11,
 			Timestamp:         blockTimestamp,
 			PreviousBlockHash: nil,

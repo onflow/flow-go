@@ -8,13 +8,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
-
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/client"
 	"github.com/dapperlabs/flow-go/sdk/client/mocks"
 	"github.com/dapperlabs/flow-go/sdk/convert"
@@ -237,15 +241,43 @@ func TestGetEvents(t *testing.T) {
 	c := client.NewFromRPCClient(mockRPC)
 	ctx := context.Background()
 
-	// Set up a mock event response
-	mockEvent := flow.Event{
-		Type: "Transfer",
-		Values: map[string]interface{}{
-			"to":   flow.ZeroAddress,
-			"from": flow.ZeroAddress,
-			"id":   1,
+	// declare event type used for decoding event payloads
+	mockEventType := types.Event{
+		Identifier: "Transfer",
+		FieldTypes: []types.EventField{
+			{
+				Identifier: "to",
+				Type:       types.Address{},
+			},
+			{
+				Identifier: "from",
+				Type:       types.Address{},
+			},
+			{
+				Identifier: "amount",
+				Type:       types.Int{},
+			},
 		},
 	}
+
+	to := values.Address(flow.ZeroAddress)
+	from := values.Address(flow.ZeroAddress)
+	amount := values.Int(42)
+
+	mockEventValue := values.Event{
+		Identifier: "Transfer",
+		Fields:     []values.Value{to, from, amount},
+	}
+
+	// encode event payload from mock value
+	eventPayload, _ := encoding.Encode(mockEventValue)
+
+	// Set up a mock event response
+	mockEvent := flow.Event{
+		Type:    "Transfer",
+		Payload: eventPayload,
+	}
+
 	events := []flow.Event{mockEvent}
 
 	var buf bytes.Buffer
@@ -254,16 +286,29 @@ func TestGetEvents(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		// Set up the mock to return a mocked event response
+		mockRes := &observation.GetEventsResponse{Events: []*entities.Event{
+			convert.EventToMessage(mockEvent),
+		}}
+
 		mockRPC.EXPECT().
 			GetEvents(ctx, gomock.Any()).
-			Return(&observation.GetEventsResponse{EventsJson: buf.Bytes()}, nil).
+			Return(mockRes, nil).
 			Times(1)
 
 		// The client should pass the response to the client
-		res, err := c.GetEvents(ctx, client.EventQuery{})
+		events, err := c.GetEvents(ctx, client.EventQuery{})
 		assert.Nil(t, err)
-		assert.Equal(t, len(res), 1)
-		assert.Equal(t, res[0].Type, mockEvent.Type)
+		require.Len(t, events, 1)
+
+		actualEvent := events[0]
+
+		value, err := encoding.Decode(mockEventType, actualEvent.Payload)
+		eventValue := value.(values.Event)
+
+		assert.Equal(t, actualEvent.Type, mockEvent.Type)
+		assert.Equal(t, to, eventValue.Fields[0])
+		assert.Equal(t, from, eventValue.Fields[1])
+		assert.Equal(t, amount, eventValue.Fields[2])
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -274,18 +319,6 @@ func TestGetEvents(t *testing.T) {
 			Times(1)
 
 		// The client should pass along the error
-		_, err = c.GetEvents(ctx, client.EventQuery{})
-		assert.Error(t, err)
-	})
-
-	t.Run("Error - malformed return value", func(t *testing.T) {
-		// Set up the mock to return a malformed eventsJSON response
-		mockRPC.EXPECT().
-			GetEvents(ctx, gomock.Any()).
-			Return(&observation.GetEventsResponse{EventsJson: []byte{1, 2, 3, 4}}, nil).
-			Times(1)
-
-		// The client should return an error because it should fail to decode
 		_, err = c.GetEvents(ctx, client.EventQuery{})
 		assert.Error(t, err)
 	})
