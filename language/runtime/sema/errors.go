@@ -1601,3 +1601,19 @@ func (e *ResourceMethodBindingError) Error() string {
 }
 
 func (*ResourceMethodBindingError) isSemanticError() {}
+
+// InvalidCharacterLiteralError
+
+type InvalidCharacterLiteralError struct {
+	Length int
+	ast.Range
+}
+
+func (e *InvalidCharacterLiteralError) Error() string {
+	return fmt.Sprintf(
+		"character literal has invalid length: expected 1, got %d",
+		e.Length,
+	)
+}
+
+func (*InvalidCharacterLiteralError) isSemanticError() {}
