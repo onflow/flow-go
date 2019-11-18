@@ -2,6 +2,7 @@ package encoding_test
 
 import (
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,22 +73,32 @@ func TestEncodeAddress(t *testing.T) {
 }
 
 func TestEncodeInt(t *testing.T) {
+	x := big.NewInt(0).SetUint64(math.MaxUint64)
+	x = x.Mul(x, big.NewInt(2))
+
+	largerThanMaxUint64 := encodeTest{
+		"LargerThanMaxUint64",
+		types.Int{},
+		values.NewIntFromBig(x),
+	}
+
 	testAllEncode(t, []encodeTest{
 		{
 			"Negative",
 			types.Int{},
-			values.Int(-42),
+			values.NewInt(-42),
 		},
 		{
 			"Zero",
 			types.Int{},
-			values.Int(0),
+			values.NewInt(0),
 		},
 		{
-			"Max",
+			"Positive",
 			types.Int{},
-			values.Int(42),
+			values.NewInt(42),
 		},
+		largerThanMaxUint64,
 	}...)
 }
 
@@ -246,9 +257,9 @@ func TestEncodeVariableSizedArray(t *testing.T) {
 			ElementType: types.Int{},
 		},
 		values.VariableSizedArray{
-			values.Int(1),
-			values.Int(2),
-			values.Int(3),
+			values.NewInt(1),
+			values.NewInt(2),
+			values.NewInt(3),
 		},
 	}
 
@@ -266,19 +277,19 @@ func TestEncodeVariableSizedArray(t *testing.T) {
 			values.Composite{
 				Fields: []values.Value{
 					values.String("a"),
-					values.Int(1),
+					values.NewInt(1),
 				},
 			},
 			values.Composite{
 				Fields: []values.Value{
 					values.String("b"),
-					values.Int(1),
+					values.NewInt(1),
 				},
 			},
 			values.Composite{
 				Fields: []values.Value{
 					values.String("c"),
-					values.Int(1),
+					values.NewInt(1),
 				},
 			},
 		},
@@ -308,9 +319,9 @@ func TestEncodeConstantSizedArray(t *testing.T) {
 				ElementType: types.Int{},
 			},
 			values.ConstantSizedArray{
-				values.Int(1),
-				values.Int(2),
-				values.Int(3),
+				values.NewInt(1),
+				values.NewInt(2),
+				values.NewInt(3),
 			},
 		},
 	}...)
@@ -326,15 +337,15 @@ func TestEncodeDictionary(t *testing.T) {
 		values.Dictionary{
 			values.KeyValuePair{
 				values.String("a"),
-				values.Int(1),
+				values.NewInt(1),
 			},
 			values.KeyValuePair{
 				values.String("b"),
-				values.Int(2),
+				values.NewInt(2),
 			},
 			values.KeyValuePair{
 				values.String("c"),
-				values.Int(3),
+				values.NewInt(3),
 			},
 		},
 	}
@@ -354,7 +365,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Dictionary{
 					values.KeyValuePair{
 						values.String("1"),
-						values.Int(1),
+						values.NewInt(1),
 					},
 				},
 			},
@@ -363,7 +374,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Dictionary{
 					values.KeyValuePair{
 						values.String("2"),
-						values.Int(2),
+						values.NewInt(2),
 					},
 				},
 			},
@@ -372,7 +383,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Dictionary{
 					values.KeyValuePair{
 						values.String("3"),
-						values.Int(3),
+						values.NewInt(3),
 					},
 				},
 			},
@@ -396,7 +407,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Composite{
 					Fields: []values.Value{
 						values.String("a"),
-						values.Int(1),
+						values.NewInt(1),
 					},
 				},
 			},
@@ -405,7 +416,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Composite{
 					Fields: []values.Value{
 						values.String("b"),
-						values.Int(2),
+						values.NewInt(2),
 					},
 				},
 			},
@@ -414,7 +425,7 @@ func TestEncodeDictionary(t *testing.T) {
 				values.Composite{
 					Fields: []values.Value{
 						values.String("c"),
-						values.Int(3),
+						values.NewInt(3),
 					},
 				},
 			},
@@ -457,7 +468,7 @@ func TestEncodeComposite(t *testing.T) {
 		values.Composite{
 			Fields: []values.Value{
 				values.String("foo"),
-				values.Int(42),
+				values.NewInt(42),
 				values.Bool(true),
 			},
 		},
@@ -475,11 +486,11 @@ func TestEncodeComposite(t *testing.T) {
 		values.Composite{
 			Fields: []values.Value{
 				values.VariableSizedArray{
-					values.Int(1),
-					values.Int(2),
-					values.Int(3),
-					values.Int(4),
-					values.Int(5),
+					values.NewInt(1),
+					values.NewInt(2),
+					values.NewInt(3),
+					values.NewInt(4),
+					values.NewInt(5),
 				},
 			},
 		},
@@ -502,7 +513,7 @@ func TestEncodeComposite(t *testing.T) {
 				values.String("foo"),
 				values.Composite{
 					Fields: []values.Value{
-						values.Int(42),
+						values.NewInt(42),
 					},
 				},
 			},
@@ -536,7 +547,7 @@ func TestEncodeEvent(t *testing.T) {
 		values.Event{
 			Identifier: "Test",
 			Fields: []values.Value{
-				values.Int(1),
+				values.NewInt(1),
 				values.String("foo"),
 			},
 		},
@@ -569,7 +580,7 @@ func TestEncodeEvent(t *testing.T) {
 				values.Composite{
 					Fields: []values.Value{
 						values.String("bar"),
-						values.Int(42),
+						values.NewInt(42),
 					},
 				},
 			},
