@@ -31,6 +31,18 @@ func (v *BaseCadenceVisitor) VisitDeclaration(ctx *DeclarationContext) interface
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

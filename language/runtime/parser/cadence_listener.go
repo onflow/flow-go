@@ -25,6 +25,15 @@ type CadenceListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterTransactionDeclaration is called when entering the transactionDeclaration production.
+	EnterTransactionDeclaration(c *TransactionDeclarationContext)
+
+	// EnterPrepare is called when entering the prepare production.
+	EnterPrepare(c *PrepareContext)
+
+	// EnterExecute is called when entering the execute production.
+	EnterExecute(c *ExecuteContext)
+
 	// EnterImportDeclaration is called when entering the importDeclaration production.
 	EnterImportDeclaration(c *ImportDeclarationContext)
 
@@ -309,6 +318,15 @@ type CadenceListener interface {
 
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
+
+	// ExitTransactionDeclaration is called when exiting the transactionDeclaration production.
+	ExitTransactionDeclaration(c *TransactionDeclarationContext)
+
+	// ExitPrepare is called when exiting the prepare production.
+	ExitPrepare(c *PrepareContext)
+
+	// ExitExecute is called when exiting the execute production.
+	ExitExecute(c *ExecuteContext)
 
 	// ExitImportDeclaration is called when exiting the importDeclaration production.
 	ExitImportDeclaration(c *ImportDeclarationContext)

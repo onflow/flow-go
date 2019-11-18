@@ -56,6 +56,24 @@ func (s *BaseCadenceListener) EnterDeclaration(ctx *DeclarationContext) {}
 // ExitDeclaration is called when production declaration is exited.
 func (s *BaseCadenceListener) ExitDeclaration(ctx *DeclarationContext) {}
 
+// EnterTransactionDeclaration is called when production transactionDeclaration is entered.
+func (s *BaseCadenceListener) EnterTransactionDeclaration(ctx *TransactionDeclarationContext) {}
+
+// ExitTransactionDeclaration is called when production transactionDeclaration is exited.
+func (s *BaseCadenceListener) ExitTransactionDeclaration(ctx *TransactionDeclarationContext) {}
+
+// EnterPrepare is called when production prepare is entered.
+func (s *BaseCadenceListener) EnterPrepare(ctx *PrepareContext) {}
+
+// ExitPrepare is called when production prepare is exited.
+func (s *BaseCadenceListener) ExitPrepare(ctx *PrepareContext) {}
+
+// EnterExecute is called when production execute is entered.
+func (s *BaseCadenceListener) EnterExecute(ctx *ExecuteContext) {}
+
+// ExitExecute is called when production execute is exited.
+func (s *BaseCadenceListener) ExitExecute(ctx *ExecuteContext) {}
+
 // EnterImportDeclaration is called when production importDeclaration is entered.
 func (s *BaseCadenceListener) EnterImportDeclaration(ctx *ImportDeclarationContext) {}
 
