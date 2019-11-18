@@ -8,13 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Implement sort.Interface for testing sortedness.
-func (c changelist) Len() int { return len(c.list) }
-
-func (c changelist) Less(i, j int) bool { return c.list[i] < c.list[j] }
-
-func (c changelist) Swap(i, j int) { c.list[i], c.list[j] = c.list[j], c.list[i] }
-
 func TestChangelist(t *testing.T) {
 	t.Run("should be safe to interact with empty changelist", func(t *testing.T) {
 		var clist changelist
