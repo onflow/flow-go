@@ -612,8 +612,6 @@ From : 'from' ;
 Create : 'create' ;
 Destroy : 'destroy' ;
 
-Transaction : 'transaction' ;
-
 identifier
     : Identifier
     | From
