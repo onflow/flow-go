@@ -202,23 +202,59 @@ func TestEncodeUint64(t *testing.T) {
 }
 
 func TestEncodeVariableSizedArray(t *testing.T) {
+	emptyArray := encodeTest{
+		types.VariableSizedArray{
+			ElementType: types.Int{},
+		},
+		values.VariableSizedArray{},
+	}
+
+	intArray := encodeTest{
+		types.VariableSizedArray{
+			ElementType: types.Int{},
+		},
+		values.VariableSizedArray{
+			values.Int(1),
+			values.Int(2),
+			values.Int(3),
+		},
+	}
+
+	compositeArray := encodeTest{
+		types.VariableSizedArray{
+			ElementType: types.Composite{
+				FieldTypes: []types.Type{
+					types.String{},
+					types.Int{},
+				},
+			},
+		},
+		values.VariableSizedArray{
+			values.Composite{
+				Fields: []values.Value{
+					values.String("a"),
+					values.Int(1),
+				},
+			},
+			values.Composite{
+				Fields: []values.Value{
+					values.String("b"),
+					values.Int(1),
+				},
+			},
+			values.Composite{
+				Fields: []values.Value{
+					values.String("c"),
+					values.Int(1),
+				},
+			},
+		},
+	}
+
 	testAllEncode(t, []encodeTest{
-		{
-			types.VariableSizedArray{
-				ElementType: types.Int{},
-			},
-			values.VariableSizedArray{},
-		},
-		{
-			types.VariableSizedArray{
-				ElementType: types.Int{},
-			},
-			values.VariableSizedArray{
-				values.Int(1),
-				values.Int(2),
-				values.Int(3),
-			},
-		},
+		emptyArray,
+		intArray,
+		compositeArray,
 	})
 }
 
@@ -246,76 +282,259 @@ func TestEncodeConstantSizedArray(t *testing.T) {
 }
 
 func TestEncodeDictionary(t *testing.T) {
-	// TODO: add more cases
-	testAllEncode(t, []encodeTest{
-		{
-			types.Dictionary{
+	simpleDict := encodeTest{
+		types.Dictionary{
+			KeyType:     types.String{},
+			ElementType: types.Int{},
+		},
+		values.Dictionary{
+			values.KeyValuePair{
+				values.String("a"),
+				values.Int(1),
+			},
+			values.KeyValuePair{
+				values.String("b"),
+				values.Int(2),
+			},
+			values.KeyValuePair{
+				values.String("c"),
+				values.Int(3),
+			},
+		},
+	}
+
+	nestedDict := encodeTest{
+		types.Dictionary{
+			KeyType: types.String{},
+			ElementType: types.Dictionary{
 				KeyType:     types.String{},
 				ElementType: types.Int{},
 			},
-			values.Dictionary{
-				values.KeyValuePair{
-					values.String("a"),
-					values.Int(1),
+		},
+		values.Dictionary{
+			values.KeyValuePair{
+				values.String("a"),
+				values.Dictionary{
+					values.KeyValuePair{
+						values.String("1"),
+						values.Int(1),
+					},
 				},
-				values.KeyValuePair{
-					values.String("b"),
-					values.Int(2),
+			},
+			values.KeyValuePair{
+				values.String("b"),
+				values.Dictionary{
+					values.KeyValuePair{
+						values.String("2"),
+						values.Int(2),
+					},
 				},
-				values.KeyValuePair{
-					values.String("c"),
-					values.Int(3),
+			},
+			values.KeyValuePair{
+				values.String("c"),
+				values.Dictionary{
+					values.KeyValuePair{
+						values.String("3"),
+						values.Int(3),
+					},
 				},
 			},
 		},
+	}
+
+	compositeDict := encodeTest{
+		types.Dictionary{
+			KeyType: types.String{},
+			ElementType: types.Composite{
+				FieldTypes: []types.Type{
+					types.String{},
+					types.Int{},
+				},
+			},
+		},
+		values.Dictionary{
+			values.KeyValuePair{
+				values.String("a"),
+				values.Composite{
+					Fields: []values.Value{
+						values.String("a"),
+						values.Int(1),
+					},
+				},
+			},
+			values.KeyValuePair{
+				values.String("b"),
+				values.Composite{
+					Fields: []values.Value{
+						values.String("b"),
+						values.Int(2),
+					},
+				},
+			},
+			values.KeyValuePair{
+				values.String("c"),
+				values.Composite{
+					Fields: []values.Value{
+						values.String("c"),
+						values.Int(3),
+					},
+				},
+			},
+		},
+	}
+
+	testAllEncode(t, []encodeTest{
+		simpleDict,
+		nestedDict,
+		compositeDict,
 	})
 }
 
 func TestEncodeComposite(t *testing.T) {
-	// TODO: add more cases
-	testAllEncode(t, []encodeTest{
-		{
-			types.Composite{
-				FieldTypes: []types.Type{
-					types.String{},
-					types.String{},
-				},
+	simpleComp := encodeTest{
+		types.Composite{
+			FieldTypes: []types.Type{
+				types.String{},
+				types.String{},
 			},
-			values.Composite{
-				Fields: []values.Value{
-					values.String("foo"),
-					values.String("bar"),
+		},
+		values.Composite{
+			Fields: []values.Value{
+				values.String("foo"),
+				values.String("bar"),
+			},
+		},
+	}
+
+	multiTypeComp := encodeTest{
+		types.Composite{
+			FieldTypes: []types.Type{
+				types.String{},
+				types.Int{},
+				types.Bool{},
+			},
+		},
+		values.Composite{
+			Fields: []values.Value{
+				values.String("foo"),
+				values.Int(42),
+				values.Bool(true),
+			},
+		},
+	}
+
+	arrayComp := encodeTest{
+		types.Composite{
+			FieldTypes: []types.Type{
+				types.VariableSizedArray{
+					ElementType: types.Int{},
 				},
 			},
 		},
+		values.Composite{
+			Fields: []values.Value{
+				values.VariableSizedArray{
+					values.Int(1),
+					values.Int(2),
+					values.Int(3),
+					values.Int(4),
+					values.Int(5),
+				},
+			},
+		},
+	}
+
+	nestedComp := encodeTest{
+		types.Composite{
+			FieldTypes: []types.Type{
+				types.String{},
+				types.Composite{
+					FieldTypes: []types.Type{
+						types.Int{},
+					},
+				},
+			},
+		},
+		values.Composite{
+			Fields: []values.Value{
+				values.String("foo"),
+				values.Composite{
+					Fields: []values.Value{
+						values.Int(42),
+					},
+				},
+			},
+		},
+	}
+
+	testAllEncode(t, []encodeTest{
+		simpleComp,
+		multiTypeComp,
+		arrayComp,
+		nestedComp,
 	})
 }
 
 func TestEncodeEvent(t *testing.T) {
-	// TODO: add more cases
-	testAllEncode(t, []encodeTest{
-		{
-			types.Event{
-				Identifier: "Test",
-				FieldTypes: []types.EventField{
-					{
-						Identifier: "x",
-						Type:       types.Int{},
-					},
-					{
-						Identifier: "y",
-						Type:       types.String{},
-					},
+	simpleEvent := encodeTest{
+		types.Event{
+			Identifier: "Test",
+			FieldTypes: []types.EventField{
+				{
+					Identifier: "x",
+					Type:       types.Int{},
 				},
-			},
-			values.Event{
-				Identifier: "Test",
-				Fields: []values.Value{
-					values.Int(1),
-					values.String("foo"),
+				{
+					Identifier: "y",
+					Type:       types.String{},
 				},
 			},
 		},
+		values.Event{
+			Identifier: "Test",
+			Fields: []values.Value{
+				values.Int(1),
+				values.String("foo"),
+			},
+		},
+	}
+
+	compositeEvent := encodeTest{
+		types.Event{
+			Identifier: "Test",
+			FieldTypes: []types.EventField{
+				{
+					Identifier: "x",
+					Type:       types.String{},
+				},
+				{
+					Identifier: "y",
+					Type: types.Composite{
+						FieldTypes: []types.Type{
+							types.String{},
+							types.Int{},
+						},
+					},
+				},
+			},
+		},
+		values.Event{
+			Identifier: "Test",
+			Fields: []values.Value{
+				values.String("foo"),
+				values.Composite{
+					Fields: []values.Value{
+						values.String("bar"),
+						values.Int(42),
+					},
+				},
+			},
+		},
+	}
+
+	testAllEncode(t, []encodeTest{
+		simpleEvent,
+		compositeEvent,
 	})
 }
 
