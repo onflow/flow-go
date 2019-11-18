@@ -2162,6 +2162,11 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		})
 }
 
+func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
+	// TODO: implement transaction interpretation
+	panic(" not implemented")
+}
+
 func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	interpreter.declareEventConstructor(declaration)
 
