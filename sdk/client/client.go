@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 
 	"google.golang.org/grpc"
 
@@ -85,20 +84,13 @@ func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block
 }
 
 // ExecuteScript executes a script against the latest sealed world state.
-func (c *Client) ExecuteScript(ctx context.Context, script []byte) (interface{}, error) {
+func (c *Client) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
 	res, err := c.rpcClient.ExecuteScript(ctx, &observation.ExecuteScriptRequest{Script: script})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: change to production encoding format
-	var value interface{}
-	err = json.Unmarshal(res.GetValue(), &value)
-	if err != nil {
-		return nil, err
-	}
-
-	return value, nil
+	return res.GetValue(), nil
 }
 
 // GetTransaction fetches a transaction by hash.

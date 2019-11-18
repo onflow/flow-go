@@ -174,7 +174,7 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(values.Int(2137), nil).
+			ExecuteScript(sampleScriptText).Return(values.NewInt(2137), nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
@@ -183,7 +183,7 @@ func TestBackend(t *testing.T) {
 		value, err := encoding.Decode(types.Int{}, response.GetValue())
 		assert.NoError(t, err)
 
-		assert.Equal(t, values.Int(2137), value)
+		assert.Equal(t, values.NewInt(2137), value)
 	}))
 
 	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
