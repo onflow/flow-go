@@ -1,8 +1,8 @@
-# Bamboo Programming Language - K Semantics
+# Cadence Programming Language – K Semantics
 
 A K definition of the programming language.
 
-This currently only defines the language syntax.
+This currently only defines the language syntax and rules to execute a subset of the language.
 
 `make test` will run the parsing tests from `/tests/parser`,
 which are extracted from the positive and negative unit tests

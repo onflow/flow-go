@@ -19,12 +19,12 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.Equal(t,
+	assert.IsType(t,
 		&sema.IntType{},
 		checker.GlobalValues["x"].Type,
 	)
 
-	assert.Equal(t,
+	assert.IsType(t,
 		&sema.IntType{},
 		checker.GlobalValues["y"].Type,
 	)
@@ -99,7 +99,6 @@ func TestCheckInvalidUnknownDeclaration(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-
 	assert.IsType(t, &sema.InvalidReturnValueError{}, errs[1])
 }
 
@@ -166,7 +165,6 @@ func TestCheckInvalidRedeclarations(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
 	assert.IsType(t, &sema.RedeclarationError{}, errs[1])
 }
 
@@ -192,4 +190,194 @@ func TestCheckInvalidReference(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueNotDeclared(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       var y = 2
+       let z = y = x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueCopyTransfers(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       var x = 1
+       var y = 2
+       let z = y = x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NonResourceTypeError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueNotTarget(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+      fun f() {}
+
+      let x <- create X()
+      let z = f() <- x
+  `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidAssignmentTargetError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueCopyTransferSecond(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     var y <- create R()
+     let z <- y = x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueCopyTransferFirst(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     var y <- create R()
+     let z = y <- x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueConstant(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     let y <- create R()
+     let z <- y <- x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource X {}
+     resource Y {}
+
+     let x <- create X()
+     var y <- create Y()
+     let z <- y <- x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidVariableDeclarationSecondValueUseAfterInvalidation(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     var y <- create R()
+     let z <- y <- x
+
+     let r <- x
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckVariableDeclarationSecondValue(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     var y <- create R()
+     let z <- y <- x
+
+     let r <- y
+   `)
+
+	assert.Nil(t, err)
+
+	assert.IsType(t,
+		&sema.CompositeType{},
+		checker.GlobalValues["x"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.CompositeType{},
+		checker.GlobalValues["y"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.CompositeType{},
+		checker.GlobalValues["z"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.CompositeType{},
+		checker.GlobalValues["r"].Type,
+	)
+}
+
+func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+     resource R {}
+
+     let x <- create R()
+     var ys <- {"r": <-create R()}
+     // NOTE: nested move is valid here
+     let z <- ys["r"] <- x
+
+     // NOTE: nested move is invalid here
+     let r <- ys.remove(key: "r")
+   `)
+
+	assert.Nil(t, err)
+
+	assert.IsType(t,
+		&sema.CompositeType{},
+		checker.GlobalValues["x"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.DictionaryType{},
+		checker.GlobalValues["ys"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.OptionalType{},
+		checker.GlobalValues["z"].Type,
+	)
+
+	assert.IsType(t,
+		&sema.OptionalType{},
+		checker.GlobalValues["r"].Type,
+	)
 }

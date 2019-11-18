@@ -28,6 +28,12 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		checker.inCreate = inCreate
 	}()
 
+	inInvocation := checker.inInvocation
+	checker.inInvocation = true
+	defer func() {
+		checker.inInvocation = inInvocation
+	}()
+
 	// check the invoked expression can be invoked
 
 	invokedExpression := invocationExpression.InvokedExpression
@@ -52,7 +58,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	var returnType Type = &InvalidType{}
 
-	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType)
+	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType, invokableType)
 
 	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
@@ -225,6 +231,7 @@ func (checker *Checker) checkInvocationArgumentLabels(
 func (checker *Checker) checkInvocationArguments(
 	invocationExpression *ast.InvocationExpression,
 	functionType *FunctionType,
+	invokableType InvokableType,
 ) (
 	argumentTypes []Type,
 ) {
@@ -261,24 +268,37 @@ func (checker *Checker) checkInvocationArguments(
 		parameterType := functionType.ParameterTypeAnnotations[i].Type
 		argument := invocationExpression.Arguments[i]
 
-		argumentType := argument.Expression.Accept(checker).(Type)
-
-		argumentTypes[i] = argumentType
-
-		if !parameterType.IsInvalidType() &&
-			!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
-
-			checker.report(
-				&TypeMismatchError{
-					ExpectedType: parameterType,
-					ActualType:   argumentType,
-					Range:        ast.NewRangeFromPositioned(argument.Expression),
-				},
-			)
-		}
-
-		checker.checkResourceMoveOperation(argument.Expression, argumentType)
+		argumentTypes[i] = checker.checkInvocationArgument(argument, parameterType)
 	}
 
+	// The invokable type might have special checks for the arguments
+
+	argumentExpressions := make([]ast.Expression, argumentCount)
+	for i, argument := range invocationExpression.Arguments {
+		argumentExpressions[i] = argument.Expression
+	}
+
+	invokableType.CheckArgumentExpressions(checker, argumentExpressions)
+
 	return argumentTypes
+}
+
+func (checker *Checker) checkInvocationArgument(argument *ast.Argument, parameterType Type) Type {
+	argumentType := argument.Expression.Accept(checker).(Type)
+
+	if !parameterType.IsInvalidType() &&
+		!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: parameterType,
+				ActualType:   argumentType,
+				Range:        ast.NewRangeFromPositioned(argument.Expression),
+			},
+		)
+	}
+
+	checker.checkResourceMoveOperation(argument.Expression, argumentType)
+
+	return argumentType
 }

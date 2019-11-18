@@ -35,7 +35,13 @@ func (checker *Checker) visitFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	options functionDeclarationOptions,
 ) ast.Repr {
-	checker.checkFunctionAccessModifier(declaration)
+
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+	)
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
 
@@ -77,21 +83,6 @@ func (checker *Checker) declareFunctionDeclaration(
 	checker.report(err)
 
 	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
-}
-
-func (checker *Checker) checkFunctionAccessModifier(declaration *ast.FunctionDeclaration) {
-	switch declaration.Access {
-	case ast.AccessNotSpecified, ast.AccessPublic:
-		return
-	default:
-		checker.report(
-			&InvalidAccessModifierError{
-				DeclarationKind: common.DeclarationKindFunction,
-				Access:          declaration.Access,
-				Pos:             declaration.StartPosition(),
-			},
-		)
-	}
 }
 
 func (checker *Checker) checkFunction(

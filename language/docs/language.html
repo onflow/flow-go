@@ -220,6 +220,9 @@
           </li>
           <li>
             <p><a href="#storage-references">Storage References</a></p>
+            <ul>
+              <li><a href="#reference-based-access-control">Reference-Based Access Control</a></li>
+            </ul>
           </li>
           <li>
             <p><a href="#events">Events</a></p>
@@ -231,7 +234,6 @@
             <p><a href="#transactions">Transactions</a></p>
             <ul>
               <li><a href="#deploying-code">Deploying Code</a></li>
-              <li><a href="#using-deployed-code">Using Deployed Code</a></li>
             </ul>
           </li>
           <li>
@@ -359,8 +361,8 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
 </span></code></pre>
         <p>
-          Once a constant or variable is declared, it cannot be redeclared
-          or changed into the corresponding other kind (variable to a constant and vice versa) in the same scope.
+          The names of the variable or constant declarations in each scope must be unique.
+          Declaring another variable or constant with a name that is already declared in the current scope is invalid, regardless of kind or type.
         </p>
         <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -849,8 +851,8 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
             <p>
-              The type of the right-hand side of the operator (the alternative value) must be compatible
-              with the left-hand side, i.e. the right-hand side of the operator must
+              The type of the right-hand side of the operator (the alternative value) must be a subtype
+              of the type of left-hand side, i.e. the right-hand side of the operator must
               be the non-optional or optional type matching the type of the left-hand side.
             </p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant with an optional integer type.</span><span>
@@ -1117,6 +1119,9 @@
 </span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
 </span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable length array of integers</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> variableLengthArray: [Int] = []</span><span>
 </span></code></pre>
             <p>
               Array types are covariant in their element types.
@@ -1427,7 +1432,10 @@
           </section>
           <section>
             <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
-            <p>To get the value for a specific key from a dictionary, the access syntax can be used: The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.</p>
+            <p>
+              To get the value for a specific key from a dictionary, the access syntax can be used:
+              The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.
+            </p>
             <p>
               Accessing a key returns an <a href="#optionals">optional</a>:
               If the key is found in the dictionary, the value for the given key is returned,
@@ -1601,7 +1609,7 @@
 </span></code></pre>
           <p>
             The left-hand side of the assignment operand must be an identifier.
-            For arrays and dictionaries, followed by one or more index or access expressions.
+            For arrays and dictionaries, this identifier can be followed by one or more index or access expressions.
           </p>
           <pre><code class="language-cadence,file=assignment-numbers.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -2916,7 +2924,8 @@
 </span><span style="color: #008000">// `example.balance` is `10`</span><span>
 </span><span>
 </span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
-</span><span style="color: #008000">// `example.balance` is `-50` internally, but while reading value, getter returns `0` instead.</span><span>
+</span><span style="color: #008000">// The stored value of the field `example` is `-50` internally,</span><span>
+</span><span style="color: #008000">// though `example.balance` is `0` because the getter for `balance` returns `0` instead.</span><span>
 </span></code></pre>
           <p>
             Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses.
@@ -3673,10 +3682,28 @@
         <blockquote>
           <p>🚧 Status: Access control is not implemented yet.</p>
         </blockquote>
-        <p>
-          Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.
-          Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.
-        </p>
+        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.</p>
+        <p>In Flow and Cadence, there are two types of access control</p>
+        <ul>
+          <li>
+            <ol>
+              <li>
+                Access control between accounts using capability security.<br>Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.<br>This means that nothing is truly public by default.<br>Other accounts can not read or write the objects in an account
+                unless the owner of the account has granted them access by providing references to the objects.
+              </li>
+            </ol>
+          </li>
+          <li>
+            <ol start="2">
+              <li>
+                Access control within programs using <code>private</code> and <code>public</code> keywords.<br>Assuming the caller has a valid reference that satisfies the first type of access control,
+                these keywords further govern how access is controlled.
+              </li>
+            </ol>
+          </li>
+        </ul>
+        <p>The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.</p>
+        <p>Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
         <ul>
           <li>
             <p>
@@ -4601,15 +4628,18 @@
         <h2 id="storage-references"><a href="#storage-references" aria-hidden="true"><span class="icon icon-link"></span></a>Storage References</h2>
         <p>
           It is possible to create references to <strong>storage locations</strong>.
-          References allow access to stored values and restricting the access to the stored value.
+          References allow access to stored values. A reference can be used to read or
+          call fields and methods of stored values without having to move or call the fields
+          and methods on the storage location directly.
         </p>
         <p>
-          For example, a user might want to share a reference to a token stored in their account,
-          but limit the access and only allow reads of certain fields and calls to certain functions,
-          but not expose all functionality of the token.
+          References are <strong>copied</strong>, i.e. they are value types. Any number of references to
+          a storage location can be created and used, but only by the account that owns
+          the location being referenced.
         </p>
         <p>
           Note that references are <strong>not</strong> referencing stored values –
+          A reference cannot be used to directly modify a value it references, and
           if the value stored in the references location is moved or removed,
           the reference is not updated and it becomes invalid.
         </p>
@@ -4617,28 +4647,18 @@
           References are created by using the <code>&#x26;</code> operator, followed by the storage location,
           the <code>as</code> keyword, and the type through which the stored location should be accessed.
         </p>
-        <p>The storage location must be a subtype of the given type.</p>
-        <p>References are <strong>copied</strong>, i.e. they are value types.</p>
+        <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as Name</span><span>
+</span></code></pre>
+        <p>The storage location must be a subtype of the type given after the <code>as</code> keyword.</p>
         <p>
           References are covariant in their base types.
           For example, <code>&#x26;R</code> is a subtype of <code>&#x26;RI</code>, if <code>R</code> is a resource, <code>RI</code> is a resource interface,
           and resource <code>R</code> conforms to (implements) resource interface <code>RI</code>.
         </p>
         <pre><code class="language-cadence,file=storage-reference.cdc"><span>
-</span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
+</span><span style="color: #008000">// Declare a resource named `Counter`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
-</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
-</span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a resource named `Counter` that conforms</span><span>
-</span><span style="color: #008000">// to the resource interface `HasCount`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter: HasCount {</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter: {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
@@ -4677,6 +4697,34 @@
 </span><span style="color: #000000">counterReference.increment()</span><span>
 </span><span>
 </span><span style="color: #000000">counterReference.count  </span><span style="color: #008000">// is `43`</span><span>
+</span></code></pre>
+        <section>
+          <h3 id="reference-based-access-control"><a href="#reference-based-access-control" aria-hidden="true"><span class="icon icon-link"></span></a>Reference-Based Access Control</h3>
+          <p>
+            As was mentioned before, access to stored objects is governed by the
+            tenets of <a href="https://en.wikipedia.org/wiki/Capability-based_security">Capability Security</a>. This
+            means that if an account wants to be able to access another account's
+            stored objects, it must have a valid reference to that object.
+          </p>
+          <p>
+            Access to stored objects can be restricted by using interfaces. When storing a reference,
+            it can be stored as an interface so that only the fields and methods that the interface
+            specifies are able to be called by those who have a reference.
+          </p>
+          <p>
+            Based on the above example, a user could use an interface to restrict access to only
+            the <code>count</code> field.
+          </p>
+          <pre><code class="language-cadence,file=storage-access-control.cdc"><span>
+</span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
@@ -4697,6 +4745,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">limitedReference.increment()</span><span>
 </span></code></pre>
+        </section>
       </section>
       <section>
         <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
@@ -4742,6 +4791,7 @@
           and are sent to the chain to interact with it.
         </p>
         <p>Transactions are structured as such:</p>
+        <p>First, the transaction can import any number of types from external accounts using the import syntax.</p>
         <p>
           Next is the body of the transaction, which is broken into three main phases:
           Preparation, execution, and postconditions, only in that order.
@@ -4815,6 +4865,8 @@
 </span><span style="color: #000000">                </span><span style="color: #A31515">"incorrect amount returned"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
@@ -4867,6 +4919,17 @@
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Insufficient funds"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>
@@ -4875,16 +4938,6 @@
             followed by the name of the type, the <code>from</code> keyword,
             and the string literal for the path of the file which contains the code of the type.
           </p>
-          <p>The prepare phase can use the signing account's <code>deploy</code> function to deploy types.</p>
-          <p>This essentially stores the types in the account's <code>types</code> object so it can be used again.</p>
-          <p>A second layer of access control manages which user has access to stored values.</p>
-          <p>
-            When deploying code to an account, it is private by default,
-            just like fields and functions within the resources, i.e. it can only be imported
-            by code in the same account.
-          </p>
-          <p>The <code>publish</code> operator can be used to make deployed types publicly available to other accounts.</p>
-          <p>After a type is published it can be imported by other code.</p>
           <pre><code class="language-cadence,file=deploy-resource-interface.cdc"><span style="color: #008000">// Import the resource interface type `FungibleToken`</span><span>
 </span><span style="color: #008000">// from the local file "FungibleToken.cdc".</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -4896,15 +4949,10 @@
 </span><span style="color: #000000">transaction {</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Deploy the code for the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store the code for the resource interface type `FungibleToken`</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// in the signing account.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        signer.deploy(FungibleToken)</span><span>
-</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Make the deployed type publicly available, so anyone can import</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// resource interface type `FungibleToken` from the signing account.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        publish signer.types[FungibleToken]</span><span>
+</span><span style="color: #000000">        signer.storage[FungibleToken] = FungibleToken</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -4926,21 +4974,29 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
-</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
-</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
-</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit` </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// into a single function call</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// recipient's account using their deposit reference</span><span>
+</span><span style="color: #000000">        to.deposit(from: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.withdraw(amount: amount))</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function that lets any user create an example token</span><span>
@@ -4950,101 +5006,60 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <p>Again, the type must be deployed and published.</p>
-          <pre><code class="language-cadence,file=deploy-example-token.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"ExampleToken.cdc"</span><span>
-</span><span>
-</span><span style="color: #008000">// Run a transaction which deploys the code for the resource type `ExampleToken`</span><span>
-</span><span style="color: #008000">// and makes the deployed type publicly available by publishing it.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">transaction {</span><span>
-</span><span>
-</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
-</span><span style="color: #000000">        signer.deploy(ExampleToken)</span><span>
-</span><span style="color: #000000">        publish signer.types[ExampleToken]</span><span>
-</span><span style="color: #000000">    }</span><span>
-</span><span style="color: #000000">}</span><span>
-</span></code></pre>
-          <p>
-            Now, the resource type <code>ExampleToken</code> is deployed to the account
-            and published so that anyone who wants to use it
-            or interact with it can easily do so by importing it from the account.
-          </p>
-        </section>
-        <section>
-          <h3 id="using-deployed-code"><a href="#using-deployed-code" aria-hidden="true"><span class="icon icon-link"></span></a>Using Deployed Code</h3>
+          <p>Again, the type must be stored in the owners account.</p>
           <p>Once code is deployed, it can be used in other code and in transactions.</p>
           <p>
-            In many scenarios, publishing a stored value might be necessary,
-            because any user should have access all public functionality of the type.
-          </p>
-          <p>
-            In most situations though it is important to expose only a subset of the functionality
+            In most situations it is important to expose only a subset of the functionality
             of the stored values, because some of the functionality should only be available to the owner.
           </p>
           <p>
             The following transaction creates an empty token and stores it in the signer's account.
-            This allows the owner to withdraw and deposit. As this functionality should not be available
-            to anyone else, the token is not published.
+            This allows the owner to withdraw and deposit.
           </p>
           <p>
             However, the deposit function should be available to anyone. To achieve this,
             an additional reference to the token is created, stored, and published,
             which has the type <code>Receiver</code>, i.e. it only exposes the <code>deposit</code> function.
           </p>
-          <pre><code class="language-cadence,file=setup-transaction.cdc"><span style="color: #008000">// Import the resource interface types `Receiver` and `Provider`,</span><span>
-</span><span style="color: #008000">// which were deployed above, in this example to the account with address 0x23.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">import</span><span style="color: #000000"> Receiver, Provider </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x23</span><span>
+          <pre><code class="language-cadence,file=deploy-example-token.cdc"><span style="color: #008000">// import the `ExampleToken`, `newEmptyExampleToken`, `Receiver`, and `Provider` from the account who created them</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken, newEmptyExampleToken, Receiver, Provider </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
 </span><span>
-</span><span style="color: #008000">// Import the resource type `ExampleToken` and the function `newEmptyExampleToken`,</span><span>
-</span><span style="color: #008000">// which were deployed above, in this example to the account with address 0x42.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken, newEmptyExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
-</span><span>
-</span><span style="color: #008000">// Run a transaction which creates a new example token for the signing account</span><span>
-</span><span style="color: #008000">// and sets up references to it for allowing withdrawals for the owner</span><span>
-</span><span style="color: #008000">// and deposits from anyone.</span><span>
+</span><span style="color: #008000">// Run a transaction which stored the code and an instance for the resource type `ExampleToken`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Create a new example token for the signing account.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: the token is not published, so that only the owner can access it.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> exampleToken: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">? &#x3C;- newEmptyExampleToken()</span><span>
-</span><span style="color: #000000">        signer.storage[ExampleToken] &#x3C;-> exampleToken</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
+</span><span style="color: #000000">		</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by swapping it with whatever</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>
+</span><span style="color: #000000">        signer.storage[ExampleToken] &#x3C;-> tokenA</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// `exampleToken` now contains the previously stored token, if any.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// In this example it is simply destroyed, because it is assumed</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// there was no prior stored token.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> exampleToken</span><span>
-</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Store a reference to the token as a provider in the signing account,</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// so the owner can use it to withdraw tokens.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: the provider is not published, so that only the owner can access it.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// create references to the stored `ExampleToken`.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `Receiver` is for external calls.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `Provider` is for internal calls by the owner.</span><span>
+</span><span style="color: #000000">        signer.storage[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
 </span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Store a reference to the token as a receiver in the signing account</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// and publish it, so anyone can use it to deposit tokens.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        signer.storage[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
-</span><span style="color: #000000">        publish signer.storage[&#x26;Receiver]</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// destroy the empty swapped resource</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> tokenA</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>
+            Now, the resource type <code>ExampleToken</code> is stored in the account
+            and its <code>Receiver</code> interface is available so that anyone can
+            interact with it by importing it from the account.
+          </p>
+          <p>
             Once an account is prepared in such a way, transactions can be run that deposit
             tokens into the account.
           </p>
-          <pre><code class="language-cadence,file=send-transaction.cdc"><span style="color: #008000">// Import the resource type `ExampleToken`,</span><span>
+          <pre><code class="language-cadence,file=send-transaction.cdc"><span style="color: #008000">// Import the resource type `ExampleToken`, `Provider`, and `Receiver`</span><span>
 </span><span style="color: #008000">// in this example deployed to the account with address 0x42.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken, Provider, Receiver </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #008000">// Execute a transaction which sends five coins from one account to another.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5053,12 +5068,12 @@
 </span><span style="color: #008000">// available for the recipient account.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Only a signature from the sender is required.</span><span>
-</span><span style="color: #008000">// No signature from the recipient is required, as the receiver</span><span>
+</span><span style="color: #008000">// No signature from the recipient is required, as the receiver reference</span><span>
 </span><span style="color: #008000">// is published/publicly available (if it exists for the recipient).</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">transaction {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> sentFunds: &#x3C;-ExampleToken</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> providerRef: &#x26;</span><span style="color: #0000FF">Provider</span><span>
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span>
@@ -5070,13 +5085,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// If the signer's account has no provider reference stored in it,</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// or it is not published, abort the transaction.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> provider = signer.storage[&#x26;Provider] ?? panic(</span><span style="color: #A31515">"Signer has no provider"</span><span style="color: #000000">)</span><span>
-</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Withdraw 5 tokens from the provider by calling the provider's</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// `withdraw` function, and move the tokens to the field `sentFunds`,</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// so they can be deposited in the execute phase below.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.sentFunds &#x3C;- provider.withdraw(amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        providerRef = signer.storage[&#x26;Provider] ?? panic(</span><span style="color: #A31515">"Signer has no provider"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">execute</span><span style="color: #000000"> {</span><span>
@@ -5092,13 +5101,13 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// If the recipient's account has no receiver reference stored in it,</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// or it is not published, abort the transaction.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver = recipient.storage[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.storage[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the amount withdrawn from the signer's provider/token</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// into the recipient's receiver/token.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// (It was withdrawn in the preparation phase above).</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// using the reference to their deposit function.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        receiver.deposit(token: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.sentFunds)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.providerRef.transfer(to: receiverRef, amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>

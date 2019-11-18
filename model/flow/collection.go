@@ -24,14 +24,14 @@ func (c *Collection) Encode() []byte {
 }
 
 type collectionWrapper struct {
-	Transactions []transactionWrapper
+	Transactions []TransactionWrapper
 }
 
 func wrapCollection(c Collection) collectionWrapper {
-	transactions := make([]transactionWrapper, 0, len(c.Transactions))
+	transactions := make([]TransactionWrapper, 0, len(c.Transactions))
 
 	for i, tx := range c.Transactions {
-		transactions[i] = wrapTransaction(*tx)
+		transactions[i] = WrapTransaction(*tx)
 	}
 
 	return collectionWrapper{
