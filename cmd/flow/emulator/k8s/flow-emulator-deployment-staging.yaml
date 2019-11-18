@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: flow-emulator-v1
+  namespace: flow
+
+  labels:
+    app: flow-emulator
+    env: staging
+    owner: Kan
+    version: v1
+
+spec:
+  type: ClusterIP
+  selector:
+    app: flow-emulator
+    env: staging
+    version: v1
+
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3000
+      targetPort: web # reference to the name of the port in your container config
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # This is the full name of your deployment. It must be unique
+  name: flow-emulator-v1
+  namespace: flow
+
+  # Best practice labels:
+  #   app: <app-name> (the non-unique version of metadata.name)
+  #   kind: [web|worker]
+  #   env: [staging|production|canary|test|dev]
+  #   owner: who to ask about this service
+  #   version: the major version of this service (v1/v2/v1beta1)
+  labels:
+    app: flow-emulator
+    kind: web
+    env: staging
+    owner: Kan
+    version: v1
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flow-emulator
+      env: staging
+      version: v1
+
+  # Deployment strategy dictates how an update will be rolled out across the deployment
+  # K8s will try to roll up to the maxSurge before taking pods offline
+  # If availability is a strong concern, increase surge and decrease unavailable
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+
+  template:
+    metadata:
+      annotations:
+        # Set to "false" to opt out of prometheus scrapes
+        # Prometheus still needs a port called "metrics" (below) to scrape properly
+        prometheus.io/scrape: 'true'
+
+        # Set the path to the API endpoint that exposes prometheus metrics, or leave blank for `/metrics`
+        # prometheus.io/path: "/metrics"
+
+      labels:
+        app: flow-emulator
+        env: staging
+        owner: Kan
+        version: v1
+        kind: web
+
+    spec:
+      # Affinity keeps your replicas from all being scheduled to
+      # nodes in the same zone. Prevents zonal failures from taking
+      # down your entire service
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: flow-emulator
+                    env: staging
+                    version: v1
+                topologyKey: failure-domain.beta.kubernetes.io/zone
+              weight: 1
+      imagePullSecrets:
+        - name: gcr
+      containers:
+        - name: flow-emulator
+          image: gcr.io/dl-flow/emulator:d8eceb8b
+          # args: ["emulator", "start", "-v"]
+
+          # Ports exposed can be named so other resources can reference
+          # them by name and not have to hard code numbers
+          ports:
+            - name: web
+              containerPort: 3569
+
+            # Prometheus is looking specifically for a port named 'metrics'
+            # This may be the same as the above port, or different
+            # - name: metrics
+            #   containerPort: 3001
+
+          # Environment variables
+          env:
+            - name: FLOW_ROOTKEY
+              valueFrom:
+                secretKeyRef:
+                  name: flow-json
+                  key: root-key
+            - name: FLOW_DBPATH
+              value: '/flowdb'
+
+          # Resource requests and contraints
+          resources:
+            requests:
+              cpu: '125m'
+              memory: '128Mi'
+            limits:
+              cpu: '250m'
+              memory: '256Mi'
+          volumeMounts:
+            - name: badger-volume
+              mountPath: /flowdb
+      volumes:
+        - name: badger-volume
+          persistentVolumeClaim:
+            claimName: emulator-storage-claim
+          # # Readiness Probe
+          # readinessProbe:
+          #   httpGet:
+          #     path: /live
+          #     port: web
+          #   initialDelaySeconds: 5
+          #   successThreshold: 1
+          
+          # # Liveness Probe
+          # livenessProbe:
+          #   httpGet:
+          #     path: /live
+          #     port: web
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30
+          #   successThreshold: 1
