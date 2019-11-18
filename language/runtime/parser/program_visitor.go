@@ -193,6 +193,53 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var preConditions []*ast.Condition
+	preConditionsCtx := ctx.PreConditions()
+	if preConditionsCtx != nil {
+		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var postConditions []*ast.Condition
+	postConditionsCtx := ctx.PostConditions()
+	if postConditionsCtx != nil {
+		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var prepareFunction *ast.SpecialFunctionDeclaration
+	prepareCtx := ctx.Prepare()
+	if prepareCtx != nil {
+		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+	}
+
+	var executeBlock *ast.Block
+	executeCtx := ctx.Execute()
+	if executeCtx != nil {
+		executeBlock = executeCtx.Accept(v).(*ast.Block)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.TransactionDeclaration{
+		PreConditions:  preConditions,
+		PostConditions: postConditions,
+		Prepare:        prepareFunction,
+		Execute:        executeBlock,
+		Range: ast.Range{
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		},
+	}
+}
+
+func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
+	return ctx.SpecialFunctionDeclaration().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
+	return ctx.Block().Accept(v)
+}
+
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
