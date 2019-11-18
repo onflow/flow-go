@@ -16,25 +16,31 @@
       "description": "A function declaration",
       "type": "object",
       "properties": {
-        "$type": { "const": "function" },
-        "name": {
-          "title": "Function name",
-          "description": "The name of the function (required)",
-          "type": "string"
-        },
-        "parameters": {
-          "title": "Function parameters",
-          "description": "The parameters of the function (optional; none if not given)",
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/parameter"
-          }
-        },
-        "returnType": {
-          "$ref": "#/definitions/returnType"
+        "function": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Function name",
+              "description": "The name of the function (required)",
+              "type": "string"
+            },
+            "parameters": {
+              "title": "Function parameters",
+              "description": "The parameters of the function (optional; none if not given)",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/parameter"
+              }
+            },
+            "returnType": {
+              "$ref": "#/definitions/type"
+            }
+          },
+          "required": [ "name"],
+          "additionalProperties": false
         }
       },
-      "required": ["$type", "name"]
+      "required": ["function"]
     },
     "parameter": {
       "title": "Parameter",
@@ -53,47 +59,58 @@
         "type": {
           "title": "Function parameter type",
           "description": "The type of the function parameter (required)",
-          "$ref": "#/definitions/typeAnnotation"
+          "$ref": "#/definitions/type"
         }
       },
-      "required": ["name", "type"]
+      "required": ["name", "type"],
+      "additionalProperties": false
     },
-    "typeAnnotation": {
-      "oneOf": [
-        {
-          "$ref": "#/definitions/type"
+    "variable": {
+      "type": "object",
+      "title": "A variable",
+      "properties": {
+        "name": {
+          "type": "string"
         },
-        {
-          "type": "object",
-          "properties": {
-            "move": {
-              "title": "Type annotation move indicator",
-              "description": "The move annotation for the type (required)",
-              "type": "boolean"
-            },
-            "type":  {
-              "title": "Type annotation type",
-              "description": "The annotated type (required)",
-              "$ref": "#/definitions/type"
-            }
-          },
-          "required": ["move", "type"]
+        "type": {
+          "$ref": "#/definitions/type"
         }
-      ]
+      },
+      "required": ["name"]
     },
     "type": {
       "title": "Type",
       "oneOf": [
-        {"$ref": "#/definitions/nominalType"},
-        {"$ref": "#/definitions/arrayType"},
-        {"$ref": "#/definitions/functionType"}
+        {
+          "$ref": "#/definitions/builtinType"
+        },
+        {
+          "$ref": "#/definitions/arrayType"
+        },
+        {
+          "$ref": "#/definitions/optionalType"
+        },
+        {
+          "$ref": "#/definitions/functionType"
+        }
       ]
     },
-    "nominalType": {
-      "title": "Nominal Type",
+    "optionalType": {
+      "title": "Optional type",
+      "type": "object",
+      "properties": {
+        "optional": {
+          "$ref": "#/definitions/type"
+        }
+      },
+      "required": ["optional"],
+      "additionalProperties": false
+    },
+    "builtinType": {
+      "title": "Builtin Type",
       "type": "string",
       "enum": [
-        "string",
+        "String",
         "Int8",
         "Int16",
         "Int32",
@@ -105,49 +122,61 @@
         "Address",
         "Any",
         "Bool"
-      ]
+      ],
+      "additionalProperties": false
     },
     "arrayType": {
       "title": "Array Type",
       "type": "object",
       "properties": {
-        "$type": { "const": "array" },
-        "elementType": {
-          "title": "Element Type",
-          "description": "The type of the elements (required)",
-          "$ref": "#/definitions/type"
-        },
-        "size": {
-          "title": "Array Size",
-          "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
-          "type": "integer"
+        "array": {
+          "type": "object",
+          "properties": {
+            "of": {
+              "title": "Element Type",
+              "description": "The type of the elements (required)",
+              "$ref": "#/definitions/type"
+            },
+            "size": {
+              "title": "Array Size",
+              "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
         }
       },
-      "required": ["$type", "elementType"]
+      "required": [
+        "array"
+      ],
+      "additionalProperties": false
     },
     "functionType": {
       "title": "Function type",
       "type": "object",
       "properties": {
-        "$type": {"const": "functionType"},
-        "parameters" : {
-          "$type": {
-            "const": "array"
-          },
-          "items": {
-              "$ref": "#/definitions/typeAnnotation"
+        "function": {
+          "type": "object",
+          "properties": {
+            "parameters" : {
+              "$type": {
+                "const": "array"
+              },
+              "items": {
+                "$ref": "#/definitions/type"
+              }
+            },
+            "returnType": {
+              "$ref": "#/definitions/type"
             }
-        },
-        "returnType": {
-          "$ref": "#/definitions/returnType"
+          }
         }
       },
-      "required": ["$type"]
-    },
-    "returnType": {
-      "title": "Function return type",
-      "description": "The return type of the function (optional; Void if not given)",
-      "$ref": "#/definitions/typeAnnotation"
+      "required": ["function"],
+      "additionalProperties": false
     },
     "dictionaryType": {
       "title": "Dictionary Type",
