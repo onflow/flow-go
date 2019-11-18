@@ -16,6 +16,9 @@
 /cmd/execution @turbolent
 /engine/execution @turbolent
 
+# Verification Stream
+/module/chunking @ramtinms
+
 # Observation Stream
 /cmd/observation @psiemens
 /engine/observation @psiemens

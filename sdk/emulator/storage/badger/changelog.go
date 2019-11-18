@@ -18,6 +18,7 @@ type changelist struct {
 	Blocks []uint64
 }
 
+// Implement sort.Interface for testing sortedness.
 func (c changelist) Len() int { return len(c.Blocks) }
 
 func (c changelist) Less(i, j int) bool { return c.Blocks[i] < c.Blocks[j] }

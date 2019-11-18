@@ -1200,17 +1200,16 @@ func TestCheckInvalidResourceAssignmentTransfer(t *testing.T) {
       resource X {}
 
       fun test() {
-         let x <- create X()
-         var x2 <- create X()
-         destroy x2
-         x2 <- x
+          let x <- create X()
+          var x2 <- create X()
+          destroy x2
+          x2 <- x
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[0])
-	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
 func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
@@ -1219,18 +1218,17 @@ func TestCheckInvalidResourceAssignmentIncorrectTransfer(t *testing.T) {
       resource X {}
 
       fun test() {
-        let x <- create X()
-        var x2 <- create X()
-        destroy x2
-        x2 = x
+          let x <- create X()
+          var x2 <- create X()
+          destroy x2
+          x2 = x
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 3)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
-	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
@@ -1293,11 +1291,10 @@ func TestCheckInvalidResourceLossThroughAssignment(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 3)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
-	assert.IsType(t, &sema.ResourceLossError{}, errs[2])
 }
 
 func TestCheckResourceMoveThroughReturn(t *testing.T) {
@@ -2780,6 +2777,39 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
          destroy ri
      }
    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceMethodBinding(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test(): ((<-R): Void) {
+          let rs <- [<-create R()]
+          let append = rs.append
+          destroy rs
+          return append
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceMethodBindingError{}, errs[0])
+}
+
+func TestCheckInvalidResourceMethodCall(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let rs <- [<-create R()]
+          rs.append(<-create R())
+          destroy rs
+      }
+    `)
 
 	assert.Nil(t, err)
 }

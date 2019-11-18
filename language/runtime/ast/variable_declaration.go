@@ -3,12 +3,15 @@ package ast
 import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type VariableDeclaration struct {
+	Access         Access
 	IsConstant     bool
 	Identifier     Identifier
 	TypeAnnotation *TypeAnnotation
 	Value          Expression
 	Transfer       *Transfer
 	StartPos       Position
+	SecondTransfer *Transfer
+	SecondValue    Expression
 }
 
 func (v *VariableDeclaration) StartPosition() Position {

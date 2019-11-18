@@ -247,3 +247,12 @@ func TestCheckInvocationOfFunctionFromStructFunctionWithSameName(t *testing.T) {
     `)
 	assert.Nil(t, err)
 }
+
+func TestCheckIntricateIntegerBinaryExpression(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      let x: Int8 = 100
+      let y = (Int8(90) + Int8(10)) == x
+    `)
+	assert.Nil(t, err)
+}

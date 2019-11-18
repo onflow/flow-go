@@ -38,6 +38,11 @@ void _ep2_print(char* s, ep2_st* p) {
 
 // seeds relic PRG
 void _seed_relic(byte* seed, int len) {
+    #if RAND == HASHD
+    // instantiate a new DRBG
+    ctx_t *ctx = core_get();
+    ctx->seeded = 0;
+    #endif
     rand_seed(seed, len);
 }
 
