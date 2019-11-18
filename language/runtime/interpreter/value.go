@@ -511,7 +511,7 @@ func (v IntValue) Copy() Value {
 }
 
 func (v IntValue) Export() values.Value {
-	return values.Int(v.Int.Int64())
+	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
 }
 
 func (v IntValue) IntValue() int {
