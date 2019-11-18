@@ -152,8 +152,9 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	// then fix up the type reference
 
 	interfaceType := &InterfaceType{
-		CompositeKind: declaration.CompositeKind,
+		Location:      checker.Location,
 		Identifier:    identifier.Identifier,
+		CompositeKind: declaration.CompositeKind,
 	}
 
 	err := checker.typeActivations.Declare(identifier, interfaceType)

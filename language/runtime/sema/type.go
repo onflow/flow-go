@@ -17,6 +17,7 @@ type Type interface {
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
+	ID() string
 }
 
 // ValueIndexableType
@@ -80,6 +81,10 @@ func (*AnyType) String() string {
 	return "Any"
 }
 
+func (*AnyType) ID() string {
+	return "Any"
+}
+
 func (*AnyType) Equal(other Type) bool {
 	_, ok := other.(*AnyType)
 	return ok
@@ -99,6 +104,10 @@ type NeverType struct{}
 func (*NeverType) isType() {}
 
 func (*NeverType) String() string {
+	return "Never"
+}
+
+func (*NeverType) ID() string {
 	return "Never"
 }
 
@@ -124,6 +133,10 @@ func (*VoidType) String() string {
 	return "Void"
 }
 
+func (*VoidType) ID() string {
+	return "Void"
+}
+
 func (*VoidType) Equal(other Type) bool {
 	_, ok := other.(*VoidType)
 	return ok
@@ -145,7 +158,11 @@ type InvalidType struct{}
 
 func (*InvalidType) isType() {}
 
-func (*InvalidType) String() string {
+func (t *InvalidType) String() string {
+	return "<<invalid>>"
+}
+
+func (*InvalidType) ID() string {
 	return "<<invalid>>"
 }
 
@@ -176,6 +193,13 @@ func (t *OptionalType) String() string {
 	return fmt.Sprintf("%s?", t.Type)
 }
 
+func (t *OptionalType) ID() string {
+	if t.Type == nil {
+		return "optional"
+	}
+	return fmt.Sprintf("%s?", t.Type.ID())
+}
+
 func (t *OptionalType) Equal(other Type) bool {
 	otherOptional, ok := other.(*OptionalType)
 	if !ok {
@@ -198,6 +222,10 @@ type BoolType struct{}
 func (*BoolType) isType() {}
 
 func (*BoolType) String() string {
+	return "Bool"
+}
+
+func (*BoolType) ID() string {
 	return "Bool"
 }
 
@@ -224,6 +252,10 @@ func (*CharacterType) String() string {
 	return "Character"
 }
 
+func (*CharacterType) ID() string {
+	return "Character"
+}
+
 func (*CharacterType) Equal(other Type) bool {
 	_, ok := other.(*CharacterType)
 	return ok
@@ -243,6 +275,10 @@ type StringType struct{}
 func (*StringType) isType() {}
 
 func (*StringType) String() string {
+	return "String"
+}
+
+func (*StringType) ID() string {
 	return "String"
 }
 
@@ -332,6 +368,10 @@ func (*IntegerType) String() string {
 	return "integer"
 }
 
+func (*IntegerType) ID() string {
+	return "integer"
+}
+
 func (*IntegerType) Equal(other Type) bool {
 	_, ok := other.(*IntegerType)
 	return ok
@@ -359,6 +399,10 @@ type IntType struct{}
 func (*IntType) isType() {}
 
 func (*IntType) String() string {
+	return "Int"
+}
+
+func (*IntType) ID() string {
 	return "Int"
 }
 
@@ -390,6 +434,10 @@ type Int8Type struct{}
 func (*Int8Type) isType() {}
 
 func (*Int8Type) String() string {
+	return "Int8"
+}
+
+func (*Int8Type) ID() string {
 	return "Int8"
 }
 
@@ -426,6 +474,10 @@ func (*Int16Type) String() string {
 	return "Int16"
 }
 
+func (*Int16Type) ID() string {
+	return "Int16"
+}
+
 func (*Int16Type) Equal(other Type) bool {
 	_, ok := other.(*Int16Type)
 	return ok
@@ -456,6 +508,10 @@ type Int32Type struct{}
 func (*Int32Type) isType() {}
 
 func (*Int32Type) String() string {
+	return "Int32"
+}
+
+func (*Int32Type) ID() string {
 	return "Int32"
 }
 
@@ -492,6 +548,10 @@ func (*Int64Type) String() string {
 	return "Int64"
 }
 
+func (*Int64Type) ID() string {
+	return "Int64"
+}
+
 func (*Int64Type) Equal(other Type) bool {
 	_, ok := other.(*Int64Type)
 	return ok
@@ -522,6 +582,10 @@ type UInt8Type struct{}
 func (*UInt8Type) isType() {}
 
 func (*UInt8Type) String() string {
+	return "UInt8"
+}
+
+func (*UInt8Type) ID() string {
 	return "UInt8"
 }
 
@@ -558,6 +622,10 @@ func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
+func (*UInt16Type) ID() string {
+	return "UInt16"
+}
+
 func (*UInt16Type) Equal(other Type) bool {
 	_, ok := other.(*UInt16Type)
 	return ok
@@ -591,6 +659,10 @@ func (*UInt32Type) String() string {
 	return "UInt32"
 }
 
+func (*UInt32Type) ID() string {
+	return "UInt32"
+}
+
 func (*UInt32Type) Equal(other Type) bool {
 	_, ok := other.(*UInt32Type)
 	return ok
@@ -621,6 +693,10 @@ type UInt64Type struct{}
 func (*UInt64Type) isType() {}
 
 func (*UInt64Type) String() string {
+	return "UInt64"
+}
+
+func (*UInt64Type) ID() string {
 	return "UInt64"
 }
 
@@ -865,6 +941,10 @@ func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
 
+func (t *VariableSizedType) ID() string {
+	return fmt.Sprintf("[%s]", t.Type.ID())
+}
+
 func (t *VariableSizedType) Equal(other Type) bool {
 	otherArray, ok := other.(*VariableSizedType)
 	if !ok {
@@ -913,6 +993,10 @@ func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
+}
+
+func (t *ConstantSizedType) ID() string {
+	return fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size)
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -991,6 +1075,22 @@ func (t *FunctionType) String() string {
 
 	return fmt.Sprintf(
 		"((%s): %s)",
+		parameters.String(),
+		t.ReturnTypeAnnotation,
+	)
+}
+
+func (t *FunctionType) ID() string {
+	var parameters strings.Builder
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		if i > 0 {
+			parameters.WriteString(",")
+		}
+		parameters.WriteString(parameterTypeAnnotation.Type.ID())
+	}
+
+	return fmt.Sprintf(
+		"((%s):%s)",
 		parameters.String(),
 		t.ReturnTypeAnnotation,
 	)
@@ -1205,8 +1305,8 @@ func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, 
 
 type CompositeType struct {
 	Location     ast.Location
-	Kind         common.CompositeKind
 	Identifier   string
+	Kind         common.CompositeKind
 	Conformances []*InterfaceType
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
@@ -1217,6 +1317,23 @@ func (*CompositeType) isType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
+}
+
+func (t *CompositeType) ID() string {
+	return fmt.Sprintf("%c.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+}
+
+func (t *CompositeType) idPrefix() rune {
+	switch t.Kind {
+	case common.CompositeKindStructure:
+		return 'S'
+	case common.CompositeKindResource:
+		return 'R'
+	case common.CompositeKindContract:
+		return 'C'
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1292,8 +1409,9 @@ type MemberAccessibleType interface {
 // InterfaceType
 
 type InterfaceType struct {
-	CompositeKind common.CompositeKind
+	Location      ast.Location
 	Identifier    string
+	CompositeKind common.CompositeKind
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
 	InitializerParameterTypeAnnotations []*TypeAnnotation
@@ -1303,6 +1421,23 @@ func (*InterfaceType) isType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
+}
+
+func (t *InterfaceType) ID() string {
+	return fmt.Sprintf("%s.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+}
+
+func (t *InterfaceType) idPrefix() string {
+	switch t.CompositeKind {
+	case common.CompositeKindStructure:
+		return "SI"
+	case common.CompositeKindResource:
+		return "RI"
+	case common.CompositeKindContract:
+		return "CI"
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -1342,7 +1477,19 @@ type DictionaryType struct {
 func (*DictionaryType) isType() {}
 
 func (t *DictionaryType) String() string {
-	return fmt.Sprintf("{%s: %s}", t.KeyType, t.ValueType)
+	return fmt.Sprintf(
+		"{%s: %s}",
+		t.KeyType,
+		t.ValueType,
+	)
+}
+
+func (t *DictionaryType) ID() string {
+	return fmt.Sprintf(
+		"{%s:%s}",
+		t.KeyType.ID(),
+		t.ValueType.ID(),
+	)
 }
 
 func (t *DictionaryType) Equal(other Type) bool {
@@ -1445,6 +1592,10 @@ func (t *StorageType) String() string {
 	return "Storage"
 }
 
+func (t *StorageType) ID() string {
+	return "Storage"
+}
+
 func (t *StorageType) Equal(other Type) bool {
 	_, ok := other.(*StorageType)
 	return ok
@@ -1470,11 +1621,13 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 // EventType
 
 type EventType struct {
-	Identifier                          string
 	Location                            ast.Location
+	Identifier                          string
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
+
+const EventTypeIDPrefix = 'E'
 
 func (*EventType) isType() {}
 
@@ -1488,6 +1641,15 @@ func (t *EventType) String() string {
 	}
 
 	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
+}
+
+func (t *EventType) ID() string {
+	return fmt.Sprintf(
+		"%c.%s.%s",
+		EventTypeIDPrefix,
+		t.Location,
+		t.Identifier,
+	)
 }
 
 func (t *EventType) Equal(other Type) bool {
@@ -1557,6 +1719,13 @@ func (t *ReferenceType) String() string {
 	return fmt.Sprintf("&%s", t.Type)
 }
 
+func (t *ReferenceType) ID() string {
+	if t.Type == nil {
+		return "reference"
+	}
+	return fmt.Sprintf("&%s", t.Type.ID())
+}
+
 func (t *ReferenceType) Equal(other Type) bool {
 	otherReference, ok := other.(*ReferenceType)
 	if !ok {
@@ -1620,6 +1789,10 @@ type AddressType struct{}
 func (*AddressType) isType() {}
 
 func (*AddressType) String() string {
+	return "Address"
+}
+
+func (*AddressType) ID() string {
 	return "Address"
 }
 
