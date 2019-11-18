@@ -1684,10 +1684,6 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
-	case *CharacterType:
-		// TODO: only allow valid character literals
-		return subType.Equal(&StringType{})
-
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
 		if !ok {
