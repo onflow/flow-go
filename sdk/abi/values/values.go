@@ -38,6 +38,10 @@ func NewIntFromBig(v *big.Int) Int {
 	return Int{v}
 }
 
+func (v Int) ToInt() int {
+	return int(v.Int.Int64())
+}
+
 func (Int) isValue() {}
 
 type Int8 int8
