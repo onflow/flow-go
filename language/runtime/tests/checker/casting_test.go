@@ -52,3 +52,18 @@ func TestCheckCastingIntLiteralToAny(t *testing.T) {
 
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
+
+func TestCheckCastingArrayLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun zipOf3(a: [Any; 3], b: [Int; 3]): [[Any; 2]; 3] {
+          return [
+              [a[0], b[0]] as [Any; 2],
+              [a[1], b[1]] as [Any; 2],
+              [a[2], b[2]] as [Any; 2]
+          ]
+      }
+    `)
+
+	require.Nil(t, err)
+}
