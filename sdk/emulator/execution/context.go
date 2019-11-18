@@ -154,7 +154,7 @@ func (r *RuntimeContext) AddAccountKey(address values.Address, publicKey values.
 // provided key is invalid, or if key deletion fails.
 func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
 	accountID := address[:]
-	i := int(index)
+	i := index.ToInt()
 
 	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
@@ -167,12 +167,12 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 	}
 
 	if i < 0 || i > len(publicKeys)-1 {
-		return nil, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
+		return nil, fmt.Errorf("invalid key index %d, account has %d keys", i, len(publicKeys))
 	}
 
-	removedKey := publicKeys[index]
+	removedKey := publicKeys[i]
 
-	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
+	publicKeys = append(publicKeys[:i], publicKeys[i+1:]...)
 
 	err = r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/big"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -136,13 +137,30 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 	return err
 }
 
-// EncodeInt writes the XDR-encoded representation of an integer value.
+// EncodeInt writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
 //
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
-//  RFC Section 4.1 - Integer
-//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
 func (e *Encoder) EncodeInt(v values.Int) error {
-	_, err := e.enc.EncodeInt(int32(v))
+	isPositive := v.Int.Cmp(big.NewInt(0)) >= 0
+
+	var b []byte
+
+	if isPositive {
+		b = []byte{1}
+	} else {
+		b = []byte{0}
+	}
+
+	b = append(b, v.Int.Bytes()...)
+
+	_, err := e.enc.EncodeOpaque(b)
 	return err
 }
 

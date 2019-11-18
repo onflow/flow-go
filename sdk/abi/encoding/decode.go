@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/big"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -160,18 +161,31 @@ func (e *Decoder) DecodeAddress() (values.Address, error) {
 	return values.BytesToAddress(b), nil
 }
 
-// DecodeInt reads the XDR-encoded representation of an integer value.
+// DecodeInt reads the XDR-encoded representation of an arbitrary-precision
+// integer value.
 //
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.1
-//  RFC Section 4.1 - Integer
-//  32-bit big-endian signed integer in range [-2147483648, 2147483647]
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
 func (e *Decoder) DecodeInt() (values.Int, error) {
-	i, _, err := e.dec.DecodeInt()
+	b, _, err := e.dec.DecodeOpaque()
 	if err != nil {
-		return 0, err
+		return values.Int{}, err
 	}
 
-	return values.Int(i), nil
+	isPositive := b[0] == 1
+
+	i := big.NewInt(0).SetBytes(b[1:])
+
+	if !isPositive {
+		i = i.Neg(i)
+	}
+
+	return values.NewIntFromBig(i), nil
 }
 
 // DecodeInt8 reads the XDR-encoded representation of an int-8 value.

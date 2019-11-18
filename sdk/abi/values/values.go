@@ -1,5 +1,7 @@
 package values
 
+import "math/big"
+
 type Value interface {
 	isValue()
 }
@@ -24,8 +26,21 @@ type Bytes []byte
 
 func (Bytes) isValue() {}
 
-// TODO: use big.Int to represent Int value
-type Int int
+type Int struct {
+	Int *big.Int
+}
+
+func NewInt(v int) Int {
+	return Int{big.NewInt(int64(v))}
+}
+
+func NewIntFromBig(v *big.Int) Int {
+	return Int{v}
+}
+
+func (v Int) ToInt() int {
+	return int(v.Int.Int64())
+}
 
 func (Int) isValue() {}
 
