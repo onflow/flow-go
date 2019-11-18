@@ -302,6 +302,11 @@ func (s Store) Close() error {
 	return s.db.Close()
 }
 
+// Sync syncs database content to disk.
+func (s Store) Sync() error {
+	return s.db.Sync()
+}
+
 // getTx returns a getter function bound to the input transaction that can be
 // used to get values from Badger.
 //

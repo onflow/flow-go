@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -357,6 +358,112 @@ func TestPersistence(t *testing.T) {
 	assert.Equal(t, ledger.NewView(), &gotLedger)
 }
 
+func benchmarkSetLedger(b *testing.B, nKeys int) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	ledger := make(flow.Ledger)
+	for i := 0; i < nKeys; i++ {
+		ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		if err := store.SetLedger(1, unittest.LedgerFixture()); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSetLedger1(b *testing.B)    { benchmarkSetLedger(b, 1) }
+func BenchmarkSetLedger10(b *testing.B)   { benchmarkSetLedger(b, 10) }
+func BenchmarkSetLedger100(b *testing.B)  { benchmarkSetLedger(b, 100) }
+func BenchmarkSetLedger1000(b *testing.B) { benchmarkSetLedger(b, 1000) }
+
+func benchmarkGetLedger(b *testing.B, nBlocks int) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	for i := 0; i < nBlocks; i++ {
+		ledger := make(flow.Ledger)
+		for j := i + 2; j < i+12; j++ {
+			ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
+		}
+		if err := store.SetLedger(uint64(i), ledger); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := store.GetLedgerView(uint64(b.N))
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGetLedger1(b *testing.B)    { benchmarkGetLedger(b, 1) }
+func BenchmarkGetLedger10(b *testing.B)   { benchmarkGetLedger(b, 10) }
+func BenchmarkGetLedger100(b *testing.B)  { benchmarkGetLedger(b, 100) }
+func BenchmarkGetLedger1000(b *testing.B) { benchmarkGetLedger(b, 1000) }
+
+func BenchmarkLedgerDiskUsage(b *testing.B) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	b.StartTimer()
+	var lastDBSize int64
+	for i := 0; i < b.N; i++ {
+		ledger := make(flow.Ledger)
+		for j := 0; j < 100; j++ {
+			ledger[fmt.Sprintf("%d-%d", i, j)] = []byte{byte(i), byte(j)}
+		}
+		if err := store.SetLedger(uint64(i), ledger); err != nil {
+			b.Fatal(err)
+		}
+		if err := store.Sync(); err != nil {
+			b.Fatal(err)
+		}
+
+		size, err := dirSize(dir)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		dbSizeIncrease := size - lastDBSize
+		b.ReportMetric(float64(dbSizeIncrease), "db_size_increase/op")
+		lastDBSize = size
+	}
+}
+
 // setupStore creates a temporary directory for the Badger and creates a
 // badger.Store instance. The caller is responsible for closing the store
 // and deleting the temporary directory.
@@ -368,4 +475,19 @@ func setupStore(t *testing.T) (badger.Store, string) {
 	require.Nil(t, err)
 
 	return store, dir
+}
+
+// Returns the size of a directory and all contents
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }
