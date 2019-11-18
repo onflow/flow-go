@@ -78,6 +78,25 @@ declaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
+    | transactionDeclaration
+    ;
+
+transactionDeclaration
+    : Transaction '{' preConditions? prepare? execute? postConditions? '}'
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `prepare` in semantic analysis to provide better error
+//
+prepare
+    : Identifier parameterList block
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `execute` in semantic analysis to provide better error
+//
+execute
+    : Identifier block
     ;
 
 importDeclaration
@@ -592,6 +611,8 @@ From : 'from' ;
 
 Create : 'create' ;
 Destroy : 'destroy' ;
+
+Transaction : 'transaction' ;
 
 identifier
     : Identifier
