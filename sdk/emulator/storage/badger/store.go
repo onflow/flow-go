@@ -15,7 +15,8 @@ import (
 // Store is an embedded storage implementation using Badger as the underlying
 // persistent key-value store.
 type Store struct {
-	db *badger.DB
+	db              *badger.DB
+	ledgerChangeLog changelog
 }
 
 // New returns a new Badger Store.
@@ -24,7 +25,7 @@ func New(path string) (Store, error) {
 	if err != nil {
 		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
-	return Store{db}, nil
+	return Store{db, newChangelog()}, nil
 }
 
 func (s Store) GetBlockByHash(blockHash crypto.Hash) (block types.Block, err error) {
@@ -137,6 +138,17 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 }
 
 func (s Store) GetLedgerView(blockNumber uint64) (view flow.LedgerView, err error) {
+	var changelog changelog
+	_ = changelog
+	for key, value := range changelog.registers {
+		_, _ = key, value
+		// find the highest block number in the register's changelog so that
+		//     it is <= blockNumber
+		// get the corresponding value from storage
+		// insert the value to the ledger view
+	}
+
+	// TODO replace this by implementing above
 	err = s.db.View(func(txn *badger.Txn) error {
 		encLedger, err := getTx(txn)(ledgerKey(blockNumber))
 		if err != nil {
@@ -154,6 +166,28 @@ func (s Store) GetLedgerView(blockNumber uint64) (view flow.LedgerView, err erro
 }
 
 func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
+	// List of register IDs with changed values after this operation
+	var updatedRegisters []string
+	_ = updatedRegisters
+
+	for registerID, value := range ledger {
+		_, _ = registerID, value
+		// get most recent change from changelog [O(lg(k))]
+		// if no change exists:
+		//   - write value
+		//   - update changelog
+		//   - note key
+		// get corresponding value from storage [O(a1)]
+		// if value is different:
+		//   - write value
+		//   - update changelog
+		//   - note key in changelog diff
+		// else:
+		//   - continue
+	}
+	// write each key in the changelog diff (to disk)
+
+	// TODO replace this by implementing above
 	encLedger, err := encodeLedger(ledger)
 	if err != nil {
 		return err
