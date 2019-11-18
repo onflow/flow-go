@@ -18,12 +18,6 @@ type changelist struct {
 	list []uint64
 }
 
-func (c changelist) Len() int { return len(c.list) }
-
-func (c changelist) Less(i, j int) bool { return c.list[i] < c.list[j] }
-
-func (c changelist) Swap(i, j int) { c.list[i], c.list[j] = c.list[j], c.list[i] }
-
 // search finds the highest block number B in the changelist so that B<=n.
 // Returns notFound if no such block number exists. This relies on the fact
 // that the changelist is kept sorted in ascending order.
