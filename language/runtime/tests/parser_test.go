@@ -4523,7 +4523,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncasting(t *testing.T) {
+func TestParseFailableCasting(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
        let x = 0 as? Int
@@ -4543,7 +4543,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 					Operation: TransferOperationCopy,
 					Pos:       Position{Offset: 14, Line: 2, Column: 13},
 				},
-				Value: &FailableDowncastExpression{
+				Value: &CastingExpression{
 					Expression: &IntExpression{
 						Value: big.NewInt(0),
 						Base:  10,
@@ -4552,6 +4552,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
 						},
 					},
+					Operation: OperationFailableCast,
 					TypeAnnotation: &TypeAnnotation{
 						Move: false,
 						Type: &NominalType{
@@ -5574,7 +5575,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
+func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
         let y = x as? <-R
@@ -5592,13 +5593,14 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 			Operation: TransferOperationCopy,
 			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Value: &FailableDowncastExpression{
+		Value: &CastingExpression{
 			Expression: &IdentifierExpression{
 				Identifier: Identifier{
 					Identifier: "x",
 					Pos:        Position{Offset: 17, Line: 2, Column: 16},
 				},
 			},
+			Operation: OperationFailableCast,
 			TypeAnnotation: &TypeAnnotation{
 				Move: true,
 				Type: &NominalType{
@@ -5608,6 +5610,52 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 					},
 				},
 				StartPos: Position{Offset: 23, Line: 2, Column: 22},
+			},
+		},
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{test},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseCasting(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        let y = x as Y
+	`)
+
+	assert.Nil(t, err)
+
+	test := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "y",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Value: &CastingExpression{
+			Expression: &IdentifierExpression{
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 17, Line: 2, Column: 16},
+				},
+			},
+			Operation: OperationCast,
+			TypeAnnotation: &TypeAnnotation{
+				Type: &NominalType{
+					Identifier: Identifier{
+						Identifier: "Y",
+						Pos:        Position{Offset: 22, Line: 2, Column: 21},
+					},
+				},
+				StartPos: Position{Offset: 22, Line: 2, Column: 21},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},

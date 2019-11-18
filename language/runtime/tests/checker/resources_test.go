@@ -13,7 +13,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
+func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -31,7 +31,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 
@@ -45,7 +45,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
@@ -55,7 +55,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 			}
@@ -702,7 +702,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -722,7 +722,7 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
@@ -734,13 +734,13 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindStructure:
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				errs := ExpectCheckerErrors(t, err, 1)
 

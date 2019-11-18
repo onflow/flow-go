@@ -2213,19 +2213,30 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 		})
 }
 
-func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(Value)
 
-			anyValue := value.(AnyValue)
-			expectedType := interpreter.Checker.Elaboration.FailableDowncastingTypes[expression]
+			expectedType := interpreter.Checker.Elaboration.CastingTargetTypes[expression]
 
-			if !sema.IsSubType(anyValue.Type, expectedType) {
-				return NilValue{}
+			switch expression.Operation {
+			case ast.OperationFailableCast:
+				anyValue := value.(AnyValue)
+
+				if !sema.IsSubType(anyValue.Type, expectedType) {
+					return NilValue{}
+				}
+
+				return SomeValue{Value: anyValue.Value}
+
+			case ast.OperationCast:
+				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
+				return interpreter.convertAndBox(value, staticValueType, expectedType)
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
-
-			return SomeValue{Value: anyValue.Value}
 		})
 }
 
