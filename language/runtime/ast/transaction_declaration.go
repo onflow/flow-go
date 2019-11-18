@@ -7,6 +7,7 @@ type TransactionDeclaration struct {
 	PostConditions []*Condition
 	Prepare        *SpecialFunctionDeclaration
 	Execute        *Block
+	Range
 }
 
 func (e *TransactionDeclaration) Accept(visitor Visitor) Repr {
