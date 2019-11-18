@@ -44,6 +44,13 @@ var emptyFunctionType = &sema.FunctionType{
 	},
 }
 
+//
+
+type getterSetter struct {
+	get func() Value
+	set func(Value)
+}
+
 // StatementTrampoline
 
 type StatementTrampoline struct {
@@ -209,6 +216,8 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		DestructorFunctions: map[string]*InterpretedFunctionValue{},
 		SubInterpreters:     map[ast.LocationID]*Interpreter{},
 	}
+
+	interpreter.defineBaseFunctions()
 
 	for _, option := range options {
 		err := option(interpreter)
@@ -471,7 +480,7 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		}
 	}
 
-	boxedArguments := make([]Value, len(arguments))
+	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
 		parameterType := parameterTypeAnnotations[i].Type
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
@@ -480,10 +489,10 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 				Value: variableValue,
 			}
 		}
-		boxedArguments[i] = interpreter.box(argument, nil, parameterType)
+		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(boxedArguments, LocationPosition{})
+	trampoline = function.invoke(preparedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
@@ -773,7 +782,7 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 			valueType := interpreter.Checker.Elaboration.ReturnStatementValueTypes[statement]
 			returnType := interpreter.Checker.Elaboration.ReturnStatementReturnTypes[statement]
 
-			value = interpreter.box(value, valueType, returnType)
+			value = interpreter.convertAndBox(value, valueType, returnType)
 
 			return functionReturn{value}
 		})
@@ -873,21 +882,31 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 // VisitVariableDeclaration first visits the declaration's value,
 // then declares the variable with the name bound to the value
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
+
+	targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
+	valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+	secondValueType := interpreter.Checker.Elaboration.VariableDeclarationSecondValueTypes[declaration]
+
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-
-			valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
-			targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
-
-			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
+			valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
 				declaration.Identifier.Identifier,
 				valueCopy,
 			)
 
-			// NOTE: ignore result, so it does *not* act like a return-statement
-			return Done{}
+			if declaration.SecondValue == nil {
+				// NOTE: ignore result, so it does *not* act like a return-statement
+				return Done{}
+			}
+
+			return interpreter.visitAssignment(
+				declaration.Value,
+				valueType,
+				declaration.SecondValue,
+				secondValueType,
+			)
 		})
 }
 
@@ -899,63 +918,97 @@ func (interpreter *Interpreter) declareVariable(identifier string, value Value) 
 }
 
 func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
-	return assignment.Value.Accept(interpreter).(Trampoline).
+	targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
+	valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
+
+	target := assignment.Target
+	value := assignment.Value
+
+	return interpreter.visitAssignment(target, targetType, value, valueType)
+}
+
+func (interpreter *Interpreter) visitAssignment(
+	target ast.Expression, targetType sema.Type,
+	value ast.Expression, valueType sema.Type,
+) Trampoline {
+
+	// First evaluate the target, which results in a getter/setter function pair
+	return interpreter.assignmentGetterSetter(target).
 		FlatMap(func(result interface{}) Trampoline {
+			getterSetter := result.(getterSetter)
 
-			valueType := interpreter.Checker.Elaboration.AssignmentStatementValueTypes[assignment]
-			targetType := interpreter.Checker.Elaboration.AssignmentStatementTargetTypes[assignment]
+			// Finally, evaluate the value, and assign it using the setter function
+			return value.Accept(interpreter).(Trampoline).
+				FlatMap(func(result interface{}) Trampoline {
+					valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
+					getterSetter.set(valueCopy)
 
-			valueCopy := interpreter.copyAndBox(result.(Value), valueType, targetType)
-
-			return interpreter.visitAssignmentValue(assignment.Target, valueCopy)
+					// NOTE: no result, so it does *not* act like a return-statement
+					return Done{}
+				})
 		})
 }
 
 func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	// Evaluate the left expression
-	return swap.Left.Accept(interpreter).(Trampoline).
+	return interpreter.assignmentGetterSetter(swap.Left).
 		FlatMap(func(result interface{}) Trampoline {
-			leftValue := result.(Value)
+			leftGetterSetter := result.(getterSetter)
+			leftValue := leftGetterSetter.get()
 
 			// Evaluate the right expression
-			return swap.Right.Accept(interpreter).(Trampoline).
-				FlatMap(func(result interface{}) Trampoline {
-					rightValue := result.(Value)
+			return interpreter.assignmentGetterSetter(swap.Right).
+				Then(func(result interface{}) {
+					rightGetterSetter := result.(getterSetter)
+					rightValue := rightGetterSetter.get()
 
-					// Assign the right-hand side value to the left-hand side
-					return interpreter.visitAssignmentValue(swap.Left, rightValue).
-						FlatMap(func(_ interface{}) Trampoline {
-
-							// Assign the left-hand side value to the right-hand side
-							return interpreter.visitAssignmentValue(swap.Right, leftValue)
-						})
+					// Assign right value to left target
+					// and left value to right target
+					leftGetterSetter.set(rightValue)
+					rightGetterSetter.set(leftValue)
 				})
 		})
 }
 
-func (interpreter *Interpreter) visitAssignmentValue(target ast.Expression, value Value) Trampoline {
+// assignmentGetterSetter returns a getter/setter function pair
+// for the target expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) assignmentGetterSetter(target ast.Expression) Trampoline {
 	switch target := target.(type) {
 	case *ast.IdentifierExpression:
-		return interpreter.visitIdentifierExpressionAssignment(target, value)
+		return interpreter.identifierExpressionGetterSetter(target)
 
 	case *ast.IndexExpression:
-		return interpreter.visitIndexExpressionAssignment(target, value)
+		return interpreter.indexExpressionGetterSetter(target)
 
 	case *ast.MemberExpression:
-		return interpreter.visitMemberExpressionAssignment(target, value)
+		return interpreter.memberExpressionGetterSetter(target)
 	}
 
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) visitIdentifierExpressionAssignment(target *ast.IdentifierExpression, value Value) Trampoline {
+// identifierExpressionGetterSetter returns a getter/setter function pair
+// for the target identifier expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.IdentifierExpression) Trampoline {
 	variable := interpreter.findVariable(target.Identifier.Identifier)
-	variable.Value = value
-	// NOTE: no result, so it does *not* act like a return-statement
-	return Done{}
+	return Done{
+		Result: getterSetter{
+			get: func() Value {
+				return variable.Value
+			},
+			set: func(value Value) {
+				variable.Value = value
+			},
+		},
+	}
 }
 
-func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.IndexExpression, value Value) Trampoline {
+// indexExpressionGetterSetter returns a getter/setter function pair
+// for the target index expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExpression) Trampoline {
 	return target.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
@@ -964,17 +1017,31 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
 						locationRange := interpreter.locationRange(target)
-						typedResult.Set(interpreter, locationRange, indexingValue, value)
-
-						// NOTE: no result, so it does *not* act like a return-statement
-						return Done{}
+						return Done{
+							Result: getterSetter{
+								get: func() Value {
+									return typedResult.Get(interpreter, locationRange, indexingValue)
+								},
+								set: func(value Value) {
+									typedResult.Set(interpreter, locationRange, indexingValue, value)
+								},
+							},
+						}
 					})
 
 			case StorageValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
 				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
-				interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
-				return Done{}
+				return Done{
+					Result: getterSetter{
+						get: func() Value {
+							return interpreter.readStored(typedResult.Identifier, key)
+						},
+						set: func(value Value) {
+							interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
+						},
+					},
+				}
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -982,15 +1049,25 @@ func (interpreter *Interpreter) visitIndexExpressionAssignment(target *ast.Index
 		})
 }
 
-func (interpreter *Interpreter) visitMemberExpressionAssignment(target *ast.MemberExpression, value Value) Trampoline {
+// memberExpressionGetterSetter returns a getter/setter function pair
+// for the target member expression, wrapped in a trampoline
+//
+func (interpreter *Interpreter) memberExpressionGetterSetter(target *ast.MemberExpression) Trampoline {
 	return target.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(MemberAccessibleValue)
 			locationRange := interpreter.locationRange(target)
-			structure.SetMember(interpreter, locationRange, target.Identifier.Identifier, value)
-
-			// NOTE: no result, so it does *not* act like a return-statement
-			return Done{}
+			identifier := target.Identifier.Identifier
+			return Done{
+				Result: getterSetter{
+					get: func() Value {
+						return structure.GetMember(interpreter, locationRange, identifier)
+					},
+					set: func(value Value) {
+						structure.SetMember(interpreter, locationRange, identifier, value)
+					},
+				},
+			}
 		})
 }
 
@@ -1170,8 +1247,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 							rightType := interpreter.Checker.Elaboration.BinaryExpressionRightTypes[expression]
 							resultType := interpreter.Checker.Elaboration.BinaryExpressionResultTypes[expression]
 
-							// NOTE: important to box both any and optional
-							return interpreter.box(value, rightType, resultType)
+							// NOTE: important to convert both any and optional
+							return interpreter.convertAndBox(value, rightType, resultType)
 						})
 				}
 
@@ -1310,7 +1387,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 			copies := make([]Value, len(*values.Values))
 			for i, argument := range *values.Values {
 				argumentType := argumentTypes[i]
-				copies[i] = interpreter.copyAndBox(argument, argumentType, elementType)
+				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
 			return Done{Result: NewArrayValue(copies...)}
@@ -1328,13 +1405,13 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
 				entryType := entryTypes[i]
 
-				key := interpreter.copyAndBox(
+				key := interpreter.copyAndConvert(
 					dictionaryEntryValues.Key,
 					entryType.KeyType,
 					dictionaryType.KeyType,
 				)
 
-				value := interpreter.copyAndBox(
+				value := interpreter.copyAndConvert(
 					dictionaryEntryValues.Value,
 					entryType.ValueType,
 					dictionaryType.ValueType,
@@ -1345,7 +1422,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 
 				// TODO: panic for duplicate keys?
 
-				// NOTE: important to box in optional, as assignment to dictionary
+				// NOTE: important to convert in optional, as assignment to dictionary
 				// is always considered as an optional
 
 				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
@@ -1427,7 +1504,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					for i, argument := range *arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndBox(argument, argumentType, parameterType)
+						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
 					}
 
 					// TODO: optimize: only potentially used by host-functions
@@ -1873,17 +1950,59 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) copyAndBox(value Value, valueType, targetType sema.Type) Value {
+func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetType sema.Type) Value {
 	if valueType == nil || !valueType.IsResourceType() {
 		value = value.Copy()
 	}
-	return interpreter.box(value, valueType, targetType)
+	return interpreter.convertAndBox(value, valueType, targetType)
 }
 
-// box boxes a value in optionals and any value, if necessary
-func (interpreter *Interpreter) box(value Value, valueType, targetType sema.Type) Value {
+// convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary
+func (interpreter *Interpreter) convertAndBox(value Value, valueType, targetType sema.Type) Value {
+	value = interpreter.convert(value, valueType, targetType)
 	value, valueType = interpreter.boxOptional(value, valueType, targetType)
 	return interpreter.boxAny(value, valueType, targetType)
+}
+
+func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.Type) Value {
+	if valueType == nil {
+		return value
+	}
+
+	if _, valueIsOptional := valueType.(*sema.OptionalType); valueIsOptional {
+		return value
+	}
+
+	unwrappedTargetType := sema.UnwrapOptionalType(targetType)
+
+	if valueType.Equal(unwrappedTargetType) {
+		return value
+	}
+
+	switch unwrappedTargetType.(type) {
+	case *sema.IntType:
+		return ConvertInt(value)
+	case *sema.Int8Type:
+		return ConvertInt8(value)
+	case *sema.Int16Type:
+		return ConvertInt16(value)
+	case *sema.Int32Type:
+		return ConvertInt32(value)
+	case *sema.Int64Type:
+		return ConvertInt64(value)
+	case *sema.UInt8Type:
+		return ConvertUInt8(value)
+	case *sema.UInt16Type:
+		return ConvertUInt16(value)
+	case *sema.UInt32Type:
+		return ConvertUInt32(value)
+	case *sema.UInt64Type:
+		return ConvertUInt64(value)
+	case *sema.AddressType:
+		return ConvertAddress(value)
+	default:
+		return value
+	}
 }
 
 // boxOptional boxes a value in optionals, if necessary
@@ -1918,7 +2037,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
 	switch targetType := targetType.(type) {
 	case *sema.AnyType:
-		// no need to box already boxed value
+		// no need to convert already boxed value
 		if _, ok := value.(AnyValue); ok {
 			return value
 		}
@@ -2010,8 +2129,14 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 			// set variables for all imported values
 			for name, variable := range variables {
+
 				// don't import predeclared values
 				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+					continue
+				}
+
+				// don't import base values
+				if _, ok := sema.BaseValues[name]; ok {
 					continue
 				}
 
@@ -2147,4 +2272,37 @@ func (interpreter *Interpreter) readStored(storageIdentifier string, key string)
 
 func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
 	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
+}
+
+var converters = map[string]func(Value) Value{
+	"Int":     ConvertInt,
+	"Int8":    ConvertInt8,
+	"Int16":   ConvertInt16,
+	"Int32":   ConvertInt32,
+	"Int64":   ConvertInt64,
+	"UInt8":   ConvertUInt8,
+	"UInt16":  ConvertUInt16,
+	"UInt32":  ConvertUInt32,
+	"UInt64":  ConvertUInt64,
+	"Address": ConvertAddress,
+}
+
+func (interpreter *Interpreter) defineBaseFunctions() {
+	for name, converter := range converters {
+		err := interpreter.ImportValue(
+			name,
+			interpreter.newConverterFunction(converter),
+		)
+		if err != nil {
+			panic(errors.NewUnreachableError())
+		}
+	}
+}
+
+func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
+	return HostFunctionValue{
+		Function: func(arguments []Value, location LocationPosition) Trampoline {
+			return Done{Result: converter(arguments[0])}
+		},
+	}
 }

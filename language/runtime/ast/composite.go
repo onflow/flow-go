@@ -8,6 +8,7 @@ import (
 // CompositeDeclaration
 
 type CompositeDeclaration struct {
+	Access        Access
 	CompositeKind common.CompositeKind
 	Identifier    Identifier
 	Conformances  []*NominalType

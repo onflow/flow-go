@@ -53,6 +53,29 @@ type EmulatedBlockchain struct {
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
+// EmulatedBlockchainAPI defines the method set of EmulatedBlockchain.
+type EmulatedBlockchainAPI interface {
+	RootAccountAddress() flow.Address
+	RootKey() flow.AccountPrivateKey
+	GetLatestBlock() *types.Block
+	GetBlockByHash(hash crypto.Hash) (*types.Block, error)
+	GetBlockByNumber(number uint64) (*types.Block, error)
+	GetTransaction(txHash crypto.Hash) (*flow.Transaction, error)
+	GetTransactionAtVersion(txHash, version crypto.Hash) (*flow.Transaction, error)
+	GetAccount(address flow.Address) (*flow.Account, error)
+	GetAccountAtVersion(address flow.Address, version crypto.Hash) (*flow.Account, error)
+	SubmitTransaction(tx flow.Transaction) error
+	ExecuteScript(script []byte) (interface{}, error)
+	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error)
+	CommitBlock() *types.Block
+	SeekToState(hash crypto.Hash)
+	LastCreatedAccount() flow.Account
+	CreateAccount(
+		publicKeys []flow.AccountPublicKey,
+		code []byte, nonce uint64,
+	) (flow.Address, error)
+}
+
 // Config is a set of configuration options for an emulated blockchain.
 type Config struct {
 	RootAccountKey flow.AccountPrivateKey

@@ -55,8 +55,20 @@ program
     ;
 
 replInput
-    : program
-    | statements
+    : replElement* EOF
+    ;
+
+replElement
+    : replDeclaration
+    | replStatement
+    ;
+
+replStatement
+    : statement eos
+    ;
+
+replDeclaration
+    : declaration ';'?
     ;
 
 declaration
@@ -74,6 +86,7 @@ importDeclaration
 
 access
     : /* Not specified */
+    | Priv
     | Pub
     | PubSet
     ;
@@ -100,7 +113,7 @@ interfaceDeclaration
     ;
 
 members[bool functionBlockRequired]
-    : member[functionBlockRequired]*
+    : (member[functionBlockRequired] ';'?)*
     ;
 
 member[bool functionBlockRequired]
@@ -267,8 +280,12 @@ emitStatement
     : Emit identifier invocation
     ;
 
+// Variable declarations might be of the form `let|var <- x <- y`
+//
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)? transfer expression
+    : access variableKind identifier (':' typeAnnotation)?
+      leftTransfer=transfer leftExpression=expression
+      (rightTransfer=transfer rightExpression=expression)?
     ;
 
 // NOTE: we allow any kind of transfer, i.e. moves, but ensure
@@ -548,6 +565,7 @@ Emit : 'emit' ;
 Pre : 'pre' ;
 Post : 'post' ;
 
+Priv : 'priv' ;
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;
 

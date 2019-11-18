@@ -265,13 +265,10 @@ func (*StringType) HasMembers() bool {
 
 func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
 	switch field {
-	case "length":
-		return NewMemberForType(t, "length", Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
-		})
 	case "concat":
-		return NewMemberForType(t, "concat", Member{
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&StringType{},
@@ -282,7 +279,9 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 			},
 		})
 	case "slice":
-		return NewMemberForType(t, "slice", Member{
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntType{},
@@ -293,6 +292,12 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 				),
 			},
 			ArgumentLabels: []string{"from", "upTo"},
+		})
+	case "length":
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 	default:
 		return nil
@@ -663,7 +668,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		elementType := t.ElementType(false)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					elementType,
@@ -698,7 +704,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		typeAnnotation := NewTypeAnnotation(t)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					typeAnnotation,
@@ -717,7 +724,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 		elementType := t.ElementType(false)
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntegerType{},
@@ -741,7 +749,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					&IntegerType{},
@@ -764,7 +773,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -783,7 +793,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		elementType := t.ElementType(false)
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -818,7 +829,8 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		}
 
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					elementType,
@@ -831,8 +843,9 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 
 	case "length":
 		return NewMemberForType(t, field, Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 
 	default:
@@ -945,6 +958,7 @@ func (t *ConstantSizedType) IndexingType() Type {
 type InvokableType interface {
 	Type
 	InvocationFunctionType() *FunctionType
+	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
 // FunctionType
@@ -960,6 +974,10 @@ func (*FunctionType) isType() {}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
+}
+
+func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
@@ -1023,6 +1041,18 @@ type SpecialFunctionType struct {
 	*FunctionType
 }
 
+// CheckedFunctionType is the the type representing a function that checks the arguments,
+// e.g., integer functions
+
+type CheckedFunctionType struct {
+	*FunctionType
+	ArgumentExpressionsCheck func(checker *Checker, argumentExpressions []ast.Expression)
+}
+
+func (t *CheckedFunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+	t.ArgumentExpressionsCheck(checker, argumentExpressions)
+}
+
 // baseTypes are the nominal types available in programs
 
 var baseTypes map[string]Type
@@ -1049,6 +1079,7 @@ func init() {
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&AddressType{},
 	}
 
 	for _, ty := range types {
@@ -1060,6 +1091,113 @@ func init() {
 		}
 
 		baseTypes[typeName] = ty
+	}
+}
+
+// baseValues are the values available in programs
+
+var BaseValues map[string]ValueDeclaration
+
+type baseFunction struct {
+	name           string
+	invokableType  InvokableType
+	argumentLabels []string
+}
+
+func (f baseFunction) ValueDeclarationType() Type {
+	return f.invokableType
+}
+
+func (baseFunction) ValueDeclarationKind() common.DeclarationKind {
+	return common.DeclarationKindFunction
+}
+
+func (baseFunction) ValueDeclarationPosition() ast.Position {
+	return ast.Position{}
+}
+
+func (baseFunction) ValueDeclarationIsConstant() bool {
+	return true
+}
+
+func (f baseFunction) ValueDeclarationArgumentLabels() []string {
+	return f.argumentLabels
+}
+
+func init() {
+	BaseValues = map[string]ValueDeclaration{}
+	initIntegerFunctions()
+	initAddressFunction()
+}
+
+func initIntegerFunctions() {
+	integerTypes := []Type{
+		&IntType{},
+		&Int8Type{},
+		&Int16Type{},
+		&Int32Type{},
+		&Int64Type{},
+		&UInt8Type{},
+		&UInt16Type{},
+		&UInt32Type{},
+		&UInt64Type{},
+	}
+
+	for _, integerType := range integerTypes {
+		typeName := integerType.String()
+
+		// check type is not accidentally redeclared
+		if _, ok := BaseValues[typeName]; ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		BaseValues[typeName] = baseFunction{
+			name: typeName,
+			invokableType: &CheckedFunctionType{
+				FunctionType: &FunctionType{
+					ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+					ReturnTypeAnnotation:     &TypeAnnotation{Type: integerType},
+				},
+				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
+			},
+		}
+	}
+}
+
+func initAddressFunction() {
+	addressType := &AddressType{}
+	typeName := addressType.String()
+
+	// check type is not accidentally redeclared
+	if _, ok := BaseValues[typeName]; ok {
+		panic(errors.NewUnreachableError())
+	}
+
+	BaseValues[typeName] = baseFunction{
+		name: typeName,
+		invokableType: &CheckedFunctionType{
+			FunctionType: &FunctionType{
+				ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
+				ReturnTypeAnnotation:     &TypeAnnotation{Type: addressType},
+			},
+			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
+				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+				if !ok {
+					return
+				}
+				checker.checkAddressLiteral(intExpression)
+			},
+		},
+	}
+}
+
+func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
+	return func(checker *Checker, argumentExpressions []ast.Expression) {
+		intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+		if !ok {
+			return
+		}
+		checker.checkIntegerLiteral(intExpression, integerType)
 	}
 }
 
@@ -1111,9 +1249,10 @@ func (t *CompositeType) IsInvalidType() bool {
 // Member
 
 type Member struct {
-	Type           Type
-	VariableKind   ast.VariableKind
-	ArgumentLabels []string
+	Type            Type
+	DeclarationKind common.DeclarationKind
+	VariableKind    ast.VariableKind
+	ArgumentLabels  []string
 }
 
 // NewMemberForType initializes a new member type and panics if the member declaration is invalid.
@@ -1234,13 +1373,15 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 	switch field {
 	case "length":
 		return NewMemberForType(t, field, Member{
-			Type:         &IntType{},
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &IntType{},
 		})
 
 	case "insert":
 		return NewMemberForType(t, field, Member{
-			VariableKind: ast.VariableKindConstant,
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					t.KeyType,
@@ -1256,8 +1397,9 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 		})
 
 	case "remove":
-		return NewMemberForType(t, "remove", Member{
-			VariableKind: ast.VariableKindConstant,
+		return NewMemberForType(t, field, Member{
+			DeclarationKind: common.DeclarationKindFunction,
+			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: NewTypeAnnotations(
 					t.KeyType,
@@ -1472,6 +1614,45 @@ func (t *ReferenceType) IndexingType() Type {
 	return referencedType.IndexingType()
 }
 
+// AddressType represents the address type
+type AddressType struct{}
+
+func (*AddressType) isType() {}
+
+func (*AddressType) String() string {
+	return "Address"
+}
+
+func (*AddressType) Equal(other Type) bool {
+	_, ok := other.(*AddressType)
+	return ok
+}
+
+func (*AddressType) IsResourceType() bool {
+	return false
+}
+
+func (*AddressType) IsInvalidType() bool {
+	return false
+}
+
+var AddressTypeMin = big.NewInt(0)
+var AddressTypeMax *big.Int
+
+func init() {
+	AddressTypeMax = big.NewInt(2)
+	AddressTypeMax.Exp(AddressTypeMax, big.NewInt(160), nil)
+	AddressTypeMax.Sub(AddressTypeMax, big.NewInt(1))
+}
+
+func (*AddressType) Min() *big.Int {
+	return AddressTypeMin
+}
+
+func (*AddressType) Max() *big.Int {
+	return AddressTypeMax
+}
+
 // IsSubType determines if the given subtype is a subtype
 // of the given supertype.
 //
@@ -1591,7 +1772,7 @@ func IsEquatableType(ty Type) bool {
 
 	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntType{}) {
+		IsSubType(ty, &IntegerType{}) {
 
 		return true
 	}

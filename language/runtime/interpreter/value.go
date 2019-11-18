@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"math/big"
@@ -62,6 +63,10 @@ type DestroyableValue interface {
 
 type VoidValue struct{}
 
+func init() {
+	gob.Register(VoidValue{})
+}
+
 func (VoidValue) isValue() {}
 
 func (v VoidValue) Copy() Value {
@@ -79,6 +84,10 @@ func (v VoidValue) String() string {
 // BoolValue
 
 type BoolValue bool
+
+func init() {
+	gob.Register(BoolValue(true))
+}
 
 func (BoolValue) isValue() {}
 
@@ -106,6 +115,10 @@ func (v BoolValue) String() string {
 
 type StringValue struct {
 	Str *string
+}
+
+func init() {
+	gob.Register(StringValue{})
 }
 
 func NewStringValue(str string) StringValue {
@@ -236,6 +249,10 @@ type ArrayValue struct {
 	Values *[]Value
 }
 
+func init() {
+	gob.Register(ArrayValue{})
+}
+
 func NewArrayValue(values ...Value) ArrayValue {
 	return ArrayValue{
 		Values: &values,
@@ -261,6 +278,30 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 		})
 	}
 	return result
+}
+
+func (v ArrayValue) GobEncode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(v.Values)
+	if err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+func (v *ArrayValue) GobDecode(buf []byte) error {
+	r := bytes.NewBuffer(buf)
+	decoder := gob.NewDecoder(r)
+	err := decoder.Decode(&v.Values)
+	if err != nil {
+		return err
+	}
+	// NOTE: ensure the `Values` slice is properly allocated
+	if v.Values == nil {
+		v.Values = new([]Value)
+	}
+	return nil
 }
 
 func (v ArrayValue) ToGoValue() interface{} {
@@ -445,8 +486,20 @@ type IntValue struct {
 	Int *big.Int
 }
 
+func init() {
+	gob.Register(IntValue{})
+}
+
 func NewIntValue(value int64) IntValue {
 	return IntValue{Int: big.NewInt(value)}
+}
+
+func ConvertInt(value Value) Value {
+	if intValue, ok := value.(IntValue); ok {
+		return intValue.Copy()
+	} else {
+		return NewIntValue(int64(value.(IntegerValue).IntValue()))
+	}
 }
 
 func (v IntValue) isValue() {}
@@ -530,6 +583,10 @@ func (v IntValue) Equal(other Value) BoolValue {
 
 type Int8Value int8
 
+func init() {
+	gob.Register(Int8Value(0))
+}
+
 func (Int8Value) isValue() {}
 
 func (v Int8Value) Copy() Value {
@@ -588,9 +645,17 @@ func (v Int8Value) Equal(other Value) BoolValue {
 	return v == other.(Int8Value)
 }
 
+func ConvertInt8(value Value) Value {
+	return Int8Value(value.(IntegerValue).IntValue())
+}
+
 // Int16Value
 
 type Int16Value int16
+
+func init() {
+	gob.Register(Int16Value(0))
+}
 
 func (Int16Value) isValue() {}
 
@@ -650,9 +715,17 @@ func (v Int16Value) Equal(other Value) BoolValue {
 	return v == other.(Int16Value)
 }
 
+func ConvertInt16(value Value) Value {
+	return Int16Value(value.(IntegerValue).IntValue())
+}
+
 // Int32Value
 
 type Int32Value int32
+
+func init() {
+	gob.Register(Int32Value(0))
+}
 
 func (Int32Value) isValue() {}
 
@@ -712,9 +785,17 @@ func (v Int32Value) Equal(other Value) BoolValue {
 	return v == other.(Int32Value)
 }
 
+func ConvertInt32(value Value) Value {
+	return Int32Value(value.(IntegerValue).IntValue())
+}
+
 // Int64Value
 
 type Int64Value int64
+
+func init() {
+	gob.Register(Int64Value(0))
+}
 
 func (Int64Value) isValue() {}
 
@@ -774,9 +855,17 @@ func (v Int64Value) Equal(other Value) BoolValue {
 	return v == other.(Int64Value)
 }
 
+func ConvertInt64(value Value) Value {
+	return Int64Value(value.(IntegerValue).IntValue())
+}
+
 // UInt8Value
 
 type UInt8Value uint8
+
+func init() {
+	gob.Register(UInt8Value(0))
+}
 
 func (UInt8Value) isValue() {}
 
@@ -836,9 +925,17 @@ func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == other.(UInt8Value)
 }
 
+func ConvertUInt8(value Value) Value {
+	return UInt8Value(value.(IntegerValue).IntValue())
+}
+
 // UInt16Value
 
 type UInt16Value uint16
+
+func init() {
+	gob.Register(UInt16Value(0))
+}
 
 func (UInt16Value) isValue() {}
 
@@ -897,9 +994,17 @@ func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == other.(UInt16Value)
 }
 
+func ConvertUInt16(value Value) Value {
+	return UInt16Value(value.(IntegerValue).IntValue())
+}
+
 // UInt32Value
 
 type UInt32Value uint32
+
+func init() {
+	gob.Register(UInt32Value(0))
+}
 
 func (UInt32Value) isValue() {}
 
@@ -959,9 +1064,17 @@ func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == other.(UInt32Value)
 }
 
+func ConvertUInt32(value Value) Value {
+	return UInt32Value(value.(IntegerValue).IntValue())
+}
+
 // UInt64Value
 
 type UInt64Value uint64
+
+func init() {
+	gob.Register(UInt64Value(0))
+}
 
 func (UInt64Value) isValue() {}
 
@@ -1021,6 +1134,10 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == other.(UInt64Value)
 }
 
+func ConvertUInt64(value Value) Value {
+	return UInt64Value(value.(IntegerValue).IntValue())
+}
+
 // CompositeValue
 
 type CompositeValue struct {
@@ -1029,6 +1146,10 @@ type CompositeValue struct {
 	Fields     *map[string]Value
 	Functions  *map[string]FunctionValue
 	Destructor *InterpretedFunctionValue
+}
+
+func init() {
+	gob.Register(CompositeValue{})
 }
 
 func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -1145,9 +1266,35 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	return nil
 }
 
+func (v CompositeValue) String() string {
+	var builder strings.Builder
+	builder.WriteString(v.Identifier)
+	builder.WriteString("(")
+	i := 0
+	for name, value := range *v.Fields {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(name)
+		builder.WriteString(": ")
+		builder.WriteString(fmt.Sprint(value))
+		i += 1
+	}
+	builder.WriteString(")")
+	return builder.String()
+}
+
+func (v CompositeValue) GetField(name string) Value {
+	return (*v.Fields)[name]
+}
+
 // DictionaryValue
 
 type DictionaryValue map[interface{}]Value
+
+func init() {
+	gob.Register(DictionaryValue{})
+}
 
 func (DictionaryValue) isValue() {}
 
@@ -1413,6 +1560,10 @@ type OptionalValue interface {
 
 type NilValue struct{}
 
+func init() {
+	gob.Register(NilValue{})
+}
+
 func (NilValue) isValue() {}
 
 func (NilValue) isOptionalValue() {}
@@ -1439,6 +1590,10 @@ type SomeValue struct {
 	Value Value
 }
 
+func init() {
+	gob.Register(SomeValue{})
+}
+
 func (SomeValue) isValue() {}
 
 func (SomeValue) isOptionalValue() {}
@@ -1463,6 +1618,10 @@ type AnyValue struct {
 	Value Value
 	// TODO: don't store
 	Type sema.Type
+}
+
+func init() {
+	gob.Register(AnyValue{})
 }
 
 func (AnyValue) isValue() {}
@@ -1497,6 +1656,10 @@ func (v StorageValue) Copy() Value {
 type ReferenceValue struct {
 	StorageIdentifier string
 	Key               string
+}
+
+func init() {
+	gob.Register(ReferenceValue{})
 }
 
 func (ReferenceValue) isValue() {}
@@ -1539,24 +1702,35 @@ func (v ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRang
 		Set(interpreter, locationRange, key, value)
 }
 
+// AddressValue
+
+const AddressLength = 20
+
+type AddressValue [AddressLength]byte
+
 func init() {
-	gob.Register(VoidValue{})
-	gob.Register(BoolValue(true))
-	gob.Register(StringValue{})
-	gob.Register(ArrayValue{})
-	gob.Register(IntValue{})
-	gob.Register(Int8Value(0))
-	gob.Register(Int16Value(0))
-	gob.Register(Int32Value(0))
-	gob.Register(Int64Value(0))
-	gob.Register(UInt8Value(0))
-	gob.Register(UInt16Value(0))
-	gob.Register(UInt32Value(0))
-	gob.Register(UInt64Value(0))
-	gob.Register(CompositeValue{})
-	gob.Register(DictionaryValue{})
-	gob.Register(NilValue{})
-	gob.Register(SomeValue{})
-	gob.Register(AnyValue{})
-	gob.Register(ReferenceValue{})
+	gob.Register(AddressValue{})
+}
+
+func ConvertAddress(value Value) Value {
+	result := AddressValue{}
+	if intValue, ok := value.(IntValue); ok {
+		bigEndianBytes := intValue.Int.Bytes()
+		copy(
+			result[AddressLength-len(bigEndianBytes):AddressLength],
+			bigEndianBytes,
+		)
+	} else {
+		binary.BigEndian.PutUint64(
+			result[AddressLength-8:AddressLength],
+			uint64(value.(IntegerValue).IntValue()),
+		)
+	}
+	return result
+}
+
+func (AddressValue) isValue() {}
+
+func (v AddressValue) Copy() Value {
+	return v
 }

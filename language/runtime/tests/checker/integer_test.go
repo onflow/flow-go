@@ -79,17 +79,34 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		&sema.AddressType{},
 	} {
 		t.Run(ty.String(), func(t *testing.T) {
 
+			min := ty.(sema.Ranged).Min()
+			max := ty.(sema.Ranged).Max()
+
+			var minString string
+			var maxString string
+
+			// addresses are only valid as hexadecimal literals
+			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+				minString = fmt.Sprintf("0x%s", min.Text(16))
+				maxString = fmt.Sprintf("0x%s", max.Text(16))
+			} else {
+				minString = min.String()
+				maxString = max.String()
+			}
+
 			code := fmt.Sprintf(`
-                let min: %s = %s
-                let max: %s = %s
+                let min: %[1]s = %[2]s
+                let max: %[1]s = %[3]s
+                let a = %[1]s(%[2]s)
+                let b = %[1]s(%[3]s)
             `,
 				ty.String(),
-				ty.(sema.Ranged).Min(),
-				ty.String(),
-				ty.(sema.Ranged).Max(),
+				minString,
+				maxString,
 			)
 
 			_, err := ParseAndCheck(t, code)
@@ -110,33 +127,69 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		&sema.AddressType{},
 	} {
+
 		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
 
+			var minMinusOneString string
+
+			// addresses are only valid as hexadecimal literals
+			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+				minMinusOneString = "-0x1"
+			} else {
+				minMinusOne := big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1))
+				minMinusOneString = minMinusOne.String()
+			}
+
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let minMinusOne: %s = %s
+                let minMinusOne: %[1]s = %[2]s
+                let minMinusOne2 = %[1]s(%[2]s)
             `,
 				ty.String(),
-				big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1)),
+				minMinusOneString,
 			))
 
-			errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 2)
 
-			assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+			} else {
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
+			}
 		})
 
 		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
 
+			maxPlusOne := big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1))
+			var maxPlusOneString string
+
+			// addresses are only valid as hexadecimal literals
+			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+				maxPlusOneString = fmt.Sprintf("0x%s", maxPlusOne.Text(16))
+			} else {
+				maxPlusOneString = maxPlusOne.String()
+			}
+
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let maxPlusOne: %s = %s
+                let maxPlusOne: %[1]s = %[2]s
+                let maxPlusOne2 = %[1]s(%[2]s)
             `,
 				ty.String(),
-				big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1)),
+				maxPlusOneString,
 			))
 
-			errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 2)
 
-			assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+			} else {
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
+			}
 		})
 	}
 }
@@ -197,4 +250,17 @@ func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
     `)
 
 	assert.Nil(t, err)
+}
+
+func TestCheckInvalidAddressDecimal(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        let a: Address = 1
+        let b = Address(2)
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
 }

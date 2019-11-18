@@ -7,18 +7,33 @@ import (
 )
 
 func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentStatement) ast.Repr {
-	valueType := assignment.Value.Accept(checker).(Type)
-	checker.Elaboration.AssignmentStatementValueTypes[assignment] = valueType
+	targetType, valueType := checker.checkAssignment(
+		assignment.Target,
+		assignment.Value,
+		assignment.Transfer,
+		false,
+	)
 
-	targetType := checker.visitAssignmentValueType(assignment.Target, assignment.Value, valueType)
+	checker.Elaboration.AssignmentStatementValueTypes[assignment] = valueType
 	checker.Elaboration.AssignmentStatementTargetTypes[assignment] = targetType
 
-	checker.checkTransfer(assignment.Transfer, valueType)
+	return nil
+}
 
-	// An assignment of a resource or an assignment to a resource is not valid,
-	// as it would result in a resource loss
+func (checker *Checker) checkAssignment(
+	target, value ast.Expression,
+	transfer *ast.Transfer,
+	allowResourceTarget bool,
+) (targetType, valueType Type) {
+	valueType = value.Accept(checker).(Type)
 
-	if valueType.IsResourceType() || targetType.IsResourceType() {
+	targetType = checker.visitAssignmentValueType(target, value, valueType)
+
+	checker.checkTransfer(transfer, valueType)
+
+	// An assignment to a resource is invalid, as it would result in a loss
+
+	if targetType.IsResourceType() {
 
 		// However, an assignment to a `self` field in the initializer is allowed.
 		// In that case the value that is assigned must be invalidated.
@@ -26,26 +41,26 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 		// The check for a repeated assignment of a constant field after initialization
 		// is not part of this logic here, see `visitMemberExpressionAssignment`
 
-		accessedSelfMember := checker.accessedSelfMember(assignment.Target)
+		accessedSelfMember := checker.accessedSelfMember(target)
 
-		if accessedSelfMember != nil &&
-			checker.functionActivations.Current().InitializationInfo != nil {
-
-			checker.recordResourceInvalidation(
-				assignment.Value,
-				valueType,
-				ResourceInvalidationKindMove,
-			)
-		} else {
+		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !allowResourceTarget {
 			checker.report(
 				&InvalidResourceAssignmentError{
-					Range: ast.NewRangeFromPositioned(assignment),
+					Range: ast.NewRangeFromPositioned(target),
 				},
 			)
 		}
 	}
 
-	return nil
+	if valueType.IsResourceType() {
+		checker.recordResourceInvalidation(
+			value,
+			valueType,
+			ResourceInvalidationKindMove,
+		)
+	}
+
+	return
 }
 
 func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
@@ -86,6 +101,13 @@ func (checker *Checker) visitAssignmentValueType(
 	valueExpression ast.Expression,
 	valueType Type,
 ) (targetType Type) {
+
+	inAssignment := checker.inAssignment
+	checker.inAssignment = true
+	defer func() {
+		checker.inAssignment = inAssignment
+	}()
+
 	switch target := targetExpression.(type) {
 	case *ast.IdentifierExpression:
 		return checker.visitIdentifierExpressionAssignment(valueExpression, target, valueType)

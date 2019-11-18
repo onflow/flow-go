@@ -111,7 +111,7 @@ func TestInterpreterBoxing(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		inter.box(
+		inter.convertAndBox(
 			BoolValue(true),
 			&sema.BoolType{},
 			&sema.OptionalType{Type: &sema.AnyType{}},
@@ -125,7 +125,7 @@ func TestInterpreterBoxing(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.box(
+		inter.convertAndBox(
 			SomeValue{BoolValue(true)},
 			&sema.OptionalType{Type: &sema.BoolType{}},
 			&sema.OptionalType{Type: &sema.AnyType{}},
