@@ -69,4 +69,5 @@ type Visitor interface {
 	VisitCondition(*Condition) Repr
 	VisitImportDeclaration(*ImportDeclaration) Repr
 	VisitEventDeclaration(*EventDeclaration) Repr
+	VisitTransactionDeclaration(*TransactionDeclaration) Repr
 }
