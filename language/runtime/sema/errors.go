@@ -1508,18 +1508,38 @@ func (e *UninitializedUseError) EndPosition() ast.Position {
 // InvalidResourceArrayMemberError
 
 type InvalidResourceArrayMemberError struct {
-	Name string
+	Name            string
+	DeclarationKind common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidResourceArrayMemberError) Error() string {
 	return fmt.Sprintf(
-		"array member `%s` is not available for resource arrays",
+		"array %s `%s` is not available for resource arrays",
+		e.DeclarationKind.Name(),
 		e.Name,
 	)
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// InvalidResourceDictionaryMemberError
+
+type InvalidResourceDictionaryMemberError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidResourceDictionaryMemberError) Error() string {
+	return fmt.Sprintf(
+		"dictionary %s `%s` is not available for resource dictionaries",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
 // NonResourceReferenceError
 
