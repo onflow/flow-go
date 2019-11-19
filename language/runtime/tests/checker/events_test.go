@@ -123,9 +123,9 @@ func TestCheckEmitEvent(t *testing.T) {
 				},
 			},
 		)
-		if assert.Error(t, err) {
-			errs := ExpectCheckerErrors(t, err, 1)
-			assert.IsType(t, &sema.EmitImportedEventError{}, errs[0])
-		}
+
+		errs := ExpectCheckerErrors(t, err, 2)
+		assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+		assert.IsType(t, &sema.EmitImportedEventError{}, errs[1])
 	})
 }

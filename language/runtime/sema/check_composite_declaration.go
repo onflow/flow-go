@@ -138,17 +138,16 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		Identifier: identifier.Identifier,
 	}
 
-	err := checker.typeActivations.Declare(identifier, compositeType)
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Access,
+	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            compositeType,
-			Pos:             &identifier.Pos,
-		},
+		variable,
 	)
 
 	conformances := checker.conformances(declaration)
@@ -364,6 +363,7 @@ func (checker *Checker) declareCompositeConstructor(
 
 	_, err := checker.valueActivations.DeclareFunction(
 		compositeDeclaration.Identifier,
+		compositeDeclaration.Access,
 		functionType,
 		argumentLabels,
 	)
@@ -574,6 +574,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 
 	self := &Variable{
 		Identifier:      SelfIdentifier,
+		Access:          ast.AccessPublic,
 		DeclarationKind: common.DeclarationKindSelf,
 		Type:            selfType,
 		IsConstant:      true,

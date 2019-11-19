@@ -5364,7 +5364,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		value,
 	)
 
-	rType := inter.Checker.GlobalTypes["R"]
+	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
 		interpreter.ReferenceValue{

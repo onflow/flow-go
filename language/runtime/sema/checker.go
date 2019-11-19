@@ -39,10 +39,10 @@ type Checker struct {
 	errors                  []error
 	valueActivations        *ValueActivations
 	resources               *Resources
-	typeActivations         *TypeActivations
+	typeActivations         *ValueActivations
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
-	GlobalTypes             map[string]Type
+	GlobalTypes             map[string]*Variable
 	inCondition             bool
 	Occurrences             *Occurrences
 	variableOrigins         map[*Variable]*Origin
@@ -91,16 +91,29 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 		0,
 	)
 
+	typeActivations := NewValueActivations()
+	for name, baseType := range baseTypes {
+		_, err := typeActivations.DeclareType(
+			ast.Identifier{Identifier: name},
+			baseType,
+			common.DeclarationKindType,
+			ast.AccessPublic,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	checker := &Checker{
 		Program:             program,
 		Location:            location,
 		ImportCheckers:      map[ast.LocationID]*Checker{},
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
-		typeActivations:     NewTypeActivations(baseTypes),
+		typeActivations:     typeActivations,
 		functionActivations: functionActivations,
 		GlobalValues:        map[string]*Variable{},
-		GlobalTypes:         map[string]Type{},
+		GlobalTypes:         map[string]*Variable{},
 		Occurrences:         NewOccurrences(),
 		variableOrigins:     map[*Variable]*Origin{},
 		memberOrigins:       map[Type]map[string]*Origin{},
@@ -136,6 +149,8 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
+		// TODO: add access to ValueDeclaration and use declaration's access instead here
+		ast.AccessPublic,
 		declaration.ValueDeclarationKind(),
 		declaration.ValueDeclarationPosition(),
 		declaration.ValueDeclarationIsConstant(),
@@ -152,22 +167,25 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	}
 
 	ty := declaration.TypeDeclarationType()
-	err := checker.typeActivations.Declare(identifier, ty)
-	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(
-		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			DeclarationKind: declaration.TypeDeclarationKind(),
-			IsConstant:      true,
-			Type:            ty,
-			Pos:             &identifier.Pos,
-		},
+	// TODO: add access to TypeDeclaration and use declaration's access instead here
+	const access = ast.AccessPublic
+
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		ty,
+		declaration.TypeDeclarationKind(),
+		access,
 	)
+	checker.report(err)
+	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 }
 
 func (checker *Checker) FindType(name string) Type {
-	return checker.typeActivations.Find(name)
+	variable := checker.typeActivations.Find(name)
+	if variable == nil {
+		return nil
+	}
+	return variable.Type
 }
 
 func (checker *Checker) IsChecked() bool {
@@ -476,7 +494,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case *ast.NominalType:
 		identifier := t.Identifier.Identifier
-		result := checker.typeActivations.Find(identifier)
+		result := checker.FindType(identifier)
 		if result == nil {
 			checker.report(
 				&NotDeclaredError{
