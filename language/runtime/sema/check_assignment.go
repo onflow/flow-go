@@ -227,7 +227,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		member.Access != ast.AccessPrivate {
 
 		checker.report(
-			&InvalidAccessError{
+			&InvalidAssignmentAccessError{
 				Name:              member.Identifier.Identifier,
 				RestrictingAccess: member.Access,
 				DeclarationKind:   member.DeclarationKind,

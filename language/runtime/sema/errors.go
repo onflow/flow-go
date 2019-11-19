@@ -1642,6 +1642,30 @@ func (e *InvalidAccessError) Error() string {
 
 func (*InvalidAccessError) isSemanticError() {}
 
+// InvalidAssignmentAccessError
+
+type InvalidAssignmentAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAssignmentAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot assign to `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (e *InvalidAssignmentAccessError) SecondaryError() string {
+	return "has %s access. Consider making it publicly settable"
+}
+
+func (*InvalidAssignmentAccessError) isSemanticError() {}
+
 // InvalidCharacterLiteralError
 
 type InvalidCharacterLiteralError struct {
