@@ -1508,18 +1508,38 @@ func (e *UninitializedUseError) EndPosition() ast.Position {
 // InvalidResourceArrayMemberError
 
 type InvalidResourceArrayMemberError struct {
-	Name string
+	Name            string
+	DeclarationKind common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidResourceArrayMemberError) Error() string {
 	return fmt.Sprintf(
-		"array member `%s` is not available for resource arrays",
+		"array %s `%s` is not available for resource arrays",
+		e.DeclarationKind.Name(),
 		e.Name,
 	)
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// InvalidResourceDictionaryMemberError
+
+type InvalidResourceDictionaryMemberError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidResourceDictionaryMemberError) Error() string {
+	return fmt.Sprintf(
+		"dictionary %s `%s` is not available for resource dictionaries",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
 // NonResourceReferenceError
 
@@ -1621,3 +1641,19 @@ func (e *InvalidAccessError) Error() string {
 }
 
 func (*InvalidAccessError) isSemanticError() {}
+
+// InvalidCharacterLiteralError
+
+type InvalidCharacterLiteralError struct {
+	Length int
+	ast.Range
+}
+
+func (e *InvalidCharacterLiteralError) Error() string {
+	return fmt.Sprintf(
+		"character literal has invalid length: expected 1, got %d",
+		e.Length,
+	)
+}
+
+func (*InvalidCharacterLiteralError) isSemanticError() {}

@@ -263,13 +263,13 @@ func (*StringType) HasMembers() bool {
 	return true
 }
 
-func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
-	switch field {
+func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
 	case "concat":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -281,11 +281,12 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 				),
 			},
 		})
+
 	case "slice":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -299,15 +300,17 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 			},
 			ArgumentLabels: []string{"from", "upTo"},
 		})
+
 	case "length":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
 		})
+
 	default:
 		return nil
 	}
@@ -708,8 +711,9 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 		if elementType.IsResourceType() {
 			report(
 				&InvalidResourceArrayMemberError{
-					Name:  field,
-					Range: targetRange,
+					Name:            field,
+					DeclarationKind: common.DeclarationKindFunction,
+					Range:           targetRange,
 				},
 			)
 		}
@@ -840,8 +844,9 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 		if elementType.IsResourceType() {
 			report(
 				&InvalidResourceArrayMemberError{
-					Name:  field,
-					Range: targetRange,
+					Name:            field,
+					DeclarationKind: common.DeclarationKindFunction,
+					Range:           targetRange,
 				},
 			)
 		}
@@ -1324,7 +1329,7 @@ func NewCheckedMember(member *Member) *Member {
 type MemberAccessibleType interface {
 	Type
 	HasMembers() bool
-	GetMember(field string, targetRange ast.Range, report func(error)) *Member
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
 }
 
 // InterfaceType
@@ -1407,23 +1412,67 @@ func (t *DictionaryType) HasMembers() bool {
 	return true
 }
 
-func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
-	switch field {
+func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	switch identifier {
 	case "length":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
+		})
+
+	case "keys":
+		// TODO: maybe allow for resource key type
+
+		if t.KeyType.IsResourceType() {
+			report(
+				&InvalidResourceDictionaryMemberError{
+					Name:            identifier,
+					DeclarationKind: common.DeclarationKindField,
+					Range:           targetRange,
+				},
+			)
+		}
+
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &VariableSizedType{Type: t.KeyType},
+		})
+
+	case "values":
+		// TODO: maybe allow for resource value type
+
+		if t.ValueType.IsResourceType() {
+			report(
+				&InvalidResourceDictionaryMemberError{
+					Name:            identifier,
+					DeclarationKind: common.DeclarationKindField,
+					Range:           targetRange,
+				},
+			)
+		}
+
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &VariableSizedType{Type: t.ValueType},
 		})
 
 	case "insert":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1444,7 +1493,7 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1628,13 +1677,13 @@ func (t *ReferenceType) HasMembers() bool {
 	return referencedType.HasMembers()
 }
 
-func (t *ReferenceType) GetMember(field string, targetRange ast.Range, report func(error)) *Member {
+func (t *ReferenceType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	// forward to referenced type, if it has members
 	referencedTypeWithMember, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return nil
 	}
-	return referencedTypeWithMember.GetMember(field, targetRange, report)
+	return referencedTypeWithMember.GetMember(identifier, targetRange, report)
 }
 
 func (t *ReferenceType) isValueIndexableType() bool {
@@ -1730,10 +1779,6 @@ func IsSubType(subType Type, superType Type) bool {
 		default:
 			return false
 		}
-
-	case *CharacterType:
-		// TODO: only allow valid character literals
-		return subType.Equal(&StringType{})
 
 	case *OptionalType:
 		optionalSubType, ok := subType.(*OptionalType)
