@@ -1601,3 +1601,19 @@ func (e *ResourceMethodBindingError) Error() string {
 }
 
 func (*ResourceMethodBindingError) isSemanticError() {}
+
+// InvalidDictionaryKeyTypeError
+
+type InvalidDictionaryKeyTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidDictionaryKeyTypeError) Error() string {
+	return fmt.Sprintf(
+		"cannot use type as dictionary key type: `%s`",
+		e.Type,
+	)
+}
+
+func (*InvalidDictionaryKeyTypeError) isSemanticError() {}

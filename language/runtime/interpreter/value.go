@@ -593,6 +593,14 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
+func (v Int8Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int8Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
 func (v Int8Value) ToGoValue() interface{} {
 	return int8(v)
 }
@@ -661,6 +669,14 @@ func (Int16Value) isValue() {}
 
 func (v Int16Value) Copy() Value {
 	return v
+}
+
+func (v Int16Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int16Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int16Value) ToGoValue() interface{} {
@@ -733,6 +749,14 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
+func (v Int32Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int32Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
 func (v Int32Value) ToGoValue() interface{} {
 	return int32(v)
 }
@@ -801,6 +825,14 @@ func (Int64Value) isValue() {}
 
 func (v Int64Value) Copy() Value {
 	return v
+}
+
+func (v Int64Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int64Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int64Value) ToGoValue() interface{} {
@@ -873,6 +905,14 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
+func (v UInt8Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt8Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 func (v UInt8Value) ToGoValue() interface{} {
 	return uint8(v)
 }
@@ -941,6 +981,14 @@ func (UInt16Value) isValue() {}
 
 func (v UInt16Value) Copy() Value {
 	return v
+}
+
+func (v UInt16Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt16Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt16Value) ToGoValue() interface{} {
@@ -1012,6 +1060,14 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
+func (v UInt32Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt32Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 func (v UInt32Value) ToGoValue() interface{} {
 	return uint32(v)
 }
@@ -1080,6 +1136,14 @@ func (UInt64Value) isValue() {}
 
 func (v UInt64Value) Copy() Value {
 	return v
+}
+
+func (v UInt64Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt64Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt64Value) ToGoValue() interface{} {

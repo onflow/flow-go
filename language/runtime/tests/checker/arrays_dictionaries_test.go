@@ -746,3 +746,55 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
+
+func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
+
+	for _, code := range []string{
+		`let k = 1`,
+		`let k = "a"`,
+		`let k = true`,
+		`let k: UInt8 = 2`,
+		`let k: UInt16 = 3`,
+		`let k: UInt32 = 4`,
+		`let k: UInt64 = 5`,
+		`let k: Int8 = 6`,
+		`let k: Int16 = 7`,
+		`let k: Int32 = 8`,
+		`let k: Int64 = 9`,
+	} {
+		t.Run("valid", func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %s
+              let xs = {k: "x"}
+            `,
+				code,
+			))
+
+			assert.Nil(t, err)
+		})
+	}
+
+	for _, code := range []string{
+		`
+           struct X {}
+           let k = X()
+        `,
+		`let k = [1]`,
+		`let k = {"a": 1}`,
+	} {
+		t.Run("invalid", func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %s
+              let xs = {k: "x"}
+            `,
+				code,
+			))
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
+		})
+	}
+}
