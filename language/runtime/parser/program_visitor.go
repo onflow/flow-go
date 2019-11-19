@@ -228,10 +228,10 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 
 	return &ast.TransactionDeclaration{
 		Members:        members,
-		PreConditions:  preConditions,
-		PostConditions: postConditions,
 		Prepare:        prepareFunction,
+		PreConditions:  preConditions,
 		Execute:        executeBlock,
+		PostConditions: postConditions,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,

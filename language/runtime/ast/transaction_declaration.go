@@ -4,10 +4,10 @@ import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type TransactionDeclaration struct {
 	Members        *Members
-	PreConditions  []*Condition
-	PostConditions []*Condition
 	Prepare        *SpecialFunctionDeclaration
+	PreConditions  []*Condition
 	Execute        *Block
+	PostConditions []*Condition
 	Range
 }
 
