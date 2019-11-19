@@ -19,17 +19,19 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 		fun main(acct: Account) {
 			var tokenA: <-NFT <- createNFT(id: %d)
 
-			var collection: <-NFTCollection <- createCollection(token: <-tokenA)
+			var collection: <-NFTCollection <- createCollection()
+
+			collection.deposit(token: <-tokenA)
 
 			if collection.idExists(tokenID: %d) == false {
 				panic("Token ID doesn't exist!")
 			}
 			
 			let oldCollection <- acct.storage[NFTCollection] <- collection
+			destroy oldCollection
 
 			acct.storage[&NFTCollection] = &acct.storage[NFTCollection] as NFTCollection
 
-			destroy oldCollection
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, id, id))
 }
@@ -89,46 +91,4 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 		}`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
-}
-
-// GenerateInspectCollectionDictionaryScript creates a script that retrieves an NFT collection
-// from storage and makes assertions about the NFT IDs that it contains with the NFT
-// dictionary
-func GenerateInspectCollectionDictionaryScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist bool) []byte {
-	template := `
-		import NFT, NFTCollection from 0x%s
-
-		fun main() {
-			let acct = getAccount("%s")
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
-
-			if collectionRef.ownedNFTs[%d] == nil {
-				if %v {
-					panic("Token ID doesn't exist!")
-				}
-			}
-		}`
-
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
-}
-
-// GenerateInspectCollectionScript creates a script that retrieves an NFT collection
-// from storage and returns an array of IDs that the collection contains
-func GenerateInspectCollectionArrayScript(nftCodeAddr, userAddr flow.Address) []byte {
-	template := `
-		import NFT, NFTCollection from 0x%s
-
-		fun main() {
-			let acct = getAccount("%s")
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
-
-			let array = collectionRef.getOwnedNFTs()
-
-			if (array.length != 2 || array[1] != 1 || array[0] != 2) {
-				panic("Array is incorrect")
-			}
-			
-		}`
-
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr))
 }
