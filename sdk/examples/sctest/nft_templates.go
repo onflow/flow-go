@@ -95,6 +95,7 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 
 // GenerateInspectKeysScript creates a script that retrieves an NFT collection
 // from storage and reads the array of keys in the dictionary
+// arrays can't be compared for equality right now so the first two elements are compared
 func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s

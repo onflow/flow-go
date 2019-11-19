@@ -98,6 +98,7 @@ resource NFTCollection: INFTCollection {
         destroy self.ownedNFTs
     }
 
+    // createCollection returns a new collection resource to the caller
     pub fun createCollection(): <-NFTCollection {
         return <- create NFTCollection()
     }
