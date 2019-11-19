@@ -1,0 +1,111 @@
+[
+  {
+    "variable": {
+      "name": "bools",
+      "type": {
+        "dictionary": {
+          "keys": "Int",
+          "values": "Bool"
+        }
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "forEach",
+      "parameters": [
+        {
+          "name": "d",
+          "type": {
+            "dictionary": {
+              "keys": "String",
+              "values": "String"
+            }
+          }
+        },
+        {
+          "name": "f",
+          "type": {
+            "function": {
+              "parameters": [
+                "String", "String"
+              ],
+              ,
+              "returnType": {
+                "optional": "Any"
+              }
+            }
+          }
+        }
+      ],
+      "returnType": {
+        "array": {
+          "of": {
+            "optional": "Any"
+          }
+        }
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "transpose",
+      "parameters": [
+        {
+          "name": "d",
+          "type": {
+            "dictionary": {
+              "keys": "String",
+              "values": "String"
+            }
+          }
+        }
+      ],
+      "returnType": {
+        "dictionary": {
+          "keys": "String",
+          "values": "String"
+        }
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "call",
+      "parameters": [{
+        "name": "d",
+        "type": {
+          "dictionary": {
+            "keys": "Int",
+            "values": {
+              "function": {
+                "parameters": [
+                  "Int"
+                ],
+                "returnType": {
+                  "array": {
+                    "of": {
+                      "optional": "String"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }],
+      "returnType": {
+        "dictionary": {
+          "keys": "Int",
+          "values": {
+            "array": {
+              "of": {
+                "optional": "String"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

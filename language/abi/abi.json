@@ -7,6 +7,9 @@
     "oneOf": [
       {
         "$ref": "#/definitions/function"
+      },
+      {
+        "$ref": "#/definitions/variable"
       }
     ]
   },
@@ -36,11 +39,16 @@
               "$ref": "#/definitions/type"
             }
           },
-          "required": [ "name"],
+          "required": [
+            "name"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["function"]
+      "required": [
+        "function"
+      ],
+      "additionalProperties": false
     },
     "parameter": {
       "title": "Parameter",
@@ -62,21 +70,37 @@
           "$ref": "#/definitions/type"
         }
       },
-      "required": ["name", "type"],
+      "required": [
+        "name",
+        "type"
+      ],
       "additionalProperties": false
     },
     "variable": {
       "type": "object",
-      "title": "A variable",
+      "title": "A variable definition",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "$ref": "#/definitions/type"
+        "variable": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/type"
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ],
+          "additionalProperties": false
         }
       },
-      "required": ["name"]
+      "required": [
+        "variable"
+      ],
+      "additionalProperties": false
     },
     "type": {
       "title": "Type",
@@ -92,6 +116,9 @@
         },
         {
           "$ref": "#/definitions/functionType"
+        },
+        {
+          "$ref": "#/definitions/dictionaryType"
         }
       ]
     },
@@ -103,25 +130,43 @@
           "$ref": "#/definitions/type"
         }
       },
-      "required": ["optional"],
+      "required": [
+        "optional"
+      ],
       "additionalProperties": false
     },
-    "builtinType": {
-      "title": "Builtin Type",
+    "hashableType": {
+      "title": "Type that can be used as dictionary key",
       "type": "string",
       "enum": [
         "String",
+        "Int",
+        "Bool"
+      ]
+    },
+    "builtinType": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/nonHashableType"
+        },
+        {
+          "$ref": "#/definitions/hashableType"
+        }
+      ]
+    },
+    "nonHashableType": {
+      "title": "Builtin Type",
+      "type": "string",
+      "enum": [
+        "Address",
+        "Any",
         "Int8",
         "Int16",
         "Int32",
         "Int64",
         "UInt16",
         "UInt32",
-        "UInt64",
-        "Int",
-        "Address",
-        "Any",
-        "Bool"
+        "UInt64"
       ],
       "additionalProperties": false
     },
@@ -161,7 +206,7 @@
         "function": {
           "type": "object",
           "properties": {
-            "parameters" : {
+            "parameters": {
               "$type": {
                 "const": "array"
               },
@@ -175,26 +220,39 @@
           }
         }
       },
-      "required": ["function"],
+      "required": [
+        "function"
+      ],
       "additionalProperties": false
     },
     "dictionaryType": {
       "title": "Dictionary Type",
       "type": "object",
       "properties": {
-        "$type": { "const": "dictionary" },
-        "keyType": {
-          "title": "Key Type",
-          "description": "The key type (required)",
-          "$ref": "#/definitions/type"
-        },
-        "valueType": {
-          "title": "Element Type",
-          "description": "The value type (required)",
-          "$ref": "#/definitions/type"
+        "dictionary": {
+          "properties": {
+            "keys": {
+              "title": "Key Type",
+              "description": "The key type (required)",
+              "$ref": "#/definitions/hashableType"
+            },
+            "values": {
+              "title": "Element Type",
+              "description": "The value type (required)",
+              "$ref": "#/definitions/type"
+            }
+          },
+          "required": [
+            "keys",
+            "values"
+          ],
+          "additionalProperties": false
         }
       },
-      "required": ["$type", "keyType", "valueType"]
+      "required": [
+        "dictionary"
+      ],
+      "additionalProperties": false
     }
   }
 }
