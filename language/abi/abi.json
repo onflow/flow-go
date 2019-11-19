@@ -10,6 +10,9 @@
       },
       {
         "$ref": "#/definitions/variable"
+      },
+      {
+        "$ref": "#/definitions/struct"
       }
     ]
   },
@@ -102,6 +105,39 @@
       ],
       "additionalProperties": false
     },
+    "struct": {
+      "type": "object",
+      "title": "Composite data type",
+      "properties": {
+        "struct": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/type"
+              }
+            },
+            "initializers": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/parameter"
+                }
+              }
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["struct"],
+      "additionalProperties": false
+    },
     "type": {
       "title": "Type",
       "oneOf": [
@@ -119,6 +155,9 @@
         },
         {
           "$ref": "#/definitions/dictionaryType"
+        },
+        {
+          "$ref": "#/definitions/structType"
         }
       ]
     },
@@ -252,6 +291,20 @@
       "required": [
         "dictionary"
       ],
+      "additionalProperties": false
+    },
+    "structType": {
+      "title": "A composable struct type",
+      "type": "object",
+      "properties": {
+         "struct": {
+           "type": "string",
+           "not": {
+             "$ref": "#/definitions/builtinType"
+           }
+         }
+      },
+      "required": ["struct"],
       "additionalProperties": false
     }
   }
