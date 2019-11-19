@@ -68,11 +68,12 @@ func unrollChildErrors(sb *strings.Builder, level int, err error) {
 	}
 
 	if err, ok := err.(ParentError); ok {
-		if len(err.ChildErrors()) > 0 {
+		childErrors := err.ChildErrors()
+		if len(childErrors) > 0 {
 			sb.WriteString(":")
 		}
 
-		for _, childErr := range err.ChildErrors() {
+		for _, childErr := range childErrors {
 			sb.WriteString("\n")
 			unrollChildErrors(sb, level+1, childErr)
 		}
