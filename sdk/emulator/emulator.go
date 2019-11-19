@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/state"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -52,8 +53,8 @@ type EmulatedBlockchainAPI interface {
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtVersion(address flow.Address, version crypto.Hash) (*flow.Account, error)
 	SubmitTransaction(tx flow.Transaction) error
-	ExecuteScript(script []byte) (interface{}, error)
-	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error)
+	ExecuteScript(script []byte) (values.Value, error)
+	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (values.Value, error)
 	CommitBlock() *types.Block
 	SeekToState(hash crypto.Hash)
 	LastCreatedAccount() flow.Account
@@ -274,7 +275,7 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, error) {
 	registers := b.pendingWorldState.Registers.NewView()
 	value, events, err := b.computer.ExecuteScript(registers, script)
 	if err != nil {
@@ -287,7 +288,7 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
 }
 
 // ExecuteScriptAtVersion executes a read-only script against a specified world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (values.Value, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err
@@ -485,9 +486,15 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {
-			accountAddress := event.Values["address"].(flow.Address)
 
-			account, err := b.GetAccount(accountAddress)
+			event, err := flow.DecodeAccountCreatedEvent(event.Payload)
+			if err != nil {
+				panic("failed to decode AccountCreated event")
+			}
+
+			address := event.Address()
+
+			account, err := b.GetAccount(address)
 			if err != nil {
 				panic("failed to get newly-created account")
 			}
@@ -531,13 +538,13 @@ func createRootAccount(
 
 	runtimeContext := execution.NewRuntimeContext(registers)
 	accountAddress, _ := runtimeContext.CreateAccount(
-		[][]byte{publicKeyBytes},
+		[]values.Bytes{publicKeyBytes},
 		[]byte{},
 	)
 
 	ws.SetRegisters(registers.UpdatedRegisters())
 
-	account := runtimeContext.GetAccount(accountAddress)
+	account := runtimeContext.GetAccount(flow.Address(accountAddress))
 
 	return *account, privateKey
 }

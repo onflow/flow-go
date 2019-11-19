@@ -524,25 +524,6 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 	return result.(Value), nil
 }
 
-func (interpreter *Interpreter) InvokeExportable(
-	functionName string,
-	arguments ...interface{},
-) (
-	value ExportableValue,
-	err error,
-) {
-	result, err := interpreter.Invoke(functionName, arguments...)
-	if err != nil {
-		return nil, err
-	}
-
-	if result == nil {
-		return nil, nil
-	}
-
-	return result.(ExportableValue), nil
-}
-
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
 	interpreter.prepareInterpretation()
 
@@ -1401,7 +1382,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 			entryTypes := interpreter.Checker.Elaboration.DictionaryExpressionEntryTypes[expression]
 			dictionaryType := interpreter.Checker.Elaboration.DictionaryExpressionType[expression]
 
-			newDictionary := DictionaryValue{}
+			newDictionary := NewDictionaryValue()
 			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
 				entryType := entryTypes[i]
 
@@ -1417,15 +1398,12 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 					dictionaryType.ValueType,
 				)
 
-				// TODO: improve: should be just for current entry
-				locationRange := interpreter.locationRange(expression)
-
 				// TODO: panic for duplicate keys?
 
 				// NOTE: important to convert in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
+				newDictionary.Insert(key, value)
 			}
 
 			return Done{Result: newDictionary}
@@ -2196,9 +2174,9 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 			}
 
 			value := EventValue{
-				ID:       eventType.Identifier,
-				Fields:   fields,
-				Location: interpreter.Checker.Location,
+				Identifier: eventType.Identifier,
+				Fields:     fields,
+				Location:   interpreter.Checker.Location,
 			}
 
 			return Done{Result: value}

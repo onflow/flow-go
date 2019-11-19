@@ -59,8 +59,7 @@ message ExecuteScriptRequest {
 }
 
 message ExecuteScriptResponse {
-  string type = 1;
-  bytes value = 2;
+  bytes value = 1;
 }
 
 message GetEventsRequest {
@@ -70,8 +69,7 @@ message GetEventsRequest {
 }
 
 message GetEventsResponse {
-    // Contains JSON-encoded array of event objects
-    bytes events_json = 1;
+    repeated flow.sdk.entities.Event events = 1;
 }
 
 
@@ -81,6 +79,6 @@ message GetTransactionRequest {
 
 message GetTransactionResponse {
   flow.sdk.entities.Transaction transaction = 1;
-  // Contains JSON-encoded array of event objects
-  bytes events_json = 2;
+  repeated flow.sdk.entities.Event events = 2;
+
 }
