@@ -6286,3 +6286,76 @@ func TestParseAccessModifiers(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTransactionDeclaration(t *testing.T) {
+	t.Run("EmptyTransaction", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {}
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields:         []*FieldDeclaration{},
+					Prepare:        nil,
+					PreConditions:  []*Condition{},
+					Execute:        nil,
+					PostConditions: []*Condition{},
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					},
+				},
+			},
+		}
+
+		assert.Equal(t, expected, actual)
+	})
+
+	// t.Run("SimpleTransaction", func(t *testing.T) {
+	// 	actual, _, err := parser.ParseProgram(`
+	// 	  transaction {
+	//
+	// 	    var x: Int
+	//
+	// 	    prepare(signer1: Account) {
+	//           self.x = 0
+	// 		}
+	//
+	// 		pre {
+	//       	  self.x == 0
+	// 		}
+	//
+	// 	    execute {
+	//           self.x = 1 + 1
+	// 		}
+	//
+	// 	    post {
+	//           self.x == 2
+	//         }
+	// 	  }
+	// 	`)
+	//
+	// 	assert.NoError(t, err)
+	//
+	// 	expected := &Program{
+	// 		Declarations: []Declaration{
+	// 			&TransactionDeclaration{
+	// 				Fields:         nil,
+	// 				PreConditions:  nil,
+	// 				PostConditions: nil,
+	// 				Prepare:        nil,
+	// 				Execute:        nil,
+	// 				Range: Range{
+	// 					StartPos: Position{Offset: 5, Line: 2, Column: 4},
+	// 					EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+	// 				},
+	// 			},
+	// 		},
+	// 	}
+	//
+	// 	assert.Equal(t, expected, actual)
+	// })
+}
