@@ -381,6 +381,30 @@ func (e *InvalidAccessModifierError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// MissingAccessModifierError
+
+type MissingAccessModifierError struct {
+	DeclarationKind common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *MissingAccessModifierError) Error() string {
+	return fmt.Sprintf(
+		"missing access modifier for %s",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*MissingAccessModifierError) isSemanticError() {}
+
+func (e *MissingAccessModifierError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingAccessModifierError) EndPosition() ast.Position {
+	return e.Pos
+}
+
 // InvalidNameError
 
 type InvalidNameError struct {

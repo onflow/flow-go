@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -36,6 +37,7 @@ type Checker struct {
 	PredeclaredValues       map[string]ValueDeclaration
 	PredeclaredTypes        map[string]TypeDeclaration
 	ImportCheckers          map[ast.LocationID]*Checker
+	AccessCheckMode         AccessCheckMode
 	errors                  []error
 	valueActivations        *VariableActivations
 	resources               *Resources
@@ -80,6 +82,13 @@ func WithPredeclaredTypes(predeclaredTypes map[string]TypeDeclaration) Option {
 			checker.declareTypeDeclaration(name, declaration)
 		}
 
+		return nil
+	}
+}
+
+func WithAccessCheckMode(mode AccessCheckMode) Option {
+	return func(checker *Checker) error {
+		checker.AccessCheckMode = mode
 		return nil
 	}
 }
@@ -940,16 +949,37 @@ func (checker *Checker) checkDeclarationAccessModifier(
 
 	// Constant cannot be set, so allowing writes makes little sense
 
-	if (isLocal && access != ast.AccessNotSpecified) ||
-		(!isLocal && isConstant && access == ast.AccessPublicSettable) {
+	if isLocal {
+		if access != ast.AccessNotSpecified {
+			checker.report(
+				&InvalidAccessModifierError{
+					Access:          access,
+					DeclarationKind: declarationKind,
+					Pos:             startPos,
+				},
+			)
+		}
+	} else {
+		if isConstant && access == ast.AccessPublicSettable {
+			checker.report(
+				&InvalidAccessModifierError{
+					Access:          access,
+					DeclarationKind: declarationKind,
+					Pos:             startPos,
+				},
+			)
+		}
 
-		checker.report(
-			&InvalidAccessModifierError{
-				Access:          access,
-				DeclarationKind: declarationKind,
-				Pos:             startPos,
-			},
-		)
+		if checker.AccessCheckMode == AccessCheckModeStrict &&
+			access == ast.AccessNotSpecified {
+
+			checker.report(
+				&MissingAccessModifierError{
+					DeclarationKind: declarationKind,
+					Pos:             startPos,
+				},
+			)
+		}
 	}
 }
 
@@ -981,4 +1011,46 @@ func (checker *Checker) checkCharacterLiteral(expression *ast.StringExpression) 
 			Range:  ast.NewRangeFromPositioned(expression),
 		},
 	)
+}
+
+func (checker *Checker) isReadableAccess(access ast.Access) bool {
+	switch checker.AccessCheckMode {
+	case AccessCheckModeStrict,
+		AccessCheckModeNotSpecifiedRestricted:
+
+		return access == ast.AccessPublic ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNotSpecifiedUnrestricted:
+
+		return access == ast.AccessNotSpecified ||
+			access == ast.AccessPublic ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNone:
+		return true
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
+func (checker *Checker) isWriteableAccess(access ast.Access) bool {
+	switch checker.AccessCheckMode {
+	case AccessCheckModeStrict,
+		AccessCheckModeNotSpecifiedRestricted:
+
+		return access == ast.AccessPublicSettable
+
+	case AccessCheckModeNotSpecifiedUnrestricted:
+
+		return access == ast.AccessNotSpecified ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNone:
+		return true
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
