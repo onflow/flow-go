@@ -3,6 +3,8 @@ package sema
 import (
 	"math/big"
 
+	"github.com/rivo/uniseg"
+
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
@@ -336,6 +338,15 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 					return true
 				}
 			}
+		}
+
+	case *ast.StringExpression:
+		unwrappedTargetType := UnwrapOptionalType(targetType)
+
+		if IsSubType(unwrappedTargetType, &CharacterType{}) {
+			checker.checkCharacterLiteral(typedExpression)
+
+			return true
 		}
 	}
 
@@ -950,4 +961,22 @@ func (checker *Checker) checkFieldsAccess(fields []*ast.FieldDeclaration) {
 			isConstant,
 		)
 	}
+}
+
+// checkCharacterLiteral checks that the string literal is a valid character,
+// i.e. it has exactly one grapheme cluster.
+//
+func (checker *Checker) checkCharacterLiteral(expression *ast.StringExpression) {
+	length := uniseg.GraphemeClusterCount(expression.Value)
+
+	if length == 1 {
+		return
+	}
+
+	checker.report(
+		&InvalidCharacterLiteralError{
+			Length: length,
+			Range:  ast.NewRangeFromPositioned(expression),
+		},
+	)
 }
