@@ -1417,6 +1417,68 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 
 	assert.Nil(t, err)
 
+	ifStatement := &IfStatement{
+		Then: &Block{
+			Statements: []Statement{
+				&ExpressionStatement{
+					Expression: &IntExpression{
+						Value: big.NewInt(1),
+						Base:  10,
+						Range: Range{
+							StartPos: Position{Offset: 62, Line: 4, Column: 16},
+							EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+						},
+					},
+				},
+			},
+			Range: Range{
+				StartPos: Position{Offset: 44, Line: 3, Column: 25},
+				EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+			},
+		},
+		Else: &Block{
+			Statements: []Statement{
+				&ExpressionStatement{
+					Expression: &IntExpression{
+						Value: big.NewInt(2),
+						Base:  10,
+						Range: Range{
+							StartPos: Position{Offset: 101, Line: 6, Column: 16},
+							EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+						},
+					},
+				},
+			},
+			Range: Range{
+				StartPos: Position{Offset: 83, Line: 5, Column: 19},
+				EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+			},
+		},
+		StartPos: Position{Offset: 31, Line: 3, Column: 12},
+	}
+
+	ifTestVariableDeclaration := &VariableDeclaration{
+		IsConstant: false,
+		Identifier: Identifier{
+			Identifier: "y",
+			Pos:        Position{Offset: 38, Line: 3, Column: 19},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 40, Line: 3, Column: 21},
+		},
+		Value: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 42, Line: 3, Column: 23},
+			},
+		},
+		StartPos:          Position{Offset: 34, Line: 3, Column: 15},
+		ParentIfStatement: ifStatement,
+	}
+
+	ifStatement.Test = ifTestVariableDeclaration
+
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
 		Identifier: Identifier{
@@ -1441,63 +1503,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Statements: []Statement{
-					&IfStatement{
-						Test: &VariableDeclaration{
-							IsConstant: false,
-							Identifier: Identifier{
-								Identifier: "y",
-								Pos:        Position{Offset: 38, Line: 3, Column: 19},
-							},
-							Transfer: &Transfer{
-								Operation: TransferOperationCopy,
-								Pos:       Position{Offset: 40, Line: 3, Column: 21},
-							},
-							Value: &IdentifierExpression{
-								Identifier: Identifier{
-									Identifier: "x",
-									Pos:        Position{Offset: 42, Line: 3, Column: 23},
-								},
-							},
-							StartPos: Position{Offset: 34, Line: 3, Column: 15},
-						},
-						Then: &Block{
-							Statements: []Statement{
-								&ExpressionStatement{
-									Expression: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 62, Line: 4, Column: 16},
-											EndPos:   Position{Offset: 62, Line: 4, Column: 16},
-										},
-									},
-								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 44, Line: 3, Column: 25},
-								EndPos:   Position{Offset: 76, Line: 5, Column: 12},
-							},
-						},
-						Else: &Block{
-							Statements: []Statement{
-								&ExpressionStatement{
-									Expression: &IntExpression{
-										Value: big.NewInt(2),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 101, Line: 6, Column: 16},
-											EndPos:   Position{Offset: 101, Line: 6, Column: 16},
-										},
-									},
-								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 83, Line: 5, Column: 19},
-								EndPos:   Position{Offset: 115, Line: 7, Column: 12},
-							},
-						},
-						StartPos: Position{Offset: 31, Line: 3, Column: 12},
-					},
+					ifStatement,
 				},
 				Range: Range{
 					StartPos: Position{Offset: 17, Line: 2, Column: 16},
@@ -4531,40 +4537,46 @@ func TestParseFailableDowncasting(t *testing.T) {
 
 	assert.Nil(t, err)
 
+	failableDowncast := &FailableDowncastExpression{
+		Expression: &IntExpression{
+			Value: big.NewInt(0),
+			Base:  10,
+			Range: Range{
+				StartPos: Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			},
+		},
+		TypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "Int",
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
+				},
+			},
+			StartPos: Position{Offset: 22, Line: 2, Column: 21},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "x",
+			Pos:        Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 14, Line: 2, Column: 13},
+		},
+		Value:    failableDowncast,
+		StartPos: Position{Offset: 8, Line: 2, Column: 7},
+	}
+
+	failableDowncast.ParentVariableDeclaration = variableDeclaration
+
 	expected := &Program{
 		Declarations: []Declaration{
-			&VariableDeclaration{
-				IsConstant: true,
-				Identifier: Identifier{
-					Identifier: "x",
-					Pos:        Position{Offset: 12, Line: 2, Column: 11},
-				},
-				Transfer: &Transfer{
-					Operation: TransferOperationCopy,
-					Pos:       Position{Offset: 14, Line: 2, Column: 13},
-				},
-				Value: &FailableDowncastExpression{
-					Expression: &IntExpression{
-						Value: big.NewInt(0),
-						Base:  10,
-						Range: Range{
-							StartPos: Position{Offset: 16, Line: 2, Column: 15},
-							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
-						},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Int",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
-							},
-						},
-						StartPos: Position{Offset: 22, Line: 2, Column: 21},
-					},
-				},
-				StartPos: Position{Offset: 8, Line: 2, Column: 7},
-			},
+			variableDeclaration,
 		},
 	}
 
@@ -5582,7 +5594,26 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	test := &VariableDeclaration{
+	failableDowncast := &FailableDowncastExpression{
+		Expression: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
+			},
+		},
+		TypeAnnotation: &TypeAnnotation{
+			Move: true,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "R",
+					Pos:        Position{Offset: 25, Line: 2, Column: 24},
+				},
+			},
+			StartPos: Position{Offset: 23, Line: 2, Column: 22},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
 		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "y",
@@ -5592,29 +5623,14 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 			Operation: TransferOperationCopy,
 			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Value: &FailableDowncastExpression{
-			Expression: &IdentifierExpression{
-				Identifier: Identifier{
-					Identifier: "x",
-					Pos:        Position{Offset: 17, Line: 2, Column: 16},
-				},
-			},
-			TypeAnnotation: &TypeAnnotation{
-				Move: true,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Identifier: "R",
-						Pos:        Position{Offset: 25, Line: 2, Column: 24},
-					},
-				},
-				StartPos: Position{Offset: 23, Line: 2, Column: 22},
-			},
-		},
+		Value:    failableDowncast,
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
 
+	failableDowncast.ParentVariableDeclaration = variableDeclaration
+
 	expected := &Program{
-		Declarations: []Declaration{test},
+		Declarations: []Declaration{variableDeclaration},
 	}
 
 	assert.Equal(t, expected, actual)

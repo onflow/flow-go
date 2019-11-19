@@ -1617,3 +1617,15 @@ func (e *InvalidCharacterLiteralError) Error() string {
 }
 
 func (*InvalidCharacterLiteralError) isSemanticError() {}
+
+// InvalidFailableResourceDowncastOutsideOptionalBindingError
+
+type InvalidFailableResourceDowncastOutsideOptionalBindingError struct {
+	ast.Range
+}
+
+func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() string {
+	return "cannot failable downcast resource type outside of optional binding"
+}
+
+func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}

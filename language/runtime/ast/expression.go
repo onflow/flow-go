@@ -499,8 +499,9 @@ func (e *FunctionExpression) EndPosition() Position {
 // FailableDowncastExpression
 
 type FailableDowncastExpression struct {
-	Expression     Expression
-	TypeAnnotation *TypeAnnotation
+	Expression                Expression
+	TypeAnnotation            *TypeAnnotation
+	ParentVariableDeclaration *VariableDeclaration
 }
 
 func (*FailableDowncastExpression) isExpression() {}
