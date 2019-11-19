@@ -155,6 +155,21 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) GetBlockByNumber(arg0 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByNumber", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetBlockByNumber), arg0)
 }
 
+// GetEvents mocks base method
+func (m *MockEmulatedBlockchainAPI) GetEvents(arg0 string, arg1, arg2 uint64) ([]flow.Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEvents", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]flow.Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEvents indicates an expected call of GetEvents
+func (mr *MockEmulatedBlockchainAPIMockRecorder) GetEvents(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEvents", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetEvents), arg0, arg1, arg2)
+}
+
 // GetLatestBlock mocks base method
 func (m *MockEmulatedBlockchainAPI) GetLatestBlock() (*types.Block, error) {
 	m.ctrl.T.Helper()
