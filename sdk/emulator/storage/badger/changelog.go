@@ -114,6 +114,23 @@ func (c changelog) getMostRecentChange(registerID string, blockNumber uint64) ui
 	return clist.search(blockNumber)
 }
 
+// changelists returns an exhaustive list of changelists keyed by register ID.
+func (c changelog) changelists() map[string]changelist {
+	return c.registers
+}
+
+// getChangelist returns the changelist corresponding to the given register ID.
+// Returns an empty changelist if none exists.
+func (c changelog) getChangelist(registerID string) changelist {
+	return c.registers[registerID]
+}
+
+// setChangelist sets the changelist for the given register ID, discarding the
+// existing changelist if one exists.
+func (c changelog) setChangelist(registerID string, clist changelist) {
+	c.registers[registerID] = clist
+}
+
 // addChange adds a change record to the given register at the given block.
 // If the changelist already reflects a change for this register at this block,
 // this is a no-op.

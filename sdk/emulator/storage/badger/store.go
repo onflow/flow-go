@@ -69,7 +69,7 @@ func (s Store) setup() error {
 			}
 
 			// add to the changelog
-			s.ledgerChangeLog.registers[registerID] = clist
+			s.ledgerChangeLog.setChangelist(registerID, clist)
 		}
 		return nil
 	})
@@ -191,7 +191,7 @@ func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
 	ledger := make(flow.Ledger)
 
 	err := s.db.View(func(txn *badger.Txn) error {
-		for registerID, clist := range s.ledgerChangeLog.registers {
+		for registerID, clist := range s.ledgerChangeLog.changelists() {
 			// Get the block at which the register last changed value. If no
 			// such block exists, skip this register.
 			lastChangedBlock := clist.search(blockNumber)
@@ -225,7 +225,7 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 			s.ledgerChangeLog.addChange(registerID, blockNumber)
 
 			// encode and write the changelist for the register to disk
-			encChangelist, err := encodeChangelist(s.ledgerChangeLog.registers[registerID])
+			encChangelist, err := encodeChangelist(s.ledgerChangeLog.getChangelist(registerID))
 			if err != nil {
 				return err
 			}
