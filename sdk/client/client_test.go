@@ -262,7 +262,7 @@ func TestGetEvents(t *testing.T) {
 
 	to := values.Address(flow.ZeroAddress)
 	from := values.Address(flow.ZeroAddress)
-	amount := values.Int(42)
+	amount := values.NewInt(42)
 
 	mockEventValue := values.Event{
 		Identifier: "Transfer",

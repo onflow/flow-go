@@ -286,7 +286,8 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 }
 
 func (v ArrayValue) Export() values.Value {
-	arrayVal := make(values.Array, len(*v.Values))
+	// TODO: how to export constant-sized array?
+	arrayVal := make(values.VariableSizedArray, len(*v.Values))
 
 	for i, value := range *v.Values {
 		arrayVal[i] = value.(ExportableValue).Export()
@@ -526,7 +527,7 @@ func (v IntValue) Copy() Value {
 }
 
 func (v IntValue) Export() values.Value {
-	return values.Int(v.Int.Int64())
+	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
 }
 
 func (v IntValue) IntValue() int {
@@ -1384,16 +1385,22 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 }
 
 func (v DictionaryValue) Export() values.Value {
-	values := make(values.Dictionary)
+	d := make(values.Dictionary, v.Count())
 
-	for key, val := range v {
-		key := key.(ExportableValue).Export()
-		value := val.(ExportableValue).Export()
+	for i, keyValue := range *v.Keys.Values {
+		key := dictionaryKey(keyValue)
+		value := v.Entries[key]
 
-		values[key] = value
+		exportedKey := keyValue.(ExportableValue).Export()
+		exportedValue := value.(ExportableValue).Export()
+
+		d[i] = values.KeyValuePair{
+			Key:   exportedKey,
+			Value: exportedValue,
+		}
 	}
 
-	return values
+	return d
 }
 
 func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {

@@ -46,6 +46,7 @@ type VariableSizedArray struct {
 
 type ConstantSizedArray struct {
 	isAType
+	Size        int
 	ElementType Type
 }
 
