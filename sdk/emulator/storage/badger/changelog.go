@@ -15,15 +15,15 @@ const notFound uint64 = ^uint64(0)
 // Users should NEVER interact with the backing slice directly, as it must
 // be kept sorted for lookups to work.
 type changelist struct {
-	list []uint64
+	blocks []uint64
 }
 
 // Implement sort.Interface for testing sortedness.
-func (c changelist) Len() int { return len(c.list) }
+func (c changelist) Len() int { return len(c.blocks) }
 
-func (c changelist) Less(i, j int) bool { return c.list[i] < c.list[j] }
+func (c changelist) Less(i, j int) bool { return c.blocks[i] < c.blocks[j] }
 
-func (c changelist) Swap(i, j int) { c.list[i], c.list[j] = c.list[j], c.list[i] }
+func (c changelist) Swap(i, j int) { c.blocks[i], c.blocks[j] = c.blocks[j], c.blocks[i] }
 
 // search finds the highest block number B in the changelist so that B<=n.
 // Returns notFound if no such block number exists. This relies on the fact
@@ -33,20 +33,20 @@ func (c changelist) search(n uint64) uint64 {
 	if index == -1 {
 		return notFound
 	}
-	return c.list[index]
+	return c.blocks[index]
 }
 
 // searchForIndex finds the index of the highest block number B in the
 // changelist so that B<=n. Returns -1 if no such block number exists. This
 // relies on the fact that the changelist is kept sorted in ascending order.
 func (c changelist) searchForIndex(n uint64) (index int) {
-	if len(c.list) == 0 {
+	if len(c.blocks) == 0 {
 		return -1
 	}
 	// This will return the lowest index where the block number is >n.
 	// What we want is the index directly BEFORE this.
 	foundIndex := sort.Search(c.Len(), func(i int) bool {
-		return c.list[i] > n
+		return c.blocks[i] > n
 	})
 
 	if foundIndex == 0 {
@@ -66,18 +66,18 @@ func (c *changelist) add(n uint64) {
 	index := c.searchForIndex(n)
 	if index == -1 {
 		// all blocks in the list are >n, or the list is empty
-		c.list = append([]uint64{n}, c.list...)
+		c.blocks = append([]uint64{n}, c.blocks...)
 		return
 	}
 
-	lastBlockNumber := c.list[index]
+	lastBlockNumber := c.blocks[index]
 	if lastBlockNumber == n {
 		// n already exists in the list
 		return
 	}
 
 	// insert n directly after lastBlockNumber
-	c.list = append(c.list[:index+1], append([]uint64{n}, c.list[index+1:]...)...)
+	c.blocks = append(c.blocks[:index+1], append([]uint64{n}, c.blocks[index+1:]...)...)
 }
 
 // The changelog describes the change history of each register in a ledger.
@@ -112,6 +112,23 @@ func (c changelog) getMostRecentChange(registerID string, blockNumber uint64) ui
 	}
 
 	return clist.search(blockNumber)
+}
+
+// changelists returns an exhaustive list of changelists keyed by register ID.
+func (c changelog) changelists() map[string]changelist {
+	return c.registers
+}
+
+// getChangelist returns the changelist corresponding to the given register ID.
+// Returns an empty changelist if none exists.
+func (c changelog) getChangelist(registerID string) changelist {
+	return c.registers[registerID]
+}
+
+// setChangelist sets the changelist for the given register ID, discarding the
+// existing changelist if one exists.
+func (c changelog) setChangelist(registerID string, clist changelist) {
+	c.registers[registerID] = clist
 }
 
 // addChange adds a change record to the given register at the given block.

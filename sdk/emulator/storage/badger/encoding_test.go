@@ -67,3 +67,16 @@ func TestEncodeEventList(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, eventList, decodedEventList)
 }
+
+func TestEncodeChangelist(t *testing.T) {
+	var clist changelist
+	clist.add(1)
+
+	data, err := encodeChangelist(clist)
+	require.NoError(t, err)
+
+	var decodedClist changelist
+	err = decodeChangelist(&decodedClist, data)
+	require.NoError(t, err)
+	assert.Equal(t, clist, decodedClist)
+}

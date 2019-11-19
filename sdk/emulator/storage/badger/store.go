@@ -25,7 +25,54 @@ func New(path string) (Store, error) {
 	if err != nil {
 		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}
-	return Store{db, newChangelog()}, nil
+
+	store := Store{db, newChangelog()}
+	if err = store.setup(); err != nil {
+		return Store{}, err
+	}
+
+	return store, nil
+}
+
+// setup sets up in-memory indexes and prepares the store for use.
+func (s Store) setup() error {
+	s.db.RLock()
+	defer s.db.RUnlock()
+
+	iterOpts := badger.DefaultIteratorOptions
+	// only search for changelog entries
+	iterOpts.Prefix = []byte(ledgerChangelogKeyPrefix)
+	// create a buffer for copying changelists, this is reused for each register
+	clistBuf := make([]byte, 256)
+
+	// read the changelist from disk for each register
+	return s.db.View(func(txn *badger.Txn) error {
+		iter := txn.NewIterator(iterOpts)
+		defer iter.Close()
+
+		for iter.Rewind(); iter.Valid(); iter.Next() {
+			item := iter.Item()
+			registerID := registerIDFromLedgerChangelogKey(item.Key())
+			// ensure the register ID is value
+			if len(registerID) == 0 {
+				return errors.New("found changelist for invalid register ID")
+			}
+
+			// decode the changelist
+			encClist, err := item.ValueCopy(clistBuf)
+			if err != nil {
+				return err
+			}
+			var clist changelist
+			if err := decodeChangelist(&clist, encClist); err != nil {
+				return err
+			}
+
+			// add to the changelog
+			s.ledgerChangeLog.setChangelist(registerID, clist)
+		}
+		return nil
+	})
 }
 
 func (s Store) GetBlockByHash(blockHash crypto.Hash) (block types.Block, err error) {
@@ -137,64 +184,56 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	})
 }
 
-func (s Store) GetLedgerView(blockNumber uint64) (view flow.LedgerView, err error) {
-	var changelog changelog
-	_ = changelog
-	for key, value := range changelog.registers {
-		_, _ = key, value
-		// find the highest block number in the register's changelog so that
-		//     it is <= blockNumber
-		// get the corresponding value from storage
-		// insert the value to the ledger view
-	}
+func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
+	s.ledgerChangeLog.RLock()
+	defer s.ledgerChangeLog.RUnlock()
 
-	// TODO replace this by implementing above
-	err = s.db.View(func(txn *badger.Txn) error {
-		encLedger, err := getTx(txn)(ledgerKey(blockNumber))
-		if err != nil {
-			return err
-		}
+	ledger := make(flow.Ledger)
 
-		var ledger flow.Ledger
-		if err := decodeLedger(&ledger, encLedger); err != nil {
-			return err
+	err := s.db.View(func(txn *badger.Txn) error {
+		for registerID, clist := range s.ledgerChangeLog.changelists() {
+			// Get the block at which the register last changed value. If no
+			// such block exists, skip this register.
+			lastChangedBlock := clist.search(blockNumber)
+			if lastChangedBlock == notFound {
+				continue
+			}
+
+			// Get the value of the register and add it to the ledger.
+			value, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
+			if err != nil {
+				return err
+			}
+			ledger[registerID] = value
 		}
-		view = *ledger.NewView()
 		return nil
 	})
-	return
+	return *ledger.NewView(), err
 }
 
 func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
-	// List of register IDs with changed values after this operation
-	var updatedRegisters []string
-	_ = updatedRegisters
-
-	for registerID, value := range ledger {
-		_, _ = registerID, value
-		// get most recent change from changelog [O(lg(k))]
-		// if no change exists:
-		//   - write value
-		//   - update changelog
-		//   - note key
-		// get corresponding value from storage [O(a1)]
-		// if value is different:
-		//   - write value
-		//   - update changelog
-		//   - note key in changelog diff
-		// else:
-		//   - continue
-	}
-	// write each key in the changelog diff (to disk)
-
-	// TODO replace this by implementing above
-	encLedger, err := encodeLedger(ledger)
-	if err != nil {
-		return err
-	}
+	s.ledgerChangeLog.Lock()
+	defer s.ledgerChangeLog.Unlock()
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(ledgerKey(blockNumber), encLedger)
+		for registerID, value := range ledger {
+			if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
+				return err
+			}
+
+			// update the in-memory changelog
+			s.ledgerChangeLog.addChange(registerID, blockNumber)
+
+			// encode and write the changelist for the register to disk
+			encChangelist, err := encodeChangelist(s.ledgerChangeLog.getChangelist(registerID))
+			if err != nil {
+				return err
+			}
+			if err := txn.Set(ledgerChangelogKey(registerID), encChangelist); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -261,6 +300,11 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 // a Store before exiting to ensure all writes are persisted to disk.
 func (s Store) Close() error {
 	return s.db.Close()
+}
+
+// Sync syncs database content to disk.
+func (s Store) Sync() error {
+	return s.db.Sync()
 }
 
 // getTx returns a getter function bound to the input transaction that can be

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -124,30 +125,97 @@ func TestTransactions(t *testing.T) {
 }
 
 func TestLedger(t *testing.T) {
-	store, dir := setupStore(t)
-	defer func() {
-		require.Nil(t, store.Close())
-		require.Nil(t, os.RemoveAll(dir))
-	}()
+	t.Run("get/set", func(t *testing.T) {
+		store, dir := setupStore(t)
+		defer func() {
+			require.Nil(t, store.Close())
+			require.Nil(t, os.RemoveAll(dir))
+		}()
 
-	var blockNumber uint64 = 1
-	ledger := unittest.LedgerFixture()
+		var blockNumber uint64 = 1
+		ledger := unittest.LedgerFixture()
 
-	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.GetLedgerView(blockNumber)
-		if assert.Error(t, err) {
-			assert.IsType(t, storage.ErrNotFound{}, err)
-		}
-	})
+		t.Run("should get able to set ledger", func(t *testing.T) {
+			err := store.SetLedger(blockNumber, ledger)
+			assert.NoError(t, err)
+		})
 
-	t.Run("should be able set ledger", func(t *testing.T) {
-		err := store.SetLedger(blockNumber, ledger)
-		assert.NoError(t, err)
-
-		t.Run("Should be to get set ledger", func(t *testing.T) {
+		t.Run("should be to get set ledger", func(t *testing.T) {
 			view, err := store.GetLedgerView(blockNumber)
 			assert.NoError(t, err)
 			assert.Equal(t, ledger.NewView(), &view)
+		})
+	})
+
+	t.Run("versioning", func(t *testing.T) {
+		store, dir := setupStore(t)
+		defer func() {
+			require.Nil(t, store.Close())
+			require.Nil(t, os.RemoveAll(dir))
+		}()
+
+		// Create a list of ledgers, where the ledger at index i has
+		// keys (i+2)-1->(i+2)+1 set to value i-1.
+		totalBlocks := 10
+		var ledgers []flow.Ledger
+		for i := 2; i < totalBlocks+2; i++ {
+			ledger := make(flow.Ledger)
+			for j := i - 1; j <= i+1; j++ {
+				ledger[fmt.Sprintf("%d", j)] = []byte{byte(i - 1)}
+			}
+			ledgers = append(ledgers, ledger)
+		}
+		require.Equal(t, totalBlocks, len(ledgers))
+
+		// Insert all the ledgers, starting with block 1.
+		// This will result in a ledger state that looks like this:
+		// Block 1: {1: 1, 2: 1, 3: 1}
+		// Block 2: {2: 2, 3: 2, 4: 2}
+		// ...
+		// The combined state at block N looks like:
+		// {1: 1, 2: 2, 3: 3, ..., N+1: N, N+2: N}
+		for i, ledger := range ledgers {
+			err := store.SetLedger(uint64(i+1), ledger)
+			require.NoError(t, err)
+		}
+
+		// We didn't insert anything at block 0, so this should be empty.
+		t.Run("should return empty view for block 0", func(t *testing.T) {
+			view, err := store.GetLedgerView(0)
+			require.NoError(t, err)
+			expected := make(flow.Ledger).NewView()
+			assert.Equal(t, *expected, view)
+		})
+
+		// View at block 1 should have keys 1, 2, 3
+		t.Run("should version the first written block", func(t *testing.T) {
+			view, err := store.GetLedgerView(1)
+			require.NoError(t, err)
+			for i := 1; i <= 3; i++ {
+				val, ok := view.Get(fmt.Sprintf("%d", i))
+				assert.True(t, ok)
+				assert.Equal(t, []byte{byte(1)}, val)
+			}
+		})
+
+		// View at block N should have values 1->N+2
+		t.Run("should version all blocks", func(t *testing.T) {
+			for block := 2; block < totalBlocks; block++ {
+				view, err := store.GetLedgerView(uint64(block))
+				require.NoError(t, err)
+				// The keys 1->N-1 are defined in previous blocks
+				for i := 1; i < block; i++ {
+					val, ok := view.Get(fmt.Sprintf("%d", i))
+					assert.True(t, ok)
+					assert.Equal(t, []byte{byte(i)}, val)
+				}
+				// The keys N->N+2 are defined in the queried block
+				for i := block; i <= block+2; i++ {
+					val, ok := view.Get(fmt.Sprintf("%d", i))
+					assert.True(t, ok)
+					assert.Equal(t, []byte{byte(block)}, val)
+				}
+			}
 		})
 	})
 }
@@ -233,7 +301,7 @@ func TestEvents(t *testing.T) {
 			})
 
 			t.Run("type=1, block=1->10", func(t *testing.T) {
-				// should be 10 events type=1 in blocks 1->10
+				// should be 10 events type=1 in Blocks 1->10
 				gotEvents, err := store.GetEvents("1", 1, 10)
 				assert.NoError(t, err)
 				assert.Len(t, gotEvents, 10)
@@ -299,6 +367,112 @@ func TestPersistence(t *testing.T) {
 	assert.Equal(t, ledger.NewView(), &gotLedger)
 }
 
+func benchmarkSetLedger(b *testing.B, nKeys int) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	ledger := make(flow.Ledger)
+	for i := 0; i < nKeys; i++ {
+		ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		if err := store.SetLedger(1, unittest.LedgerFixture()); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSetLedger1(b *testing.B)    { benchmarkSetLedger(b, 1) }
+func BenchmarkSetLedger10(b *testing.B)   { benchmarkSetLedger(b, 10) }
+func BenchmarkSetLedger100(b *testing.B)  { benchmarkSetLedger(b, 100) }
+func BenchmarkSetLedger1000(b *testing.B) { benchmarkSetLedger(b, 1000) }
+
+func benchmarkGetLedger(b *testing.B, nBlocks int) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	for i := 0; i < nBlocks; i++ {
+		ledger := make(flow.Ledger)
+		for j := i + 2; j < i+12; j++ {
+			ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
+		}
+		if err := store.SetLedger(uint64(i), ledger); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := store.GetLedgerView(uint64(b.N))
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGetLedger1(b *testing.B)    { benchmarkGetLedger(b, 1) }
+func BenchmarkGetLedger10(b *testing.B)   { benchmarkGetLedger(b, 10) }
+func BenchmarkGetLedger100(b *testing.B)  { benchmarkGetLedger(b, 100) }
+func BenchmarkGetLedger1000(b *testing.B) { benchmarkGetLedger(b, 1000) }
+
+func BenchmarkLedgerDiskUsage(b *testing.B) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	b.StartTimer()
+	var lastDBSize int64
+	for i := 0; i < b.N; i++ {
+		ledger := make(flow.Ledger)
+		for j := 0; j < 100; j++ {
+			ledger[fmt.Sprintf("%d-%d", i, j)] = []byte{byte(i), byte(j)}
+		}
+		if err := store.SetLedger(uint64(i), ledger); err != nil {
+			b.Fatal(err)
+		}
+		if err := store.Sync(); err != nil {
+			b.Fatal(err)
+		}
+
+		size, err := dirSize(dir)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		dbSizeIncrease := size - lastDBSize
+		b.ReportMetric(float64(dbSizeIncrease), "db_size_increase/op")
+		lastDBSize = size
+	}
+}
+
 // setupStore creates a temporary directory for the Badger and creates a
 // badger.Store instance. The caller is responsible for closing the store
 // and deleting the temporary directory.
@@ -310,4 +484,19 @@ func setupStore(t *testing.T) (badger.Store, string) {
 	require.Nil(t, err)
 
 	return store, dir
+}
+
+// Returns the size of a directory and all contents
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }

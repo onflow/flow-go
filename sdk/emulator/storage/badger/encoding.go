@@ -67,3 +67,15 @@ func encodeEvents(events []flow.Event) ([]byte, error) {
 func decodeEvents(events *[]flow.Event, from []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(events)
 }
+
+func encodeChangelist(clist changelist) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(&clist.blocks); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func decodeChangelist(clist *changelist, from []byte) error {
+	return gob.NewDecoder(bytes.NewBuffer(from)).Decode(&clist.blocks)
+}

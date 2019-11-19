@@ -53,7 +53,7 @@ func ledgerChangelogKey(registerID string) []byte {
 	return []byte(fmt.Sprintf("%s-%s", ledgerChangelogKeyPrefix, registerID))
 }
 
-func ledgerValueKey(blockNumber uint64, registerID string) []byte {
+func ledgerValueKey(registerID string, blockNumber uint64) []byte {
 	return []byte(fmt.Sprintf("%s-%s-%032d", ledgerValueKeyPrefix, registerID, blockNumber))
 }
 
@@ -62,4 +62,12 @@ func blockNumberFromEventsKey(key []byte) uint64 {
 	var blockNumber uint64
 	_, _ = fmt.Sscanf(string(key), eventsKeyPrefix+"-%032d", &blockNumber)
 	return blockNumber
+}
+
+// registerIDFromLedgerChangelogKey recovers the register ID from a ledger
+// changelog key.
+func registerIDFromLedgerChangelogKey(key []byte) string {
+	var registerID string
+	_, _ = fmt.Sscanf(string(key), ledgerChangelogKeyPrefix+"-%s", &registerID)
+	return registerID
 }
