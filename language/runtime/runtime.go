@@ -806,7 +806,7 @@ func toBytes(value interpreter.Value) (values.Bytes, error) {
 
 		j := intValue.IntValue()
 
-		if !(0 <= j && j < 256) {
+		if j < 0 || j > 255 {
 			return nil, errors.New("array value is not in byte range (0-255)")
 		}
 

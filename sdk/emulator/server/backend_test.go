@@ -183,7 +183,7 @@ func TestBackend(t *testing.T) {
 
 		assert.Nil(t, err)
 
-		//TODO likely to be refactored with a proper serialization/ABI implemented
+		// TODO likely to be refactored with a proper serialization/ABI implemented
 		assert.Equal(t, "*big.Int", response.Type)
 		assert.Equal(t, []uint8("2137"), response.Value)
 	}))
@@ -236,7 +236,8 @@ func TestBackend(t *testing.T) {
 			}),
 			unittest.EventFixture(func(e *flow.Event) {
 				e.Index = 1
-			})}
+			}),
+		}
 
 		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(eventsToReturn, nil).Times(1)
 
@@ -255,8 +256,8 @@ func TestBackend(t *testing.T) {
 		resEvents := response.GetEvents()
 
 		assert.Len(t, resEvents, 2)
-		assert.Equal(t, uint32(0), resEvents[0].GetIndex())
-		assert.Equal(t, uint32(1), resEvents[1].GetIndex())
+		assert.EqualValues(t, 0, resEvents[0].GetIndex())
+		assert.EqualValues(t, 1, resEvents[1].GetIndex())
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
