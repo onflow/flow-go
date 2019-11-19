@@ -130,31 +130,13 @@ func TestTransferNFT(t *testing.T) {
 		}
 
 		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-
-		// Assert that the account's collection is correct
 		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 2, true))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
 
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 1, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
+		// Assert that the account's id keys are correct
+		_, err = b.ExecuteScript(GenerateInspectKeysScript(contractAddr, bastianAddress, 2, 1))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
@@ -167,11 +149,6 @@ func TestTransferNFT(t *testing.T) {
 
 		// Assert that the account's collection is correct
 		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 2, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-
-		_, err = b.ExecuteScript(GenerateInspectCollectionArrayScript(contractAddr, bastianAddress))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
@@ -194,18 +171,9 @@ func TestTransferNFT(t *testing.T) {
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
+
 		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
+		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, bastianAddress, 1, false))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
@@ -225,21 +193,6 @@ func TestTransferNFT(t *testing.T) {
 
 		// Assert that the account's collection is correct
 		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 2, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, bastianAddress, 1, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		// Assert that the account's collection is correct
-		_, err = b.ExecuteScript(GenerateInspectCollectionDictionaryScript(contractAddr, b.RootAccountAddress(), 2, false))
 		if !assert.Nil(t, err) {
 			t.Log(err.Error())
 		}
