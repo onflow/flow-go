@@ -15,22 +15,19 @@ import (
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation GRPC API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
-	eventStore events.Store
 	logger     *log.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, eventStore events.Store, logger *log.Logger) *Backend {
+func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *log.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
-		eventStore: eventStore,
 		logger:     logger,
 	}
 }
@@ -199,10 +196,9 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	events, err := b.eventStore.Query(ctx, req.Type, req.StartBlock, req.EndBlock)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	// TODO: Get events from blockchain
+	var err error
+	var events []flow.Event
 
 	b.logger.WithFields(log.Fields{
 		"eventType":  req.Type,
