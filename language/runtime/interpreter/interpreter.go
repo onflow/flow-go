@@ -1401,7 +1401,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 			entryTypes := interpreter.Checker.Elaboration.DictionaryExpressionEntryTypes[expression]
 			dictionaryType := interpreter.Checker.Elaboration.DictionaryExpressionType[expression]
 
-			newDictionary := DictionaryValue{}
+			newDictionary := NewDictionaryValue()
 			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
 				entryType := entryTypes[i]
 
@@ -1417,15 +1417,12 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 					dictionaryType.ValueType,
 				)
 
-				// TODO: improve: should be just for current entry
-				locationRange := interpreter.locationRange(expression)
-
 				// TODO: panic for duplicate keys?
 
 				// NOTE: important to convert in optional, as assignment to dictionary
 				// is always considered as an optional
 
-				newDictionary.Set(interpreter, locationRange, key, SomeValue{value})
+				newDictionary.Insert(key, value)
 			}
 
 			return Done{Result: newDictionary}

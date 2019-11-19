@@ -312,7 +312,7 @@ func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
 	// Assertion is a bit more complex, because dictionary order is not deterministic
 	require.Len(t, loggedMessages, 4)
 	assert.Equal(t, []string{"nil", `{}`, `{}`}, loggedMessages[:3])
-	assert.Contains(t, []string{`{A: 1, B: 2}`, `{B: 2, A: 1}`}, loggedMessages[3])
+	assert.Contains(t, []string{`{"A": 1, "B": 2}`, `{"B": 2, "A": 1}`}, loggedMessages[3])
 }
 
 func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
