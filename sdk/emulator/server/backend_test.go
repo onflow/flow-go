@@ -1,9 +1,7 @@
 package server_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -21,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	event_mocks "github.com/dapperlabs/flow-go/sdk/emulator/events/mocks"
@@ -339,14 +338,14 @@ func TestBackend(t *testing.T) {
 
 		assert.Equal(t, tx.Nonce, response.Transaction.Nonce)
 
-		var decodedEvents []flow.Event
+		resEvents := response.GetEvents()
 
-		err = json.NewDecoder(bytes.NewReader(response.EventsJson)).Decode(&decodedEvents)
-		assert.NoError(t, err)
+		require.Len(t, resEvents, 1)
 
-		assert.Len(t, decodedEvents, 1)
-		assert.Equal(t, txHash, decodedEvents[0].TxHash)
-		assert.Equal(t, txEventType, decodedEvents[0].Type)
+		event := convert.MessageToEvent(resEvents[0])
+
+		assert.Equal(t, txHash, event.TxHash)
+		assert.Equal(t, txEventType, event.Type)
 	}))
 
 	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
