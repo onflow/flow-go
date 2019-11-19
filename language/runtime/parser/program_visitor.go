@@ -194,6 +194,12 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var members *ast.Members
+	membersCtx := ctx.Members()
+	if membersCtx != nil {
+		members = membersCtx.Accept(v).(*ast.Members)
+	}
+
 	var preConditions []*ast.Condition
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
@@ -221,6 +227,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
+		Members:        members,
 		PreConditions:  preConditions,
 		PostConditions: postConditions,
 		Prepare:        prepareFunction,

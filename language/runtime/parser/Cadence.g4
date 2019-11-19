@@ -82,7 +82,7 @@ declaration
     ;
 
 transactionDeclaration
-    : Transaction '{' preConditions? prepare? execute? postConditions? '}'
+    : Transaction '{' members[true] prepare? preConditions? execute? postConditions? '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
