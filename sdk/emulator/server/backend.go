@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"reflect"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -13,13 +11,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
-// required by the Observation GRPC API.
+// required by the Observation API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
 	eventStore events.Store
@@ -178,12 +177,12 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 
 	b.logger.Debugf("📞  Contract script called")
 
-	// TODO: change this to whatever interface -> byte encoding decided on
-	valueBytes, _ := json.Marshal(value)
+	valueBytes, err := encoding.Encode(value)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	response := &observation.ExecuteScriptResponse{
-		// TODO: standardize flow to be language-agnostic
-		Type:  reflect.TypeOf(value).String(),
 		Value: valueBytes,
 	}
 

@@ -53,8 +53,8 @@ type EmulatedBlockchainAPI interface {
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtVersion(address flow.Address, version crypto.Hash) (*flow.Account, error)
 	SubmitTransaction(tx flow.Transaction) error
-	ExecuteScript(script []byte) (interface{}, error)
-	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error)
+	ExecuteScript(script []byte) (values.Value, error)
+	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (values.Value, error)
 	CommitBlock() *types.Block
 	SeekToState(hash crypto.Hash)
 	LastCreatedAccount() flow.Account
@@ -275,7 +275,7 @@ func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, error) {
 	registers := b.pendingWorldState.Registers.NewView()
 	value, events, err := b.computer.ExecuteScript(registers, script)
 	if err != nil {
@@ -288,7 +288,7 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
 }
 
 // ExecuteScriptAtVersion executes a read-only script against a specified world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScriptAtVersion(script []byte, version crypto.Hash) (values.Value, error) {
 	ws, err := b.getWorldStateAtVersion(version)
 	if err != nil {
 		return nil, err

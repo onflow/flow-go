@@ -59,8 +59,7 @@ message ExecuteScriptRequest {
 }
 
 message ExecuteScriptResponse {
-  string type = 1;
-  bytes value = 2;
+  bytes value = 1;
 }
 
 message GetEventsRequest {

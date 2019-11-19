@@ -2,7 +2,6 @@ package client_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -137,7 +136,9 @@ func TestExecuteScript(t *testing.T) {
 	c := client.NewFromRPCClient(mockRPC)
 	ctx := context.Background()
 
-	valueBytes, _ := json.Marshal(1)
+	value := values.NewInt(42)
+	valueBytes, err := encoding.Encode(value)
+	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
 		// client should return non-error if RPC call succeeds
@@ -146,9 +147,13 @@ func TestExecuteScript(t *testing.T) {
 			Return(&observation.ExecuteScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
-		value, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
-		assert.Nil(t, err)
-		assert.Equal(t, value, float64(1))
+		b, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		assert.NoError(t, err)
+
+		value, err := encoding.Decode(types.Int{}, b)
+		assert.NoError(t, err)
+
+		assert.Equal(t, values.NewInt(42), value)
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -156,30 +161,6 @@ func TestExecuteScript(t *testing.T) {
 		mockRPC.EXPECT().
 			ExecuteScript(ctx, gomock.Any()).
 			Return(nil, errors.New("dummy error")).
-			Times(1)
-
-		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
-		assert.Error(t, err)
-	})
-
-	t.Run("Error - empty return value", func(t *testing.T) {
-		// client should return error if value is empty
-		mockRPC.EXPECT().
-			ExecuteScript(ctx, gomock.Any()).
-			Return(&observation.ExecuteScriptResponse{Value: []byte{}}, nil).
-			Times(1)
-
-		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
-		assert.Error(t, err)
-	})
-
-	t.Run("Error - malformed return value", func(t *testing.T) {
-		// client should return error if value is malformed
-		mockRPC.EXPECT().
-			ExecuteScript(ctx, gomock.Any()).
-			Return(&observation.ExecuteScriptResponse{Value: []byte("asdfafa")}, nil).
 			Times(1)
 
 		// error should be passed to user
