@@ -82,7 +82,7 @@ declaration
     ;
 
 transactionDeclaration
-    : Transaction '{' members[true] prepare? preConditions? execute? postConditions? '}'
+    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -125,6 +125,10 @@ variableKind
 
 field
     : access variableKind? identifier ':' typeAnnotation
+    ;
+
+fields
+    : (field ';'?)*
     ;
 
 interfaceDeclaration

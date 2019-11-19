@@ -110,6 +110,12 @@ func (s *BaseCadenceListener) EnterField(ctx *FieldContext) {}
 // ExitField is called when production field is exited.
 func (s *BaseCadenceListener) ExitField(ctx *FieldContext) {}
 
+// EnterFields is called when production fields is entered.
+func (s *BaseCadenceListener) EnterFields(ctx *FieldsContext) {}
+
+// ExitFields is called when production fields is exited.
+func (s *BaseCadenceListener) ExitFields(ctx *FieldsContext) {}
+
 // EnterInterfaceDeclaration is called when production interfaceDeclaration is entered.
 func (s *BaseCadenceListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 

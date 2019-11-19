@@ -3,7 +3,7 @@ package ast
 import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type TransactionDeclaration struct {
-	Members        *Members
+	Fields         []*FieldDeclaration
 	Prepare        *SpecialFunctionDeclaration
 	PreConditions  []*Condition
 	Execute        *Block

@@ -56,6 +56,9 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#field.
 	VisitField(ctx *FieldContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#fields.
+	VisitFields(ctx *FieldsContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 

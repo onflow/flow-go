@@ -194,19 +194,19 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
-	var members *ast.Members
-	membersCtx := ctx.Members()
-	if membersCtx != nil {
-		members = membersCtx.Accept(v).(*ast.Members)
+	var fields []*ast.FieldDeclaration
+	fieldsCtx := ctx.Fields()
+	if fieldsCtx != nil {
+		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
 	}
 
-	var preConditions []*ast.Condition
+	preConditions := make([]*ast.Condition, 0)
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
 		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
 	}
 
-	var postConditions []*ast.Condition
+	postConditions := make([]*ast.Condition, 0)
 	postConditionsCtx := ctx.PostConditions()
 	if postConditionsCtx != nil {
 		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
@@ -227,7 +227,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
-		Members:        members,
+		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
 		Execute:        executeBlock,
@@ -357,6 +357,18 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 		Functions:             functions,
 		CompositeDeclarations: compositeDeclarations,
 	}
+}
+
+func (v *ProgramVisitor) VisitFields(ctx *FieldsContext) interface{} {
+	fieldsCtx := ctx.AllField()
+
+	fields := make([]*ast.FieldDeclaration, len(fieldsCtx))
+
+	for i, fieldCtx := range ctx.AllField() {
+		fields[i] = fieldCtx.Accept(v).(*ast.FieldDeclaration)
+	}
+
+	return fields
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {

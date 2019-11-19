@@ -67,6 +67,10 @@ func (v *BaseCadenceVisitor) VisitField(ctx *FieldContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitFields(ctx *FieldsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

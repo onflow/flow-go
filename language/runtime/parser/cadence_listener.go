@@ -52,6 +52,9 @@ type CadenceListener interface {
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
 
+	// EnterFields is called when entering the fields production.
+	EnterFields(c *FieldsContext)
+
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
@@ -345,6 +348,9 @@ type CadenceListener interface {
 
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)
+
+	// ExitFields is called when exiting the fields production.
+	ExitFields(c *FieldsContext)
 
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
