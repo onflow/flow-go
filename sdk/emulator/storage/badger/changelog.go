@@ -15,15 +15,15 @@ const notFound uint64 = ^uint64(0)
 // Users should NEVER interact with the backing slice directly, as it must
 // be kept sorted for lookups to work.
 type changelist struct {
-	Blocks []uint64
+	blocks []uint64
 }
 
 // Implement sort.Interface for testing sortedness.
-func (c changelist) Len() int { return len(c.Blocks) }
+func (c changelist) Len() int { return len(c.blocks) }
 
-func (c changelist) Less(i, j int) bool { return c.Blocks[i] < c.Blocks[j] }
+func (c changelist) Less(i, j int) bool { return c.blocks[i] < c.blocks[j] }
 
-func (c changelist) Swap(i, j int) { c.Blocks[i], c.Blocks[j] = c.Blocks[j], c.Blocks[i] }
+func (c changelist) Swap(i, j int) { c.blocks[i], c.blocks[j] = c.blocks[j], c.blocks[i] }
 
 // search finds the highest block number B in the changelist so that B<=n.
 // Returns notFound if no such block number exists. This relies on the fact
@@ -33,20 +33,20 @@ func (c changelist) search(n uint64) uint64 {
 	if index == -1 {
 		return notFound
 	}
-	return c.Blocks[index]
+	return c.blocks[index]
 }
 
 // searchForIndex finds the index of the highest block number B in the
 // changelist so that B<=n. Returns -1 if no such block number exists. This
 // relies on the fact that the changelist is kept sorted in ascending order.
 func (c changelist) searchForIndex(n uint64) (index int) {
-	if len(c.Blocks) == 0 {
+	if len(c.blocks) == 0 {
 		return -1
 	}
 	// This will return the lowest index where the block number is >n.
 	// What we want is the index directly BEFORE this.
 	foundIndex := sort.Search(c.Len(), func(i int) bool {
-		return c.Blocks[i] > n
+		return c.blocks[i] > n
 	})
 
 	if foundIndex == 0 {
@@ -66,18 +66,18 @@ func (c *changelist) add(n uint64) {
 	index := c.searchForIndex(n)
 	if index == -1 {
 		// all blocks in the list are >n, or the list is empty
-		c.Blocks = append([]uint64{n}, c.Blocks...)
+		c.blocks = append([]uint64{n}, c.blocks...)
 		return
 	}
 
-	lastBlockNumber := c.Blocks[index]
+	lastBlockNumber := c.blocks[index]
 	if lastBlockNumber == n {
 		// n already exists in the list
 		return
 	}
 
 	// insert n directly after lastBlockNumber
-	c.Blocks = append(c.Blocks[:index+1], append([]uint64{n}, c.Blocks[index+1:]...)...)
+	c.blocks = append(c.blocks[:index+1], append([]uint64{n}, c.blocks[index+1:]...)...)
 }
 
 // The changelog describes the change history of each register in a ledger.
