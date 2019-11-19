@@ -155,13 +155,13 @@ func TestLedger(t *testing.T) {
 		}()
 
 		// Create a list of ledgers, where the ledger at index i has
-		// keys (i+2)-1->(i+2)+1 set.
+		// keys (i+2)-1->(i+2)+1 set to value i-1.
 		totalBlocks := 10
 		var ledgers []flow.Ledger
 		for i := 2; i < totalBlocks+2; i++ {
 			ledger := make(flow.Ledger)
 			for j := i - 1; j <= i+1; j++ {
-				ledger[fmt.Sprintf("%d", j)] = []byte{byte(j)}
+				ledger[fmt.Sprintf("%d", j)] = []byte{byte(i - 1)}
 			}
 			ledgers = append(ledgers, ledger)
 		}
@@ -169,9 +169,11 @@ func TestLedger(t *testing.T) {
 
 		// Insert all the ledgers, starting with block 1.
 		// This will result in a ledger state that looks like this:
-		// Block 1: {1: 1, 2: 2, 3: 3}
-		// Block 2: {2: 2, 3: 3, 4: 4}
+		// Block 1: {1: 1, 2: 1, 3: 1}
+		// Block 2: {2: 2, 3: 2, 4: 2}
 		// ...
+		// The combined state at block N looks like:
+		// {1: 1, 2: 2, 3: 3, ..., N+1: N, N+2: N}
 		for i, ledger := range ledgers {
 			err := store.SetLedger(uint64(i+1), ledger)
 			require.NoError(t, err)
@@ -192,19 +194,26 @@ func TestLedger(t *testing.T) {
 			for i := 1; i <= 3; i++ {
 				val, ok := view.Get(fmt.Sprintf("%d", i))
 				assert.True(t, ok)
-				assert.Equal(t, []byte{byte(i)}, val)
+				assert.Equal(t, []byte{byte(1)}, val)
 			}
 		})
 
 		// View at block N should have values 1->N+2
-		t.Run("should version the first written block", func(t *testing.T) {
+		t.Run("should version all blocks", func(t *testing.T) {
 			for block := 2; block < totalBlocks; block++ {
 				view, err := store.GetLedgerView(uint64(block))
 				require.NoError(t, err)
-				for i := 1; i <= block+2; i++ {
+				// The keys 1->N-1 are defined in previous blocks
+				for i := 1; i < block; i++ {
 					val, ok := view.Get(fmt.Sprintf("%d", i))
 					assert.True(t, ok)
 					assert.Equal(t, []byte{byte(i)}, val)
+				}
+				// The keys N->N+2 are defined in the queried block
+				for i := block; i <= block+2; i++ {
+					val, ok := view.Get(fmt.Sprintf("%d", i))
+					assert.True(t, ok)
+					assert.Equal(t, []byte{byte(block)}, val)
 				}
 			}
 		})
