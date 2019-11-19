@@ -89,10 +89,10 @@ resource NFTCollection: INFTCollection {
         return false
     }
 
-    // getOwnedNFTs returns an array of the IDs that are in the collection
-    // pub fun getOwnedNFTs(): [Int] {
-    //     return self.ownedNFTs.keys
-    // }
+    // getIDs returns an array of the IDs that are in the collection
+    pub fun getIDs(): [Int] {
+        return self.ownedNFTs.keys
+    }
 
     destroy() {
         destroy self.ownedNFTs

@@ -135,6 +135,12 @@ func TestTransferNFT(t *testing.T) {
 			t.Log(err.Error())
 		}
 
+		// Assert that the account's id keys are correct
+		_, err = b.ExecuteScript(GenerateInspectKeysScript(contractAddr, bastianAddress, 2, 1))
+		if !assert.Nil(t, err) {
+			t.Log(err.Error())
+		}
+
 		// Assert that the account's collection is correct
 		_, err = b.ExecuteScript(GenerateInspectCollectionScript(contractAddr, b.RootAccountAddress(), 1, false))
 		if !assert.Nil(t, err) {

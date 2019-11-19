@@ -92,3 +92,23 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
 }
+
+// GenerateInspectKeysScript creates a script that retrieves an NFT collection
+// from storage and reads the array of keys in the dictionary
+func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int) []byte {
+	template := `
+		import NFT, NFTCollection from 0x%s
+
+		fun main() {
+			let acct = getAccount("%s")
+			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
+
+			let array = collectionRef.getIDs() 
+			
+			if array[0] != %d || array[1] != %d {
+				panic("Keys array is incorrect!")
+			}
+		}`
+
+	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, id1, id2))
+}
