@@ -61,7 +61,7 @@ func (s Server) Start() {
 	<-protocol.NewServer(s).Start()
 }
 
-func (Server) Initialize(
+func (s Server) Initialize(
 	connection protocol.Connection,
 	params *protocol.InitializeParams,
 ) (
@@ -77,8 +77,23 @@ func (Server) Initialize(
 			//SignatureHelpProvider: &protocol.SignatureHelpOptions{
 			//	TriggerCharacters: []string{"("},
 			//},
+			CodeLensProvider: &protocol.CodeLensOptions{
+				ResolveProvider: true,
+			},
 		},
 	}
+
+	// TODO remove
+	//var buf bytes.Buffer
+	//json.NewEncoder(&buf).Encode(params)
+	//connection.LogMessage(&protocol.LogMessageParams{
+	//	Type:    protocol.Log,
+	//	Message: string(buf.Bytes()),
+	//})
+
+	// after initialization, indicate to the client which commands we support
+	go s.registerCommands(connection)
+
 	return result, nil
 }
 
@@ -267,6 +282,70 @@ func (s Server) SignatureHelp(
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.SignatureHelp, error) {
 	return nil, nil
+}
+
+func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: "code lens called" + string(params.TextDocument.URI),
+	})
+	codeLens := protocol.CodeLens{
+		Range: protocol.Range{
+			Start: protocol.Position{
+				Line:      0,
+				Character: 0,
+			},
+			End: protocol.Position{
+				Line:      0,
+				Character: 0,
+			},
+		},
+		Command: &protocol.Command{
+			Title:   "do something",
+			Command: "cadence.submitTransaction",
+			//Arguments: []interface{}{"a", "b", "c"},
+		},
+		//Data: "codelens data",
+	}
+	return []*protocol.CodeLens{&codeLens}, nil
+}
+
+// TODO is this necessary?
+func (s Server) CodeLensResolve(connection protocol.Connection, params *protocol.CodeLens) (*protocol.CodeLens, error) {
+	return params, nil
+}
+
+func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.ExecuteCommandParams) (interface{}, error) {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "called execute command: " + params.Command,
+	})
+	return nil, nil
+}
+
+// Registers the commands that the server is able to handle.
+// The best reference I've found for how this works is:
+// https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
+func (s Server) registerCommands(connection protocol.Connection) {
+	err := connection.RegisterCapability(&protocol.RegistrationParams{
+		Registrations: []protocol.Registration{
+			{
+				ID:     "test",
+				Method: "workspace/executeCommand",
+				RegisterOptions: protocol.ExecuteCommandRegistrationOptions{
+					ExecuteCommandOptions: protocol.ExecuteCommandOptions{
+						Commands: []string{"cadence.submitTransaction"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		connection.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Warning,
+			Message: "Failed to register command: " + err.Error(),
+		})
+	}
 }
 
 func (Server) Shutdown(connection protocol.Connection) error {

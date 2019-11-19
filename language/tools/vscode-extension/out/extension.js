@@ -47,7 +47,10 @@ function startServer(ctx) {
         documentSelector: [{ scheme: "file", language: "cadence" }],
         synchronize: {
             configurationSection: "cadence"
-        }
+        },
+        initializationOptions: {
+            "test": "test",
+        },
     });
     client
         .onReady()
