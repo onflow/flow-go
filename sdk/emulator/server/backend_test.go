@@ -259,7 +259,7 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			GetLatestBlock().
-			Return(&block).
+			Return(&block, nil).
 			Times(1)
 
 		response, err := backend.GetLatestBlock(context.Background(), &observation.GetLatestBlockRequest{})
