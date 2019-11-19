@@ -37,9 +37,9 @@ type Checker struct {
 	PredeclaredTypes        map[string]TypeDeclaration
 	ImportCheckers          map[ast.LocationID]*Checker
 	errors                  []error
-	valueActivations        *ValueActivations
+	valueActivations        *VariableActivations
 	resources               *Resources
-	typeActivations         *ValueActivations
+	typeActivations         *VariableActivations
 	containerTypes          map[Type]bool
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
