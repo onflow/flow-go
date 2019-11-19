@@ -99,7 +99,7 @@ spec:
         - name: gcr
       containers:
         - name: flow-emulator
-          image: gcr.io/dl-flow/emulator:d8eceb8b
+          image: gcr.io/dl-flow/emulator:emulator-storage
           # args: ["emulator", "start", "-v"]
 
           # Ports exposed can be named so other resources can reference
