@@ -57,18 +57,16 @@ type EmulatedBlockchain struct {
 type EmulatedBlockchainAPI interface {
 	RootAccountAddress() flow.Address
 	RootKey() flow.AccountPrivateKey
-	GetLatestBlock() *types.Block
+	GetLatestBlock() (*types.Block, error)
 	GetBlockByHash(hash crypto.Hash) (*types.Block, error)
 	GetBlockByNumber(number uint64) (*types.Block, error)
 	GetTransaction(txHash crypto.Hash) (*flow.Transaction, error)
-	GetTransactionAtVersion(txHash, version crypto.Hash) (*flow.Transaction, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
-	GetAccountAtVersion(address flow.Address, version crypto.Hash) (*flow.Account, error)
+	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	SubmitTransaction(tx flow.Transaction) error
 	ExecuteScript(script []byte) (interface{}, error)
-	ExecuteScriptAtVersion(script []byte, version crypto.Hash) (interface{}, error)
-	CommitBlock() *types.Block
-	SeekToState(hash crypto.Hash)
+	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, error)
+	CommitBlock() (*types.Block, error)
 	LastCreatedAccount() flow.Account
 	CreateAccount(
 		publicKeys []flow.AccountPublicKey,
@@ -237,7 +235,7 @@ func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
 }
 
 // TODO: Implement
-func GetAccountAtBlock(address flow.Address, blockNumber uint64) (flow.Account, error) {
+func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error) {
 	panic("not implemented")
 }
 

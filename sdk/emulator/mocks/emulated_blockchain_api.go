@@ -36,11 +36,12 @@ func (m *MockEmulatedBlockchainAPI) EXPECT() *MockEmulatedBlockchainAPIMockRecor
 }
 
 // CommitBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) CommitBlock() *types.Block {
+func (m *MockEmulatedBlockchainAPI) CommitBlock() (*types.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitBlock")
 	ret0, _ := ret[0].(*types.Block)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CommitBlock indicates an expected call of CommitBlock
@@ -79,19 +80,19 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScript(arg0 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteScript", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).ExecuteScript), arg0)
 }
 
-// ExecuteScriptAtVersion mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtVersion(arg0 []byte, arg1 crypto.Hash) (interface{}, error) {
+// ExecuteScriptAtBlock mocks base method
+func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (interface{}, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExecuteScriptAtVersion", arg0, arg1)
+	ret := m.ctrl.Call(m, "ExecuteScriptAtBlock", arg0, arg1)
 	ret0, _ := ret[0].(interface{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ExecuteScriptAtVersion indicates an expected call of ExecuteScriptAtVersion
-func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScriptAtVersion(arg0, arg1 interface{}) *gomock.Call {
+// ExecuteScriptAtBlock indicates an expected call of ExecuteScriptAtBlock
+func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScriptAtBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteScriptAtVersion", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).ExecuteScriptAtVersion), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteScriptAtBlock", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).ExecuteScriptAtBlock), arg0, arg1)
 }
 
 // GetAccount mocks base method
@@ -109,19 +110,19 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) GetAccount(arg0 interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetAccount), arg0)
 }
 
-// GetAccountAtVersion mocks base method
-func (m *MockEmulatedBlockchainAPI) GetAccountAtVersion(arg0 flow.Address, arg1 crypto.Hash) (*flow.Account, error) {
+// GetAccountAtBlock mocks base method
+func (m *MockEmulatedBlockchainAPI) GetAccountAtBlock(arg0 flow.Address, arg1 uint64) (*flow.Account, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAccountAtVersion", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetAccountAtBlock", arg0, arg1)
 	ret0, _ := ret[0].(*flow.Account)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetAccountAtVersion indicates an expected call of GetAccountAtVersion
-func (mr *MockEmulatedBlockchainAPIMockRecorder) GetAccountAtVersion(arg0, arg1 interface{}) *gomock.Call {
+// GetAccountAtBlock indicates an expected call of GetAccountAtBlock
+func (mr *MockEmulatedBlockchainAPIMockRecorder) GetAccountAtBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountAtVersion", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetAccountAtVersion), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountAtBlock", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetAccountAtBlock), arg0, arg1)
 }
 
 // GetBlockByHash mocks base method
@@ -155,11 +156,12 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) GetBlockByNumber(arg0 interface
 }
 
 // GetLatestBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) GetLatestBlock() *types.Block {
+func (m *MockEmulatedBlockchainAPI) GetLatestBlock() (*types.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLatestBlock")
 	ret0, _ := ret[0].(*types.Block)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetLatestBlock indicates an expected call of GetLatestBlock
@@ -181,21 +183,6 @@ func (m *MockEmulatedBlockchainAPI) GetTransaction(arg0 crypto.Hash) (*flow.Tran
 func (mr *MockEmulatedBlockchainAPIMockRecorder) GetTransaction(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransaction", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetTransaction), arg0)
-}
-
-// GetTransactionAtVersion mocks base method
-func (m *MockEmulatedBlockchainAPI) GetTransactionAtVersion(arg0, arg1 crypto.Hash) (*flow.Transaction, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTransactionAtVersion", arg0, arg1)
-	ret0, _ := ret[0].(*flow.Transaction)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetTransactionAtVersion indicates an expected call of GetTransactionAtVersion
-func (mr *MockEmulatedBlockchainAPIMockRecorder) GetTransactionAtVersion(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionAtVersion", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetTransactionAtVersion), arg0, arg1)
 }
 
 // LastCreatedAccount mocks base method
@@ -238,18 +225,6 @@ func (m *MockEmulatedBlockchainAPI) RootKey() flow.AccountPrivateKey {
 func (mr *MockEmulatedBlockchainAPIMockRecorder) RootKey() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RootKey", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).RootKey))
-}
-
-// SeekToState mocks base method
-func (m *MockEmulatedBlockchainAPI) SeekToState(arg0 crypto.Hash) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SeekToState", arg0)
-}
-
-// SeekToState indicates an expected call of SeekToState
-func (mr *MockEmulatedBlockchainAPIMockRecorder) SeekToState(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SeekToState", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).SeekToState), arg0)
 }
 
 // SubmitTransaction mocks base method
