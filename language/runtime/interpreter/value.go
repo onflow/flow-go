@@ -112,6 +112,10 @@ func (v BoolValue) String() string {
 	return strconv.FormatBool(bool(v))
 }
 
+func (v BoolValue) KeyString() string {
+	return v.String()
+}
+
 // StringValue
 
 type StringValue struct {
@@ -400,7 +404,8 @@ func (v ArrayValue) Contains(x Value) BoolValue {
 func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		return NewIntValue(int64(len(*v.Values)))
+		return NewIntValue(int64(v.Count()))
+
 	case "append":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -408,6 +413,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -416,6 +422,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "insert":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -425,6 +432,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -433,6 +441,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "removeFirst":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -440,6 +449,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "removeLast":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -447,6 +457,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "contains":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -454,6 +465,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
@@ -461,6 +473,10 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 
 func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
+}
+
+func (v ArrayValue) Count() int {
+	return len(*v.Values)
 }
 
 // IntegerValue
@@ -1298,7 +1314,28 @@ func (v CompositeValue) GetField(name string) Value {
 
 // DictionaryValue
 
-type DictionaryValue map[interface{}]Value
+type DictionaryValue struct {
+	Keys    ArrayValue
+	Entries map[string]Value
+}
+
+func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
+	keysAndValuesCount := len(keysAndValues)
+	if keysAndValuesCount%2 != 0 {
+		panic("uneven number of keys and values")
+	}
+
+	result := DictionaryValue{
+		Keys:    NewArrayValue(),
+		Entries: make(map[string]Value, keysAndValuesCount/2),
+	}
+
+	for i := 0; i < keysAndValuesCount; i += 2 {
+		result.Insert(keysAndValues[i], keysAndValues[i+1])
+	}
+
+	return result
+}
 
 func init() {
 	gob.Register(DictionaryValue{})
@@ -1307,11 +1344,17 @@ func init() {
 func (DictionaryValue) isValue() {}
 
 func (v DictionaryValue) Copy() Value {
-	newDictionary := make(DictionaryValue, len(v))
-	for field, value := range v {
-		newDictionary[field] = value.Copy()
+	newKeys := v.Keys.Copy().(ArrayValue)
+
+	newEntries := make(map[string]Value, len(v.Entries))
+	for name, value := range v.Entries {
+		newEntries[name] = value.Copy()
 	}
-	return newDictionary
+
+	return DictionaryValue{
+		Keys:    newKeys,
+		Entries: newEntries,
+	}
 }
 
 func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -1329,10 +1372,14 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 			})
 	}
 
-	for key, value := range v {
-		maybeDestroy(key)
+	for _, keyValue := range *v.Keys.Values {
+		maybeDestroy(keyValue)
+	}
+
+	for _, value := range v.Entries {
 		maybeDestroy(value)
 	}
+
 	return result
 }
 
@@ -1350,19 +1397,19 @@ func (v DictionaryValue) Export() values.Value {
 }
 
 func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
-	value, ok := v[dictionaryKey(keyValue)]
+	value, ok := v.Entries[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
 	}
 	return SomeValue{Value: value}
 }
 
-func dictionaryKey(keyValue Value) interface{} {
-	var key interface{} = keyValue
-	if keyValue, ok := keyValue.(HasKeyString); ok {
-		return keyValue.KeyString()
+func dictionaryKey(keyValue Value) string {
+	hasKeyString, ok := keyValue.(HasKeyString)
+	if !ok {
+		panic(errors.NewUnreachableError())
 	}
-	return key
+	return hasKeyString.KeyString()
 }
 
 type HasKeyString interface {
@@ -1370,14 +1417,14 @@ type HasKeyString interface {
 }
 
 func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
-	key := dictionaryKey(keyValue)
 	switch typedValue := value.(type) {
 	case SomeValue:
-		v[key] = typedValue.Value
-		return
+		v.Insert(keyValue, typedValue.Value)
+
 	case NilValue:
-		delete(v, key)
+		v.Remove(keyValue)
 		return
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
@@ -1387,13 +1434,17 @@ func (v DictionaryValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("{")
 	i := 0
-	for key, value := range v {
+	for _, keyValue := range *v.Keys.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
-		builder.WriteString(fmt.Sprint(key))
+		builder.WriteString(fmt.Sprint(keyValue))
 		builder.WriteString(": ")
+
+		key := dictionaryKey(keyValue)
+		value := v.Entries[key]
 		builder.WriteString(fmt.Sprint(value))
+
 		i += 1
 	}
 	builder.WriteString("}")
@@ -1403,26 +1454,37 @@ func (v DictionaryValue) String() string {
 func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		return NewIntValue(int64(len(v)))
+		return NewIntValue(int64(v.Count()))
+
+	case "keys":
+		return v.Keys.Copy()
+
+	case "values":
+		values := make([]Value, v.Count())
+		i := 0
+		for _, keyValue := range *v.Keys.Values {
+			key := dictionaryKey(keyValue)
+			values[i] = v.Entries[key]
+			i += 1
+		}
+		return NewArrayValue(values...)
 
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 
-				key := dictionaryKey(keyValue)
-				value, hadValue := v[key]
+				existingValue := v.Remove(keyValue)
 
-				delete(v, key)
-
-				if !hadValue {
-					return trampoline.Done{
-						Result: NilValue{},
-					}
+				var returnValue Value
+				if existingValue == nil {
+					returnValue = NilValue{}
+				} else {
+					returnValue = SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
-					Result: SomeValue{Value: value},
+					Result: returnValue,
 				}
 			},
 		)
@@ -1433,18 +1495,17 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 				keyValue := arguments[0]
 				newValue := arguments[1]
 
-				key := dictionaryKey(keyValue)
-				oldValue, hadValue := v[key]
-				v[key] = newValue
+				existingValue := v.Insert(keyValue, newValue)
 
-				if !hadValue {
-					return trampoline.Done{
-						Result: NilValue{},
-					}
+				var returnValue Value
+				if existingValue == nil {
+					returnValue = NilValue{}
+				} else {
+					returnValue = SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
-					Result: SomeValue{Value: oldValue},
+					Result: returnValue,
 				}
 			},
 		)
@@ -1455,7 +1516,49 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 }
 
 func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+	// Dictionaries have no settable members (fields / functions)
 	panic(errors.NewUnreachableError())
+}
+
+func (v DictionaryValue) Count() int {
+	return v.Keys.Count()
+}
+
+func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
+	key := dictionaryKey(keyValue)
+	existingValue, exists := v.Entries[key]
+
+	if !exists {
+		return nil
+	}
+
+	delete(v.Entries, key)
+
+	// TODO: optimize linear scan
+	for i, keyValue := range *v.Keys.Values {
+		if dictionaryKey(keyValue) == key {
+			v.Keys.Remove(i)
+			return existingValue
+		}
+	}
+
+	panic(errors.NewUnreachableError())
+}
+
+func (v DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
+	key := dictionaryKey(keyValue)
+	existingValue, existed := v.Entries[key]
+
+	if !existed {
+		v.Keys.Append(keyValue)
+	}
+	v.Entries[key] = value
+
+	if !existed {
+		return nil
+	}
+
+	return existingValue
 }
 
 type DictionaryEntryValues struct {
