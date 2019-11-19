@@ -26,7 +26,11 @@ type ParseCheckAndInterpretOptions struct {
 }
 
 func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{})
+	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{
+		CheckerOptions: []sema.Option{
+			sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+		},
+	})
 }
 
 func parseCheckAndInterpretWithOptions(
@@ -558,7 +562,7 @@ func TestInterpretReturns(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
-           fun returnEarly(): Int {
+           pub fun returnEarly(): Int {
                return 2
                return 1
            }
@@ -1273,7 +1277,7 @@ func TestInterpretIfStatement(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
-           fun testTrue(): Int {
+           pub fun testTrue(): Int {
                if true {
                    return 2
                } else {
@@ -1282,7 +1286,7 @@ func TestInterpretIfStatement(t *testing.T) {
                return 4
            }
 
-           fun testFalse(): Int {
+           pub fun testFalse(): Int {
                if false {
                    return 2
                } else {
@@ -1291,14 +1295,14 @@ func TestInterpretIfStatement(t *testing.T) {
                return 4
            }
 
-           fun testNoElse(): Int {
+           pub fun testNoElse(): Int {
                if true {
                    return 2
                }
                return 3
            }
 
-           fun testElseIf(): Int {
+           pub fun testElseIf(): Int {
                if false {
                    return 2
                } else if true {
@@ -1603,7 +1607,7 @@ func TestInterpretUnaryBooleanNegation(t *testing.T) {
 func TestInterpretHostFunction(t *testing.T) {
 
 	program, _, err := parser.ParseProgram(`
-      let a = test(1, 2)
+      pub let a = test(1, 2)
     `)
 
 	assert.Nil(t, err)
@@ -3614,7 +3618,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 func TestInterpretImport(t *testing.T) {
 
 	checkerImported, err := ParseAndCheck(t, `
-      fun answer(): Int {
+      pub fun answer(): Int {
           return 42
       }
     `)
@@ -3624,7 +3628,7 @@ func TestInterpretImport(t *testing.T) {
 		`
           import answer from "imported"
 
-          fun test(): Int {
+          pub fun test(): Int {
               return answer()
           }
         `,
@@ -3663,7 +3667,7 @@ func TestInterpretImportError(t *testing.T) {
 
 	checkerImported, err := ParseAndCheckWithOptions(t,
 		`
-          fun answer(): Int {
+          pub fun answer(): Int {
               return panic("?!")
           }
         `,
@@ -3679,7 +3683,7 @@ func TestInterpretImportError(t *testing.T) {
 		`
           import answer from "imported"
 
-          fun test(): Int {
+          pub fun test(): Int {
               return answer()
           }
         `,
@@ -4730,13 +4734,14 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 
 	checkerImported, err := ParseAndCheck(t, `
       // function must have arguments
-      fun x(x: Int) {}
+      pub fun x(x: Int) {}
 
       // invocation must be in composite
-      struct Y {
-        fun x() {
-          x(x: 1)
-        }
+      pub struct Y {
+
+          pub fun x() {
+              x(x: 1)
+          }
       }
     `)
 	require.Nil(t, err)
@@ -4745,7 +4750,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 		`
           import Y from "imported"
 
-          fun test() {
+          pub fun test() {
               // get member must bind using imported interpreter
               Y().x()
           }
@@ -4806,7 +4811,7 @@ func TestInterpretStorage(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
-          fun test(): Int? {
+          pub fun test(): Int? {
               storage[Int] = 42
               return storage[Int]
           }
@@ -5333,9 +5338,9 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	storageValue := interpreter.StorageValue{}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
-          resource R {}
+          pub resource R {}
 
-          fun test(): &R {
+          pub fun test(): &R {
               return &storage[R] as R
           }
         `,
@@ -5404,19 +5409,19 @@ func TestInterpretReferenceUse(t *testing.T) {
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
-          resource R {
-              var x: Int
+          pub resource R {
+              pub(set) var x: Int
 
               init() {
                   self.x = 0
               }
 
-              fun setX(_ newX: Int) {
+              pub fun setX(_ newX: Int) {
                   self.x = newX
               }
           }
 
-          fun test(): [Int] {
+          pub fun test(): [Int] {
               var r: <-R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
@@ -5494,19 +5499,19 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
-          resource R {
-              var x: Int
+          pub resource R {
+              pub(set) var x: Int
 
               init() {
                   self.x = 0
               }
 
-              fun setX(_ newX: Int) {
+              pub fun setX(_ newX: Int) {
                   self.x = newX
               }
           }
 
-          fun test(): [Int] {
+          pub fun test(): [Int] {
               var rs: <-[R]? <- [<-create R()]
               storage[[R]] <-> rs
               // there was no old value, but it must be discarded
@@ -5581,11 +5586,11 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
-          resource R {
-              fun foo() {}
+          pub resource R {
+              pub fun foo() {}
           }
 
-          fun test() {
+          pub fun test() {
               let ref = &storage[R] as R
               ref.foo()
           }

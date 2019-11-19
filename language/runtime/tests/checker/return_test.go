@@ -80,6 +80,7 @@ func testExits(t *testing.T, tests []exitTest) {
 				ParseAndCheckOptions{
 					Options: []sema.Option{
 						sema.WithPredeclaredValues(test.valueDeclarations),
+						sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 					},
 				},
 			)
