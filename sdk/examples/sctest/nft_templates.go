@@ -17,9 +17,9 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
 		fun main(acct: Account) {
-			var tokenA: <-NFT <- createNFT(id: %d)
+			let tokenA <- createNFT(id: %d)
 
-			var collection: <-NFTCollection <- createCollection()
+			let collection: <-NFTCollection <- createCollection()
 
 			collection.deposit(token: <-tokenA)
 

@@ -82,11 +82,7 @@ resource NFTCollection: INFTCollection {
 
     // idExists checks to see if a NFT with the given ID exists in the collection
     pub fun idExists(tokenID: Int): Bool {
-        if (self.ownedNFTs[tokenID] != nil) {
-            return true
-        }
-
-        return false
+        return self.ownedNFTs[tokenID] != nil
     }
 
     // getIDs returns an array of the IDs that are in the collection
