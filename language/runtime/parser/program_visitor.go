@@ -193,6 +193,60 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 	}
 }
 
+func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var fields []*ast.FieldDeclaration
+	fieldsCtx := ctx.Fields()
+	if fieldsCtx != nil {
+		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
+	}
+
+	var preConditions []*ast.Condition
+	preConditionsCtx := ctx.PreConditions()
+	if preConditionsCtx != nil {
+		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var postConditions []*ast.Condition
+	postConditionsCtx := ctx.PostConditions()
+	if postConditionsCtx != nil {
+		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var prepareFunction *ast.SpecialFunctionDeclaration
+	prepareCtx := ctx.Prepare()
+	if prepareCtx != nil {
+		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+	}
+
+	var executeBlock *ast.Block
+	executeCtx := ctx.Execute()
+	if executeCtx != nil {
+		executeBlock = executeCtx.Accept(v).(*ast.Block)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.TransactionDeclaration{
+		Fields:         fields,
+		Prepare:        prepareFunction,
+		PreConditions:  preConditions,
+		Execute:        executeBlock,
+		PostConditions: postConditions,
+		Range: ast.Range{
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		},
+	}
+}
+
+func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
+	return ctx.SpecialFunctionDeclaration().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
+	return ctx.Block().Accept(v)
+}
+
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
@@ -303,6 +357,18 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 		Functions:             functions,
 		CompositeDeclarations: compositeDeclarations,
 	}
+}
+
+func (v *ProgramVisitor) VisitFields(ctx *FieldsContext) interface{} {
+	fieldsCtx := ctx.AllField()
+
+	fields := make([]*ast.FieldDeclaration, len(fieldsCtx))
+
+	for i, fieldCtx := range ctx.AllField() {
+		fields[i] = fieldCtx.Accept(v).(*ast.FieldDeclaration)
+	}
+
+	return fields
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {

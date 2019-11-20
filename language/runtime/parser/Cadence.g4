@@ -78,6 +78,25 @@ declaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
+    | transactionDeclaration
+    ;
+
+transactionDeclaration
+    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `prepare` in semantic analysis to provide better error
+//
+prepare
+    : specialFunctionDeclaration
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `execute` in semantic analysis to provide better error
+//
+execute
+    : Identifier block
     ;
 
 importDeclaration
@@ -106,6 +125,10 @@ variableKind
 
 field
     : access variableKind? identifier ':' typeAnnotation
+    ;
+
+fields
+    : (field ';'?)*
     ;
 
 interfaceDeclaration
