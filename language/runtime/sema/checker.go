@@ -1028,12 +1028,14 @@ func (checker *Checker) isReadableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessPublic ||
+		return access == ast.AccessAuthorized ||
+			access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
+			access == ast.AccessAuthorized ||
 			access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
@@ -1050,11 +1052,13 @@ func (checker *Checker) isWriteableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessPublicSettable
+		return access == ast.AccessAuthorized ||
+			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
+			access == ast.AccessAuthorized ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNone:
