@@ -66,12 +66,13 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) CreateAccount(arg0, arg1, arg2 
 }
 
 // ExecuteScript mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (interface{}, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (interface{}, []flow.Event, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScript", arg0)
 	ret0, _ := ret[0].(interface{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].([]flow.Event)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // ExecuteScript indicates an expected call of ExecuteScript
@@ -81,12 +82,13 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScript(arg0 interface{})
 }
 
 // ExecuteScriptAtBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (interface{}, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (interface{}, []flow.Event, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScriptAtBlock", arg0, arg1)
 	ret0, _ := ret[0].(interface{})
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].([]flow.Event)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // ExecuteScriptAtBlock indicates an expected call of ExecuteScriptAtBlock

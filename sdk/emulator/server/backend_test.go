@@ -77,7 +77,7 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil).
+			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil, nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)

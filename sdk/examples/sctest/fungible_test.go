@@ -56,7 +56,7 @@ func TestCreateToken(t *testing.T) {
 
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 10))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 10))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
@@ -106,7 +106,7 @@ func TestInAccountTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vaults balance is correct
-		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 0, 7))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 0, 7))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
@@ -125,13 +125,13 @@ func TestInAccountTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vault's balance is correct
-		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 1, 12))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 1, 12))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
 
 		// Assert that the vault's balance is correct
-		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 2, 13))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 2, 13))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
@@ -185,11 +185,11 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vaults' balances are correct
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
@@ -245,11 +245,11 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, true)
 
 		// Assert that the vaults' balances have not changed after all the fails
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 7))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 13))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
@@ -269,11 +269,11 @@ func TestExternalTransfers(t *testing.T) {
 		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
 		// Assert that the vaults' balances are correct
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 14))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 14))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 6))
+		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, bastianAddress, 6))
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
