@@ -56,9 +56,6 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
       synchronize: {
         configurationSection: "cadence"
       },
-      initializationOptions: {
-        "test": "test",
-      },
     }
   );
 
