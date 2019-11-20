@@ -102,8 +102,8 @@ Negate
 Move
 Optional
 NilCoalescing
-Downcasting
-FailableDowncasting
+Casting
+FailableCasting
 OpenParen
 CloseParen
 Transaction
@@ -175,8 +175,8 @@ Negate
 Move
 Optional
 NilCoalescing
-Downcasting
-FailableDowncasting
+Casting
+FailableCasting
 OpenParen
 CloseParen
 Transaction

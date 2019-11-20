@@ -89,7 +89,7 @@ transactionDeclaration
 // is `prepare` in semantic analysis to provide better error
 //
 prepare
-    : specialFunctionDeclaration[true]
+    : specialFunctionDeclaration
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
