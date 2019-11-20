@@ -9,11 +9,62 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
+
+func expectSuccess(t *testing.T, err error) {
+	assert.Nil(t, err)
+}
+
+func expectConformanceError(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func expectInvalidAccessError(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+}
+
+func expectInvalidAssignmentAccessError(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
+}
+
+func expectAccessErrors(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
+}
+
+func expectConformanceAndInvalidAccessErrors(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[1])
+}
+
+func expectTwoInvalidAssignmentAccessErrors(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
+}
+
+func expectTwoAccessErrors(t *testing.T, err error) {
+	errs := ExpectCheckerErrors(t, err, 4)
+
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[2])
+	assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[3])
+}
 
 func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
@@ -659,25 +710,25 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 
 func TestCheckAccessCompositeFunction(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate: 1,
-			ast.AccessPublic:  0,
+			ast.AccessPrivate: expectInvalidAccessError,
+			ast.AccessPublic:  expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified: 1,
-			ast.AccessPrivate:      1,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectInvalidAccessError,
+			ast.AccessPrivate:      expectInvalidAccessError,
+			ast.AccessPublic:       expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified: 0,
-			ast.AccessPrivate:      1,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectSuccess,
+			ast.AccessPrivate:      expectInvalidAccessError,
+			ast.AccessPublic:       expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified: 0,
-			ast.AccessPrivate:      0,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectSuccess,
+			ast.AccessPrivate:      expectSuccess,
+			ast.AccessPublic:       expectSuccess,
 		},
 	}
 
@@ -689,7 +740,7 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -730,17 +781,7 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 						},
 					)
 
-					if expectedErrors == 0 {
-						assert.Nil(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, expectedErrors)
-
-						for i := 0; i < expectedErrors; i++ {
-							assert.IsType(t, &sema.InvalidAccessError{}, errs[i])
-						}
-
-						// TODO: check line numbers to ensure errors where for outside composite
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -749,25 +790,25 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 
 func TestCheckAccessInterfaceFunction(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate: 1,
-			ast.AccessPublic:  0,
+			ast.AccessPrivate: expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:  expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified: 1,
-			ast.AccessPrivate:      1,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectInvalidAccessError,
+			ast.AccessPrivate:      expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:       expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified: 0,
-			ast.AccessPrivate:      1,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectSuccess,
+			ast.AccessPrivate:      expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:       expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified: 0,
-			ast.AccessPrivate:      0,
-			ast.AccessPublic:       0,
+			ast.AccessNotSpecified: expectSuccess,
+			ast.AccessPrivate:      expectConformanceError,
+			ast.AccessPublic:       expectSuccess,
 		},
 	}
 
@@ -779,7 +820,7 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -825,17 +866,7 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 						},
 					)
 
-					if expectedErrors == 0 {
-						assert.Nil(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, expectedErrors)
-
-						for i := 0; i < expectedErrors; i++ {
-							assert.IsType(t, &sema.InvalidAccessError{}, errs[i])
-						}
-
-						// TODO: check line numbers to ensure errors where for outside composite
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -844,29 +875,29 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 
 func TestCheckAccessCompositeFieldRead(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectInvalidAccessError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   1,
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectInvalidAccessError,
+			ast.AccessPrivate:        expectInvalidAccessError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectInvalidAccessError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectSuccess,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
@@ -878,7 +909,7 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -923,17 +954,7 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 						},
 					)
 
-					if expectedErrors == 0 {
-						assert.Nil(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, expectedErrors)
-
-						for i := 0; i < expectedErrors; i++ {
-							assert.IsType(t, &sema.InvalidAccessError{}, errs[i])
-						}
-
-						// TODO: check line numbers to ensure errors where for outside composite
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -942,29 +963,29 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 
 func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   1,
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectInvalidAccessError,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        1,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
@@ -976,7 +997,7 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -1025,17 +1046,7 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 						},
 					)
 
-					if expectedErrors == 0 {
-						assert.Nil(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, expectedErrors)
-
-						for i := 0; i < expectedErrors; i++ {
-							assert.IsType(t, &sema.InvalidAccessError{}, errs[i])
-						}
-
-						// TODO: check line numbers to ensure errors where for outside composite
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -1044,29 +1055,29 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 
 func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectTwoAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   4,
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectTwoAccessErrors,
+			ast.AccessPrivate:        expectTwoAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectTwoAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectSuccess,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
@@ -1078,7 +1089,7 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -1126,29 +1137,7 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 						},
 					)
 
-					// TODO: check line numbers to ensure errors where for outside composite
-
-					switch expectedErrors {
-					case 0:
-						assert.Nil(t, err)
-
-					case 2:
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-
-					case 4:
-						errs := ExpectCheckerErrors(t, err, 4)
-
-						assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-						assert.IsType(t, &sema.InvalidAccessError{}, errs[2])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[3])
-
-					default:
-						panic(errors.NewUnreachableError())
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -1157,29 +1146,39 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 
 func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	expectConformanceAndAccessErrors := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 5)
+
+		assert.IsType(t, &sema.ConformanceError{}, errs[0])
+		assert.IsType(t, &sema.InvalidAccessError{}, errs[1])
+		assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[2])
+		assert.IsType(t, &sema.InvalidAccessError{}, errs[3])
+		assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[4])
+	}
+
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectConformanceAndAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   4,
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectTwoAccessErrors,
+			ast.AccessPrivate:        expectConformanceAndAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        4,
-			ast.AccessPublic:         2,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceAndAccessErrors,
+			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
@@ -1191,7 +1190,7 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
-			for access, expectedErrors := range checkModeTests {
+			for access, check := range checkModeTests {
 
 				testName := fmt.Sprintf(
 					"%s/%s/%s",
@@ -1244,29 +1243,7 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 						},
 					)
 
-					// TODO: check line numbers to ensure errors where for outside composite
-
-					switch expectedErrors {
-					case 0:
-						assert.Nil(t, err)
-
-					case 2:
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-
-					case 4:
-						errs := ExpectCheckerErrors(t, err, 4)
-
-						assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-						assert.IsType(t, &sema.InvalidAccessError{}, errs[2])
-						assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[3])
-
-					default:
-						panic(errors.NewUnreachableError())
-					}
+					check(t, err)
 				})
 			}
 		}
@@ -1275,34 +1252,34 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 
 func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   2,
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectAccessErrors,
+			ast.AccessPrivate:        expectAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectSuccess,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
 	for checkMode, checkModeTests := range checkModeTests {
-		for access, expectedErrors := range checkModeTests {
+		for access, check := range checkModeTests {
 
 			testName := fmt.Sprintf(
 				"%s/%s",
@@ -1349,26 +1326,7 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 					},
 				)
 
-				// TODO: check line numbers to ensure errors where for outside composite
-
-				switch expectedErrors {
-				case 0:
-					assert.Nil(t, err)
-
-				case 1:
-					errs := ExpectCheckerErrors(t, err, 1)
-
-					assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
-
-				case 2:
-					errs := ExpectCheckerErrors(t, err, 2)
-
-					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
-					assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				check(t, err)
 			})
 		}
 	}
@@ -1376,34 +1334,42 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 
 func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]int{
+	expectConformanceAndInvalidAccessAndAssignmentAccessErrors := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 3)
+
+		assert.IsType(t, &sema.ConformanceError{}, errs[0])
+		assert.IsType(t, &sema.InvalidAccessError{}, errs[1])
+		assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[2])
+	}
+
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 		sema.AccessCheckModeStrict: {
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   2,
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectAccessErrors,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        2,
-			ast.AccessPublic:         1,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
+			ast.AccessPublic:         expectInvalidAssignmentAccessError,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   0,
-			ast.AccessPrivate:        0,
-			ast.AccessPublic:         0,
-			ast.AccessPublicSettable: 0,
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectConformanceError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
 
 	for checkMode, checkModeTests := range checkModeTests {
-		for access, expectedErrors := range checkModeTests {
+		for access, check := range checkModeTests {
 
 			testName := fmt.Sprintf(
 				"%s/%s",
@@ -1454,24 +1420,7 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 					},
 				)
 
-				// TODO: check line numbers to ensure errors where for outside composite
-
-				switch expectedErrors {
-				case 0:
-					assert.Nil(t, err)
-				case 1:
-					errs := ExpectCheckerErrors(t, err, 1)
-
-					assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[0])
-
-				case 2:
-					errs := ExpectCheckerErrors(t, err, 2)
-
-					assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
-					assert.IsType(t, &sema.InvalidAssignmentAccessError{}, errs[1])
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				check(t, err)
 			})
 		}
 	}
