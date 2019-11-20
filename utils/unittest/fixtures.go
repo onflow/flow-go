@@ -48,7 +48,7 @@ func BlockHeaderFixture() flow.BlockHeader {
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{
-		Script:             []byte("fun main() {}"),
+		Script:             []byte("pub fun main() {}"),
 		ReferenceBlockHash: nil,
 		Nonce:              0,
 		ComputeLimit:       10,
@@ -66,7 +66,7 @@ func AccountFixture() flow.Account {
 	return flow.Account{
 		Address: AddressFixture(),
 		Balance: 10,
-		Code:    []byte("fun main() {}"),
+		Code:    []byte("pub fun main() {}"),
 		Keys:    []flow.AccountPublicKey{AccountPublicKeyFixture()},
 	}
 }

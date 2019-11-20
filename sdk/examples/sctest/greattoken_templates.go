@@ -14,7 +14,7 @@ func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int)
 	template := `
 		import GreatNFTMinter from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let minter = GreatNFTMinter(firstID: %d, specialMod: %d)
 			acct.storage[GreatNFTMinter] = minter
 		}`
@@ -27,7 +27,7 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 	template := `
 		import GreatNFTMinter, GreatNFT from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
 			let nft = minter.mint()
 
@@ -44,7 +44,7 @@ func GenerateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int
 	template := `
 		import GreatNFT from 0x%s
 
-		fun main() {
+		pub fun main() {
 			let acct = getAccount("%s")
 			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
 			if nft.id() != %d {
@@ -63,7 +63,7 @@ func GenerateNFTIDScript(nftCodeAddr, userAddr flow.Address) []byte {
 	template := `
 		import GreatNFT from 0x%s
 
-		fun main(): Int {
+		pub fun main(): Int {
 			let acct = getAccount("%s")
 			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
 			return nft.id()

@@ -28,7 +28,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			fun main() {
+			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
 			}
 		`)
@@ -72,7 +72,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			fun main() {
+			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
 			}
 		`)
@@ -116,7 +116,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
-			fun main() {
+			pub fun main() {
 				emitMyEvent(x: 1, y: 2)
 			}
 		`, address.Hex()))

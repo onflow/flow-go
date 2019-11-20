@@ -112,7 +112,7 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(): Int {
+       pub fun main(): Int {
            return 42
 		}
 	`)

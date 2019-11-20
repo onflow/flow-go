@@ -1,6 +1,6 @@
 
 
-resource interface INFT {
+pub resource interface INFT {
     // The unique ID that each NFT has
     pub let id: Int
 }
@@ -19,7 +19,7 @@ pub resource NFT: INFT {
 
 // possibility for each account with NFTs to have a copy of this resource that they keep their NFTs in
 // they could send one NFT, multiple at a time, or potentially even send the entire collection in one go
-resource interface INFTCollection {
+pub resource interface INFTCollection {
 
     // dictionary of NFT conforming tokens
     pub var ownedNFTs: <-{Int: NFT}
@@ -41,7 +41,7 @@ resource interface INFTCollection {
     }
 }
 
-resource NFTCollection: INFTCollection { 
+pub resource NFTCollection: INFTCollection {
     // dictionary of NFT conforming tokens
     // NFT is a resource type with an `Int` ID field
     pub var ownedNFTs: <-{Int: NFT}
@@ -130,11 +130,11 @@ resource NFTCollection: INFTCollection {
     }
 }
 
-fun createNFT(id: Int): <-NFT {
+pub fun createNFT(id: Int): <-NFT {
     return <- create NFT(newID: id)
 }
 
-fun createCollection(token: <-NFT): <-NFTCollection {
+pub fun createCollection(token: <-NFT): <-NFTCollection {
     return <- create NFTCollection(firstToken: <-token)
 }
 

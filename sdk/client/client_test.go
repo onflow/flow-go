@@ -143,7 +143,7 @@ func TestExecuteScript(t *testing.T) {
 			Return(&observation.ExecuteScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
-		value, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		value, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.Nil(t, err)
 		assert.Equal(t, value, float64(1))
 	})
@@ -156,7 +156,7 @@ func TestExecuteScript(t *testing.T) {
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
@@ -168,7 +168,7 @@ func TestExecuteScript(t *testing.T) {
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 
@@ -180,7 +180,7 @@ func TestExecuteScript(t *testing.T) {
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 }
