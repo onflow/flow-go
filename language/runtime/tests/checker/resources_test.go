@@ -3063,7 +3063,7 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
-func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterElse(t *testing.T) {
+func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterThen(t *testing.T) {
 
 	_, err := ParseAndCheck(t,
 		`
