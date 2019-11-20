@@ -362,7 +362,7 @@ func (s Server) registerCommands(connection protocol.Connection) {
 	if err != nil {
 		connection.LogMessage(&protocol.LogMessageParams{
 			Type:    protocol.Warning,
-			Message: "Failed to register command: " + err.Error(),
+			Message: fmt.Sprintf("Failed to register command: %w", err),
 		})
 	}
 }
