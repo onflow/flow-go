@@ -19,10 +19,14 @@ spec:
     version: v1
 
   ports:
-    - name: web
+    - name: http
       protocol: TCP
-      port: 3000
-      targetPort: web # reference to the name of the port in your container config
+      port: 8080
+      targetPort: http # reference to the name of the port in your container config
+    - name: grpc
+      protocol: TCP
+      port: 3569
+      targetPort: grpc # reference to the name of the port in your container config
 
 ---
 
@@ -86,8 +90,10 @@ spec:
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
           ports:
-            - name: web
+            - name: grpc
               containerPort: 3569
+            - name: http
+              containerPort: 8080
 
             # Prometheus is looking specifically for a port named 'metrics'
             # This may be the same as the above port, or different
