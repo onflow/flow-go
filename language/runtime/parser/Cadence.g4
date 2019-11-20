@@ -480,7 +480,7 @@ expressionAccess
     ;
 
 memberAccess
-    : '.' identifier
+    : Optional? '.' identifier
     ;
 
 bracketExpression

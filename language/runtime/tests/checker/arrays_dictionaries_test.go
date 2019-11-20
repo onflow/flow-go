@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -91,7 +92,7 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
       let y = x["abc"]
     `)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -197,6 +198,34 @@ func TestCheckInvalidDictionaryInsert(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckDictionaryKeys(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+        let keys = {"abc": 1, "def": 2}.keys
+    `)
+
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		&sema.VariableSizedType{Type: &sema.StringType{}},
+		checker.GlobalValues["keys"].Type,
+	)
+}
+
+func TestCheckDictionaryValues(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+        let values = {"abc": 1, "def": 2}.values
+    `)
+
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		&sema.VariableSizedType{Type: &sema.IntType{}},
+		checker.GlobalValues["values"].Type,
+	)
 }
 
 func TestCheckLength(t *testing.T) {
