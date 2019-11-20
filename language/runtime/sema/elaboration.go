@@ -2,6 +2,11 @@ package sema
 
 import "github.com/dapperlabs/flow-go/language/runtime/ast"
 
+type MemberInfo struct {
+	Member     *Member
+	IsOptional bool
+}
+
 type Elaboration struct {
 	FunctionDeclarationFunctionTypes    map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes       map[*ast.VariableDeclaration]Type
@@ -20,7 +25,7 @@ type Elaboration struct {
 	ReturnStatementReturnTypes          map[*ast.ReturnStatement]Type
 	BinaryExpressionResultTypes         map[*ast.BinaryExpression]Type
 	BinaryExpressionRightTypes          map[*ast.BinaryExpression]Type
-	MemberExpressionMembers             map[*ast.MemberExpression]*Member
+	MemberExpressionMemberInfos         map[*ast.MemberExpression]MemberInfo
 	ArrayExpressionArgumentTypes        map[*ast.ArrayExpression][]Type
 	ArrayExpressionElementType          map[*ast.ArrayExpression]Type
 	DictionaryExpressionType            map[*ast.DictionaryExpression]*DictionaryType
@@ -51,7 +56,7 @@ func NewElaboration() *Elaboration {
 		ReturnStatementReturnTypes:          map[*ast.ReturnStatement]Type{},
 		BinaryExpressionResultTypes:         map[*ast.BinaryExpression]Type{},
 		BinaryExpressionRightTypes:          map[*ast.BinaryExpression]Type{},
-		MemberExpressionMembers:             map[*ast.MemberExpression]*Member{},
+		MemberExpressionMemberInfos:         map[*ast.MemberExpression]MemberInfo{},
 		ArrayExpressionArgumentTypes:        map[*ast.ArrayExpression][]Type{},
 		ArrayExpressionElementType:          map[*ast.ArrayExpression]Type{},
 		DictionaryExpressionType:            map[*ast.DictionaryExpression]*DictionaryType{},

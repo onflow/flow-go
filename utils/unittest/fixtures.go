@@ -84,11 +84,13 @@ func EventFixture(n ...func(e *flow.Event)) flow.Event {
 
 	event := flow.Event{
 		Type: "Transfer",
-		Values: map[string]interface{}{
-			"to":   flow.ZeroAddress,
-			"from": flow.ZeroAddress,
-			"id":   1,
-		},
+		// TODO: create proper fixture
+		// Values: map[string]interface{}{
+		// 	"to":   flow.ZeroAddress,
+		// 	"from": flow.ZeroAddress,
+		// 	"id":   1,
+		// },
+		Payload: []byte{},
 	}
 	if len(n) >= 1 {
 		n[0](&event)

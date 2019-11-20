@@ -8,7 +8,7 @@ import (
 // NOTE: only called if the member expression is *not* an assignment
 //
 func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
-	member := checker.visitMember(expression)
+	member, isOptional := checker.visitMember(expression)
 
 	if member == nil {
 		return &InvalidType{}
@@ -46,13 +46,17 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 		}
 	}
 
-	return member.Type
+	if isOptional {
+		return &OptionalType{Type: member.Type}
+	} else {
+		return member.Type
+	}
 }
 
-func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
-	member, ok := checker.Elaboration.MemberExpressionMembers[expression]
+func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *Member, isOptional bool) {
+	memberInfo, ok := checker.Elaboration.MemberExpressionMemberInfos[expression]
 	if ok {
-		return member
+		return memberInfo.Member, memberInfo.IsOptional
 	}
 
 	accessedExpression := expression.Expression
@@ -97,9 +101,48 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 	// i.e. a Go type switch would be sufficient.
 	// However, for some types (e.g. reference types) this depends on what type is referenced
 
-	if ty, ok := expressionType.(MemberAccessibleType); ok && ty.HasMembers() {
-		targetRange := ast.NewRangeFromPositioned(expression.Expression)
-		member = ty.GetMember(identifier, targetRange, checker.report)
+	getMemberForType := func(expressionType Type) {
+		if ty, ok := expressionType.(MemberAccessibleType); ok && ty.HasMembers() {
+			targetRange := ast.NewRangeFromPositioned(expression.Expression)
+			member = ty.GetMember(identifier, targetRange, checker.report)
+		}
+	}
+
+	// Get the member from the accessed value based
+	// on the use of optional chaining syntax
+
+	if expression.Optional {
+
+		// If the member expression is using optional chaining,
+		// check if the accessed type is optional
+
+		if optionalExpressionType, ok := expressionType.(*OptionalType); ok {
+			// The accessed type is optional, get the member from the wrapped type
+
+			getMemberForType(optionalExpressionType.Type)
+			isOptional = true
+		} else {
+			// Optional chaining was used on a non-optional type, report an error
+
+			checker.report(
+				&InvalidOptionalChainingError{
+					Type:  expressionType,
+					Range: ast.NewRangeFromPositioned(expression),
+				},
+			)
+
+			// NOTE: still try to get member for non-optional expression
+			// to avoid spurious error that member does not exist,
+			// even if the non-optional accessed type has the member
+
+			getMemberForType(expressionType)
+		}
+	} else {
+		// The member is accessed directly without optional chaining.
+		// Get the member directly from the accessed type
+
+		getMemberForType(expressionType)
+		isOptional = false
 	}
 
 	if member == nil {
@@ -158,9 +201,13 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) *Member {
 		}
 	}
 
-	checker.Elaboration.MemberExpressionMembers[expression] = member
+	checker.Elaboration.MemberExpressionMemberInfos[expression] =
+		MemberInfo{
+			Member:     member,
+			IsOptional: isOptional,
+		}
 
-	return member
+	return member, isOptional
 }
 
 func (checker *Checker) IsAccessibleMember(member *Member) bool {
