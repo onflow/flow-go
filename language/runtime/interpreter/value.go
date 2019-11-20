@@ -611,6 +611,14 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
+func (v Int8Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int8Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
 func (v Int8Value) Export() values.Value {
 	return values.Int8(v)
 }
@@ -679,6 +687,14 @@ func (Int16Value) isValue() {}
 
 func (v Int16Value) Copy() Value {
 	return v
+}
+
+func (v Int16Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int16Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int16Value) Export() values.Int16 {
@@ -751,6 +767,14 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
+func (v Int32Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int32Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
 func (v Int32Value) Export() values.Value {
 	return values.Int32(v)
 }
@@ -819,6 +843,14 @@ func (Int64Value) isValue() {}
 
 func (v Int64Value) Copy() Value {
 	return v
+}
+
+func (v Int64Value) String() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
+func (v Int64Value) KeyString() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int64Value) Export() values.Value {
@@ -891,6 +923,14 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
+func (v UInt8Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt8Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 func (v UInt8Value) Export() values.Value {
 	return values.Uint8(v)
 }
@@ -959,6 +999,14 @@ func (UInt16Value) isValue() {}
 
 func (v UInt16Value) Copy() Value {
 	return v
+}
+
+func (v UInt16Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt16Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt16Value) Export() values.Value {
@@ -1030,6 +1078,14 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
+func (v UInt32Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt32Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 func (v UInt32Value) Export() values.Value {
 	return values.Uint32(v)
 }
@@ -1098,6 +1154,14 @@ func (UInt64Value) isValue() {}
 
 func (v UInt64Value) Copy() Value {
 	return v
+}
+
+func (v UInt64Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v UInt64Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt64Value) Export() values.Value {

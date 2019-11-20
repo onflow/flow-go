@@ -18,6 +18,7 @@ type Type interface {
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
+	ID() string
 }
 
 type ExportableType interface {
@@ -92,6 +93,10 @@ func (*AnyType) String() string {
 	return "Any"
 }
 
+func (*AnyType) ID() string {
+	return "Any"
+}
+
 func (*AnyType) Equal(other Type) bool {
 	_, ok := other.(*AnyType)
 	return ok
@@ -111,6 +116,10 @@ type NeverType struct{}
 func (*NeverType) isType() {}
 
 func (*NeverType) String() string {
+	return "Never"
+}
+
+func (*NeverType) ID() string {
 	return "Never"
 }
 
@@ -140,6 +149,10 @@ func (*VoidType) String() string {
 	return "Void"
 }
 
+func (*VoidType) ID() string {
+	return "Void"
+}
+
 func (*VoidType) Equal(other Type) bool {
 	_, ok := other.(*VoidType)
 	return ok
@@ -161,7 +174,11 @@ type InvalidType struct{}
 
 func (*InvalidType) isType() {}
 
-func (*InvalidType) String() string {
+func (t *InvalidType) String() string {
+	return "<<invalid>>"
+}
+
+func (*InvalidType) ID() string {
 	return "<<invalid>>"
 }
 
@@ -190,6 +207,13 @@ func (t *OptionalType) String() string {
 		return "optional"
 	}
 	return fmt.Sprintf("%s?", t.Type)
+}
+
+func (t *OptionalType) ID() string {
+	if t.Type == nil {
+		return "optional"
+	}
+	return fmt.Sprintf("%s?", t.Type.ID())
 }
 
 func (t *OptionalType) Equal(other Type) bool {
@@ -221,6 +245,10 @@ func (*BoolType) String() string {
 	return "Bool"
 }
 
+func (*BoolType) ID() string {
+	return "Bool"
+}
+
 func (*BoolType) Equal(other Type) bool {
 	_, ok := other.(*BoolType)
 	return ok
@@ -241,6 +269,10 @@ type CharacterType struct{}
 func (*CharacterType) isType() {}
 
 func (*CharacterType) String() string {
+	return "Character"
+}
+
+func (*CharacterType) ID() string {
 	return "Character"
 }
 
@@ -270,6 +302,10 @@ func (*StringType) String() string {
 	return "String"
 }
 
+func (*StringType) ID() string {
+	return "String"
+}
+
 func (*StringType) Equal(other Type) bool {
 	_, ok := other.(*StringType)
 	return ok
@@ -290,7 +326,10 @@ func (*StringType) HasMembers() bool {
 func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	switch identifier {
 	case "concat":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -302,8 +341,12 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 				),
 			},
 		})
+
 	case "slice":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -317,12 +360,17 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			},
 			ArgumentLabels: []string{"from", "upTo"},
 		})
+
 	case "length":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
 		})
+
 	default:
 		return nil
 	}
@@ -353,6 +401,10 @@ type IntegerType struct{}
 func (*IntegerType) isType() {}
 
 func (*IntegerType) String() string {
+	return "integer"
+}
+
+func (*IntegerType) ID() string {
 	return "integer"
 }
 
@@ -390,6 +442,10 @@ func (*IntType) String() string {
 	return "Int"
 }
 
+func (*IntType) ID() string {
+	return "Int"
+}
+
 func (*IntType) Equal(other Type) bool {
 	_, ok := other.(*IntType)
 	return ok
@@ -422,6 +478,10 @@ func (*Int8Type) Export() types.Type {
 }
 
 func (*Int8Type) String() string {
+	return "Int8"
+}
+
+func (*Int8Type) ID() string {
 	return "Int8"
 }
 
@@ -462,6 +522,10 @@ func (*Int16Type) String() string {
 	return "Int16"
 }
 
+func (*Int16Type) ID() string {
+	return "Int16"
+}
+
 func (*Int16Type) Equal(other Type) bool {
 	_, ok := other.(*Int16Type)
 	return ok
@@ -496,6 +560,10 @@ func (*Int32Type) Export() types.Type {
 }
 
 func (*Int32Type) String() string {
+	return "Int32"
+}
+
+func (*Int32Type) ID() string {
 	return "Int32"
 }
 
@@ -536,6 +604,10 @@ func (*Int64Type) String() string {
 	return "Int64"
 }
 
+func (*Int64Type) ID() string {
+	return "Int64"
+}
+
 func (*Int64Type) Equal(other Type) bool {
 	_, ok := other.(*Int64Type)
 	return ok
@@ -570,6 +642,10 @@ func (*UInt8Type) Export() types.Type {
 }
 
 func (*UInt8Type) String() string {
+	return "UInt8"
+}
+
+func (*UInt8Type) ID() string {
 	return "UInt8"
 }
 
@@ -610,6 +686,10 @@ func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
+func (*UInt16Type) ID() string {
+	return "UInt16"
+}
+
 func (*UInt16Type) Equal(other Type) bool {
 	_, ok := other.(*UInt16Type)
 	return ok
@@ -644,6 +724,10 @@ func (*UInt32Type) Export() types.Type {
 }
 
 func (*UInt32Type) String() string {
+	return "UInt32"
+}
+
+func (*UInt32Type) ID() string {
 	return "UInt32"
 }
 
@@ -684,6 +768,10 @@ func (*UInt64Type) String() string {
 	return "UInt64"
 }
 
+func (*UInt64Type) ID() string {
+	return "UInt64"
+}
+
 func (*UInt64Type) Equal(other Type) bool {
 	_, ok := other.(*UInt64Type)
 	return ok
@@ -715,19 +803,22 @@ type ArrayType interface {
 	isArrayType()
 }
 
-func getArrayMember(t ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
+func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
 
 	switch field {
 	case "append":
 		// Appending elements to a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
-		return NewMemberForType(t, field, Member{
+		elementType := arrayType.ElementType(false)
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -744,14 +835,14 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		// TODO: maybe allow constant sized:
 		//    concatenate with variable sized and return variable sized
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
 		// TODO: maybe allow for resource element type
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
 		if elementType.IsResourceType() {
 			report(
@@ -763,8 +854,12 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 			)
 		}
 
-		typeAnnotation := NewTypeAnnotation(t)
-		return NewMemberForType(t, field, Member{
+		typeAnnotation := NewTypeAnnotation(arrayType)
+
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -778,13 +873,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "insert":
 		// Inserting elements into to a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
-		return NewMemberForType(t, field, Member{
+		elementType := arrayType.ElementType(false)
+
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -802,14 +901,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "remove":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -826,14 +928,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "removeFirst":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -846,14 +951,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "removeLast":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -864,7 +972,7 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		})
 
 	case "contains":
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
 		// It impossible for an array of resources to have a `contains` function:
 		// if the resource is passed as an argument, it cannot be inside the array
@@ -890,7 +998,10 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 			)
 		}
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -904,7 +1015,10 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		})
 
 	case "length":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
@@ -931,6 +1045,10 @@ func (t *VariableSizedType) Export() types.Type {
 
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
+}
+
+func (t *VariableSizedType) ID() string {
+	return fmt.Sprintf("[%s]", t.Type.ID())
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -981,6 +1099,10 @@ func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
+}
+
+func (t *ConstantSizedType) ID() string {
+	return fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size)
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -1072,6 +1194,22 @@ func (t *FunctionType) String() string {
 
 	return fmt.Sprintf(
 		"((%s): %s)",
+		parameters.String(),
+		t.ReturnTypeAnnotation,
+	)
+}
+
+func (t *FunctionType) ID() string {
+	var parameters strings.Builder
+	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		if i > 0 {
+			parameters.WriteString(",")
+		}
+		parameters.WriteString(parameterTypeAnnotation.Type.ID())
+	}
+
+	return fmt.Sprintf(
+		"((%s):%s)",
 		parameters.String(),
 		t.ReturnTypeAnnotation,
 	)
@@ -1286,8 +1424,8 @@ func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, 
 
 type CompositeType struct {
 	Location     ast.Location
-	Kind         common.CompositeKind
 	Identifier   string
+	Kind         common.CompositeKind
 	Conformances []*InterfaceType
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
@@ -1298,6 +1436,23 @@ func (*CompositeType) isType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
+}
+
+func (t *CompositeType) ID() string {
+	return fmt.Sprintf("%c.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+}
+
+func (t *CompositeType) idPrefix() rune {
+	switch t.Kind {
+	case common.CompositeKindStructure:
+		return 'S'
+	case common.CompositeKindResource:
+		return 'R'
+	case common.CompositeKindContract:
+		return 'C'
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1330,14 +1485,17 @@ func (t *CompositeType) IsInvalidType() bool {
 // Member
 
 type Member struct {
+	ContainerType   Type
+	Access          ast.Access
+	Identifier      ast.Identifier
 	Type            Type
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
 }
 
-// NewMemberForType initializes a new member type and panics if the member declaration is invalid.
-func NewMemberForType(ty Type, identifier string, member Member) *Member {
+// NewCheckedMember panics if the member declaration is invalid.
+func NewCheckedMember(member *Member) *Member {
 
 	if invokableType, ok := member.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()
@@ -1347,21 +1505,21 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 
 			panic(fmt.Sprintf(
 				"member `%s.%s` has incorrect argument label count",
-				ty,
-				identifier,
+				member.ContainerType,
+				member.Identifier.Identifier,
 			))
 		}
 	} else {
 		if member.ArgumentLabels != nil {
 			panic(fmt.Sprintf(
 				"non-function member `%s.%s` should not declare argument labels",
-				ty,
-				identifier,
+				member.ContainerType,
+				member.Identifier.Identifier,
 			))
 		}
 	}
 
-	return &member
+	return member
 }
 
 type MemberAccessibleType interface {
@@ -1373,8 +1531,9 @@ type MemberAccessibleType interface {
 // InterfaceType
 
 type InterfaceType struct {
-	CompositeKind common.CompositeKind
+	Location      ast.Location
 	Identifier    string
+	CompositeKind common.CompositeKind
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
 	InitializerParameterTypeAnnotations []*TypeAnnotation
@@ -1384,6 +1543,23 @@ func (*InterfaceType) isType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
+}
+
+func (t *InterfaceType) ID() string {
+	return fmt.Sprintf("%s.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+}
+
+func (t *InterfaceType) idPrefix() string {
+	switch t.CompositeKind {
+	case common.CompositeKindStructure:
+		return "SI"
+	case common.CompositeKindResource:
+		return "RI"
+	case common.CompositeKindContract:
+		return "CI"
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -1423,7 +1599,19 @@ type DictionaryType struct {
 func (*DictionaryType) isType() {}
 
 func (t *DictionaryType) String() string {
-	return fmt.Sprintf("{%s: %s}", t.KeyType, t.ValueType)
+	return fmt.Sprintf(
+		"{%s: %s}",
+		t.KeyType,
+		t.ValueType,
+	)
+}
+
+func (t *DictionaryType) ID() string {
+	return fmt.Sprintf(
+		"{%s:%s}",
+		t.KeyType.ID(),
+		t.ValueType.ID(),
+	)
 }
 
 func (t *DictionaryType) Equal(other Type) bool {
@@ -1453,7 +1641,10 @@ func (t *DictionaryType) HasMembers() bool {
 func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	switch identifier {
 	case "length":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
@@ -1472,7 +1663,10 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &VariableSizedType{Type: t.KeyType},
@@ -1491,14 +1685,20 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &VariableSizedType{Type: t.ValueType},
 		})
 
 	case "insert":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1516,7 +1716,10 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 		})
 
 	case "remove":
-		return NewMemberForType(t, identifier, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1564,6 +1767,10 @@ func (t *StorageType) String() string {
 	return "Storage"
 }
 
+func (t *StorageType) ID() string {
+	return "Storage"
+}
+
 func (t *StorageType) Equal(other Type) bool {
 	_, ok := other.(*StorageType)
 	return ok
@@ -1589,11 +1796,13 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 // EventType
 
 type EventType struct {
-	Identifier                          string
 	Location                            ast.Location
+	Identifier                          string
 	Fields                              []EventFieldType
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
+
+const EventTypeIDPrefix = 'E'
 
 func (*EventType) isType() {}
 
@@ -1623,6 +1832,15 @@ func (t *EventType) String() string {
 	}
 
 	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
+}
+
+func (t *EventType) ID() string {
+	return fmt.Sprintf(
+		"%c.%s.%s",
+		EventTypeIDPrefix,
+		t.Location,
+		t.Identifier,
+	)
 }
 
 func (t *EventType) Equal(other Type) bool {
@@ -1692,6 +1910,13 @@ func (t *ReferenceType) String() string {
 	return fmt.Sprintf("&%s", t.Type)
 }
 
+func (t *ReferenceType) ID() string {
+	if t.Type == nil {
+		return "reference"
+	}
+	return fmt.Sprintf("&%s", t.Type.ID())
+}
+
 func (t *ReferenceType) Equal(other Type) bool {
 	otherReference, ok := other.(*ReferenceType)
 	if !ok {
@@ -1755,6 +1980,10 @@ type AddressType struct{}
 func (*AddressType) isType() {}
 
 func (*AddressType) String() string {
+	return "Address"
+}
+
+func (*AddressType) ID() string {
 	return "Address"
 }
 

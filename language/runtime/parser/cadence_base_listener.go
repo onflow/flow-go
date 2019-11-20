@@ -369,13 +369,11 @@ func (s *BaseCadenceListener) EnterNilCoalescingExpression(ctx *NilCoalescingExp
 // ExitNilCoalescingExpression is called when production nilCoalescingExpression is exited.
 func (s *BaseCadenceListener) ExitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
 
-// EnterFailableDowncastingExpression is called when production failableDowncastingExpression is entered.
-func (s *BaseCadenceListener) EnterFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
-}
+// EnterCastingExpression is called when production castingExpression is entered.
+func (s *BaseCadenceListener) EnterCastingExpression(ctx *CastingExpressionContext) {}
 
-// ExitFailableDowncastingExpression is called when production failableDowncastingExpression is exited.
-func (s *BaseCadenceListener) ExitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
-}
+// ExitCastingExpression is called when production castingExpression is exited.
+func (s *BaseCadenceListener) ExitCastingExpression(ctx *CastingExpressionContext) {}
 
 // EnterConcatenatingExpression is called when production concatenatingExpression is entered.
 func (s *BaseCadenceListener) EnterConcatenatingExpression(ctx *ConcatenatingExpressionContext) {}
@@ -448,6 +446,12 @@ func (s *BaseCadenceListener) EnterUnaryOp(ctx *UnaryOpContext) {}
 
 // ExitUnaryOp is called when production unaryOp is exited.
 func (s *BaseCadenceListener) ExitUnaryOp(ctx *UnaryOpContext) {}
+
+// EnterCastingOp is called when production castingOp is entered.
+func (s *BaseCadenceListener) EnterCastingOp(ctx *CastingOpContext) {}
+
+// ExitCastingOp is called when production castingOp is exited.
+func (s *BaseCadenceListener) ExitCastingOp(ctx *CastingOpContext) {}
 
 // EnterPrimaryExpressionStart is called when production primaryExpressionStart is entered.
 func (s *BaseCadenceListener) EnterPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}

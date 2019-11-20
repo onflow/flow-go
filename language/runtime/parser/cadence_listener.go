@@ -181,8 +181,8 @@ type CadenceListener interface {
 	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
 	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
-	// EnterFailableDowncastingExpression is called when entering the failableDowncastingExpression production.
-	EnterFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+	// EnterCastingExpression is called when entering the castingExpression production.
+	EnterCastingExpression(c *CastingExpressionContext)
 
 	// EnterConcatenatingExpression is called when entering the concatenatingExpression production.
 	EnterConcatenatingExpression(c *ConcatenatingExpressionContext)
@@ -219,6 +219,9 @@ type CadenceListener interface {
 
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
+
+	// EnterCastingOp is called when entering the castingOp production.
+	EnterCastingOp(c *CastingOpContext)
 
 	// EnterPrimaryExpressionStart is called when entering the primaryExpressionStart production.
 	EnterPrimaryExpressionStart(c *PrimaryExpressionStartContext)
@@ -478,8 +481,8 @@ type CadenceListener interface {
 	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
 	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
-	// ExitFailableDowncastingExpression is called when exiting the failableDowncastingExpression production.
-	ExitFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+	// ExitCastingExpression is called when exiting the castingExpression production.
+	ExitCastingExpression(c *CastingExpressionContext)
 
 	// ExitConcatenatingExpression is called when exiting the concatenatingExpression production.
 	ExitConcatenatingExpression(c *ConcatenatingExpressionContext)
@@ -516,6 +519,9 @@ type CadenceListener interface {
 
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
+
+	// ExitCastingOp is called when exiting the castingOp production.
+	ExitCastingOp(c *CastingOpContext)
 
 	// ExitPrimaryExpressionStart is called when exiting the primaryExpressionStart production.
 	ExitPrimaryExpressionStart(c *PrimaryExpressionStartContext)

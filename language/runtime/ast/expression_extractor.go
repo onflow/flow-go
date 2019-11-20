@@ -62,8 +62,8 @@ type FunctionExtractor interface {
 	ExtractFunction(extractor *ExpressionExtractor, expression *FunctionExpression) ExpressionExtraction
 }
 
-type FailableDowncastExtractor interface {
-	ExtractFailableDowncast(extractor *ExpressionExtractor, expression *FailableDowncastExpression) ExpressionExtraction
+type CastingExtractor interface {
+	ExtractCast(extractor *ExpressionExtractor, expression *CastingExpression) ExpressionExtraction
 }
 
 type CreateExtractor interface {
@@ -79,25 +79,25 @@ type ReferenceExtractor interface {
 }
 
 type ExpressionExtractor struct {
-	nextIdentifier            int
-	BoolExtractor             BoolExtractor
-	NilExtractor              NilExtractor
-	IntExtractor              IntExtractor
-	StringExtractor           StringExtractor
-	ArrayExtractor            ArrayExtractor
-	DictionaryExtractor       DictionaryExtractor
-	IdentifierExtractor       IdentifierExtractor
-	InvocationExtractor       InvocationExtractor
-	MemberExtractor           MemberExtractor
-	IndexExtractor            IndexExtractor
-	ConditionalExtractor      ConditionalExtractor
-	UnaryExtractor            UnaryExtractor
-	BinaryExtractor           BinaryExtractor
-	FunctionExtractor         FunctionExtractor
-	FailableDowncastExtractor FailableDowncastExtractor
-	CreateExtractor           CreateExtractor
-	DestroyExtractor          DestroyExtractor
-	ReferenceExtractor        ReferenceExtractor
+	nextIdentifier       int
+	BoolExtractor        BoolExtractor
+	NilExtractor         NilExtractor
+	IntExtractor         IntExtractor
+	StringExtractor      StringExtractor
+	ArrayExtractor       ArrayExtractor
+	DictionaryExtractor  DictionaryExtractor
+	IdentifierExtractor  IdentifierExtractor
+	InvocationExtractor  InvocationExtractor
+	MemberExtractor      MemberExtractor
+	IndexExtractor       IndexExtractor
+	ConditionalExtractor ConditionalExtractor
+	UnaryExtractor       UnaryExtractor
+	BinaryExtractor      BinaryExtractor
+	FunctionExtractor    FunctionExtractor
+	CastingExtractor     CastingExtractor
+	CreateExtractor      CreateExtractor
+	DestroyExtractor     DestroyExtractor
+	ReferenceExtractor   ReferenceExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -583,19 +583,19 @@ func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpres
 	panic(errors.NewUnreachableError())
 }
 
-func (extractor *ExpressionExtractor) VisitFailableDowncastExpression(expression *FailableDowncastExpression) Repr {
+func (extractor *ExpressionExtractor) VisitCastingExpression(expression *CastingExpression) Repr {
 
 	// delegate to child extractor, if any,
 	// or call default implementation
 
-	if extractor.FailableDowncastExtractor != nil {
-		return extractor.FailableDowncastExtractor.ExtractFailableDowncast(extractor, expression)
+	if extractor.CastingExtractor != nil {
+		return extractor.CastingExtractor.ExtractCast(extractor, expression)
 	} else {
-		return extractor.ExtractFailableDowncast(expression)
+		return extractor.ExtractCast(expression)
 	}
 }
 
-func (extractor *ExpressionExtractor) ExtractFailableDowncast(expression *FailableDowncastExpression) ExpressionExtraction {
+func (extractor *ExpressionExtractor) ExtractCast(expression *CastingExpression) ExpressionExtraction {
 
 	// copy the expression
 	newExpression := *expression

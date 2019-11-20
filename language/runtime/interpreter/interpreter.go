@@ -1413,9 +1413,28 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
+			if expression.Optional {
+				switch typedResult := result.(type) {
+				case NilValue:
+					return typedResult
+
+				case SomeValue:
+					result = typedResult.Value
+
+				default:
+					panic(errors.NewUnreachableError())
+				}
+			}
+
 			value := result.(MemberAccessibleValue)
 			locationRange := interpreter.locationRange(expression)
-			return value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
+			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
+
+			if expression.Optional {
+				return SomeValue{Value: resultValue}
+			} else {
+				return resultValue
+			}
 		})
 }
 
@@ -1461,6 +1480,24 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	// interpret the invoked expression
 	return invocationExpression.InvokedExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
+
+			// Handle optional chaining on member expression, if any
+
+			if invokedMemberExpression, ok :=
+				invocationExpression.InvokedExpression.(*ast.MemberExpression); ok && invokedMemberExpression.Optional {
+
+				switch typedResult := result.(type) {
+				case NilValue:
+					return Done{Result: typedResult}
+
+				case SomeValue:
+					result = typedResult.Value
+
+				default:
+					panic(errors.NewUnreachableError())
+				}
+			}
+
 			function := result.(FunctionValue)
 
 			// NOTE: evaluate all argument expressions in call-site scope, not in function body
@@ -2196,19 +2233,30 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 		})
 }
 
-func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(Value)
 
-			anyValue := value.(AnyValue)
-			expectedType := interpreter.Checker.Elaboration.FailableDowncastingTypes[expression]
+			expectedType := interpreter.Checker.Elaboration.CastingTargetTypes[expression]
 
-			if !sema.IsSubType(anyValue.Type, expectedType) {
-				return NilValue{}
+			switch expression.Operation {
+			case ast.OperationFailableCast:
+				anyValue := value.(AnyValue)
+
+				if !sema.IsSubType(anyValue.Type, expectedType) {
+					return NilValue{}
+				}
+
+				return SomeValue{Value: anyValue.Value}
+
+			case ast.OperationCast:
+				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
+				return interpreter.convertAndBox(value, staticValueType, expectedType)
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
-
-			return SomeValue{Value: anyValue.Value}
 		})
 }
 

@@ -894,21 +894,17 @@ func (e *MissingReturnStatementError) Error() string {
 
 func (*MissingReturnStatementError) isSemanticError() {}
 
-// UnsupportedExpressionError
+// UnsupportedOptionalChainingAssignmentError
 
-type UnsupportedExpressionError struct {
-	ExpressionKind common.ExpressionKind
+type UnsupportedOptionalChainingAssignmentError struct {
 	ast.Range
 }
 
-func (e *UnsupportedExpressionError) Error() string {
-	return fmt.Sprintf(
-		"%s expressions are not supported yet",
-		e.ExpressionKind.Name(),
-	)
+func (e *UnsupportedOptionalChainingAssignmentError) Error() string {
+	return "cannot assign to optional chaining expression"
 }
 
-func (*UnsupportedExpressionError) isSemanticError() {}
+func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 
 // MissingMoveAnnotationError
 
@@ -1622,6 +1618,78 @@ func (e *ResourceMethodBindingError) Error() string {
 
 func (*ResourceMethodBindingError) isSemanticError() {}
 
+// InvalidDictionaryKeyTypeError
+
+type InvalidDictionaryKeyTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidDictionaryKeyTypeError) Error() string {
+	return fmt.Sprintf(
+		"cannot use type as dictionary key type: `%s`",
+		e.Type,
+	)
+}
+
+func (*InvalidDictionaryKeyTypeError) isSemanticError() {}
+
+// MissingFunctionBodyError
+
+type MissingFunctionBodyError struct {
+	Pos ast.Position
+}
+
+func (e *MissingFunctionBodyError) Error() string {
+	return "missing function implementation"
+}
+
+func (*MissingFunctionBodyError) isSemanticError() {}
+
+func (e *MissingFunctionBodyError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingFunctionBodyError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidOptionalChainingError
+
+type InvalidOptionalChainingError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidOptionalChainingError) Error() string {
+	return fmt.Sprintf(
+		"cannot use optional chaining: type '%s' is not optional",
+		e.Type,
+	)
+}
+
+func (*InvalidOptionalChainingError) isSemanticError() {}
+
+// InvalidAccessError
+
+type InvalidAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAccessError) isSemanticError() {}
+
 // InvalidCharacterLiteralError
 
 type InvalidCharacterLiteralError struct {
@@ -1637,3 +1705,15 @@ func (e *InvalidCharacterLiteralError) Error() string {
 }
 
 func (*InvalidCharacterLiteralError) isSemanticError() {}
+
+// InvalidFailableResourceDowncastOutsideOptionalBindingError
+
+type InvalidFailableResourceDowncastOutsideOptionalBindingError struct {
+	ast.Range
+}
+
+func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() string {
+	return "cannot failably downcast resource type outside of optional binding"
+}
+
+func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}

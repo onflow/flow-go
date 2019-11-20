@@ -3855,7 +3855,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
+func TestInterpretFailableCastingAnySuccess(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Any = 42
@@ -3878,7 +3878,7 @@ func TestInterpretFailableDowncastingAnySuccess(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableDowncastingAnyFailure(t *testing.T) {
+func TestInterpretFailableCastingAnyFailure(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Any = 42
@@ -3908,7 +3908,7 @@ func TestInterpretOptionalAny(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
+func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Any? = 42
@@ -3933,7 +3933,7 @@ func TestInterpretOptionalAnyFailableDowncasting(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
+func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Any? = 23
@@ -3967,7 +3967,7 @@ func TestInterpretOptionalAnyFailableDowncastingInt(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableDowncastingNil(t *testing.T) {
+func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Any? = nil
@@ -5364,7 +5364,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		value,
 	)
 
-	rType := inter.Checker.GlobalTypes["R"]
+	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
 		interpreter.ReferenceValue{
@@ -5748,5 +5748,144 @@ func TestInterpretAddressConversion(t *testing.T) {
 	assert.Equal(t,
 		interpreter.AddressValue{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2},
 		inter.Globals["y"].Value,
+	)
+}
+
+func TestInterpretCastingIntLiteralToInt8(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x = 42 as Int8
+    `)
+
+	assert.Equal(t,
+		interpreter.Int8Value(42),
+		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretCastingIntLiteralToAny(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x = 42 as Any
+    `)
+
+	assert.Equal(t,
+		interpreter.AnyValue{
+			Type:  &sema.IntType{},
+			Value: interpreter.NewIntValue(42),
+		},
+		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretCastingIntLiteralToOptional(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      let x = 42 as Int?
+    `)
+
+	assert.Equal(t,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretOptionalChainingFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test(x: 42)
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test()
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	require.IsType(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{},
+	)
+
+	assert.IsType(t,
+		inter.Globals["x2"].Value.(interpreter.SomeValue).Value,
+		interpreter.HostFunctionValue{},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+         struct Test {
+             fun x(): Int {
+                 return 42
+             }
+         }
+
+         let test1: Test? = nil
+         let x1 = test1?.x()
+
+         let test2: Test? = Test()
+         let x2 = test2?.x()
+       `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
 	)
 }

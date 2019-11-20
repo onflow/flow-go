@@ -36,3 +36,15 @@ func (v StandardLibraryValue) ValueDeclarationIsConstant() bool {
 func (StandardLibraryValue) ValueDeclarationArgumentLabels() []string {
 	return nil
 }
+
+// StandardLibraryValues
+
+type StandardLibraryValues []StandardLibraryValue
+
+func (functions StandardLibraryValues) ToValueDeclarations() map[string]sema.ValueDeclaration {
+	valueDeclarations := make(map[string]sema.ValueDeclaration, len(functions))
+	for _, function := range functions {
+		valueDeclarations[function.Name] = function
+	}
+	return valueDeclarations
+}

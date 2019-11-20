@@ -13,7 +13,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
+func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -29,11 +29,13 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
-				// TODO: add support for non-Any types in failable downcasting
+				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[0])
 
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+				// TODO: add support for non-Any types in failable casting
+
+				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindContract:
 
@@ -45,7 +47,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
@@ -55,7 +57,7 @@ func TestCheckFailableDowncastingWithMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 			}
@@ -702,7 +704,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -718,13 +720,14 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 3)
 
 				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[1])
 
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
+				// TODO: add support for non-Any types in failable downcasting
+				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
 			case common.CompositeKindContract:
 
@@ -734,13 +737,13 @@ func TestCheckFailableDowncastingWithoutMoveAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindStructure:
 
-				// TODO: add support for non-Any types in failable downcasting
+				// TODO: add support for non-Any types in failable casting
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1674,9 +1677,10 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
       let xs <- {<-x: <-x}
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[1])
 }
 
 func TestCheckInvalidResourceUseAfterMoveInWhileStatement(t *testing.T) {
@@ -2568,10 +2572,11 @@ func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 3)
 
-	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
 }
 
 func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
@@ -2850,4 +2855,257 @@ func TestCheckInvalidResourceMethodCall(t *testing.T) {
     `)
 
 	assert.Nil(t, err)
+}
+
+func TestCheckResourceOptionalBinding(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          if let r <- maybeR {
+              destroy r
+          } else {
+              destroy maybeR
+          }
+      }
+    `)
+
+	assert.Nil(t, err)
+}
+
+func TestCheckInvalidResourceOptionalBindingResourceLossInThen(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          if let r <- maybeR {
+              // resource loss of r
+          } else {
+              destroy maybeR
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOptionalBindingResourceLossInElse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          if let r <- maybeR {
+              destroy r
+          } else {
+              // resource loss of maybeR
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationInThen(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          if let r <- maybeR {
+              destroy r
+              destroy maybeR
+          } else {
+              destroy maybeR
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationAfterBranches(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let maybeR: <-R? <- create R()
+          if let r <- maybeR {
+              destroy r
+          } else {
+              destroy maybeR
+          }
+          f(<-maybeR)
+      }
+
+      fun f(_ r: <-R?) {
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
+func TestCheckResourceOptionalBindingFailableCast(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             if let r <- ri as? <-R {
+                 destroy r
+             } else {
+                 destroy ri
+             }
+         }
+    `)
+
+	// TODO: remove once supported
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationInThen(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             if let r <- ri as? <-R {
+                 destroy r
+                 destroy ri
+             } else {
+                 destroy ri
+             }
+         }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	// TODO: remove once supported
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+}
+
+func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterBranches(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             if let r <- ri as? <-R {
+                 destroy r
+             }
+             destroy ri
+         }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	// TODO: remove once supported
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+}
+
+func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             if let r <- ri as? <-R {
+                 destroy r
+             }
+         }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	// TODO: remove once supported
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+}
+
+func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterThen(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             if let r <- ri as? <-R {
+                 destroy r
+             }
+             destroy ri
+         }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	// TODO: remove once supported
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+}
+
+func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         resource interface RI {}
+
+         resource R: RI {}
+
+         fun test() {
+             let ri: <-RI <- create R()
+             let r <- ri as? <-R
+             destroy r
+         }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[0])
+
+	// TODO: remove once supported
+	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 }

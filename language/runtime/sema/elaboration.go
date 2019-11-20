@@ -2,6 +2,11 @@ package sema
 
 import "github.com/dapperlabs/flow-go/language/runtime/ast"
 
+type MemberInfo struct {
+	Member     *Member
+	IsOptional bool
+}
+
 type Elaboration struct {
 	FunctionDeclarationFunctionTypes    map[*ast.FunctionDeclaration]*FunctionType
 	VariableDeclarationValueTypes       map[*ast.VariableDeclaration]Type
@@ -15,12 +20,13 @@ type Elaboration struct {
 	InvocationExpressionArgumentTypes   map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes  map[*ast.InvocationExpression][]Type
 	InterfaceDeclarationTypes           map[*ast.InterfaceDeclaration]*InterfaceType
-	FailableDowncastingTypes            map[*ast.FailableDowncastExpression]Type
+	CastingStaticValueTypes             map[*ast.CastingExpression]Type
+	CastingTargetTypes                  map[*ast.CastingExpression]Type
 	ReturnStatementValueTypes           map[*ast.ReturnStatement]Type
 	ReturnStatementReturnTypes          map[*ast.ReturnStatement]Type
 	BinaryExpressionResultTypes         map[*ast.BinaryExpression]Type
 	BinaryExpressionRightTypes          map[*ast.BinaryExpression]Type
-	MemberExpressionMembers             map[*ast.MemberExpression]*Member
+	MemberExpressionMemberInfos         map[*ast.MemberExpression]MemberInfo
 	ArrayExpressionArgumentTypes        map[*ast.ArrayExpression][]Type
 	ArrayExpressionElementType          map[*ast.ArrayExpression]Type
 	DictionaryExpressionType            map[*ast.DictionaryExpression]*DictionaryType
@@ -46,12 +52,13 @@ func NewElaboration() *Elaboration {
 		InvocationExpressionArgumentTypes:   map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes:  map[*ast.InvocationExpression][]Type{},
 		InterfaceDeclarationTypes:           map[*ast.InterfaceDeclaration]*InterfaceType{},
-		FailableDowncastingTypes:            map[*ast.FailableDowncastExpression]Type{},
+		CastingStaticValueTypes:             map[*ast.CastingExpression]Type{},
+		CastingTargetTypes:                  map[*ast.CastingExpression]Type{},
 		ReturnStatementValueTypes:           map[*ast.ReturnStatement]Type{},
 		ReturnStatementReturnTypes:          map[*ast.ReturnStatement]Type{},
 		BinaryExpressionResultTypes:         map[*ast.BinaryExpression]Type{},
 		BinaryExpressionRightTypes:          map[*ast.BinaryExpression]Type{},
-		MemberExpressionMembers:             map[*ast.MemberExpression]*Member{},
+		MemberExpressionMemberInfos:         map[*ast.MemberExpression]MemberInfo{},
 		ArrayExpressionArgumentTypes:        map[*ast.ArrayExpression][]Type{},
 		ArrayExpressionElementType:          map[*ast.ArrayExpression]Type{},
 		DictionaryExpressionType:            map[*ast.DictionaryExpression]*DictionaryType{},

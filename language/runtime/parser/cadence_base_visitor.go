@@ -239,7 +239,7 @@ func (v *BaseCadenceVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpr
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+func (v *BaseCadenceVisitor) VisitCastingExpression(ctx *CastingExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -288,6 +288,10 @@ func (v *BaseCadenceVisitor) VisitMultiplicativeOp(ctx *MultiplicativeOpContext)
 }
 
 func (v *BaseCadenceVisitor) VisitUnaryOp(ctx *UnaryOpContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

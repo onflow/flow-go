@@ -74,7 +74,7 @@ replDeclaration
 declaration
     : compositeDeclaration
     | interfaceDeclaration
-    | functionDeclaration[true]
+    | functionDeclaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
@@ -111,7 +111,7 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members[true] '}'
+    : access compositeKind identifier conformances '{' members '}'
     ;
 
 conformances
@@ -132,17 +132,17 @@ fields
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members[false] '}'
+    : access compositeKind Interface identifier '{' members '}'
     ;
 
-members[bool functionBlockRequired]
-    : (member[functionBlockRequired] ';'?)*
+members
+    : (member ';'?)*
     ;
 
-member[bool functionBlockRequired]
+member
     : field
-    | specialFunctionDeclaration[functionBlockRequired]
-    | functionDeclaration[functionBlockRequired]
+    | specialFunctionDeclaration
+    | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
     ;
@@ -160,16 +160,12 @@ compositeKind
 // NOTE: allow any identifier in parser, then check identifier is one of
 // the valid identifiers in the semantic analysis to provide better error
 //
-specialFunctionDeclaration[bool functionBlockRequired]
-    : identifier parameterList
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+specialFunctionDeclaration
+    : identifier parameterList functionBlock?
     ;
 
-functionDeclaration[bool functionBlockRequired]
-    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+functionDeclaration
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)? functionBlock?
     ;
 
 eventDeclaration
@@ -363,12 +359,12 @@ relationalExpression
 
 nilCoalescingExpression
     // NOTE: right associative
-    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    : castingExpression (NilCoalescing nilCoalescingExpression)?
     ;
 
-failableDowncastingExpression
+castingExpression
     : concatenatingExpression
-    | failableDowncastingExpression FailableDowncasting typeAnnotation
+    | castingExpression castingOp typeAnnotation
     ;
 
 concatenatingExpression
@@ -462,9 +458,13 @@ Optional : '?' ;
 
 NilCoalescing : WS '??';
 
-Downcasting : 'as' ;
+Casting : 'as' ;
+FailableCasting : 'as?' ;
 
-FailableDowncasting : 'as?' ;
+castingOp
+    : Casting
+    | FailableCasting
+    ;
 
 primaryExpressionStart
     : identifierExpression
@@ -482,7 +482,7 @@ destroyExpression
     ;
 
 referenceExpression
-    : Ampersand expression Downcasting fullType
+    : Ampersand expression Casting fullType
     ;
 
 identifierExpression
@@ -507,7 +507,7 @@ expressionAccess
     ;
 
 memberAccess
-    : '.' identifier
+    : Optional? '.' identifier
     ;
 
 bracketExpression

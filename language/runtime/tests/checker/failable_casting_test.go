@@ -9,7 +9,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableDowncastingAny(t *testing.T) {
+func TestCheckFailableCastingAny(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       let x: Any = 1
@@ -18,10 +18,10 @@ func TestCheckFailableDowncastingAny(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	assert.NotEmpty(t, checker.Elaboration.FailableDowncastingTypes)
+	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
 
-func TestCheckInvalidFailableDowncastingAny(t *testing.T) {
+func TestCheckInvalidFailableCastingAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: Any = 1
@@ -34,7 +34,7 @@ func TestCheckInvalidFailableDowncastingAny(t *testing.T) {
 }
 
 // TODO: add support for statically known casts
-func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
+func TestCheckInvalidFailableCastingStaticallyKnown(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: Int = 1
@@ -48,7 +48,7 @@ func TestCheckInvalidFailableDowncastingStaticallyKnown(t *testing.T) {
 
 // TODO: add support for interfaces
 // TODO: add test this is *INVALID* for resources
-func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
+func TestCheckInvalidFailableCastingInterface(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       struct interface I {}
@@ -65,7 +65,7 @@ func TestCheckInvalidFailableDowncastingInterface(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
+func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: Any? = 1
@@ -78,7 +78,7 @@ func TestCheckInvalidFailableDowncastingOptionalAny(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
+func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: [Any] = [1]
@@ -90,7 +90,7 @@ func TestCheckInvalidFailableDowncastingArrayAny(t *testing.T) {
 	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
-func TestCheckOptionalAnyFailableDowncastingNil(t *testing.T) {
+func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       let x: Any? = nil

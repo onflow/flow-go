@@ -277,7 +277,7 @@ var lexerSymbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal",
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
 	"Div", "Mod", "Ampersand", "Negate", "Move", "Optional", "NilCoalescing",
-	"Downcasting", "FailableDowncasting", "OpenParen", "CloseParen", "Transaction",
+	"Casting", "FailableCasting", "OpenParen", "CloseParen", "Transaction",
 	"Struct", "Resource", "Contract", "Interface", "Fun", "Event", "Emit",
 	"Pre", "Post", "Priv", "Pub", "PubSet", "Return", "Break", "Continue",
 	"Let", "Var", "If", "Else", "While", "True", "False", "Nil", "Import",
@@ -290,11 +290,11 @@ var lexerRuleNames = []string{
 	"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8",
 	"T__9", "T__10", "T__11", "Equal", "Unequal", "Less", "Greater", "LessEqual",
 	"GreaterEqual", "Plus", "Minus", "Mul", "Div", "Mod", "Ampersand", "Negate",
-	"Move", "Optional", "NilCoalescing", "Downcasting", "FailableDowncasting",
-	"OpenParen", "CloseParen", "Transaction", "Struct", "Resource", "Contract",
-	"Interface", "Fun", "Event", "Emit", "Pre", "Post", "Priv", "Pub", "PubSet",
-	"Return", "Break", "Continue", "Let", "Var", "If", "Else", "While", "True",
-	"False", "Nil", "Import", "From", "Create", "Destroy", "Identifier", "IdentifierHead",
+	"Move", "Optional", "NilCoalescing", "Casting", "FailableCasting", "OpenParen",
+	"CloseParen", "Transaction", "Struct", "Resource", "Contract", "Interface",
+	"Fun", "Event", "Emit", "Pre", "Post", "Priv", "Pub", "PubSet", "Return",
+	"Break", "Continue", "Let", "Var", "If", "Else", "While", "True", "False",
+	"Nil", "Import", "From", "Create", "Destroy", "Identifier", "IdentifierHead",
 	"IdentifierCharacter", "DecimalLiteral", "BinaryLiteral", "OctalLiteral",
 	"HexadecimalLiteral", "InvalidNumberLiteral", "StringLiteral", "QuotedText",
 	"EscapedCharacter", "HexadecimalDigit", "WS", "Terminator", "BlockComment",
@@ -364,8 +364,8 @@ const (
 	CadenceLexerMove                 = 26
 	CadenceLexerOptional             = 27
 	CadenceLexerNilCoalescing        = 28
-	CadenceLexerDowncasting          = 29
-	CadenceLexerFailableDowncasting  = 30
+	CadenceLexerCasting              = 29
+	CadenceLexerFailableCasting      = 30
 	CadenceLexerOpenParen            = 31
 	CadenceLexerCloseParen           = 32
 	CadenceLexerTransaction          = 33
