@@ -83,14 +83,6 @@ func (s Server) Initialize(
 		},
 	}
 
-	// TODO remove
-	//var buf bytes.Buffer
-	//json.NewEncoder(&buf).Encode(params)
-	//connection.LogMessage(&protocol.LogMessageParams{
-	//	Type:    protocol.Log,
-	//	Message: string(buf.Bytes()),
-	//})
-
 	// after initialization, indicate to the client which commands we support
 	go s.registerCommands(connection)
 
@@ -147,6 +139,10 @@ func (s Server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "DidChangeText",
+	})
 	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
 
@@ -179,7 +175,7 @@ func (s Server) DidChangeTextDocument(
 		mainPath := strings.TrimPrefix(string(uri), "file://")
 
 		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-			return s.resolveImport(connection, mainPath, location)
+			return resolveImport(connection, mainPath, location)
 		})
 
 		// check program
@@ -289,25 +285,40 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 		Type:    protocol.Info,
 		Message: "code lens called" + string(params.TextDocument.URI),
 	})
-	codeLens := protocol.CodeLens{
-		Range: protocol.Range{
-			Start: protocol.Position{
-				Line:      0,
-				Character: 0,
-			},
-			End: protocol.Position{
-				Line:      0,
-				Character: 0,
-			},
-		},
-		Command: &protocol.Command{
-			Title:   "do something",
-			Command: "cadence.submitTransaction",
-			//Arguments: []interface{}{"a", "b", "c"},
-		},
-		//Data: "codelens data",
+
+	checker, ok := s.checkers[params.TextDocument.URI]
+	if !ok {
+		// Can we ensure this doesn't happen?
+		return []*protocol.CodeLens{}, nil
 	}
-	return []*protocol.CodeLens{&codeLens}, nil
+
+	var actions []*protocol.CodeLens
+
+	// Search for relevant function declarations
+	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+		if declaration.Identifier.String() == "main" {
+			actions = append(actions, &protocol.CodeLens{
+				Range: protocol.Range{
+					Start: protocol.Position{
+						Line:      float64(declaration.StartPosition().Line - 1),
+						Character: 0,
+					},
+					End: protocol.Position{
+						Line:      float64(declaration.StartPosition().Line - 1),
+						Character: 0,
+					},
+				},
+				Command: &protocol.Command{
+					Title:   "submit transaction",
+					Command: "cadence.submitTransaction",
+					//Arguments: []interface{}{"a", "b", "c"},
+				},
+				//Data: "codelens data",
+			})
+		}
+	}
+
+	return actions, nil
 }
 
 // TODO is this necessary?
@@ -320,6 +331,14 @@ func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.
 		Type:    protocol.Log,
 		Message: "called execute command: " + params.Command,
 	})
+
+	switch params.Command {
+	case "cadence.submitTransaction":
+		connection.ShowMessage(&protocol.ShowMessageParams{
+			Type:    protocol.Info,
+			Message: "called submit transaction",
+		})
+	}
 	return nil, nil
 }
 
@@ -361,7 +380,7 @@ func (Server) Exit(connection protocol.Connection) error {
 	return nil
 }
 
-func (s Server) resolveImport(
+func resolveImport(
 	connection protocol.Connection,
 	mainPath string,
 	location ast.Location,
