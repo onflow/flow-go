@@ -125,8 +125,6 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		config.Store = memstore.New()
 	}
 
-	// attempt to load state from the
-
 	// create the root account
 	rootAccount := createAccount(initialState, config.RootAccountKey)
 
