@@ -1,0 +1,63 @@
+{
+  "definitions": {
+    "Colour": {
+      "struct": {
+        "fields": {
+          "r": "Int8",
+          "g": "Int8",
+          "b": "Int8"
+        },
+        "initializers": [
+          [
+            {
+              "name": "r",
+              "type": "Int8"
+            },
+            {
+              "name": "g",
+              "type": "Int8"
+            },
+            {
+              "name": "b",
+              "type": "Int8"
+            }
+          ]
+        ]
+      }
+    },
+    "Banana": {
+      "resource": {
+        "fields": {
+          "colour": {
+            "struct": "Banana"
+          }
+        },
+        "initializers": [
+          [
+            {
+              "name": "colour",
+              "type": {
+                "struct": "Colour"
+              }
+            }
+          ]
+        ]
+      }
+    },
+    "BunchOfBananas": {
+      "resource": {
+        "fields": {
+          "bananas": {
+            "array": {
+              "of": {
+                "optional": {
+                  "resource": "Banana"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

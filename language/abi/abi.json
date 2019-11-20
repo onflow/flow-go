@@ -2,21 +2,41 @@
   "$id": "https://www.withflow.org/cadence.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "description": "The JSON Schema for Cadence",
-  "type": "array",
-  "items": {
-    "oneOf": [
-      {
-        "$ref": "#/definitions/function"
+  "type": "object",
+  "properties": {
+    "imports": {
+      "type": "object",
+      "title": "Imported types (empty for now)"
+    },
+    "definitions": {
+      "type": "object",
+      "title": "Types definitions",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/definitions/function"
+          },
+          {
+            "$ref": "#/definitions/variable"
+          },
+          {
+            "$ref": "#/definitions/struct"
+          },
+          {
+            "$ref": "#/definitions/resource"
+          }
+        ]
       },
-      {
-        "$ref": "#/definitions/variable"
-      },
-      {
-        "$ref": "#/definitions/struct"
+      "propertyNames": {
+        "$ref": "#/definitions/namePattern"
       }
-    ]
+    }
   },
+  "additionalProperties": false,
   "definitions": {
+    "namePattern": {
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+    },
     "function": {
       "title": "Function",
       "description": "A function declaration",
@@ -25,11 +45,6 @@
         "function": {
           "type": "object",
           "properties": {
-            "name": {
-              "title": "Function name",
-              "description": "The name of the function (required)",
-              "type": "string"
-            },
             "parameters": {
               "title": "Function parameters",
               "description": "The parameters of the function (optional; none if not given)",
@@ -42,9 +57,6 @@
               "$ref": "#/definitions/type"
             }
           },
-          "required": [
-            "name"
-          ],
           "additionalProperties": false
         }
       },
@@ -63,9 +75,16 @@
           "type": "string"
         },
         "name": {
-          "title": "Function parameter name",
-          "description": "The name of the function parameter (required)",
-          "type": "string"
+          "allOf": [
+            {
+              "title": "Function parameter name",
+              "description": "The name of the function parameter (required)",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
         },
         "type": {
           "title": "Function parameter type",
@@ -79,26 +98,47 @@
       ],
       "additionalProperties": false
     },
+    "resourceParameter": {
+      "title": "Resource Parameter",
+      "type": "object",
+      "properties": {
+        "label": {
+          "title": "Function parameter argument label",
+          "description": "The argument label for the function parameter (optional)",
+          "type": "string"
+        },
+        "name": {
+          "allOf": [
+            {
+              "title": "Function parameter name",
+              "description": "The name of the function parameter (required)",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        },
+        "type": {
+          "title": "Function parameter type",
+          "description": "The type of the function parameter (required)",
+          "$ref": "#/definitions/resourceType"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false
+    },
     "variable": {
       "type": "object",
       "title": "A variable definition",
       "properties": {
         "variable": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "type": {
-              "$ref": "#/definitions/type"
-            }
-          },
-          "required": [
-            "name",
-            "type"
-          ],
-          "additionalProperties": false
-        }
+          "$ref": "#/definitions/type"
+        },
+        "additionalProperties": false
       },
       "required": [
         "variable"
@@ -107,18 +147,18 @@
     },
     "struct": {
       "type": "object",
-      "title": "Composite data type",
+      "title": "Simple composite data type",
       "properties": {
         "struct": {
           "type": "object",
           "properties": {
-            "name": {
-              "type": "string"
-            },
             "fields": {
               "type": "object",
               "additionalProperties": {
                 "$ref": "#/definitions/type"
+              },
+              "propertyNames": {
+                "$ref": "#/definitions/namePattern"
               }
             },
             "initializers": {
@@ -131,11 +171,68 @@
               }
             }
           },
-          "required": ["name"],
           "additionalProperties": false
         }
       },
-      "required": ["struct"],
+      "required": [
+        "struct"
+      ],
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "title": "Resource, composite datatype with strictly-managed lifecycle",
+      "properties": {
+        "resource": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/resourceType"
+              },
+              "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+              }
+            },
+            "initializers": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/resourceParameter"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "resourceReferenceType": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "allOf": [
+            {
+              "type": "string",
+              "not": {
+                "$ref": "#/definitions/builtinType"
+              }
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        }
+      },
+      "required": [
+        "resource"
+      ],
       "additionalProperties": false
     },
     "type": {
@@ -157,7 +254,23 @@
           "$ref": "#/definitions/dictionaryType"
         },
         {
-          "$ref": "#/definitions/structType"
+          "$ref": "#/definitions/structReferenceType"
+        }
+      ]
+    },
+    "resourceType": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/type"
+        },
+        {
+          "$ref": "#/definitions/resourceReferenceType"
+        },
+        {
+          "$ref": "#/definitions/resourceArrayType"
+        },
+        {
+          "$ref": "#/definitions/resourceOptionalType"
         }
       ]
     },
@@ -167,6 +280,19 @@
       "properties": {
         "optional": {
           "$ref": "#/definitions/type"
+        }
+      },
+      "required": [
+        "optional"
+      ],
+      "additionalProperties": false
+    },
+    "resourceOptionalType": {
+      "title": "Optional resource type",
+      "type": "object",
+      "properties": {
+        "optional": {
+          "$ref": "#/definitions/resourceType"
         }
       },
       "required": [
@@ -220,6 +346,35 @@
               "title": "Element Type",
               "description": "The type of the elements (required)",
               "$ref": "#/definitions/type"
+            },
+            "size": {
+              "title": "Array Size",
+              "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "array"
+      ],
+      "additionalProperties": false
+    },
+    "resourceArrayType": {
+      "title": "Resource Array Type",
+      "type": "object",
+      "properties": {
+        "array": {
+          "type": "object",
+          "properties": {
+            "of": {
+              "title": "Element Type",
+              "description": "The type of the elements (required)",
+              "$ref": "#/definitions/resourceType"
             },
             "size": {
               "title": "Array Size",
@@ -293,18 +448,27 @@
       ],
       "additionalProperties": false
     },
-    "structType": {
+    "structReferenceType": {
       "title": "A composable struct type",
       "type": "object",
       "properties": {
-         "struct": {
-           "type": "string",
-           "not": {
-             "$ref": "#/definitions/builtinType"
-           }
-         }
+        "struct": {
+          "allOf": [
+            {
+              "type": "string",
+              "not": {
+                "$ref": "#/definitions/builtinType"
+              }
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        }
       },
-      "required": ["struct"],
+      "required": [
+        "struct"
+      ],
       "additionalProperties": false
     }
   }
