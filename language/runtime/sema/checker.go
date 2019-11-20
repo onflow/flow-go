@@ -40,6 +40,7 @@ type Checker struct {
 	valueActivations        *ValueActivations
 	resources               *Resources
 	typeActivations         *ValueActivations
+	containerTypes          map[Type]bool
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
 	GlobalTypes             map[string]*Variable
@@ -115,6 +116,7 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 		GlobalValues:        map[string]*Variable{},
 		GlobalTypes:         map[string]*Variable{},
 		Occurrences:         NewOccurrences(),
+		containerTypes:      map[Type]bool{},
 		variableOrigins:     map[*Variable]*Origin{},
 		memberOrigins:       map[Type]map[string]*Origin{},
 		seenImports:         map[ast.LocationID]bool{},

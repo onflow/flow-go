@@ -166,6 +166,22 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 			origin,
 		)
 
+		// Check access and report if inaccessible
+
+		// TODO: add option to checker to specify behaviour
+		//   for not-specified access modifier
+
+		if !checker.IsAccessibleMember(member) {
+			checker.report(
+				&InvalidAccessError{
+					Name:              member.Identifier.Identifier,
+					RestrictingAccess: member.Access,
+					DeclarationKind:   member.DeclarationKind,
+					Range:             ast.NewRangeFromPositioned(expression),
+				},
+			)
+		}
+
 		// Check that the member access is not to a function of resource type
 		// outside of an invocation of it.
 		//
@@ -192,4 +208,9 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 		}
 
 	return member, isOptional
+}
+
+func (checker *Checker) IsAccessibleMember(member *Member) bool {
+	return member.Access != ast.AccessPrivate ||
+		checker.containerTypes[member.ContainerType]
 }
