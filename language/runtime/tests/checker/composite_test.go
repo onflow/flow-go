@@ -2041,3 +2041,29 @@ func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
 }
+
+func TestCheckInvalidStructureFunctionWithMissingBody(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        struct Test {
+            pub fun getFoo(): Int
+        }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.MissingFunctionBodyError{}, errs[0])
+}
+
+func TestCheckInvalidStructureInitializerWithMissingBody(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        struct Test {
+            init()
+        }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.MissingFunctionBodyError{}, errs[0])
+}

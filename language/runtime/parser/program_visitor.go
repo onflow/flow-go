@@ -1272,9 +1272,11 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			IndexingType:       partialAccessExpression.IndexingType,
 			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
+
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{
 			Expression: wrapped,
+			Optional:   partialAccessExpression.Optional,
 			Identifier: partialAccessExpression.Identifier,
 		}
 	}
@@ -1292,9 +1294,11 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	optional := ctx.Optional() != nil
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
+		Optional:   optional,
 		Identifier: identifier,
 	}
 }

@@ -285,6 +285,7 @@ type AccessExpression interface {
 
 type MemberExpression struct {
 	Expression Expression
+	Optional   bool
 	Identifier Identifier
 }
 
@@ -309,9 +310,13 @@ func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 }
 
 func (e *MemberExpression) String() string {
+	optional := ""
+	if e.Optional {
+		optional = "?"
+	}
 	return fmt.Sprintf(
-		"%s.%s",
-		e.Expression, e.Identifier,
+		"%s%s.%s",
+		e.Expression, optional, e.Identifier,
 	)
 }
 

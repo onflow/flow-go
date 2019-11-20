@@ -547,6 +547,47 @@ func TestParseMemberExpression(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestParseOptionalMemberExpression(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+	    let a = b?.c
+	`)
+
+	assert.Nil(t, err)
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "a",
+			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Value: &MemberExpression{
+			Optional: true,
+			Expression: &IdentifierExpression{
+				Identifier: Identifier{
+					Identifier: "b",
+					Pos:        Position{Offset: 14, Line: 2, Column: 13},
+				},
+			},
+			Identifier: Identifier{
+				Identifier: "c",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
+			},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestParseIndexExpression(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -3978,17 +4019,6 @@ func TestParseStructureWithConformances(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, actual)
-}
-
-func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
-
-	_, _, err := parser.ParseProgram(`
-        struct Test {
-            pub fun getFoo(): Int
-        }
-	`)
-
-	assert.NotNil(t, err)
 }
 
 func TestParsePreAndPostConditions(t *testing.T) {

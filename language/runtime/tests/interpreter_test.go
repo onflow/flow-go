@@ -3727,26 +3727,26 @@ func TestInterpretDictionary(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.DictionaryValue{
-			"a": interpreter.NewIntValue(1),
-			"b": interpreter.NewIntValue(2),
-		},
+		interpreter.NewDictionaryValue(
+			interpreter.NewStringValue("a"), interpreter.NewIntValue(1),
+			interpreter.NewStringValue("b"), interpreter.NewIntValue(2),
+		),
 		inter.Globals["x"].Value,
 	)
 }
 
-func TestInterpretDictionaryNonLexicalOrder(t *testing.T) {
+func TestInterpretDictionaryInsertionOrder(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x = {"c": 3, "b": 2, "a": 1}
+      let x = {"c": 3, "a": 1, "b": 2}
     `)
 
 	assert.Equal(t,
-		interpreter.DictionaryValue{
-			"c": interpreter.NewIntValue(3),
-			"b": interpreter.NewIntValue(2),
-			"a": interpreter.NewIntValue(1),
-		},
+		interpreter.NewDictionaryValue(
+			interpreter.NewStringValue("c"), interpreter.NewIntValue(3),
+			interpreter.NewStringValue("a"), interpreter.NewIntValue(1),
+			interpreter.NewStringValue("b"), interpreter.NewIntValue(2),
+		),
 		inter.Globals["x"].Value,
 	)
 }
@@ -4321,11 +4321,12 @@ func TestInterpretDictionaryRemove(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.DictionaryValue{
-			"def": interpreter.NewIntValue(2),
-		},
+		interpreter.NewDictionaryValue(
+			interpreter.NewStringValue("def"), interpreter.NewIntValue(2),
+		),
 		value,
 	)
 
@@ -4350,12 +4351,13 @@ func TestInterpretDictionaryInsert(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.DictionaryValue{
-			"def": interpreter.NewIntValue(2),
-			"abc": interpreter.NewIntValue(3),
-		},
+		interpreter.NewDictionaryValue(
+			interpreter.NewStringValue("abc"), interpreter.NewIntValue(3),
+			interpreter.NewStringValue("def"), interpreter.NewIntValue(2),
+		),
 		value,
 	)
 
@@ -4364,6 +4366,52 @@ func TestInterpretDictionaryInsert(t *testing.T) {
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["inserted"].Value,
+	)
+}
+
+func TestInterpretDictionaryKeys(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      fun test(): [String] {
+          let dict = {"def": 2, "abc": 1}
+          dict.insert(key: "a", 3)
+          return dict.keys
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewStringValue("def"),
+			interpreter.NewStringValue("abc"),
+			interpreter.NewStringValue("a"),
+		),
+		value,
+	)
+}
+
+func TestInterpretDictionaryValues(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      fun test(): [Int] {
+          let dict = {"def": 2, "abc": 1}
+          dict.insert(key: "a", 3)
+          return dict.values
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValue(
+			interpreter.NewIntValue(2),
+			interpreter.NewIntValue(1),
+			interpreter.NewIntValue(3),
+		),
+		value,
 	)
 }
 
@@ -5238,9 +5286,17 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
 		value,
 	)
 
+	foo := value.(interpreter.DictionaryValue).
+		Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("foo"))
+
+	require.IsType(t,
+		interpreter.SomeValue{},
+		foo,
+	)
+
 	assert.IsType(t,
 		interpreter.CompositeValue{},
-		value.(interpreter.DictionaryValue)["foo"],
+		foo.(interpreter.SomeValue).Value,
 	)
 }
 
@@ -5308,7 +5364,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		value,
 	)
 
-	rType := inter.Checker.GlobalTypes["R"]
+	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
 		interpreter.ReferenceValue{
@@ -5653,7 +5709,7 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	)
 }
 
-func TestInterpreterIntegerConversions(t *testing.T) {
+func TestInterpretIntegerConversions(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Int8 = 100
@@ -5677,7 +5733,7 @@ func TestInterpreterIntegerConversions(t *testing.T) {
 	)
 }
 
-func TestInterpreterAddressConversion(t *testing.T) {
+func TestInterpretAddressConversion(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: Address = 0x1
@@ -5692,5 +5748,103 @@ func TestInterpreterAddressConversion(t *testing.T) {
 	assert.Equal(t,
 		interpreter.AddressValue{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2},
 		inter.Globals["y"].Value,
+	)
+}
+
+func TestInterpretOptionalChainingFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test(x: 42)
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test1: Test? = nil
+          let x1 = test1?.x
+
+          let test2: Test? = Test()
+          let x2 = test2?.x
+        `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	require.IsType(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{},
+	)
+
+	assert.IsType(t,
+		inter.Globals["x2"].Value.(interpreter.SomeValue).Value,
+		interpreter.HostFunctionValue{},
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+         struct Test {
+             fun x(): Int {
+                 return 42
+             }
+         }
+
+         let test1: Test? = nil
+         let x1 = test1?.x()
+
+         let test2: Test? = Test()
+         let x2 = test2?.x()
+       `,
+	)
+
+	assert.Equal(t,
+		inter.Globals["x1"].Value,
+		interpreter.NilValue{},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x2"].Value,
+		interpreter.SomeValue{
+			Value: interpreter.NewIntValue(42),
+		},
 	)
 }
