@@ -55,13 +55,8 @@ spec:
       version: v1
 
   # Deployment strategy dictates how an update will be rolled out across the deployment
-  # K8s will try to roll up to the maxSurge before taking pods offline
-  # If availability is a strong concern, increase surge and decrease unavailable
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 50%
-      maxUnavailable: 50%
+    type: Recreate
 
   template:
     metadata:
@@ -81,20 +76,6 @@ spec:
         kind: web
 
     spec:
-      # Affinity keeps your replicas from all being scheduled to
-      # nodes in the same zone. Prevents zonal failures from taking
-      # down your entire service
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app: flow-emulator
-                    env: staging
-                    version: v1
-                topologyKey: failure-domain.beta.kubernetes.io/zone
-              weight: 1
       imagePullSecrets:
         - name: gcr
       containers:
@@ -134,10 +115,6 @@ spec:
           volumeMounts:
             - name: badger-volume
               mountPath: /flowdb
-      volumes:
-        - name: badger-volume
-          persistentVolumeClaim:
-            claimName: emulator-storage-claim
           # # Readiness Probe
           # readinessProbe:
           #   httpGet:
@@ -154,3 +131,7 @@ spec:
           #   initialDelaySeconds: 30
           #   periodSeconds: 30
           #   successThreshold: 1
+      volumes:
+        - name: badger-volume
+          persistentVolumeClaim:
+            claimName: emulator-storage-claim
