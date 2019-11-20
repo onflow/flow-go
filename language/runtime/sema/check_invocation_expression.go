@@ -28,10 +28,25 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		checker.inCreate = inCreate
 	}()
 
+	inInvocation := checker.inInvocation
+	checker.inInvocation = true
+	defer func() {
+		checker.inInvocation = inInvocation
+	}()
+
 	// check the invoked expression can be invoked
 
 	invokedExpression := invocationExpression.InvokedExpression
 	expressionType := invokedExpression.Accept(checker).(Type)
+
+	isOptionalResult := false
+	if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
+		var member *Member
+		member, isOptionalResult = checker.visitMember(memberExpression)
+		if member != nil {
+			expressionType = member.Type
+		}
+	}
 
 	invokableType, ok := expressionType.(InvokableType)
 	if !ok {
@@ -58,15 +73,17 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 	// or the invocation refers to a function of a composite (member),
 	// check that the correct argument labels are supplied in the invocation
 
-	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
+	switch typedInvokedExpression := invokedExpression.(type) {
+	case *ast.IdentifierExpression:
 		checker.checkIdentifierInvocationArgumentLabels(
 			invocationExpression,
-			identifierExpression,
+			typedInvokedExpression,
 		)
-	} else if memberExpression, ok := invokedExpression.(*ast.MemberExpression); ok {
+
+	case *ast.MemberExpression:
 		checker.checkMemberInvocationArgumentLabels(
 			invocationExpression,
-			memberExpression,
+			typedInvokedExpression,
 		)
 	}
 
@@ -102,7 +119,11 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		functionActivation.ReturnInfo.DefinitelyReturned = true
 	}
 
-	return returnType
+	if isOptionalResult {
+		return &OptionalType{Type: returnType}
+	} else {
+		return returnType
+	}
 }
 
 func (checker *Checker) checkConstructorInvocationWithResourceResult(
@@ -155,7 +176,7 @@ func (checker *Checker) checkMemberInvocationArgumentLabels(
 	invocationExpression *ast.InvocationExpression,
 	memberExpression *ast.MemberExpression,
 ) {
-	member := checker.visitMember(memberExpression)
+	member, _ := checker.visitMember(memberExpression)
 
 	if member == nil || len(member.ArgumentLabels) == 0 {
 		return

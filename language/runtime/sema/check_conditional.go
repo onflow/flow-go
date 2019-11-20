@@ -34,6 +34,7 @@ func (checker *Checker) VisitIfStatement(statement *ast.IfStatement) ast.Repr {
 				return nil
 			},
 		)
+
 	default:
 		panic(errors.NewUnreachableError())
 	}

@@ -1,90 +1,118 @@
 package values
 
+import "math/big"
+
 type Value interface {
 	isValue()
-	// TODO: remove this function after encoding/decoding is implemented
-	ToGoValue() interface{}
 }
 
 type Void struct{}
 
-func (Void) isValue()                 {}
-func (v Void) ToGoValue() interface{} { return nil }
+func (Void) isValue() {}
 
 type Nil struct{}
 
-func (Nil) isValue()                 {}
-func (v Nil) ToGoValue() interface{} { return nil }
+func (Nil) isValue() {}
 
 type Bool bool
 
-func (Bool) isValue()                 {}
-func (v Bool) ToGoValue() interface{} { return bool(v) }
+func (Bool) isValue() {}
 
 type String string
 
-func (String) isValue()                 {}
-func (v String) ToGoValue() interface{} { return string(v) }
+func (String) isValue() {}
 
-// TODO: use big.Int to represent Int value
-type Int int
+type Bytes []byte
 
-func (Int) isValue()                 {}
-func (v Int) ToGoValue() interface{} { return int(v) }
+func (Bytes) isValue() {}
+
+type Int struct {
+	Int *big.Int
+}
+
+func NewInt(v int) Int {
+	return Int{big.NewInt(int64(v))}
+}
+
+func NewIntFromBig(v *big.Int) Int {
+	return Int{v}
+}
+
+func (v Int) ToInt() int {
+	return int(v.Int.Int64())
+}
+
+func (Int) isValue() {}
 
 type Int8 int8
 
-func (Int8) isValue()                 {}
-func (v Int8) ToGoValue() interface{} { return int8(v) }
+func (Int8) isValue() {}
 
 type Int16 int16
 
-func (Int16) isValue()                 {}
-func (v Int16) ToGoValue() interface{} { return int16(v) }
+func (Int16) isValue() {}
 
 type Int32 int32
 
-func (Int32) isValue()                 {}
-func (v Int32) ToGoValue() interface{} { return int32(v) }
+func (Int32) isValue() {}
 
 type Int64 int64
 
-func (Int64) isValue()                 {}
-func (v Int64) ToGoValue() interface{} { return int64(v) }
+func (Int64) isValue() {}
 
 type Uint8 uint8
 
-func (Uint8) isValue()                 {}
-func (v Uint8) ToGoValue() interface{} { return uint8(v) }
+func (Uint8) isValue() {}
 
 type Uint16 uint16
 
-func (Uint16) isValue()                 {}
-func (v Uint16) ToGoValue() interface{} { return uint16(v) }
+func (Uint16) isValue() {}
 
 type Uint32 uint32
 
-func (Uint32) isValue()                 {}
-func (v Uint32) ToGoValue() interface{} { return uint32(v) }
+func (Uint32) isValue() {}
 
 type Uint64 uint64
 
-func (Uint64) isValue()                 {}
-func (v Uint64) ToGoValue() interface{} { return uint64(v) }
+func (Uint64) isValue() {}
 
-type Array []Value
+type VariableSizedArray []Value
 
-func (Array) isValue()                 {}
-func (v Array) ToGoValue() interface{} { panic("not implemented") }
+func (VariableSizedArray) isValue() {}
+
+type ConstantSizedArray []Value
+
+func (ConstantSizedArray) isValue() {}
+
+type Dictionary []KeyValuePair
+
+func (Dictionary) isValue() {}
+
+type KeyValuePair struct {
+	Key   Value
+	Value Value
+}
+
+type Event struct {
+	// TODO: is the Identifier field needed here?
+	Identifier string
+	Fields     []Value
+}
 
 type Composite struct {
 	Fields []Value
 }
 
-func (Composite) isValue()                 {}
-func (v Composite) ToGoValue() interface{} { panic("not implemented") }
+func (Composite) isValue() {}
 
-type Dictionary map[Value]Value
+func (Event) isValue() {}
 
-func (Dictionary) isValue()                 {}
-func (v Dictionary) ToGoValue() interface{} { panic("not implemented") }
+type Address [20]byte
+
+func (Address) isValue() {}
+
+func BytesToAddress(b []byte) Address {
+	var a Address
+	copy(a[:], b)
+	return a
+}

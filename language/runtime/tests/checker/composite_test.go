@@ -1811,8 +1811,8 @@ func TestCheckCompositeFunction(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s X {
-                  fun foo(): ((): %[2]sX) {
-                      return self.bar
+                  fun foo(): %[2]sX {
+                      return %[2]s self.bar()
                   }
 
                   fun bar(): %[2]sX {
@@ -2040,4 +2040,30 @@ func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+}
+
+func TestCheckInvalidStructureFunctionWithMissingBody(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        struct Test {
+            pub fun getFoo(): Int
+        }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.MissingFunctionBodyError{}, errs[0])
+}
+
+func TestCheckInvalidStructureInitializerWithMissingBody(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+        struct Test {
+            init()
+        }
+	`)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.MissingFunctionBodyError{}, errs[0])
 }

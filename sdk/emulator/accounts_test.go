@@ -216,9 +216,11 @@ func TestCreateAccount(t *testing.T) {
 		assert.Nil(t, err)
 
 		require.Equal(t, flow.EventAccountCreated, lastEvent.Type)
-		require.IsType(t, flow.Address{}, lastEvent.Values["address"])
 
-		accountAddress := lastEvent.Values["address"].(flow.Address)
+		accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(lastEvent.Payload)
+		assert.Nil(t, err)
+
+		accountAddress := accountCreatedEvent.Address()
 		account, err := b.GetAccount(accountAddress)
 		assert.Nil(t, err)
 
