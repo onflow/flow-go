@@ -63,6 +63,15 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 		valueType = &NeverType{}
 	}
 
+	if !IsValidDictionaryKeyType(keyType) {
+		checker.report(
+			&InvalidDictionaryKeyTypeError{
+				Type:  keyType,
+				Range: ast.NewRangeFromPositioned(expression),
+			},
+		)
+	}
+
 	dictionaryType := &DictionaryType{
 		KeyType:   keyType,
 		ValueType: valueType,
@@ -72,4 +81,18 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 	checker.Elaboration.DictionaryExpressionType[expression] = dictionaryType
 
 	return dictionaryType
+}
+
+func IsValidDictionaryKeyType(keyType Type) bool {
+	// TODO: implement support for more built-in types here and in interpreter
+	switch keyType.(type) {
+	case *NeverType, *StringType, *BoolType:
+		return true
+	default:
+		if IsSubType(keyType, &IntegerType{}) {
+			return true
+		}
+
+		return false
+	}
 }

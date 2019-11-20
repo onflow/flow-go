@@ -1642,6 +1642,42 @@ func (e *ResourceMethodBindingError) Error() string {
 
 func (*ResourceMethodBindingError) isSemanticError() {}
 
+// InvalidDictionaryKeyTypeError
+
+type InvalidDictionaryKeyTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidDictionaryKeyTypeError) Error() string {
+	return fmt.Sprintf(
+		"cannot use type as dictionary key type: `%s`",
+		e.Type,
+	)
+}
+
+func (*InvalidDictionaryKeyTypeError) isSemanticError() {}
+
+// MissingFunctionBodyError
+
+type MissingFunctionBodyError struct {
+	Pos ast.Position
+}
+
+func (e *MissingFunctionBodyError) Error() string {
+	return "missing function implementation"
+}
+
+func (*MissingFunctionBodyError) isSemanticError() {}
+
+func (e *MissingFunctionBodyError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingFunctionBodyError) EndPosition() ast.Position {
+	return e.Pos
+}
+
 // InvalidOptionalChainingError
 
 type InvalidOptionalChainingError struct {
@@ -1717,3 +1753,15 @@ func (e *InvalidCharacterLiteralError) Error() string {
 }
 
 func (*InvalidCharacterLiteralError) isSemanticError() {}
+
+// InvalidFailableResourceDowncastOutsideOptionalBindingError
+
+type InvalidFailableResourceDowncastOutsideOptionalBindingError struct {
+	ast.Range
+}
+
+func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() string {
+	return "cannot failably downcast resource type outside of optional binding"
+}
+
+func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}

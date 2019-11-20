@@ -555,6 +555,15 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 		keyType := checker.ConvertType(t.KeyType)
 		valueType := checker.ConvertType(t.ValueType)
 
+		if !IsValidDictionaryKeyType(keyType) {
+			checker.report(
+				&InvalidDictionaryKeyTypeError{
+					Type:  keyType,
+					Range: ast.NewRangeFromPositioned(t.KeyType),
+				},
+			)
+		}
+
 		return &DictionaryType{
 			KeyType:   keyType,
 			ValueType: valueType,
@@ -601,6 +610,7 @@ func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterLis
 
 	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
+
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,
 			Type: convertedParameterType,
