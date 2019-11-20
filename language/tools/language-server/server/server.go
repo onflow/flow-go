@@ -49,11 +49,13 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type Server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
+	commands map[string]CommandHandler
 }
 
 func NewServer() Server {
 	return Server{
-		map[protocol.DocumentUri]*sema.Checker{},
+		checkers: make(map[protocol.DocumentUri]*sema.Checker),
+		commands: make(map[string]CommandHandler),
 	}
 }
 
@@ -78,7 +80,7 @@ func (s Server) Initialize(
 			//	TriggerCharacters: []string{"("},
 			//},
 			CodeLensProvider: &protocol.CodeLensOptions{
-				ResolveProvider: true,
+				ResolveProvider: false,
 			},
 		},
 	}
@@ -313,7 +315,6 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 					Command: "cadence.submitTransaction",
 					//Arguments: []interface{}{"a", "b", "c"},
 				},
-				//Data: "codelens data",
 			})
 		}
 	}
@@ -332,39 +333,11 @@ func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.
 		Message: "called execute command: " + params.Command,
 	})
 
-	switch params.Command {
-	case "cadence.submitTransaction":
-		connection.ShowMessage(&protocol.ShowMessageParams{
-			Type:    protocol.Info,
-			Message: "called submit transaction",
-		})
+	f, ok := s.commands[params.Command]
+	if !ok {
+		return nil, fmt.Errorf("invalid command: %s", params.Command)
 	}
-	return nil, nil
-}
-
-// Registers the commands that the server is able to handle.
-// The best reference I've found for how this works is:
-// https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
-func (s Server) registerCommands(connection protocol.Connection) {
-	err := connection.RegisterCapability(&protocol.RegistrationParams{
-		Registrations: []protocol.Registration{
-			{
-				ID:     "test",
-				Method: "workspace/executeCommand",
-				RegisterOptions: protocol.ExecuteCommandRegistrationOptions{
-					ExecuteCommandOptions: protocol.ExecuteCommandOptions{
-						Commands: []string{"cadence.submitTransaction"},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		connection.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Warning,
-			Message: "Failed to register command: " + err.Error(),
-		})
-	}
+	return f(connection, params.Arguments...)
 }
 
 func (Server) Shutdown(connection protocol.Connection) error {
