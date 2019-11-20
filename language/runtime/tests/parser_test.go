@@ -4559,7 +4559,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncasting(t *testing.T) {
+func TestParseFailableCasting(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
        let x = 0 as? Int
@@ -4567,7 +4567,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	failableDowncast := &FailableDowncastExpression{
+	failableDowncast := &CastingExpression{
 		Expression: &IntExpression{
 			Value: big.NewInt(0),
 			Base:  10,
@@ -4576,6 +4576,7 @@ func TestParseFailableDowncasting(t *testing.T) {
 				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
 			},
 		},
+		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
 			Move: false,
 			Type: &NominalType{
@@ -5616,7 +5617,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
+func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
         let y = x as? <-R
@@ -5624,13 +5625,14 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	failableDowncast := &FailableDowncastExpression{
+	failableDowncast := &CastingExpression{
 		Expression: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "x",
 				Pos:        Position{Offset: 17, Line: 2, Column: 16},
 			},
 		},
+		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
 			Move: true,
 			Type: &NominalType{
@@ -5658,6 +5660,56 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 	}
 
 	failableDowncast.ParentVariableDeclaration = variableDeclaration
+
+	expected := &Program{
+		Declarations: []Declaration{variableDeclaration},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseCasting(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        let y = x as Y
+	`)
+
+	assert.Nil(t, err)
+
+	cast := &CastingExpression{
+		Expression: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
+			},
+		},
+		Operation: OperationCast,
+		TypeAnnotation: &TypeAnnotation{
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "Y",
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
+				},
+			},
+			StartPos: Position{Offset: 22, Line: 2, Column: 21},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "y",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Value:    cast,
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	cast.ParentVariableDeclaration = variableDeclaration
 
 	expected := &Program{
 		Declarations: []Declaration{variableDeclaration},

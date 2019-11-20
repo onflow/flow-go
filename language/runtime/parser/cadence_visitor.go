@@ -173,8 +173,8 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#nilCoalescingExpression.
 	VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#failableDowncastingExpression.
-	VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{}
+	// Visit a parse tree produced by CadenceParser#castingExpression.
+	VisitCastingExpression(ctx *CastingExpressionContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#concatenatingExpression.
 	VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{}
@@ -211,6 +211,9 @@ type CadenceVisitor interface {
 
 	// Visit a parse tree produced by CadenceParser#unaryOp.
 	VisitUnaryOp(ctx *UnaryOpContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#castingOp.
+	VisitCastingOp(ctx *CastingOpContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#primaryExpressionStart.
 	VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{}

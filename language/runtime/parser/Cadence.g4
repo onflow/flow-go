@@ -336,12 +336,12 @@ relationalExpression
 
 nilCoalescingExpression
     // NOTE: right associative
-    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    : castingExpression (NilCoalescing nilCoalescingExpression)?
     ;
 
-failableDowncastingExpression
+castingExpression
     : concatenatingExpression
-    | failableDowncastingExpression FailableDowncasting typeAnnotation
+    | castingExpression castingOp typeAnnotation
     ;
 
 concatenatingExpression
@@ -435,9 +435,13 @@ Optional : '?' ;
 
 NilCoalescing : WS '??';
 
-Downcasting : 'as' ;
+Casting : 'as' ;
+FailableCasting : 'as?' ;
 
-FailableDowncasting : 'as?' ;
+castingOp
+    : Casting
+    | FailableCasting
+    ;
 
 primaryExpressionStart
     : identifierExpression
@@ -455,7 +459,7 @@ destroyExpression
     ;
 
 referenceExpression
-    : Ampersand expression Downcasting fullType
+    : Ampersand expression Casting fullType
     ;
 
 identifierExpression

@@ -795,7 +795,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	}
 	leftExpression := leftExpressionResult.(ast.Expression)
 
-	failableDowncastExpression, leftIsFailableDownCast := leftExpression.(*ast.FailableDowncastExpression)
+	castingExpression, leftIsCasting := leftExpression.(*ast.CastingExpression)
 
 	var typeAnnotation *ast.TypeAnnotation
 	typeAnnotationContext := ctx.TypeAnnotation()
@@ -831,8 +831,8 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		SecondValue:    rightExpression,
 	}
 
-	if leftIsFailableDownCast {
-		failableDowncastExpression.ParentVariableDeclaration = variableDeclaration
+	if leftIsCasting {
+		castingExpression.ParentVariableDeclaration = variableDeclaration
 	}
 
 	return variableDeclaration
@@ -1082,7 +1082,7 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{} {
 	// NOTE: right associative
 
-	left := ctx.FailableDowncastingExpression().Accept(v)
+	left := ctx.CastingExpression().Accept(v)
 	if left == nil {
 		return nil
 	}
@@ -1102,17 +1102,19 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 	}
 }
 
-func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+func (v *ProgramVisitor) VisitCastingExpression(ctx *CastingExpressionContext) interface{} {
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext == nil {
 		return ctx.ConcatenatingExpression().Accept(v)
 	}
 
-	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
+	expression := ctx.CastingExpression().Accept(v).(ast.Expression)
 	typeAnnotation := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
+	operation := ctx.CastingOp().Accept(v).(ast.Operation)
 
-	return &ast.FailableDowncastExpression{
+	return &ast.CastingExpression{
 		Expression:     expression,
+		Operation:      operation,
 		TypeAnnotation: typeAnnotation,
 	}
 }
@@ -1744,6 +1746,19 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 		LabelStartPos: labelStartPos,
 		LabelEndPos:   labelEndPos,
 		Expression:    expression,
+	}
+}
+
+func (v *ProgramVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
+	switch {
+	case ctx.Casting() != nil:
+		return ast.OperationCast
+
+	case ctx.FailableCasting() != nil:
+		return ast.OperationFailableCast
+
+	default:
+		panic(errors.NewUnreachableError())
 	}
 }
 
