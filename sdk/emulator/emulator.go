@@ -240,9 +240,9 @@ func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber
 	panic("not implemented")
 }
 
-// TODO: Implement
+// GetEvents returns events matching a query.
 func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
-	panic("not implemented")
+	return b.storage.GetEvents(eventType, startBlock, endBlock)
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately
