@@ -305,6 +305,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 				),
 			},
 		})
+
 	case "slice":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
@@ -323,6 +324,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			},
 			ArgumentLabels: []string{"from", "upTo"},
 		})
+
 	case "length":
 		return NewCheckedMember(&Member{
 			ContainerType:   t,
@@ -332,6 +334,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
 		})
+
 	default:
 		return nil
 	}
