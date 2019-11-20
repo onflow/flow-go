@@ -3,23 +3,23 @@
     "Colour": {
       "struct": {
         "fields": {
-          "r": "Int8",
-          "g": "Int8",
-          "b": "Int8"
+          "r": "UInt8",
+          "g": "UInt8",
+          "b": "UInt8"
         },
         "initializers": [
           [
             {
               "name": "r",
-              "type": "Int8"
+              "type": "UInt8"
             },
             {
               "name": "g",
-              "type": "Int8"
+              "type": "UInt8"
             },
             {
               "name": "b",
-              "type": "Int8"
+              "type": "UInt8"
             }
           ]
         ]

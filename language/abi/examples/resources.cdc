@@ -19,9 +19,9 @@ resource Banana {
 }
 
 resource BunchOfBananas {
-    let bananas: [Banana]
+    let bananas: <-[Banana]
 
-    init(bananas: [Banana]) {
-        self.bananas = bananas
+    init(bananas: <-[Banana]) {
+        self.bananas <- bananas
     }
 }
