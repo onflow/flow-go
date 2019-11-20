@@ -1625,7 +1625,7 @@ type InvalidFailableResourceDowncastOutsideOptionalBindingError struct {
 }
 
 func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() string {
-	return "cannot failable downcast resource type outside of optional binding"
+	return "cannot failably downcast resource type outside of optional binding"
 }
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
