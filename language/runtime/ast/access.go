@@ -11,6 +11,7 @@ type Access int
 const (
 	AccessNotSpecified Access = iota
 	AccessPrivate
+	AccessAuthorized
 	AccessPublic
 	AccessPublicSettable
 )
@@ -18,6 +19,7 @@ const (
 var Accesses = []Access{
 	AccessNotSpecified,
 	AccessPrivate,
+	AccessAuthorized,
 	AccessPublic,
 	AccessPublicSettable,
 }
@@ -28,6 +30,8 @@ func (a Access) Keyword() string {
 		return ""
 	case AccessPrivate:
 		return "priv"
+	case AccessAuthorized:
+		return "auth"
 	case AccessPublic:
 		return "pub"
 	case AccessPublicSettable:
@@ -43,6 +47,8 @@ func (a Access) Description() string {
 		return "not specified"
 	case AccessPrivate:
 		return "private"
+	case AccessAuthorized:
+		return "authorized"
 	case AccessPublic:
 		return "public"
 	case AccessPublicSettable:
