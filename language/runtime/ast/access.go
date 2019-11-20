@@ -22,8 +22,8 @@ var Accesses = []Access{
 	AccessPublicSettable,
 }
 
-func (s Access) Keyword() string {
-	switch s {
+func (a Access) Keyword() string {
+	switch a {
 	case AccessNotSpecified:
 		return ""
 	case AccessPrivate:
@@ -37,8 +37,8 @@ func (s Access) Keyword() string {
 	panic(errors.NewUnreachableError())
 }
 
-func (s Access) Description() string {
-	switch s {
+func (a Access) Description() string {
+	switch a {
 	case AccessNotSpecified:
 		return "not specified"
 	case AccessPrivate:
@@ -50,4 +50,8 @@ func (s Access) Description() string {
 	}
 
 	panic(errors.NewUnreachableError())
+}
+
+func (a Access) IsLessPermissiveThan(otherAccess Access) bool {
+	return a < otherAccess
 }
