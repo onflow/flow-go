@@ -19,6 +19,28 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 
 	checker.Elaboration.CastingTargetTypes[expression] = rightHandType
 
+	if leftHandType.IsResourceType() {
+		checker.recordResourceInvalidation(
+			leftHandExpression,
+			leftHandType,
+			ResourceInvalidationKindMove,
+		)
+
+		// If the casted type is a resource, the cast expression must occur
+		// in an optional binding, i.e. inside a variable declaration
+		// as the if-statement test element
+
+		if expression.ParentVariableDeclaration == nil ||
+			expression.ParentVariableDeclaration.ParentIfStatement == nil {
+
+			checker.report(
+				&InvalidFailableResourceDowncastOutsideOptionalBindingError{
+					Range: ast.NewRangeFromPositioned(expression),
+				},
+			)
+		}
+	}
+
 	switch expression.Operation {
 	case ast.OperationFailableCast:
 		// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now

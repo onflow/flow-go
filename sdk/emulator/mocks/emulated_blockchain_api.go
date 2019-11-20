@@ -7,6 +7,7 @@ package mocks
 import (
 	crypto "github.com/dapperlabs/flow-go/crypto"
 	flow "github.com/dapperlabs/flow-go/model/flow"
+	values "github.com/dapperlabs/flow-go/sdk/abi/values"
 	types "github.com/dapperlabs/flow-go/sdk/emulator/types"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -65,10 +66,10 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) CreateAccount(arg0, arg1, arg2 
 }
 
 // ExecuteScript mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (interface{}, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (values.Value, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScript", arg0)
-	ret0, _ := ret[0].(interface{})
+	ret0, _ := ret[0].(values.Value)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -80,10 +81,10 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScript(arg0 interface{})
 }
 
 // ExecuteScriptAtVersion mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtVersion(arg0 []byte, arg1 crypto.Hash) (interface{}, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtVersion(arg0 []byte, arg1 crypto.Hash) (values.Value, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScriptAtVersion", arg0, arg1)
-	ret0, _ := ret[0].(interface{})
+	ret0, _ := ret[0].(values.Value)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

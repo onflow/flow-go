@@ -795,6 +795,8 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	}
 	leftExpression := leftExpressionResult.(ast.Expression)
 
+	castingExpression, leftIsCasting := leftExpression.(*ast.CastingExpression)
+
 	var typeAnnotation *ast.TypeAnnotation
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext != nil {
@@ -817,7 +819,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	return &ast.VariableDeclaration{
+	variableDeclaration := &ast.VariableDeclaration{
 		Access:         access,
 		IsConstant:     isConstant,
 		Identifier:     identifier,
@@ -828,6 +830,12 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		SecondTransfer: rightTransfer,
 		SecondValue:    rightExpression,
 	}
+
+	if leftIsCasting {
+		castingExpression.ParentVariableDeclaration = variableDeclaration
+	}
+
+	return variableDeclaration
 }
 
 func (v *ProgramVisitor) VisitVariableKind(ctx *VariableKindContext) interface{} {
@@ -844,11 +852,14 @@ func (v *ProgramVisitor) VisitVariableKind(ctx *VariableKindContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
+	var variableDeclaration *ast.VariableDeclaration
+
 	var test ast.IfStatementTest
 	if ctx.testExpression != nil {
 		test = ctx.testExpression.Accept(v).(ast.Expression)
 	} else if ctx.testDeclaration != nil {
-		test = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
+		variableDeclaration = ctx.testDeclaration.Accept(v).(*ast.VariableDeclaration)
+		test = variableDeclaration
 	} else {
 		panic(errors.NewUnreachableError())
 	}
@@ -872,12 +883,18 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
-	return &ast.IfStatement{
+	ifStatement := &ast.IfStatement{
 		Test:     test,
 		Then:     then,
 		Else:     elseBlock,
 		StartPos: startPosition,
 	}
+
+	if variableDeclaration != nil {
+		variableDeclaration.ParentIfStatement = ifStatement
+	}
+
+	return ifStatement
 }
 
 func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interface{} {
@@ -1257,9 +1274,11 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 			IndexingType:       partialAccessExpression.IndexingType,
 			Range:              ast.NewRangeFromPositioned(partialAccessExpression),
 		}
+
 	case *ast.MemberExpression:
 		return &ast.MemberExpression{
 			Expression: wrapped,
+			Optional:   partialAccessExpression.Optional,
 			Identifier: partialAccessExpression.Identifier,
 		}
 	}
@@ -1277,9 +1296,11 @@ func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) int
 
 func (v *ProgramVisitor) VisitMemberAccess(ctx *MemberAccessContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	optional := ctx.Optional() != nil
 
 	// NOTE: partial, expression is filled later
 	return &ast.MemberExpression{
+		Optional:   optional,
 		Identifier: identifier,
 	}
 }

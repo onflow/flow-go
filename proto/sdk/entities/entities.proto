@@ -116,3 +116,10 @@ message AccountPublicKey {
   uint32 hash_algo = 3;
   uint32 weight = 4;
 }
+
+message Event {
+  string type = 1;
+  bytes transaction_hash = 2;
+  uint32 index = 3;
+  bytes payload = 4;
+}

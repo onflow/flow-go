@@ -47,6 +47,19 @@ func (k CompositeKind) Keyword() string {
 	panic(errors.NewUnreachableError())
 }
 
+func (k CompositeKind) DeclarationKind() DeclarationKind {
+	switch k {
+	case CompositeKindStructure:
+		return DeclarationKindStructure
+	case CompositeKindResource:
+		return DeclarationKindResource
+	case CompositeKindContract:
+		return DeclarationKindContract
+	}
+
+	panic(errors.NewUnreachableError())
+}
+
 func (k CompositeKind) Annotation() string {
 	if k != CompositeKindResource {
 		return ""

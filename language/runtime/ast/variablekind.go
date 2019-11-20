@@ -14,6 +14,11 @@ const (
 	VariableKindConstant
 )
 
+var VariableKinds = []VariableKind{
+	VariableKindConstant,
+	VariableKindVariable,
+}
+
 func (k VariableKind) Name() string {
 	switch k {
 	case VariableKindVariable:
