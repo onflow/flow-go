@@ -1,7 +1,6 @@
 package memstore
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
@@ -17,27 +16,23 @@ type Store struct {
 	// Maps block hashes to block numbers
 	blockHashToNumber map[string]uint64
 	// Finalized blocks indexed by block number
-	blocks []types.Block
+	blocks map[uint64]types.Block
 	// Finalized transactions by hash
 	transactions map[string]flow.Transaction
 	// Ledger states by block number
 	ledger map[uint64]flow.Ledger
 	// Stores events by block number
 	eventsByBlockNumber map[uint64][]flow.Event
+	// Tracks the highest block number
+	blockHeight uint64
 }
-
-var (
-	// ErrInvalidBlockInsertion occurs when a block with a block number that
-	// is NOT one greater than the last block number is inserted.
-	ErrInvalidBlockInsertion = errors.New("cannot insert block with invalid number")
-)
 
 // New returns a new in-memory Store implementation.
 func New() Store {
 	return Store{
 		mu:                  sync.RWMutex{},
 		blockHashToNumber:   make(map[string]uint64),
-		blocks:              []types.Block{types.GenesisBlock()},
+		blocks:              make(map[uint64]types.Block),
 		transactions:        make(map[string]flow.Transaction),
 		ledger:              make(map[uint64]flow.Ledger),
 		eventsByBlockNumber: make(map[uint64][]flow.Event),
@@ -49,38 +44,46 @@ func (s Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	defer s.mu.RUnlock()
 
 	blockNumber := s.blockHashToNumber[hash.Hex()]
-	if blockNumber > s.blockHeight() {
+	block, ok := s.blocks[blockNumber]
+	if !ok {
 		return types.Block{}, storage.ErrNotFound{}
 	}
-	return s.blocks[int(blockNumber)], nil
+
+	return block, nil
 }
 
 func (s Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if blockNumber > s.blockHeight() {
+	block, ok := s.blocks[blockNumber]
+	if !ok {
 		return types.Block{}, storage.ErrNotFound{}
 	}
-	return s.blocks[int(blockNumber)], nil
+
+	return block, nil
 }
 
 func (s Store) GetLatestBlock() (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.getLatestBlock(), nil
+	latestBlock, ok := s.blocks[s.blockHeight]
+	if !ok {
+		return types.Block{}, storage.ErrNotFound{}
+	}
+	return latestBlock, nil
 }
 
 func (s Store) InsertBlock(block types.Block) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	nextBlockHeight := s.blockHeight() + 1
-	if block.Number != nextBlockHeight {
-		return ErrInvalidBlockInsertion
+	s.blocks[block.Number] = block
+	if block.Number > s.blockHeight {
+		s.blockHeight = block.Number
 	}
-	s.blocks = append(s.blocks, block)
+
 	return nil
 }
 
@@ -103,14 +106,15 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
+func (s Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if blockNumber > s.blockHeight() {
-		return flow.LedgerView{}, storage.ErrNotFound{}
+	ledger, ok := s.ledger[blockNumber]
+	if !ok {
+		return flow.Ledger{}, storage.ErrNotFound{}
 	}
-	return *s.ledger[blockNumber].NewView(), nil
+	return ledger, nil
 }
 
 func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
@@ -159,13 +163,7 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 	return nil
 }
 
-// Returns the block most recently appended to the chain.
+// Returns the block with the highest number.
 func (s Store) getLatestBlock() types.Block {
-	return s.blocks[len(s.blocks)-1]
-}
-
-// Returns the current block height, defined as the block number of the latest
-// block.
-func (s Store) blockHeight() uint64 {
-	return s.getLatestBlock().Number
+	return s.blocks[s.blockHeight]
 }

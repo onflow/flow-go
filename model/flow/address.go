@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 )
 
 const (
@@ -21,7 +22,10 @@ func init() {
 type Address [AddressLength]byte
 
 // ZeroAddress represents the "zero address" (account that no one owns).
-var ZeroAddress Address = Address{}
+var (
+	ZeroAddress = Address{}
+	RootAddress = BytesToAddress(big.NewInt(1).Bytes())
+)
 
 // BytesToAddress returns Address with value b.
 //

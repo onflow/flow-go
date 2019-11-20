@@ -141,9 +141,9 @@ func TestLedger(t *testing.T) {
 		})
 
 		t.Run("should be to get set ledger", func(t *testing.T) {
-			view, err := store.GetLedgerView(blockNumber)
+			gotLedger, err := store.GetLedger(blockNumber)
 			assert.NoError(t, err)
-			assert.Equal(t, ledger.NewView(), &view)
+			assert.Equal(t, ledger, gotLedger)
 		})
 	})
 
@@ -181,18 +181,18 @@ func TestLedger(t *testing.T) {
 
 		// We didn't insert anything at block 0, so this should be empty.
 		t.Run("should return empty view for block 0", func(t *testing.T) {
-			view, err := store.GetLedgerView(0)
+			gotLedger, err := store.GetLedger(0)
 			require.NoError(t, err)
-			expected := make(flow.Ledger).NewView()
-			assert.Equal(t, *expected, view)
+			expected := make(flow.Ledger)
+			assert.Equal(t, expected, gotLedger)
 		})
 
 		// View at block 1 should have keys 1, 2, 3
 		t.Run("should version the first written block", func(t *testing.T) {
-			view, err := store.GetLedgerView(1)
+			gotLedger, err := store.GetLedger(1)
 			require.NoError(t, err)
 			for i := 1; i <= 3; i++ {
-				val, ok := view.Get(fmt.Sprintf("%d", i))
+				val, ok := gotLedger[fmt.Sprintf("%d", i)]
 				assert.True(t, ok)
 				assert.Equal(t, []byte{byte(1)}, val)
 			}
@@ -201,17 +201,17 @@ func TestLedger(t *testing.T) {
 		// View at block N should have values 1->N+2
 		t.Run("should version all blocks", func(t *testing.T) {
 			for block := 2; block < totalBlocks; block++ {
-				view, err := store.GetLedgerView(uint64(block))
+				gotLedger, err := store.GetLedger(uint64(block))
 				require.NoError(t, err)
 				// The keys 1->N-1 are defined in previous blocks
 				for i := 1; i < block; i++ {
-					val, ok := view.Get(fmt.Sprintf("%d", i))
+					val, ok := gotLedger[fmt.Sprintf("%d", i)]
 					assert.True(t, ok)
 					assert.Equal(t, []byte{byte(i)}, val)
 				}
 				// The keys N->N+2 are defined in the queried block
 				for i := block; i <= block+2; i++ {
-					val, ok := view.Get(fmt.Sprintf("%d", i))
+					val, ok := gotLedger[fmt.Sprintf("%d", i)]
 					assert.True(t, ok)
 					assert.Equal(t, []byte{byte(block)}, val)
 				}
@@ -362,9 +362,9 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, events, gotEvents)
 
-	gotLedger, err := store.GetLedgerView(block.Number)
+	gotLedger, err := store.GetLedger(block.Number)
 	assert.NoError(t, err)
-	assert.Equal(t, ledger.NewView(), &gotLedger)
+	assert.Equal(t, ledger, gotLedger)
 }
 
 func benchmarkSetLedger(b *testing.B, nKeys int) {
@@ -423,7 +423,7 @@ func benchmarkGetLedger(b *testing.B, nBlocks int) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := store.GetLedgerView(uint64(b.N))
+		_, err := store.GetLedger(uint64(b.N))
 		if err != nil {
 			b.Fatal(err)
 		}

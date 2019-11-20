@@ -124,9 +124,35 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	if config.Store == nil {
 		config.Store = memstore.New()
 	}
+	store := config.Store
 
-	// create the root account
-	rootAccount := createAccount(initialState, config.RootAccountKey)
+	latestBlock, err := store.GetLatestBlock()
+	if err == nil && latestBlock.Number > 0 {
+		// storage contains data, load state from storage
+		latestState, err := store.GetLedger(latestBlock.Number)
+		if err != nil {
+			// TODO bubble
+			panic(err)
+		}
+		initialState = latestState
+	} else {
+		// storage is empty, create the root account and genesis block
+		createAccount(initialState, config.RootAccountKey)
+
+		// insert the genesis block
+		if err := store.InsertBlock(types.GenesisBlock()); err != nil {
+			// TODO bubble
+			panic(err)
+		}
+
+		// insert the initial state containing the root account
+		if err := store.SetLedger(0, initialState); err != nil {
+			// TODO bubble
+			panic(err)
+		}
+	}
+
+	rootAccount := getAccount(initialState, flow.RootAddress)
 
 	b := &EmulatedBlockchain{
 		storage:            config.Store,
@@ -134,7 +160,7 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		txPool:             txPool,
 		rootAccountAddress: rootAccount.Address,
 		rootAccountKey:     config.RootAccountKey,
-		lastCreatedAccount: rootAccount,
+		lastCreatedAccount: *rootAccount,
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
@@ -225,14 +251,17 @@ func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, er
 // Returns the account for the given address, or nil if the account does not
 // exist.
 func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
-	ledger := b.pendingState
-	runtimeContext := execution.NewRuntimeContext(ledger.NewView())
-	return runtimeContext.GetAccount(address)
+	return getAccount(b.pendingState, address)
 }
 
 // TODO: Implement
 func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error) {
 	panic("not implemented")
+}
+
+func getAccount(ledger flow.Ledger, address flow.Address) *flow.Account {
+	runtimeCtx := execution.NewRuntimeContext(ledger.NewView())
+	return runtimeCtx.GetAccount(address)
 }
 
 // GetEvents returns events matching a query.
