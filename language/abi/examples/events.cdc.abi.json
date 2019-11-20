@@ -1,5 +1,19 @@
 {
   "definitions": {
+    "Sow": {
+      "event": [
+        {
+          "name": "seed",
+          "type": "String"
+        },
+        {
+          "name": "times",
+          "type": "Int"
+        }
+      ]
+    }
+  },
+  "TODO": {
     "Seed": {
       "struct": {
         "fields": {
