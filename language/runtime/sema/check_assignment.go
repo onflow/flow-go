@@ -197,10 +197,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	valueType Type,
 ) (memberType Type) {
 
-	member := checker.visitMember(target)
+	member, isOptional := checker.visitMember(target)
 
 	if member == nil {
 		return &InvalidType{}
+	}
+
+	if isOptional {
+		checker.report(
+			&UnsupportedOptionalChainingAssignmentError{
+				Range: ast.NewRangeFromPositioned(target),
+			},
+		)
 	}
 
 	// If the value type is valid, check that the value can be assigned to the member type
