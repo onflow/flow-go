@@ -894,21 +894,17 @@ func (e *MissingReturnStatementError) Error() string {
 
 func (*MissingReturnStatementError) isSemanticError() {}
 
-// UnsupportedExpressionError
+// UnsupportedOptionalChainingAssignmentError
 
-type UnsupportedExpressionError struct {
-	ExpressionKind common.ExpressionKind
+type UnsupportedOptionalChainingAssignmentError struct {
 	ast.Range
 }
 
-func (e *UnsupportedExpressionError) Error() string {
-	return fmt.Sprintf(
-		"%s expressions are not supported yet",
-		e.ExpressionKind.Name(),
-	)
+func (e *UnsupportedOptionalChainingAssignmentError) Error() string {
+	return "cannot assign to optional chaining expression"
 }
 
-func (*UnsupportedExpressionError) isSemanticError() {}
+func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 
 // MissingMoveAnnotationError
 
@@ -1621,6 +1617,22 @@ func (e *ResourceMethodBindingError) Error() string {
 }
 
 func (*ResourceMethodBindingError) isSemanticError() {}
+
+// InvalidOptionalChainingError
+
+type InvalidOptionalChainingError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidOptionalChainingError) Error() string {
+	return fmt.Sprintf(
+		"cannot use optional chaining: type '%s' is not optional",
+		e.Type,
+	)
+}
+
+func (*InvalidOptionalChainingError) isSemanticError() {}
 
 // InvalidAccessError
 
