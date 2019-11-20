@@ -2556,6 +2556,45 @@ func TestCheckResourceDictionaryLength(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- {<-create X(): "x1"}
+          let keys <- xs.keys
+          destroy keys
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 3)
+
+	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
+}
+
+func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource X {}
+
+      fun test() {
+          let xs <- {"x1": <-create X()}
+          let values <- xs.values
+          destroy values
+          destroy xs
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+}
+
 func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `

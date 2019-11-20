@@ -74,7 +74,7 @@ replDeclaration
 declaration
     : compositeDeclaration
     | interfaceDeclaration
-    | functionDeclaration[true]
+    | functionDeclaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
@@ -92,7 +92,7 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members[true] '}'
+    : access compositeKind identifier conformances '{' members '}'
     ;
 
 conformances
@@ -109,17 +109,17 @@ field
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members[false] '}'
+    : access compositeKind Interface identifier '{' members '}'
     ;
 
-members[bool functionBlockRequired]
-    : (member[functionBlockRequired] ';'?)*
+members
+    : (member ';'?)*
     ;
 
-member[bool functionBlockRequired]
+member
     : field
-    | specialFunctionDeclaration[functionBlockRequired]
-    | functionDeclaration[functionBlockRequired]
+    | specialFunctionDeclaration
+    | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
     ;
@@ -137,16 +137,12 @@ compositeKind
 // NOTE: allow any identifier in parser, then check identifier is one of
 // the valid identifiers in the semantic analysis to provide better error
 //
-specialFunctionDeclaration[bool functionBlockRequired]
-    : identifier parameterList
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+specialFunctionDeclaration
+    : identifier parameterList functionBlock?
     ;
 
-functionDeclaration[bool functionBlockRequired]
-    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+functionDeclaration
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)? functionBlock?
     ;
 
 eventDeclaration
@@ -484,7 +480,7 @@ expressionAccess
     ;
 
 memberAccess
-    : '.' identifier
+    : Optional? '.' identifier
     ;
 
 bracketExpression

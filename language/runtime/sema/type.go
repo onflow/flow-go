@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 type Type interface {
@@ -17,6 +18,10 @@ type Type interface {
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
+}
+
+type ExportableType interface {
+	Export() types.Type
 }
 
 // ValueIndexableType
@@ -41,6 +46,13 @@ type TypeIndexableType interface {
 type TypeAnnotation struct {
 	Move bool
 	Type Type
+}
+
+func (a *TypeAnnotation) Export() types.Annotation {
+	return types.Annotation{
+		IsMove: a.Move,
+		Type:   a.Type.(ExportableType).Export(),
+	}
 }
 
 func (a *TypeAnnotation) String() string {
@@ -120,6 +132,10 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
+func (*VoidType) Export() types.Type {
+	return types.Void{}
+}
+
 func (*VoidType) String() string {
 	return "Void"
 }
@@ -197,6 +213,10 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
+func (*BoolType) Export() types.Type {
+	return types.Bool{}
+}
+
 func (*BoolType) String() string {
 	return "Bool"
 }
@@ -242,6 +262,10 @@ type StringType struct{}
 
 func (*StringType) isType() {}
 
+func (*StringType) Export() types.Type {
+	return types.String{}
+}
+
 func (*StringType) String() string {
 	return "String"
 }
@@ -263,10 +287,13 @@ func (*StringType) HasMembers() bool {
 	return true
 }
 
-func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
-	switch field {
+func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
 	case "concat":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -278,8 +305,12 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 				),
 			},
 		})
+
 	case "slice":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -293,12 +324,17 @@ func (t *StringType) GetMember(field string, _ ast.Range, _ func(error)) *Member
 			},
 			ArgumentLabels: []string{"from", "upTo"},
 		})
+
 	case "length":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
 		})
+
 	default:
 		return nil
 	}
@@ -358,6 +394,10 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
+func (*IntType) Export() types.Type {
+	return types.Int{}
+}
+
 func (*IntType) String() string {
 	return "Int"
 }
@@ -388,6 +428,10 @@ func (*IntType) Max() *big.Int {
 type Int8Type struct{}
 
 func (*Int8Type) isType() {}
+
+func (*Int8Type) Export() types.Type {
+	return types.Int8{}
+}
 
 func (*Int8Type) String() string {
 	return "Int8"
@@ -422,6 +466,10 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
+func (*Int16Type) Export() types.Type {
+	return types.Int16{}
+}
+
 func (*Int16Type) String() string {
 	return "Int16"
 }
@@ -454,6 +502,10 @@ func (*Int16Type) Max() *big.Int {
 type Int32Type struct{}
 
 func (*Int32Type) isType() {}
+
+func (*Int32Type) Export() types.Type {
+	return types.Int32{}
+}
 
 func (*Int32Type) String() string {
 	return "Int32"
@@ -488,6 +540,10 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
+func (*Int64Type) Export() types.Type {
+	return types.Int64{}
+}
+
 func (*Int64Type) String() string {
 	return "Int64"
 }
@@ -520,6 +576,10 @@ func (*Int64Type) Max() *big.Int {
 type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
+
+func (*UInt8Type) Export() types.Type {
+	return types.Uint8{}
+}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
@@ -554,6 +614,10 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
+func (*UInt16Type) Export() types.Type {
+	return types.Uint16{}
+}
+
 func (*UInt16Type) String() string {
 	return "UInt16"
 }
@@ -587,6 +651,10 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
+func (*UInt32Type) Export() types.Type {
+	return types.Uint32{}
+}
+
 func (*UInt32Type) String() string {
 	return "UInt32"
 }
@@ -619,6 +687,10 @@ func (*UInt32Type) Max() *big.Int {
 type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
+
+func (*UInt64Type) Export() types.Type {
+	return types.Uint64{}
+}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
@@ -655,19 +727,22 @@ type ArrayType interface {
 	isArrayType()
 }
 
-func getArrayMember(t ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
+func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
 
 	switch field {
 	case "append":
 		// Appending elements to a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
-		return NewMemberForType(t, field, Member{
+		elementType := arrayType.ElementType(false)
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -684,26 +759,31 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		// TODO: maybe allow constant sized:
 		//    concatenate with variable sized and return variable sized
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
 		// TODO: maybe allow for resource element type
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
 		if elementType.IsResourceType() {
 			report(
 				&InvalidResourceArrayMemberError{
-					Name:  field,
-					Range: targetRange,
+					Name:            field,
+					DeclarationKind: common.DeclarationKindFunction,
+					Range:           targetRange,
 				},
 			)
 		}
 
-		typeAnnotation := NewTypeAnnotation(t)
-		return NewMemberForType(t, field, Member{
+		typeAnnotation := NewTypeAnnotation(arrayType)
+
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -717,13 +797,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "insert":
 		// Inserting elements into to a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
-		return NewMemberForType(t, field, Member{
+		elementType := arrayType.ElementType(false)
+
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -741,14 +825,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "remove":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -765,14 +852,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "removeFirst":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -785,14 +875,17 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 	case "removeLast":
 		// Removing elements from a constant sized array is not allowed
 
-		if _, isConstantSized := t.(*ConstantSizedType); isConstantSized {
+		if _, isConstantSized := arrayType.(*ConstantSizedType); isConstantSized {
 			// TODO: maybe return member but report helpful error?
 			return nil
 		}
 
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -803,7 +896,7 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		})
 
 	case "contains":
-		elementType := t.ElementType(false)
+		elementType := arrayType.ElementType(false)
 
 		// It impossible for an array of resources to have a `contains` function:
 		// if the resource is passed as an argument, it cannot be inside the array
@@ -811,8 +904,9 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		if elementType.IsResourceType() {
 			report(
 				&InvalidResourceArrayMemberError{
-					Name:  field,
-					Range: targetRange,
+					Name:            field,
+					DeclarationKind: common.DeclarationKindFunction,
+					Range:           targetRange,
 				},
 			)
 		}
@@ -828,7 +922,10 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 			)
 		}
 
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -842,7 +939,10 @@ func getArrayMember(t ArrayType, field string, targetRange ast.Range, report fun
 		})
 
 	case "length":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   arrayType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
@@ -860,6 +960,12 @@ type VariableSizedType struct {
 
 func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
+
+func (t *VariableSizedType) Export() types.Type {
+	return types.VariableSizedArray{
+		ElementType: t.Type.(ExportableType).Export(),
+	}
+}
 
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
@@ -971,6 +1077,19 @@ type FunctionType struct {
 }
 
 func (*FunctionType) isType() {}
+
+func (t *FunctionType) Export() types.Type {
+	parameterTypeAnnotations := make([]types.Annotation, len(t.ParameterTypeAnnotations))
+
+	for i, annotation := range t.ParameterTypeAnnotations {
+		parameterTypeAnnotations[i] = annotation.Export()
+	}
+
+	return types.Function{
+		ParameterTypeAnnotations: parameterTypeAnnotations,
+		ReturnTypeAnnotation:     t.ReturnTypeAnnotation.Export(),
+	}
+}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
@@ -1249,14 +1368,17 @@ func (t *CompositeType) IsInvalidType() bool {
 // Member
 
 type Member struct {
+	ContainerType   Type
+	Access          ast.Access
+	Identifier      ast.Identifier
 	Type            Type
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
 }
 
-// NewMemberForType initializes a new member type and panics if the member declaration is invalid.
-func NewMemberForType(ty Type, identifier string, member Member) *Member {
+// NewCheckedMember panics if the member declaration is invalid.
+func NewCheckedMember(member *Member) *Member {
 
 	if invokableType, ok := member.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()
@@ -1266,27 +1388,27 @@ func NewMemberForType(ty Type, identifier string, member Member) *Member {
 
 			panic(fmt.Sprintf(
 				"member `%s.%s` has incorrect argument label count",
-				ty,
-				identifier,
+				member.ContainerType,
+				member.Identifier.Identifier,
 			))
 		}
 	} else {
 		if member.ArgumentLabels != nil {
 			panic(fmt.Sprintf(
 				"non-function member `%s.%s` should not declare argument labels",
-				ty,
-				identifier,
+				member.ContainerType,
+				member.Identifier.Identifier,
 			))
 		}
 	}
 
-	return &member
+	return member
 }
 
 type MemberAccessibleType interface {
 	Type
 	HasMembers() bool
-	GetMember(field string, targetRange ast.Range, report func(error)) *Member
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
 }
 
 // InterfaceType
@@ -1369,17 +1491,67 @@ func (t *DictionaryType) HasMembers() bool {
 	return true
 }
 
-func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Member {
-	switch field {
+func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	switch identifier {
 	case "length":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 			Type:            &IntType{},
 		})
 
+	case "keys":
+		// TODO: maybe allow for resource key type
+
+		if t.KeyType.IsResourceType() {
+			report(
+				&InvalidResourceDictionaryMemberError{
+					Name:            identifier,
+					DeclarationKind: common.DeclarationKindField,
+					Range:           targetRange,
+				},
+			)
+		}
+
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &VariableSizedType{Type: t.KeyType},
+		})
+
+	case "values":
+		// TODO: maybe allow for resource value type
+
+		if t.ValueType.IsResourceType() {
+			report(
+				&InvalidResourceDictionaryMemberError{
+					Name:            identifier,
+					DeclarationKind: common.DeclarationKindField,
+					Range:           targetRange,
+				},
+			)
+		}
+
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+			Type:            &VariableSizedType{Type: t.ValueType},
+		})
+
 	case "insert":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1397,7 +1569,10 @@ func (t *DictionaryType) GetMember(field string, _ ast.Range, _ func(error)) *Me
 		})
 
 	case "remove":
-		return NewMemberForType(t, field, Member{
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
 			Type: &FunctionType{
@@ -1477,6 +1652,22 @@ type EventType struct {
 }
 
 func (*EventType) isType() {}
+
+func (t *EventType) Export() types.Type {
+	fieldTypes := make([]types.EventField, len(t.Fields))
+
+	for i, field := range t.Fields {
+		fieldTypes[i] = types.EventField{
+			Identifier: field.Identifier,
+			Type:       field.Type.(ExportableType).Export(),
+		}
+	}
+
+	return types.Event{
+		Identifier: t.Identifier,
+		FieldTypes: fieldTypes,
+	}
+}
 
 func (t *EventType) String() string {
 	var fields strings.Builder
@@ -1581,13 +1772,13 @@ func (t *ReferenceType) HasMembers() bool {
 	return referencedType.HasMembers()
 }
 
-func (t *ReferenceType) GetMember(field string, targetRange ast.Range, report func(error)) *Member {
+func (t *ReferenceType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
 	// forward to referenced type, if it has members
 	referencedTypeWithMember, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return nil
 	}
-	return referencedTypeWithMember.GetMember(field, targetRange, report)
+	return referencedTypeWithMember.GetMember(identifier, targetRange, report)
 }
 
 func (t *ReferenceType) isValueIndexableType() bool {

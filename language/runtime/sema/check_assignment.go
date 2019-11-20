@@ -197,10 +197,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	valueType Type,
 ) (memberType Type) {
 
-	member := checker.visitMember(target)
+	member, isOptional := checker.visitMember(target)
 
 	if member == nil {
 		return &InvalidType{}
+	}
+
+	if isOptional {
+		checker.report(
+			&UnsupportedOptionalChainingAssignmentError{
+				Range: ast.NewRangeFromPositioned(target),
+			},
+		)
 	}
 
 	// If the value type is valid, check that the value can be assigned to the member type
@@ -213,6 +221,25 @@ func (checker *Checker) visitMemberExpressionAssignment(
 				ExpectedType: member.Type,
 				ActualType:   valueType,
 				Range:        ast.NewRangeFromPositioned(valueExpression),
+			},
+		)
+	}
+
+	// TODO: add option to checker to specify behaviour
+	//   for not-specified access modifier
+
+	// NOTE: exclude private access to avoid spurious error, because the plain access
+	// of the field already resulted in an invalid access error
+
+	if !checker.isWriteableMember(member) &&
+		member.Access != ast.AccessPrivate {
+
+		checker.report(
+			&InvalidAccessError{
+				Name:              member.Identifier.Identifier,
+				RestrictingAccess: member.Access,
+				DeclarationKind:   member.DeclarationKind,
+				Range:             ast.NewRangeFromPositioned(member.Identifier),
 			},
 		)
 	}
