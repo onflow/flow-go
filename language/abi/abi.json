@@ -24,6 +24,9 @@
           },
           {
             "$ref": "#/definitions/resource"
+          },
+          {
+            "$ref": "#/definitions/event"
           }
         ]
       },
@@ -213,6 +216,19 @@
       ],
       "additionalProperties": false
     },
+    "event": {
+      "type": "object",
+      "title": "An event composite type",
+      "properties": {
+        "event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/resourceParameter"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "resourceReferenceType": {
       "type": "object",
       "properties": {
@@ -261,7 +277,7 @@
     "resourceType": {
       "oneOf": [
         {
-          "$ref": "#/definitions/type"
+          "$ref": "#/definitions/builtinType"
         },
         {
           "$ref": "#/definitions/resourceReferenceType"
@@ -271,6 +287,15 @@
         },
         {
           "$ref": "#/definitions/resourceOptionalType"
+        },
+        {
+          "$ref": "#/definitions/functionType"
+        },
+        {
+          "$ref": "#/definitions/resourceDictionaryType"
+        },
+        {
+          "$ref": "#/definitions/structReferenceType"
         }
       ]
     },
@@ -435,6 +460,35 @@
               "title": "Element Type",
               "description": "The value type (required)",
               "$ref": "#/definitions/type"
+            }
+          },
+          "required": [
+            "keys",
+            "values"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "dictionary"
+      ],
+      "additionalProperties": false
+    },
+    "resourceDictionaryType": {
+      "title": "Dictionary containing resources Type",
+      "type": "object",
+      "properties": {
+        "dictionary": {
+          "properties": {
+            "keys": {
+              "title": "Key Type",
+              "description": "The key type (required)",
+              "$ref": "#/definitions/hashableType"
+            },
+            "values": {
+              "title": "Element Type",
+              "description": "The value type (required)",
+              "$ref": "#/definitions/resourceType"
             }
           },
           "required": [
