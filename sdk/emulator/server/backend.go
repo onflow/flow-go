@@ -196,9 +196,10 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	// TODO: Get events from blockchain
-	var err error
-	var events []flow.Event
+	events, err := b.blockchain.GetEvents(req.GetType(), req.GetStartBlock(), req.GetEndBlock())
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	b.logger.WithFields(log.Fields{
 		"eventType":  req.Type,
@@ -210,7 +211,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(events)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	res := observation.GetEventsResponse{
 		EventsJson: buf.Bytes(),

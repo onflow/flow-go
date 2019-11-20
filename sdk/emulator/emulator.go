@@ -63,7 +63,7 @@ type EmulatedBlockchainAPI interface {
 	GetTransaction(txHash crypto.Hash) (*flow.Transaction, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
-	GetEvents(eventID string, startBlock, endBlock uint64) ([]flow.Event, error)
+	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	SubmitTransaction(tx flow.Transaction) error
 	ExecuteScript(script []byte) (interface{}, error)
 	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, error)
@@ -241,7 +241,7 @@ func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber
 }
 
 // TODO: Implement
-func (b *EmulatedBlockchain) GetEvents(eventID string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	panic("not implemented")
 }
 

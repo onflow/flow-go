@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -127,6 +128,21 @@ func TestBackend(t *testing.T) {
 		require.True(t, ok)
 
 		assert.Equal(t, grpcError.Code(), codes.InvalidArgument)
+	}))
+
+	t.Run("GetEvents fails if blockchain returns error", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
+		api.EXPECT().
+			GetEvents(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, errors.New("dummy")).
+			Times(1)
+
+		_, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{})
+
+		if assert.Error(t, err) {
+			grpcError, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, grpcError.Code(), codes.Internal)
+		}
 	}))
 
 	t.Run("GetEvents", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
