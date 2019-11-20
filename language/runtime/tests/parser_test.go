@@ -6299,9 +6299,9 @@ func TestParseTransactionDeclaration(t *testing.T) {
 				&TransactionDeclaration{
 					Fields:         []*FieldDeclaration{},
 					Prepare:        nil,
-					PreConditions:  []*Condition{},
+					PreConditions:  nil,
 					Execute:        nil,
-					PostConditions: []*Condition{},
+					PostConditions: nil,
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
@@ -6431,7 +6431,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					PreConditions: []*Condition{},
+					PreConditions: nil,
 					Execute: &Block{
 						Statements: []Statement{
 							&AssignmentStatement{
@@ -6471,7 +6471,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							EndPos:   Position{Offset: 137, Line: 12, Column: 3},
 						},
 					},
-					PostConditions: []*Condition{},
+					PostConditions: nil,
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 143, Line: 13, Column: 4},

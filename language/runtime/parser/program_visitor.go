@@ -200,13 +200,13 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
 	}
 
-	preConditions := make([]*ast.Condition, 0)
+	var preConditions []*ast.Condition
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
 		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
 	}
 
-	postConditions := make([]*ast.Condition, 0)
+	var postConditions []*ast.Condition
 	postConditionsCtx := ctx.PostConditions()
 	if postConditionsCtx != nil {
 		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
