@@ -35,18 +35,18 @@ deploy-production: update-deployment-image apply-prod-files
 # Staging YAMLs must have 'staging' in their name.
 .PHONY: apply-staging-files
 apply-staging-files:
-    kconfig=$$(uuidgen); \
-    echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-    files=$$(find ${K8S_YAMLS_LOCATION} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep staging); \
-    echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
+	kconfig=$$(uuidgen); \
+	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
+	files=$$(find ${K8S_YAMLS_LOCATION} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep staging); \
+	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
 
 # Production YAMLs must have 'production' in their name.
 .PHONY: apply-prod-files
 apply-prod-files:
-    kconfig=$$(uuidgen); \
-    echo "$$KUBECONFIG_PRODUCTION" > $$kconfig; \
-    files=$$(find ${K8S_YAMLS_LOCATION} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep production); \
-    echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
+	kconfig=$$(uuidgen); \
+	echo "$$KUBECONFIG_PRODUCTION" > $$kconfig; \
+	files=$$(find ${K8S_YAMLS_LOCATION} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep production); \
+	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
 
 # Deployment YAMLs must have 'deployment' in their name.
 .PHONY: update-deployment-image
