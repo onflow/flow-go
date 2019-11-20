@@ -82,10 +82,15 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 		conf.HTTPPort = defaultHTTPPort
 	}
 
+	blockchain, err := emulator.NewEmulatedBlockchain(options...)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize blockchain")
+	}
+
 	grpcServer := grpc.NewServer()
 	server := &EmulatorServer{
 		backend: &Backend{
-			blockchain: emulator.NewEmulatedBlockchain(options...),
+			blockchain: blockchain,
 			logger:     logger,
 		},
 		grpcServer: grpcServer,

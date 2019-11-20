@@ -108,7 +108,7 @@ func WithStore(store storage.Store) Option {
 }
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
-func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
+func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 	initialState := make(flow.Ledger)
 	txPool := make(map[string]*flow.Transaction)
 
@@ -131,8 +131,7 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		// storage contains data, load state from storage
 		latestState, err := store.GetLedger(latestBlock.Number)
 		if err != nil {
-			// TODO bubble
-			panic(err)
+			return nil, err
 		}
 		initialState = latestState
 	} else {
@@ -141,14 +140,12 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 
 		// insert the genesis block
 		if err := store.InsertBlock(types.GenesisBlock()); err != nil {
-			// TODO bubble
-			panic(err)
+			return nil, err
 		}
 
 		// insert the initial state containing the root account
 		if err := store.SetLedger(0, initialState); err != nil {
-			// TODO bubble
-			panic(err)
+			return nil, err
 		}
 	}
 
@@ -167,7 +164,7 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	computer := execution.NewComputer(interpreterRuntime, config.RuntimeLogger)
 	b.computer = computer
 
-	return b
+	return b, nil
 }
 
 // RootAccountAddress returns the root account address for this blockchain.

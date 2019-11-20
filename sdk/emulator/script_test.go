@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -13,7 +14,8 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	accountAddress := b.RootAccountAddress()
 

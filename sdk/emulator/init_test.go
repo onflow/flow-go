@@ -28,7 +28,7 @@ func TestInitialization(t *testing.T) {
 	defer store.Close()
 
 	t.Run("should inject initial state when initialized with empty store", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
 
 		rootAcct, err := b.GetAccount(flow.RootAddress)
 		assert.NoError(t, err)
@@ -41,7 +41,7 @@ func TestInitialization(t *testing.T) {
 	})
 
 	t.Run("should restore state when initialized with non-empty store", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
 
 		// Submit a transaction adds some ledger state and event state
 		script := `
@@ -79,7 +79,7 @@ func TestInitialization(t *testing.T) {
 		minedEvents, err := b.GetEvents("", block.Number, block.Number)
 
 		// Create a new blockchain with the same store
-		b = emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ = emulator.NewEmulatedBlockchain(emulator.WithStore(store))
 
 		t.Run("should be able to read blocks", func(t *testing.T) {
 			latestBlock, err := b.GetLatestBlock()
