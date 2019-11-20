@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -300,10 +301,7 @@ func TestCheckLocalVariableDeclarationAccessModifier(t *testing.T) {
 
 	require.Len(t, tests, len(ast.Accesses))
 
-	for _, variableKind := range []ast.VariableKind{
-		ast.VariableKindConstant,
-		ast.VariableKindVariable,
-	} {
+	for _, variableKind := range ast.VariableKinds {
 
 		for _, test := range tests {
 
@@ -472,5 +470,94 @@ func TestCheckGlobalCompositeDeclarationAccessModifier(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestCheckImportGlobalValueAccess(t *testing.T) {
+
+	tests := []string{
+		`
+        priv fun x() {}
+        pub fun y() {}
+        `,
+	}
+
+	for _, variableKind := range ast.VariableKinds {
+
+		tests = append(tests,
+			fmt.Sprintf(
+				`
+                   priv %[1]s x = 1
+                   pub %[1]s y = 2
+                `,
+				variableKind.Keyword(),
+			),
+		)
+	}
+
+	for _, test := range tests {
+		// NOTE: only parse, don't check imported program.
+		// will be checked by checker checking importing program
+
+		imported, _, err := parser.ParseProgram(test)
+
+		require.Nil(t, err)
+
+		_, err = ParseAndCheckWithOptions(t,
+			`
+               import x, y from "imported"
+            `,
+			ParseAndCheckOptions{
+				ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+					return imported, nil
+				},
+			},
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		require.IsType(t, &sema.InvalidAccessError{}, errs[0])
+		assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "x")
+
+	}
+}
+
+func TestCheckImportGlobalTypeAccess(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		// TODO: add support for contracts
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		// NOTE: only parse, don't check imported program.
+		// will be checked by checker checking importing program
+
+		imported, _, err := parser.ParseProgram(fmt.Sprintf(
+			`
+               priv %[1]s A {}
+               pub %[1]s B {}
+            `,
+			compositeKind.Keyword(),
+		))
+
+		require.Nil(t, err)
+
+		_, err = ParseAndCheckWithOptions(t,
+			`
+               import A, B from "imported"
+            `,
+			ParseAndCheckOptions{
+				ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+					return imported, nil
+				},
+			},
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		require.IsType(t, &sema.InvalidAccessError{}, errs[0])
+		assert.Equal(t, errs[0].(*sema.InvalidAccessError).Name, "A")
 	}
 }

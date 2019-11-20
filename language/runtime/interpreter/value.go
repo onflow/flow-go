@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Value interface {
@@ -24,7 +25,7 @@ type Value interface {
 }
 
 type ExportableValue interface {
-	ToGoValue() interface{}
+	Export() values.Value
 }
 
 // ValueIndexableValue
@@ -73,8 +74,8 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
-func (v VoidValue) ToGoValue() interface{} {
-	return nil
+func (v VoidValue) Export() values.Value {
+	return values.Void{}
 }
 
 func (v VoidValue) String() string {
@@ -95,8 +96,8 @@ func (v BoolValue) Copy() Value {
 	return v
 }
 
-func (v BoolValue) ToGoValue() interface{} {
-	return bool(v)
+func (v BoolValue) Export() values.Value {
+	return values.Bool(v)
 }
 
 func (v BoolValue) Negate() BoolValue {
@@ -109,6 +110,10 @@ func (v BoolValue) Equal(other Value) BoolValue {
 
 func (v BoolValue) String() string {
 	return strconv.FormatBool(bool(v))
+}
+
+func (v BoolValue) KeyString() string {
+	return v.String()
 }
 
 // StringValue
@@ -131,8 +136,8 @@ func (v StringValue) Copy() Value {
 	return v
 }
 
-func (v StringValue) ToGoValue() interface{} {
-	return v.StrValue()
+func (v StringValue) Export() values.Value {
+	return values.String(v.StrValue())
 }
 
 func (v StringValue) String() string {
@@ -280,6 +285,17 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 	return result
 }
 
+func (v ArrayValue) Export() values.Value {
+	// TODO: how to export constant-sized array?
+	arrayVal := make(values.VariableSizedArray, len(*v.Values))
+
+	for i, value := range *v.Values {
+		arrayVal[i] = value.(ExportableValue).Export()
+	}
+
+	return arrayVal
+}
+
 func (v ArrayValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
@@ -302,16 +318,6 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 		v.Values = new([]Value)
 	}
 	return nil
-}
-
-func (v ArrayValue) ToGoValue() interface{} {
-	values := make([]interface{}, len(*v.Values))
-
-	for i, value := range *v.Values {
-		values[i] = value.(ExportableValue).ToGoValue()
-	}
-
-	return values
 }
 
 func (v ArrayValue) Concat(other ConcatenatableValue) Value {
@@ -399,7 +405,8 @@ func (v ArrayValue) Contains(x Value) BoolValue {
 func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		return NewIntValue(int64(len(*v.Values)))
+		return NewIntValue(int64(v.Count()))
+
 	case "append":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -407,6 +414,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -415,6 +423,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "insert":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -424,6 +433,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
+
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -432,6 +442,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "removeFirst":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -439,6 +450,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "removeLast":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -446,6 +458,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "contains":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -453,6 +466,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
@@ -460,6 +474,10 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 
 func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
+}
+
+func (v ArrayValue) Count() int {
+	return len(*v.Values)
 }
 
 // IntegerValue
@@ -508,8 +526,8 @@ func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
 
-func (v IntValue) ToGoValue() interface{} {
-	return big.NewInt(0).Set(v.Int)
+func (v IntValue) Export() values.Value {
+	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
 }
 
 func (v IntValue) IntValue() int {
@@ -593,8 +611,8 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
-func (v Int8Value) ToGoValue() interface{} {
-	return int8(v)
+func (v Int8Value) Export() values.Value {
+	return values.Int8(v)
 }
 
 func (v Int8Value) IntValue() int {
@@ -663,8 +681,8 @@ func (v Int16Value) Copy() Value {
 	return v
 }
 
-func (v Int16Value) ToGoValue() interface{} {
-	return int16(v)
+func (v Int16Value) Export() values.Int16 {
+	return values.Int16(v)
 }
 
 func (v Int16Value) IntValue() int {
@@ -733,8 +751,8 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
-func (v Int32Value) ToGoValue() interface{} {
-	return int32(v)
+func (v Int32Value) Export() values.Value {
+	return values.Int32(v)
 }
 
 func (v Int32Value) IntValue() int {
@@ -803,8 +821,8 @@ func (v Int64Value) Copy() Value {
 	return v
 }
 
-func (v Int64Value) ToGoValue() interface{} {
-	return int64(v)
+func (v Int64Value) Export() values.Value {
+	return values.Int64(v)
 }
 
 func (v Int64Value) IntValue() int {
@@ -873,8 +891,8 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
-func (v UInt8Value) ToGoValue() interface{} {
-	return uint8(v)
+func (v UInt8Value) Export() values.Value {
+	return values.Uint8(v)
 }
 
 func (v UInt8Value) IntValue() int {
@@ -943,8 +961,8 @@ func (v UInt16Value) Copy() Value {
 	return v
 }
 
-func (v UInt16Value) ToGoValue() interface{} {
-	return uint16(v)
+func (v UInt16Value) Export() values.Value {
+	return values.Uint16(v)
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1012,8 +1030,8 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
-func (v UInt32Value) ToGoValue() interface{} {
-	return uint32(v)
+func (v UInt32Value) Export() values.Value {
+	return values.Uint32(v)
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1082,8 +1100,8 @@ func (v UInt64Value) Copy() Value {
 	return v
 }
 
-func (v UInt64Value) ToGoValue() interface{} {
-	return uint64(v)
+func (v UInt64Value) Export() values.Value {
+	return values.Uint64(v)
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1186,9 +1204,16 @@ func (v CompositeValue) Copy() Value {
 	}
 }
 
-func (v CompositeValue) ToGoValue() interface{} {
-	// TODO: convert values to Go values?
-	return *v.Fields
+func (v CompositeValue) Export() values.Value {
+	fieldMap := *v.Fields
+
+	fields := make([]values.Value, 0, len(fieldMap))
+
+	for _, value := range fieldMap {
+		fields = append(fields, value.(ExportableValue).Export())
+	}
+
+	return values.Composite{fields}
 }
 
 func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
@@ -1290,7 +1315,28 @@ func (v CompositeValue) GetField(name string) Value {
 
 // DictionaryValue
 
-type DictionaryValue map[interface{}]Value
+type DictionaryValue struct {
+	Keys    ArrayValue
+	Entries map[string]Value
+}
+
+func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
+	keysAndValuesCount := len(keysAndValues)
+	if keysAndValuesCount%2 != 0 {
+		panic("uneven number of keys and values")
+	}
+
+	result := DictionaryValue{
+		Keys:    NewArrayValue(),
+		Entries: make(map[string]Value, keysAndValuesCount/2),
+	}
+
+	for i := 0; i < keysAndValuesCount; i += 2 {
+		result.Insert(keysAndValues[i], keysAndValues[i+1])
+	}
+
+	return result
+}
 
 func init() {
 	gob.Register(DictionaryValue{})
@@ -1299,11 +1345,17 @@ func init() {
 func (DictionaryValue) isValue() {}
 
 func (v DictionaryValue) Copy() Value {
-	newDictionary := make(DictionaryValue, len(v))
-	for field, value := range v {
-		newDictionary[field] = value.Copy()
+	newKeys := v.Keys.Copy().(ArrayValue)
+
+	newEntries := make(map[string]Value, len(v.Entries))
+	for name, value := range v.Entries {
+		newEntries[name] = value.Copy()
 	}
-	return newDictionary
+
+	return DictionaryValue{
+		Keys:    newKeys,
+		Entries: newEntries,
+	}
 }
 
 func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -1321,32 +1373,50 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 			})
 	}
 
-	for key, value := range v {
-		maybeDestroy(key)
+	for _, keyValue := range *v.Keys.Values {
+		maybeDestroy(keyValue)
+	}
+
+	for _, value := range v.Entries {
 		maybeDestroy(value)
 	}
+
 	return result
 }
 
-func (v DictionaryValue) ToGoValue() interface{} {
-	// TODO: convert values to Go values?
-	return v
+func (v DictionaryValue) Export() values.Value {
+	d := make(values.Dictionary, v.Count())
+
+	for i, keyValue := range *v.Keys.Values {
+		key := dictionaryKey(keyValue)
+		value := v.Entries[key]
+
+		exportedKey := keyValue.(ExportableValue).Export()
+		exportedValue := value.(ExportableValue).Export()
+
+		d[i] = values.KeyValuePair{
+			Key:   exportedKey,
+			Value: exportedValue,
+		}
+	}
+
+	return d
 }
 
 func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
-	value, ok := v[dictionaryKey(keyValue)]
+	value, ok := v.Entries[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
 	}
 	return SomeValue{Value: value}
 }
 
-func dictionaryKey(keyValue Value) interface{} {
-	var key interface{} = keyValue
-	if keyValue, ok := keyValue.(HasKeyString); ok {
-		return keyValue.KeyString()
+func dictionaryKey(keyValue Value) string {
+	hasKeyString, ok := keyValue.(HasKeyString)
+	if !ok {
+		panic(errors.NewUnreachableError())
 	}
-	return key
+	return hasKeyString.KeyString()
 }
 
 type HasKeyString interface {
@@ -1354,14 +1424,14 @@ type HasKeyString interface {
 }
 
 func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
-	key := dictionaryKey(keyValue)
 	switch typedValue := value.(type) {
 	case SomeValue:
-		v[key] = typedValue.Value
-		return
+		v.Insert(keyValue, typedValue.Value)
+
 	case NilValue:
-		delete(v, key)
+		v.Remove(keyValue)
 		return
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
@@ -1371,13 +1441,17 @@ func (v DictionaryValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("{")
 	i := 0
-	for key, value := range v {
+	for _, keyValue := range *v.Keys.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
-		builder.WriteString(fmt.Sprint(key))
+		builder.WriteString(fmt.Sprint(keyValue))
 		builder.WriteString(": ")
+
+		key := dictionaryKey(keyValue)
+		value := v.Entries[key]
 		builder.WriteString(fmt.Sprint(value))
+
 		i += 1
 	}
 	builder.WriteString("}")
@@ -1387,26 +1461,37 @@ func (v DictionaryValue) String() string {
 func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		return NewIntValue(int64(len(v)))
+		return NewIntValue(int64(v.Count()))
+
+	case "keys":
+		return v.Keys.Copy()
+
+	case "values":
+		values := make([]Value, v.Count())
+		i := 0
+		for _, keyValue := range *v.Keys.Values {
+			key := dictionaryKey(keyValue)
+			values[i] = v.Entries[key]
+			i += 1
+		}
+		return NewArrayValue(values...)
 
 	case "remove":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				keyValue := arguments[0]
 
-				key := dictionaryKey(keyValue)
-				value, hadValue := v[key]
+				existingValue := v.Remove(keyValue)
 
-				delete(v, key)
-
-				if !hadValue {
-					return trampoline.Done{
-						Result: NilValue{},
-					}
+				var returnValue Value
+				if existingValue == nil {
+					returnValue = NilValue{}
+				} else {
+					returnValue = SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
-					Result: SomeValue{Value: value},
+					Result: returnValue,
 				}
 			},
 		)
@@ -1417,18 +1502,17 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 				keyValue := arguments[0]
 				newValue := arguments[1]
 
-				key := dictionaryKey(keyValue)
-				oldValue, hadValue := v[key]
-				v[key] = newValue
+				existingValue := v.Insert(keyValue, newValue)
 
-				if !hadValue {
-					return trampoline.Done{
-						Result: NilValue{},
-					}
+				var returnValue Value
+				if existingValue == nil {
+					returnValue = NilValue{}
+				} else {
+					returnValue = SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
-					Result: SomeValue{Value: oldValue},
+					Result: returnValue,
 				}
 			},
 		)
@@ -1439,7 +1523,49 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 }
 
 func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+	// Dictionaries have no settable members (fields / functions)
 	panic(errors.NewUnreachableError())
+}
+
+func (v DictionaryValue) Count() int {
+	return v.Keys.Count()
+}
+
+func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
+	key := dictionaryKey(keyValue)
+	existingValue, exists := v.Entries[key]
+
+	if !exists {
+		return nil
+	}
+
+	delete(v.Entries, key)
+
+	// TODO: optimize linear scan
+	for i, keyValue := range *v.Keys.Values {
+		if dictionaryKey(keyValue) == key {
+			v.Keys.Remove(i)
+			return existingValue
+		}
+	}
+
+	panic(errors.NewUnreachableError())
+}
+
+func (v DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
+	key := dictionaryKey(keyValue)
+	existingValue, existed := v.Entries[key]
+
+	if !existed {
+		v.Keys.Append(keyValue)
+	}
+	v.Entries[key] = value
+
+	if !existed {
+		return nil
+	}
+
+	return existingValue
 }
 
 type DictionaryEntryValues struct {
@@ -1450,12 +1576,25 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID       string
-	Fields   []EventField
-	Location ast.Location
+	Identifier string
+	Fields     []EventField
+	Location   ast.Location
 }
 
 func (EventValue) isValue() {}
+
+func (v EventValue) Export() values.Value {
+	fields := make([]values.Value, len(v.Fields))
+
+	for i, field := range v.Fields {
+		fields[i] = field.Value.(ExportableValue).Export()
+	}
+
+	return values.Event{
+		Identifier: v.Identifier,
+		Fields:     fields,
+	}
+}
 
 func (v EventValue) Copy() Value {
 	fields := make([]EventField, len(v.Fields))
@@ -1467,8 +1606,8 @@ func (v EventValue) Copy() Value {
 	}
 
 	return EventValue{
-		ID:     v.ID,
-		Fields: fields,
+		Identifier: v.Identifier,
+		Fields:     fields,
 	}
 }
 
@@ -1481,7 +1620,7 @@ func (v EventValue) String() string {
 		fields.WriteString(field.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
+	return fmt.Sprintf("%s(%s)", v.Identifier, fields.String())
 }
 
 // EventField
@@ -1580,8 +1719,8 @@ func (NilValue) String() string {
 	return "nil"
 }
 
-func (v NilValue) ToGoValue() interface{} {
-	return nil
+func (v NilValue) Export() values.Value {
+	return values.Nil{}
 }
 
 // SomeValue
@@ -1730,6 +1869,10 @@ func ConvertAddress(value Value) Value {
 }
 
 func (AddressValue) isValue() {}
+
+func (v AddressValue) Export() values.Value {
+	return values.Address(v)
+}
 
 func (v AddressValue) Copy() Value {
 	return v

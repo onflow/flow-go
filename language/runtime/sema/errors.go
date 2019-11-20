@@ -1504,18 +1504,38 @@ func (e *UninitializedUseError) EndPosition() ast.Position {
 // InvalidResourceArrayMemberError
 
 type InvalidResourceArrayMemberError struct {
-	Name string
+	Name            string
+	DeclarationKind common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidResourceArrayMemberError) Error() string {
 	return fmt.Sprintf(
-		"array member `%s` is not available for resource arrays",
+		"array %s `%s` is not available for resource arrays",
+		e.DeclarationKind.Name(),
 		e.Name,
 	)
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// InvalidResourceDictionaryMemberError
+
+type InvalidResourceDictionaryMemberError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidResourceDictionaryMemberError) Error() string {
+	return fmt.Sprintf(
+		"dictionary %s `%s` is not available for resource dictionaries",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
 // NonResourceReferenceError
 
@@ -1596,6 +1616,8 @@ func (e *ResourceMethodBindingError) Error() string {
 	return "cannot create bound method for resource"
 }
 
+func (*ResourceMethodBindingError) isSemanticError() {}
+
 // InvalidOptionalChainingError
 
 type InvalidOptionalChainingError struct {
@@ -1611,3 +1633,39 @@ func (e *InvalidOptionalChainingError) Error() string {
 }
 
 func (*InvalidOptionalChainingError) isSemanticError() {}
+
+// InvalidAccessError
+
+type InvalidAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAccessError) isSemanticError() {}
+
+// InvalidCharacterLiteralError
+
+type InvalidCharacterLiteralError struct {
+	Length int
+	ast.Range
+}
+
+func (e *InvalidCharacterLiteralError) Error() string {
+	return fmt.Sprintf(
+		"character literal has invalid length: expected 1, got %d",
+		e.Length,
+	)
+}
+
+func (*InvalidCharacterLiteralError) isSemanticError() {}
