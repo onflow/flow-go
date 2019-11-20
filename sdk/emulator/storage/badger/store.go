@@ -155,7 +155,7 @@ func (s Store) InsertBlock(block types.Block) error {
 		}
 
 		// if this is latest block, set latest block
-		if block.Number > latestBlockNumber {
+		if block.Number >= latestBlockNumber {
 			return txn.Set(latestBlockKey(), encBlockNumber)
 		}
 		return nil
