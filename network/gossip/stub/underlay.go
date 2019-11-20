@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip"
 )
 
+// Underlay is a stub to be used for testing overlay's behavior
 type Underlay struct {
 	running    bool
 	callback   gossip.OnReceiveCallback
