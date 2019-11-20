@@ -179,13 +179,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("EventEmitted", func(t *testing.T) {
-		var lastEvent flow.Event
-
-		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
-			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				lastEvent = event
-			},
-		))
+		b := emulator.NewEmulatedBlockchain()
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -213,12 +207,18 @@ func TestCreateAccount(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		require.Equal(t, flow.EventAccountCreated, lastEvent.Type)
-		require.IsType(t, flow.Address{}, lastEvent.Values["address"])
+		block, err := b.CommitBlock()
+		require.NoError(t, err)
 
-		accountAddress := lastEvent.Values["address"].(flow.Address)
+		events, err := b.GetEvents(flow.EventAccountCreated, block.Number, block.Number)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		assert.Equal(t, flow.EventAccountCreated, events[0].Type)
+		require.IsType(t, flow.Address{}, events[0].Values["address"])
+
+		accountAddress := events[0].Values["address"].(flow.Address)
 		account, err := b.GetAccount(accountAddress)
 		assert.NoError(t, err)
 

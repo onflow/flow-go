@@ -118,6 +118,15 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		opt(&config)
 	}
 
+	// if no store is specified, use a memstore
+	// NOTE: we don't initialize this in defaultConfig because otherwise the same
+	// memstore instance is shared
+	if config.Store == nil {
+		config.Store = memstore.New()
+	}
+
+	// attempt to load state from the
+
 	// create the root account
 	rootAccount := createAccount(initialState, config.RootAccountKey)
 
@@ -529,5 +538,4 @@ func init() {
 
 	defaultConfig.RuntimeLogger = func(string) {}
 	defaultConfig.RootAccountKey = defaultRootKey
-	defaultConfig.Store = memstore.New()
 }
