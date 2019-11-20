@@ -60,10 +60,6 @@ func TestCheckInvalidMissingReturnStatementStructFunction(t *testing.T) {
 	assert.IsType(t, &sema.MissingReturnStatementError{}, errs[0])
 }
 
-func assertExits(t *testing.T, body string, exits bool) {
-
-}
-
 type exitTest struct {
 	body              string
 	exits             bool

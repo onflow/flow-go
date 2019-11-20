@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,12 +9,29 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestEventEmitted(t *testing.T) {
+	// event type definition that is reused in tests
+	myEventType := types.Event{
+		FieldTypes: []types.EventField{
+			{
+				Identifier: "x",
+				Type:       types.Int{},
+			},
+			{
+				Identifier: "y",
+				Type:       types.Int{},
+			},
+		},
+	}
+
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
 		events := make([]flow.Event, 0)
 
@@ -51,13 +67,20 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
+		actualEvent := events[0]
+
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		assert.Nil(t, err)
+
+		decodedEvent := eventValue.(values.Event)
+
 		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
-		assert.Equal(t, expectedType, events[0].Type)
-		assert.Equal(t, expectedID, events[0].ID())
-		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, expectedType, actualEvent.Type)
+		assert.Equal(t, expectedID, actualEvent.ID())
+		assert.Equal(t, values.NewInt(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.NewInt(2), decodedEvent.Fields[1])
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
@@ -82,12 +105,19 @@ func TestEventEmitted(t *testing.T) {
 
 		require.Len(t, events, 1)
 
+		actualEvent := events[0]
+
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		assert.Nil(t, err)
+
+		decodedEvent := eventValue.(values.Event)
+
 		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
 		// NOTE: ID is undefined for events emitted from scripts
 
-		assert.Equal(t, expectedType, events[0].Type)
-		assert.Equal(t, big.NewInt(1), events[0].Values["x"])
-		assert.Equal(t, big.NewInt(2), events[0].Values["y"])
+		assert.Equal(t, expectedType, actualEvent.Type)
+		assert.Equal(t, values.NewInt(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.NewInt(2), decodedEvent.Fields[1])
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
@@ -103,7 +133,7 @@ func TestEventEmitted(t *testing.T) {
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
 
-			fun emitMyEvent(x: Int, y: Int) {
+			pub fun emitMyEvent(x: Int, y: Int) {
 				emit MyEvent(x: x, y: y)
 			}
 		`)
@@ -142,12 +172,17 @@ func TestEventEmitted(t *testing.T) {
 		// first event is AccountCreated event
 		actualEvent := events[1]
 
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		assert.Nil(t, err)
+
+		decodedEvent := eventValue.(values.Event)
+
 		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)
 		assert.Equal(t, expectedID, actualEvent.ID())
-		assert.Equal(t, big.NewInt(1), actualEvent.Values["x"])
-		assert.Equal(t, big.NewInt(2), actualEvent.Values["y"])
+		assert.Equal(t, values.NewInt(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.NewInt(2), decodedEvent.Fields[1])
 	})
 }

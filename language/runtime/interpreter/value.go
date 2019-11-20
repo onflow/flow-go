@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Value interface {
@@ -24,7 +25,7 @@ type Value interface {
 }
 
 type ExportableValue interface {
-	ToGoValue() interface{}
+	Export() values.Value
 }
 
 // ValueIndexableValue
@@ -73,8 +74,8 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
-func (v VoidValue) ToGoValue() interface{} {
-	return nil
+func (v VoidValue) Export() values.Value {
+	return values.Void{}
 }
 
 func (v VoidValue) String() string {
@@ -95,8 +96,8 @@ func (v BoolValue) Copy() Value {
 	return v
 }
 
-func (v BoolValue) ToGoValue() interface{} {
-	return bool(v)
+func (v BoolValue) Export() values.Value {
+	return values.Bool(v)
 }
 
 func (v BoolValue) Negate() BoolValue {
@@ -135,8 +136,8 @@ func (v StringValue) Copy() Value {
 	return v
 }
 
-func (v StringValue) ToGoValue() interface{} {
-	return v.StrValue()
+func (v StringValue) Export() values.Value {
+	return values.String(v.StrValue())
 }
 
 func (v StringValue) String() string {
@@ -284,6 +285,17 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 	return result
 }
 
+func (v ArrayValue) Export() values.Value {
+	// TODO: how to export constant-sized array?
+	arrayVal := make(values.VariableSizedArray, len(*v.Values))
+
+	for i, value := range *v.Values {
+		arrayVal[i] = value.(ExportableValue).Export()
+	}
+
+	return arrayVal
+}
+
 func (v ArrayValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
@@ -306,16 +318,6 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 		v.Values = new([]Value)
 	}
 	return nil
-}
-
-func (v ArrayValue) ToGoValue() interface{} {
-	values := make([]interface{}, len(*v.Values))
-
-	for i, value := range *v.Values {
-		values[i] = value.(ExportableValue).ToGoValue()
-	}
-
-	return values
 }
 
 func (v ArrayValue) Concat(other ConcatenatableValue) Value {
@@ -524,8 +526,8 @@ func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
 
-func (v IntValue) ToGoValue() interface{} {
-	return big.NewInt(0).Set(v.Int)
+func (v IntValue) Export() values.Value {
+	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
 }
 
 func (v IntValue) IntValue() int {
@@ -609,8 +611,8 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
-func (v Int8Value) ToGoValue() interface{} {
-	return int8(v)
+func (v Int8Value) Export() values.Value {
+	return values.Int8(v)
 }
 
 func (v Int8Value) IntValue() int {
@@ -679,8 +681,8 @@ func (v Int16Value) Copy() Value {
 	return v
 }
 
-func (v Int16Value) ToGoValue() interface{} {
-	return int16(v)
+func (v Int16Value) Export() values.Int16 {
+	return values.Int16(v)
 }
 
 func (v Int16Value) IntValue() int {
@@ -749,8 +751,8 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
-func (v Int32Value) ToGoValue() interface{} {
-	return int32(v)
+func (v Int32Value) Export() values.Value {
+	return values.Int32(v)
 }
 
 func (v Int32Value) IntValue() int {
@@ -819,8 +821,8 @@ func (v Int64Value) Copy() Value {
 	return v
 }
 
-func (v Int64Value) ToGoValue() interface{} {
-	return int64(v)
+func (v Int64Value) Export() values.Value {
+	return values.Int64(v)
 }
 
 func (v Int64Value) IntValue() int {
@@ -889,8 +891,8 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
-func (v UInt8Value) ToGoValue() interface{} {
-	return uint8(v)
+func (v UInt8Value) Export() values.Value {
+	return values.Uint8(v)
 }
 
 func (v UInt8Value) IntValue() int {
@@ -959,8 +961,8 @@ func (v UInt16Value) Copy() Value {
 	return v
 }
 
-func (v UInt16Value) ToGoValue() interface{} {
-	return uint16(v)
+func (v UInt16Value) Export() values.Value {
+	return values.Uint16(v)
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1028,8 +1030,8 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
-func (v UInt32Value) ToGoValue() interface{} {
-	return uint32(v)
+func (v UInt32Value) Export() values.Value {
+	return values.Uint32(v)
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1098,8 +1100,8 @@ func (v UInt64Value) Copy() Value {
 	return v
 }
 
-func (v UInt64Value) ToGoValue() interface{} {
-	return uint64(v)
+func (v UInt64Value) Export() values.Value {
+	return values.Uint64(v)
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1202,9 +1204,16 @@ func (v CompositeValue) Copy() Value {
 	}
 }
 
-func (v CompositeValue) ToGoValue() interface{} {
-	// TODO: convert values to Go values?
-	return *v.Fields
+func (v CompositeValue) Export() values.Value {
+	fieldMap := *v.Fields
+
+	fields := make([]values.Value, 0, len(fieldMap))
+
+	for _, value := range fieldMap {
+		fields = append(fields, value.(ExportableValue).Export())
+	}
+
+	return values.Composite{fields}
 }
 
 func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
@@ -1375,9 +1384,23 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 	return result
 }
 
-func (v DictionaryValue) ToGoValue() interface{} {
-	// TODO: convert values to Go values?
-	return v
+func (v DictionaryValue) Export() values.Value {
+	d := make(values.Dictionary, v.Count())
+
+	for i, keyValue := range *v.Keys.Values {
+		key := dictionaryKey(keyValue)
+		value := v.Entries[key]
+
+		exportedKey := keyValue.(ExportableValue).Export()
+		exportedValue := value.(ExportableValue).Export()
+
+		d[i] = values.KeyValuePair{
+			Key:   exportedKey,
+			Value: exportedValue,
+		}
+	}
+
+	return d
 }
 
 func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
@@ -1553,12 +1576,25 @@ type DictionaryEntryValues struct {
 // EventValue
 
 type EventValue struct {
-	ID       string
-	Fields   []EventField
-	Location ast.Location
+	Identifier string
+	Fields     []EventField
+	Location   ast.Location
 }
 
 func (EventValue) isValue() {}
+
+func (v EventValue) Export() values.Value {
+	fields := make([]values.Value, len(v.Fields))
+
+	for i, field := range v.Fields {
+		fields[i] = field.Value.(ExportableValue).Export()
+	}
+
+	return values.Event{
+		Identifier: v.Identifier,
+		Fields:     fields,
+	}
+}
 
 func (v EventValue) Copy() Value {
 	fields := make([]EventField, len(v.Fields))
@@ -1570,8 +1606,8 @@ func (v EventValue) Copy() Value {
 	}
 
 	return EventValue{
-		ID:     v.ID,
-		Fields: fields,
+		Identifier: v.Identifier,
+		Fields:     fields,
 	}
 }
 
@@ -1584,7 +1620,7 @@ func (v EventValue) String() string {
 		fields.WriteString(field.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", v.ID, fields.String())
+	return fmt.Sprintf("%s(%s)", v.Identifier, fields.String())
 }
 
 // EventField
@@ -1683,8 +1719,8 @@ func (NilValue) String() string {
 	return "nil"
 }
 
-func (v NilValue) ToGoValue() interface{} {
-	return nil
+func (v NilValue) Export() values.Value {
+	return values.Nil{}
 }
 
 // SomeValue
@@ -1833,6 +1869,10 @@ func ConvertAddress(value Value) Value {
 }
 
 func (AddressValue) isValue() {}
+
+func (v AddressValue) Export() values.Value {
+	return values.Address(v)
+}
 
 func (v AddressValue) Copy() Value {
 	return v
