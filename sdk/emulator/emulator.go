@@ -134,6 +134,9 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 			return nil, err
 		}
 		initialState = latestState
+	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
+		// internal storage error, fail fast
+		return nil, err
 	} else {
 		// storage is empty, create the root account and genesis block
 		createAccount(initialState, config.RootAccountKey)
