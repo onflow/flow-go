@@ -34,7 +34,7 @@ func TestExecuteScript(t *testing.T) {
 	callScript := fmt.Sprintf(sampleCall, accountAddress)
 
 	// Sample call (value is 0)
-	value, err := b.ExecuteScript([]byte(callScript))
+	value, _, err := b.ExecuteScript([]byte(callScript))
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(0), value)
 
@@ -43,7 +43,7 @@ func TestExecuteScript(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.ExecuteScript([]byte(callScript))
+	value, _, err = b.ExecuteScript([]byte(callScript))
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(2), value)
 }

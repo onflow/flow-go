@@ -18,11 +18,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -64,23 +62,8 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 		logger.Debug(msg)
 	}
 
-	eventStore := events.NewMemStore()
-
-	eventEmitter := func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-		logger.
-			WithField("eventType", event.Type).
-			Infof("🔔  Event emitted: %s", event)
-
-		ctx := context.Background()
-		err := eventStore.Add(ctx, blockNumber, event)
-		if err != nil {
-			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
-		}
-	}
-
 	options := []emulator.Option{
 		emulator.WithRuntimeLogger(messageLogger),
-		emulator.WithEventEmitter(eventEmitter),
 		emulator.WithStore(store),
 	}
 	if conf.RootAccountKey != nil {
@@ -104,7 +87,6 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options...),
 			logger:     logger,
-			eventStore: eventStore,
 		},
 		grpcServer: grpcServer,
 		config:     conf,

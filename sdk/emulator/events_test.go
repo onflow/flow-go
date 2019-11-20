@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -17,13 +16,7 @@ import (
 
 func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		events := make([]flow.Event, 0)
-
-		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
-			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				events = append(events, event)
-			},
-		))
+		b := emulator.NewEmulatedBlockchain()
 
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
@@ -49,6 +42,11 @@ func TestEventEmitted(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.NoError(t, err)
 
+		block, err := b.CommitBlock()
+		require.NoError(t, err)
+
+		events, err := b.GetEvents("", block.Number, block.Number)
+		require.NoError(t, err)
 		require.Len(t, events, 1)
 
 		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
@@ -63,11 +61,7 @@ func TestEventEmitted(t *testing.T) {
 	t.Run("EmittedFromScript", func(t *testing.T) {
 		events := make([]flow.Event, 0)
 
-		b := emulator.NewEmulatedBlockchain(emulator.WithEventEmitter(
-			func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				events = append(events, event)
-			},
-		))
+		b := emulator.NewEmulatedBlockchain()
 
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
@@ -77,9 +71,8 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, err := b.ExecuteScript(script)
+		_, events, err := b.ExecuteScript(script)
 		assert.NoError(t, err)
-
 		require.Len(t, events, 1)
 
 		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
@@ -91,20 +84,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		events := make([]flow.Event, 0)
-
-		b := emulator.NewEmulatedBlockchain(
-			emulator.WithEventEmitter(
-				func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-					events = append(events, event)
-				},
-			),
-			emulator.WithRuntimeLogger(
-				func(msg string) {
-					fmt.Println("LOG:", msg)
-				},
-			),
-		)
+		b := emulator.NewEmulatedBlockchain()
 
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
@@ -143,12 +123,15 @@ func TestEventEmitted(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.NoError(t, err)
 
-		require.Len(t, events, 2)
-
-		// first event is AccountCreated event
-		actualEvent := events[1]
+		block, err := b.CommitBlock()
+		require.NoError(t, err)
 
 		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
+		events, err := b.GetEvents(expectedType, block.Number, block.Number)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		actualEvent := events[0]
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)

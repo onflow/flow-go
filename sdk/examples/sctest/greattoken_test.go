@@ -101,7 +101,7 @@ func TestMinting(t *testing.T) {
 	SignAndSubmit(mintTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
+	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
 	assert.NoError(t, err)
 
 	// Mint a second NF
@@ -116,6 +116,6 @@ func TestMinting(t *testing.T) {
 	SignAndSubmit(mintTx2, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
+	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
 	assert.NoError(t, err)
 }

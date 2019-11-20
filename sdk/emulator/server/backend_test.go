@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -19,8 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
-	event_mocks "github.com/dapperlabs/flow-go/sdk/emulator/events/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -30,7 +29,7 @@ import (
 func TestPing(t *testing.T) {
 	ctx := context.Background()
 	b := emulator.NewEmulatedBlockchain()
-	server := server.NewBackend(b, events.NewMemStore(), log.New())
+	server := server.NewBackend(b, log.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
 	assert.NoError(t, err)
@@ -39,33 +38,8 @@ func TestPing(t *testing.T) {
 
 func TestGetEvents(t *testing.T) {
 	ctx := context.Background()
-	eventStore := events.NewMemStore()
 	b := emulator.NewEmulatedBlockchain()
-	server := server.NewBackend(b, eventStore, log.New())
-
-	// Add some events
-	var (
-		mintType     = "Mint()"
-		transferType = "Transfer(to: Address)"
-		toAddress    = flow.HexToAddress("1234567890123456789012345678901234567890")
-
-		ev1 = flow.Event{
-			Type:   mintType,
-			Values: map[string]interface{}{},
-		}
-		ev2 = flow.Event{
-			Type: transferType,
-			Values: map[string]interface{}{
-				"to": toAddress.String(),
-			},
-		}
-	)
-
-	err := eventStore.Add(ctx, 1, ev1)
-	require.Nil(t, err)
-
-	err = eventStore.Add(ctx, 3, ev2)
-	require.Nil(t, err)
+	server := server.NewBackend(b, log.New())
 
 	t.Run("should return error for invalid query", func(t *testing.T) {
 		// End block cannot be less than start block
@@ -75,92 +49,35 @@ func TestGetEvents(t *testing.T) {
 		})
 		assert.Error(t, err)
 	})
-
-	t.Run("should return empty list when there are no results", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			StartBlock: 2,
-			EndBlock:   2,
-		})
-		assert.NoError(t, err)
-		var events []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &events)
-		assert.NoError(t, err)
-		assert.Len(t, events, 0)
-	})
-
-	t.Run("should filter by ID", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			Type:       transferType,
-			StartBlock: 1,
-			EndBlock:   3,
-		})
-		assert.NoError(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.NoError(t, err)
-		assert.Len(t, resEvents, 1)
-		assert.Equal(t, resEvents[0].Type, transferType)
-		assert.Equal(t, resEvents[0].Values["to"], toAddress.String())
-	})
-
-	t.Run("should not filter by ID when omitted", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			StartBlock: 1,
-			EndBlock:   3,
-		})
-		assert.NoError(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.NoError(t, err)
-		// Should get both events
-		assert.Len(t, resEvents, 2)
-	})
-
-	t.Run("should preserve event ordering", func(t *testing.T) {
-		res, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			StartBlock: 1,
-			EndBlock:   3,
-		})
-		assert.NoError(t, err)
-		var resEvents []flow.Event
-		err = json.Unmarshal(res.GetEventsJson(), &resEvents)
-		assert.NoError(t, err)
-		assert.Len(t, resEvents, 2)
-		// Mint event first, then Transfer
-		assert.Equal(t, resEvents[0].Type, mintType)
-		assert.Equal(t, resEvents[1].Type, transferType)
-	})
 }
 
 func TestBackend(t *testing.T) {
 
 	//wrapper which manages mock lifecycle
-	withMocks := func(sut func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore)) func(t *testing.T) {
+	withMocks := func(sut func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI)) func(t *testing.T) {
 		return func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
 			api := mocks.NewMockEmulatedBlockchainAPI(mockCtrl)
-			events := event_mocks.NewMockStore(mockCtrl)
 
 			backend := server.NewBackend(
 				api,
-				events,
 				log.New(),
 			)
 
-			sut(t, backend, api, events)
+			sut(t, backend, api)
 		}
 	}
 
-	t.Run("ExecuteScript", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("ExecuteScript", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 		sampleScriptText := []byte("hey I'm so totally uninterpretable script text with unicode ć, ń, ó, ś, ź")
 		executionScriptRequest := observation.ExecuteScriptRequest{
 			Script: sampleScriptText,
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil).
+			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil, nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
@@ -172,7 +89,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, []uint8("2137"), response.Value)
 	}))
 
-	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		account := unittest.AccountFixture()
 
@@ -192,9 +109,12 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, account.Balance, response.Account.Balance)
 	}))
 
-	t.Run("GetEvents fails with wrong block numbers", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetEvents fails with wrong block numbers", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
-		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+		api.EXPECT().
+			GetEvents(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return([]flow.Event{}, nil).
+			Times(0)
 
 		response, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{
 			Type:       "SomeEvents",
@@ -210,7 +130,22 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, grpcError.Code(), codes.InvalidArgument)
 	}))
 
-	t.Run("GetEvents", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetEvents fails if blockchain returns error", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
+		api.EXPECT().
+			GetEvents(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, errors.New("dummy")).
+			Times(1)
+
+		_, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{})
+
+		if assert.Error(t, err) {
+			grpcError, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, grpcError.Code(), codes.Internal)
+		}
+	}))
+
+	t.Run("GetEvents", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		eventType := "SomeEvents"
 
@@ -222,7 +157,10 @@ func TestBackend(t *testing.T) {
 				e.Index = 1
 			})}
 
-		events.EXPECT().Query(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(eventsToReturn, nil).Times(1)
+		api.EXPECT().
+			GetEvents(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(eventsToReturn, nil).
+			Times(1)
 
 		startBlock := 21
 		endBlock := 37
@@ -242,12 +180,12 @@ func TestBackend(t *testing.T) {
 		err = json.NewDecoder(bytes.NewReader(response.EventsJson)).Decode(&decodedEvents)
 		assert.NoError(t, err)
 
-		assert.Len(t, decodedEvents, 2)
+		require.Len(t, decodedEvents, 2)
 		assert.Equal(t, uint(0), decodedEvents[0].Index)
 		assert.Equal(t, uint(1), decodedEvents[1].Index)
 	}))
 
-	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		blockTimestamp := time.Time{}
 		block := types.Block{
@@ -270,7 +208,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, block.Number, response.Block.Number)
 	}))
 
-	t.Run("GetTransaction tx does not exists", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetTransaction tx does not exists", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		bytes := []byte{2, 2, 2, 2}
 
@@ -293,7 +231,7 @@ func TestBackend(t *testing.T) {
 		assert.Nil(t, response)
 	}))
 
-	t.Run("GetTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("GetTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		txEventType := "TxEvent"
 
@@ -336,7 +274,7 @@ func TestBackend(t *testing.T) {
 		assert.Equal(t, txEventType, decodedEvents[0].Type)
 	}))
 
-	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		response, err := backend.Ping(context.Background(), &observation.PingRequest{})
 
@@ -344,7 +282,7 @@ func TestBackend(t *testing.T) {
 		assert.NotNil(t, response)
 	}))
 
-	t.Run("SendTransaction with nil tx", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("SendTransaction with nil tx", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		response, err := backend.SendTransaction(context.Background(), &observation.SendTransactionRequest{
 			Transaction: nil,
@@ -360,7 +298,7 @@ func TestBackend(t *testing.T) {
 
 	}))
 
-	t.Run("SendTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("SendTransaction", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		var capturedTx flow.Transaction
 
@@ -403,7 +341,7 @@ func TestBackend(t *testing.T) {
 		assert.True(t, capturedTx.Hash().Equal(response.Hash))
 	}))
 
-	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI, events *event_mocks.MockStore) {
+	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).

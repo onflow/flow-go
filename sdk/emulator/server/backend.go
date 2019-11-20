@@ -15,22 +15,19 @@ import (
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation GRPC API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
-	eventStore events.Store
 	logger     *log.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, eventStore events.Store, logger *log.Logger) *Backend {
+func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *log.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
-		eventStore: eventStore,
 		logger:     logger,
 	}
 }
@@ -169,7 +166,7 @@ func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountReq
 // ExecuteScript performs a call.
 func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
 	script := req.GetScript()
-	value, err := b.blockchain.ExecuteScript(script)
+	value, events, err := b.blockchain.ExecuteScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -179,6 +176,10 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 	}
 
 	b.logger.Debugf("📞  Contract script called")
+
+	for _, event := range events {
+		b.logger.Debugf("🔔  Event emitted: %s", event.String())
+	}
 
 	// TODO: change this to whatever interface -> byte encoding decided on
 	valueBytes, _ := json.Marshal(value)
@@ -199,7 +200,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	events, err := b.eventStore.Query(ctx, req.Type, req.StartBlock, req.EndBlock)
+	events, err := b.blockchain.GetEvents(req.GetType(), req.GetStartBlock(), req.GetEndBlock())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -214,7 +215,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(events)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	res := observation.GetEventsResponse{
 		EventsJson: buf.Bytes(),

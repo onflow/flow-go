@@ -48,9 +48,6 @@ type EmulatedBlockchain struct {
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
 	lastCreatedAccount flow.Account
-
-	// TODO: store events in storage
-	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
 // EmulatedBlockchainAPI defines the method set of EmulatedBlockchain.
@@ -63,9 +60,10 @@ type EmulatedBlockchainAPI interface {
 	GetTransaction(txHash crypto.Hash) (*flow.Transaction, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
+	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	SubmitTransaction(tx flow.Transaction) error
-	ExecuteScript(script []byte) (interface{}, error)
-	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, error)
+	ExecuteScript(script []byte) (interface{}, []flow.Event, error)
+	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error)
 	CommitBlock() (*types.Block, error)
 	LastCreatedAccount() flow.Account
 	CreateAccount(
@@ -78,7 +76,6 @@ type EmulatedBlockchainAPI interface {
 type Config struct {
 	RootAccountKey flow.AccountPrivateKey
 	RuntimeLogger  func(string)
-	OnEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 	Store          storage.Store
 }
 
@@ -110,13 +107,6 @@ func WithStore(store storage.Store) Option {
 	}
 }
 
-// TODO remove
-func WithEventEmitter(emitter func(event flow.Event, blockNumber uint64, txHash crypto.Hash)) Option {
-	return func(c *Config) {
-		c.OnEventEmitted = emitter
-	}
-}
-
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 	initialState := make(flow.Ledger)
@@ -128,6 +118,13 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		opt(&config)
 	}
 
+	// if no store is specified, use a memstore
+	// NOTE: we don't initialize this in defaultConfig because otherwise the same
+	// memstore instance is shared
+	if config.Store == nil {
+		config.Store = memstore.New()
+	}
+
 	// create the root account
 	rootAccount := createAccount(initialState, config.RootAccountKey)
 
@@ -135,7 +132,6 @@ func NewEmulatedBlockchain(opts ...Option) *EmulatedBlockchain {
 		storage:            config.Store,
 		pendingState:       initialState,
 		txPool:             txPool,
-		onEventEmitted:     config.OnEventEmitted,
 		rootAccountAddress: rootAccount.Address,
 		rootAccountKey:     config.RootAccountKey,
 		lastCreatedAccount: rootAccount,
@@ -239,6 +235,11 @@ func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber
 	panic("not implemented")
 }
 
+// GetEvents returns events matching a query.
+func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+	return b.storage.GetEvents(eventType, startBlock, endBlock)
+}
+
 // SubmitTransaction sends a transaction to the network that is immediately
 // executed (updates pending blockchain state).
 //
@@ -293,36 +294,37 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	// TODO: improve the pending block, provide all block information
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
-		return fmt.Errorf("Failed to get latest block: %w", err)
+		return fmt.Errorf("failed to get latest block: %w", err)
 	}
 	blockNumber := prevBlock.Number + 1
 
-	// TODO: remove this. Instead we are storing events in storage, they
-	// TODO: should be stored there when the block is committed
-	b.emitTransactionEvents(events, blockNumber, tx.Hash())
+	// Update system state based on emitted events
+	b.handleEvents(events, blockNumber, tx.Hash())
+
+	// TODO: Do this in CommitBlock instead
+	if err := b.storage.InsertEvents(blockNumber, events...); err != nil {
+		return fmt.Errorf("failed to insert events: %w", err)
+	}
 
 	return nil
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, []flow.Event, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	ledger := b.pendingState.NewView()
 	value, events, err := b.computer.ExecuteScript(ledger, script)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// TODO: decide how to handle script events
-	b.emitScriptEvents(events)
-
-	return value, nil
+	return value, events, nil
 }
 
 // TODO: implement
-func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, error) {
+func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error) {
 	panic("not implemented")
 }
 
@@ -480,11 +482,8 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 	}
 }
 
-// TODO remove this in favor of storing events in emulator
-// emitTransactionEvents emits events that occurred during a transaction execution.
-//
-// This function parses AccountCreated events to update the lastCreatedAccount field.
-func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
+// handleEvents updates emulator state based on emitted system events.
+func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {
@@ -498,14 +497,6 @@ func (b *EmulatedBlockchain) emitTransactionEvents(events []flow.Event, blockNum
 			b.lastCreatedAccount = *account
 		}
 
-		b.onEventEmitted(event, blockNumber, txHash)
-	}
-}
-
-// emitScriptEvents emits events that occurred during a script execution.
-func (b *EmulatedBlockchain) emitScriptEvents(events []flow.Event) {
-	for _, event := range events {
-		b.onEventEmitted(event, 0, nil)
 	}
 }
 
@@ -544,7 +535,5 @@ func init() {
 	}
 
 	defaultConfig.RuntimeLogger = func(string) {}
-	defaultConfig.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {}
 	defaultConfig.RootAccountKey = defaultRootKey
-	defaultConfig.Store = memstore.New()
 }
