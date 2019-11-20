@@ -1674,9 +1674,10 @@ func TestCheckInvalidUseAfterResourceMoveIntoDictionaryAsKey(t *testing.T) {
       let xs <- {<-x: <-x}
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[1])
 }
 
 func TestCheckInvalidResourceUseAfterMoveInWhileStatement(t *testing.T) {
@@ -2568,10 +2569,11 @@ func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 3)
 
-	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
 }
 
 func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
