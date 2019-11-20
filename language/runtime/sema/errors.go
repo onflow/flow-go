@@ -1618,6 +1618,26 @@ func (e *ResourceMethodBindingError) Error() string {
 
 func (*ResourceMethodBindingError) isSemanticError() {}
 
+// MissingFunctionBodyError
+
+type MissingFunctionBodyError struct {
+	Pos ast.Position
+}
+
+func (e *MissingFunctionBodyError) Error() string {
+	return "missing function implementation"
+}
+
+func (*MissingFunctionBodyError) isSemanticError() {}
+
+func (e *MissingFunctionBodyError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingFunctionBodyError) EndPosition() ast.Position {
+	return e.Pos
+}
+
 // InvalidOptionalChainingError
 
 type InvalidOptionalChainingError struct {
