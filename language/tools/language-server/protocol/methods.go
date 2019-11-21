@@ -48,6 +48,33 @@ func (server *Server) handleSignatureHelp(req *json.RawMessage) (interface{}, er
 	return server.Handler.SignatureHelp(server.connection, &params)
 }
 
+func (server *Server) handleCodeLens(req *json.RawMessage) (interface{}, error) {
+	var params CodeLensParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return server.Handler.CodeLens(server.connection, &params)
+}
+
+func (server *Server) handleCodeLensResolve(req *json.RawMessage) (interface{}, error) {
+	var params CodeLens
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return server.Handler.CodeLensResolve(server.connection, &params)
+}
+
+func (server *Server) handleExecuteCommand(req *json.RawMessage) (interface{}, error) {
+	var params ExecuteCommandParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return server.Handler.ExecuteCommand(server.connection, &params)
+}
+
 func (server *Server) handleShutdown(req *json.RawMessage) (interface{}, error) {
 	err := server.Handler.Shutdown(server.connection)
 	return nil, err

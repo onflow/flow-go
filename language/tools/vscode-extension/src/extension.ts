@@ -55,7 +55,7 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
       documentSelector: [{ scheme: "file", language: "cadence" }],
       synchronize: {
         configurationSection: "cadence"
-      }
+      },
     }
   );
 
