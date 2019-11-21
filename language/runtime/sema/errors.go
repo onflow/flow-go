@@ -1733,7 +1733,10 @@ func (e *InvalidAssignmentAccessError) Error() string {
 }
 
 func (e *InvalidAssignmentAccessError) SecondaryError() string {
-	return "has %s access. Consider making it publicly settable"
+	return fmt.Sprintf(
+		"has %s access. Consider making it publicly settable",
+		e.RestrictingAccess.Description(),
+	)
 }
 
 func (*InvalidAssignmentAccessError) isSemanticError() {}

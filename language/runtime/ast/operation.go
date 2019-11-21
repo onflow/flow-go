@@ -27,6 +27,8 @@ const (
 	OperationNegate
 	OperationNilCoalesce
 	OperationMove
+	OperationCast
+	OperationFailableCast
 )
 
 func (s Operation) Symbol() string {
@@ -65,6 +67,10 @@ func (s Operation) Symbol() string {
 		return "??"
 	case OperationMove:
 		return "<-"
+	case OperationCast:
+		return "as"
+	case OperationFailableCast:
+		return "as?"
 	}
 
 	panic(errors.NewUnreachableError())

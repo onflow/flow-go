@@ -124,23 +124,23 @@ var serializedLexerAtn = []uint16{
 	139, 461, 3, 2, 2, 2, 141, 472, 3, 2, 2, 2, 143, 487, 3, 2, 2, 2, 145,
 	489, 3, 2, 2, 2, 147, 492, 3, 2, 2, 2, 149, 499, 3, 2, 2, 2, 151, 505,
 	3, 2, 2, 2, 153, 520, 3, 2, 2, 2, 155, 156, 7, 61, 2, 2, 156, 4, 3, 2,
-	2, 2, 157, 158, 7, 46, 2, 2, 158, 6, 3, 2, 2, 2, 159, 160, 7, 125, 2, 2,
-	160, 8, 3, 2, 2, 2, 161, 162, 7, 127, 2, 2, 162, 10, 3, 2, 2, 2, 163, 164,
-	7, 60, 2, 2, 164, 12, 3, 2, 2, 2, 165, 166, 7, 93, 2, 2, 166, 14, 3, 2,
-	2, 2, 167, 168, 7, 95, 2, 2, 168, 16, 3, 2, 2, 2, 169, 170, 7, 62, 2, 2,
-	170, 171, 7, 47, 2, 2, 171, 172, 7, 64, 2, 2, 172, 18, 3, 2, 2, 2, 173,
-	174, 7, 63, 2, 2, 174, 20, 3, 2, 2, 2, 175, 176, 7, 126, 2, 2, 176, 177,
-	7, 126, 2, 2, 177, 22, 3, 2, 2, 2, 178, 179, 7, 40, 2, 2, 179, 180, 7,
-	40, 2, 2, 180, 24, 3, 2, 2, 2, 181, 182, 7, 48, 2, 2, 182, 26, 3, 2, 2,
-	2, 183, 184, 7, 63, 2, 2, 184, 185, 7, 63, 2, 2, 185, 28, 3, 2, 2, 2, 186,
-	187, 7, 35, 2, 2, 187, 188, 7, 63, 2, 2, 188, 30, 3, 2, 2, 2, 189, 190,
-	7, 62, 2, 2, 190, 32, 3, 2, 2, 2, 191, 192, 7, 64, 2, 2, 192, 34, 3, 2,
-	2, 2, 193, 194, 7, 62, 2, 2, 194, 195, 7, 63, 2, 2, 195, 36, 3, 2, 2, 2,
-	196, 197, 7, 64, 2, 2, 197, 198, 7, 63, 2, 2, 198, 38, 3, 2, 2, 2, 199,
-	200, 7, 45, 2, 2, 200, 40, 3, 2, 2, 2, 201, 202, 7, 47, 2, 2, 202, 42,
-	3, 2, 2, 2, 203, 204, 7, 44, 2, 2, 204, 44, 3, 2, 2, 2, 205, 206, 7, 49,
-	2, 2, 206, 46, 3, 2, 2, 2, 207, 208, 7, 39, 2, 2, 208, 48, 3, 2, 2, 2,
-	209, 210, 7, 40, 2, 2, 210, 50, 3, 2, 2, 2, 211, 212, 7, 35, 2, 2, 212,
+	2, 2, 157, 158, 7, 125, 2, 2, 158, 6, 3, 2, 2, 2, 159, 160, 7, 127, 2,
+	2, 160, 8, 3, 2, 2, 2, 161, 162, 7, 46, 2, 2, 162, 10, 3, 2, 2, 2, 163,
+	164, 7, 60, 2, 2, 164, 12, 3, 2, 2, 2, 165, 166, 7, 93, 2, 2, 166, 14,
+	3, 2, 2, 2, 167, 168, 7, 95, 2, 2, 168, 16, 3, 2, 2, 2, 169, 170, 7, 62,
+	2, 2, 170, 171, 7, 47, 2, 2, 171, 172, 7, 64, 2, 2, 172, 18, 3, 2, 2, 2,
+	173, 174, 7, 63, 2, 2, 174, 20, 3, 2, 2, 2, 175, 176, 7, 126, 2, 2, 176,
+	177, 7, 126, 2, 2, 177, 22, 3, 2, 2, 2, 178, 179, 7, 40, 2, 2, 179, 180,
+	7, 40, 2, 2, 180, 24, 3, 2, 2, 2, 181, 182, 7, 48, 2, 2, 182, 26, 3, 2,
+	2, 2, 183, 184, 7, 63, 2, 2, 184, 185, 7, 63, 2, 2, 185, 28, 3, 2, 2, 2,
+	186, 187, 7, 35, 2, 2, 187, 188, 7, 63, 2, 2, 188, 30, 3, 2, 2, 2, 189,
+	190, 7, 62, 2, 2, 190, 32, 3, 2, 2, 2, 191, 192, 7, 64, 2, 2, 192, 34,
+	3, 2, 2, 2, 193, 194, 7, 62, 2, 2, 194, 195, 7, 63, 2, 2, 195, 36, 3, 2,
+	2, 2, 196, 197, 7, 64, 2, 2, 197, 198, 7, 63, 2, 2, 198, 38, 3, 2, 2, 2,
+	199, 200, 7, 45, 2, 2, 200, 40, 3, 2, 2, 2, 201, 202, 7, 47, 2, 2, 202,
+	42, 3, 2, 2, 2, 203, 204, 7, 44, 2, 2, 204, 44, 3, 2, 2, 2, 205, 206, 7,
+	49, 2, 2, 206, 46, 3, 2, 2, 2, 207, 208, 7, 39, 2, 2, 208, 48, 3, 2, 2,
+	2, 209, 210, 7, 40, 2, 2, 210, 50, 3, 2, 2, 2, 211, 212, 7, 35, 2, 2, 212,
 	52, 3, 2, 2, 2, 213, 214, 7, 62, 2, 2, 214, 215, 7, 47, 2, 2, 215, 54,
 	3, 2, 2, 2, 216, 217, 7, 65, 2, 2, 217, 56, 3, 2, 2, 2, 218, 219, 5, 147,
 	74, 2, 219, 220, 7, 65, 2, 2, 220, 221, 7, 65, 2, 2, 221, 58, 3, 2, 2,
@@ -263,7 +263,7 @@ var lexerModeNames = []string{
 }
 
 var lexerLiteralNames = []string{
-	"", "';'", "','", "'{'", "'}'", "':'", "'['", "']'", "'<->'", "'='", "'||'",
+	"", "';'", "'{'", "'}'", "','", "':'", "'['", "']'", "'<->'", "'='", "'||'",
 	"'&&'", "'.'", "'=='", "'!='", "'<'", "'>'", "'<='", "'>='", "'+'", "'-'",
 	"'*'", "'/'", "'%'", "'&'", "'!'", "'<-'", "'?'", "", "'as'", "'as?'",
 	"'('", "')'", "'transaction'", "'struct'", "'resource'", "'contract'",
@@ -277,7 +277,7 @@ var lexerSymbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal",
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
 	"Div", "Mod", "Ampersand", "Negate", "Move", "Optional", "NilCoalescing",
-	"Downcasting", "FailableDowncasting", "OpenParen", "CloseParen", "Transaction",
+	"Casting", "FailableCasting", "OpenParen", "CloseParen", "Transaction",
 	"Struct", "Resource", "Contract", "Interface", "Fun", "Event", "Emit",
 	"Pre", "Post", "Priv", "Pub", "PubSet", "Return", "Break", "Continue",
 	"Let", "Var", "If", "Else", "While", "True", "False", "Nil", "Import",
@@ -290,11 +290,11 @@ var lexerRuleNames = []string{
 	"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8",
 	"T__9", "T__10", "T__11", "Equal", "Unequal", "Less", "Greater", "LessEqual",
 	"GreaterEqual", "Plus", "Minus", "Mul", "Div", "Mod", "Ampersand", "Negate",
-	"Move", "Optional", "NilCoalescing", "Downcasting", "FailableDowncasting",
-	"OpenParen", "CloseParen", "Transaction", "Struct", "Resource", "Contract",
-	"Interface", "Fun", "Event", "Emit", "Pre", "Post", "Priv", "Pub", "PubSet",
-	"Return", "Break", "Continue", "Let", "Var", "If", "Else", "While", "True",
-	"False", "Nil", "Import", "From", "Create", "Destroy", "Identifier", "IdentifierHead",
+	"Move", "Optional", "NilCoalescing", "Casting", "FailableCasting", "OpenParen",
+	"CloseParen", "Transaction", "Struct", "Resource", "Contract", "Interface",
+	"Fun", "Event", "Emit", "Pre", "Post", "Priv", "Pub", "PubSet", "Return",
+	"Break", "Continue", "Let", "Var", "If", "Else", "While", "True", "False",
+	"Nil", "Import", "From", "Create", "Destroy", "Identifier", "IdentifierHead",
 	"IdentifierCharacter", "DecimalLiteral", "BinaryLiteral", "OctalLiteral",
 	"HexadecimalLiteral", "InvalidNumberLiteral", "StringLiteral", "QuotedText",
 	"EscapedCharacter", "HexadecimalDigit", "WS", "Terminator", "BlockComment",
@@ -364,8 +364,8 @@ const (
 	CadenceLexerMove                 = 26
 	CadenceLexerOptional             = 27
 	CadenceLexerNilCoalescing        = 28
-	CadenceLexerDowncasting          = 29
-	CadenceLexerFailableDowncasting  = 30
+	CadenceLexerCasting              = 29
+	CadenceLexerFailableCasting      = 30
 	CadenceLexerOpenParen            = 31
 	CadenceLexerCloseParen           = 32
 	CadenceLexerTransaction          = 33

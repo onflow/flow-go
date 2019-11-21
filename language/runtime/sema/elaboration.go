@@ -20,7 +20,8 @@ type Elaboration struct {
 	InvocationExpressionArgumentTypes   map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes  map[*ast.InvocationExpression][]Type
 	InterfaceDeclarationTypes           map[*ast.InterfaceDeclaration]*InterfaceType
-	FailableDowncastingTypes            map[*ast.FailableDowncastExpression]Type
+	CastingStaticValueTypes             map[*ast.CastingExpression]Type
+	CastingTargetTypes                  map[*ast.CastingExpression]Type
 	ReturnStatementValueTypes           map[*ast.ReturnStatement]Type
 	ReturnStatementReturnTypes          map[*ast.ReturnStatement]Type
 	BinaryExpressionResultTypes         map[*ast.BinaryExpression]Type
@@ -51,7 +52,8 @@ func NewElaboration() *Elaboration {
 		InvocationExpressionArgumentTypes:   map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes:  map[*ast.InvocationExpression][]Type{},
 		InterfaceDeclarationTypes:           map[*ast.InterfaceDeclaration]*InterfaceType{},
-		FailableDowncastingTypes:            map[*ast.FailableDowncastExpression]Type{},
+		CastingStaticValueTypes:             map[*ast.CastingExpression]Type{},
+		CastingTargetTypes:                  map[*ast.CastingExpression]Type{},
 		ReturnStatementValueTypes:           map[*ast.ReturnStatement]Type{},
 		ReturnStatementReturnTypes:          map[*ast.ReturnStatement]Type{},
 		BinaryExpressionResultTypes:         map[*ast.BinaryExpression]Type{},

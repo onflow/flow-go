@@ -12,6 +12,7 @@ type Connection interface {
 	ShowMessage(params *ShowMessageParams)
 	LogMessage(params *LogMessageParams)
 	PublishDiagnostics(params *PublishDiagnosticsParams)
+	RegisterCapability(params *RegistrationParams) error
 }
 
 type connection struct {
@@ -30,12 +31,19 @@ func (conn *connection) PublishDiagnostics(params *PublishDiagnosticsParams) {
 	conn.jsonrpc2Server.Notify("textDocument/publishDiagnostics", params)
 }
 
+func (conn *connection) RegisterCapability(params *RegistrationParams) error {
+	return conn.jsonrpc2Server.Call("client/registerCapability", params)
+}
+
 type Handler interface {
 	Initialize(connection Connection, params *InitializeParams) (*InitializeResult, error)
 	DidChangeTextDocument(connection Connection, params *DidChangeTextDocumentParams) error
 	Hover(connection Connection, params *TextDocumentPositionParams) (*Hover, error)
 	Definition(connection Connection, params *TextDocumentPositionParams) (*Location, error)
 	SignatureHelp(connection Connection, params *TextDocumentPositionParams) (*SignatureHelp, error)
+	CodeLens(connection Connection, params *CodeLensParams) ([]*CodeLens, error)
+	CodeLensResolve(connection Connection, params *CodeLens) (*CodeLens, error)
+	ExecuteCommand(connection Connection, params *ExecuteCommandParams) (interface{}, error)
 	Shutdown(connection Connection) error
 	Exit(connection Connection) error
 }
@@ -67,6 +75,15 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/signatureHelp"] =
 		server.handleSignatureHelp
+
+	jsonrpc2Server.Methods["textDocument/codeLens"] =
+		server.handleCodeLens
+
+	jsonrpc2Server.Methods["codeLens/resolve"] =
+		server.handleCodeLensResolve
+
+	jsonrpc2Server.Methods["workspace/executeCommand"] =
+		server.handleExecuteCommand
 
 	jsonrpc2Server.Methods["shutdown"] =
 		server.handleShutdown
