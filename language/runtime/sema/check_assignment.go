@@ -87,6 +87,8 @@ func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
 		members = containerType.Members
 	case *InterfaceType:
 		members = containerType.Members
+	case *TransactionType:
+		members = containerType.Members
 	default:
 		panic(errors.NewUnreachableError())
 	}
