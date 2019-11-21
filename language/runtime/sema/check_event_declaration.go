@@ -108,7 +108,6 @@ func (checker *Checker) checkEventParameters(parameterList *ast.ParameterList, p
 			})
 		}
 	}
-
 }
 
 // isValidEventParameterType returns true if the given type is a valid event parameters.
