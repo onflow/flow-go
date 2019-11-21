@@ -816,7 +816,11 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 		FlatMap(func(result interface{}) Trampoline {
 
 			if someValue, ok := result.(SomeValue); ok {
-				unwrappedValueCopy := someValue.Value.Copy()
+
+				targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
+				valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+				unwrappedValueCopy := interpreter.copyAndConvert(someValue.Value, valueType, targetType)
+
 				interpreter.activations.PushCurrent()
 				interpreter.declareVariable(
 					declaration.Identifier.Identifier,
