@@ -98,7 +98,7 @@ func (s Server) Initialize(
 	// TODO remove
 	connection.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
-		Message: "Successfully loaded config: " + conf.EmulatorAddr + conf.AccountAddr.String(),
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
 	})
 
 	// after initialization, indicate to the client which commands we support
