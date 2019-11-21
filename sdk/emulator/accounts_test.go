@@ -19,7 +19,8 @@ func TestCreateAccount(t *testing.T) {
 	publicKeys := unittest.PublicKeyFixtures()
 
 	t.Run("SingleKey", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -56,7 +57,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("MultipleKeys", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -101,7 +103,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("KeysAndCode", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -148,7 +151,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("CodeAndNoKeys", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		code := []byte("fun main() {}")
 
@@ -179,7 +183,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("EventEmitted", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -229,7 +234,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
 
@@ -266,7 +272,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidCode", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
 
@@ -299,7 +306,8 @@ func TestCreateAccount(t *testing.T) {
 
 func TestAddAccountKey(t *testing.T) {
 	t.Run("ValidKey", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
@@ -345,7 +353,8 @@ func TestAddAccountKey(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: unittest.PublicKeyFixtures()[0],
@@ -378,7 +387,8 @@ func TestAddAccountKey(t *testing.T) {
 }
 
 func TestRemoveAccountKey(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 		[]byte("pineapple elephant ears space cowboy octopus rodeo potato cannon"))
@@ -485,7 +495,8 @@ func TestUpdateAccountCode(t *testing.T) {
 	publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -526,7 +537,8 @@ func TestUpdateAccountCode(t *testing.T) {
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -564,7 +576,8 @@ func TestUpdateAccountCode(t *testing.T) {
 	})
 
 	t.Run("UnauthorizedAccount", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -609,7 +622,8 @@ func TestUpdateAccountCode(t *testing.T) {
 }
 
 func TestImportAccountCode(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	accountScript := []byte(`
 		fun answer(): Int {

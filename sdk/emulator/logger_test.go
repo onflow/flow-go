@@ -11,7 +11,7 @@ import (
 func TestRuntimeLogger(t *testing.T) {
 	loggedMessages := make([]string, 0)
 
-	b := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
+	b, _ := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
 		func(msg string) {
 			loggedMessages = append(loggedMessages, msg)
 		},

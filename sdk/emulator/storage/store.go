@@ -39,8 +39,8 @@ type Store interface {
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
-	// GetLedgerView returns a view into the ledger state at a given block.
-	GetLedgerView(blockNumber uint64) (flow.LedgerView, error)
+	// GetLedger returns the ledger state at a given block.
+	GetLedger(blockNumber uint64) (flow.Ledger, error)
 
 	// SetLedger updates all registers in the ledger for the given block.
 	// Callers should only include registers in the ledger whose value changed

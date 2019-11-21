@@ -44,7 +44,11 @@ func randomKey() flow.AccountPrivateKey {
 
 // newEmulator returns a emulator object for testing
 func newEmulator() *emulator.EmulatedBlockchain {
-	return emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // SignAndSubmit signs a transaction with an array of signers and adds their signatures to the transaction

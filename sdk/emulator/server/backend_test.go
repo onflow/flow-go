@@ -28,7 +28,8 @@ import (
 
 func TestPing(t *testing.T) {
 	ctx := context.Background()
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 	server := server.NewBackend(b, log.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
@@ -38,7 +39,8 @@ func TestPing(t *testing.T) {
 
 func TestGetEvents(t *testing.T) {
 	ctx := context.Background()
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 	server := server.NewBackend(b, log.New())
 
 	t.Run("should return error for invalid query", func(t *testing.T) {

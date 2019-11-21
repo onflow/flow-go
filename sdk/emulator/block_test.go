@@ -13,7 +13,8 @@ import (
 )
 
 func TestCommitBlock(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),

@@ -3,7 +3,9 @@
 package flow
 
 import (
+	"encoding/gob"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -70,4 +72,8 @@ func wrapEvent(e Event) eventWrapper {
 		TxHash: e.TxHash,
 		Index:  e.Index,
 	}
+}
+
+func init() {
+	gob.Register(big.Int{})
 }

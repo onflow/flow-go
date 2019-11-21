@@ -155,7 +155,7 @@ func (s Store) InsertBlock(block types.Block) error {
 		}
 
 		// if this is latest block, set latest block
-		if block.Number > latestBlockNumber {
+		if block.Number >= latestBlockNumber {
 			return txn.Set(latestBlockKey(), encBlockNumber)
 		}
 		return nil
@@ -184,7 +184,7 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	})
 }
 
-func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
+func (s Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	s.ledgerChangeLog.RLock()
 	defer s.ledgerChangeLog.RUnlock()
 
@@ -208,7 +208,7 @@ func (s Store) GetLedgerView(blockNumber uint64) (flow.LedgerView, error) {
 		}
 		return nil
 	})
-	return *ledger.NewView(), err
+	return ledger, err
 }
 
 func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
