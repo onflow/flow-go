@@ -18,9 +18,9 @@ const _Access_name = "AccessNotSpecifiedAccessPrivateAccessPublicAccessPublicSet
 
 var _Access_index = [...]uint8{0, 18, 31, 43, 63}
 
-func (i Access) String() string {
-	if i < 0 || i >= Access(len(_Access_index)-1) {
-		return "Access(" + strconv.FormatInt(int64(i), 10) + ")"
+func (a Access) String() string {
+	if a < 0 || a >= Access(len(_Access_index)-1) {
+		return "Access(" + strconv.FormatInt(int64(a), 10) + ")"
 	}
-	return _Access_name[_Access_index[i]:_Access_index[i+1]]
+	return _Access_name[_Access_index[a]:_Access_index[a+1]]
 }

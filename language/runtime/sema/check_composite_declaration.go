@@ -319,14 +319,32 @@ func (checker *Checker) checkCompositeConformance(
 	}
 }
 
+// TODO: return proper error
 func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
+	// Check type
+
 	// TODO: subtype?
 	if !compositeMember.Type.Equal(interfaceMember.Type) {
 		return false
 	}
 
+	// Check variable kind
+
 	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
 		compositeMember.VariableKind != interfaceMember.VariableKind {
+
+		return false
+	}
+
+	// Check access
+
+	if compositeMember.Access == ast.AccessPrivate {
+		return false
+	}
+
+	if interfaceMember.DeclarationKind == common.DeclarationKindField &&
+		interfaceMember.Access != ast.AccessNotSpecified &&
+		compositeMember.Access.IsLessPermissiveThan(interfaceMember.Access) {
 
 		return false
 	}

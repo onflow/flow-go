@@ -738,6 +738,44 @@ func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 	}
 }
 
+func TestCheckInvalidInterfaceConformanceFunctionPrivateAccessModifier(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %[1]s interface Test {
+                  fun test(): Int
+              }
+
+              %[1]s TestImpl: Test {
+                  priv fun test(): Int {
+                      return 1
+                  }
+              }
+	        `,
+				kind.Keyword(),
+			))
+
+			// TODO: add support for non-structure / non-resource declarations
+
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.ConformanceError{}, errs[0])
+
+			default:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.ConformanceError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+			}
+		})
+	}
+}
+
 func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
@@ -803,6 +841,117 @@ func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 				assert.IsType(t, &sema.ConformanceError{}, errs[1])
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+			}
+		})
+	}
+}
+
+func TestCheckInvalidInterfaceConformanceFieldPrivateAccessModifier(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %[1]s interface Test {
+                  x: Int
+              }
+
+              %[1]s TestImpl: Test {
+                  priv var x: Int
+
+                  init(x: Int) {
+                     self.x = x
+                  }
+              }
+	        `, kind.Keyword()))
+
+			// TODO: add support for non-structure / non-resource declarations
+
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.ConformanceError{}, errs[0])
+
+			default:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.ConformanceError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+			}
+		})
+	}
+}
+
+func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifier(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %[1]s interface Test {
+                  pub(set) x: Int
+              }
+
+              %[1]s TestImpl: Test {
+                  pub var x: Int
+
+                  init(x: Int) {
+                     self.x = x
+                  }
+              }
+	        `, kind.Keyword()))
+
+			// TODO: add support for non-structure / non-resource declarations
+
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.ConformanceError{}, errs[0])
+
+			default:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.ConformanceError{}, errs[1])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+			}
+		})
+	}
+}
+
+func TestCheckInterfaceConformanceFieldMorePermissiveAccessModifier(t *testing.T) {
+
+	for _, kind := range common.CompositeKinds {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t, fmt.Sprintf(`
+              %[1]s interface Test {
+                  pub x: Int
+              }
+
+              %[1]s TestImpl: Test {
+                  pub(set) var x: Int
+
+                  init(x: Int) {
+                     self.x = x
+                  }
+              }
+	        `, kind.Keyword()))
+
+			// TODO: add support for non-structure / non-resource declarations
+
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindResource:
+				assert.Nil(t, err)
+
+			default:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 			}
 		})
 	}
