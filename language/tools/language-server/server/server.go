@@ -95,6 +95,12 @@ func (s Server) Initialize(
 	}
 	s.config = conf
 
+	// TODO remove
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: "Successfully loaded config: " + conf.EmulatorAddr + conf.AccountAddr.String(),
+	})
+
 	// after initialization, indicate to the client which commands we support
 	go s.registerCommands(connection)
 
