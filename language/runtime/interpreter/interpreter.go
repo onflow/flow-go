@@ -1698,6 +1698,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 			value := CompositeValue{
 				Location:   interpreter.Checker.Location,
 				Identifier: identifier,
+				Kind:       declaration.CompositeKind,
 				Fields:     &map[string]Value{},
 				Functions:  &functions,
 				Destructor: destructorFunction,
@@ -1966,10 +1967,7 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 }
 
 func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetType sema.Type) Value {
-	if valueType == nil || !valueType.IsResourceType() {
-		value = value.Copy()
-	}
-	return interpreter.convertAndBox(value, valueType, targetType)
+	return interpreter.convertAndBox(value.Copy(), valueType, targetType)
 }
 
 // convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary

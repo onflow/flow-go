@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
@@ -1225,6 +1226,7 @@ func ConvertUInt64(value Value) Value {
 type CompositeValue struct {
 	Location   ast.Location
 	Identifier string
+	Kind       common.CompositeKind
 	Fields     *map[string]Value
 	Functions  *map[string]FunctionValue
 	Destructor *InterpretedFunctionValue
@@ -1252,6 +1254,11 @@ func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosit
 func (CompositeValue) isValue() {}
 
 func (v CompositeValue) Copy() Value {
+	// Resources are moved and not copied
+	if v.Kind == common.CompositeKindResource {
+		return v
+	}
+
 	newFields := make(map[string]Value, len(*v.Fields))
 	for field, value := range *v.Fields {
 		newFields[field] = value.Copy()
@@ -1262,6 +1269,7 @@ func (v CompositeValue) Copy() Value {
 	return CompositeValue{
 		Location:   v.Location,
 		Identifier: v.Identifier,
+		Kind:       v.Kind,
 		Fields:     &newFields,
 		Functions:  v.Functions,
 		Destructor: v.Destructor,
