@@ -247,6 +247,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		checker.declareEventDeclaration(declaration)
 	}
 
+	for _, declaration := range program.TransactionDeclarations() {
+		checker.declareTransactionDeclaration(declaration)
+	}
+
 	// check all declarations
 
 	for _, declaration := range program.Declarations {
