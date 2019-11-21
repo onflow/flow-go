@@ -18,6 +18,8 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.checkTransactionPrepareFunction(declaration, transactionType)
 	checker.checkTransactionExecuteFunction(declaration, transactionType)
 
+	checker.checkTransactionResourceFieldInvalidation(transactionType)
+
 	return nil
 }
 
@@ -105,6 +107,28 @@ func (checker *Checker) checkTransactionExecuteFunction(
 		returnType,
 		true,
 	)
+
+}
+
+func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionType *TransactionType) {
+	for name, member := range transactionType.Members {
+		if !member.Type.IsResourceType() {
+			return
+		}
+
+		info := checker.resources.Get(member)
+		if !info.DefinitivelyInvalidated {
+			// TODO: use different error here
+			checker.report(
+				&ResourceFieldNotInvalidatedError{
+					FieldName: name,
+					TypeName:  "BLA-BLA",
+					// TODO:
+					Pos: ast.Position{},
+				},
+			)
+		}
+	}
 }
 
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
