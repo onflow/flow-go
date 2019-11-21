@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/sourcegraph/jsonrpc2"
 )
 
@@ -76,4 +77,8 @@ func (server *Server) Notify(method string, params interface{}) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (server *Server) Call(method string, params interface{}) error {
+	return server.conn.Call(context.Background(), method, params, nil)
 }

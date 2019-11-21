@@ -56,6 +56,24 @@ func (s *BaseCadenceListener) EnterDeclaration(ctx *DeclarationContext) {}
 // ExitDeclaration is called when production declaration is exited.
 func (s *BaseCadenceListener) ExitDeclaration(ctx *DeclarationContext) {}
 
+// EnterTransactionDeclaration is called when production transactionDeclaration is entered.
+func (s *BaseCadenceListener) EnterTransactionDeclaration(ctx *TransactionDeclarationContext) {}
+
+// ExitTransactionDeclaration is called when production transactionDeclaration is exited.
+func (s *BaseCadenceListener) ExitTransactionDeclaration(ctx *TransactionDeclarationContext) {}
+
+// EnterPrepare is called when production prepare is entered.
+func (s *BaseCadenceListener) EnterPrepare(ctx *PrepareContext) {}
+
+// ExitPrepare is called when production prepare is exited.
+func (s *BaseCadenceListener) ExitPrepare(ctx *PrepareContext) {}
+
+// EnterExecute is called when production execute is entered.
+func (s *BaseCadenceListener) EnterExecute(ctx *ExecuteContext) {}
+
+// ExitExecute is called when production execute is exited.
+func (s *BaseCadenceListener) ExitExecute(ctx *ExecuteContext) {}
+
 // EnterImportDeclaration is called when production importDeclaration is entered.
 func (s *BaseCadenceListener) EnterImportDeclaration(ctx *ImportDeclarationContext) {}
 
@@ -91,6 +109,12 @@ func (s *BaseCadenceListener) EnterField(ctx *FieldContext) {}
 
 // ExitField is called when production field is exited.
 func (s *BaseCadenceListener) ExitField(ctx *FieldContext) {}
+
+// EnterFields is called when production fields is entered.
+func (s *BaseCadenceListener) EnterFields(ctx *FieldsContext) {}
+
+// ExitFields is called when production fields is exited.
+func (s *BaseCadenceListener) ExitFields(ctx *FieldsContext) {}
 
 // EnterInterfaceDeclaration is called when production interfaceDeclaration is entered.
 func (s *BaseCadenceListener) EnterInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
@@ -345,13 +369,11 @@ func (s *BaseCadenceListener) EnterNilCoalescingExpression(ctx *NilCoalescingExp
 // ExitNilCoalescingExpression is called when production nilCoalescingExpression is exited.
 func (s *BaseCadenceListener) ExitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) {}
 
-// EnterFailableDowncastingExpression is called when production failableDowncastingExpression is entered.
-func (s *BaseCadenceListener) EnterFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
-}
+// EnterCastingExpression is called when production castingExpression is entered.
+func (s *BaseCadenceListener) EnterCastingExpression(ctx *CastingExpressionContext) {}
 
-// ExitFailableDowncastingExpression is called when production failableDowncastingExpression is exited.
-func (s *BaseCadenceListener) ExitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) {
-}
+// ExitCastingExpression is called when production castingExpression is exited.
+func (s *BaseCadenceListener) ExitCastingExpression(ctx *CastingExpressionContext) {}
 
 // EnterConcatenatingExpression is called when production concatenatingExpression is entered.
 func (s *BaseCadenceListener) EnterConcatenatingExpression(ctx *ConcatenatingExpressionContext) {}
@@ -424,6 +446,12 @@ func (s *BaseCadenceListener) EnterUnaryOp(ctx *UnaryOpContext) {}
 
 // ExitUnaryOp is called when production unaryOp is exited.
 func (s *BaseCadenceListener) ExitUnaryOp(ctx *UnaryOpContext) {}
+
+// EnterCastingOp is called when production castingOp is entered.
+func (s *BaseCadenceListener) EnterCastingOp(ctx *CastingOpContext) {}
+
+// ExitCastingOp is called when production castingOp is exited.
+func (s *BaseCadenceListener) ExitCastingOp(ctx *CastingOpContext) {}
 
 // EnterPrimaryExpressionStart is called when production primaryExpressionStart is entered.
 func (s *BaseCadenceListener) EnterPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}

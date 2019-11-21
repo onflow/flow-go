@@ -78,6 +78,25 @@ declaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
+    | transactionDeclaration
+    ;
+
+transactionDeclaration
+    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `prepare` in semantic analysis to provide better error
+//
+prepare
+    : specialFunctionDeclaration
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `execute` in semantic analysis to provide better error
+//
+execute
+    : Identifier block
     ;
 
 importDeclaration
@@ -107,6 +126,10 @@ variableKind
 
 field
     : access variableKind? identifier ':' typeAnnotation
+    ;
+
+fields
+    : (field ';'?)*
     ;
 
 interfaceDeclaration
@@ -337,12 +360,12 @@ relationalExpression
 
 nilCoalescingExpression
     // NOTE: right associative
-    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    : castingExpression (NilCoalescing nilCoalescingExpression)?
     ;
 
-failableDowncastingExpression
+castingExpression
     : concatenatingExpression
-    | failableDowncastingExpression FailableDowncasting typeAnnotation
+    | castingExpression castingOp typeAnnotation
     ;
 
 concatenatingExpression
@@ -436,9 +459,13 @@ Optional : '?' ;
 
 NilCoalescing : WS '??';
 
-Downcasting : 'as' ;
+Casting : 'as' ;
+FailableCasting : 'as?' ;
 
-FailableDowncasting : 'as?' ;
+castingOp
+    : Casting
+    | FailableCasting
+    ;
 
 primaryExpressionStart
     : identifierExpression
@@ -456,7 +483,7 @@ destroyExpression
     ;
 
 referenceExpression
-    : Ampersand expression Downcasting fullType
+    : Ampersand expression Casting fullType
     ;
 
 identifierExpression

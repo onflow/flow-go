@@ -125,14 +125,14 @@ var serializedLexerAtn = []uint16{
 	3, 2, 2, 2, 139, 460, 3, 2, 2, 2, 141, 468, 3, 2, 2, 2, 143, 479, 3, 2,
 	2, 2, 145, 494, 3, 2, 2, 2, 147, 496, 3, 2, 2, 2, 149, 499, 3, 2, 2, 2,
 	151, 506, 3, 2, 2, 2, 153, 512, 3, 2, 2, 2, 155, 527, 3, 2, 2, 2, 157,
-	158, 7, 61, 2, 2, 158, 4, 3, 2, 2, 2, 159, 160, 7, 46, 2, 2, 160, 6, 3,
-	2, 2, 2, 161, 162, 7, 125, 2, 2, 162, 8, 3, 2, 2, 2, 163, 164, 7, 127,
-	2, 2, 164, 10, 3, 2, 2, 2, 165, 166, 7, 60, 2, 2, 166, 12, 3, 2, 2, 2,
-	167, 168, 7, 93, 2, 2, 168, 14, 3, 2, 2, 2, 169, 170, 7, 95, 2, 2, 170,
-	16, 3, 2, 2, 2, 171, 172, 7, 62, 2, 2, 172, 173, 7, 47, 2, 2, 173, 174,
-	7, 64, 2, 2, 174, 18, 3, 2, 2, 2, 175, 176, 7, 63, 2, 2, 176, 20, 3, 2,
-	2, 2, 177, 178, 7, 126, 2, 2, 178, 179, 7, 126, 2, 2, 179, 22, 3, 2, 2,
-	2, 180, 181, 7, 40, 2, 2, 181, 182, 7, 40, 2, 2, 182, 24, 3, 2, 2, 2, 183,
+	158, 7, 61, 2, 2, 158, 4, 3, 2, 2, 2, 159, 160, 7, 125, 2, 2, 160, 6, 3,
+	2, 2, 2, 161, 162, 7, 127, 2, 2, 162, 8, 3, 2, 2, 2, 163, 164, 7, 46, 2,
+	2, 164, 10, 3, 2, 2, 2, 165, 166, 7, 60, 2, 2, 166, 12, 3, 2, 2, 2, 167,
+	168, 7, 93, 2, 2, 168, 14, 3, 2, 2, 2, 169, 170, 7, 95, 2, 2, 170, 16,
+	3, 2, 2, 2, 171, 172, 7, 62, 2, 2, 172, 173, 7, 47, 2, 2, 173, 174, 7,
+	64, 2, 2, 174, 18, 3, 2, 2, 2, 175, 176, 7, 63, 2, 2, 176, 20, 3, 2, 2,
+	2, 177, 178, 7, 126, 2, 2, 178, 179, 7, 126, 2, 2, 179, 22, 3, 2, 2, 2,
+	180, 181, 7, 40, 2, 2, 181, 182, 7, 40, 2, 2, 182, 24, 3, 2, 2, 2, 183,
 	184, 7, 48, 2, 2, 184, 26, 3, 2, 2, 2, 185, 186, 7, 63, 2, 2, 186, 187,
 	7, 63, 2, 2, 187, 28, 3, 2, 2, 2, 188, 189, 7, 35, 2, 2, 189, 190, 7, 63,
 	2, 2, 190, 30, 3, 2, 2, 2, 191, 192, 7, 62, 2, 2, 192, 32, 3, 2, 2, 2,
@@ -266,7 +266,7 @@ var lexerModeNames = []string{
 }
 
 var lexerLiteralNames = []string{
-	"", "';'", "','", "'{'", "'}'", "':'", "'['", "']'", "'<->'", "'='", "'||'",
+	"", "';'", "'{'", "'}'", "','", "':'", "'['", "']'", "'<->'", "'='", "'||'",
 	"'&&'", "'.'", "'=='", "'!='", "'<'", "'>'", "'<='", "'>='", "'+'", "'-'",
 	"'*'", "'/'", "'%'", "'&'", "'!'", "'<-'", "'?'", "", "'as'", "'as?'",
 	"'('", "')'", "'transaction'", "'struct'", "'resource'", "'contract'",
@@ -280,7 +280,7 @@ var lexerSymbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal",
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
 	"Div", "Mod", "Ampersand", "Negate", "Move", "Optional", "NilCoalescing",
-	"Downcasting", "FailableDowncasting", "OpenParen", "CloseParen", "Transaction",
+	"Casting", "FailableCasting", "OpenParen", "CloseParen", "Transaction",
 	"Struct", "Resource", "Contract", "Interface", "Fun", "Event", "Emit",
 	"Pre", "Post", "Priv", "Auth", "Pub", "PubSet", "Return", "Break", "Continue",
 	"Let", "Var", "If", "Else", "While", "True", "False", "Nil", "Import",
@@ -293,15 +293,15 @@ var lexerRuleNames = []string{
 	"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8",
 	"T__9", "T__10", "T__11", "Equal", "Unequal", "Less", "Greater", "LessEqual",
 	"GreaterEqual", "Plus", "Minus", "Mul", "Div", "Mod", "Ampersand", "Negate",
-	"Move", "Optional", "NilCoalescing", "Downcasting", "FailableDowncasting",
-	"OpenParen", "CloseParen", "Transaction", "Struct", "Resource", "Contract",
-	"Interface", "Fun", "Event", "Emit", "Pre", "Post", "Priv", "Auth", "Pub",
-	"PubSet", "Return", "Break", "Continue", "Let", "Var", "If", "Else", "While",
-	"True", "False", "Nil", "Import", "From", "Create", "Destroy", "Identifier",
-	"IdentifierHead", "IdentifierCharacter", "DecimalLiteral", "BinaryLiteral",
-	"OctalLiteral", "HexadecimalLiteral", "InvalidNumberLiteral", "StringLiteral",
-	"QuotedText", "EscapedCharacter", "HexadecimalDigit", "WS", "Terminator",
-	"BlockComment", "LineComment",
+	"Move", "Optional", "NilCoalescing", "Casting", "FailableCasting", "OpenParen",
+	"CloseParen", "Transaction", "Struct", "Resource", "Contract", "Interface",
+	"Fun", "Event", "Emit", "Pre", "Post", "Priv", "Auth", "Pub", "PubSet",
+	"Return", "Break", "Continue", "Let", "Var", "If", "Else", "While", "True",
+	"False", "Nil", "Import", "From", "Create", "Destroy", "Identifier", "IdentifierHead",
+	"IdentifierCharacter", "DecimalLiteral", "BinaryLiteral", "OctalLiteral",
+	"HexadecimalLiteral", "InvalidNumberLiteral", "StringLiteral", "QuotedText",
+	"EscapedCharacter", "HexadecimalDigit", "WS", "Terminator", "BlockComment",
+	"LineComment",
 }
 
 type CadenceLexer struct {
@@ -367,8 +367,8 @@ const (
 	CadenceLexerMove                 = 26
 	CadenceLexerOptional             = 27
 	CadenceLexerNilCoalescing        = 28
-	CadenceLexerDowncasting          = 29
-	CadenceLexerFailableDowncasting  = 30
+	CadenceLexerCasting              = 29
+	CadenceLexerFailableCasting      = 30
 	CadenceLexerOpenParen            = 31
 	CadenceLexerCloseParen           = 32
 	CadenceLexerTransaction          = 33
