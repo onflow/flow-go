@@ -6,6 +6,7 @@ import {
   ColorPresentation
 } from "vscode";
 import { LanguageClient } from "vscode-languageclient";
+import { getConfig, Config } from "./config";
 
 export function activate(ctx: ExtensionContext) {
   detectLaunchConfigurationChanges();
@@ -14,55 +15,37 @@ export function activate(ctx: ExtensionContext) {
     ctx.subscriptions.push(commands.registerCommand(command, callback));
   }
 
-  let client = startServer(ctx);
+  const maybeConfig: Config | undefined = getConfig();
+  if (!maybeConfig) {
+    window.showWarningMessage("Missing required config");
+  }
+  const config = maybeConfig as Config;
+
+  let client = startServer(ctx, config);
 
   registerCommand("cadence.restartServer", async () => {
     if (!client) {
       return;
     }
     await client.stop();
-    client = startServer(ctx);
+    client = startServer(ctx, config);
   });
 }
 
-function startServer(ctx: ExtensionContext): LanguageClient | undefined {
-  const languageServerCommand: string | undefined = workspace
-    .getConfiguration("cadence")
-    .get("languageServerCommand");
-
-  if (!languageServerCommand) {
-    window.showWarningMessage("Missing command to start the Cadence language server");
-    return;
-  }
-
-  const config = getServerConfig();
-  if (!config) {
-    window.showWarningMessage("Missing server config");
-    return;
-  }
-
-  const startLanguageServerCommandAndArgs = languageServerCommand.split(/\s+/);
-  if (startLanguageServerCommandAndArgs.length < 1) {
-    window.showWarningMessage("Malformed language server command");
-    return;
-  }
-
-  const command = startLanguageServerCommandAndArgs[0];
-  const args = startLanguageServerCommandAndArgs.splice(1);
-
+function startServer(ctx: ExtensionContext, config: Config): LanguageClient | undefined {
   const client = new LanguageClient(
     "cadence",
     "Cadence",
     {
-      command,
-      args,
+      command: config.languageServerCommand,
+      args: config.languageServerArgs,
     },
     {
       documentSelector: [{ scheme: "file", language: "cadence" }],
       synchronize: {
         configurationSection: "cadence"
       },
-      initializationOptions: config,
+      initializationOptions: config.serverConfig,
     }
   );
 
@@ -104,37 +87,6 @@ function detectLaunchConfigurationChanges() {
         });
     }
   });
-}
-
-type ServerConfig = {
-  accountKey: string
-  accountAddress: string
-  emulatorAddress: string
-};
-
-function getServerConfig(): ServerConfig|undefined {
-  const accountKey : string | undefined = workspace
-      .getConfiguration("cadence")
-      .get("accountKey");
-  if (!accountKey) {
-    return;
-  }
-
-  const accountAddress: string | undefined = workspace
-      .getConfiguration("cadence")
-      .get("accountAddress");
-  if (!accountAddress) {
-    return;
-  }
-
-  const emulatorAddress: string | undefined = workspace
-      .getConfiguration("cadence")
-      .get("emulatorAddress");
-  if (!emulatorAddress) {
-    return;
-  }
-
-  return { accountKey, accountAddress, emulatorAddress };
 }
 
 export function deactivate() {}
