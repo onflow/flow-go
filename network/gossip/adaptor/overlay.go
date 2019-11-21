@@ -36,21 +36,21 @@ func NewNetwork(node *gossip.Node, codec network.Codec) (*Network, error) {
 // Register will register a new engine with the wrapping adaptor. The returned
 // conduit will use the GRPC functionality of the underlying gossip node to
 // create a network bus for each engine.
-func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
 
 	// check if the engine slot is still free
-	_, ok := n.engines[code]
+	_, ok := n.engines[engineID]
 	if ok {
-		return nil, errors.Errorf("engine already registered (%d)", code)
+		return nil, errors.Errorf("engine already registered (%d)", engineID)
 	}
 
 	// create and register sender for receiving
 	conduit := &Conduit{
-		code:   code,
-		submit: n.submit,
-		handle: n.handle,
+		engineID: engineID,
+		submit:   n.submit,
+		handle:   n.handle,
 	}
-	msgType := fmt.Sprint(code)
+	msgType := fmt.Sprint(engineID)
 	err := n.node.RegisterFunc(msgType, conduit.Handle)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register handler")
@@ -61,12 +61,12 @@ func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, 
 	// requester here is never used
 
 	// register the engine
-	n.engines[code] = engine
+	n.engines[engineID] = engine
 
 	return conduit, nil
 }
 
-func (n *Network) submit(code uint8, event interface{}, recipients ...string) error {
+func (n *Network) submit(engineID uint8, event interface{}, recipients ...string) error {
 
 	// encode the event
 	payload, err := n.codec.Encode(event)
@@ -74,8 +74,8 @@ func (n *Network) submit(code uint8, event interface{}, recipients ...string) er
 		return errors.Wrap(err, "could not encode event")
 	}
 
-	// gossip the message using the engine code as message type
-	msgType := fmt.Sprint(code)
+	// gossip the message using the engine engineID as message type
+	msgType := fmt.Sprint(engineID)
 	_, err = n.node.AsyncGossip(context.Background(), payload, recipients, msgType)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
@@ -84,10 +84,10 @@ func (n *Network) submit(code uint8, event interface{}, recipients ...string) er
 	return nil
 }
 
-func (n *Network) handle(code uint8, payload []byte) error {
+func (n *Network) handle(engineID uint8, payload []byte) error {
 
 	// check if we have the given engine receiver registered
-	engine, ok := n.engines[code]
+	engine, ok := n.engines[engineID]
 	if !ok {
 		return errors.Errorf("could not find engine (%d)", engine)
 	}
