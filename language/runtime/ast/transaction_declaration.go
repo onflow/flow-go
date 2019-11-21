@@ -3,11 +3,9 @@ package ast
 import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type TransactionDeclaration struct {
-	Fields         []*FieldDeclaration
-	Prepare        *SpecialFunctionDeclaration
-	PreConditions  []*Condition
-	Execute        *Block
-	PostConditions []*Condition
+	Fields  []*FieldDeclaration
+	Prepare *SpecialFunctionDeclaration
+	Execute *FunctionBlock
 	Range
 }
 
