@@ -81,8 +81,9 @@ declaration
     | transactionDeclaration
     ;
 
+// Transactions can be in the form "prepare pre execute post" or "prepare pre post execute"
 transactionDeclaration
-    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
+    : Transaction '{' fields prepare? ((preConditions? execute? postConditions?) | (preConditions? postConditions? execute?))'}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
