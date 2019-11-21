@@ -35,14 +35,20 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
     return;
   }
 
-  const startLanguageServerCommandAndArgs = languageServerCommand.split(/\s+/)
-  if (startLanguageServerCommandAndArgs.length < 1) {
-    window.showWarningMessage("Malformed language server command")
-    return
+  const config = getServerConfig();
+  if (!config) {
+    window.showWarningMessage("Missing server config");
+    return;
   }
 
-  const command = startLanguageServerCommandAndArgs[0]
-  const args = startLanguageServerCommandAndArgs.splice(1)
+  const startLanguageServerCommandAndArgs = languageServerCommand.split(/\s+/);
+  if (startLanguageServerCommandAndArgs.length < 1) {
+    window.showWarningMessage("Malformed language server command");
+    return;
+  }
+
+  const command = startLanguageServerCommandAndArgs[0];
+  const args = startLanguageServerCommandAndArgs.splice(1);
 
   const client = new LanguageClient(
     "cadence",
@@ -56,6 +62,7 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
       synchronize: {
         configurationSection: "cadence"
       },
+      initializationOptions: config,
     }
   );
 
@@ -78,7 +85,8 @@ function startServer(ctx: ExtensionContext): LanguageClient | undefined {
 
 function detectLaunchConfigurationChanges() {
   workspace.onDidChangeConfiguration(e => {
-    const promptRestartKeys = ["languageServerPath"];
+    // TODO: do something smarter for account/emulator config (re-send to server)
+    const promptRestartKeys = ["languageServerPath", "accountKey", "accountAddress", "emulatorAddress"];
     const shouldPromptRestart = promptRestartKeys.some(key =>
       e.affectsConfiguration(`cadence.${key}`)
     );
@@ -96,6 +104,37 @@ function detectLaunchConfigurationChanges() {
         });
     }
   });
+}
+
+type ServerConfig = {
+  accountKey: string
+  accountAddress: string
+  emulatorAddress: string
+};
+
+function getServerConfig(): ServerConfig|undefined {
+  const accountKey : string | undefined = workspace
+      .getConfiguration("cadence")
+      .get("accountKey");
+  if (!accountKey) {
+    return;
+  }
+
+  const accountAddress: string | undefined = workspace
+      .getConfiguration("cadence")
+      .get("accountAddress");
+  if (!accountAddress) {
+    return;
+  }
+
+  const emulatorAddress: string | undefined = workspace
+      .getConfiguration("cadence")
+      .get("emulatorAddress");
+  if (!emulatorAddress) {
+    return;
+  }
+
+  return { accountKey, accountAddress, emulatorAddress };
 }
 
 export function deactivate() {}
