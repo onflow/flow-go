@@ -7,10 +7,11 @@ import (
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
-	checker.checkTransactionFields(declaration)
-
+	// enter a new scope for this transaction
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
+
+	checker.checkTransactionFields(declaration)
 
 	checker.declareSelfValue(transactionType)
 
