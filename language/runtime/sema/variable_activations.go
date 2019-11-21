@@ -8,31 +8,31 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
-type ValueActivations struct {
+type VariableActivations struct {
 	activations *activations.Activations
 }
 
-func NewValueActivations() *ValueActivations {
+func NewValueActivations() *VariableActivations {
 	valueActivations := &activations.Activations{}
 	valueActivations.Push(hamt.NewMap())
-	return &ValueActivations{
+	return &VariableActivations{
 		activations: valueActivations,
 	}
 }
 
-func (a *ValueActivations) Enter() {
+func (a *VariableActivations) Enter() {
 	a.activations.PushCurrent()
 }
 
-func (a *ValueActivations) Leave() {
+func (a *VariableActivations) Leave() {
 	a.activations.Pop()
 }
 
-func (a *ValueActivations) Set(name string, variable *Variable) {
+func (a *VariableActivations) Set(name string, variable *Variable) {
 	a.activations.Set(name, variable)
 }
 
-func (a *ValueActivations) Find(name string) *Variable {
+func (a *VariableActivations) Find(name string) *Variable {
 	value := a.activations.Find(name)
 	if value == nil {
 		return nil
@@ -44,11 +44,11 @@ func (a *ValueActivations) Find(name string) *Variable {
 	return variable
 }
 
-func (a *ValueActivations) Depth() int {
+func (a *VariableActivations) Depth() int {
 	return a.activations.Depth()
 }
 
-func (a *ValueActivations) Declare(
+func (a *VariableActivations) Declare(
 	identifier string,
 	ty Type,
 	access ast.Access,
@@ -86,7 +86,7 @@ func (a *ValueActivations) Declare(
 	return variable, err
 }
 
-func (a *ValueActivations) DeclareFunction(
+func (a *VariableActivations) DeclareFunction(
 	identifier ast.Identifier,
 	access ast.Access,
 	invokableType InvokableType,
@@ -103,7 +103,7 @@ func (a *ValueActivations) DeclareFunction(
 	)
 }
 
-func (a *ValueActivations) DeclareType(
+func (a *VariableActivations) DeclareType(
 	identifier ast.Identifier,
 	ty Type,
 	declarationKind common.DeclarationKind,
@@ -120,7 +120,7 @@ func (a *ValueActivations) DeclareType(
 	)
 }
 
-func (a *ValueActivations) DeclareImplicitConstant(
+func (a *VariableActivations) DeclareImplicitConstant(
 	identifier string,
 	ty Type,
 	kind common.DeclarationKind,
@@ -136,7 +136,7 @@ func (a *ValueActivations) DeclareImplicitConstant(
 	)
 }
 
-func (a *ValueActivations) VariablesDeclaredInAndBelow(depth int) map[string]*Variable {
+func (a *VariableActivations) VariablesDeclaredInAndBelow(depth int) map[string]*Variable {
 	variables := map[string]*Variable{}
 
 	values := a.activations.CurrentOrNew()

@@ -1,6 +1,6 @@
 
-struct interface Vault {
-    balance: Int
+pub struct interface Vault {
+    pub balance: Int
 
     init(balance: Int) {
         post {
@@ -31,8 +31,8 @@ struct interface Vault {
     }
 }
 
-struct ExampleVault: Vault {
-    var balance: Int
+pub struct ExampleVault: Vault {
+    pub var balance: Int
 
     init(balance: Int) {
         self.balance = balance
@@ -48,7 +48,7 @@ struct ExampleVault: Vault {
     }
 }
 
-fun main() {
+pub fun main() {
     let vaultA = ExampleVault(balance: 10)
     let vaultB = ExampleVault(balance: 0)
 

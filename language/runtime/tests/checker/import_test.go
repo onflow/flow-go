@@ -46,18 +46,18 @@ func TestCheckInvalidRepeatedImport(t *testing.T) {
 func TestCheckImportAll(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-       fun answer(): Int {
-           return 42
-        }
+      pub fun answer(): Int {
+          return 42
+      }
     `)
 
 	assert.Nil(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
-           import "imported"
+          import "imported"
 
-           let x = answer()
+          pub let x = answer()
         `,
 		ParseAndCheckOptions{
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -72,7 +72,7 @@ func TestCheckImportAll(t *testing.T) {
 func TestCheckInvalidImportUnexported(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-       let x = 1
+       pub let x = 1
     `)
 
 	assert.Nil(t, err)
@@ -81,7 +81,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 		`
            import answer from "imported"
 
-           let x = answer()
+           pub let x = answer()
         `,
 		ParseAndCheckOptions{
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -98,20 +98,20 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
 func TestCheckImportSome(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-       fun answer(): Int {
-           return 42
-       }
+      pub fun answer(): Int {
+          return 42
+      }
 
-       let x = 1
+      pub let x = 1
     `)
 
 	assert.Nil(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
-           import answer from "imported"
+          import answer from "imported"
 
-           let x = answer()
+          pub let x = answer()
         `,
 		ParseAndCheckOptions{
 			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -156,10 +156,12 @@ func TestCheckImportTypes(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-               %[1]s Test {}
+               pub %[1]s Test {}
 
-               %[1]s interface TestInterface {}
-            `, kind.Keyword()))
+               pub %[1]s interface TestInterface {}
+            `,
+				kind.Keyword(),
+			))
 
 			// TODO: add support for non-structure / non-resource declarations
 
@@ -179,9 +181,9 @@ func TestCheckImportTypes(t *testing.T) {
 					`
                       import "imported"
 
-                      %[1]s TestImpl: TestInterface {}
+                      pub %[1]s TestImpl: TestInterface {}
 
-                      let x: %[2]sTest %[3]s %[4]s Test()
+                      pub let x: %[2]sTest %[3]s %[4]s Test()
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
@@ -215,7 +217,6 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[4])
 			}
-
 		})
 	}
 }

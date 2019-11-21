@@ -381,6 +381,30 @@ func (e *InvalidAccessModifierError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// MissingAccessModifierError
+
+type MissingAccessModifierError struct {
+	DeclarationKind common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *MissingAccessModifierError) Error() string {
+	return fmt.Sprintf(
+		"missing access modifier for %s",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*MissingAccessModifierError) isSemanticError() {}
+
+func (e *MissingAccessModifierError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingAccessModifierError) EndPosition() ast.Position {
+	return e.Pos
+}
+
 // InvalidNameError
 
 type InvalidNameError struct {
@@ -1689,6 +1713,33 @@ func (e *InvalidAccessError) Error() string {
 }
 
 func (*InvalidAccessError) isSemanticError() {}
+
+// InvalidAssignmentAccessError
+
+type InvalidAssignmentAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAssignmentAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot assign to `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (e *InvalidAssignmentAccessError) SecondaryError() string {
+	return fmt.Sprintf(
+		"has %s access. Consider making it publicly settable",
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAssignmentAccessError) isSemanticError() {}
 
 // InvalidCharacterLiteralError
 

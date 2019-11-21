@@ -18,6 +18,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		declaration.StartPos,
 		declaration.IsConstant,
 	)
+
 	// Determine the type of the initial value of the variable declaration
 	// and save it in the elaboration
 

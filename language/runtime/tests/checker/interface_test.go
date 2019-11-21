@@ -242,9 +242,9 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 			_, err := ParseAndCheckWithOptions(t,
 				fmt.Sprintf(`
-                  %[1]s interface Test {}
+                  pub %[1]s interface Test {}
 
-                  let test: %[2]sTest %[3]s panic("")
+                  pub let test: %[2]sTest %[3]s panic("")
                 `,
 					kind.Keyword(),
 					kind.Annotation(),
