@@ -2194,3 +2194,40 @@ func IsNilType(ty Type) bool {
 
 	return true
 }
+
+type TransactionType struct {
+	Members map[string]*Member
+	Prepare *SpecialFunctionType
+}
+
+func (*TransactionType) isType() {}
+
+func (*TransactionType) String() string {
+	return "Transaction"
+}
+
+func (*TransactionType) ID() string {
+	return "Transaction"
+}
+
+func (*TransactionType) Equal(other Type) bool {
+	// TODO:
+	_, ok := other.(*TransactionType)
+	return ok
+}
+
+func (*TransactionType) IsResourceType() bool {
+	return false
+}
+
+func (*TransactionType) IsInvalidType() bool {
+	return false
+}
+
+func (t *TransactionType) HasMembers() bool {
+	return true
+}
+
+func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	return t.Members[identifier]
+}
