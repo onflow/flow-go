@@ -48,7 +48,7 @@ func (s Server) Start() {
 }
 
 func (s Server) Initialize(
-	connection protocol.Connection,
+	conn protocol.Conn,
 	params *protocol.InitializeParams,
 ) (
 	*protocol.InitializeResult,
@@ -82,13 +82,13 @@ func (s Server) Initialize(
 	}
 
 	// TODO remove
-	connection.LogMessage(&protocol.LogMessageParams{
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
 	})
 
 	// after initialization, indicate to the client which commands we support
-	go s.registerCommands(connection)
+	go s.registerCommands(conn)
 
 	return result, nil
 }
@@ -97,10 +97,10 @@ func (s Server) Initialize(
 // We parse and check the new text and indicate any syntax or semantic errors
 // by publishing "diagnostics".
 func (s Server) DidChangeTextDocument(
-	connection protocol.Connection,
+	conn protocol.Conn,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
-	connection.LogMessage(&protocol.LogMessageParams{
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
 		Message: "DidChangeText",
 	})
@@ -108,7 +108,7 @@ func (s Server) DidChangeTextDocument(
 	code := params.ContentChanges[0].Text
 	s.documents[uri] = code
 
-	program, err := parse(connection, code, string(uri))
+	program, err := parse(conn, code, string(uri))
 
 	diagnostics := []protocol.Diagnostic{}
 
@@ -137,7 +137,7 @@ func (s Server) DidChangeTextDocument(
 		mainPath := strings.TrimPrefix(string(uri), "file://")
 
 		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-			return resolveImport(connection, mainPath, location)
+			return resolveImport(mainPath, location)
 		})
 
 		// check program
@@ -156,7 +156,7 @@ func (s Server) DidChangeTextDocument(
 		err = checker.Check()
 		elapsed := time.Since(start)
 
-		connection.LogMessage(&protocol.LogMessageParams{
+		conn.LogMessage(&protocol.LogMessageParams{
 			Type:    protocol.Info,
 			Message: fmt.Sprintf("checking took %s", elapsed),
 		})
@@ -175,7 +175,7 @@ func (s Server) DidChangeTextDocument(
 		}
 	}
 
-	connection.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
+	conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
 		URI:         params.TextDocument.URI,
 		Diagnostics: diagnostics,
 	})
@@ -186,7 +186,7 @@ func (s Server) DidChangeTextDocument(
 // Hover returns contextual type information about the variable at the given
 // location.
 func (s Server) Hover(
-	connection protocol.Connection,
+	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.Hover, error) {
 
@@ -211,7 +211,7 @@ func (s Server) Hover(
 
 // Definition finds the definition of the type at the given location.
 func (s Server) Definition(
-	connection protocol.Connection,
+	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.Location, error) {
 
@@ -240,7 +240,7 @@ func (s Server) Definition(
 
 // TODO
 func (s Server) SignatureHelp(
-	connection protocol.Connection,
+	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.SignatureHelp, error) {
 	return nil, nil
@@ -248,8 +248,8 @@ func (s Server) SignatureHelp(
 
 // CodeLens is called every time the document contents change and returns a
 // list of actions to be injected into the source as inline buttons.
-func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
-	connection.LogMessage(&protocol.LogMessageParams{
+func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: "code lens called" + string(params.TextDocument.URI),
 	})
@@ -293,8 +293,8 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 //
 // We register all the commands we support in registerCommands and populate
 // their corresponding handler at server initialization.
-func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.ExecuteCommandParams) (interface{}, error) {
-	connection.LogMessage(&protocol.LogMessageParams{
+func (s Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteCommandParams) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
 		Message: "called execute command: " + params.Command,
 	})
@@ -303,13 +303,13 @@ func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.
 	if !ok {
 		return nil, fmt.Errorf("invalid command: %s", params.Command)
 	}
-	return f(connection, params.Arguments...)
+	return f(conn, params.Arguments...)
 }
 
 // Shutdown tells the server to stop accepting any new requests. This can only
 // be followed by a call to Exit, which exits the process.
-func (Server) Shutdown(connection protocol.Connection) error {
-	connection.ShowMessage(&protocol.ShowMessageParams{
+func (Server) Shutdown(conn protocol.Conn) error {
+	conn.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
 		Message: "Cadence language server is shutting down",
 	})
@@ -317,7 +317,7 @@ func (Server) Shutdown(connection protocol.Connection) error {
 }
 
 // Exit exits the process.
-func (Server) Exit(connection protocol.Connection) error {
+func (Server) Exit(_ protocol.Conn) error {
 	os.Exit(0)
 	return nil
 }
@@ -330,12 +330,12 @@ func (s *Server) getNextNonce() uint64 {
 }
 
 // parse parses the given code and returns the resultant program.
-func parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
+func parse(conn protocol.Conn, code, location string) (*ast.Program, error) {
 	start := time.Now()
 	program, _, err := parser.ParseProgram(code)
 	elapsed := time.Since(start)
 
-	connection.LogMessage(&protocol.LogMessageParams{
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("parsing %s took %s", location, elapsed),
 	})
@@ -344,7 +344,6 @@ func parse(connection protocol.Connection, code, location string) (*ast.Program,
 }
 
 func resolveImport(
-	connection protocol.Connection,
 	mainPath string,
 	location ast.Location,
 ) (*ast.Program, error) {

@@ -17,13 +17,13 @@ const (
 
 // CommandHandler represents the form of functions that handle commands
 // submitted from the client using workspace/executeCommand.
-type CommandHandler func(conn protocol.Connection, args ...interface{}) (interface{}, error)
+type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, error)
 
 // Registers the commands that the server is able to handle.
 //
 // The best reference I've found for how this works is:
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
-func (s Server) registerCommands(connection protocol.Connection) {
+func (s Server) registerCommands(connection protocol.Conn) {
 	// Send a message to the client indicating which commands we support
 	err := connection.RegisterCapability(&protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
@@ -53,7 +53,7 @@ func (s Server) registerCommands(connection protocol.Connection) {
 // source document in VS Code.
 //
 // There should be exactly 1 argument, the DocumentURI of the file to submit.
-func (s Server) submitTransaction(connection protocol.Connection, args ...interface{}) (interface{}, error) {
+func (s Server) submitTransaction(connection protocol.Conn, args ...interface{}) (interface{}, error) {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("called submit transaction %v", args),

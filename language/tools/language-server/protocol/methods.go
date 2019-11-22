@@ -8,7 +8,7 @@ func (server *Server) handleInitialize(req *json.RawMessage) (interface{}, error
 		return nil, err
 	}
 
-	return server.Handler.Initialize(server.connection, &params)
+	return server.Handler.Initialize(server.conn, &params)
 }
 
 func (server *Server) handleDidChangeTextDocument(req *json.RawMessage) (interface{}, error) {
@@ -17,7 +17,7 @@ func (server *Server) handleDidChangeTextDocument(req *json.RawMessage) (interfa
 		return nil, err
 	}
 
-	err := server.Handler.DidChangeTextDocument(server.connection, &params)
+	err := server.Handler.DidChangeTextDocument(server.conn, &params)
 	return nil, err
 }
 
@@ -27,7 +27,7 @@ func (server *Server) handleHover(req *json.RawMessage) (interface{}, error) {
 		return nil, err
 	}
 
-	return server.Handler.Hover(server.connection, &params)
+	return server.Handler.Hover(server.conn, &params)
 }
 
 func (server *Server) handleDefinition(req *json.RawMessage) (interface{}, error) {
@@ -36,7 +36,7 @@ func (server *Server) handleDefinition(req *json.RawMessage) (interface{}, error
 		return nil, err
 	}
 
-	return server.Handler.Definition(server.connection, &params)
+	return server.Handler.Definition(server.conn, &params)
 }
 
 func (server *Server) handleSignatureHelp(req *json.RawMessage) (interface{}, error) {
@@ -45,7 +45,7 @@ func (server *Server) handleSignatureHelp(req *json.RawMessage) (interface{}, er
 		return nil, err
 	}
 
-	return server.Handler.SignatureHelp(server.connection, &params)
+	return server.Handler.SignatureHelp(server.conn, &params)
 }
 
 func (server *Server) handleCodeLens(req *json.RawMessage) (interface{}, error) {
@@ -54,7 +54,7 @@ func (server *Server) handleCodeLens(req *json.RawMessage) (interface{}, error) 
 		return nil, err
 	}
 
-	return server.Handler.CodeLens(server.connection, &params)
+	return server.Handler.CodeLens(server.conn, &params)
 }
 
 func (server *Server) handleExecuteCommand(req *json.RawMessage) (interface{}, error) {
@@ -63,15 +63,15 @@ func (server *Server) handleExecuteCommand(req *json.RawMessage) (interface{}, e
 		return nil, err
 	}
 
-	return server.Handler.ExecuteCommand(server.connection, &params)
+	return server.Handler.ExecuteCommand(server.conn, &params)
 }
 
 func (server *Server) handleShutdown(req *json.RawMessage) (interface{}, error) {
-	err := server.Handler.Shutdown(server.connection)
+	err := server.Handler.Shutdown(server.conn)
 	return nil, err
 }
 
 func (server *Server) handleExit(req *json.RawMessage) (interface{}, error) {
-	err := server.Handler.Exit(server.connection)
+	err := server.Handler.Exit(server.conn)
 	return nil, err
 }
