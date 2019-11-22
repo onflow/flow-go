@@ -11,6 +11,8 @@ import (
 // KeyType is a key format supported by Flow.
 type KeyType int
 
+// revive:disable:var-naming
+
 const (
 	UnknownKeyType KeyType = iota
 	ECDSA_P256_SHA2_256
@@ -18,6 +20,8 @@ const (
 	ECDSA_SECp256k1_SHA2_256
 	ECDSA_SECp256k1_SHA3_256
 )
+
+// revive:enable
 
 // SigningAlgorithm returns the signing algorithm for this key type.
 func (k KeyType) SigningAlgorithm() crypto.SigningAlgorithm {
