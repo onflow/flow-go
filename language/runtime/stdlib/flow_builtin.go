@@ -7,53 +7,6 @@ import (
 )
 
 // This file defines functions built in to the Flow runtime.
-// TODO: improve types
-var setValueFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// value
-		// TODO: add proper type
-		&sema.IntType{},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// TODO: improve types
-var getValueFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-	),
-	// value
-	// TODO: add proper type
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.IntType{},
-	),
-}
 
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
