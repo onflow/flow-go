@@ -37,14 +37,28 @@ func (checker *Checker) checkTransactionPrepareFunction(
 	declaration *ast.TransactionDeclaration,
 	transactionType *TransactionType,
 ) {
+	fields := declaration.Fields
+
 	if declaration.Prepare == nil {
-		// prepare is optional
+		if len(declaration.Fields) != 0 {
+			// report error for first field
+			firstField := fields[0]
+
+			checker.report(
+				&TransactionMissingPrepareError{
+					ContainerType:  transactionType,
+					FirstFieldName: firstField.Identifier.Identifier,
+					FirstFieldPos:  firstField.Identifier.Pos,
+				},
+			)
+		}
+
 		return
 	}
 
 	fieldMembers := map[*Member]*ast.FieldDeclaration{}
 
-	for _, field := range declaration.Fields {
+	for _, field := range fields {
 		fieldName := field.Identifier.Identifier
 		member := transactionType.Members[fieldName]
 		fieldMembers[member] = field
@@ -92,7 +106,7 @@ func (checker *Checker) checkTransactionExecuteFunction(
 	transactionType *TransactionType,
 ) {
 	if declaration.Execute.Block == nil {
-		checker.report(&IncompleteTransactionError{
+		checker.report(&TransactionMissingExecuteError{
 			Range: declaration.Range,
 		})
 
@@ -124,7 +138,7 @@ func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionTyp
 			checker.report(
 				&ResourceFieldNotInvalidatedError{
 					FieldName: name,
-					TypeName:  "BLA-BLA",
+					TypeName:  transactionType.String(),
 					// TODO:
 					Pos: ast.Position{},
 				},

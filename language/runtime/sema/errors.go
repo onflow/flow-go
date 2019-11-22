@@ -1418,7 +1418,7 @@ type ResourceFieldNotInvalidatedError struct {
 
 func (e *ResourceFieldNotInvalidatedError) Error() string {
 	return fmt.Sprintf(
-		"field `%s` of resource type `%s` is not invalidated (moved or destroyed)",
+		"field `%s` of type `%s` is not invalidated (moved or destroyed)",
 		e.FieldName,
 		e.TypeName,
 	)
@@ -1718,14 +1718,44 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
 
-// IncompleteTransactionError
+// TransactionMissingExecuteError
 
-type IncompleteTransactionError struct {
+type TransactionMissingExecuteError struct {
 	ast.Range
 }
 
-func (e *IncompleteTransactionError) Error() string {
+func (e *TransactionMissingExecuteError) Error() string {
 	return "transaction is missing an execute block"
 }
 
-func (*IncompleteTransactionError) isSemanticError() {}
+func (*TransactionMissingExecuteError) isSemanticError() {}
+
+// TransactionMissingPrepareError
+
+type TransactionMissingPrepareError struct {
+	ContainerType  Type
+	FirstFieldName string
+	FirstFieldPos  ast.Position
+}
+
+func (e *TransactionMissingPrepareError) Error() string {
+	return fmt.Sprintf(
+		"missing prepare function for field `%s` in type `%s`",
+		e.FirstFieldName,
+		e.ContainerType,
+	)
+}
+
+func (*TransactionMissingPrepareError) isSemanticError() {}
+
+func (e *TransactionMissingPrepareError) StartPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
+	length := len(e.FirstFieldName)
+	return e.FirstFieldPos.Shifted(length - 1)
+}
+
+type TransactionResourceLossError struct {
+}
