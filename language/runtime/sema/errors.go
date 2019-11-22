@@ -1856,3 +1856,20 @@ func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position 
 	length := len(e.Access)
 	return e.Pos.Shifted(length - 1)
 }
+
+// InvalidTransactionPrepareParameterType
+
+type InvalidTransactionPrepareParameterType struct {
+	Type  Type
+	Range ast.Range
+}
+
+func (e *InvalidTransactionPrepareParameterType) Error() string {
+	return fmt.Sprintf(
+		"prepare parameter must be of type `%s`, not `%s`",
+		&AccountType{},
+		e.Type,
+	)
+}
+
+func (*InvalidTransactionPrepareParameterType) isSemanticError() {}
