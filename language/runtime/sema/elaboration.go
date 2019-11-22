@@ -36,6 +36,8 @@ type Elaboration struct {
 	//   with "type" which is an expression, i.e., an IdentifierExpression.
 	//   See `Checker.visitTypeIndexingExpression`
 	IndexExpressionIndexingTypes map[*ast.IndexExpression]Type
+	SwapStatementLeftTypes       map[*ast.SwapStatement]Type
+	SwapStatementRightTypes      map[*ast.SwapStatement]Type
 }
 
 func NewElaboration() *Elaboration {
@@ -65,5 +67,7 @@ func NewElaboration() *Elaboration {
 		DictionaryExpressionEntryTypes:      map[*ast.DictionaryExpression][]DictionaryEntryType{},
 		EventDeclarationTypes:               map[*ast.EventDeclaration]*EventType{},
 		IndexExpressionIndexingTypes:        map[*ast.IndexExpression]Type{},
+		SwapStatementLeftTypes:              map[*ast.SwapStatement]Type{},
+		SwapStatementRightTypes:             map[*ast.SwapStatement]Type{},
 	}
 }

@@ -935,6 +935,10 @@ func (interpreter *Interpreter) visitAssignment(
 }
 
 func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
+
+	leftType := interpreter.Checker.Elaboration.SwapStatementLeftTypes[swap]
+	rightType := interpreter.Checker.Elaboration.SwapStatementRightTypes[swap]
+
 	// Evaluate the left expression
 	return interpreter.assignmentGetterSetter(swap.Left).
 		FlatMap(func(result interface{}) Trampoline {
@@ -949,8 +953,12 @@ func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.
 
 					// Assign right value to left target
 					// and left value to right target
-					leftGetterSetter.set(rightValue)
-					rightGetterSetter.set(leftValue)
+
+					rightValueCopy := interpreter.copyAndConvert(rightValue.(Value), rightType, leftType)
+					leftValueCopy := interpreter.copyAndConvert(leftValue.(Value), leftType, rightType)
+
+					leftGetterSetter.set(rightValueCopy)
+					rightGetterSetter.set(leftValueCopy)
 				})
 		})
 }
