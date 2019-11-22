@@ -1,9 +1,8 @@
 package sema
 
 import (
+	interfaceentry "github.com/dapperlabs/flow-go/language/runtime/common/interface_entry"
 	"github.com/raviqqe/hamt"
-
-	"github.com/dapperlabs/flow-go/language/runtime/common/interfaceentry"
 )
 
 // MemberSet is an immutable set of field assignments.
