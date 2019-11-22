@@ -53,12 +53,7 @@ func (s Server) registerCommands(connection protocol.Conn) {
 // source document in VS Code.
 //
 // There should be exactly 1 argument, the DocumentURI of the file to submit.
-func (s Server) submitTransaction(connection protocol.Conn, args ...interface{}) (interface{}, error) {
-	connection.ShowMessage(&protocol.ShowMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("called submit transaction %v", args),
-	})
-
+func (s *Server) submitTransaction(connection protocol.Conn, args ...interface{}) (interface{}, error) {
 	if len(args) != 1 {
 		return nil, errors.New("missing argument")
 	}
@@ -79,7 +74,7 @@ func (s Server) submitTransaction(connection protocol.Conn, args ...interface{})
 		ScriptAccounts: []flow.Address{s.config.AccountAddr},
 	}
 
-	connection.ShowMessage(&protocol.ShowMessageParams{
+	connection.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
 	})
