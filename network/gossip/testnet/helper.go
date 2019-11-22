@@ -3,39 +3,35 @@ package testnet
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog"
 )
 
 // helper contains helper functions and constants used in tests_test
 
-var defaultLogger = zerolog.New(ioutil.Discard)
+var (
+	defaultLogger = zerolog.New(ioutil.Discard)
+	timeout       = 200 * time.Millisecond
+)
 
-// pickPort picks the first available port from port pool and returns a listener to that port,
-// the port itself, and a list containing the remaining ports
-func pickPort(portPool []string) (ln net.Listener, myPort string, othersPort []string, err error) {
-	othersPort = make([]string, 0)
+// FindPorts goes and finds num different empty ports and returns a slice of listeners to these ports as well as their addresses
+func FindPorts(num int) (listeners []net.Listener, addresses []string) {
+	for num > 0 {
+		//generate random port, range: 1000-61000
+		port := 1000 + rand.Intn(60000)
+		address := fmt.Sprintf("127.0.0.1:%v", port)
 
-	for _, port := range portPool {
-		ln, err = net.Listen("tcp", port)
-		if err == nil {
-			myPort = port
-			break
+		ln, err := net.Listen("tcp", address)
+		if err != nil {
+			continue
 		}
-	}
-
-	// if ln is nil then no valid port was found
-	if ln == nil {
-		return nil, "", nil, fmt.Errorf("could not find an empty port in the given pool")
-	}
-
-	// listing the port number of other nodes
-	for _, port := range portPool {
-		if port != myPort {
-			othersPort = append(othersPort, port)
-		}
+		num--
+		listeners = append(listeners, ln)
+		addresses = append(addresses, address)
 	}
 
 	return
@@ -79,4 +75,47 @@ func extractHashIndices(allHashes []string, containedHashes []string) (*[]bool, 
 		}
 	}
 	return &indices, nil
+}
+
+// randomSubset returns a random subset of size n from a range of addresses. It returns the
+// indices of the addresses (starting from the startPort) as well as the addresses themselves
+func randomSubset(size int, availableAddresses []string) (indices map[int]bool, addressesSubset []string) {
+	numNodesTotal := len(availableAddresses)
+	if size > numNodesTotal || size < 0 {
+		return nil, nil
+	}
+	indices = make(map[int]bool)
+
+	for {
+		if len(indices) == size {
+			return
+		}
+		idx := rand.Intn(numNodesTotal)
+		if indices[idx] {
+			continue
+		}
+		indices[idx] = true
+		addressesSubset = append(addressesSubset, availableAddresses[idx])
+	}
+}
+
+// contains returns true if a slice contains a specific string
+func contains(slice []string, str string) bool {
+	for _, el := range slice {
+		if el == str {
+			return true
+		}
+	}
+	return false
+}
+
+// containsDuplicate returns true if a slice contains a specific string more than once
+func containsDuplicate(slice []string, str string) bool {
+	cnt := 0
+	for _, el := range slice {
+		if el == str {
+			cnt++
+		}
+	}
+	return cnt > 1
 }
