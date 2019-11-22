@@ -20,7 +20,10 @@ import (
 	"github.com/dapperlabs/flow-go/language/tools/language-server/protocol"
 )
 
-var valueDeclarations = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...).ToValueDeclarations()
+var valueDeclarations = append(
+	stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{}),
+	stdlib.BuiltinFunctions...,
+).ToValueDeclarations()
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type Server struct {
