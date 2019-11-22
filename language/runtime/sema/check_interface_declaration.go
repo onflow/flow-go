@@ -19,6 +19,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
+		false,
 	)
 
 	// TODO: also check nested composite members
@@ -26,7 +27,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	// TODO: also check nested composite members' identifiers
 
 	// NOTE: functions are checked separately
-	checker.checkFieldsAccess(declaration.Members.Fields)
+	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
@@ -114,9 +115,11 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 func (checker *Checker) checkInterfaceFunctions(
 	functions []*ast.FunctionDeclaration,
-	interfaceType Type,
+	interfaceType *InterfaceType,
 	declarationKind common.DeclarationKind,
 ) {
+	inResource := interfaceType.CompositeKind == common.CompositeKindResource
+
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
 		// shouldn't be visible in other function declarations,
@@ -132,9 +135,10 @@ func (checker *Checker) checkInterfaceFunctions(
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:          false,
-					declareFunction:   false,
-					checkResourceLoss: false,
+					mustExit:                false,
+					declareFunction:         false,
+					checkResourceLoss:       false,
+					allowAuthAccessModifier: inResource,
 				},
 			)
 

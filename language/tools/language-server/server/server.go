@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/tools/language-server/config"
+
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
@@ -49,11 +51,14 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type Server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
+	commands map[string]CommandHandler
+	config   config.Config
 }
 
 func NewServer() Server {
 	return Server{
-		map[protocol.DocumentUri]*sema.Checker{},
+		checkers: make(map[protocol.DocumentUri]*sema.Checker),
+		commands: make(map[string]CommandHandler),
 	}
 }
 
@@ -61,7 +66,7 @@ func (s Server) Start() {
 	<-protocol.NewServer(s).Start()
 }
 
-func (Server) Initialize(
+func (s Server) Initialize(
 	connection protocol.Connection,
 	params *protocol.InitializeParams,
 ) (
@@ -77,8 +82,28 @@ func (Server) Initialize(
 			//SignatureHelpProvider: &protocol.SignatureHelpOptions{
 			//	TriggerCharacters: []string{"("},
 			//},
+			CodeLensProvider: &protocol.CodeLensOptions{
+				ResolveProvider: false,
+			},
 		},
 	}
+
+	// load the config options sent from the client
+	conf, err := config.FromInitializationOptions(params.InitializationOptions)
+	if err != nil {
+		return nil, err
+	}
+	s.config = conf
+
+	// TODO remove
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
+	})
+
+	// after initialization, indicate to the client which commands we support
+	go s.registerCommands(connection)
+
 	return result, nil
 }
 
@@ -132,6 +157,10 @@ func (s Server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "DidChangeText",
+	})
 	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
 
@@ -164,7 +193,7 @@ func (s Server) DidChangeTextDocument(
 		mainPath := strings.TrimPrefix(string(uri), "file://")
 
 		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-			return s.resolveImport(connection, mainPath, location)
+			return resolveImport(connection, mainPath, location)
 		})
 
 		// check program
@@ -269,6 +298,64 @@ func (s Server) SignatureHelp(
 	return nil, nil
 }
 
+func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: "code lens called" + string(params.TextDocument.URI),
+	})
+
+	checker, ok := s.checkers[params.TextDocument.URI]
+	if !ok {
+		// Can we ensure this doesn't happen?
+		return []*protocol.CodeLens{}, nil
+	}
+
+	var actions []*protocol.CodeLens
+
+	// Search for relevant function declarations
+	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+		if declaration.Identifier.String() == "main" {
+			actions = append(actions, &protocol.CodeLens{
+				Range: protocol.Range{
+					Start: protocol.Position{
+						Line:      float64(declaration.StartPosition().Line - 1),
+						Character: 0,
+					},
+					End: protocol.Position{
+						Line:      float64(declaration.StartPosition().Line - 1),
+						Character: 0,
+					},
+				},
+				Command: &protocol.Command{
+					Title:   "submit transaction",
+					Command: "cadence.submitTransaction",
+					//Arguments: []interface{}{"a", "b", "c"},
+				},
+			})
+		}
+	}
+
+	return actions, nil
+}
+
+// TODO is this necessary?
+func (s Server) CodeLensResolve(connection protocol.Connection, params *protocol.CodeLens) (*protocol.CodeLens, error) {
+	return params, nil
+}
+
+func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.ExecuteCommandParams) (interface{}, error) {
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "called execute command: " + params.Command,
+	})
+
+	f, ok := s.commands[params.Command]
+	if !ok {
+		return nil, fmt.Errorf("invalid command: %s", params.Command)
+	}
+	return f(connection, params.Arguments...)
+}
+
 func (Server) Shutdown(connection protocol.Connection) error {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
@@ -282,7 +369,7 @@ func (Server) Exit(connection protocol.Connection) error {
 	return nil
 }
 
-func (s Server) resolveImport(
+func resolveImport(
 	connection protocol.Connection,
 	mainPath string,
 	location ast.Location,

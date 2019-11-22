@@ -27,6 +27,7 @@ func ParseAndCheckWithStorage(t *testing.T, code string) (*sema.Checker, error) 
 		ParseAndCheckOptions{
 			Options: []sema.Option{
 				sema.WithPredeclaredValues(storageValueDeclaration),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)

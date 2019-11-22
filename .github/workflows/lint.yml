@@ -1,6 +1,11 @@
 name: Lint
 
-on: pull_request
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'revive.toml'
+      - '.github/workflows/lint.yaml'
 
 jobs:
   lint:

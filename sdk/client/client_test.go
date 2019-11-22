@@ -147,7 +147,7 @@ func TestExecuteScript(t *testing.T) {
 			Return(&observation.ExecuteScriptResponse{Value: valueBytes}, nil).
 			Times(1)
 
-		b, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		b, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.NoError(t, err)
 
 		value, err := encoding.Decode(types.Int{}, b)
@@ -164,7 +164,7 @@ func TestExecuteScript(t *testing.T) {
 			Times(1)
 
 		// error should be passed to user
-		_, err := c.ExecuteScript(ctx, []byte("fun main(): Int { return 1 }"))
+		_, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.Error(t, err)
 	})
 }

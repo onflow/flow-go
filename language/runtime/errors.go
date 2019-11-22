@@ -128,6 +128,8 @@ func writeCodeExcerpts(
 ) {
 	var lastLineNumber int
 
+	lines := strings.Split(code, "\n")
+
 	for i, excerpt := range excerpts {
 
 		lineNumberString := ""
@@ -150,7 +152,7 @@ func writeCodeExcerpts(
 		}
 
 		// code, if position
-		if excerpt.startPos != nil {
+		if excerpt.startPos != nil && len(code) > 0 {
 
 			if i > 0 && lastLineNumber != 0 && excerpt.startPos.Line-1 > lastLineNumber {
 				writeCodeExcerptContinuation(builder, lineNumberLength, useColor)
@@ -171,7 +173,6 @@ func writeCodeExcerpts(
 			builder.WriteString(lineNumberString)
 
 			// code line
-			lines := strings.Split(code, "\n")
 			line := lines[excerpt.startPos.Line-1]
 			builder.WriteString(line)
 			builder.WriteString("\n")
