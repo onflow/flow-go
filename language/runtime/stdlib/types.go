@@ -36,44 +36,6 @@ func (types StandardLibraryTypes) ToTypeDeclarations() map[string]sema.TypeDecla
 	return valueDeclarations
 }
 
-// AccountType
-
-var AccountType = func() StandardLibraryType {
-	accountType := &sema.CompositeType{
-		Kind:       common.CompositeKindStructure,
-		Identifier: "Account",
-		Members:    map[string]*sema.Member{},
-	}
-
-	accountType.Members["address"] =
-		sema.NewCheckedMember(&sema.Member{
-			ContainerType:   accountType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: "address"},
-			Type:            &sema.StringType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
-
-	accountType.Members["storage"] =
-		sema.NewCheckedMember(&sema.Member{
-			ContainerType:   accountType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: "storage"},
-			Type:            &sema.StorageType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
-
-	return StandardLibraryType{
-		Name: accountType.Identifier,
-		Type: accountType,
-		Kind: common.DeclarationKindStructure,
-	}
-}()
-
 // BuiltinTypes
 
-var BuiltinTypes = StandardLibraryTypes{
-	AccountType,
-}
+var BuiltinTypes = StandardLibraryTypes{}

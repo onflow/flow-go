@@ -214,17 +214,13 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	),
 }
 
-var accountType = stdlib.AccountType.Type
-
 var getAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// TODO:
 		// address
 		&sema.StringType{},
 	),
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		accountType,
-	),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.AccountType{}),
 }
 
 var logFunctionType = sema.FunctionType{
@@ -495,10 +491,10 @@ func (r *interpreterRuntime) executeScript(
 	for _, parameterTypeAnnotation := range mainFunctionType.ParameterTypeAnnotations {
 		parameterType := parameterTypeAnnotation.Type
 
-		if !parameterType.Equal(accountType) {
+		if !parameterType.Equal(&sema.AccountType{}) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				accountType,
+				&sema.AccountType{},
 				parameterType,
 			)
 			return nil, Error{[]error{err}}
@@ -590,7 +586,7 @@ func accountValue(address values.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
 	return interpreter.CompositeValue{
-		Identifier: stdlib.AccountType.Name,
+		Identifier: (&sema.AccountType{}).ID(),
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(addressHex),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
