@@ -16,9 +16,8 @@ type TypeAnnotation struct {
 func (e *TypeAnnotation) String() string {
 	if e.Move {
 		return fmt.Sprintf("<-%s", e.Type)
-	} else {
-		return fmt.Sprint(e.Type)
 	}
+	return fmt.Sprint(e.Type)
 }
 
 func (e *TypeAnnotation) StartPosition() Position {
@@ -29,13 +28,15 @@ func (e *TypeAnnotation) EndPosition() Position {
 	return e.Type.EndPosition()
 }
 
-// Type
+// revive:disable:redefines-builtin-id
 
 type Type interface {
 	HasPosition
 	fmt.Stringer
 	isType()
 }
+
+// revive:enable
 
 // NominalType represents a base type (e.g. boolean, integer, etc.)
 

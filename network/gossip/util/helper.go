@@ -1,17 +1,16 @@
-package gossip
+package util
 
 import (
 	"fmt"
-
 	"github.com/golang/protobuf/proto"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
-// extractHashMsgInfo receives the bytes of a HashMessage instance, unmarshals it and returns
-// its components
-func extractHashMsgInfo(hashMsgBytes []byte) ([]byte, *messages.Socket, error) {
+// extractHashMsgInfo receives the bytes of a HashMessage instance,
+// unmarshals it and returns its components
+func ExtractHashMsgInfo(hashMsgBytes []byte) ([]byte, *messages.Socket, error) {
 	hashMsg := &messages.HashMessage{}
 	if err := proto.Unmarshal(hashMsgBytes, hashMsg); err != nil {
 		return nil, &messages.Socket{}, fmt.Errorf("could not unmarshal message: %v", err)
@@ -21,7 +20,7 @@ func extractHashMsgInfo(hashMsgBytes []byte) ([]byte, *messages.Socket, error) {
 }
 
 // Pick a random subset of a list
-func randomSubSet(list []string, size int) ([]string, error) {
+func RandomSubSet(list []string, size int) ([]string, error) {
 	if size == 0 {
 		return nil, fmt.Errorf("could not find subset of a size 0 ")
 	}
@@ -33,12 +32,12 @@ func randomSubSet(list []string, size int) ([]string, error) {
 	var (
 		gossipPartners = make([]string, size)
 		us             = newUniqSelector(len(list))
-		index          = 0
+		index          int
 		err            error
 	)
 
 	for i := 0; i < size; i++ {
-		index, err = us.Int()
+		index, err = us.GetUniqueInt()
 		if err != nil {
 			return nil, fmt.Errorf("could not pick index for a gossip partner: %v", err)
 		}
@@ -48,7 +47,7 @@ func randomSubSet(list []string, size int) ([]string, error) {
 }
 
 // computeHash computes the hash of GossipMessage using sha256 algorithm
-func computeHash(msg *messages.GossipMessage) ([]byte, error) {
+func ComputeHash(msg *messages.GossipMessage) ([]byte, error) {
 
 	alg, err := crypto.NewHasher(crypto.SHA3_256)
 	if err != nil {

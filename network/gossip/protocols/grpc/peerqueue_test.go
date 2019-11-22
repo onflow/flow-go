@@ -2,9 +2,9 @@ package protocols
 
 import (
 	"context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"testing"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,9 +122,7 @@ func TestRemove(t *testing.T) {
 }
 
 // dummyStream implements clientStream and can be used as an argument
-type dummyStream struct {
-	cs grpc.ClientStream
-}
+type dummyStream struct{}
 
 func (ds *dummyStream) Header() (metadata.MD, error) {
 	return nil, nil

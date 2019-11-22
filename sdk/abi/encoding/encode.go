@@ -315,11 +315,7 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	}
 
 	// encode elements
-	if err := e.encodeArray(elements); err != nil {
-		return err
-	}
-
-	return nil
+	return e.encodeArray(elements)
 }
 
 // EncodeComposite writes the XDR-encoded representation of a composite value.

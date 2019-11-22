@@ -4,12 +4,12 @@ package adaptor
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/network/gossip/registry"
 )
 
 // Network implements the network interface as a wrapper around the gossip
@@ -50,7 +50,7 @@ func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, 
 		submit: n.submit,
 		handle: n.handle,
 	}
-	msgType := fmt.Sprint(code)
+	msgType := registry.MessageType(code)
 	err := n.node.RegisterFunc(msgType, conduit.Handle)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register handler")
@@ -75,8 +75,8 @@ func (n *Network) submit(code uint8, event interface{}, recipients ...string) er
 	}
 
 	// gossip the message using the engine code as message type
-	msgType := fmt.Sprint(code)
-	_, err = n.node.AsyncGossip(context.Background(), payload, recipients, msgType)
+	msgType := registry.MessageType(code)
+	_, err = n.node.Gossip(context.Background(), payload, recipients, msgType)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
