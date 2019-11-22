@@ -31,6 +31,7 @@ func TestTransactions(t *testing.T) {
 		"No-op",
 		`
 		  transaction {
+
 		    execute {}
 		  }
 		`,
@@ -48,6 +49,36 @@ func TestTransactions(t *testing.T) {
 		  }
 		`,
 		nil,
+	}
+
+	invalidPrepareBlock := test{
+		"InvalidPrepareBlock",
+		`
+		  transaction {
+
+		    notPrepare() {}
+
+		    execute {}
+		  }
+		`,
+		[]error{
+			&sema.InvalidTransactionBlockError{},
+		},
+	}
+
+	invalidExecuteBlock := test{
+		"InvalidExecuteBlock",
+		`
+		  transaction {
+
+		    prepare() {}
+
+		    notExecute {}
+		  }
+		`,
+		[]error{
+			&sema.InvalidTransactionBlockError{},
+		},
 	}
 
 	fieldUninitialized := test{
@@ -235,6 +266,8 @@ func TestTransactions(t *testing.T) {
 		emptyTx,
 		noopTx,
 		simpleTx,
+		invalidPrepareBlock,
+		invalidExecuteBlock,
 		fieldUninitialized,
 		fieldInitialized,
 		preConditions,
