@@ -33,7 +33,10 @@ func (s Server) registerCommands(conn protocol.Conn) {
 				Method: "workspace/executeCommand",
 				RegisterOptions: protocol.ExecuteCommandRegistrationOptions{
 					ExecuteCommandOptions: protocol.ExecuteCommandOptions{
-						Commands: []string{CommandSubmitTransaction},
+						Commands: []string{
+							CommandSubmitTransaction,
+							CommandExecuteScript,
+						},
 					},
 				},
 			},
@@ -48,6 +51,7 @@ func (s Server) registerCommands(conn protocol.Conn) {
 
 	// Register each command handler function in the server
 	s.commands[CommandSubmitTransaction] = s.submitTransaction
+	s.commands[CommandExecuteScript] = s.executeScript
 }
 
 // submitTransaction handles submitting a transaction defined in the
@@ -92,4 +96,34 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 	}
 
 	return nil, nil
+}
+
+// executeScript handles executing a script defined in the source document in
+// VS Code.
+//
+// There should be exactly 1 argument, the DocumentURI of the file to submit.
+func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, errors.New("missing argument")
+	}
+	uri, ok := args[0].(string)
+	if !ok {
+		return nil, errors.New("invalid uri argument")
+	}
+	documentText, ok := s.documents[protocol.DocumentUri(uri)]
+	if !ok {
+		return nil, fmt.Errorf("could not find document for URI %s", uri)
+	}
+
+	script := []byte(documentText)
+	res, err := s.flowClient.ExecuteScript(context.Background(), script)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Executed Script with result: %v", res),
+	})
+	return res, nil
 }
