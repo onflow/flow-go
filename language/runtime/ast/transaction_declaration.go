@@ -7,7 +7,7 @@ type TransactionDeclaration struct {
 	Prepare        *SpecialFunctionDeclaration
 	PreConditions  []*Condition
 	PostConditions []*Condition
-	Execute        *Block
+	Execute        *SpecialFunctionDeclaration
 	Range
 }
 

@@ -97,7 +97,7 @@ prepare
 // is `execute` in semantic analysis to provide better error
 //
 execute
-    : Identifier block
+    : identifier block
     ;
 
 importDeclaration

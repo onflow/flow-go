@@ -175,7 +175,7 @@ var parserATN = []uint16{
 	2, 255, 254, 3, 2, 2, 2, 255, 256, 3, 2, 2, 2, 256, 258, 3, 2, 2, 2, 257,
 	240, 3, 2, 2, 2, 257, 249, 3, 2, 2, 2, 258, 259, 3, 2, 2, 2, 259, 260,
 	7, 5, 2, 2, 260, 15, 3, 2, 2, 2, 261, 262, 5, 42, 22, 2, 262, 17, 3, 2,
-	2, 2, 263, 264, 7, 63, 2, 2, 264, 265, 5, 68, 35, 2, 265, 19, 3, 2, 2,
+	2, 2, 263, 264, 5, 190, 96, 2, 264, 265, 5, 68, 35, 2, 265, 19, 3, 2, 2,
 	2, 266, 277, 7, 59, 2, 2, 267, 272, 5, 190, 96, 2, 268, 269, 7, 6, 2, 2,
 	269, 271, 5, 190, 96, 2, 270, 268, 3, 2, 2, 2, 271, 274, 3, 2, 2, 2, 272,
 	270, 3, 2, 2, 2, 272, 273, 3, 2, 2, 2, 273, 275, 3, 2, 2, 2, 274, 272,
@@ -1747,7 +1747,7 @@ func (p *CadenceParser) TransactionDeclaration() (localctx ITransactionDeclarati
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CadenceParserIdentifier {
+		if ((_la-58)&-(0x1f+1)) == 0 && ((1<<uint((_la-58)))&((1<<(CadenceParserFrom-58))|(1<<(CadenceParserCreate-58))|(1<<(CadenceParserDestroy-58))|(1<<(CadenceParserIdentifier-58)))) != 0 {
 			{
 				p.SetState(240)
 				p.Execute()
@@ -1793,7 +1793,7 @@ func (p *CadenceParser) TransactionDeclaration() (localctx ITransactionDeclarati
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CadenceParserIdentifier {
+		if ((_la-58)&-(0x1f+1)) == 0 && ((1<<uint((_la-58)))&((1<<(CadenceParserFrom-58))|(1<<(CadenceParserCreate-58))|(1<<(CadenceParserDestroy-58))|(1<<(CadenceParserIdentifier-58)))) != 0 {
 			{
 				p.SetState(252)
 				p.Execute()
@@ -1955,8 +1955,14 @@ func NewExecuteContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 
 func (s *ExecuteContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ExecuteContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CadenceParserIdentifier, 0)
+func (s *ExecuteContext) Identifier() IIdentifierContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IIdentifierContext)(nil)).Elem(), 0)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IIdentifierContext)
 }
 
 func (s *ExecuteContext) Block() IBlockContext {
@@ -2022,7 +2028,7 @@ func (p *CadenceParser) Execute() (localctx IExecuteContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(261)
-		p.Match(CadenceParserIdentifier)
+		p.Identifier()
 	}
 	{
 		p.SetState(262)

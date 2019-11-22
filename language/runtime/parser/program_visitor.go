@@ -204,12 +204,13 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	prepareCtx := ctx.Prepare()
 	if prepareCtx != nil {
 		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+		prepareFunction.DeclarationKind = common.DeclarationKindPrepare
 	}
 
-	var executeBlock *ast.Block
+	var executeFunction *ast.SpecialFunctionDeclaration
 	executeCtx := ctx.Execute()
 	if executeCtx != nil {
-		executeBlock = executeCtx.Accept(v).(*ast.Block)
+		executeFunction = executeCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
 	}
 
 	var preConditions []*ast.Condition
@@ -231,7 +232,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
 		PostConditions: postConditions,
-		Execute:        executeBlock,
+		Execute:        executeFunction,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -244,7 +245,23 @@ func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
-	return ctx.Block().Accept(v)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	block := ctx.Block().Accept(v).(*ast.Block)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.SpecialFunctionDeclaration{
+		DeclarationKind: common.DeclarationKindExecute,
+		FunctionDeclaration: &ast.FunctionDeclaration{
+			Access:        ast.AccessNotSpecified,
+			Identifier:    identifier,
+			ParameterList: &ast.ParameterList{},
+			FunctionBlock: &ast.FunctionBlock{
+				Block: block,
+			},
+			StartPos: startPosition,
+		},
+	}
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
