@@ -1717,3 +1717,15 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 }
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
+
+// IncompleteTransactionError
+
+type IncompleteTransactionError struct {
+	ast.Range
+}
+
+func (e *IncompleteTransactionError) Error() string {
+	return "transaction is missing an execute block"
+}
+
+func (*IncompleteTransactionError) isSemanticError() {}

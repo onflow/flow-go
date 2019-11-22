@@ -91,9 +91,12 @@ func (checker *Checker) checkTransactionExecuteFunction(
 	declaration *ast.TransactionDeclaration,
 	transactionType *TransactionType,
 ) {
-	if declaration.Execute == nil {
-		// TODO error: execute block is required
-		panic("NO execute BLOCK")
+	if declaration.Execute.Block == nil {
+		checker.report(&IncompleteTransactionError{
+			Range: declaration.Range,
+		})
+
+		return
 	}
 
 	// execute always has a void return type
@@ -107,7 +110,6 @@ func (checker *Checker) checkTransactionExecuteFunction(
 		returnType,
 		true,
 	)
-
 }
 
 func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionType *TransactionType) {
@@ -143,7 +145,10 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 
 	checker.memberOrigins[transactionType] = origins
 
-	prepareParameterTypeAnnotations := checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
+	var prepareParameterTypeAnnotations []*TypeAnnotation
+	if declaration.Prepare != nil {
+		prepareParameterTypeAnnotations = checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
+	}
 
 	prepareFunctionType := &SpecialFunctionType{
 		FunctionType: &FunctionType{
