@@ -23,6 +23,15 @@ export function activate(ctx: ExtensionContext) {
     await client.stop();
     client = startServer(ctx);
   });
+
+  const terminal = window.createTerminal({
+    name: "Flow Emulator",
+    hideFromUser: false,
+    cwd: "~/.flow",
+  });
+  terminal.show();
+  terminal.sendText("flow emulator start");
+
 }
 
 function startServer(ctx: ExtensionContext): LanguageClient | undefined {
