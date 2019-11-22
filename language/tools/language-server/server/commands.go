@@ -13,6 +13,7 @@ import (
 
 const (
 	CommandSubmitTransaction = "cadence.submitTransaction"
+	CommandExecuteScript     = "cadence.executeScript"
 )
 
 // CommandHandler represents the form of functions that handle commands

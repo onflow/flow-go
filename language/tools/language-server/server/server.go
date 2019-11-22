@@ -265,15 +265,28 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 	// Search for relevant function declarations
 	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
 		if declaration.Identifier.String() == "main" {
-			_ = params.TextDocument.URI
-			actions = append(actions, &protocol.CodeLens{
-				Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
-				Command: &protocol.Command{
-					Title:     "submit transaction",
-					Command:   "cadence.submitTransaction",
-					Arguments: []interface{}{params.TextDocument.URI},
-				},
-			})
+			if len(declaration.ParameterList.Parameters) == 0 {
+				// this is a script
+				actions = append(actions, &protocol.CodeLens{
+					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
+					Command: &protocol.Command{
+						Title:     "execute script",
+						Command:   CommandExecuteScript,
+						Arguments: []interface{}{params.TextDocument.URI},
+					},
+				})
+			}
+			if len(declaration.ParameterList.Parameters) == 1 {
+				// this is transaction
+				actions = append(actions, &protocol.CodeLens{
+					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
+					Command: &protocol.Command{
+						Title:     "submit transaction",
+						Command:   CommandSubmitTransaction,
+						Arguments: []interface{}{params.TextDocument.URI},
+					},
+				})
+			}
 		}
 	}
 
