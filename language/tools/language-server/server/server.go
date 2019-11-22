@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/tools/language-server/config"
+
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
@@ -50,6 +52,7 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 type Server struct {
 	checkers map[protocol.DocumentUri]*sema.Checker
 	commands map[string]CommandHandler
+	config   config.Config
 }
 
 func NewServer() Server {
@@ -84,6 +87,19 @@ func (s Server) Initialize(
 			},
 		},
 	}
+
+	// load the config options sent from the client
+	conf, err := config.FromInitializationOptions(params.InitializationOptions)
+	if err != nil {
+		return nil, err
+	}
+	s.config = conf
+
+	// TODO remove
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
+	})
 
 	// after initialization, indicate to the client which commands we support
 	go s.registerCommands(connection)
