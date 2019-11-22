@@ -38,7 +38,7 @@ func (conn *connection) LogMessage(params *LogMessageParams) {
 	conn.jsonrpc2Server.Notify("window/logMessage", params)
 }
 
-// PublishDiagnostics is used to report errors for a document, typically synax
+// PublishDiagnostics is used to report errors for a document, typically syntax
 // or semantic errors in the code.
 func (conn *connection) PublishDiagnostics(params *PublishDiagnosticsParams) {
 	conn.jsonrpc2Server.Notify("textDocument/publishDiagnostics", params)
