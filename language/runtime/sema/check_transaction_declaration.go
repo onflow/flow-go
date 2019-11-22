@@ -17,15 +17,9 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.checkTransactionPrepareFunction(declaration, transactionType)
 
-	checker.visitConditions(declaration.PreConditions)
-
+	checker.checkTransactionPreConditions(declaration.PreConditions)
 	checker.checkTransactionExecuteFunction(declaration, transactionType)
-
-	if len(declaration.PostConditions) > 0 {
-		checker.declareBefore()
-	}
-
-	checker.visitConditions(declaration.PostConditions)
+	checker.checkTransactionPostConditions(declaration.PostConditions)
 
 	checker.checkTransactionResourceFieldInvalidation(transactionType)
 
@@ -110,6 +104,10 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 
 }
 
+func (checker *Checker) checkTransactionPreConditions(conditions []*ast.Condition) {
+	checker.visitConditions(conditions)
+}
+
 func (checker *Checker) checkTransactionExecuteFunction(
 	declaration *ast.TransactionDeclaration,
 	transactionType *TransactionType,
@@ -129,6 +127,14 @@ func (checker *Checker) checkTransactionExecuteFunction(
 	// and post-conditions need to be able to refer to block's declarations
 
 	checker.visitStatements(declaration.Execute.Statements)
+}
+
+func (checker *Checker) checkTransactionPostConditions(conditions []*ast.Condition) {
+	if len(conditions) > 0 {
+		checker.declareBefore()
+	}
+
+	checker.visitConditions(conditions)
 }
 
 func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionType *TransactionType) {
