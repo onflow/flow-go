@@ -1756,6 +1756,3 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 	length := len(e.FirstFieldName)
 	return e.FirstFieldPos.Shifted(length - 1)
 }
-
-type TransactionResourceLossError struct {
-}
