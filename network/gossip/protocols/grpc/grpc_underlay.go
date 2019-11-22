@@ -1,4 +1,4 @@
-// A GRPC implementation of the Protocol interface.
+// A GRPC implementation of the Underlay interface.
 package protocols
 
 import (
