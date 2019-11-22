@@ -127,7 +127,6 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 		_ = parameterTypeAnnotation
 
 		// TODO: only allow Account type
-		// should Account become a built-in type? :/
 	}
 
 }
