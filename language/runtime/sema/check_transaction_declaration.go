@@ -25,11 +25,11 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.declareSelfValue(transactionType)
 
-	checker.checkTransactionPrepareFunction(declaration, transactionType, fieldMembers)
+	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
 
-	checker.checkTransactionPreConditions(declaration.PreConditions)
-	checker.checkTransactionExecuteFunction(declaration, transactionType)
-	checker.checkTransactionPostConditions(declaration.PostConditions)
+	checker.visitTransactionPreConditions(declaration.PreConditions)
+	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+	checker.visitTransactionPostConditions(declaration.PostConditions)
 
 	checker.checkTransactionResourceFieldInvalidation(transactionType, fieldMembers)
 
@@ -59,6 +59,18 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  prepareIdentifier.Pos,
 			})
 		}
+	} else {
+		if len(declaration.Fields) != 0 {
+			// report error for first field
+			firstField := declaration.Fields[0]
+
+			checker.report(
+				&TransactionMissingPrepareError{
+					FirstFieldName: firstField.Identifier.Identifier,
+					FirstFieldPos:  firstField.Identifier.Pos,
+				},
+			)
+		}
 	}
 
 	if declaration.Execute != nil {
@@ -69,35 +81,24 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  executeIdentifier.Pos,
 			})
 		}
+	} else {
+		checker.report(&TransactionMissingExecuteError{
+			Range: declaration.Range,
+		})
 	}
 }
 
-func (checker *Checker) checkTransactionPrepareFunction(
-	declaration *ast.TransactionDeclaration,
+func (checker *Checker) visitTransactionPrepareFunction(
+	prepareFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
 	fieldMembers map[*Member]*ast.FieldDeclaration,
 ) {
-	fields := declaration.Fields
-
-	if declaration.Prepare == nil {
-		if len(fields) != 0 {
-			// report error for first field
-			firstField := fields[0]
-
-			checker.report(
-				&TransactionMissingPrepareError{
-					FirstFieldName: firstField.Identifier.Identifier,
-					FirstFieldPos:  firstField.Identifier.Pos,
-				},
-			)
-		}
-
+	if prepareFunction == nil {
 		return
 	}
 
 	initializationInfo := NewInitializationInfo(transactionType, fieldMembers)
 
-	prepareFunction := declaration.Prepare
 	prepareFunctionType := transactionType.Prepare
 
 	checker.checkFunction(
@@ -131,29 +132,25 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 
 }
 
-func (checker *Checker) checkTransactionPreConditions(conditions []*ast.Condition) {
+func (checker *Checker) visitTransactionPreConditions(conditions []*ast.Condition) {
 	checker.visitConditions(conditions)
 }
 
-func (checker *Checker) checkTransactionExecuteFunction(
-	declaration *ast.TransactionDeclaration,
+func (checker *Checker) visitTransactionExecuteFunction(
+	executeFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
 ) {
-	if declaration.Execute == nil {
-		checker.report(&TransactionMissingExecuteError{
-			Range: declaration.Range,
-		})
-
+	if executeFunction == nil {
 		return
 	}
 
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	checker.visitStatements(declaration.Execute.FunctionBlock.Statements)
+	checker.visitStatements(executeFunction.FunctionBlock.Statements)
 }
 
-func (checker *Checker) checkTransactionPostConditions(conditions []*ast.Condition) {
+func (checker *Checker) visitTransactionPostConditions(conditions []*ast.Condition) {
 	if len(conditions) > 0 {
 		checker.declareBefore()
 	}
