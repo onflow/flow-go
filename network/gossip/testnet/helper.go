@@ -37,8 +37,8 @@ func FindPorts(num int) (listeners []net.Listener, addresses []string) {
 	return
 }
 
-// extractSenderId returns a bool array with the index i true if there is a message from node i in the provided messages.
-func extractSenderId(numNodes int, messages []string, expectedMsgTxt string, expectedMsgSize int) (*[]bool, error) {
+// extractSenderID returns a bool array with the index i true if there is a message from node i in the provided messages.
+func extractSenderID(numNodes int, messages []string, expectedMsgTxt string, expectedMsgSize int) (*[]bool, error) {
 	indices := make([]bool, numNodes)
 	for _, msg := range messages {
 		if len(msg) < expectedMsgSize {

@@ -70,7 +70,7 @@ func TestChatNodeOneToAll(t *testing.T) {
 			t.Errorf("Node #%v has wrong number of messages. Expected: %v, Got: %v", i, numNodes-1, len(cn.messages))
 
 			// Inform the user which messages are missing
-			receivedIndices, err := extractSenderId(numNodes, cn.messages, "Hello from node", 16)
+			receivedIndices, err := extractSenderID(numNodes, cn.messages, "Hello from node", 16)
 			if err != nil {
 				t.Errorf("Unexpected error in extractIndices in node %v. Cannot check message content. Error: %v", i, err)
 			}

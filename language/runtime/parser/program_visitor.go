@@ -164,7 +164,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		length := len(bytes)
 		if length%2 == 1 {
 			bytes = append([]byte{'0'}, bytes...)
-			length += 1
+			length++
 		}
 
 		address := make([]byte, hex.DecodedLen(length))

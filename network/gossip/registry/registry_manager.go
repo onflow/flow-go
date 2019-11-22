@@ -32,6 +32,8 @@ func NewRegistryManager(registry Registry) *RegistryManager {
 	}
 }
 
+// revive:disable:unexported-return
+
 // Invoke passes input parameters to given msgType handler in the registry
 func (r *RegistryManager) Invoke(ctx context.Context, msgType MessageType, payloadBytes []byte) (*invokeResponse, error) {
 	r.mu.RLock()
@@ -45,6 +47,8 @@ func (r *RegistryManager) Invoke(ctx context.Context, msgType MessageType, paylo
 
 	return &invokeResponse{Resp: resp, Err: err}, nil
 }
+
+// revive:enable
 
 // AddDefaultType adds defaults handlers to registry
 func (r *RegistryManager) AddDefaultTypes(msgType []MessageType, f []HandleFunc) error {
