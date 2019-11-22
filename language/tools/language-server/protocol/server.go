@@ -42,7 +42,6 @@ type Handler interface {
 	Definition(connection Connection, params *TextDocumentPositionParams) (*Location, error)
 	SignatureHelp(connection Connection, params *TextDocumentPositionParams) (*SignatureHelp, error)
 	CodeLens(connection Connection, params *CodeLensParams) ([]*CodeLens, error)
-	CodeLensResolve(connection Connection, params *CodeLens) (*CodeLens, error)
 	ExecuteCommand(connection Connection, params *ExecuteCommandParams) (interface{}, error)
 	Shutdown(connection Connection) error
 	Exit(connection Connection) error
@@ -78,9 +77,6 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/codeLens"] =
 		server.handleCodeLens
-
-	jsonrpc2Server.Methods["codeLens/resolve"] =
-		server.handleCodeLensResolve
 
 	jsonrpc2Server.Methods["workspace/executeCommand"] =
 		server.handleExecuteCommand

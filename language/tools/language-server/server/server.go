@@ -24,12 +24,15 @@ var valueDeclarations = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions..
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type Server struct {
-	checkers   map[protocol.DocumentUri]*sema.Checker
-	documents  map[protocol.DocumentUri]string
+	config   config.Config
+	checkers map[protocol.DocumentUri]*sema.Checker
+	// map of document URI to the document text
+	documents map[protocol.DocumentUri]string
+	// registry of custom commands we support
 	commands   map[string]CommandHandler
-	config     config.Config
 	flowClient *client.Client
-	nonce      uint64
+	// the nonce to use when submitting transactions
+	nonce uint64
 }
 
 func NewServer() Server {
@@ -90,6 +93,9 @@ func (s Server) Initialize(
 	return result, nil
 }
 
+// DidChangeTextDocument is called whenever the current document changes.
+// We parse and check the new text and indicate any syntax or semantic errors
+// by publishing "diagnostics".
 func (s Server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
@@ -177,6 +183,8 @@ func (s Server) DidChangeTextDocument(
 	return nil
 }
 
+// Hover returns contextual type information about the variable at the given
+// location.
 func (s Server) Hover(
 	connection protocol.Connection,
 	params *protocol.TextDocumentPositionParams,
@@ -201,6 +209,7 @@ func (s Server) Hover(
 	return &protocol.Hover{Contents: contents}, nil
 }
 
+// Definition finds the definition of the type at the given location.
 func (s Server) Definition(
 	connection protocol.Connection,
 	params *protocol.TextDocumentPositionParams,
@@ -229,6 +238,7 @@ func (s Server) Definition(
 	}, nil
 }
 
+// TODO
 func (s Server) SignatureHelp(
 	connection protocol.Connection,
 	params *protocol.TextDocumentPositionParams,
@@ -236,6 +246,8 @@ func (s Server) SignatureHelp(
 	return nil, nil
 }
 
+// CodeLens is called every time the document contents change and returns a
+// list of actions to be injected into the source as inline buttons.
 func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
 	connection.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
@@ -277,11 +289,10 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 	return actions, nil
 }
 
-// TODO is this necessary?
-func (s Server) CodeLensResolve(connection protocol.Connection, params *protocol.CodeLens) (*protocol.CodeLens, error) {
-	return params, nil
-}
-
+// ExecuteCommand is called to execute a custom, server-defined command.
+//
+// We register all the commands we support in registerCommands and populate
+// their corresponding handler at server initialization.
 func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.ExecuteCommandParams) (interface{}, error) {
 	connection.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
@@ -295,6 +306,8 @@ func (s Server) ExecuteCommand(connection protocol.Connection, params *protocol.
 	return f(connection, params.Arguments...)
 }
 
+// Shutdown tells the server to stop accepting any new requests. This can only
+// be followed by a call to Exit, which exits the process.
 func (Server) Shutdown(connection protocol.Connection) error {
 	connection.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
@@ -303,11 +316,14 @@ func (Server) Shutdown(connection protocol.Connection) error {
 	return nil
 }
 
+// Exit exits the process.
 func (Server) Exit(connection protocol.Connection) error {
 	os.Exit(0)
 	return nil
 }
 
+// getNextNonce increments and returns the nonce. This ensures that subsequent
+// transaction submissions aren't duplicates.
 func (s Server) getNextNonce() uint64 {
 	s.nonce += 1
 	return s.nonce
