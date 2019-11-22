@@ -1778,7 +1778,7 @@ type InvalidTransactionBlockError struct {
 
 func (e *InvalidTransactionBlockError) Error() string {
 	return fmt.Sprintf(
-		"invalid transaction block `%s`, expected `prepare` or `execute`",
+		"invalid transaction block: expected `prepare` or `execute`, got `%s`",
 		e.Name,
 	)
 }
