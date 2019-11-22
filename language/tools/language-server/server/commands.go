@@ -28,7 +28,7 @@ func (s Server) registerCommands(connection protocol.Connection) {
 	err := connection.RegisterCapability(&protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
-				ID:     "test",
+				ID:     "registerCommand",
 				Method: "workspace/executeCommand",
 				RegisterOptions: protocol.ExecuteCommandRegistrationOptions{
 					ExecuteCommandOptions: protocol.ExecuteCommandOptions{
@@ -78,6 +78,11 @@ func (s Server) submitTransaction(connection protocol.Connection, args ...interf
 		PayerAccount:   s.config.AccountAddr,
 		ScriptAccounts: []flow.Address{s.config.AccountAddr},
 	}
+
+	connection.ShowMessage(&protocol.ShowMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
+	})
 
 	sig, err := keys.SignTransaction(tx, s.config.AccountKey)
 	if err != nil {

@@ -324,7 +324,7 @@ func (Server) Exit(connection protocol.Connection) error {
 
 // getNextNonce increments and returns the nonce. This ensures that subsequent
 // transaction submissions aren't duplicates.
-func (s Server) getNextNonce() uint64 {
+func (s *Server) getNextNonce() uint64 {
 	s.nonce += 1
 	return s.nonce
 }
