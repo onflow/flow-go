@@ -13,13 +13,12 @@ type handler struct {
 }
 
 func (handler *handler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
+	if req.Notif {
+		return
+	}
+
 	method, ok := handler.server.Methods[req.Method]
-
 	if !ok {
-		if req.Notif {
-			return
-		}
-
 		errResponse := &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeMethodNotFound,
 			Message: fmt.Sprintf("method %q not found", req.Method),
@@ -33,11 +32,6 @@ func (handler *handler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *js
 	}
 
 	result, err := method(req.Params)
-
-	if req.Notif {
-		return
-	}
-
 	if err != nil {
 		errResponse := &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeInternalError,
