@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/sdk/client"
+
 	"github.com/dapperlabs/flow-go/language/tools/language-server/config"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
@@ -18,47 +20,23 @@ import (
 	"github.com/dapperlabs/flow-go/language/tools/language-server/protocol"
 )
 
-func protocolToSemaPosition(pos protocol.Position) sema.Position {
-	return sema.Position{
-		Line:   int(pos.Line + 1),
-		Column: int(pos.Character),
-	}
-}
-
-func semaToProtocolPosition(pos sema.Position) protocol.Position {
-	return protocol.Position{
-		Line:      float64(pos.Line - 1),
-		Character: float64(pos.Column),
-	}
-}
-
-func astToProtocolPosition(pos ast.Position) protocol.Position {
-	return protocol.Position{
-		Line:      float64(pos.Line - 1),
-		Character: float64(pos.Column),
-	}
-}
-
-func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
-	return protocol.Range{
-		Start: astToProtocolPosition(startPos),
-		End:   astToProtocolPosition(endPos.Shifted(1)),
-	}
-}
-
 var valueDeclarations = append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...).ToValueDeclarations()
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type Server struct {
-	checkers map[protocol.DocumentUri]*sema.Checker
-	commands map[string]CommandHandler
-	config   config.Config
+	checkers   map[protocol.DocumentUri]*sema.Checker
+	documents  map[protocol.DocumentUri]string
+	commands   map[string]CommandHandler
+	config     config.Config
+	flowClient *client.Client
+	nonce      uint64
 }
 
 func NewServer() Server {
 	return Server{
-		checkers: make(map[protocol.DocumentUri]*sema.Checker),
-		commands: make(map[string]CommandHandler),
+		checkers:  make(map[protocol.DocumentUri]*sema.Checker),
+		documents: make(map[protocol.DocumentUri]string),
+		commands:  make(map[string]CommandHandler),
 	}
 }
 
@@ -95,6 +73,11 @@ func (s Server) Initialize(
 	}
 	s.config = conf
 
+	s.flowClient, err = client.New(s.config.EmulatorAddr)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO remove
 	connection.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
@@ -107,52 +90,6 @@ func (s Server) Initialize(
 	return result, nil
 }
 
-func convertError(err error) *protocol.Diagnostic {
-	positionedError, ok := err.(ast.HasPosition)
-	if !ok {
-		return nil
-	}
-
-	startPosition := positionedError.StartPosition()
-	endPosition := positionedError.EndPosition()
-
-	var message strings.Builder
-	message.WriteString(err.Error())
-
-	if secondaryError, ok := err.(errors.SecondaryError); ok {
-		message.WriteString(". ")
-		message.WriteString(secondaryError.SecondaryError())
-	}
-
-	return &protocol.Diagnostic{
-		Message: message.String(),
-		Code:    protocol.SeverityError,
-		Range: protocol.Range{
-			Start: protocol.Position{
-				Line:      float64(startPosition.Line - 1),
-				Character: float64(startPosition.Column),
-			},
-			End: protocol.Position{
-				Line:      float64(endPosition.Line - 1),
-				Character: float64(endPosition.Column + 1),
-			},
-		},
-	}
-}
-
-func (s Server) parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
-	start := time.Now()
-	program, _, err := parser.ParseProgram(code)
-	elapsed := time.Since(start)
-
-	connection.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("parsing %s took %s", location, elapsed),
-	})
-
-	return program, err
-}
-
 func (s Server) DidChangeTextDocument(
 	connection protocol.Connection,
 	params *protocol.DidChangeTextDocumentParams,
@@ -163,8 +100,9 @@ func (s Server) DidChangeTextDocument(
 	})
 	uri := params.TextDocument.URI
 	code := params.ContentChanges[0].Text
+	s.documents[uri] = code
 
-	program, err := s.parse(connection, code, string(uri))
+	program, err := parse(connection, code, string(uri))
 
 	diagnostics := []protocol.Diagnostic{}
 
@@ -315,6 +253,7 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 	// Search for relevant function declarations
 	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
 		if declaration.Identifier.String() == "main" {
+			_ = params.TextDocument.URI
 			actions = append(actions, &protocol.CodeLens{
 				Range: protocol.Range{
 					Start: protocol.Position{
@@ -327,9 +266,9 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 					},
 				},
 				Command: &protocol.Command{
-					Title:   "submit transaction",
-					Command: "cadence.submitTransaction",
-					//Arguments: []interface{}{"a", "b", "c"},
+					Title:     "submit transaction",
+					Command:   "cadence.submitTransaction",
+					Arguments: []interface{}{params.TextDocument.URI},
 				},
 			})
 		}
@@ -369,6 +308,25 @@ func (Server) Exit(connection protocol.Connection) error {
 	return nil
 }
 
+func (s Server) getNextNonce() uint64 {
+	s.nonce += 1
+	return s.nonce
+}
+
+// parse parses the given code and returns the resultant program.
+func parse(connection protocol.Connection, code, location string) (*ast.Program, error) {
+	start := time.Now()
+	program, _, err := parser.ParseProgram(code)
+	elapsed := time.Since(start)
+
+	connection.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("parsing %s took %s", location, elapsed),
+	})
+
+	return program, err
+}
+
 func resolveImport(
 	connection protocol.Connection,
 	mainPath string,
@@ -394,4 +352,66 @@ func resolveImport(
 	}
 
 	return program, nil
+}
+
+// convertError converts a checker error to a diagnostic.
+func convertError(err error) *protocol.Diagnostic {
+	positionedError, ok := err.(ast.HasPosition)
+	if !ok {
+		return nil
+	}
+
+	startPosition := positionedError.StartPosition()
+	endPosition := positionedError.EndPosition()
+
+	var message strings.Builder
+	message.WriteString(err.Error())
+
+	if secondaryError, ok := err.(errors.SecondaryError); ok {
+		message.WriteString(". ")
+		message.WriteString(secondaryError.SecondaryError())
+	}
+
+	return &protocol.Diagnostic{
+		Message: message.String(),
+		Code:    protocol.SeverityError,
+		Range: protocol.Range{
+			Start: protocol.Position{
+				Line:      float64(startPosition.Line - 1),
+				Character: float64(startPosition.Column),
+			},
+			End: protocol.Position{
+				Line:      float64(endPosition.Line - 1),
+				Character: float64(endPosition.Column + 1),
+			},
+		},
+	}
+}
+
+func protocolToSemaPosition(pos protocol.Position) sema.Position {
+	return sema.Position{
+		Line:   int(pos.Line + 1),
+		Column: int(pos.Character),
+	}
+}
+
+func semaToProtocolPosition(pos sema.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolPosition(pos ast.Position) protocol.Position {
+	return protocol.Position{
+		Line:      float64(pos.Line - 1),
+		Character: float64(pos.Column),
+	}
+}
+
+func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
+	return protocol.Range{
+		Start: astToProtocolPosition(startPos),
+		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
 }
