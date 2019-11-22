@@ -57,15 +57,6 @@ func (server *Server) handleCodeLens(req *json.RawMessage) (interface{}, error) 
 	return server.Handler.CodeLens(server.connection, &params)
 }
 
-func (server *Server) handleCodeLensResolve(req *json.RawMessage) (interface{}, error) {
-	var params CodeLens
-	if err := json.Unmarshal(*req, &params); err != nil {
-		return nil, err
-	}
-
-	return server.Handler.CodeLensResolve(server.connection, &params)
-}
-
 func (server *Server) handleExecuteCommand(req *json.RawMessage) (interface{}, error) {
 	var params ExecuteCommandParams
 	if err := json.Unmarshal(*req, &params); err != nil {
