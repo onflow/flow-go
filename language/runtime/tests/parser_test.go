@@ -6458,7 +6458,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 						},
 					},
 					Prepare: &SpecialFunctionDeclaration{
-						DeclarationKind: common.DeclarationKindUnknown,
+						DeclarationKind: common.DeclarationKindPrepare,
 						FunctionDeclaration: &FunctionDeclaration{
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
@@ -6532,43 +6532,60 @@ func TestParseTransactionDeclaration(t *testing.T) {
 					},
 					PreConditions:  nil,
 					PostConditions: nil,
-					Execute: &Block{
-						Statements: []Statement{
-							&AssignmentStatement{
-								Target: &IdentifierExpression{
-									Identifier{
-										Identifier: "x",
-										Pos:        Position{Offset: 124, Line: 11, Column: 11},
-									},
-								},
-								Transfer: &Transfer{
-									Operation: TransferOperationCopy,
-									Pos:       Position{Offset: 126, Line: 11, Column: 13},
-								},
-								Value: &BinaryExpression{
-									Operation: OperationPlus,
-									Left: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 128, Line: 11, Column: 15},
-											EndPos:   Position{Offset: 128, Line: 11, Column: 15},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 132, Line: 11, Column: 19},
-											EndPos:   Position{Offset: 132, Line: 11, Column: 19},
-										},
-									},
-								},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 103, Line: 10, Column: 6},
 							},
-						},
-						Range: Range{
-							StartPos: Position{Offset: 111, Line: 10, Column: 14},
-							EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 124, Line: 11, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 126, Line: 11, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 128, Line: 11, Column: 15},
+														EndPos:   Position{Offset: 128, Line: 11, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 132, Line: 11, Column: 19},
+														EndPos:   Position{Offset: 132, Line: 11, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 111, Line: 10, Column: 14},
+										EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 103, Line: 10, Column: 6},
 						},
 					},
 					Range: Range{
@@ -6636,7 +6653,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 						},
 					},
 					Prepare: &SpecialFunctionDeclaration{
-						DeclarationKind: common.DeclarationKindUnknown,
+						DeclarationKind: common.DeclarationKindPrepare,
 						FunctionDeclaration: &FunctionDeclaration{
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
@@ -6752,43 +6769,60 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
-					Execute: &Block{
-						Statements: []Statement{
-							&AssignmentStatement{
-								Target: &IdentifierExpression{
-									Identifier{
-										Identifier: "x",
-										Pos:        Position{Offset: 157, Line: 15, Column: 11},
-									},
-								},
-								Transfer: &Transfer{
-									Operation: TransferOperationCopy,
-									Pos:       Position{Offset: 159, Line: 15, Column: 13},
-								},
-								Value: &BinaryExpression{
-									Operation: OperationPlus,
-									Left: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 161, Line: 15, Column: 15},
-											EndPos:   Position{Offset: 161, Line: 15, Column: 15},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 165, Line: 15, Column: 19},
-											EndPos:   Position{Offset: 165, Line: 15, Column: 19},
-										},
-									},
-								},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 136, Line: 14, Column: 6},
 							},
-						},
-						Range: Range{
-							StartPos: Position{Offset: 144, Line: 14, Column: 14},
-							EndPos:   Position{Offset: 170, Line: 16, Column: 3},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 157, Line: 15, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 159, Line: 15, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 161, Line: 15, Column: 15},
+														EndPos:   Position{Offset: 161, Line: 15, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 165, Line: 15, Column: 19},
+														EndPos:   Position{Offset: 165, Line: 15, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 144, Line: 14, Column: 14},
+										EndPos:   Position{Offset: 170, Line: 16, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 136, Line: 14, Column: 6},
 						},
 					},
 					Range: Range{
@@ -6856,7 +6890,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 						},
 					},
 					Prepare: &SpecialFunctionDeclaration{
-						DeclarationKind: common.DeclarationKindUnknown,
+						DeclarationKind: common.DeclarationKindPrepare,
 						FunctionDeclaration: &FunctionDeclaration{
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
@@ -6972,43 +7006,60 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
-					Execute: &Block{
-						Statements: []Statement{
-							&AssignmentStatement{
-								Target: &IdentifierExpression{
-									Identifier{
-										Identifier: "x",
-										Pos:        Position{Offset: 200, Line: 19, Column: 11},
-									},
-								},
-								Transfer: &Transfer{
-									Operation: TransferOperationCopy,
-									Pos:       Position{Offset: 202, Line: 19, Column: 13},
-								},
-								Value: &BinaryExpression{
-									Operation: OperationPlus,
-									Left: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 204, Line: 19, Column: 15},
-											EndPos:   Position{Offset: 204, Line: 19, Column: 15},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 208, Line: 19, Column: 19},
-											EndPos:   Position{Offset: 208, Line: 19, Column: 19},
-										},
-									},
-								},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 179, Line: 18, Column: 6},
 							},
-						},
-						Range: Range{
-							StartPos: Position{Offset: 187, Line: 18, Column: 14},
-							EndPos:   Position{Offset: 213, Line: 20, Column: 3},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 200, Line: 19, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 202, Line: 19, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 204, Line: 19, Column: 15},
+														EndPos:   Position{Offset: 204, Line: 19, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 208, Line: 19, Column: 19},
+														EndPos:   Position{Offset: 208, Line: 19, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 187, Line: 18, Column: 14},
+										EndPos:   Position{Offset: 213, Line: 20, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 179, Line: 18, Column: 6},
 						},
 					},
 					Range: Range{
