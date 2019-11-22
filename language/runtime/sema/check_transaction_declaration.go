@@ -2,16 +2,18 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
+	checker.checkTransactionFields(declaration)
+	checker.checkTransactionBlocks(declaration)
+
 	// enter a new scope for this transaction
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
-
-	checker.checkTransactionFields(declaration)
 
 	checker.declareSelfValue(transactionType)
 
@@ -34,6 +36,28 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 	}
 
 	// TODO: error for redeclaration
+}
+
+func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDeclaration) {
+	if declaration.Prepare != nil {
+		prepareIdentifier := declaration.Prepare.Identifier
+		if prepareIdentifier.Identifier != common.DeclarationKindPrepare.Keywords() {
+			checker.report(&InvalidTransactionBlockError{
+				Name: prepareIdentifier.Identifier,
+				Pos:  prepareIdentifier.Pos,
+			})
+		}
+	}
+
+	if declaration.Execute != nil {
+		executeIdentifier := declaration.Execute.Identifier
+		if executeIdentifier.Identifier != common.DeclarationKindExecute.Keywords() {
+			checker.report(&InvalidTransactionBlockError{
+				Name: executeIdentifier.Identifier,
+				Pos:  executeIdentifier.Pos,
+			})
+		}
+	}
 }
 
 func (checker *Checker) checkTransactionPrepareFunction(
@@ -123,10 +147,7 @@ func (checker *Checker) checkTransactionExecuteFunction(
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	// NOTE: not checking block as it enters a new scope
-	// and post-conditions need to be able to refer to block's declarations
-
-	checker.visitStatements(declaration.Execute.Statements)
+	checker.visitStatements(declaration.Execute.FunctionBlock.Statements)
 }
 
 func (checker *Checker) checkTransactionPostConditions(conditions []*ast.Condition) {

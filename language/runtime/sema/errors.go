@@ -1730,6 +1730,31 @@ func (e *TransactionMissingExecuteError) Error() string {
 
 func (*TransactionMissingExecuteError) isSemanticError() {}
 
+// InvalidTransactionBlockError
+
+type InvalidTransactionBlockError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *InvalidTransactionBlockError) Error() string {
+	return fmt.Sprintf(
+		"invalid transaction block `%s`, expected `prepare` or `execute`",
+		e.Name,
+	)
+}
+
+func (*InvalidTransactionBlockError) isSemanticError() {}
+
+func (e *InvalidTransactionBlockError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
 // TransactionMissingPrepareError
 
 type TransactionMissingPrepareError struct {
