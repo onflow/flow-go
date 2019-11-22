@@ -66,12 +66,12 @@ func (server *Server) handleExecuteCommand(req *json.RawMessage) (interface{}, e
 	return server.Handler.ExecuteCommand(server.conn, &params)
 }
 
-func (server *Server) handleShutdown(req *json.RawMessage) (interface{}, error) {
+func (server *Server) handleShutdown(_ *json.RawMessage) (interface{}, error) {
 	err := server.Handler.Shutdown(server.conn)
 	return nil, err
 }
 
-func (server *Server) handleExit(req *json.RawMessage) (interface{}, error) {
+func (server *Server) handleExit(_ *json.RawMessage) (interface{}, error) {
 	err := server.Handler.Exit(server.conn)
 	return nil, err
 }

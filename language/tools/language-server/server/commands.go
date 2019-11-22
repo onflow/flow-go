@@ -23,9 +23,9 @@ type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, 
 //
 // The best reference I've found for how this works is:
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
-func (s Server) registerCommands(connection protocol.Conn) {
+func (s Server) registerCommands(conn protocol.Conn) {
 	// Send a message to the client indicating which commands we support
-	err := connection.RegisterCapability(&protocol.RegistrationParams{
+	err := conn.RegisterCapability(&protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
 				ID:     "registerCommand",
@@ -39,7 +39,7 @@ func (s Server) registerCommands(connection protocol.Conn) {
 		},
 	})
 	if err != nil {
-		connection.LogMessage(&protocol.LogMessageParams{
+		conn.LogMessage(&protocol.LogMessageParams{
 			Type:    protocol.Warning,
 			Message: fmt.Sprintf("Failed to register command: %s", err.Error()),
 		})
@@ -53,7 +53,7 @@ func (s Server) registerCommands(connection protocol.Conn) {
 // source document in VS Code.
 //
 // There should be exactly 1 argument, the DocumentURI of the file to submit.
-func (s *Server) submitTransaction(connection protocol.Conn, args ...interface{}) (interface{}, error) {
+func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (interface{}, error) {
 	if len(args) != 1 {
 		return nil, errors.New("missing argument")
 	}
@@ -74,7 +74,7 @@ func (s *Server) submitTransaction(connection protocol.Conn, args ...interface{}
 		ScriptAccounts: []flow.Address{s.config.AccountAddr},
 	}
 
-	connection.LogMessage(&protocol.LogMessageParams{
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
 	})
