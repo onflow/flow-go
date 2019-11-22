@@ -267,16 +267,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 		if declaration.Identifier.String() == "main" {
 			_ = params.TextDocument.URI
 			actions = append(actions, &protocol.CodeLens{
-				Range: protocol.Range{
-					Start: protocol.Position{
-						Line:      float64(declaration.StartPosition().Line - 1),
-						Character: 0,
-					},
-					End: protocol.Position{
-						Line:      float64(declaration.StartPosition().Line - 1),
-						Character: 0,
-					},
-				},
+				Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
 				Command: &protocol.Command{
 					Title:     "submit transaction",
 					Command:   "cadence.submitTransaction",
