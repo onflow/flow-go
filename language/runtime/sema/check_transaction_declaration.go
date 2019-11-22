@@ -73,7 +73,6 @@ func (checker *Checker) checkTransactionPrepareFunction(
 
 			checker.report(
 				&TransactionMissingPrepareError{
-					ContainerType:  transactionType,
 					FirstFieldName: firstField.Identifier.Identifier,
 					FirstFieldPos:  firstField.Identifier.Pos,
 				},

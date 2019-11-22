@@ -1718,18 +1718,6 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
 
-// TransactionMissingExecuteError
-
-type TransactionMissingExecuteError struct {
-	ast.Range
-}
-
-func (e *TransactionMissingExecuteError) Error() string {
-	return "transaction is missing an execute block"
-}
-
-func (*TransactionMissingExecuteError) isSemanticError() {}
-
 // InvalidTransactionBlockError
 
 type InvalidTransactionBlockError struct {
@@ -1755,19 +1743,29 @@ func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// TransactionMissingExecuteError
+
+type TransactionMissingExecuteError struct {
+	ast.Range
+}
+
+func (e *TransactionMissingExecuteError) Error() string {
+	return "transaction missing an execute block"
+}
+
+func (*TransactionMissingExecuteError) isSemanticError() {}
+
 // TransactionMissingPrepareError
 
 type TransactionMissingPrepareError struct {
-	ContainerType  Type
 	FirstFieldName string
 	FirstFieldPos  ast.Position
 }
 
 func (e *TransactionMissingPrepareError) Error() string {
 	return fmt.Sprintf(
-		"missing prepare function for field `%s` in type `%s`",
+		"transaction missing prepare function for field `%s`",
 		e.FirstFieldName,
-		e.ContainerType,
 	)
 }
 
