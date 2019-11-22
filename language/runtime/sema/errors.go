@@ -1779,3 +1779,29 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 	length := len(e.FirstFieldName)
 	return e.FirstFieldPos.Shifted(length - 1)
 }
+
+// InvalidTransactionFieldAccessModifierError
+
+type InvalidTransactionFieldAccessModifierError struct {
+	Name   string
+	Access string
+	Pos    ast.Position
+}
+
+func (e *InvalidTransactionFieldAccessModifierError) Error() string {
+	return fmt.Sprintf(
+		"access modifier not required for transaction field `%s`",
+		e.Name,
+	)
+}
+
+func (*InvalidTransactionFieldAccessModifierError) isSemanticError() {}
+
+func (e *InvalidTransactionFieldAccessModifierError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position {
+	length := len(e.Access)
+	return e.Pos.Shifted(length - 1)
+}

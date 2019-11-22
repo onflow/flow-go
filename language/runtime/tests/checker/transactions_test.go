@@ -81,6 +81,25 @@ func TestTransactions(t *testing.T) {
 		},
 	}
 
+	fieldAccessSpecified := test{
+		"FieldAccessSpecified",
+		`
+		  transaction {
+    		
+			pub(set) var x: Int
+			
+		    prepare() {
+				self.x = 1
+			}
+
+		    execute {}
+		  }
+		`,
+		[]error{
+			&sema.InvalidTransactionFieldAccessModifierError{},
+		},
+	}
+
 	fieldUninitialized := test{
 		"FieldUninitialized",
 		`
@@ -268,6 +287,7 @@ func TestTransactions(t *testing.T) {
 		simpleTx,
 		invalidPrepareBlock,
 		invalidExecuteBlock,
+		fieldAccessSpecified,
 		fieldUninitialized,
 		fieldInitialized,
 		preConditions,
@@ -286,7 +306,9 @@ func TestTransactions(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, len(test.errors))
 
 			for i, err := range errs {
-				assert.IsType(t, test.errors[i], err)
+				if !assert.IsType(t, test.errors[i], err) {
+					t.Log(err)
+				}
 			}
 		})
 	}

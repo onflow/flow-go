@@ -31,11 +31,15 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDeclaration) {
 	for _, field := range declaration.Fields {
 		if field.Access != ast.AccessNotSpecified {
-			// error: no access modifier required
+			checker.report(
+				&InvalidTransactionFieldAccessModifierError{
+					Name:   field.Identifier.Identifier,
+					Access: field.Access.Keyword(),
+					Pos:    field.StartPosition(),
+				},
+			)
 		}
 	}
-
-	// TODO: error for redeclaration
 }
 
 func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDeclaration) {
