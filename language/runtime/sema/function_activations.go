@@ -58,11 +58,11 @@ func (a *FunctionActivations) Current() *FunctionActivation {
 }
 
 func (a *FunctionActivations) EnterLoop() {
-	a.Current().Loops += 1
+	a.Current().Loops++
 }
 
 func (a *FunctionActivations) LeaveLoop() {
-	a.Current().Loops -= 1
+	a.Current().Loops--
 }
 
 func (a *FunctionActivations) WithLoop(f func()) {

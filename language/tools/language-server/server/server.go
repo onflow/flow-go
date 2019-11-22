@@ -316,7 +316,7 @@ func (s Server) CodeLens(connection protocol.Connection, params *protocol.CodeLe
 	var actions []*protocol.CodeLens
 
 	// Search for relevant function declarations
-	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+	for declaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
 		if declaration.Identifier.String() == "main" {
 			actions = append(actions, &protocol.CodeLens{
 				Range: protocol.Range{

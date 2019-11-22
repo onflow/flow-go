@@ -2,8 +2,7 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/language/runtime/common/interface_entry"
-
+	interfaceentry "github.com/dapperlabs/flow-go/language/runtime/common/interface_entry"
 	"github.com/raviqqe/hamt"
 )
 
@@ -29,7 +28,7 @@ type Resources struct {
 // entry returns a `hamt` entry for the given resource.
 //
 func (ris *Resources) entry(resource interface{}) hamt.Entry {
-	return interface_entry.InterfaceEntry{Interface: resource}
+	return interfaceentry.InterfaceEntry{Interface: resource}
 }
 
 // Get returns the invalidation info for the given resource.
@@ -88,7 +87,7 @@ func (ris *Resources) Size() int {
 
 func (ris *Resources) FirstRest() (interface{}, ResourceInfo, *Resources) {
 	entry, value, rest := ris.resources.FirstRest()
-	resource := entry.(interface_entry.InterfaceEntry).Interface
+	resource := entry.(interfaceentry.InterfaceEntry).Interface
 	info := value.(ResourceInfo)
 	resources := &Resources{resources: rest}
 	return resource, info, resources
