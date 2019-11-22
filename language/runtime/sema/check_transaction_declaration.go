@@ -16,7 +16,16 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.declareSelfValue(transactionType)
 
 	checker.checkTransactionPrepareFunction(declaration, transactionType)
+
+	checker.visitConditions(declaration.PreConditions)
+
 	checker.checkTransactionExecuteFunction(declaration, transactionType)
+
+	if len(declaration.PostConditions) > 0 {
+		checker.declareBefore()
+	}
+
+	checker.visitConditions(declaration.PostConditions)
 
 	checker.checkTransactionResourceFieldInvalidation(transactionType)
 
@@ -105,7 +114,7 @@ func (checker *Checker) checkTransactionExecuteFunction(
 	declaration *ast.TransactionDeclaration,
 	transactionType *TransactionType,
 ) {
-	if declaration.Execute.Block == nil {
+	if declaration.Execute == nil {
 		checker.report(&TransactionMissingExecuteError{
 			Range: declaration.Range,
 		})
@@ -113,17 +122,13 @@ func (checker *Checker) checkTransactionExecuteFunction(
 		return
 	}
 
-	// execute always has a void return type
-	returnType := &TypeAnnotation{
-		Move: false,
-		Type: &VoidType{},
-	}
+	checker.enterValueScope()
+	defer checker.leaveValueScope(true)
 
-	checker.visitFunctionBlock(
-		declaration.Execute,
-		returnType,
-		true,
-	)
+	// NOTE: not checking block as it enters a new scope
+	// and post-conditions need to be able to refer to block's declarations
+
+	checker.visitStatements(declaration.Execute.Statements)
 }
 
 func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionType *TransactionType) {

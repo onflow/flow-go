@@ -153,25 +153,24 @@ func TestTransactions(t *testing.T) {
 		nil,
 	}
 
-	// TODO: prevent post condition from accessing execute scope
-	// postConditionsAccessExecuteScope := test{
-	// 	"PostConditionsAccessExecuteScope",
-	// 	`
-	// 	  transaction {
-	//
-	// 	    execute {
-	// 		  var x = 5
-	// 		}
-	//
-	// 		post {
-	// 		  x == 5
-	// 		}
-	// 	  }
-	// 	`,
-	// 	[]error{
-	// 		&sema.CheckerError{},
-	// 	},
-	// }
+	postConditionsAccessExecuteScope := test{
+		"PostConditionsAccessExecuteScope",
+		`
+		  transaction {
+	
+		    execute {
+			  var x = 5
+			}
+	
+			post {
+			  x == 5
+			}
+		  }
+		`,
+		[]error{
+			&sema.NotDeclaredError{},
+		},
+	}
 
 	// TODO: prevent self from being used in function
 	// illegalSelfUsage := test{
@@ -241,7 +240,7 @@ func TestTransactions(t *testing.T) {
 		preConditions,
 		preConditionsWithNotDeclaredFields,
 		postConditions,
-		// postConditionsAccessExecuteScope,
+		postConditionsAccessExecuteScope,
 		// illegalSelfUsage,
 		resourceTransaction,
 		resourceLoss,

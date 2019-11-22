@@ -6396,13 +6396,11 @@ func TestParseTransactionDeclaration(t *testing.T) {
 		expected := &Program{
 			Declarations: []Declaration{
 				&TransactionDeclaration{
-					Fields:  []*FieldDeclaration{},
-					Prepare: nil,
-					Execute: &FunctionBlock{
-						Block:          nil,
-						PreConditions:  nil,
-						PostConditions: nil,
-					},
+					Fields:         []*FieldDeclaration{},
+					Prepare:        nil,
+					PreConditions:  nil,
+					PostConditions: nil,
+					Execute:        nil,
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
@@ -6532,48 +6530,46 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					Execute: &FunctionBlock{
-						Block: &Block{
-							Statements: []Statement{
-								&AssignmentStatement{
-									Target: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 124, Line: 11, Column: 11},
+					PreConditions:  nil,
+					PostConditions: nil,
+					Execute: &Block{
+						Statements: []Statement{
+							&AssignmentStatement{
+								Target: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 124, Line: 11, Column: 11},
+									},
+								},
+								Transfer: &Transfer{
+									Operation: TransferOperationCopy,
+									Pos:       Position{Offset: 126, Line: 11, Column: 13},
+								},
+								Value: &BinaryExpression{
+									Operation: OperationPlus,
+									Left: &IntExpression{
+										Value: big.NewInt(1),
+										Base:  10,
+										Range: Range{
+											StartPos: Position{Offset: 128, Line: 11, Column: 15},
+											EndPos:   Position{Offset: 128, Line: 11, Column: 15},
 										},
 									},
-									Transfer: &Transfer{
-										Operation: TransferOperationCopy,
-										Pos:       Position{Offset: 126, Line: 11, Column: 13},
-									},
-									Value: &BinaryExpression{
-										Operation: OperationPlus,
-										Left: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 128, Line: 11, Column: 15},
-												EndPos:   Position{Offset: 128, Line: 11, Column: 15},
-											},
-										},
-										Right: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 132, Line: 11, Column: 19},
-												EndPos:   Position{Offset: 132, Line: 11, Column: 19},
-											},
+									Right: &IntExpression{
+										Value: big.NewInt(1),
+										Base:  10,
+										Range: Range{
+											StartPos: Position{Offset: 132, Line: 11, Column: 19},
+											EndPos:   Position{Offset: 132, Line: 11, Column: 19},
 										},
 									},
 								},
 							},
-							Range: Range{
-								StartPos: Position{Offset: 111, Line: 10, Column: 14},
-								EndPos:   Position{Offset: 137, Line: 12, Column: 3},
-							},
 						},
-						PreConditions:  nil,
-						PostConditions: nil,
+						Range: Range{
+							StartPos: Position{Offset: 111, Line: 10, Column: 14},
+							EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+						},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
@@ -6712,89 +6708,87 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					Execute: &FunctionBlock{
-						Block: &Block{
-							Statements: []Statement{
-								&AssignmentStatement{
-									Target: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 157, Line: 15, Column: 11},
-										},
-									},
-									Transfer: &Transfer{
-										Operation: TransferOperationCopy,
-										Pos:       Position{Offset: 159, Line: 15, Column: 13},
-									},
-									Value: &BinaryExpression{
-										Operation: OperationPlus,
-										Left: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 161, Line: 15, Column: 15},
-												EndPos:   Position{Offset: 161, Line: 15, Column: 15},
-											},
-										},
-										Right: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 165, Line: 15, Column: 19},
-												EndPos:   Position{Offset: 165, Line: 15, Column: 19},
-											},
-										},
+					PreConditions: []*Condition{
+						{
+							Kind: ConditionKindPre,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 116, Line: 11, Column: 10},
 									},
 								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 144, Line: 14, Column: 14},
-								EndPos:   Position{Offset: 170, Line: 16, Column: 3},
-							},
-						},
-						PreConditions: []*Condition{
-							{
-								Kind: ConditionKindPre,
-								Test: &BinaryExpression{
-									Operation: OperationEqual,
-									Left: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 116, Line: 11, Column: 10},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(0),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 121, Line: 11, Column: 15},
-											EndPos:   Position{Offset: 121, Line: 11, Column: 15},
-										},
+								Right: &IntExpression{
+									Value: big.NewInt(0),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 121, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
 									},
 								},
 							},
 						},
-						PostConditions: []*Condition{
-							{
-								Kind: ConditionKindPost,
-								Test: &BinaryExpression{
-									Operation: OperationEqual,
-									Left: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 198, Line: 19, Column: 11},
+					},
+					PostConditions: []*Condition{
+						{
+							Kind: ConditionKindPost,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 198, Line: 19, Column: 11},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(2),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 203, Line: 19, Column: 16},
+										EndPos:   Position{Offset: 203, Line: 19, Column: 16},
+									},
+								},
+							},
+						},
+					},
+					Execute: &Block{
+						Statements: []Statement{
+							&AssignmentStatement{
+								Target: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 157, Line: 15, Column: 11},
+									},
+								},
+								Transfer: &Transfer{
+									Operation: TransferOperationCopy,
+									Pos:       Position{Offset: 159, Line: 15, Column: 13},
+								},
+								Value: &BinaryExpression{
+									Operation: OperationPlus,
+									Left: &IntExpression{
+										Value: big.NewInt(1),
+										Base:  10,
+										Range: Range{
+											StartPos: Position{Offset: 161, Line: 15, Column: 15},
+											EndPos:   Position{Offset: 161, Line: 15, Column: 15},
 										},
 									},
 									Right: &IntExpression{
-										Value: big.NewInt(2),
+										Value: big.NewInt(1),
 										Base:  10,
 										Range: Range{
-											StartPos: Position{Offset: 203, Line: 19, Column: 16},
-											EndPos:   Position{Offset: 203, Line: 19, Column: 16},
+											StartPos: Position{Offset: 165, Line: 15, Column: 19},
+											EndPos:   Position{Offset: 165, Line: 15, Column: 19},
 										},
 									},
 								},
 							},
+						},
+						Range: Range{
+							StartPos: Position{Offset: 144, Line: 14, Column: 14},
+							EndPos:   Position{Offset: 170, Line: 16, Column: 3},
 						},
 					},
 					Range: Range{
@@ -6934,89 +6928,87 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					Execute: &FunctionBlock{
-						Block: &Block{
-							Statements: []Statement{
-								&AssignmentStatement{
-									Target: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 200, Line: 19, Column: 11},
-										},
-									},
-									Transfer: &Transfer{
-										Operation: TransferOperationCopy,
-										Pos:       Position{Offset: 202, Line: 19, Column: 13},
-									},
-									Value: &BinaryExpression{
-										Operation: OperationPlus,
-										Left: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 204, Line: 19, Column: 15},
-												EndPos:   Position{Offset: 204, Line: 19, Column: 15},
-											},
-										},
-										Right: &IntExpression{
-											Value: big.NewInt(1),
-											Base:  10,
-											Range: Range{
-												StartPos: Position{Offset: 208, Line: 19, Column: 19},
-												EndPos:   Position{Offset: 208, Line: 19, Column: 19},
-											},
-										},
+					PreConditions: []*Condition{
+						{
+							Kind: ConditionKindPre,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 116, Line: 11, Column: 10},
 									},
 								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 187, Line: 18, Column: 14},
-								EndPos:   Position{Offset: 213, Line: 20, Column: 3},
-							},
-						},
-						PreConditions: []*Condition{
-							{
-								Kind: ConditionKindPre,
-								Test: &BinaryExpression{
-									Operation: OperationEqual,
-									Left: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 116, Line: 11, Column: 10},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(0),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 121, Line: 11, Column: 15},
-											EndPos:   Position{Offset: 121, Line: 11, Column: 15},
-										},
+								Right: &IntExpression{
+									Value: big.NewInt(0),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 121, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
 									},
 								},
 							},
 						},
-						PostConditions: []*Condition{
-							{
-								Kind: ConditionKindPost,
-								Test: &BinaryExpression{
-									Operation: OperationEqual,
-									Left: &IdentifierExpression{
-										Identifier{
-											Identifier: "x",
-											Pos:        Position{Offset: 153, Line: 15, Column: 11},
+					},
+					PostConditions: []*Condition{
+						{
+							Kind: ConditionKindPost,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 153, Line: 15, Column: 11},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(2),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 158, Line: 15, Column: 16},
+										EndPos:   Position{Offset: 158, Line: 15, Column: 16},
+									},
+								},
+							},
+						},
+					},
+					Execute: &Block{
+						Statements: []Statement{
+							&AssignmentStatement{
+								Target: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 200, Line: 19, Column: 11},
+									},
+								},
+								Transfer: &Transfer{
+									Operation: TransferOperationCopy,
+									Pos:       Position{Offset: 202, Line: 19, Column: 13},
+								},
+								Value: &BinaryExpression{
+									Operation: OperationPlus,
+									Left: &IntExpression{
+										Value: big.NewInt(1),
+										Base:  10,
+										Range: Range{
+											StartPos: Position{Offset: 204, Line: 19, Column: 15},
+											EndPos:   Position{Offset: 204, Line: 19, Column: 15},
 										},
 									},
 									Right: &IntExpression{
-										Value: big.NewInt(2),
+										Value: big.NewInt(1),
 										Base:  10,
 										Range: Range{
-											StartPos: Position{Offset: 158, Line: 15, Column: 16},
-											EndPos:   Position{Offset: 158, Line: 15, Column: 16},
+											StartPos: Position{Offset: 208, Line: 19, Column: 19},
+											EndPos:   Position{Offset: 208, Line: 19, Column: 19},
 										},
 									},
 								},
 							},
+						},
+						Range: Range{
+							StartPos: Position{Offset: 187, Line: 18, Column: 14},
+							EndPos:   Position{Offset: 213, Line: 20, Column: 3},
 						},
 					},
 					Range: Range{

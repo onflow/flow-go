@@ -224,19 +224,14 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
 	}
 
-	// de-sugar execute block and pre/post conditions into single AST node
-	executeFunctionBlock := &ast.FunctionBlock{
-		Block:          executeBlock,
-		PreConditions:  preConditions,
-		PostConditions: postConditions,
-	}
-
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
-		Fields:  fields,
-		Prepare: prepareFunction,
-		Execute: executeFunctionBlock,
+		Fields:         fields,
+		Prepare:        prepareFunction,
+		PreConditions:  preConditions,
+		PostConditions: postConditions,
+		Execute:        executeBlock,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
