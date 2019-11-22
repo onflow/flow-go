@@ -26,7 +26,6 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.declareSelfValue(transactionType)
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
-
 	checker.visitTransactionPreConditions(declaration.PreConditions)
 	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
 	checker.visitTransactionPostConditions(declaration.PostConditions)
@@ -36,6 +35,7 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	return nil
 }
 
+// checkTransactionFields validates the field declarations for a transaction.
 func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDeclaration) {
 	for _, field := range declaration.Fields {
 		if field.Access != ast.AccessNotSpecified {
@@ -50,8 +50,12 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 	}
 }
 
+// checkTransactionBlocks checks that a transaction contains the required prepare and execute blocks.
+//
+// An execute block is always required, but a prepare block is only required if fields are present.
 func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDeclaration) {
 	if declaration.Prepare != nil {
+		// parser allows any identifier so it must be checked here
 		prepareIdentifier := declaration.Prepare.Identifier
 		if prepareIdentifier.Identifier != common.DeclarationKindPrepare.Keywords() {
 			checker.report(&InvalidTransactionBlockError{
@@ -59,21 +63,23 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  prepareIdentifier.Pos,
 			})
 		}
-	} else {
-		if len(declaration.Fields) != 0 {
-			// report error for first field
-			firstField := declaration.Fields[0]
+	} else if len(declaration.Fields) != 0 {
+		// report an error if fields are defined but no prepare statement exists
+		// note: field initialization is checked later
 
-			checker.report(
-				&TransactionMissingPrepareError{
-					FirstFieldName: firstField.Identifier.Identifier,
-					FirstFieldPos:  firstField.Identifier.Pos,
-				},
-			)
-		}
+		// report error for first field
+		firstField := declaration.Fields[0]
+
+		checker.report(
+			&TransactionMissingPrepareError{
+				FirstFieldName: firstField.Identifier.Identifier,
+				FirstFieldPos:  firstField.Identifier.Pos,
+			},
+		)
 	}
 
 	if declaration.Execute != nil {
+		// parser allows any identifier so it must be checked here
 		executeIdentifier := declaration.Execute.Identifier
 		if executeIdentifier.Identifier != common.DeclarationKindExecute.Keywords() {
 			checker.report(&InvalidTransactionBlockError{
@@ -82,12 +88,14 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 			})
 		}
 	} else {
+		// report an error if no execute block is defined
 		checker.report(&TransactionMissingExecuteError{
 			Range: declaration.Range,
 		})
 	}
 }
 
+// visitTransactionPrepareFunction visits and checks the prepare function of a transaction.
 func (checker *Checker) visitTransactionPrepareFunction(
 	prepareFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
@@ -117,6 +125,7 @@ func (checker *Checker) visitTransactionPrepareFunction(
 	)
 }
 
+// checkTransactionPrepareFunctionParameters checks that the parameters are each of type Account.
 func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	parameterList *ast.ParameterList,
 	parameterTypeAnnotations []*TypeAnnotation,
@@ -132,10 +141,12 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 
 }
 
+// visitTransactionPreConditions visits and checks the pre-conditions of a transaction.
 func (checker *Checker) visitTransactionPreConditions(conditions []*ast.Condition) {
 	checker.visitConditions(conditions)
 }
 
+// visitTransactionExecuteFunction visits and checks the execute function of a transaction.
 func (checker *Checker) visitTransactionExecuteFunction(
 	executeFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
@@ -150,6 +161,7 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	checker.visitStatements(executeFunction.FunctionBlock.Statements)
 }
 
+// visitTransactionPreConditions visits and checks the post-conditions of a transaction.
 func (checker *Checker) visitTransactionPostConditions(conditions []*ast.Condition) {
 	if len(conditions) > 0 {
 		checker.declareBefore()
@@ -158,6 +170,7 @@ func (checker *Checker) visitTransactionPostConditions(conditions []*ast.Conditi
 	checker.visitConditions(conditions)
 }
 
+// checkTransactionResourceFieldInvalidation checks that all
 func (checker *Checker) checkTransactionResourceFieldInvalidation(
 	transactionType *TransactionType,
 	fieldMembers map[*Member]*ast.FieldDeclaration,
