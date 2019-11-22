@@ -162,8 +162,8 @@ func TestTransactions(t *testing.T) {
 		nil,
 	}
 
-	preConditionsWithNotDeclaredFields := test{
-		"PreConditionsWithNotDeclaredFields",
+	preConditionsWithUndeclaredFields := test{
+		"PreConditionsWithUndeclaredFields",
 		`
 		  transaction {
 			pre {
@@ -239,8 +239,8 @@ func TestTransactions(t *testing.T) {
 	// 	},
 	// }
 
-	resourceTransaction := test{
-		"ResourceTransaction",
+	resourceField := test{
+		"ResourceField",
 		`
 		  resource R {}
 
@@ -260,8 +260,8 @@ func TestTransactions(t *testing.T) {
 		nil,
 	}
 
-	resourceLoss := test{
-		"ResourceLoss",
+	resourceFieldLoss := test{
+		"ResourceFieldLoss",
 		`
 		  resource R {}
 
@@ -291,12 +291,12 @@ func TestTransactions(t *testing.T) {
 		fieldUninitialized,
 		fieldInitialized,
 		preConditions,
-		preConditionsWithNotDeclaredFields,
+		preConditionsWithUndeclaredFields,
 		postConditions,
 		postConditionsAccessExecuteScope,
 		// illegalSelfUsage,
-		resourceTransaction,
-		resourceLoss,
+		resourceField,
+		resourceFieldLoss,
 	}
 
 	for _, test := range tests {
@@ -312,5 +312,4 @@ func TestTransactions(t *testing.T) {
 			}
 		})
 	}
-
 }
