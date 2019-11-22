@@ -48,9 +48,8 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 
 	if isOptional {
 		return &OptionalType{Type: member.Type}
-	} else {
-		return member.Type
 	}
+	return member.Type
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *Member, isOptional bool) {

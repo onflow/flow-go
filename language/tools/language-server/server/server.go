@@ -263,7 +263,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 	var actions []*protocol.CodeLens
 
 	// Search for relevant function declarations
-	for declaration, _ := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+	for declaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
 		if declaration.Identifier.String() == "main" {
 			if len(declaration.ParameterList.Parameters) == 0 {
 				// this is a script

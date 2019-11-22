@@ -17,7 +17,7 @@ func TestAddMessageType(t *testing.T) {
 		return []byte("Response"), nil
 	}
 	var (
-		msgType1 MessageType = 0
+		msgType1 MessageType
 		msgType2 MessageType = 1
 		msgType3 MessageType = 1
 	)
@@ -64,7 +64,7 @@ func TestInvokeMessageType(t *testing.T) {
 	assert := assert.New(t)
 	r := NewRegistryManager(nil)
 	var (
-		msgType1 MessageType = 0
+		msgType1 MessageType
 		msgType2 MessageType = 1
 		msgType3 MessageType = 2
 		msgType4 MessageType = 17

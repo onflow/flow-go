@@ -1,3 +1,4 @@
+// Package crypto ...
 package crypto
 
 import (
@@ -8,12 +9,16 @@ import (
 	"sync"
 )
 
+// revive:disable:var-naming
+
 var ECDSA_P256Instance *ECDSAalgo
 var ECDSA_SECp256k1Instance *ECDSAalgo
 
 //  Once variables to make sure each Signer is instantiated only once
 var ECDSA_P256Once sync.Once
 var ECDSA_SECp256k1Once sync.Once
+
+// revive:enable
 
 // Signer interface
 type signer interface {

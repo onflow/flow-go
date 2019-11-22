@@ -54,14 +54,14 @@ func newEmulator() *emulator.EmulatedBlockchain {
 // the transaction will not succeed.
 // shouldRevert parameter indicates whether the transaction should fail or not
 // This function asserts the correct result and commits the block if it passed
-func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testing.T, signing_keys []flow.AccountPrivateKey, signing_addresses []flow.Address, shouldRevert bool) {
+func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testing.T, signingKeys []flow.AccountPrivateKey, signingAddresses []flow.Address, shouldRevert bool) {
 
 	// add array of signers to transaction
-	for i := 0; i < len(signing_addresses); i++ {
-		sig, err := keys.SignTransaction(tx, signing_keys[i])
+	for i := 0; i < len(signingAddresses); i++ {
+		sig, err := keys.SignTransaction(tx, signingKeys[i])
 		assert.Nil(t, err)
 
-		tx.AddSignature(signing_addresses[i], sig)
+		tx.AddSignature(signingAddresses[i], sig)
 	}
 
 	// submit the signed transaction
