@@ -8,6 +8,14 @@ import (
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
+	fieldMembers := map[*Member]*ast.FieldDeclaration{}
+
+	for _, field := range declaration.Fields {
+		fieldName := field.Identifier.Identifier
+		member := transactionType.Members[fieldName]
+		fieldMembers[member] = field
+	}
+
 	checker.checkTransactionFields(declaration)
 	checker.checkTransactionBlocks(declaration)
 
@@ -17,13 +25,13 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.declareSelfValue(transactionType)
 
-	checker.checkTransactionPrepareFunction(declaration, transactionType)
+	checker.checkTransactionPrepareFunction(declaration, transactionType, fieldMembers)
 
 	checker.checkTransactionPreConditions(declaration.PreConditions)
 	checker.checkTransactionExecuteFunction(declaration, transactionType)
 	checker.checkTransactionPostConditions(declaration.PostConditions)
 
-	checker.checkTransactionResourceFieldInvalidation(transactionType)
+	checker.checkTransactionResourceFieldInvalidation(transactionType, fieldMembers)
 
 	return nil
 }
@@ -67,11 +75,12 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 func (checker *Checker) checkTransactionPrepareFunction(
 	declaration *ast.TransactionDeclaration,
 	transactionType *TransactionType,
+	fieldMembers map[*Member]*ast.FieldDeclaration,
 ) {
 	fields := declaration.Fields
 
 	if declaration.Prepare == nil {
-		if len(declaration.Fields) != 0 {
+		if len(fields) != 0 {
 			// report error for first field
 			firstField := fields[0]
 
@@ -84,14 +93,6 @@ func (checker *Checker) checkTransactionPrepareFunction(
 		}
 
 		return
-	}
-
-	fieldMembers := map[*Member]*ast.FieldDeclaration{}
-
-	for _, field := range fields {
-		fieldName := field.Identifier.Identifier
-		member := transactionType.Members[fieldName]
-		fieldMembers[member] = field
 	}
 
 	initializationInfo := NewInitializationInfo(transactionType, fieldMembers)
@@ -161,21 +162,23 @@ func (checker *Checker) checkTransactionPostConditions(conditions []*ast.Conditi
 	checker.visitConditions(conditions)
 }
 
-func (checker *Checker) checkTransactionResourceFieldInvalidation(transactionType *TransactionType) {
-	for name, member := range transactionType.Members {
+func (checker *Checker) checkTransactionResourceFieldInvalidation(
+	transactionType *TransactionType,
+	fieldMembers map[*Member]*ast.FieldDeclaration,
+) {
+	for member, field := range fieldMembers {
 		if !member.Type.IsResourceType() {
 			return
 		}
 
 		info := checker.resources.Get(member)
 		if !info.DefinitivelyInvalidated {
-			// TODO: use different error here
+
 			checker.report(
 				&ResourceFieldNotInvalidatedError{
-					FieldName: name,
+					FieldName: field.Identifier.Identifier,
 					TypeName:  transactionType.String(),
-					// TODO:
-					Pos: ast.Position{},
+					Pos:       field.Identifier.StartPosition(),
 				},
 			)
 		}
