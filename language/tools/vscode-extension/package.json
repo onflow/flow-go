@@ -24,16 +24,20 @@
         "command": "cadence.restartServer",
         "category": "Cadence",
         "title": "Restart language server"
+      }, {
+        "command": "cadence.startEmulator",
+        "category": "Cadence",
+        "title": "Start emulator"
       }
     ],
     "configuration": {
       "type": "object",
       "title": "Cadence configuration",
       "properties": {
-        "cadence.languageServerCommand": {
+        "cadence.flowCommand": {
           "type": "string",
-          "default": "flow cadence language-server",
-          "description": "The command to start the Cadence language server",
+          "default": "flow",
+          "description": "The command to invoke the Flow CLI",
           "scope": "resource"
         },
         "cadence.accountKey": {
