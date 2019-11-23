@@ -141,7 +141,7 @@ func NewStringValue(str string) *StringValue {
 func (*StringValue) isValue() {}
 
 func (v *StringValue) Copy() Value {
-	return v
+	return &StringValue{Str: v.Str}
 }
 
 func (v *StringValue) Export() values.Value {
@@ -265,9 +265,7 @@ func init() {
 }
 
 func NewArrayValueNonCopying(values ...Value) *ArrayValue {
-	return &ArrayValue{
-		Values: values,
-	}
+	return &ArrayValue{Values: values}
 }
 
 func (*ArrayValue) isValue() {}
