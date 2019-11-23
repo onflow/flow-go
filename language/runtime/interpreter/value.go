@@ -251,33 +251,33 @@ func (*StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value
 // ArrayValue
 
 type ArrayValue struct {
-	Values *[]Value
+	Values []Value
 }
 
 func init() {
 	gob.Register(ArrayValue{})
 }
 
-func NewArrayValue(values ...Value) ArrayValue {
-	return ArrayValue{
-		Values: &values,
+func NewArrayValueNonCopying(values ...Value) *ArrayValue {
+	return &ArrayValue{
+		Values: values,
 	}
 }
 
-func (ArrayValue) isValue() {}
+func (*ArrayValue) isValue() {}
 
-func (v ArrayValue) Copy() Value {
+func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
-	copies := make([]Value, len(*v.Values))
-	for i, value := range *v.Values {
+	copies := make([]Value, len(v.Values))
+	for i, value := range v.Values {
 		copies[i] = value.Copy()
 	}
-	return NewArrayValue(copies...)
+	return NewArrayValueNonCopying(copies...)
 }
 
-func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
-	for _, value := range *v.Values {
+	for _, value := range v.Values {
 		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
 			return value.(DestroyableValue).Destroy(interpreter, location)
 		})
@@ -285,18 +285,18 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 	return result
 }
 
-func (v ArrayValue) Export() values.Value {
+func (v *ArrayValue) Export() values.Value {
 	// TODO: how to export constant-sized array?
-	arrayVal := make(values.VariableSizedArray, len(*v.Values))
+	result := make(values.VariableSizedArray, len(v.Values))
 
-	for i, value := range *v.Values {
-		arrayVal[i] = value.(ExportableValue).Export()
+	for i, value := range v.Values {
+		result[i] = value.(ExportableValue).Export()
 	}
 
-	return arrayVal
+	return result
 }
 
-func (v ArrayValue) GobEncode() ([]byte, error) {
+func (v *ArrayValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	err := encoder.Encode(v.Values)
@@ -315,29 +315,31 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 	}
 	// NOTE: ensure the `Values` slice is properly allocated
 	if v.Values == nil {
-		v.Values = new([]Value)
+		v.Values = make([]Value, 0)
 	}
 	return nil
 }
 
-func (v ArrayValue) Concat(other ConcatenatableValue) Value {
-	otherArray := other.(ArrayValue)
-	values := append(*v.Values, *otherArray.Values...)
-	return NewArrayValue(values...)
+func (v *ArrayValue) Concat(other ConcatenatableValue) Value {
+	otherArray := other.(*ArrayValue)
+	concatenated := append(v.Values, otherArray.Values...)
+	return NewArrayValueNonCopying(concatenated...).Copy()
 }
 
-func (v ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
-	return (*v.Values)[key.(IntegerValue).IntValue()]
+func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
+	integerKey := key.(IntegerValue).IntValue()
+	return v.Values[integerKey]
 }
 
-func (v ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
-	(*v.Values)[key.(IntegerValue).IntValue()] = value
+func (v *ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+	integerKey := key.(IntegerValue).IntValue()
+	v.Values[integerKey] = value
 }
 
-func (v ArrayValue) String() string {
+func (v *ArrayValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("[")
-	for i, value := range *v.Values {
+	for i, value := range v.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -347,62 +349,54 @@ func (v ArrayValue) String() string {
 	return builder.String()
 }
 
-func (v ArrayValue) Append(x Value) {
-	*v.Values = append(*v.Values, x)
+func (v *ArrayValue) Append(element Value) {
+	v.Values = append(v.Values, element)
 }
 
-func (v ArrayValue) Insert(i int, x Value) {
-	values := *v.Values
-	*v.Values = append(values[:i], append([]Value{x}, values[i:]...)...)
+func (v *ArrayValue) Insert(i int, element Value) {
+	v.Values = append(v.Values[:i], append([]Value{element}, v.Values[i:]...)...)
 }
 
-func (v ArrayValue) Remove(i int) Value {
-	values := *v.Values
-	result := values[i]
-	lastIndex := len(values) - 1
+func (v *ArrayValue) Remove(i int) Value {
+	result := v.Values[i]
 
-	copy(values[i:], values[i+1:])
+	lastIndex := len(v.Values) - 1
+	copy(v.Values[i:], v.Values[i+1:])
 
 	// avoid memory leaks by explicitly setting value to nil
-	values[lastIndex] = nil
+	v.Values[lastIndex] = nil
 
-	*v.Values = values[:lastIndex]
+	v.Values = v.Values[:lastIndex]
 
 	return result
 }
 
-func (v ArrayValue) RemoveFirst() Value {
-	values := *v.Values
-	var x Value
-
-	x, *v.Values = values[0], values[1:]
-
-	return x
+func (v *ArrayValue) RemoveFirst() Value {
+	var firstElement Value
+	firstElement, v.Values = v.Values[0], v.Values[1:]
+	return firstElement
 }
 
-func (v ArrayValue) RemoveLast() Value {
-	values := *v.Values
-	var x Value
-
-	lastIndex := len(values) - 1
-	x, *v.Values = values[lastIndex], values[:lastIndex]
-
-	return x
+func (v *ArrayValue) RemoveLast() Value {
+	var lastElement Value
+	lastIndex := len(v.Values) - 1
+	lastElement, v.Values = v.Values[lastIndex], v.Values[:lastIndex]
+	return lastElement
 }
 
-func (v ArrayValue) Contains(x Value) BoolValue {
-	y := x.(EquatableValue)
+func (v *ArrayValue) Contains(needleValue Value) BoolValue {
+	needleEquatable := needleValue.(EquatableValue)
 
-	for _, z := range *v.Values {
-		if y.Equal(z) {
-			return BoolValue(true)
+	for _, arrayValue := range v.Values {
+		if needleEquatable.Equal(arrayValue) {
+			return true
 		}
 	}
 
-	return BoolValue(false)
+	return false
 }
 
-func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
@@ -472,12 +466,12 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 	}
 }
 
-func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (v *ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
 }
 
-func (v ArrayValue) Count() int {
-	return len(*v.Values)
+func (v *ArrayValue) Count() int {
+	return len(v.Values)
 }
 
 // IntegerValue
@@ -1387,7 +1381,7 @@ func (v CompositeValue) GetField(name string) Value {
 // DictionaryValue
 
 type DictionaryValue struct {
-	Keys    ArrayValue
+	Keys    *ArrayValue
 	Entries map[string]Value
 }
 
@@ -1398,7 +1392,7 @@ func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
 	}
 
 	result := DictionaryValue{
-		Keys:    NewArrayValue(),
+		Keys:    NewArrayValueNonCopying(),
 		Entries: make(map[string]Value, keysAndValuesCount/2),
 	}
 
@@ -1416,7 +1410,7 @@ func init() {
 func (DictionaryValue) isValue() {}
 
 func (v DictionaryValue) Copy() Value {
-	newKeys := v.Keys.Copy().(ArrayValue)
+	newKeys := v.Keys.Copy().(*ArrayValue)
 
 	newEntries := make(map[string]Value, len(v.Entries))
 	for name, value := range v.Entries {
@@ -1444,7 +1438,7 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 			})
 	}
 
-	for _, keyValue := range *v.Keys.Values {
+	for _, keyValue := range v.Keys.Values {
 		maybeDestroy(keyValue)
 	}
 
@@ -1458,7 +1452,7 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 func (v DictionaryValue) Export() values.Value {
 	d := make(values.Dictionary, v.Count())
 
-	for i, keyValue := range *v.Keys.Values {
+	for i, keyValue := range v.Keys.Values {
 		key := dictionaryKey(keyValue)
 		value := v.Entries[key]
 
@@ -1512,7 +1506,7 @@ func (v DictionaryValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("{")
 	i := 0
-	for _, keyValue := range *v.Keys.Values {
+	for _, keyValue := range v.Keys.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -1540,12 +1534,12 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	case "values":
 		values := make([]Value, v.Count())
 		i := 0
-		for _, keyValue := range *v.Keys.Values {
+		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
 			values[i] = v.Entries[key]
 			i += 1
 		}
-		return NewArrayValue(values...)
+		return NewArrayValueNonCopying(values...)
 
 	case "remove":
 		return NewHostFunctionValue(
@@ -1613,7 +1607,7 @@ func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	delete(v.Entries, key)
 
 	// TODO: optimize linear scan
-	for i, keyValue := range *v.Keys.Values {
+	for i, keyValue := range v.Keys.Values {
 		if dictionaryKey(keyValue) == key {
 			v.Keys.Remove(i)
 			return existingValue

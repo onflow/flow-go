@@ -1359,20 +1359,20 @@ func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpr
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
-	return interpreter.visitExpressions(expression.Values).
+	return interpreter.visitExpressionsNonCopying(expression.Values).
 		FlatMap(func(result interface{}) Trampoline {
-			values := result.(ArrayValue)
+			values := result.(*ArrayValue)
 
 			argumentTypes := interpreter.Checker.Elaboration.ArrayExpressionArgumentTypes[expression]
 			elementType := interpreter.Checker.Elaboration.ArrayExpressionElementType[expression]
 
-			copies := make([]Value, len(*values.Values))
-			for i, argument := range *values.Values {
+			copies := make([]Value, len(values.Values))
+			for i, argument := range values.Values {
 				argumentType := argumentTypes[i]
 				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
-			return Done{Result: NewArrayValue(copies...)}
+			return Done{Result: NewArrayValueNonCopying(copies...)}
 		})
 }
 
@@ -1507,17 +1507,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				argumentExpressions[i] = argument.Expression
 			}
 
-			return interpreter.visitExpressions(argumentExpressions).
+			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(ArrayValue)
+					arguments := result.(*ArrayValue)
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(*arguments.Values))
-					for i, argument := range *arguments.Values {
+					argumentCopies := make([]Value, len(arguments.Values))
+					for i, argument := range arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
 						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
@@ -1581,8 +1581,8 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	}
 }
 
-func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: NewArrayValue()}
+func (interpreter *Interpreter) visitExpressionsNonCopying(expressions []ast.Expression) Trampoline {
+	var trampoline Trampoline = Done{Result: NewArrayValueNonCopying()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1590,15 +1590,15 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 
 		// append the evaluation of this expression
 		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			array := result.(*ArrayValue)
 
 			// evaluate the expression
 			return expression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					value := result.(Value)
 
-					newValues := append(*array.Values, value)
-					return Done{Result: NewArrayValue(newValues...)}
+					newValues := append(array.Values, value)
+					return Done{Result: NewArrayValueNonCopying(newValues...)}
 				})
 		})
 	}

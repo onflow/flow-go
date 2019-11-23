@@ -101,7 +101,7 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 		),
@@ -679,7 +679,7 @@ func TestInterpretConcatOperator(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -2295,7 +2295,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2329,7 +2329,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2360,7 +2360,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2391,7 +2391,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2429,7 +2429,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2489,7 +2489,7 @@ func TestInterpretArrayCopy(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(0),
 			interpreter.NewIntValue(1),
 		),
@@ -2519,7 +2519,7 @@ func TestInterpretStructCopyInArray(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
 			interpreter.NewIntValue(1),
@@ -4083,7 +4083,7 @@ func TestInterpretArrayAppend(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4107,7 +4107,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4129,7 +4129,7 @@ func TestInterpretArrayConcat(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4152,7 +4152,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4175,7 +4175,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(4),
 			interpreter.NewIntValue(2),
@@ -4193,7 +4193,7 @@ func TestInterpretArrayRemove(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(3),
 		),
@@ -4214,7 +4214,7 @@ func TestInterpretArrayRemoveFirst(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
 		),
@@ -4235,7 +4235,7 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 		),
@@ -4387,7 +4387,7 @@ func TestInterpretDictionaryKeys(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewStringValue("def"),
 			interpreter.NewStringValue("abc"),
 			interpreter.NewStringValue("a"),
@@ -4410,7 +4410,7 @@ func TestInterpretDictionaryValues(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(3),
@@ -4859,7 +4859,7 @@ func TestInterpretSwapVariables(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(3),
 			interpreter.NewIntValue(2),
 		),
@@ -4889,7 +4889,7 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(1),
 		),
@@ -5462,7 +5462,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(2),
@@ -5549,7 +5549,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(0),
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
@@ -5669,11 +5669,11 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	require.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.ArrayValue{},
+		&interpreter.ArrayValue{},
 		value,
 	)
 
-	values := *value.(interpreter.ArrayValue).Values
+	values := value.(*interpreter.ArrayValue).Values
 
 	require.IsType(t,
 		interpreter.SomeValue{},
