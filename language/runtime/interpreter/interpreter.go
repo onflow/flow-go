@@ -1285,7 +1285,7 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
 
-	case CompositeValue:
+	case *CompositeValue:
 		// TODO: call `equals` if RHS is composite
 		return false
 	}
@@ -1696,12 +1696,12 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
-			value := CompositeValue{
+			value := &CompositeValue{
 				Location:   interpreter.Checker.Location,
 				Identifier: identifier,
 				Kind:       declaration.CompositeKind,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				Fields:     map[string]Value{},
+				Functions:  functions,
 				Destructor: destructorFunction,
 			}
 
@@ -1726,7 +1726,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 //
 func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
-	structure CompositeValue,
+	structure *CompositeValue,
 ) FunctionValue {
 	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record

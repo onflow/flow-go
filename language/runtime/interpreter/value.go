@@ -1226,16 +1226,16 @@ type CompositeValue struct {
 	Location   ast.Location
 	Identifier string
 	Kind       common.CompositeKind
-	Fields     *map[string]Value
-	Functions  *map[string]FunctionValue
+	Fields     map[string]Value
+	Functions  map[string]FunctionValue
 	Destructor *InterpretedFunctionValue
 }
 
 func init() {
-	gob.Register(CompositeValue{})
+	gob.Register(&CompositeValue{})
 }
 
-func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
 		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
@@ -1250,45 +1250,43 @@ func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosit
 		invoke(nil, location)
 }
 
-func (CompositeValue) isValue() {}
+func (*CompositeValue) isValue() {}
 
-func (v CompositeValue) Copy() Value {
+func (v *CompositeValue) Copy() Value {
 	// Resources are moved and not copied
 	if v.Kind == common.CompositeKindResource {
 		return v
 	}
 
-	newFields := make(map[string]Value, len(*v.Fields))
-	for field, value := range *v.Fields {
+	newFields := make(map[string]Value, len(v.Fields))
+	for field, value := range v.Fields {
 		newFields[field] = value.Copy()
 	}
 
 	// NOTE: not copying functions or destructor – they are linked in
 
-	return CompositeValue{
+	return &CompositeValue{
 		Location:   v.Location,
 		Identifier: v.Identifier,
 		Kind:       v.Kind,
-		Fields:     &newFields,
+		Fields:     newFields,
 		Functions:  v.Functions,
 		Destructor: v.Destructor,
 	}
 }
 
-func (v CompositeValue) Export() values.Value {
-	fieldMap := *v.Fields
+func (v *CompositeValue) Export() values.Value {
+	fields := make([]values.Value, 0, len(v.Fields))
 
-	fields := make([]values.Value, 0, len(fieldMap))
-
-	for _, value := range fieldMap {
+	for _, value := range v.Fields {
 		fields = append(fields, value.(ExportableValue).Export())
 	}
 
-	return values.Composite{fields}
+	return values.Composite{Fields: fields}
 }
 
-func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
-	value, ok := (*v.Fields)[name]
+func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+	value, ok := v.Fields[name]
 	if ok {
 		return value
 	}
@@ -1304,10 +1302,10 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 	// if composite was deserialized, dynamically link in the functions
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
-		v.Functions = &functions
+		v.Functions = functions
 	}
 
-	function, ok := (*v.Functions)[name]
+	function, ok := v.Functions[name]
 	if ok {
 		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
 			function = interpreter.bindSelf(interpretedFunction, v)
@@ -1318,11 +1316,11 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 	return nil
 }
 
-func (v CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
-	(*v.Fields)[name] = value
+func (v *CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	v.Fields[name] = value
 }
 
-func (v CompositeValue) GobEncode() ([]byte, error) {
+func (v *CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	// NOTE: important: decode as pointer, so gob sees
@@ -1362,12 +1360,12 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	return nil
 }
 
-func (v CompositeValue) String() string {
+func (v *CompositeValue) String() string {
 	var builder strings.Builder
 	builder.WriteString(v.Identifier)
 	builder.WriteString("(")
 	i := 0
-	for name, value := range *v.Fields {
+	for name, value := range v.Fields {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -1380,8 +1378,8 @@ func (v CompositeValue) String() string {
 	return builder.String()
 }
 
-func (v CompositeValue) GetField(name string) Value {
-	return (*v.Fields)[name]
+func (v *CompositeValue) GetField(name string) Value {
+	return v.Fields[name]
 }
 
 // DictionaryValue

@@ -1680,7 +1680,7 @@ func TestInterpretStructureDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -1706,7 +1706,7 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	value, err := inter.Invoke("test", newValue)
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -1767,14 +1767,14 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
 	value, err = inter.Invoke("test2")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -1935,7 +1935,7 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual := inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
@@ -1949,7 +1949,7 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 		value,
 	)
 
-	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual = inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -1971,7 +1971,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
       let test = Test()
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual := inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
@@ -2587,7 +2587,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -2599,7 +2599,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	value, err = inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -3396,7 +3396,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 			))
 
 			assert.IsType(t,
-				interpreter.CompositeValue{},
+				&interpreter.CompositeValue{},
 				inter.Globals["test"].Value,
 			)
 		})
@@ -3602,7 +3602,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 			value, err := inter.Invoke("test", big.NewInt(1))
 			assert.Nil(t, err)
 			assert.IsType(t,
-				interpreter.CompositeValue{},
+				&interpreter.CompositeValue{},
 				value,
 			)
 
@@ -4041,7 +4041,7 @@ func TestInterpretStructureFunctionBindingInside(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -4065,7 +4065,7 @@ func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -5300,7 +5300,7 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
 	)
 
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		foo.(interpreter.SomeValue).Value,
 	)
 }
@@ -5328,7 +5328,7 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 	)
 
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value.(interpreter.SomeValue).Value,
 	)
 }
@@ -5683,11 +5683,11 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	firstValue := values[0].(interpreter.SomeValue).Value
 
 	require.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		firstValue,
 	)
 
-	firstResource := firstValue.(interpreter.CompositeValue)
+	firstResource := firstValue.(*interpreter.CompositeValue)
 
 	assert.Equal(t,
 		firstResource.GetField("id"),
@@ -5702,11 +5702,11 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	secondValue := values[1].(interpreter.SomeValue).Value
 
 	require.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		secondValue,
 	)
 
-	secondResource := secondValue.(interpreter.CompositeValue)
+	secondResource := secondValue.(*interpreter.CompositeValue)
 
 	assert.Equal(t,
 		secondResource.GetField("id"),

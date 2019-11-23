@@ -589,9 +589,9 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 func accountValue(address values.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
-	return interpreter.CompositeValue{
+	return &interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
-		Fields: &map[string]interpreter.Value{
+		Fields: map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(addressHex),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},
