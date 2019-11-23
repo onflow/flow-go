@@ -322,8 +322,8 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 
 func (v *ArrayValue) Concat(other ConcatenatableValue) Value {
 	otherArray := other.(*ArrayValue)
-	concatenated := append(v.Values, otherArray.Values...)
-	return NewArrayValueNonCopying(concatenated...).Copy()
+	concatenated := append(v.Copy().(*ArrayValue).Values, otherArray.Values...)
+	return NewArrayValueNonCopying(concatenated...)
 }
 
 func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
@@ -412,8 +412,8 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				x := arguments[0].(ConcatenatableValue)
-				result := v.Concat(x)
+				otherArray := arguments[0].(ConcatenatableValue)
+				result := v.Concat(otherArray)
 				return trampoline.Done{Result: result}
 			},
 		)
@@ -422,8 +422,8 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
 				i := arguments[0].(IntegerValue).IntValue()
-				x := arguments[1]
-				v.Insert(i, x)
+				element := arguments[1]
+				v.Insert(i, element)
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
