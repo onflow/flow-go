@@ -125,7 +125,7 @@ type StringValue struct {
 }
 
 func init() {
-	gob.Register(StringValue{})
+	gob.Register(&StringValue{})
 }
 
 func NewStringValue(str string) *StringValue {
@@ -255,7 +255,7 @@ type ArrayValue struct {
 }
 
 func init() {
-	gob.Register(ArrayValue{})
+	gob.Register(&ArrayValue{})
 }
 
 func NewArrayValueNonCopying(values ...Value) *ArrayValue {
