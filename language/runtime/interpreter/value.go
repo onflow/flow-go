@@ -52,6 +52,7 @@ type ConcatenatableValue interface {
 // EquatableValue
 
 type EquatableValue interface {
+	Value
 	Equal(other Value) BoolValue
 }
 
@@ -75,11 +76,11 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
-func (v VoidValue) Export() values.Value {
+func (VoidValue) Export() values.Value {
 	return values.Void{}
 }
 
-func (v VoidValue) String() string {
+func (VoidValue) String() string {
 	return "()"
 }
 
@@ -120,68 +121,63 @@ func (v BoolValue) KeyString() string {
 // StringValue
 
 type StringValue struct {
-	Str *string
+	Str string
 }
 
 func init() {
 	gob.Register(StringValue{})
 }
 
-func NewStringValue(str string) StringValue {
-	return StringValue{&str}
+func NewStringValue(str string) *StringValue {
+	return &StringValue{str}
 }
 
-func (StringValue) isValue() {}
+func (*StringValue) isValue() {}
 
-func (v StringValue) Copy() Value {
+func (v *StringValue) Copy() Value {
 	return v
 }
 
-func (v StringValue) Export() values.Value {
-	return values.String(v.StrValue())
+func (v *StringValue) Export() values.Value {
+	return values.String(v.Str)
 }
 
-func (v StringValue) String() string {
+func (v *StringValue) String() string {
 	// TODO: quote like in string literal
-	return strconv.Quote(v.StrValue())
+	return strconv.Quote(v.Str)
 }
 
-func (v StringValue) StrValue() string {
-	return *v.Str
+func (v *StringValue) KeyString() string {
+	return v.Str
 }
 
-func (v StringValue) KeyString() string {
-	return v.StrValue()
+func (v *StringValue) Equal(other Value) BoolValue {
+	otherString := other.(*StringValue)
+	return norm.NFC.String(v.Str) == norm.NFC.String(otherString.Str)
 }
 
-func (v StringValue) Equal(other Value) BoolValue {
-	otherString := other.(StringValue)
-	return norm.NFC.String(v.StrValue()) == norm.NFC.String(otherString.StrValue())
-}
-
-func (v StringValue) Concat(other ConcatenatableValue) Value {
-	otherString := other.(StringValue)
+func (v *StringValue) Concat(other ConcatenatableValue) Value {
+	otherString := other.(*StringValue)
 
 	var sb strings.Builder
 
-	sb.WriteString(v.StrValue())
-	sb.WriteString(otherString.StrValue())
+	sb.WriteString(v.Str)
+	sb.WriteString(otherString.Str)
 
 	return NewStringValue(sb.String())
 }
 
-func (v StringValue) Slice(from IntValue, to IntValue) Value {
+func (v *StringValue) Slice(from IntValue, to IntValue) Value {
 	fromInt := from.IntValue()
 	toInt := to.IntValue()
-	str := v.StrValue()
-	return NewStringValue(str[fromInt:toInt])
+	return NewStringValue(v.Str[fromInt:toInt])
 }
 
-func (v StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
+func (v *StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
-	graphemes := uniseg.NewGraphemes(v.StrValue())
+	graphemes := uniseg.NewGraphemes(v.Str)
 	graphemes.Next()
 
 	for j := 0; j < i; j++ {
@@ -193,11 +189,11 @@ func (v StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	return NewStringValue(char)
 }
 
-func (v StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+func (v *StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
 	i := key.(IntegerValue).IntValue()
-	char := value.(StringValue).StrValue()
+	char := value.(*StringValue).Str
 
-	str := v.StrValue()
+	str := v.Str
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
 	graphemes := uniseg.NewGraphemes(str)
@@ -215,14 +211,15 @@ func (v StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value
 	sb.WriteString(char)
 	sb.WriteString(str[end:])
 
-	*v.Str = sb.String()
+	v.Str = sb.String()
 }
 
-func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		count := uniseg.GraphemeClusterCount(v.StrValue())
+		count := uniseg.GraphemeClusterCount(v.Str)
 		return NewIntValue(int64(count))
+
 	case "concat":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -231,6 +228,7 @@ func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "slice":
 		return NewHostFunctionValue(
 			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
@@ -240,12 +238,13 @@ func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
 }
 
-func (v StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (*StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
 }
 

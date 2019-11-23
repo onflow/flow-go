@@ -728,7 +728,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := result.(StringValue).StrValue()
+						message := result.(*StringValue).Str
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -1273,28 +1273,17 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	// TODO: add support for arrays and dictionaries
 
 	switch left := left.(type) {
-	case IntegerValue:
+	case EquatableValue:
 		// NOTE: might be NilValue
-		right, ok := right.(IntegerValue)
+		right, ok := right.(EquatableValue)
 		if !ok {
 			return false
 		}
 		return left.Equal(right)
-
-	case BoolValue:
-		return left == right
 
 	case NilValue:
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
-
-	case StringValue:
-		// NOTE: might be NilValue
-		right, ok := right.(StringValue)
-		if !ok {
-			return false
-		}
-		return left.Equal(right)
 
 	case CompositeValue:
 		// TODO: call `equals` if RHS is composite
