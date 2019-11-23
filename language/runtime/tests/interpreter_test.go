@@ -3854,7 +3854,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
-		inter.Globals["x"].Value.(interpreter.DictionaryValue).
+		inter.Globals["x"].Value.(*interpreter.DictionaryValue).
 			Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
 	)
 }
@@ -5287,11 +5287,11 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
 	assert.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.DictionaryValue{},
+		&interpreter.DictionaryValue{},
 		value,
 	)
 
-	foo := value.(interpreter.DictionaryValue).
+	foo := value.(*interpreter.DictionaryValue).
 		Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("foo"))
 
 	require.IsType(t,

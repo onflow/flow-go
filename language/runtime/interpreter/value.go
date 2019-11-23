@@ -62,6 +62,12 @@ type DestroyableValue interface {
 	Destroy(*Interpreter, LocationPosition) trampoline.Trampoline
 }
 
+// HasKeyString
+
+type HasKeyString interface {
+	KeyString() string
+}
+
 // VoidValue
 
 type VoidValue struct{}
@@ -1385,13 +1391,13 @@ type DictionaryValue struct {
 	Entries map[string]Value
 }
 
-func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
+func NewDictionaryValue(keysAndValues ...Value) *DictionaryValue {
 	keysAndValuesCount := len(keysAndValues)
 	if keysAndValuesCount%2 != 0 {
 		panic("uneven number of keys and values")
 	}
 
-	result := DictionaryValue{
+	result := &DictionaryValue{
 		Keys:    NewArrayValueNonCopying(),
 		Entries: make(map[string]Value, keysAndValuesCount/2),
 	}
@@ -1404,12 +1410,12 @@ func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
 }
 
 func init() {
-	gob.Register(DictionaryValue{})
+	gob.Register(&DictionaryValue{})
 }
 
-func (DictionaryValue) isValue() {}
+func (*DictionaryValue) isValue() {}
 
-func (v DictionaryValue) Copy() Value {
+func (v *DictionaryValue) Copy() Value {
 	newKeys := v.Keys.Copy().(*ArrayValue)
 
 	newEntries := make(map[string]Value, len(v.Entries))
@@ -1417,13 +1423,13 @@ func (v DictionaryValue) Copy() Value {
 		newEntries[name] = value.Copy()
 	}
 
-	return DictionaryValue{
+	return &DictionaryValue{
 		Keys:    newKeys,
 		Entries: newEntries,
 	}
 }
 
-func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 
 	maybeDestroy := func(value interface{}) {
@@ -1449,7 +1455,7 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 	return result
 }
 
-func (v DictionaryValue) Export() values.Value {
+func (v *DictionaryValue) Export() values.Value {
 	d := make(values.Dictionary, v.Count())
 
 	for i, keyValue := range v.Keys.Values {
@@ -1468,7 +1474,7 @@ func (v DictionaryValue) Export() values.Value {
 	return d
 }
 
-func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
+func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
 	value, ok := v.Entries[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
@@ -1484,11 +1490,7 @@ func dictionaryKey(keyValue Value) string {
 	return hasKeyString.KeyString()
 }
 
-type HasKeyString interface {
-	KeyString() string
-}
-
-func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
+func (v *DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
 	switch typedValue := value.(type) {
 	case SomeValue:
 		v.Insert(keyValue, typedValue.Value)
@@ -1502,7 +1504,7 @@ func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, va
 	}
 }
 
-func (v DictionaryValue) String() string {
+func (v *DictionaryValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("{")
 	i := 0
@@ -1523,7 +1525,7 @@ func (v DictionaryValue) String() string {
 	return builder.String()
 }
 
-func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
@@ -1536,6 +1538,7 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 		i := 0
 		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
+			// TODO: copy
 			values[i] = v.Entries[key]
 			i += 1
 		}
@@ -1587,16 +1590,16 @@ func (v DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	}
 }
 
-func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (v *DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	// Dictionaries have no settable members (fields / functions)
 	panic(errors.NewUnreachableError())
 }
 
-func (v DictionaryValue) Count() int {
+func (v *DictionaryValue) Count() int {
 	return v.Keys.Count()
 }
 
-func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
+func (v *DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, exists := v.Entries[key]
 
@@ -1617,7 +1620,7 @@ func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	panic(errors.NewUnreachableError())
 }
 
-func (v DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
+func (v *DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, existed := v.Entries[key]
 
