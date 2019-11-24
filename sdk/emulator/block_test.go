@@ -29,6 +29,9 @@ func TestCommitBlock(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, types.TransactionFinalized, tx.Status)
 
+	// Commit tx1 into new block
+	b.CommitBlock()
+
 	tx2 := &types.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
@@ -49,7 +52,7 @@ func TestCommitBlock(t *testing.T) {
 
 	assert.Equal(t, types.TransactionReverted, tx.Status)
 
-	// Commit tx1 and tx2 into new block
+	// Commit tx2 into new block
 	b.CommitBlock()
 
 	// tx1 status becomes TransactionSealed
