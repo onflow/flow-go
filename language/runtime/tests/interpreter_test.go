@@ -5894,3 +5894,81 @@ func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
 		},
 	)
 }
+
+func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test: Test? = Test(x: 42)
+          let x = test?.x ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test: Test? = Test()
+          let x = test?.x() ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
+	)
+}
