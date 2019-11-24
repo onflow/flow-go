@@ -70,8 +70,8 @@ func TestWorldStates(t *testing.T) {
 	// Tx pool contains nothing
 	assert.Len(t, b.txPool, 0)
 
-	// Submit tx1
-	err := b.SubmitTransaction(tx1)
+	// Add tx1 to pending block
+	err := b.AddTransaction(tx1)
 	assert.Nil(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
@@ -82,8 +82,8 @@ func TestWorldStates(t *testing.T) {
 	// World state updates
 	assert.NotEqual(t, ws1, ws2)
 
-	// Submit tx1 again
-	err = b.SubmitTransaction(tx1)
+	// Add tx1 again
+	err = b.AddTransaction(tx1)
 	assert.NotNil(t, err)
 
 	ws3 := b.pendingWorldState.Hash()
@@ -94,8 +94,8 @@ func TestWorldStates(t *testing.T) {
 	// World state does not update
 	assert.Equal(t, ws2, ws3)
 
-	// Submit tx2
-	err = b.SubmitTransaction(tx2)
+	// Add tx2 to pending block
+	err = b.AddTransaction(tx2)
 	assert.Nil(t, err)
 
 	ws4 := b.pendingWorldState.Hash()
@@ -107,7 +107,7 @@ func TestWorldStates(t *testing.T) {
 	assert.NotEqual(t, ws3, ws4)
 
 	// Commit new block
-	b.CommitBlock()
+	b.ExecuteAndCommitBlock()
 	ws5 := b.pendingWorldState.Hash()
 	t.Logf("world state after commit: %x\n", ws5)
 
@@ -118,8 +118,8 @@ func TestWorldStates(t *testing.T) {
 	// World state is indexed
 	assert.Contains(t, b.worldStates, string(ws5))
 
-	// Submit tx3
-	err = b.SubmitTransaction(tx3)
+	// Add tx3 to pending block
+	err = b.AddTransaction(tx3)
 	assert.Nil(t, err)
 
 	ws6 := b.pendingWorldState.Hash()
@@ -184,9 +184,15 @@ func TestQueryByVersion(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
+	err = b.CommitBlock()
+	assert.Nil(t, err)
+
 	ws2 := b.pendingWorldState.Hash()
 
 	err = b.SubmitTransaction(tx2)
+	assert.Nil(t, err)
+
+	err = b.CommitBlock()
 	assert.Nil(t, err)
 
 	ws3 := b.pendingWorldState.Hash()

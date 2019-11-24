@@ -209,10 +209,10 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 		return err
 	}
 
-	err = b.CommitBlock()
-	if err != nil {
-		return err
-	}
+	// err = b.CommitBlock()
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -332,6 +332,11 @@ func (b *EmulatedBlockchain) CommitBlock() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	// Pending block cannot be committed before execution
+	if b.pendingBlock.Index == 0 && len(b.pendingBlock.TransactionHashes) > 0 {
+		return &ErrPendingBlockCommitBeforeExecution{BlockHash: b.pendingBlock.Hash()}
+	}
+
 	// Pending block has begun execution but has not finished (cannot commit state)
 	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
 		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
@@ -347,8 +352,9 @@ func (b *EmulatedBlockchain) CommitBlock() error {
 	b.pendingBlock.Number = prevBlock.Number + 1
 	b.pendingBlock.Timestamp = time.Now()
 	b.pendingBlock.PreviousBlockHash = prevBlock.Hash()
+	currentBlock := b.pendingBlock
 
-	b.pendingWorldState.InsertBlock(b.pendingBlock)
+	b.pendingWorldState.InsertBlock(currentBlock)
 
 	// Reset pending block
 	b.pendingBlock = &etypes.Block{
@@ -359,7 +365,7 @@ func (b *EmulatedBlockchain) CommitBlock() error {
 	// Clear transaction pool
 	b.txPool = make(map[string]*types.Transaction)
 
-	b.commitWorldState(b.pendingBlock.Hash())
+	b.commitWorldState(currentBlock.Hash())
 
 	return nil
 }
