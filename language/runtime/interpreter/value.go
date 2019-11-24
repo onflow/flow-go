@@ -1823,19 +1823,19 @@ type AnyValue struct {
 }
 
 func init() {
-	gob.Register(AnyValue{})
+	gob.Register(&AnyValue{})
 }
 
-func (AnyValue) isValue() {}
+func (*AnyValue) isValue() {}
 
-func (v AnyValue) Copy() Value {
-	return AnyValue{
+func (v *AnyValue) Copy() Value {
+	return &AnyValue{
 		Value: v.Value.Copy(),
 		Type:  v.Type,
 	}
 }
 
-func (v AnyValue) String() string {
+func (v *AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 

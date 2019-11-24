@@ -2054,10 +2054,10 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 	switch targetType := targetType.(type) {
 	case *sema.AnyType:
 		// no need to convert already boxed value
-		if _, ok := value.(AnyValue); ok {
+		if _, ok := value.(*AnyValue); ok {
 			return value
 		}
-		return AnyValue{
+		return &AnyValue{
 			Value: value,
 			Type:  valueType,
 		}
@@ -2243,7 +2243,7 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 
 			switch expression.Operation {
 			case ast.OperationFailableCast:
-				anyValue := value.(AnyValue)
+				anyValue := value.(*AnyValue)
 
 				if !sema.IsSubType(anyValue.Type, expectedType) {
 					return NilValue{}

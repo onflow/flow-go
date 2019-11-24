@@ -92,7 +92,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		AnyValue{
+		&AnyValue{
 			Value: BoolValue(true),
 			Type:  &sema.BoolType{},
 		},
@@ -105,7 +105,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 
 	assert.Equal(t,
 		&SomeValue{
-			Value: AnyValue{
+			Value: &AnyValue{
 				Value: BoolValue(true),
 				Type:  &sema.BoolType{},
 			},
@@ -119,12 +119,12 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 
 	// don't box already boxed
 	assert.Equal(t,
-		AnyValue{
+		&AnyValue{
 			Value: BoolValue(true),
 			Type:  &sema.BoolType{},
 		},
 		inter.boxAny(
-			AnyValue{
+			&AnyValue{
 				Value: BoolValue(true),
 				Type:  &sema.BoolType{},
 			},
@@ -142,7 +142,7 @@ func TestInterpreterBoxing(t *testing.T) {
 
 	assert.Equal(t,
 		&SomeValue{
-			Value: AnyValue{
+			Value: &AnyValue{
 				Value: BoolValue(true),
 				Type:  &sema.BoolType{},
 			},
@@ -156,7 +156,7 @@ func TestInterpreterBoxing(t *testing.T) {
 
 	assert.Equal(t,
 		&SomeValue{
-			Value: AnyValue{
+			Value: &AnyValue{
 				Value: BoolValue(true),
 				Type:  &sema.BoolType{},
 			},

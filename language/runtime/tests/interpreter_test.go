@@ -2964,7 +2964,7 @@ func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.BoolType{},
 			Value: interpreter.BoolValue(true),
 		},
@@ -2980,7 +2980,7 @@ func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(2),
 		},
@@ -3873,7 +3873,7 @@ func TestInterpretFailableCastingAnySuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
@@ -3909,7 +3909,7 @@ func TestInterpretOptionalAny(t *testing.T) {
 
 	assert.Equal(t,
 		&interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
@@ -3927,7 +3927,7 @@ func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
 
 	assert.Equal(t,
 		&interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
@@ -3953,7 +3953,7 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 
 	assert.Equal(t,
 		&interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(23),
 			},
@@ -3962,7 +3962,7 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(23),
 		},
@@ -3991,7 +3991,7 @@ func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
@@ -5781,7 +5781,7 @@ func TestInterpretCastingIntLiteralToAny(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
