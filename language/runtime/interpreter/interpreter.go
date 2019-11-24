@@ -2289,7 +2289,7 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
-			referenceValue := ReferenceValue{
+			referenceValue := &ReferenceValue{
 				StorageIdentifier: storage.Identifier,
 				Key:               key,
 			}

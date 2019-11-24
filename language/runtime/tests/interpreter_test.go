@@ -5371,14 +5371,14 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	require.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.ReferenceValue{},
+		&interpreter.ReferenceValue{},
 		value,
 	)
 
 	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
-		interpreter.ReferenceValue{
+		&interpreter.ReferenceValue{
 			StorageIdentifier: storageValue.Identifier,
 			// TODO: improve
 			Key: rType.String(),

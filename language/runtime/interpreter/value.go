@@ -1861,16 +1861,19 @@ type ReferenceValue struct {
 }
 
 func init() {
-	gob.Register(ReferenceValue{})
+	gob.Register(&ReferenceValue{})
 }
 
-func (ReferenceValue) isValue() {}
+func (*ReferenceValue) isValue() {}
 
-func (v ReferenceValue) Copy() Value {
-	return v
+func (v *ReferenceValue) Copy() Value {
+	return &ReferenceValue{
+		StorageIdentifier: v.StorageIdentifier,
+		Key:               v.Key,
+	}
 }
 
-func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
+func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	switch referenced :=
 		interpreter.readStored(v.StorageIdentifier, v.Key).(type) {
 	case *SomeValue:
@@ -1884,22 +1887,22 @@ func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange 
 	}
 }
 
-func (v ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+func (v *ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
 	return v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		GetMember(interpreter, locationRange, name)
 }
 
-func (v ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+func (v *ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
 	v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		SetMember(interpreter, locationRange, name, value)
 }
 
-func (v ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
+func (v *ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
 	return v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Get(interpreter, locationRange, key)
 }
 
-func (v ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
+func (v *ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
 	v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Set(interpreter, locationRange, key, value)
 }
