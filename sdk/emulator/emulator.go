@@ -204,8 +204,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
 		return err
 	}
 
-	// TODO: what happens to the TransactionReverted errors?
-	err = b.ExecuteBlock()
+	err = b.ExecuteNextTransaction()
 	if err != nil {
 		return err
 	}
