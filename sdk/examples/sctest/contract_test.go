@@ -127,6 +127,7 @@ func TestCreateMinter(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
+		b.CommitBlock()
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
@@ -143,6 +144,7 @@ func TestCreateMinter(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
+		b.CommitBlock()
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
@@ -183,6 +185,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 	err = b.SubmitTransaction(&createMinterTx)
 	assert.Nil(t, err)
+	b.CommitBlock()
 
 	// Mint the first NFT
 	mintTx := types.Transaction{
@@ -197,6 +200,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 	err = b.SubmitTransaction(&mintTx)
 	assert.Nil(t, err)
+	b.CommitBlock()
 
 	// Assert that ID/specialness are correct
 	_, err = b.CallScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
@@ -215,6 +219,7 @@ func TestMinting(t *testing.T) {
 	assert.Nil(t, err)
 	err = b.SubmitTransaction(&mintTx2)
 	assert.Nil(t, err)
+	b.CommitBlock()
 
 	// Assert that ID/specialness are correct
 	_, err = b.CallScript(generateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))

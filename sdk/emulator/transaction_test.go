@@ -134,6 +134,9 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	err := b.SubmitTransaction(tx1)
 	assert.Nil(t, err)
 
+	err = b.CommitBlock()
+	assert.Nil(t, err)
+
 	// Submit tx1 again (errors)
 	err = b.SubmitTransaction(tx1)
 	assert.IsType(t, err, &emulator.ErrDuplicateTransaction{})

@@ -530,6 +530,11 @@ func (b *EmulatedBlockchain) CreateAccount(keys []types.AccountPublicKey, code [
 		return types.Address{}, err
 	}
 
+	err = b.CommitBlock()
+	if err != nil {
+		return types.Address{}, err
+	}
+
 	return b.LastCreatedAccount().Address, nil
 }
 
