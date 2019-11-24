@@ -113,6 +113,15 @@ func (e *ErrInvalidStateVersion) Error() string {
 	return fmt.Sprintf("World State with version hash %x is invalid", e.Version)
 }
 
+// ErrPendingBlockNotEmpty indicates that the current pending block contains previously added transactions.
+type ErrPendingBlockNotEmpty struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockNotEmpty) Error() string {
+	return fmt.Sprintf("Pending block with hash %x is not empty", e.BlockHash)
+}
+
 // ErrPendingBlockMidExecution indicates that the current pending block is mid-execution.
 type ErrPendingBlockMidExecution struct {
 	BlockHash crypto.Hash
