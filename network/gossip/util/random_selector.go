@@ -1,4 +1,4 @@
-package gossip
+package util
 
 import (
 	"crypto/rand"
@@ -21,9 +21,9 @@ func newUniqSelector(n int) *uniqueRand {
 
 // Int returns a unique random integer that has not been returned by this instance
 // of uniqueRand before.
-func (u *uniqueRand) Int() (int, error) {
-
+func (u *uniqueRand) GetUniqueInt() (int, error) {
 	// Declaration outside loop for performance concerns
+	// TODO Handle possible infinite loop
 	var (
 		r   *big.Int
 		i   int
@@ -39,7 +39,7 @@ func (u *uniqueRand) Int() (int, error) {
 			return 0, fmt.Errorf("could not generate random number: %v", err)
 		}
 
-		//making sure that the number is in the range of indice
+		//making sure that the number is in the range of indices
 		i = int(r.Int64() % n64)
 
 		if !u.generated[i] {

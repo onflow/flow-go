@@ -40,7 +40,6 @@ func (v *VariableDeclaration) DeclarationName() string {
 func (v *VariableDeclaration) DeclarationKind() common.DeclarationKind {
 	if v.IsConstant {
 		return common.DeclarationKindConstant
-	} else {
-		return common.DeclarationKindVariable
 	}
+	return common.DeclarationKindVariable
 }

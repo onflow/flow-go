@@ -1,7 +1,6 @@
-package gossip
+package util
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -10,20 +9,16 @@ import (
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
-// ServePlacer is an interface for any protocol that can be used as a connection medium for gossip
-type ServePlacer interface {
-	Serve(net.Listener)
-	Place(context.Context, string, *messages.GossipMessage, bool, Mode) (*messages.GossipReply, error)
-}
+// Socket is a representation of IP addresses and ports that can be efficiently serialized into a compact form. Sockets can be used
+// instead of sending string representations over the network
 
-// newSocket takes an IP address and a port and returns a socket that encapsulates this information
-func newSocket(address string) (*messages.Socket, error) {
+// NewSocket takes an IP address and a port and returns a socket that encapsulates this information
+func NewSocket(address string) (*messages.Socket, error) {
 	//extract ip and port from address
 	ip, port, err := splitAddress(address)
 
 	//invalid ip and port
 	if err != nil {
-		fmt.Printf("invalid address")
 		return &messages.Socket{}, fmt.Errorf("invalid address")
 	}
 
@@ -58,8 +53,8 @@ func splitAddress(address string) (string, string, error) {
 	return ip, port, nil
 }
 
-// socketToString extracts an address from a given socket
+// SocketToString extracts an address from a given socket
 //TODO: IPV6 support
-func socketToString(s *messages.Socket) string {
+func SocketToString(s *messages.Socket) string {
 	return fmt.Sprintf("%v:%v", net.IP(s.Ip), s.Port)
 }

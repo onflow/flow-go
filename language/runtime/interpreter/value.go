@@ -513,9 +513,8 @@ func NewIntValue(value int64) IntValue {
 func ConvertInt(value Value) Value {
 	if intValue, ok := value.(IntValue); ok {
 		return intValue.Copy()
-	} else {
-		return NewIntValue(int64(value.(IntegerValue).IntValue()))
 	}
+	return NewIntValue(int64(value.(IntegerValue).IntValue()))
 }
 
 func (v IntValue) isValue() {}
@@ -1370,7 +1369,7 @@ func (v *CompositeValue) String() string {
 		builder.WriteString(name)
 		builder.WriteString(": ")
 		builder.WriteString(fmt.Sprint(value))
-		i += 1
+		i++
 	}
 	builder.WriteString(")")
 	return builder.String()
@@ -1515,13 +1514,13 @@ func (v *DictionaryValue) String() string {
 		value := v.Entries[key]
 		builder.WriteString(fmt.Sprint(value))
 
-		i += 1
+		i++
 	}
 	builder.WriteString("}")
 	return builder.String()
 }
 
-func (v *DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
@@ -1536,7 +1535,7 @@ func (v *DictionaryValue) GetMember(interpreter *Interpreter, _ LocationRange, n
 			key := dictionaryKey(keyValue)
 			// TODO: copy
 			values[i] = v.Entries[key]
-			i += 1
+			i++
 		}
 		return NewArrayValueNonCopying(values...)
 
@@ -1775,7 +1774,7 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
-func (v NilValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v NilValue) Destroy(_ *Interpreter, _ LocationPosition) trampoline.Trampoline {
 	return trampoline.Done{}
 }
 

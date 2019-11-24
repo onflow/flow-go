@@ -16,7 +16,7 @@ const (
 type Address [AddressLength]byte
 
 // ZeroAddress represents the "zero address" (account that no one owns).
-var ZeroAddress Address = Address{}
+var ZeroAddress = Address{}
 
 // BytesToAddress returns Address with value b.
 //

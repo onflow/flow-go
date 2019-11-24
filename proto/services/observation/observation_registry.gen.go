@@ -4,16 +4,28 @@ import (
 	"context"
 	"fmt"
 
-	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	proto "github.com/golang/protobuf/proto"
+)
+
+//go:generate stringer -type=registry.MessageType
+
+const (
+	Ping registry.MessageType = (iota + registry.DefaultTypes)
+	SendTransaction
+	GetLatestBlock
+	GetTransaction
+	GetAccount
+	ExecuteScript
+	GetEvents
 )
 
 type ObserveServiceServerRegistry struct {
 	oss ObserveServiceServer
 }
 
-// To make sure the class complies with the gossip.Registry interface
-var _ gossip.Registry = (*ObserveServiceServerRegistry)(nil)
+// To make sure the class complies with the registry.Registry interface
+var _ registry.Registry = (*ObserveServiceServerRegistry)(nil)
 
 func NewObserveServiceServerRegistry(oss ObserveServiceServer) *ObserveServiceServerRegistry {
 	return &ObserveServiceServerRegistry{
@@ -154,26 +166,14 @@ func (ossr *ObserveServiceServerRegistry) GetEvents(ctx context.Context, payload
 	return respByte, respErr
 }
 
-func (ossr *ObserveServiceServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	return map[uint64]gossip.HandleFunc{
-		0: ossr.Ping,
-		1: ossr.SendTransaction,
-		2: ossr.GetLatestBlock,
-		3: ossr.GetTransaction,
-		4: ossr.GetAccount,
-		5: ossr.ExecuteScript,
-		6: ossr.GetEvents,
-	}
-}
-
-func (ossr *ObserveServiceServerRegistry) NameMapping() map[string]uint64 {
-	return map[string]uint64{
-		"Ping":            0,
-		"SendTransaction": 1,
-		"GetLatestBlock":  2,
-		"GetTransaction":  3,
-		"GetAccount":      4,
-		"ExecuteScript":   5,
-		"GetEvents":       6,
+func (ossr *ObserveServiceServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	return map[registry.MessageType]registry.HandleFunc{
+		Ping:            ossr.Ping,
+		SendTransaction: ossr.SendTransaction,
+		GetLatestBlock:  ossr.GetLatestBlock,
+		GetTransaction:  ossr.GetTransaction,
+		GetAccount:      ossr.GetAccount,
+		ExecuteScript:   ossr.ExecuteScript,
+		GetEvents:       ossr.GetEvents,
 	}
 }

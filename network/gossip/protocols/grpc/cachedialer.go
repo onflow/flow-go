@@ -45,7 +45,7 @@ func (cd *CacheDialer) removeStream(address string) {
 
 // Dial returns a cached stream connected with the specified address if found,
 // otherwise it creates a new one and caches it
-func (cd *CacheDialer) dial(address string, isSynchronous bool, mode gossip.Mode) (clientStream, error) {
+func (cd *CacheDialer) dial(address string, mode gossip.Mode) (clientStream, error) {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
 
@@ -55,7 +55,6 @@ func (cd *CacheDialer) dial(address string, isSynchronous bool, mode gossip.Mode
 	if stream, ok := cd.staticFanout[address]; ok {
 		return stream, nil
 	}
-
 	// If the address is not part of the static fanout of the node, we check the dynamic fanout cache
 	if mode == gossip.ModeOneToMany && cd.pq.contains(address) {
 		var ok bool
@@ -73,11 +72,7 @@ func (cd *CacheDialer) dial(address string, isSynchronous bool, mode gossip.Mode
 		}
 		client := messages.NewMessageReceiverClient(conn)
 
-		if isSynchronous {
-			stream, err = client.StreamSyncQueue(context.Background(), grpc.UseCompressor(gzip.Name))
-		} else {
-			stream, err = client.StreamAsyncQueue(context.Background(), grpc.UseCompressor(gzip.Name))
-		}
+		stream, err = client.StreamQueueService(context.Background(), grpc.UseCompressor(gzip.Name))
 
 		if err != nil {
 			return nil, fmt.Errorf("could not start grpc stream with server %s: %v", address, err)
