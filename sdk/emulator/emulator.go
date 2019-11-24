@@ -32,7 +32,7 @@ type EmulatedBlockchain struct {
 	intermediateWorldStates map[string][]byte
 	// pendingWorldState is the current working world state
 	pendingWorldState *state.WorldState
-	// txPool is a pool of pending transactions waiting to be committed (already executed)
+	// txPool is a pool of pending transactions waiting to be executed
 	txPool             map[string]*types.Transaction
 	pendingBlock       *etypes.Block
 	mut                sync.RWMutex
@@ -189,67 +189,41 @@ func (b *EmulatedBlockchain) GetAccountAtVersion(address types.Address, version 
 	return account, nil
 }
 
-// SubmitTransaction sends a transaction to the network that is immediately executed (updates blockchain state).
+// SubmitTransaction sends a transaction to the network that is immediately executed and committed.
 //
-// Note that the resulting state is not finalized until CommitBlock() is called.
-// However, the pending blockchain state is indexed for testing purposes.
+// Note that the transaction is first added to the pending block, then the block is executed, and finally
+// the resulting block is committed to the state.
 func (b *EmulatedBlockchain) SubmitTransaction(tx *types.Transaction) error {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-
-	missingFields := tx.MissingFields()
-
-	// TODO: add more invalid transaction checks
-	if len(missingFields) > 0 {
-		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
+	// Prevents tx from being executed with other transactions added previously
+	if len(b.pendingBlock.TransactionHashes) > 0 {
+		return &ErrPendingBlockNotEmpty{BlockHash: b.pendingWorldState.Hash()}
 	}
 
-	if _, exists := b.txPool[string(tx.Hash())]; exists {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
-	}
-
-	if b.pendingWorldState.ContainsTransaction(tx.Hash()) {
-		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
-	}
-
-	if err := b.verifySignatures(tx); err != nil {
+	err := b.AddTransaction(tx)
+	if err != nil {
 		return err
 	}
 
-	b.txPool[string(tx.Hash())] = tx
-	b.pendingWorldState.InsertTransaction(tx)
-
-	registers := b.pendingWorldState.Registers.NewView()
-
-	events, err := b.computer.ExecuteTransaction(registers, tx)
+	// TODO: what happens to the TransactionReverted errors?
+	err = b.ExecuteBlock()
 	if err != nil {
-		b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionReverted)
-
-		b.updatePendingWorldStates(tx.Hash())
-
-		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+		return err
 	}
 
-	b.pendingWorldState.SetRegisters(registers.UpdatedRegisters())
-	b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionFinalized)
-
-	b.updatePendingWorldStates(tx.Hash())
-
-	// TODO: improve the pending block, provide all block information
-	prevBlock := b.pendingWorldState.GetLatestBlock()
-	blockNumber := prevBlock.Number + 1
-
-	b.emitTransactionEvents(events, blockNumber, tx.Hash())
+	err = b.CommitBlock()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-// AddTransaction adds a transaction to the current pendingBlock (validates transaction) but holds off on executing it.
+// AddTransaction adds a transaction to the current pending block (validates the transaction) but holds off on executing it.
 func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	// If Index > 0, pendingBlock has begun execution (cannot add anymore txs)
+	// If Index > 0, pending block has begun execution (cannot add anymore txs)
 	if b.pendingBlock.Index > 0 {
 		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
@@ -273,7 +247,7 @@ func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 		return err
 	}
 
-	// Add tx to pendingBlock
+	// Add tx to pending block (and transaction pool)
 	b.txPool[string(tx.Hash())] = tx
 	b.pendingWorldState.InsertTransaction(tx)
 	b.pendingBlock.AddTransaction(tx.Hash())
@@ -281,28 +255,32 @@ func (b *EmulatedBlockchain) AddTransaction(tx *types.Transaction) error {
 	return nil
 }
 
-// ExecuteBlock executes the remaing transactions in pendingBlock.
-func (b *EmulatedBlockchain) ExecuteBlock() []error {
+// ExecuteBlock executes the remaining transactions in pending block.
+func (b *EmulatedBlockchain) ExecuteBlock() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	errors := make([]error, 0)
-
 	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
-		errors = append(errors, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()})
+		return &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
+
+	errors := make([]string, 0)
 
 	for b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
 		err := b.executeTransaction()
 		if err != nil {
-			errors = append(errors, err)
+			errors = append(errors, err.Error())
 		}
 	}
 
-	return errors
+	if len(errors) > 0 {
+		return &ErrBlockExecutionErrors{Errors: errors}
+	}
+
+	return nil
 }
 
-// ExecuteNextTransaction executes the next indexed transaction in pendingBlock.
+// ExecuteNextTransaction executes the next indexed transaction in pending block.
 func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
@@ -310,7 +288,7 @@ func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
 	return b.executeTransaction()
 }
 
-// executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs throught the transaction execution.
+// executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs through the transaction execution.
 func (b *EmulatedBlockchain) executeTransaction() error {
 	// Check if there are remaining txs to be executed
 	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
@@ -347,15 +325,15 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	return nil
 }
 
-// CommitState takes all executed transactions and commits them into a block.
+// CommitBlock takes all executed transactions and commits them into a block.
 //
-// Note: this clears the pending transaction pool and indexes the committed blockchain
-// state for testing purposes.
-func (b *EmulatedBlockchain) CommitState() error {
+// Note: this clears the pending transaction pool and resets the pending block.
+// This also indexes the committed blockchain state for testing purposes.
+func (b *EmulatedBlockchain) CommitBlock() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	// If Index > 0, pendingBlock has begun execution (cannot commit state)
+	// Pending block has begun execution but has not finished (cannot commit state)
 	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
 		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
@@ -366,29 +344,48 @@ func (b *EmulatedBlockchain) CommitState() error {
 		}
 	}
 
-	b.txPool = make(map[string]*types.Transaction)
-
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+	b.pendingBlock.Number = prevBlock.Number + 1
 	b.pendingBlock.Timestamp = time.Now()
+	b.pendingBlock.PreviousBlockHash = prevBlock.Hash()
 
 	b.pendingWorldState.InsertBlock(b.pendingBlock)
-	b.commitWorldState(b.pendingBlock.Hash())
 
+	// Reset pending block
 	b.pendingBlock = &etypes.Block{
-		Number:            b.pendingBlock.Number + 1,
-		PreviousBlockHash: b.pendingBlock.Hash(),
 		TransactionHashes: make([]crypto.Hash, 0),
+		Index:             0,
 	}
+
+	// Clear transaction pool
+	b.txPool = make(map[string]*types.Transaction)
+
+	b.commitWorldState(b.pendingBlock.Hash())
 
 	return nil
 }
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
-func (b *EmulatedBlockchain) ExecuteAndCommitBlock() []error {
-	errors := b.ExecuteBlock()
+func (b *EmulatedBlockchain) ExecuteAndCommitBlock() error {
+	// TODO: what happens to the TransactionReverted errors?
+	err := b.ExecuteBlock()
+	if err != nil {
+		return err
+	}
 
-	b.CommitState()
+	err = b.CommitBlock()
+	if err != nil {
+		return err
+	}
 
-	return errors
+	return nil
+}
+
+// ResetPendingBlock clears the transactions in pending block.
+func (b *EmulatedBlockchain) ResetPendingBlock() {
+	prevBlock := b.pendingWorldState.GetLatestBlock()
+
+	b.SeekToState(prevBlock.Hash())
 }
 
 func (b *EmulatedBlockchain) updatePendingWorldStates(txHash crypto.Hash) {
@@ -432,41 +429,10 @@ func (b *EmulatedBlockchain) CallScriptAtVersion(script []byte, version crypto.H
 	return value, nil
 }
 
-// CommitBlock takes all pending transactions and commits them into a block.
-//
-// Note: this clears the pending transaction pool and indexes the committed blockchain
-// state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() *etypes.Block {
-	b.mut.Lock()
-	defer b.mut.Unlock()
-
-	txHashes := make([]crypto.Hash, 0)
-	for _, tx := range b.txPool {
-		txHashes = append(txHashes, tx.Hash())
-		if b.pendingWorldState.GetTransaction(tx.Hash()).Status != types.TransactionReverted {
-			b.pendingWorldState.UpdateTransactionStatus(tx.Hash(), types.TransactionSealed)
-		}
-	}
-	b.txPool = make(map[string]*types.Transaction)
-
-	prevBlock := b.pendingWorldState.GetLatestBlock()
-	block := &etypes.Block{
-		Number:            prevBlock.Number + 1,
-		Timestamp:         time.Now(),
-		PreviousBlockHash: prevBlock.Hash(),
-		TransactionHashes: txHashes,
-	}
-
-	b.pendingWorldState.InsertBlock(block)
-	b.commitWorldState(block.Hash())
-
-	return block
-}
-
 // SeekToState rewinds the blockchain state to a previously committed history.
 //
 // Note that this only seeks to a committed world state (not intermediate world state)
-// and this clears all pending transactions in txPool.
+// and this clears all pending transactions in txPool and resets the pending block.
 func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
@@ -475,6 +441,10 @@ func (b *EmulatedBlockchain) SeekToState(hash crypto.Hash) {
 		ws := state.Decode(bytes)
 		b.pendingWorldState = ws
 		b.txPool = make(map[string]*types.Transaction)
+		b.pendingBlock = &etypes.Block{
+			TransactionHashes: make([]crypto.Hash, 0),
+			Index:             0,
+		}
 	}
 }
 
