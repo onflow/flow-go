@@ -1672,6 +1672,7 @@ func (v EventValue) Copy() Value {
 	return EventValue{
 		Identifier: v.Identifier,
 		Fields:     fields,
+		Location:   v.Location,
 	}
 }
 

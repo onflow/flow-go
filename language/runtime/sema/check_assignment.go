@@ -23,13 +23,17 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 func (checker *Checker) checkAssignment(
 	target, value ast.Expression,
 	transfer *ast.Transfer,
-	allowResourceTarget bool,
+	isResourceAssignment bool,
 ) (targetType, valueType Type) {
 	valueType = value.Accept(checker).(Type)
 
 	targetType = checker.visitAssignmentValueType(target, value, valueType)
 
-	checker.checkTransfer(transfer, valueType)
+	// NOTE: `visitAssignmentValueType` checked compatibility between value and target types.
+	// Check for the *target* type, so that assignment using non-resource typed value (e.g. `nil`)
+	// is possible
+
+	checker.checkTransfer(transfer, targetType)
 
 	// An assignment to a resource is invalid, as it would result in a loss
 
@@ -43,7 +47,7 @@ func (checker *Checker) checkAssignment(
 
 		accessedSelfMember := checker.accessedSelfMember(target)
 
-		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !allowResourceTarget {
+		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !isResourceAssignment {
 			checker.report(
 				&InvalidResourceAssignmentError{
 					Range: ast.NewRangeFromPositioned(target),
