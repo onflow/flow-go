@@ -52,7 +52,7 @@ func (s *interpreterRuntimeStorage) readValue(
 			return interpreter.NilValue{}
 		}
 
-		return interpreter.SomeValue{
+		return &interpreter.SomeValue{
 			Value: cachedValue,
 		}
 	}
@@ -79,7 +79,7 @@ func (s *interpreterRuntimeStorage) readValue(
 	}
 
 	s.cache[storageKey] = storedValue
-	return interpreter.SomeValue{
+	return &interpreter.SomeValue{
 		Value: storedValue,
 	}
 }
@@ -106,7 +106,7 @@ func (s *interpreterRuntimeStorage) writeValue(
 	// The Cache is finally written back through the runtime interface in `writeCached`
 
 	switch typedValue := value.(type) {
-	case interpreter.SomeValue:
+	case *interpreter.SomeValue:
 		s.cache[storageKey] = typedValue.Value
 	case interpreter.NilValue:
 		s.cache[storageKey] = nil

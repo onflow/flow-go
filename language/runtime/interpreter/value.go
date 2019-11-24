@@ -1474,7 +1474,7 @@ func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) V
 	if !ok {
 		return NilValue{}
 	}
-	return SomeValue{Value: value}
+	return &SomeValue{Value: value}
 }
 
 func dictionaryKey(keyValue Value) string {
@@ -1487,7 +1487,7 @@ func dictionaryKey(keyValue Value) string {
 
 func (v *DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
 	switch typedValue := value.(type) {
-	case SomeValue:
+	case *SomeValue:
 		v.Insert(keyValue, typedValue.Value)
 
 	case NilValue:
@@ -1550,7 +1550,7 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = SomeValue{Value: existingValue}
+					returnValue = &SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
@@ -1571,7 +1571,7 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = SomeValue{Value: existingValue}
+					returnValue = &SomeValue{Value: existingValue}
 				}
 
 				return trampoline.Done{
@@ -1793,24 +1793,24 @@ type SomeValue struct {
 }
 
 func init() {
-	gob.Register(SomeValue{})
+	gob.Register(&SomeValue{})
 }
 
-func (SomeValue) isValue() {}
+func (*SomeValue) isValue() {}
 
-func (SomeValue) isOptionalValue() {}
+func (*SomeValue) isOptionalValue() {}
 
-func (v SomeValue) Copy() Value {
-	return SomeValue{
+func (v *SomeValue) Copy() Value {
+	return &SomeValue{
 		Value: v.Value.Copy(),
 	}
 }
 
-func (v SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 
-func (v SomeValue) String() string {
+func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
@@ -1873,7 +1873,7 @@ func (v ReferenceValue) Copy() Value {
 func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	switch referenced :=
 		interpreter.readStored(v.StorageIdentifier, v.Key).(type) {
-	case SomeValue:
+	case *SomeValue:
 		return referenced.Value
 	case NilValue:
 		panic(&DereferenceError{

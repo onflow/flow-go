@@ -518,7 +518,7 @@ func toBytes(value interpreter.Value) (values.Bytes, error) {
 		return nil, nil
 	}
 
-	someValue, ok := value.(interpreter.SomeValue)
+	someValue, ok := value.(*interpreter.SomeValue)
 	if ok {
 		value = someValue.Value
 	}

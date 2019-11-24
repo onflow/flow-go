@@ -817,7 +817,7 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			if someValue, ok := result.(SomeValue); ok {
+			if someValue, ok := result.(*SomeValue); ok {
 
 				targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
 				valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
@@ -1249,7 +1249,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 						})
 				}
 
-				value := left.(SomeValue).Value
+				value := left.(*SomeValue).Value
 				return Done{Result: value}
 			})
 
@@ -1423,7 +1423,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 				case NilValue:
 					return typedResult
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -1436,7 +1436,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 
 			if expression.Optional {
-				return SomeValue{Value: resultValue}
+				return &SomeValue{Value: resultValue}
 			}
 			return resultValue
 		})
@@ -1493,7 +1493,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				case NilValue:
 					return Done{Result: typedResult}
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -2030,7 +2030,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 			break
 		}
 
-		if some, ok := inner.(SomeValue); ok {
+		if some, ok := inner.(*SomeValue); ok {
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
 			// NOTE: nested nil will be unboxed!
@@ -2038,7 +2038,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 				Type: &sema.NeverType{},
 			}
 		} else {
-			value = SomeValue{Value: value}
+			value = &SomeValue{Value: value}
 			valueType = &sema.OptionalType{
 				Type: valueType,
 			}
@@ -2066,8 +2066,8 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 		if _, ok := value.(NilValue); ok {
 			return value
 		}
-		some := value.(SomeValue)
-		return SomeValue{
+		some := value.(*SomeValue)
+		return &SomeValue{
 			Value: interpreter.boxAny(
 				some.Value,
 				valueType.(*sema.OptionalType).Type,
@@ -2083,7 +2083,7 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 
 func (interpreter *Interpreter) unbox(value Value) Value {
 	for {
-		some, ok := value.(SomeValue)
+		some, ok := value.(*SomeValue)
 		if !ok {
 			return value
 		}
@@ -2249,7 +2249,7 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 					return NilValue{}
 				}
 
-				return SomeValue{Value: anyValue.Value}
+				return &SomeValue{Value: anyValue.Value}
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
