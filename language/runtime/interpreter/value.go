@@ -392,6 +392,8 @@ func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 }
 
 func (v *ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+	value.SetOwner(v.Owner)
+
 	integerKey := key.(IntegerValue).IntValue()
 	v.Values[integerKey] = value
 }
@@ -410,13 +412,16 @@ func (v *ArrayValue) String() string {
 }
 
 func (v *ArrayValue) Append(element Value) {
+	element.SetOwner(v.Owner)
 	v.Values = append(v.Values, element)
 }
 
 func (v *ArrayValue) Insert(i int, element Value) {
+	element.SetOwner(v.Owner)
 	v.Values = append(v.Values[:i], append([]Value{element}, v.Values[i:]...)...)
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) Remove(i int) Value {
 	result := v.Values[i]
 
@@ -431,12 +436,14 @@ func (v *ArrayValue) Remove(i int) Value {
 	return result
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) RemoveFirst() Value {
 	var firstElement Value
 	firstElement, v.Values = v.Values[0], v.Values[1:]
 	return firstElement
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) RemoveLast() Value {
 	var lastElement Value
 	lastIndex := len(v.Values) - 1
@@ -1703,16 +1710,17 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 	case "length":
 		return NewIntValue(int64(v.Count()))
 
+	// TODO: is returning copies correct?
 	case "keys":
 		return v.Keys.Copy()
 
+	// TODO: is returning copies correct?
 	case "values":
 		values := make([]Value, v.Count())
 		i := 0
 		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
-			// TODO: copy
-			values[i] = v.Entries[key]
+			values[i] = v.Entries[key].Copy()
 			i++
 		}
 		return NewArrayValueUnownedNonCopying(values...)
@@ -1772,6 +1780,7 @@ func (v *DictionaryValue) Count() int {
 	return v.Keys.Count()
 }
 
+// TODO: unset owner?
 func (v *DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, exists := v.Entries[key]
@@ -1800,6 +1809,9 @@ func (v *DictionaryValue) Insert(keyValue Value, value Value) (existingValue Val
 	if !existed {
 		v.Keys.Append(keyValue)
 	}
+
+	value.SetOwner(v.Owner)
+
 	v.Entries[key] = value
 
 	if !existed {
