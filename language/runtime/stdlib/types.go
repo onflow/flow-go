@@ -77,3 +77,105 @@ var AccountType = func() StandardLibraryType {
 var BuiltinTypes = StandardLibraryTypes{
 	AccountType,
 }
+
+// built-in event types
+
+var AccountCreatedEventType = sema.EventType{
+	Identifier: "AccountCreated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
+var AccountKeyAddedEventType = sema.EventType{
+	Identifier: "AccountKeyAdded",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountKeyRemovedEventType = sema.EventType{
+	Identifier: "AccountKeyRemoved",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountCodeUpdatedEventType = sema.EventType{
+	Identifier: "AccountCodeUpdated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "codeHash",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}

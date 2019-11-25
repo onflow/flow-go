@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/network/gossip/protocols"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
+	"github.com/dapperlabs/flow-go/network/gossip/registry"
 )
 
 // Demo of for the gossip node implementation
@@ -39,9 +42,7 @@ func main() {
 		}
 	}
 
-	config := gossip.NewNodeConfig(nil, servePort, peers, 2, 10)
-
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithAddress(servePort), gossip.WithPeers(peers), gossip.WithStaticFanoutSize(2))
 	sp, err := protocols.NewGServer(node)
 	if err != nil {
 		log.Fatalf("could not start network server: %v", err)
@@ -65,8 +66,9 @@ func main() {
 		return []byte("Pong"), nil
 	}
 
+	var TimeMsg registry.MessageType = 4
 	// add the Time function to the node's registry
-	if err := node.RegisterFunc("Time", Time); err != nil {
+	if err := node.RegisterFunc(TimeMsg, Time); err != nil {
 		log.Fatalf("could not register Time func to node: %v", err)
 	}
 
@@ -86,7 +88,7 @@ func main() {
 				// so you will notice that the responses returned to you will be empty
 				// (that is because AsyncGossip does not wait for the sent messages to be
 				// processed)
-				rep, err := node.AsyncGossip(context.Background(), bytes, peers, "Time")
+				rep, err := node.Gossip(context.Background(), bytes, peers, TimeMsg)
 				if err != nil {
 					log.Println(err)
 				}

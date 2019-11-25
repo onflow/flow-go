@@ -1,4 +1,4 @@
-package gossip
+package storage
 
 import (
 	"fmt"
@@ -9,10 +9,11 @@ import (
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
-// TestDatabase covers several storage and retrieval of data to and from database considering different scenarios
+// TestDatabase covers several storage and retrieval of data to and from storage considering different scenarios
 func TestDatabase(t *testing.T) {
 	assert := assert.New(t)
-	mmd := newMemMsgDatabase()
+	mmd := NewMemMsgStore()
+
 
 	initKeys := []string{
 		"exists",

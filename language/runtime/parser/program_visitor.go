@@ -126,6 +126,9 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	case ctx.Priv() != nil:
 		return ast.AccessPrivate
 
+	case ctx.Auth() != nil:
+		return ast.AccessAuthorized
+
 	case ctx.Pub() != nil:
 		return ast.AccessPublic
 
@@ -161,7 +164,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		length := len(bytes)
 		if length%2 == 1 {
 			bytes = append([]byte{'0'}, bytes...)
-			length += 1
+			length++
 		}
 
 		address := make([]byte, hex.DecodedLen(length))

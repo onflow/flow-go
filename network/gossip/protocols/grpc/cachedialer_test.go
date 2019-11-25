@@ -3,23 +3,25 @@ package protocols
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/rs/zerolog"
 )
 
 // TestCacheDialerFundamentals tests the fundamental functionality of CacheDialer, such as invalid inputs
 func TestCacheDialerFundamentals(t *testing.T) {
+
 	cd, err := NewCacheDialer(20)
 	if err != nil {
 		t.Errorf("Unexpected error occured when creating a cacheDilaer: %v", err)
 	}
 
 	// initialize grpc serveplacer in order to dial it
-	config := gossip.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithAddress("127.0.0.1:50000"))
 
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)
@@ -34,7 +36,11 @@ func TestCacheDialerFundamentals(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not listen to port: %v", "127.0.0.1:52000")
 	}
-	go node.Serve(ln)
+	go func() {
+		if err := node.Serve(ln); err != nil {
+			t.Errorf("could not run serve on gossip node: %v", err)
+		}
+	}()
 
 	tt := []struct {
 		address string
@@ -80,7 +86,7 @@ func TestCacheDialerFundamentals(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		stream, err := cd.dial(tc.address, tc.sync, tc.mode)
+		stream, err := cd.dial(tc.address, tc.mode)
 		if err != nil && tc.err != nil {
 			continue
 		}
@@ -101,6 +107,7 @@ func TestCacheDialerFundamentals(t *testing.T) {
 // Dynamic fanout (OneToMany) calls should use the static fanout cache if a stream is already available,
 // otherwise use its own fanout
 func TestCacheDialerCaching(t *testing.T) {
+
 	cd, err := NewCacheDialer(2)
 	if err != nil {
 		t.Errorf("Unexpected error occured when creating a cacheDilaer: %v", err)
@@ -117,8 +124,7 @@ func TestCacheDialerCaching(t *testing.T) {
 	}
 
 	for i := 0; i < numInstances; i++ {
-		config := gossip.NewNodeConfig(nil, addresses[i], []string{}, 0, 10)
-		node := gossip.NewNode(config)
+		node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithAddress(addresses[i]))
 		// establishing a new gRPC server for the gNode
 		server, err := NewGServer(node)
 		if err != nil {
@@ -132,21 +138,25 @@ func TestCacheDialerCaching(t *testing.T) {
 		if err != nil {
 			t.Errorf("could not listen to port: %v", addresses[i])
 		}
-		go node.Serve(ln)
+		go func() {
+			if err := node.Serve(ln); err != nil {
+				t.Errorf("could not run serve on gossip node: %v", err)
+			}
+		}()
 	}
 
 	// Using dynamic fanout
-	StreamDynamicFanout, err := cd.dial(addresses[0], true, gossip.ModeOneToMany)
+	StreamDynamicFanout, err := cd.dial(addresses[0], gossip.ModeOneToMany)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
 
-	_, err = cd.dial(addresses[1], true, gossip.ModeOneToMany) //an intermediate dial
+	_, err = cd.dial(addresses[1], gossip.ModeOneToMany) //an intermediate dial
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
 
-	AnotherStreamDynamicFanout, err := cd.dial(addresses[0], true, gossip.ModeOneToMany)
+	AnotherStreamDynamicFanout, err := cd.dial(addresses[0], gossip.ModeOneToMany)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
@@ -156,7 +166,7 @@ func TestCacheDialerCaching(t *testing.T) {
 	}
 
 	// Using static fanout, the stream should be different than the first streams
-	staticFanoutStream, err := cd.dial(addresses[0], true, gossip.ModeOneToAll)
+	staticFanoutStream, err := cd.dial(addresses[0], gossip.ModeOneToAll)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
@@ -167,7 +177,7 @@ func TestCacheDialerCaching(t *testing.T) {
 
 	// Using dynamic fanout, the stream returned should be the same one as the one from the static fanout
 	// since streams in static fanout have a precedence
-	AnotherStreamDynamicFanout, err = cd.dial(addresses[0], true, gossip.ModeOneToMany)
+	AnotherStreamDynamicFanout, err = cd.dial(addresses[0], gossip.ModeOneToMany)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
@@ -178,7 +188,7 @@ func TestCacheDialerCaching(t *testing.T) {
 	// Testing the LRU cache removal of the least recently used cached stream, by this time address[0:1] are in
 	// the cache, but since size of cache is determined as 2 in the beginning of the test, dialing another node rather
 	// than 0 or 1 should discard 1, since 0 is used twice after 1, so 1 is the least recent
-	_, err = cd.dial(addresses[2], true, gossip.ModeOneToMany) //an intermediate dial
+	_, err = cd.dial(addresses[2], gossip.ModeOneToMany) //an intermediate dial
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error")
 	}
@@ -191,14 +201,14 @@ func TestCacheDialerCaching(t *testing.T) {
 
 // TestCacheDialerMessaging tests whether streams expire after sending a message
 func TestCacheDialerPersistence(t *testing.T) {
+
 	cd, err := NewCacheDialer(20)
 	if err != nil {
 		t.Errorf("Unexpected error occured when creating a cacheDilaer: %v", err)
 	}
 
 	// initialize grpcServeplacer in order to dial it
-	config := gossip.NewNodeConfig(nil, "127.0.0.1:50000", []string{}, 0, 10)
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithAddress("127.0.0.1:50000"))
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)
 	if err != nil {
@@ -212,7 +222,11 @@ func TestCacheDialerPersistence(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not listen to port: %v", "127.0.0.1:54000")
 	}
-	go node.Serve(ln)
+	go func() {
+		if err := node.Serve(ln); err != nil {
+			t.Errorf("could not run serve on gossip node: %v", err)
+		}
+	}()
 
 	tt := []struct {
 		sync bool
@@ -237,13 +251,14 @@ func TestCacheDialerPersistence(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		stream, err := cd.dial("127.0.0.1:54000", tc.sync, tc.mode)
+		stream, err := cd.dial("127.0.0.1:54000", tc.mode)
 		if err != nil {
 			t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error %v", err)
 		}
+		msg := &messages.GossipMessage{MessageType: 17}
 
 		// sending the first message
-		if err := stream.Send(&messages.GossipMessage{}); err != nil {
+		if err := stream.Send(msg); err != nil {
 			t.Errorf("Unexpected error when trying to send a gossip message: %v", err)
 		}
 
@@ -254,7 +269,7 @@ func TestCacheDialerPersistence(t *testing.T) {
 		// sending an empty message to make sure that the connection is kept open after sending a message
 		// this may be a trivial test to pass for gRPC, nevertheless, this is a good pattern of test to
 		// check the durability of the connections
-		err = stream.Send(&messages.GossipMessage{})
+		err = stream.Send(msg)
 		if err == io.EOF {
 			t.Errorf("Unexpected error in send. Expected: nil error, Got: EOF")
 		}
@@ -270,14 +285,14 @@ func TestCacheDialerPersistence(t *testing.T) {
 // it is being removed from the cache. The purpose of this test is to make sure that a bad stream is
 // truely cleaned up from the cache
 func TestBadStream(t *testing.T) {
+
 	cd, err := NewCacheDialer(20)
 	if err != nil {
 		t.Errorf("Unexpected error occured when creating a cacheDialer: %v", err)
 	}
 	address := "127.0.0.1:55000"
 	// initialize grpcServeplacer in order to dial it as a static fanout
-	config := gossip.NewNodeConfig(nil, address, []string{}, 0, 10)
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithAddress(address))
 
 	// establishing a new gRPC server for the gNode
 	server, err := NewGServer(node)
@@ -293,7 +308,11 @@ func TestBadStream(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not listen to port: %v", address)
 	}
-	go node.Serve(ln)
+	go func() {
+		if err := node.Serve(ln); err != nil {
+			t.Errorf("could not run serve on gossip node: %v", err)
+		}
+	}()
 
 	// check initial size of both fanout caches
 	if len(cd.staticFanout) != 0 || cd.pq.cache.Len() != 0 {
@@ -305,7 +324,7 @@ func TestBadStream(t *testing.T) {
 	*/
 
 	// dialing with mode as OneToAll in order to use the static fanout cache
-	_, err = cd.dial(address, true, gossip.ModeOneToAll)
+	_, err = cd.dial(address, gossip.ModeOneToAll)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error: %v", err)
 	}
@@ -338,7 +357,7 @@ func TestBadStream(t *testing.T) {
 	*/
 
 	// dialing with mode as OneToMany in order to use the dynamic fanout cache
-	_, err = cd.dial(address, true, gossip.ModeOneToMany)
+	_, err = cd.dial(address, gossip.ModeOneToMany)
 	if err != nil {
 		t.Errorf("Unexpected error in dial. Expected: nil error, Got: non nil error: %v", err)
 	}

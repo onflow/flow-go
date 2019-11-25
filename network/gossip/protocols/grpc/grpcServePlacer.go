@@ -22,8 +22,7 @@ var (
 
 // Node interface defines the functions that any network node should have so that it can use Gserver
 type Node interface {
-	SyncQueue(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error)
-	AsyncQueue(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error)
+	QueueService(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error)
 }
 
 // clientStream represents a client with which Gserver establishes a stream connection
@@ -55,20 +54,16 @@ func NewGServer(n Node) (*Gserver, error) {
 	}, nil
 }
 
-// SyncQueue is invoked remotely using the gRPC stub,
+// QueueService is invoked remotely using the gRPC stub,
 // it receives a message from a remote node and places it inside the local nodes queue
-func (gs *Gserver) SyncQueue(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error) {
-	return gs.n.SyncQueue(ctx, msg)
+// In current version of Gossip, StreamQueueService is utilized for direct 1-to-1 gossips
+func (gs *Gserver) QueueService(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error) {
+	return gs.n.QueueService(context.Background(), msg)
 }
 
-// AsyncQueue is invoked remotely using the gRPC stub,
-// it receives a message from a remote node and places it inside the local nodes queue
-func (gs *Gserver) AsyncQueue(ctx context.Context, msg *messages.GossipMessage) (*messages.GossipReply, error) {
-	return gs.n.AsyncQueue(ctx, msg)
-}
-
-// StreamAsyncQueue receives sync data from stream and places is in queue
-func (gs *Gserver) StreamAsyncQueue(saq messages.MessageReceiver_StreamAsyncQueueServer) error {
+// StreamQueueService receives sync data from stream and places is in queue
+// In current version of Gossip, StreamQueueService is utilized for 1-to-many and 1-to-all gossips
+func (gs *Gserver) StreamQueueService(saq messages.MessageReceiver_StreamQueueServiceServer) error {
 	ctx := saq.Context()
 	for {
 		// exit if context is done
@@ -91,48 +86,13 @@ func (gs *Gserver) StreamAsyncQueue(saq messages.MessageReceiver_StreamAsyncQueu
 			continue
 		}
 
-		rep, err := gs.n.AsyncQueue(ctx, req)
+		rep, err := gs.n.QueueService(context.Background(), req)
+
 		if err != nil {
 			return err
 		}
 
 		err = saq.Send(rep)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-// StreamSyncQueue recieves async data from stream and places it in queue
-func (gs *Gserver) StreamSyncQueue(ssq messages.MessageReceiver_StreamSyncQueueServer) error {
-	ctx := ssq.Context()
-	for {
-		// exit if context is done
-		// or continue
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		// receive data from stream
-		req, err := ssq.Recv()
-		if err == io.EOF {
-			// return will close stream from server side
-			logger.Info().Msg("exiting StreamAsyncQueue")
-			return nil
-		}
-		if err != nil {
-			logger.Debug().Err(fmt.Errorf("receive error: %v", err)).Send()
-			continue
-		}
-
-		rep, err := gs.n.SyncQueue(ctx, req)
-		if err != nil {
-			return err
-		}
-
-		err = ssq.Send(rep)
 		if err != nil {
 			return err
 		}
@@ -149,23 +109,23 @@ func (gs *Gserver) Serve(listener net.Listener) {
 }
 
 // Place places a message for sending according to the gossip mode
-func (gs *Gserver) Place(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool, mode gossip.Mode) (*messages.GossipReply, error) {
+func (gs *Gserver) Place(ctx context.Context, addr string, msg *messages.GossipMessage, mode gossip.Mode) (*messages.GossipReply, error) {
 
 	switch mode {
 	case gossip.ModeOneToOne:
-		return gs.place(ctx, addr, msg, isSynchronous)
+		return gs.sendDirect(ctx, addr, msg)
 	case gossip.ModeOneToMany:
-		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
+		return gs.streamToMany(ctx, addr, msg)
 	case gossip.ModeOneToAll:
-		return gs.placeStreamToAll(ctx, addr, msg, isSynchronous)
+		return gs.streamToAll(ctx, addr, msg)
 	default:
-		return &messages.GossipReply{}, fmt.Errorf("Unimplemented mode")
+		return &messages.GossipReply{}, fmt.Errorf("unknown gossip mode: %v", mode)
 	}
 
 }
 
-// place is used to send one-to-one direct messages
-func (gs *Gserver) place(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool) (*messages.GossipReply, error) {
+// sendDirect is used to send one-to-one direct messages
+func (gs *Gserver) sendDirect(ctx context.Context, addr string, msg *messages.GossipMessage) (*messages.GossipReply, error) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return &messages.GossipReply{}, fmt.Errorf("could not connect to %s: %v", addr, err)
@@ -175,11 +135,7 @@ func (gs *Gserver) place(ctx context.Context, addr string, msg *messages.GossipM
 	var reply *messages.GossipReply
 
 	client := messages.NewMessageReceiverClient(conn)
-	if isSynchronous {
-		reply, err = client.SyncQueue(ctx, msg, grpc.UseCompressor(gzip.Name))
-	} else {
-		reply, err = client.AsyncQueue(ctx, msg, grpc.UseCompressor(gzip.Name))
-	}
+	reply, err = client.QueueService(context.Background(), msg, grpc.UseCompressor(gzip.Name))
 	if err != nil {
 		return &messages.GossipReply{}, fmt.Errorf("error on gossiping the message to: %s, error: %v", addr, err)
 	}
@@ -187,8 +143,8 @@ func (gs *Gserver) place(ctx context.Context, addr string, msg *messages.GossipM
 
 }
 
-func (gs *Gserver) placeStreamToAll(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool) (*messages.GossipReply, error) {
-	stream, err := gs.cacheDial(addr, isSynchronous, gossip.ModeOneToAll)
+func (gs *Gserver) streamToAll(ctx context.Context, addr string, msg *messages.GossipMessage) (*messages.GossipReply, error) {
+	stream, err := gs.cacheDial(addr, gossip.ModeOneToAll)
 	if err != nil {
 		return nil, fmt.Errorf("could not dial via cache: %v", err)
 	}
@@ -197,8 +153,9 @@ func (gs *Gserver) placeStreamToAll(ctx context.Context, addr string, msg *messa
 	err = stream.Send(msg)
 	if err == io.EOF {
 		gs.cacheDialer.removeStream(addr)
-		fmt.Println("Stream closed. Reoppenining...")
-		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
+		//TODO: Change to logging
+		fmt.Println("Stream closed. Reopening...")
+		return gs.streamToMany(context.Background(), addr, msg)
 	}
 
 	if err != nil {
@@ -213,12 +170,12 @@ func (gs *Gserver) placeStreamToAll(ctx context.Context, addr string, msg *messa
 
 }
 
-func (gs *Gserver) cacheDial(addr string, isSynchronous bool, mode gossip.Mode) (clientStream, error) {
-	return gs.cacheDialer.dial(addr, isSynchronous, mode)
+func (gs *Gserver) cacheDial(addr string, mode gossip.Mode) (clientStream, error) {
+	return gs.cacheDialer.dial(addr, mode)
 }
 
-func (gs *Gserver) placeStreamToMany(ctx context.Context, addr string, msg *messages.GossipMessage, isSynchronous bool) (*messages.GossipReply, error) {
-	stream, err := gs.cacheDial(addr, isSynchronous, gossip.ModeOneToMany)
+func (gs *Gserver) streamToMany(ctx context.Context, addr string, msg *messages.GossipMessage) (*messages.GossipReply, error) {
+	stream, err := gs.cacheDial(addr, gossip.ModeOneToMany)
 	if err != nil {
 		return &messages.GossipReply{}, fmt.Errorf("could not dial server %s: %v", addr, err)
 	}
@@ -226,11 +183,11 @@ func (gs *Gserver) placeStreamToMany(ctx context.Context, addr string, msg *mess
 	var reply *messages.GossipReply
 	err = stream.Send(msg)
 	if err == io.EOF {
-		fmt.Println("Stream closed. Reoppenining...")
+		fmt.Println("Stream closed. Reopening..")
 		// we assume a healthy stream would not ever being closed, hence, we mark a bad stream to be subject to a retry.
 		// we also remove a bad stream from the cache to give it just a single more chance of try
 		gs.cacheDialer.removeStream(addr)
-		return gs.placeStreamToMany(ctx, addr, msg, isSynchronous)
+		return gs.streamToMany(context.Background(), addr, msg)
 	}
 
 	if err != nil {

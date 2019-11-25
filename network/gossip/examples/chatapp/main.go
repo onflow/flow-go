@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/dapperlabs/flow-go/network/gossip/testnet"
+	"io/ioutil"
 	"log"
-	"net"
 	"os"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/network/gossip/protocols"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
 )
 
 // Demo of a simple chat application based on the gossip node implementation
@@ -34,7 +36,7 @@ func main() {
 
 	// step 1: establishing a tcp listener on an available port
 	// pick a port from the port pool provided and listen on it.
-	listener, err := pickPort(portPool)
+	listener, err := testnet.PickPort(portPool)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,8 +55,7 @@ func main() {
 		}
 	}
 
-	config := gossip.NewNodeConfig(NewReceiverServerRegistry(&messageReceiver{}), myPort, othersPort, 2, 10)
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithRegistry(NewReceiverServerRegistry(&messageReceiver{})), gossip.WithAddress(myPort), gossip.WithPeers(othersPort), gossip.WithStaticFanoutSize(2))
 
 	sp, err := protocols.NewGServer(node)
 	if err != nil {
@@ -79,7 +80,7 @@ func main() {
 
 		// This example is using oneToMany, in order to test OneToAll, replace
 		// othersPort with nil
-		_, err = node.AsyncGossip(context.Background(), payloadBytes, othersPort, "DisplayMessage")
+		_, err = node.Gossip(context.Background(), payloadBytes, othersPort, DisplayMessage)
 		if err != nil {
 			log.Println(err)
 		}
@@ -99,15 +100,4 @@ func createMsg(content, sender string) ([]byte, error) {
 		return nil, fmt.Errorf("could not marshal proto message: %v", err)
 	}
 	return msgBytes, nil
-}
-
-// pickPort picks and returns the first available port from port pool
-func pickPort(portPool []string) (net.Listener, error) {
-	for _, port := range portPool {
-		ln, err := net.Listen("tcp4", port)
-		if err == nil {
-			return ln, nil
-		}
-	}
-	return nil, fmt.Errorf("could not find an empty port in the given pool")
 }

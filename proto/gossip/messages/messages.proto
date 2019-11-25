@@ -24,15 +24,19 @@ message HashMessage {
   Socket senderSocket = 2;
 }
 
+message EventProcessRequest {
+  bytes Event = 1;
+  uint32  EngineID = 2;
+  string  SenderID = 3;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 // 2 testing messages + rpc service to be deleted later
 
 service MessageReceiver {
-  rpc AsyncQueue (GossipMessage) returns (GossipReply) {}
-  rpc SyncQueue  (GossipMessage) returns (GossipReply) {}
-  rpc StreamAsyncQueue (stream GossipMessage) returns (stream GossipReply) {}
-  rpc StreamSyncQueue  (stream GossipMessage) returns (stream GossipReply) {}
+  rpc QueueService (GossipMessage) returns (GossipReply) {}
+  rpc StreamQueueService (stream GossipMessage) returns (stream GossipReply) {}
 }
 
 message GossipReply {

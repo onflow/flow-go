@@ -1,4 +1,4 @@
-package gossip
+package util
 
 import (
 	"testing"
@@ -42,14 +42,50 @@ func TestComputeHash(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		res1, err := computeHash(tc.msg)
+		res1, err := ComputeHash(tc.msg)
 		require.Nil(err, "non-nil error")
 		// testing if hash generated properly
 		assert.Equal(string(tc.expectedHash), string(res1))
 		tc.msg.Payload = tc.modification
 		// testing if hash changes after modifying payload
-		res2, err := computeHash(tc.msg)
+		res2, err := ComputeHash(tc.msg)
 		require.Nil(err, "non-nil error")
 		assert.NotEqual(string(res2), string(res1))
 	}
+}
+
+func TestRandomSubSet(t *testing.T) {
+	peers := []string{
+		"Wyatt",
+		"Jayden",
+		"John",
+		"Owen",
+		"Dylan",
+		"Luke",
+		"Gabriel",
+		"Anthony",
+		"Isaac",
+		"Grayson",
+		"Jack",
+		"Julian",
+		"Levi",
+		"Christopher",
+		"Joshua",
+		"Andrew",
+		"Lincoln",
+	}
+
+	for i := 1; i < len(peers)/2; i++ {
+		subset, err := RandomSubSet(peers, i)
+		require.Nil(t, err)
+		require.Len(t, subset, i)
+	}
+}
+
+func generateGossipMessage(payloadBytes []byte, recipients []string, msgType uint64) (*messages.GossipMessage, error) {
+	return &messages.GossipMessage{
+		Payload:     payloadBytes,
+		MessageType: msgType,
+		Recipients:  recipients,
+	}, nil
 }
