@@ -1,3 +1,5 @@
+//revive:disable
+
 package sema
 
 import (
@@ -1621,6 +1623,22 @@ type Member struct {
 
 // NewCheckedMember panics if the member declaration is invalid.
 func NewCheckedMember(member *Member) *Member {
+
+	if member.DeclarationKind == common.DeclarationKindUnknown {
+		panic(fmt.Sprintf(
+			"member `%s.%s` has unknown declaration kind",
+			member.ContainerType,
+			member.Identifier.Identifier,
+		))
+	}
+
+	if member.Access == ast.AccessNotSpecified {
+		panic(fmt.Sprintf(
+			"member `%s.%s` has unspecified access",
+			member.ContainerType,
+			member.Identifier.Identifier,
+		))
+	}
 
 	if invokableType, ok := member.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()

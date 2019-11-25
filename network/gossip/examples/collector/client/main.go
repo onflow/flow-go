@@ -8,14 +8,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/examples/collector"
-	"github.com/dapperlabs/flow-go/network/gossip/protocols"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/collection"
 )
@@ -62,8 +64,8 @@ func main() {
 func PutKey(key string) error {
 	serverAddress := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
-	config := gossip.NewNodeConfig(colReg, "127.0.0.1:50004", serverAddress, 2, 10)
-	node := gossip.NewNode(config)
+
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithRegistry(colReg), gossip.WithAddress("127.0.0.1:50004"), gossip.WithPeers(serverAddress), gossip.WithStaticFanoutSize(2))
 
 	sp, err := protocols.NewGServer(node)
 	if err != nil {
@@ -76,7 +78,7 @@ func PutKey(key string) error {
 		return err
 	}
 
-	_, err = node.SyncGossip(context.Background(), subRequest, serverAddress, "SubmitTransaction")
+	_, err = node.Gossip(context.Background(), subRequest, serverAddress, collection.SubmitTransaction)
 	if err != nil {
 		return fmt.Errorf("could not reach some servers: %v", err)
 	}
@@ -89,8 +91,7 @@ func CheckKey(key string) error {
 	storageAddrs := []string{"127.0.0.1:50000", "127.0.0.1:50001", "127.0.0.1:50002"}
 
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
-	config := gossip.NewNodeConfig(colReg, "127.0.0.1:50004", storageAddrs, 2, 10)
-	node := gossip.NewNode(config)
+	node := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithRegistry(colReg), gossip.WithAddress("127.0.0.1:50004"), gossip.WithPeers(storageAddrs), gossip.WithStaticFanoutSize(2))
 	sp, err := protocols.NewGServer(node)
 	if err != nil {
 		log.Fatalf("could not start network server: %v", err)
@@ -100,8 +101,8 @@ func CheckKey(key string) error {
 	if err != nil {
 		return err
 	}
+	responses, err := node.Gossip(context.Background(), getRequest, storageAddrs, collection.GetTransaction)
 
-	responses, err := node.SyncGossip(context.Background(), getRequest, storageAddrs, "GetTransaction")
 	// check responses if they contain the specified key
 	for _, resp := range responses {
 		getResp, err := ExtractGetResp(resp.GetResponseByte())
@@ -146,7 +147,7 @@ func GenerateGetTransactionRequest(text string) ([]byte, error) {
 	return byteRequest, nil
 }
 
-// A Good Unmarshalling example
+// A Good unmarshalling example
 
 // ExtractGetResp decodes a byte response into its original type and returns it
 func ExtractGetResp(byteResponse []byte) (*collection.GetTransactionResponse, error) {

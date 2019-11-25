@@ -18,7 +18,7 @@ func TestRuntimeLogger(t *testing.T) {
 	})
 
 	script := []byte(`
-		fun main() {
+		pub fun main() {
 			log("elephant ears")
 		}
 	`)

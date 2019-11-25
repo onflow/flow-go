@@ -121,9 +121,8 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	if isOptionalResult {
 		return &OptionalType{Type: returnType}
-	} else {
-		return returnType
 	}
+	return returnType
 }
 
 func (checker *Checker) checkConstructorInvocationWithResourceResult(

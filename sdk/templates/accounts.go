@@ -24,7 +24,7 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
-		fun main() {
+		pub fun main() {
 			let publicKeys: [[Int]] = %s
 			let code: [Int]? = %s
 			createAccount(publicKeys, code)
@@ -39,7 +39,7 @@ func UpdateAccountCode(code []byte) []byte {
 	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
+		pub fun main(account: Account) {
 			let code = %s
 			updateAccountCode(account.address, code)
 		}
@@ -58,7 +58,7 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 	publicKeyStr := languageEncodeBytes(accountKeyBytes)
 
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
+		pub fun main(account: Account) {
 			let key = %s
 			addAccountKey(account.address, key)
 		}
@@ -70,7 +70,7 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 // RemoveAccountKey generates a script that removes a key from an account.
 func RemoveAccountKey(index int) []byte {
 	script := fmt.Sprintf(`
-		fun main(account: Account) {
+		pub fun main(account: Account) {
 			let index = %d
 			removeAccountKey(account.address, index)
 		}

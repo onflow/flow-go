@@ -14,7 +14,7 @@ func TestCheckNever(t *testing.T) {
 
 	_, err := ParseAndCheckWithOptions(t,
 		`
-            fun test(): Int {
+            pub fun test(): Int {
                 return panic("XXX")
             }
         `,

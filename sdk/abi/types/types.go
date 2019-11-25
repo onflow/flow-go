@@ -1,11 +1,15 @@
 package types
 
+// revive:disable:redefines-builtin-id
+
 import "encoding/json"
 
 type Type interface {
 	//isType()
 	Name() string
 }
+
+// revive:enable
 
 type isAType struct{}
 

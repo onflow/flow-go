@@ -29,6 +29,15 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#declaration.
 	VisitDeclaration(ctx *DeclarationContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#transactionDeclaration.
+	VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#prepare.
+	VisitPrepare(ctx *PrepareContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#execute.
+	VisitExecute(ctx *ExecuteContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#importDeclaration.
 	VisitImportDeclaration(ctx *ImportDeclarationContext) interface{}
 
@@ -46,6 +55,9 @@ type CadenceVisitor interface {
 
 	// Visit a parse tree produced by CadenceParser#field.
 	VisitField(ctx *FieldContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#fields.
+	VisitFields(ctx *FieldsContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
@@ -173,8 +185,8 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#nilCoalescingExpression.
 	VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#failableDowncastingExpression.
-	VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{}
+	// Visit a parse tree produced by CadenceParser#castingExpression.
+	VisitCastingExpression(ctx *CastingExpressionContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#concatenatingExpression.
 	VisitConcatenatingExpression(ctx *ConcatenatingExpressionContext) interface{}
@@ -211,6 +223,9 @@ type CadenceVisitor interface {
 
 	// Visit a parse tree produced by CadenceParser#unaryOp.
 	VisitUnaryOp(ctx *UnaryOpContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#castingOp.
+	VisitCastingOp(ctx *CastingOpContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#primaryExpressionStart.
 	VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{}

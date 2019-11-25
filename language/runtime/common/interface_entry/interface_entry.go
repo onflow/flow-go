@@ -1,4 +1,4 @@
-package interface_entry
+package interfaceentry
 
 import (
 	"unsafe"

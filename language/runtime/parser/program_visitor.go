@@ -126,6 +126,9 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	case ctx.Priv() != nil:
 		return ast.AccessPrivate
 
+	case ctx.Auth() != nil:
+		return ast.AccessAuthorized
+
 	case ctx.Pub() != nil:
 		return ast.AccessPublic
 
@@ -161,7 +164,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		length := len(bytes)
 		if length%2 == 1 {
 			bytes = append([]byte{'0'}, bytes...)
-			length += 1
+			length++
 		}
 
 		address := make([]byte, hex.DecodedLen(length))
@@ -191,6 +194,60 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		},
 		LocationPos: locationPos,
 	}
+}
+
+func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var fields []*ast.FieldDeclaration
+	fieldsCtx := ctx.Fields()
+	if fieldsCtx != nil {
+		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
+	}
+
+	var preConditions []*ast.Condition
+	preConditionsCtx := ctx.PreConditions()
+	if preConditionsCtx != nil {
+		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var postConditions []*ast.Condition
+	postConditionsCtx := ctx.PostConditions()
+	if postConditionsCtx != nil {
+		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+	}
+
+	var prepareFunction *ast.SpecialFunctionDeclaration
+	prepareCtx := ctx.Prepare()
+	if prepareCtx != nil {
+		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+	}
+
+	var executeBlock *ast.Block
+	executeCtx := ctx.Execute()
+	if executeCtx != nil {
+		executeBlock = executeCtx.Accept(v).(*ast.Block)
+	}
+
+	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+
+	return &ast.TransactionDeclaration{
+		Fields:         fields,
+		Prepare:        prepareFunction,
+		PreConditions:  preConditions,
+		Execute:        executeBlock,
+		PostConditions: postConditions,
+		Range: ast.Range{
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		},
+	}
+}
+
+func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
+	return ctx.SpecialFunctionDeclaration().Accept(v)
+}
+
+func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
+	return ctx.Block().Accept(v)
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
@@ -303,6 +360,18 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 		Functions:             functions,
 		CompositeDeclarations: compositeDeclarations,
 	}
+}
+
+func (v *ProgramVisitor) VisitFields(ctx *FieldsContext) interface{} {
+	fieldsCtx := ctx.AllField()
+
+	fields := make([]*ast.FieldDeclaration, len(fieldsCtx))
+
+	for i, fieldCtx := range ctx.AllField() {
+		fields[i] = fieldCtx.Accept(v).(*ast.FieldDeclaration)
+	}
+
+	return fields
 }
 
 func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
@@ -795,7 +864,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 	}
 	leftExpression := leftExpressionResult.(ast.Expression)
 
-	failableDowncastExpression, leftIsFailableDownCast := leftExpression.(*ast.FailableDowncastExpression)
+	castingExpression, leftIsCasting := leftExpression.(*ast.CastingExpression)
 
 	var typeAnnotation *ast.TypeAnnotation
 	typeAnnotationContext := ctx.TypeAnnotation()
@@ -831,8 +900,8 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		SecondValue:    rightExpression,
 	}
 
-	if leftIsFailableDownCast {
-		failableDowncastExpression.ParentVariableDeclaration = variableDeclaration
+	if leftIsCasting {
+		castingExpression.ParentVariableDeclaration = variableDeclaration
 	}
 
 	return variableDeclaration
@@ -1082,7 +1151,7 @@ func (v *ProgramVisitor) VisitRelationalExpression(ctx *RelationalExpressionCont
 func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressionContext) interface{} {
 	// NOTE: right associative
 
-	left := ctx.FailableDowncastingExpression().Accept(v)
+	left := ctx.CastingExpression().Accept(v)
 	if left == nil {
 		return nil
 	}
@@ -1102,17 +1171,19 @@ func (v *ProgramVisitor) VisitNilCoalescingExpression(ctx *NilCoalescingExpressi
 	}
 }
 
-func (v *ProgramVisitor) VisitFailableDowncastingExpression(ctx *FailableDowncastingExpressionContext) interface{} {
+func (v *ProgramVisitor) VisitCastingExpression(ctx *CastingExpressionContext) interface{} {
 	typeAnnotationContext := ctx.TypeAnnotation()
 	if typeAnnotationContext == nil {
 		return ctx.ConcatenatingExpression().Accept(v)
 	}
 
-	expression := ctx.FailableDowncastingExpression().Accept(v).(ast.Expression)
+	expression := ctx.CastingExpression().Accept(v).(ast.Expression)
 	typeAnnotation := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
+	operation := ctx.CastingOp().Accept(v).(ast.Operation)
 
-	return &ast.FailableDowncastExpression{
+	return &ast.CastingExpression{
 		Expression:     expression,
+		Operation:      operation,
 		TypeAnnotation: typeAnnotation,
 	}
 }
@@ -1744,6 +1815,19 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 		LabelStartPos: labelStartPos,
 		LabelEndPos:   labelEndPos,
 		Expression:    expression,
+	}
+}
+
+func (v *ProgramVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
+	switch {
+	case ctx.Casting() != nil:
+		return ast.OperationCast
+
+	case ctx.FailableCasting() != nil:
+		return ast.OperationFailableCast
+
+	default:
+		panic(errors.NewUnreachableError())
 	}
 }
 

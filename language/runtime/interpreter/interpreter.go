@@ -11,7 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	//revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	//revive:enable
 )
 
 type controlReturn interface {
@@ -848,7 +850,9 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 				FlatMap(func(value interface{}) Trampoline {
 					if _, ok := value.(loopBreak); ok {
 						return Done{}
+						// revive:disable:empty-block
 					} else if _, ok := value.(loopContinue); ok {
+						// revive:enable
 						// NO-OP
 					} else if functionReturn, ok := value.(functionReturn); ok {
 						return Done{Result: functionReturn}
@@ -1432,9 +1436,8 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 
 			if expression.Optional {
 				return SomeValue{Value: resultValue}
-			} else {
-				return resultValue
 			}
+			return resultValue
 		})
 }
 
@@ -1470,9 +1473,8 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression *ast.Condi
 
 			if value {
 				return expression.Then.Accept(interpreter).(Trampoline)
-			} else {
-				return expression.Else.Accept(interpreter).(Trampoline)
 			}
+			return expression.Else.Accept(interpreter).(Trampoline)
 		})
 }
 
@@ -2177,6 +2179,11 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		})
 }
 
+func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
+	// TODO: implement transaction interpretation
+	panic(" not implemented")
+}
+
 func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	interpreter.declareEventConstructor(declaration)
 
@@ -2228,19 +2235,30 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 		})
 }
 
-func (interpreter *Interpreter) VisitFailableDowncastExpression(expression *ast.FailableDowncastExpression) ast.Repr {
+func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingExpression) ast.Repr {
 	return expression.Expression.Accept(interpreter).(Trampoline).
 		Map(func(result interface{}) interface{} {
 			value := result.(Value)
 
-			anyValue := value.(AnyValue)
-			expectedType := interpreter.Checker.Elaboration.FailableDowncastingTypes[expression]
+			expectedType := interpreter.Checker.Elaboration.CastingTargetTypes[expression]
 
-			if !sema.IsSubType(anyValue.Type, expectedType) {
-				return NilValue{}
+			switch expression.Operation {
+			case ast.OperationFailableCast:
+				anyValue := value.(AnyValue)
+
+				if !sema.IsSubType(anyValue.Type, expectedType) {
+					return NilValue{}
+				}
+
+				return SomeValue{Value: anyValue.Value}
+
+			case ast.OperationCast:
+				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
+				return interpreter.convertAndBox(value, staticValueType, expectedType)
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
-
-			return SomeValue{Value: anyValue.Value}
 		})
 }
 

@@ -72,15 +72,15 @@ func TestRuntimeImport(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	importedScript := []byte(`
-       fun answer(): Int {
-           return 42
-		}
+      pub fun answer(): Int {
+          return 42
+      }
 	`)
 
 	script := []byte(`
        import "imported"
 
-       fun main(): Int {
+       pub fun main(): Int {
            let answer = answer()
            if answer != 42 {
                panic("?!")
@@ -110,7 +110,7 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(): Int {
+       pub fun main(): Int {
            return 42
 		}
 	`)
@@ -130,10 +130,10 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(account: Account): Int {
-           log(account.address)
-           return 42
-		}
+      pub fun main(account: Account): Int {
+          log(account.address)
+          return 42
+      }
 	`)
 
 	var loggedMessage string
@@ -165,7 +165,7 @@ func TestRuntimeStorage(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[Int])
 
            account.storage[Int] = 42
@@ -211,14 +211,14 @@ func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[[String]])
            account.storage[[String]] = []
        }
 	`)
 
 	script2 := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[[String]])
            account.storage[[String]] = ["A", "B"]
        }
@@ -263,14 +263,14 @@ func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[{String: Int}])
            account.storage[{String: Int}] = {}
        }
 	`)
 
 	script2 := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[{String: Int}])
            account.storage[{String: Int}] = {"A": 1, "B": 2}
        }
@@ -318,14 +318,15 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	container := []byte(`
-       resource Container {
-           let values: [Int]
+       pub resource Container {
+           pub let values: [Int]
+
            init() {
                self.values = []
            }
        }
 
-       fun createContainer(): <-Container {
+       pub fun createContainer(): <-Container {
            return <-create Container()
        }
 	`)
@@ -333,7 +334,7 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	script1 := []byte(`
 	   import "container"
 
-       fun main(account: Account): Int {
+       pub fun main(account: Account): Int {
            var container: <-Container? <- createContainer()
            account.storage[Container] <-> container
            destroy container
@@ -346,7 +347,7 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	script2 := []byte(`
 	   import "container"
 
-       fun main(account: Account): [Int] {
+       pub fun main(account: Account): [Int] {
           let ref = account.storage[&Container] ?? panic("no container")
           let length = ref.values.length
           ref.values.append(1)
@@ -358,7 +359,7 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	script3 := []byte(`
 	   import "container"
 
-       fun main(account: Account): [Int] {
+       pub fun main(account: Account): [Int] {
           let ref = account.storage[&Container] ?? panic("no container")
           let length = ref.values.length
           ref.values.append(2)
@@ -412,8 +413,9 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	deepThought := []byte(`
-       struct DeepThought {
-           fun answer(): Int {
+       pub struct DeepThought {
+
+           pub fun answer(): Int {
                return 42
            }
        }
@@ -422,7 +424,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	script1 := []byte(`
 	   import "deep-thought"
 
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            account.storage[DeepThought] = DeepThought()
 
            log(account.storage[DeepThought])
@@ -432,7 +434,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	script2 := []byte(`
 	   import "deep-thought"
 
-       fun main(account: Account): Int {
+       pub fun main(account: Account): Int {
            log(account.storage[DeepThought])
 
            let computer = account.storage[DeepThought]
@@ -482,13 +484,13 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      account.storage[Int] = 42
 	  }
 	`)
 
 	script2 := []byte(`
-	  fun main(account: Account): Int {
+	  pub fun main(account: Account): Int {
 	      return account.storage[Int] ?? panic("stored value is nil")
 	  }
 	`)
@@ -530,20 +532,20 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 
 	imported := []byte(`
       // function must have arguments
-      fun x(x: Int) {}
+      pub fun x(x: Int) {}
 
       // invocation must be in composite
-      struct Y {
-        fun x() {
-          x(x: 1)
-        }
+      pub struct Y {
+          pub fun x() {
+              x(x: 1)
+          }
       }
     `)
 
 	script1 := []byte(`
       import Y from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
 	      account.storage[Y] = Y()
 	  }
     `)
@@ -551,7 +553,7 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 	script2 := []byte(`
       import Y from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           let y = account.storage[Y] ?? panic("stored value is nil")
           y.x()
       }
@@ -592,13 +594,13 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource R {
-        fun x() {
-          log("x!")
-        }
+      pub resource R {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -606,7 +608,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	script1 := []byte(`
       import R, createR from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -619,7 +621,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	script2 := []byte(`
       import R from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           let ref = &account.storage[R] as R
           ref.x()
       }
@@ -671,13 +673,13 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource R {
-        fun x() {
-          log("x!")
-        }
+      pub resource R {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -685,7 +687,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	script1 := []byte(`
       import R, createR from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -698,12 +700,12 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
     `)
 
 	script2 := []byte(`
-	 import R from "imported"
+	  import R from "imported"
 
-	 fun main(account: Account) {
-	     let ref = account.storage[&R] ?? panic("no R ref")
-	     ref.x()
-	 }
+	  pub fun main(account: Account) {
+	      let ref = account.storage[&R] ?? panic("no R ref")
+	      ref.x()
+	  }
 	`)
 
 	storedValues := map[string][]byte{}
@@ -752,21 +754,21 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported1 := []byte(`
-      resource interface RI {
-        fun x()
+      pub resource interface RI {
+          pub fun x()
       }
     `)
 
 	imported2 := []byte(`
       import RI from "imported1"
 
-      resource R: RI {
-        fun x() {
-          log("x!")
-        }
+      pub resource R: RI {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -775,7 +777,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R, createR from "imported2"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -795,7 +797,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R from "imported2"
 
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      let ref = account.storage[&RI] ?? panic("no RI ref")
 	      ref.x()
 	  }
@@ -848,7 +850,7 @@ func TestParseAndCheckProgram(t *testing.T) {
 	t.Run("ValidProgram", func(t *testing.T) {
 		runtime := NewInterpreterRuntime()
 
-		script := []byte("fun test(): Int { return 42 }")
+		script := []byte("pub fun test(): Int { return 42 }")
 		runtimeInterface := &testRuntimeInterface{}
 
 		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
@@ -868,7 +870,7 @@ func TestParseAndCheckProgram(t *testing.T) {
 	t.Run("InvalidSemantics", func(t *testing.T) {
 		runtime := NewInterpreterRuntime()
 
-		script := []byte(`let a: Int = "b"`)
+		script := []byte(`pub let a: Int = "b"`)
 		runtimeInterface := &testRuntimeInterface{}
 
 		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
@@ -881,7 +883,7 @@ func TestRuntimeSyntaxError(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-      fun main(account: Account): String {
+      pub fun main(account: Account): String {
           return "Hello World!
       }
 	`)
@@ -902,14 +904,15 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource X {
-          var x: Int
+      pub resource X {
+          pub(set) var x: Int
+
           init() {
               self.x = 0
           }
       }
 
-      fun createX(): <-X {
+      pub fun createX(): <-X {
           return <-create X()
       }
     `)
@@ -917,7 +920,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	script1 := []byte(`
 	  import X, createX from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var x: <-X? <- createX()
           account.storage[X] <-> x
           destroy x
@@ -930,7 +933,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	script2 := []byte(`
 	  import X from "imported"
 
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      let ref = &account.storage[X] as X
           log(ref.x)
 	  }

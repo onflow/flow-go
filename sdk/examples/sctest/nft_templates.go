@@ -16,7 +16,7 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	template := `
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let tokenA <- createNFT(id: %d)
 
 			let collection: <-NFTCollection <- createCollection()
@@ -42,7 +42,7 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
@@ -62,7 +62,7 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
@@ -81,7 +81,7 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		fun main() {
+		pub fun main() {
 			let acct = getAccount("%s")
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
 
@@ -100,7 +100,7 @@ func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int)
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		fun main() {
+		pub fun main() {
 			let acct = getAccount("%s")
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
 
