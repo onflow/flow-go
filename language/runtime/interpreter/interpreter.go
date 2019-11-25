@@ -2238,8 +2238,12 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	prepareFunction := declaration.Prepare.FunctionDeclaration.ToExpression()
-	prepareFunctionType := transactionType.Prepare.FunctionType
+	var prepareFunction *ast.FunctionExpression
+	var prepareFunctionType *sema.FunctionType
+	if declaration.Prepare != nil {
+		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
+		prepareFunctionType = transactionType.Prepare.FunctionType
+	}
 
 	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
 	executeFunctionType := &sema.FunctionType{
@@ -2262,12 +2266,20 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 
 			transactionScope := interpreter.activations.CurrentOrNew()
 
-			prepare := newInterpretedFunction(
-				interpreter,
-				prepareFunction,
-				prepareFunctionType,
-				transactionScope,
-			)
+			var entryPoint Trampoline
+
+			if prepareFunction != nil {
+				prepare := newInterpretedFunction(
+					interpreter,
+					prepareFunction,
+					prepareFunctionType,
+					transactionScope,
+				)
+
+				entryPoint = prepare.invoke(arguments, location)
+			} else {
+				entryPoint = interpreter.visitStatements(beforeStatements)
+			}
 
 			execute := newInterpretedFunction(
 				interpreter,
@@ -2276,10 +2288,7 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 				transactionScope,
 			)
 
-			return prepare.invoke(arguments, location).
-				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitStatements(beforeStatements)
-				}).
+			return entryPoint.
 				FlatMap(func(_ interface{}) Trampoline {
 					return interpreter.visitConditions(declaration.PreConditions)
 				}).
