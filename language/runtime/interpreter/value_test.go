@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 func TestToExpression(t *testing.T) {
@@ -28,3 +31,43 @@ func TestToExpression(t *testing.T) {
 	testValue(BoolValue(true))(ToValue(true))
 	testValue(BoolValue(false))(ToValue(false))
 }
+
+func TestOwnerNewArray(t *testing.T) {
+
+	oldOwner := "1"
+
+	value := &CompositeValue{
+		Location:   utils.TestLocation,
+		Identifier: "Test",
+		Kind:       common.CompositeKindStructure,
+		Owner:      oldOwner,
+	}
+
+	assert.Equal(t, oldOwner, value.GetOwner())
+
+	array := NewArrayValueUnownedNonCopying(value)
+
+	assert.Equal(t, "", value.GetOwner())
+	assert.Equal(t, "", array.GetOwner())
+}
+
+func TestSetOwnerArray(t *testing.T) {
+
+	oldOwner := "1"
+	newOwner := "2"
+
+	value := &CompositeValue{
+		Location:   utils.TestLocation,
+		Identifier: "Test",
+		Kind:       common.CompositeKindStructure,
+		Owner:      oldOwner,
+	}
+
+	array := NewArrayValueUnownedNonCopying(value)
+
+	array.SetOwner(newOwner)
+
+	assert.Equal(t, array.GetOwner(), newOwner)
+	assert.Equal(t, value.GetOwner(), newOwner)
+}
+
