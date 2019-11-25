@@ -9,8 +9,7 @@ import {LanguageClient} from "vscode-languageclient";
 import {getConfig, handleConfigChanges, Config} from "./config";
 import {startServer} from "./language-server";
 import {registerCommands} from "./commands";
-import {createTracing} from "trace_events";
-import {createTerminal} from "./emulator";
+import {createTerminal} from "./terminal";
 
 // The container for all data relevant to the extension.
 export type Extension = {

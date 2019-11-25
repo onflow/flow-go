@@ -32,7 +32,6 @@ const startEmulator = (ext: Extension) => async () => {
         return;
     }
 
-    terminal.sendText(`${ext.config.flowCommand} init`);
-    terminal.sendText(`${ext.config.flowCommand} emulator start`);
+    terminal.sendText(`${ext.config.flowCommand} emulator start --init`);
     terminal.show();
 };
