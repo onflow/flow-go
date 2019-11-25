@@ -5,13 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"io"
+	"net"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/peer"
-	"io"
-	"net"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
 // Compile time verification that GRPCUnderlay implements the two interfaces
@@ -70,6 +72,7 @@ func (u *GRPCUnderlay) Stop() error {
 	if u.grpcServer == nil {
 		return errors.New(" GRPC Server set to nil ")
 	}
+
 	u.grpcServer.GracefulStop()
 	return nil
 }
