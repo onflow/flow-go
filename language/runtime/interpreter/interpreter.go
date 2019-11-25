@@ -2198,6 +2198,13 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
+	interpreter.declareTransactionFunction(declaration)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
+}
+
+func (interpreter *Interpreter) declareTransactionFunction(declaration *ast.TransactionDeclaration) {
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
 	transactionType := interpreter.Checker.Elaboration.TransactionDeclarationTypes[declaration]
@@ -2263,8 +2270,6 @@ func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.Tra
 	)
 
 	interpreter.transactions = append(interpreter.transactions, transactionFunction)
-
-	return Done{}
 }
 
 func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
