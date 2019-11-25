@@ -616,7 +616,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 	interpreter.activations.PushCurrent()
 
 	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(functionBlock)
+		interpreter.rewritePostConditions(functionBlock.PostConditions)
 
 	return interpreter.visitStatements(beforeStatements).
 		FlatMap(func(_ interface{}) Trampoline {
@@ -653,15 +653,15 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 		})
 }
 
-func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.FunctionBlock) (
+func (interpreter *Interpreter) rewritePostConditions(postConditions []*ast.Condition) (
 	beforeStatements []ast.Statement,
 	rewrittenPostConditions []*ast.Condition,
 ) {
 	beforeExtractor := NewBeforeExtractor()
 
-	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
+	rewrittenPostConditions = make([]*ast.Condition, len(postConditions))
 
-	for i, postCondition := range functionBlock.PostConditions {
+	for i, postCondition := range postConditions {
 
 		// copy condition and set expression to rewritten one
 		newPostCondition := *postCondition
