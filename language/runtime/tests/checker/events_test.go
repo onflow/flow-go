@@ -113,7 +113,7 @@ func TestCheckEmitEvent(t *testing.T) {
 		_, err = ParseAndCheckWithOptions(t, `
 			import Transfer from "imported"
 
-			fun test() {
+			pub fun test() {
 				emit Transfer(to: 1, from: 2)
 			}
 			`,

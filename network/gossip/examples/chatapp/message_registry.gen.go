@@ -4,17 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/protobuf/proto"
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
+	proto "github.com/golang/protobuf/proto"
+)
 
-	"github.com/dapperlabs/flow-go/network/gossip"
+//go:generate stringer -type=registry.MessageType
+
+const (
+	DisplayMessage registry.MessageType = (iota + registry.DefaultTypes)
 )
 
 type ReceiverServerRegistry struct {
 	rs ReceiverServer
 }
 
-// To make sure the class complies with the gossip.Registry interface
-var _ gossip.Registry = (*ReceiverServerRegistry)(nil)
+// To make sure the class complies with the registry.Registry interface
+var _ registry.Registry = (*ReceiverServerRegistry)(nil)
 
 func NewReceiverServerRegistry(rs ReceiverServer) *ReceiverServerRegistry {
 	return &ReceiverServerRegistry{
@@ -41,14 +46,8 @@ func (rsr *ReceiverServerRegistry) DisplayMessage(ctx context.Context, payloadBy
 	return respByte, respErr
 }
 
-func (rsr *ReceiverServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	return map[uint64]gossip.HandleFunc{
-		0: rsr.DisplayMessage,
-	}
-}
-
-func (rsr *ReceiverServerRegistry) NameMapping() map[string]uint64 {
-	return map[string]uint64{
-		"DisplayMessage": 0,
+func (rsr *ReceiverServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	return map[registry.MessageType]registry.HandleFunc{
+		DisplayMessage: rsr.DisplayMessage,
 	}
 }

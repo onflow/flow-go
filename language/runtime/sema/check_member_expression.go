@@ -48,9 +48,8 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 
 	if isOptional {
 		return &OptionalType{Type: member.Type}
-	} else {
-		return member.Type
 	}
+	return member.Type
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *Member, isOptional bool) {
@@ -168,9 +167,6 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 
 		// Check access and report if inaccessible
 
-		// TODO: add option to checker to specify behaviour
-		//   for not-specified access modifier
-
 		if !checker.isReadableMember(member) {
 			checker.report(
 				&InvalidAccessError{
@@ -211,20 +207,11 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 }
 
 func (checker *Checker) isReadableMember(member *Member) bool {
-	// TODO: add option to checker to specify behaviour
-	//   for not-specified access modifier
-
-	return member.Access == ast.AccessNotSpecified ||
-		member.Access == ast.AccessPublic ||
-		member.Access == ast.AccessPublicSettable ||
+	return checker.isReadableAccess(member.Access) ||
 		checker.containerTypes[member.ContainerType]
 }
 
 func (checker *Checker) isWriteableMember(member *Member) bool {
-	// TODO: add option to checker to specify behaviour
-	//   for not-specified access modifier
-
-	return member.Access == ast.AccessNotSpecified ||
-		member.Access == ast.AccessPublicSettable ||
+	return checker.isWriteableAccess(member.Access) ||
 		checker.containerTypes[member.ContainerType]
 }

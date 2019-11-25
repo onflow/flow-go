@@ -14,13 +14,13 @@ import (
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
-	fun main(account: Account) {
+	pub fun main(account: Account) {
 		account.storage[Int] = (account.storage[Int] ?? 0) + 2
 	}
 `
 
 const sampleCall = `
-	fun main(): Int {
+	pub fun main(): Int {
 		return getAccount("%s").storage[Int] ?? 0
 	}
 `

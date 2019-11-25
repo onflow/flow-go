@@ -44,7 +44,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			fun main() {
+			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
 			}
 		`)
@@ -95,7 +95,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			fun main() {
+			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
 			}
 		`)
@@ -133,7 +133,7 @@ func TestEventEmitted(t *testing.T) {
 		accountScript := []byte(`
 			event MyEvent(x: Int, y: Int)
 
-			fun emitMyEvent(x: Int, y: Int) {
+			pub fun emitMyEvent(x: Int, y: Int) {
 				emit MyEvent(x: x, y: y)
 			}
 		`)
@@ -146,7 +146,7 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
-			fun main() {
+			pub fun main() {
 				emitMyEvent(x: 1, y: 2)
 			}
 		`, address.Hex()))

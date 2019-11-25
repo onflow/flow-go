@@ -57,6 +57,7 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 			declaration.Location,
 			WithPredeclaredValues(checker.PredeclaredValues),
 			WithPredeclaredTypes(checker.PredeclaredTypes),
+			WithAccessCheckMode(checker.AccessCheckMode),
 		)
 		if err == nil {
 			checker.ImportCheckers[declaration.Location.ID()] = importChecker
@@ -199,7 +200,7 @@ func (checker *Checker) handleMissingImports(missing map[ast.Identifier]bool, im
 }
 
 func (checker *Checker) importVariables(
-	valueActivations *ValueActivations,
+	valueActivations *VariableActivations,
 	requestedIdentifiers []ast.Identifier,
 	availableVariables map[string]*Variable,
 	filter func(name string) bool,
@@ -239,23 +240,19 @@ func (checker *Checker) importVariables(
 			continue
 		}
 
-		// If the value can't be imported due to restricted access,
-		// report an error, but still import the
+		// If the variable can't be imported due to restricted access,
+		// report an error, but still import the variable
 
-		// TODO: handle not-specified access modifier
+		access := variable.Access
 
-		// TODO: add option to checker to specify behaviour
-		//   for not-specified access modifier
+		if !checker.isReadableAccess(access) {
 
-		if variable.Access == ast.AccessPrivate {
-
-			// If the value was imported explicitly,
-			// report an error
+			// If the variable was imported explicitly, report an error
 
 			if identifier, ok := explicitlyImported[name]; ok {
 				invalidAccessed[identifier] = variable
 			} else {
-				// Don't import not explicitly imported private values
+				// Don't import not explicitly imported inaccessible variable
 				continue
 			}
 		}
@@ -263,7 +260,8 @@ func (checker *Checker) importVariables(
 		_, err := valueActivations.Declare(
 			name,
 			variable.Type,
-			variable.Access,
+			// TODO: implies that type is "re-exported"
+			access,
 			variable.DeclarationKind,
 			// TODO:
 			ast.Position{},

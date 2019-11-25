@@ -38,25 +38,144 @@ func (types StandardLibraryTypes) ToTypeDeclarations() map[string]sema.TypeDecla
 
 // AccountType
 
-var AccountType = StandardLibraryType{
-	Name: "Account",
-	Type: &sema.CompositeType{
+var AccountType = func() StandardLibraryType {
+	accountType := &sema.CompositeType{
 		Kind:       common.CompositeKindStructure,
 		Identifier: "Account",
-		Members: map[string]*sema.Member{
-			"address": {
-				Type: &sema.StringType{},
-			},
-			"storage": {
-				Type: &sema.StorageType{},
-			},
-		},
-	},
-	Kind: common.DeclarationKindStructure,
-}
+		Members:    map[string]*sema.Member{},
+	}
+
+	accountType.Members["address"] =
+		sema.NewCheckedMember(&sema.Member{
+			ContainerType:   accountType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: "address"},
+			Type:            &sema.StringType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	accountType.Members["storage"] =
+		sema.NewCheckedMember(&sema.Member{
+			ContainerType:   accountType,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: "storage"},
+			Type:            &sema.StorageType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	return StandardLibraryType{
+		Name: accountType.Identifier,
+		Type: accountType,
+		Kind: common.DeclarationKindStructure,
+	}
+}()
 
 // BuiltinTypes
 
 var BuiltinTypes = StandardLibraryTypes{
 	AccountType,
+}
+
+// built-in event types
+
+var AccountCreatedEventType = sema.EventType{
+	Identifier: "AccountCreated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
+var AccountKeyAddedEventType = sema.EventType{
+	Identifier: "AccountKeyAdded",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountKeyRemovedEventType = sema.EventType{
+	Identifier: "AccountKeyRemoved",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountCodeUpdatedEventType = sema.EventType{
+	Identifier: "AccountCodeUpdated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "codeHash",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
 }

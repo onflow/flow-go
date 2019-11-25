@@ -901,7 +901,7 @@ func TestCheckInvalidUnaryCreateStruct(t *testing.T) {
 func TestCheckInvalidCreateImportedResource(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      resource R {}
+      pub resource R {}
 	`)
 
 	require.Nil(t, err)
@@ -910,7 +910,7 @@ func TestCheckInvalidCreateImportedResource(t *testing.T) {
 		`
           import R from "imported"
 
-          fun test() {
+          pub fun test() {
               destroy create R()
           }
         `,

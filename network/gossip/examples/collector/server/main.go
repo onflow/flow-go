@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/examples/collector"
-	"github.com/dapperlabs/flow-go/network/gossip/protocols"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
 	"github.com/dapperlabs/flow-go/proto/services/collection"
+	"github.com/rs/zerolog"
 )
 
 //A step by step on how to use gossip
@@ -33,8 +35,8 @@ func main() {
 	// Note: the gisp script should execute prior to the compile,
 	// as this step to proceed requires a _registry.gen.go version of .proto files
 	colReg := collection.NewCollectServiceServerRegistry(collector.NewCollector())
-	config := gossip.NewNodeConfig(colReg, myPort, othersPort, 0, 10)
-	collector := gossip.NewNode(config)
+
+	collector := gossip.NewNode(gossip.WithLogger(zerolog.New(ioutil.Discard)), gossip.WithRegistry(colReg), gossip.WithAddress(myPort), gossip.WithPeers(othersPort), gossip.WithStaticFanoutSize(2))
 
 	sp, err := protocols.NewGServer(collector)
 	if err != nil {

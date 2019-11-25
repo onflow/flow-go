@@ -20,6 +20,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
+		false,
 	)
 
 	// TODO: also check nested composite members
@@ -29,7 +30,7 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	// TODO: also check nested composite fields' type annotations
 
 	// NOTE: functions are checked separately
-	checker.checkFieldsAccess(declaration.Members.Fields)
+	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
@@ -319,14 +320,32 @@ func (checker *Checker) checkCompositeConformance(
 	}
 }
 
+// TODO: return proper error
 func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
+	// Check type
+
 	// TODO: subtype?
 	if !compositeMember.Type.Equal(interfaceMember.Type) {
 		return false
 	}
 
+	// Check variable kind
+
 	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
 		compositeMember.VariableKind != interfaceMember.VariableKind {
+
+		return false
+	}
+
+	// Check access
+
+	if compositeMember.Access == ast.AccessPrivate {
+		return false
+	}
+
+	if interfaceMember.DeclarationKind == common.DeclarationKindField &&
+		interfaceMember.Access != ast.AccessNotSpecified &&
+		compositeMember.Access.IsLessPermissiveThan(interfaceMember.Access) {
 
 		return false
 	}
@@ -565,6 +584,7 @@ func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
 	selfType *CompositeType,
 ) {
+	inResource := selfType.Kind == common.CompositeKindResource
 
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
@@ -580,9 +600,10 @@ func (checker *Checker) checkCompositeFunctions(
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:          true,
-					declareFunction:   false,
-					checkResourceLoss: true,
+					mustExit:                true,
+					declareFunction:         false,
+					checkResourceLoss:       true,
+					allowAuthAccessModifier: inResource,
 				},
 			)
 		}()
