@@ -37,6 +37,7 @@ export function activate(ctx: ExtensionContext) {
     ext.client = startServer(ext);
     ext.terminal = createTerminal(ext);
 
+
     registerCommands(ext);
 }
 

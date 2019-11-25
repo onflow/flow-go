@@ -25,9 +25,13 @@
         "category": "Cadence",
         "title": "Restart language server"
       }, {
-        "command": "cadence.startEmulator",
+        "command": "cadence.runEmulator",
         "category": "Cadence",
-        "title": "Start emulator"
+        "title": "Run emulator"
+      }, {
+        "command": "cadence.stopEmulator",
+        "category": "Cadence",
+        "title": "Stop emulator"
       }
     ],
     "configuration": {
