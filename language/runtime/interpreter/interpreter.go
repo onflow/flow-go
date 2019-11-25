@@ -2290,8 +2290,8 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
 			referenceValue := &ReferenceValue{
-				StorageIdentifier: storage.Identifier,
-				Key:               key,
+				TargetStorageIdentifier: storage.Identifier,
+				TargetKey:               key,
 			}
 
 			return Done{Result: referenceValue}

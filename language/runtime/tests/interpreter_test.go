@@ -5379,9 +5379,9 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 	require.Equal(t,
 		&interpreter.ReferenceValue{
-			StorageIdentifier: storageValue.Identifier,
+			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			Key: rType.String(),
+			TargetKey: rType.String(),
 		},
 		value,
 	)

@@ -1856,8 +1856,8 @@ func (v StorageValue) Copy() Value {
 // ReferenceValue
 
 type ReferenceValue struct {
-	StorageIdentifier string
-	Key               string
+	TargetStorageIdentifier string
+	TargetKey               string
 }
 
 func init() {
@@ -1868,14 +1868,14 @@ func (*ReferenceValue) isValue() {}
 
 func (v *ReferenceValue) Copy() Value {
 	return &ReferenceValue{
-		StorageIdentifier: v.StorageIdentifier,
-		Key:               v.Key,
+		TargetStorageIdentifier: v.TargetStorageIdentifier,
+		TargetKey:               v.TargetKey,
 	}
 }
 
 func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	switch referenced :=
-		interpreter.readStored(v.StorageIdentifier, v.Key).(type) {
+		interpreter.readStored(v.TargetStorageIdentifier, v.TargetKey).(type) {
 	case *SomeValue:
 		return referenced.Value
 	case NilValue:
