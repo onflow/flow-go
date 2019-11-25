@@ -857,7 +857,7 @@ func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, co
 	checker.checkResourceFieldsInvalidated(containerTypeIdentifier, compositeType.Members)
 }
 
-// checkContainedResourcesInvalidated checks that all resource fields for a container
+// checkResourceFieldsInvalidated checks that all resource fields for a container
 // type are invalidated.
 //
 func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {

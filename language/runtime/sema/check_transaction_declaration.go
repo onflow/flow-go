@@ -158,7 +158,11 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	checker.visitStatements(executeFunction.FunctionBlock.Statements)
+	checker.visitFunctionBlock(
+		executeFunction.FunctionBlock,
+		NewTypeAnnotation(&VoidType{}),
+		true,
+	)
 }
 
 // visitTransactionPreConditions visits and checks the post-conditions of a transaction.
