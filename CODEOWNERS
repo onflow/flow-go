@@ -4,8 +4,8 @@
 /proto/services/collection/** @jordanschalm
 
 # Consensus Stream
-/cmd/consensus/** @AlexHentschel @awishformore
-/engine/consensus/** @AlexHentschel @awishformore
+/cmd/consensus/** @AlexHentschel @awishformore @zhangchiqing
+/engine/consensus/** @AlexHentschel @awishformore @zhangchiqing
 
 # Execution Stream
 /cmd/execution/** @turbolent @psiemens
@@ -22,7 +22,7 @@
 /module/chunking/** @ramtinms
 
 # Networking Stream
-/network/gossip/** @yhassanzadeh
+/network/** @yhassanzadeh @vishalchangraniaxiom
 
 # Cryptography Stream
 /crypto/** @tarakby
