@@ -12,6 +12,7 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/improbable-eng/grpc-web v0.11.0
@@ -25,6 +26,7 @@ require (
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
+	github.com/prometheus/client_golang v0.9.3
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/rivo/uniseg v0.1.0
