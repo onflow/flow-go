@@ -1841,7 +1841,7 @@ type InvalidTransactionFieldAccessModifierError struct {
 
 func (e *InvalidTransactionFieldAccessModifierError) Error() string {
 	return fmt.Sprintf(
-		"access modifier not required for transaction field `%s`",
+		"access modifier not allowed for transaction field `%s`",
 		e.Name,
 	)
 }
