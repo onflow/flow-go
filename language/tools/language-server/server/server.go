@@ -84,11 +84,15 @@ func (s Server) Initialize(
 		return nil, err
 	}
 
+	//var buf bytes.Buffer
+	//json.NewEncoder(&buf).Encode(params.Capabilities)
+
 	// TODO remove
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
-	})
+	//conn.LogMessage(&protocol.LogMessageParams{
+	//	Type: protocol.Info,
+	//	Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s\n%s",
+	//		conf.EmulatorAddr, conf.AccountAddr.String(), string(buf.Bytes())),
+	//})
 
 	// after initialization, indicate to the client which commands we support
 	go s.registerCommands(conn)
@@ -201,7 +205,7 @@ func (s Server) Hover(
 
 	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if occurrence == nil {
+	if occurrence == nil || occurrence.Origin == nil {
 		return nil, nil
 	}
 

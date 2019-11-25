@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -26,7 +27,7 @@ type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, 
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
 func (s Server) registerCommands(conn protocol.Conn) {
 	// Send a message to the client indicating which commands we support
-	err := conn.RegisterCapability(&protocol.RegistrationParams{
+	registration := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
 				ID:     "registerCommand",
@@ -41,12 +42,20 @@ func (s Server) registerCommands(conn protocol.Conn) {
 				},
 			},
 		},
-	})
-	if err != nil {
-		conn.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Warning,
-			Message: fmt.Sprintf("Failed to register command: %s", err.Error()),
-		})
+	}
+
+	retryAfter := time.Millisecond * 100
+	for i := 0; i < 10; i++ {
+		if err := conn.RegisterCapability(&registration); err == nil {
+			break
+		} else {
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to register command: %s", err.Error()),
+			})
+			time.Sleep(retryAfter)
+			retryAfter *= 2
+		}
 	}
 
 	// Register each command handler function in the server
