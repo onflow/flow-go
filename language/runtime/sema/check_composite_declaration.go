@@ -10,11 +10,27 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 
+	checker.containerTypes[compositeType] = true
+	defer func() {
+		checker.containerTypes[compositeType] = false
+	}()
+
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+		false,
+	)
+
 	// TODO: also check nested composite members
 
 	// TODO: also check nested composite members' identifiers
 
 	// TODO: also check nested composite fields' type annotations
+
+	// NOTE: functions are checked separately
+	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
@@ -128,22 +144,22 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		Identifier: identifier.Identifier,
 	}
 
-	err := checker.typeActivations.Declare(identifier, compositeType)
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		compositeType,
+		declaration.DeclarationKind(),
+		declaration.Access,
+	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            compositeType,
-			Pos:             &identifier.Pos,
-		},
+		variable,
 	)
 
 	conformances := checker.conformances(declaration)
 
 	members, origins := checker.membersAndOrigins(
+		compositeType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		true,
@@ -304,14 +320,32 @@ func (checker *Checker) checkCompositeConformance(
 	}
 }
 
+// TODO: return proper error
 func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
+	// Check type
+
 	// TODO: subtype?
 	if !compositeMember.Type.Equal(interfaceMember.Type) {
 		return false
 	}
 
+	// Check variable kind
+
 	if interfaceMember.VariableKind != ast.VariableKindNotSpecified &&
 		compositeMember.VariableKind != interfaceMember.VariableKind {
+
+		return false
+	}
+
+	// Check access
+
+	if compositeMember.Access == ast.AccessPrivate {
+		return false
+	}
+
+	if interfaceMember.DeclarationKind == common.DeclarationKindField &&
+		interfaceMember.Access != ast.AccessNotSpecified &&
+		compositeMember.Access.IsLessPermissiveThan(interfaceMember.Access) {
 
 		return false
 	}
@@ -354,6 +388,7 @@ func (checker *Checker) declareCompositeConstructor(
 
 	_, err := checker.valueActivations.DeclareFunction(
 		compositeDeclaration.Identifier,
+		compositeDeclaration.Access,
 		functionType,
 		argumentLabels,
 	)
@@ -361,6 +396,7 @@ func (checker *Checker) declareCompositeConstructor(
 }
 
 func (checker *Checker) membersAndOrigins(
+	containerType Type,
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
 	requireVariableKind bool,
@@ -383,8 +419,12 @@ func (checker *Checker) membersAndOrigins(
 		identifier := field.Identifier.Identifier
 
 		members[identifier] = &Member{
-			Type:         fieldType,
-			VariableKind: field.VariableKind,
+			ContainerType:   containerType,
+			Access:          field.Access,
+			Identifier:      field.Identifier,
+			DeclarationKind: common.DeclarationKindField,
+			Type:            fieldType,
+			VariableKind:    field.VariableKind,
 		}
 
 		origins[identifier] =
@@ -411,9 +451,13 @@ func (checker *Checker) membersAndOrigins(
 		identifier := function.Identifier.Identifier
 
 		members[identifier] = &Member{
-			Type:           functionType,
-			VariableKind:   ast.VariableKindConstant,
-			ArgumentLabels: argumentLabels,
+			ContainerType:   containerType,
+			Access:          function.Access,
+			Identifier:      function.Identifier,
+			DeclarationKind: common.DeclarationKindFunction,
+			Type:            functionType,
+			VariableKind:    ast.VariableKindConstant,
+			ArgumentLabels:  argumentLabels,
 		}
 
 		origins[identifier] =
@@ -514,14 +558,25 @@ func (checker *Checker) checkSpecialFunction(
 		checkResourceLoss,
 	)
 
-	if containerKind == ContainerKindInterface &&
-		specialFunction.FunctionBlock != nil {
+	switch containerKind {
+	case ContainerKindInterface:
+		if specialFunction.FunctionBlock != nil {
 
-		checker.checkInterfaceSpecialFunctionBlock(
-			specialFunction.FunctionBlock,
-			containerDeclarationKind,
-			specialFunction.DeclarationKind,
-		)
+			checker.checkInterfaceSpecialFunctionBlock(
+				specialFunction.FunctionBlock,
+				containerDeclarationKind,
+				specialFunction.DeclarationKind,
+			)
+		}
+
+	case ContainerKindComposite:
+		if specialFunction.FunctionBlock == nil {
+			checker.report(
+				&MissingFunctionBodyError{
+					Pos: specialFunction.EndPosition(),
+				},
+			)
+		}
 	}
 }
 
@@ -529,6 +584,7 @@ func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
 	selfType *CompositeType,
 ) {
+	inResource := selfType.Kind == common.CompositeKindResource
 
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
@@ -544,12 +600,21 @@ func (checker *Checker) checkCompositeFunctions(
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:          true,
-					declareFunction:   false,
-					checkResourceLoss: true,
+					mustExit:                true,
+					declareFunction:         false,
+					checkResourceLoss:       true,
+					allowAuthAccessModifier: inResource,
 				},
 			)
 		}()
+
+		if function.FunctionBlock == nil {
+			checker.report(
+				&MissingFunctionBodyError{
+					Pos: function.EndPosition(),
+				},
+			)
+		}
 	}
 }
 
@@ -562,6 +627,7 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 
 	self := &Variable{
 		Identifier:      SelfIdentifier,
+		Access:          ast.AccessPublic,
 		DeclarationKind: common.DeclarationKindSelf,
 		Type:            selfType,
 		IsConstant:      true,

@@ -28,6 +28,7 @@ func NewREPL(onError func(error), onResult func(interpreter.Value)) (*REPL, erro
 		REPLLocation{},
 		sema.WithPredeclaredValues(valueDeclarations),
 		sema.WithPredeclaredTypes(typeDeclarations),
+		sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 	)
 	if err != nil {
 		return nil, err

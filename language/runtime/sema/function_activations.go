@@ -17,6 +17,17 @@ type FunctionActivations struct {
 	activations []*FunctionActivation
 }
 
+func (a *FunctionActivations) IsLocal() bool {
+	currentFunctionDepth := -1
+
+	currentFunctionActivation := a.Current()
+	if currentFunctionActivation != nil {
+		currentFunctionDepth = currentFunctionActivation.ValueActivationDepth
+	}
+
+	return currentFunctionDepth > 0
+}
+
 func (a *FunctionActivations) EnterFunction(functionType *FunctionType, valueActivationDepth int) {
 	a.activations = append(a.activations,
 		&FunctionActivation{
@@ -47,11 +58,11 @@ func (a *FunctionActivations) Current() *FunctionActivation {
 }
 
 func (a *FunctionActivations) EnterLoop() {
-	a.Current().Loops += 1
+	a.Current().Loops++
 }
 
 func (a *FunctionActivations) LeaveLoop() {
-	a.Current().Loops -= 1
+	a.Current().Loops--
 }
 
 func (a *FunctionActivations) WithLoop(f func()) {

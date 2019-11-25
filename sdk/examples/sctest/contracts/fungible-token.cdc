@@ -81,6 +81,6 @@ pub resource Vault: Provider, Receiver {
 
 
 
-fun createVault(initialBalance: Int): <- Vault {
+pub fun createVault(initialBalance: Int): <- Vault {
     return <-create Vault(balance: initialBalance)
 }

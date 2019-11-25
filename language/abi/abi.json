@@ -1,0 +1,530 @@
+{
+  "$id": "https://www.withflow.org/cadence.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "The JSON Schema for Cadence",
+  "type": "object",
+  "properties": {
+    "imports": {
+      "type": "object",
+      "title": "Imported types (empty for now)"
+    },
+    "definitions": {
+      "type": "object",
+      "title": "Types definitions",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/definitions/function"
+          },
+          {
+            "$ref": "#/definitions/variable"
+          },
+          {
+            "$ref": "#/definitions/struct"
+          },
+          {
+            "$ref": "#/definitions/resource"
+          },
+          {
+            "$ref": "#/definitions/event"
+          }
+        ]
+      },
+      "propertyNames": {
+        "$ref": "#/definitions/namePattern"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "namePattern": {
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+    },
+    "function": {
+      "title": "Function",
+      "description": "A function declaration",
+      "type": "object",
+      "properties": {
+        "function": {
+          "type": "object",
+          "properties": {
+            "parameters": {
+              "title": "Function parameters",
+              "description": "The parameters of the function (optional; none if not given)",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/parameter"
+              }
+            },
+            "returnType": {
+              "$ref": "#/definitions/type"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "function"
+      ],
+      "additionalProperties": false
+    },
+    "parameter": {
+      "title": "Parameter",
+      "type": "object",
+      "properties": {
+        "label": {
+          "title": "Function parameter argument label",
+          "description": "The argument label for the function parameter (optional)",
+          "type": "string"
+        },
+        "name": {
+          "allOf": [
+            {
+              "title": "Function parameter name",
+              "description": "The name of the function parameter (required)",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        },
+        "type": {
+          "title": "Function parameter type",
+          "description": "The type of the function parameter (required)",
+          "$ref": "#/definitions/type"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "resourceParameter": {
+      "title": "Resource Parameter",
+      "type": "object",
+      "properties": {
+        "label": {
+          "title": "Function parameter argument label",
+          "description": "The argument label for the function parameter (optional)",
+          "type": "string"
+        },
+        "name": {
+          "allOf": [
+            {
+              "title": "Function parameter name",
+              "description": "The name of the function parameter (required)",
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        },
+        "type": {
+          "title": "Function parameter type",
+          "description": "The type of the function parameter (required)",
+          "$ref": "#/definitions/resourceType"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "variable": {
+      "type": "object",
+      "title": "A variable definition",
+      "properties": {
+        "variable": {
+          "$ref": "#/definitions/type"
+        },
+        "additionalProperties": false
+      },
+      "required": [
+        "variable"
+      ],
+      "additionalProperties": false
+    },
+    "struct": {
+      "type": "object",
+      "title": "Simple composite data type",
+      "properties": {
+        "struct": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/type"
+              },
+              "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+              }
+            },
+            "initializers": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/parameter"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "struct"
+      ],
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "title": "Resource, composite datatype with strictly-managed lifecycle",
+      "properties": {
+        "resource": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/resourceType"
+              },
+              "propertyNames": {
+                "$ref": "#/definitions/namePattern"
+              }
+            },
+            "initializers": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/resourceParameter"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "title": "An event composite type",
+      "properties": {
+        "event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/resourceParameter"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resourceReferenceType": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "allOf": [
+            {
+              "type": "string",
+              "not": {
+                "$ref": "#/definitions/builtinType"
+              }
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "type": {
+      "title": "Type",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/builtinType"
+        },
+        {
+          "$ref": "#/definitions/arrayType"
+        },
+        {
+          "$ref": "#/definitions/optionalType"
+        },
+        {
+          "$ref": "#/definitions/functionType"
+        },
+        {
+          "$ref": "#/definitions/dictionaryType"
+        },
+        {
+          "$ref": "#/definitions/structReferenceType"
+        }
+      ]
+    },
+    "resourceType": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/builtinType"
+        },
+        {
+          "$ref": "#/definitions/resourceReferenceType"
+        },
+        {
+          "$ref": "#/definitions/resourceArrayType"
+        },
+        {
+          "$ref": "#/definitions/resourceOptionalType"
+        },
+        {
+          "$ref": "#/definitions/functionType"
+        },
+        {
+          "$ref": "#/definitions/resourceDictionaryType"
+        },
+        {
+          "$ref": "#/definitions/structReferenceType"
+        }
+      ]
+    },
+    "optionalType": {
+      "title": "Optional type",
+      "type": "object",
+      "properties": {
+        "optional": {
+          "$ref": "#/definitions/type"
+        }
+      },
+      "required": [
+        "optional"
+      ],
+      "additionalProperties": false
+    },
+    "resourceOptionalType": {
+      "title": "Optional resource type",
+      "type": "object",
+      "properties": {
+        "optional": {
+          "$ref": "#/definitions/resourceType"
+        }
+      },
+      "required": [
+        "optional"
+      ],
+      "additionalProperties": false
+    },
+    "hashableType": {
+      "title": "Type that can be used as dictionary key",
+      "type": "string",
+      "enum": [
+        "String",
+        "Int",
+        "Bool"
+      ]
+    },
+    "builtinType": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/nonHashableType"
+        },
+        {
+          "$ref": "#/definitions/hashableType"
+        }
+      ]
+    },
+    "nonHashableType": {
+      "title": "Builtin Type",
+      "type": "string",
+      "enum": [
+        "Address",
+        "Any",
+        "Int8",
+        "Int16",
+        "Int32",
+        "Int64",
+        "UInt8",
+        "UInt16",
+        "UInt32",
+        "UInt64"
+      ],
+      "additionalProperties": false
+    },
+    "arrayType": {
+      "title": "Array Type",
+      "type": "object",
+      "properties": {
+        "array": {
+          "type": "object",
+          "properties": {
+            "of": {
+              "title": "Element Type",
+              "description": "The type of the elements (required)",
+              "$ref": "#/definitions/type"
+            },
+            "size": {
+              "title": "Array Size",
+              "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "array"
+      ],
+      "additionalProperties": false
+    },
+    "resourceArrayType": {
+      "title": "Resource Array Type",
+      "type": "object",
+      "properties": {
+        "array": {
+          "type": "object",
+          "properties": {
+            "of": {
+              "title": "Element Type",
+              "description": "The type of the elements (required)",
+              "$ref": "#/definitions/resourceType"
+            },
+            "size": {
+              "title": "Array Size",
+              "description": "The size of the constant array type (optional; the array is variable-sized if the property is not given)",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "array"
+      ],
+      "additionalProperties": false
+    },
+    "functionType": {
+      "title": "Function type",
+      "type": "object",
+      "properties": {
+        "function": {
+          "type": "object",
+          "properties": {
+            "parameters": {
+              "$type": {
+                "const": "array"
+              },
+              "items": {
+                "$ref": "#/definitions/type"
+              }
+            },
+            "returnType": {
+              "$ref": "#/definitions/type"
+            }
+          }
+        }
+      },
+      "required": [
+        "function"
+      ],
+      "additionalProperties": false
+    },
+    "dictionaryType": {
+      "title": "Dictionary Type",
+      "type": "object",
+      "properties": {
+        "dictionary": {
+          "properties": {
+            "keys": {
+              "title": "Key Type",
+              "description": "The key type (required)",
+              "$ref": "#/definitions/hashableType"
+            },
+            "values": {
+              "title": "Element Type",
+              "description": "The value type (required)",
+              "$ref": "#/definitions/type"
+            }
+          },
+          "required": [
+            "keys",
+            "values"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "dictionary"
+      ],
+      "additionalProperties": false
+    },
+    "resourceDictionaryType": {
+      "title": "Dictionary containing resources Type",
+      "type": "object",
+      "properties": {
+        "dictionary": {
+          "properties": {
+            "keys": {
+              "title": "Key Type",
+              "description": "The key type (required)",
+              "$ref": "#/definitions/hashableType"
+            },
+            "values": {
+              "title": "Element Type",
+              "description": "The value type (required)",
+              "$ref": "#/definitions/resourceType"
+            }
+          },
+          "required": [
+            "keys",
+            "values"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "dictionary"
+      ],
+      "additionalProperties": false
+    },
+    "structReferenceType": {
+      "title": "A composable struct type",
+      "type": "object",
+      "properties": {
+        "struct": {
+          "allOf": [
+            {
+              "type": "string",
+              "not": {
+                "$ref": "#/definitions/builtinType"
+              }
+            },
+            {
+              "$ref": "#/definitions/namePattern"
+            }
+          ]
+        }
+      },
+      "required": [
+        "struct"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

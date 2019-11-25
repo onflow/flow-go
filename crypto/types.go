@@ -1,5 +1,7 @@
 package crypto
 
+//revive:disable:var-naming
+
 // SigningAlgorithm is an identifier for a signing algorithm and curve.
 type SigningAlgorithm int
 

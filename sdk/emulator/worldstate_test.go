@@ -2,25 +2,25 @@ package emulator
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
-	fun main(account: Account) {
+	pub fun main(account: Account) {
 		account.storage[Int] = (account.storage[Int] ?? 0) + 2
 	}
 `
 
 const sampleCall = `
-	fun main(): Int {
+	pub fun main(): Int {
 		return getAccount("%s").storage[Int] ?? 0
 	}
 `
@@ -242,17 +242,17 @@ func TestQueryByVersion(t *testing.T) {
 	// Value at ws1 is 0
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws1)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(0), value)
+	assert.Equal(t, values.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws2)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(2), value)
+	assert.Equal(t, values.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws3)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(4), value)
+	assert.Equal(t, values.NewInt(4), value)
 
 	// Pending state does not change after call scripts/get transactions
 	assert.Equal(t, ws3, b.pendingWorldState.Hash())

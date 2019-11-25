@@ -25,6 +25,15 @@ type CadenceListener interface {
 	// EnterDeclaration is called when entering the declaration production.
 	EnterDeclaration(c *DeclarationContext)
 
+	// EnterTransactionDeclaration is called when entering the transactionDeclaration production.
+	EnterTransactionDeclaration(c *TransactionDeclarationContext)
+
+	// EnterPrepare is called when entering the prepare production.
+	EnterPrepare(c *PrepareContext)
+
+	// EnterExecute is called when entering the execute production.
+	EnterExecute(c *ExecuteContext)
+
 	// EnterImportDeclaration is called when entering the importDeclaration production.
 	EnterImportDeclaration(c *ImportDeclarationContext)
 
@@ -42,6 +51,9 @@ type CadenceListener interface {
 
 	// EnterField is called when entering the field production.
 	EnterField(c *FieldContext)
+
+	// EnterFields is called when entering the fields production.
+	EnterFields(c *FieldsContext)
 
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
@@ -169,8 +181,8 @@ type CadenceListener interface {
 	// EnterNilCoalescingExpression is called when entering the nilCoalescingExpression production.
 	EnterNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
-	// EnterFailableDowncastingExpression is called when entering the failableDowncastingExpression production.
-	EnterFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+	// EnterCastingExpression is called when entering the castingExpression production.
+	EnterCastingExpression(c *CastingExpressionContext)
 
 	// EnterConcatenatingExpression is called when entering the concatenatingExpression production.
 	EnterConcatenatingExpression(c *ConcatenatingExpressionContext)
@@ -207,6 +219,9 @@ type CadenceListener interface {
 
 	// EnterUnaryOp is called when entering the unaryOp production.
 	EnterUnaryOp(c *UnaryOpContext)
+
+	// EnterCastingOp is called when entering the castingOp production.
+	EnterCastingOp(c *CastingOpContext)
 
 	// EnterPrimaryExpressionStart is called when entering the primaryExpressionStart production.
 	EnterPrimaryExpressionStart(c *PrimaryExpressionStartContext)
@@ -310,6 +325,15 @@ type CadenceListener interface {
 	// ExitDeclaration is called when exiting the declaration production.
 	ExitDeclaration(c *DeclarationContext)
 
+	// ExitTransactionDeclaration is called when exiting the transactionDeclaration production.
+	ExitTransactionDeclaration(c *TransactionDeclarationContext)
+
+	// ExitPrepare is called when exiting the prepare production.
+	ExitPrepare(c *PrepareContext)
+
+	// ExitExecute is called when exiting the execute production.
+	ExitExecute(c *ExecuteContext)
+
 	// ExitImportDeclaration is called when exiting the importDeclaration production.
 	ExitImportDeclaration(c *ImportDeclarationContext)
 
@@ -327,6 +351,9 @@ type CadenceListener interface {
 
 	// ExitField is called when exiting the field production.
 	ExitField(c *FieldContext)
+
+	// ExitFields is called when exiting the fields production.
+	ExitFields(c *FieldsContext)
 
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
@@ -454,8 +481,8 @@ type CadenceListener interface {
 	// ExitNilCoalescingExpression is called when exiting the nilCoalescingExpression production.
 	ExitNilCoalescingExpression(c *NilCoalescingExpressionContext)
 
-	// ExitFailableDowncastingExpression is called when exiting the failableDowncastingExpression production.
-	ExitFailableDowncastingExpression(c *FailableDowncastingExpressionContext)
+	// ExitCastingExpression is called when exiting the castingExpression production.
+	ExitCastingExpression(c *CastingExpressionContext)
 
 	// ExitConcatenatingExpression is called when exiting the concatenatingExpression production.
 	ExitConcatenatingExpression(c *ConcatenatingExpressionContext)
@@ -492,6 +519,9 @@ type CadenceListener interface {
 
 	// ExitUnaryOp is called when exiting the unaryOp production.
 	ExitUnaryOp(c *UnaryOpContext)
+
+	// ExitCastingOp is called when exiting the castingOp production.
+	ExitCastingOp(c *CastingOpContext)
 
 	// ExitPrimaryExpressionStart is called when exiting the primaryExpressionStart production.
 	ExitPrimaryExpressionStart(c *PrimaryExpressionStartContext)

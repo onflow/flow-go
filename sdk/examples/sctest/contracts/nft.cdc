@@ -1,31 +1,27 @@
 
 
-resource interface INFT {
-
+pub resource interface INFT {
     // The unique ID that each NFT has
     pub let id: Int
-
-    init(newID: Int) {
-        pre {
-            newID > 0:
-                "NFT ID needs to be positive!"
-        }
-    }
 }
 
 pub resource NFT: INFT {
     pub let id: Int
 
     init(newID: Int) {
+        pre {
+            newID > 0:
+                "NFT ID must be positive!"
+        }
         self.id = newID
     }
 }
 
 // possibility for each account with NFTs to have a copy of this resource that they keep their NFTs in
-// they could send one NFT, multiple at a time, or potentially even send the entire collection in one go?
-resource interface INFTCollection {
+// they could send one NFT, multiple at a time, or potentially even send the entire collection in one go
+pub resource interface INFTCollection {
 
-    // variable size array of NFT conforming tokens
+    // dictionary of NFT conforming tokens
     pub var ownedNFTs: <-{Int: NFT}
 
     pub fun transfer(recipient: &NFTCollection, tokenID: Int) {
@@ -35,91 +31,80 @@ resource interface INFTCollection {
         }
     }
 
-    pub fun deposit(token: <-NFT?, id: Int): Void {
+    pub fun withdraw(tokenID: Int): <-NFT
+
+    pub fun deposit(token: <-NFT): Void {
         pre {
-            id >= 0:
+            token.id >= 0:
                 "ID cannot be negative"
         }
     }
 }
 
-resource NFTCollection: INFTCollection { 
-    // variable size array of NFT conforming tokens
+pub resource NFTCollection: INFTCollection {
+    // dictionary of NFT conforming tokens
     // NFT is a resource type with an `Int` ID field
     pub var ownedNFTs: <-{Int: NFT}
 
-    init(firstToken: <-NFT) {
-        self.ownedNFTs <- {firstToken.id: <-firstToken}
+    init () {
+        self.ownedNFTs = {}
     }
 
-    pub fun withdraw(tokenID: Int): <-NFT? {
-        return <-self.ownedNFTs.remove(key: tokenID)
+    // withdraw removes an NFT from the collection and moves it to the caller
+    pub fun withdraw(tokenID: Int): <-NFT {
+        let token <- self.ownedNFTs.remove(key: tokenID) ?? panic("missing NFT")
+            
+        return <-token
     }
 
-    pub fun deposit(token: <-NFT?, id: Int): Void {
-        var newToken <- token
+    // deposit takes a NFT and adds it to the collections dictionary
+    // and adds the ID to the id array
+    pub fun deposit(token: <-NFT): Void {
+        let id: Int = token.id
 
-        // add the new token to the array
-        // 
-        self.ownedNFTs[id] <-> newToken
+        // add the new token to the dictionary which removes the old one
+        let oldToken <- self.ownedNFTs[id] <- token
 
-        destroy newToken
+        destroy oldToken
     }
 
-    // takes a reference to another user's NFT collection,
+    // transfer takes a reference to another user's NFT collection,
     // takes the NFT out of this collection, and deposits it
     // in the reference's collection
     pub fun transfer(recipient: &NFTCollection, tokenID: Int): Void {
-        // remove the token from the array
-        let sentNFT: <-NFT? <- self.ownedNFTs.remove(key: tokenID)
+
+        // remove the token from the dictionary get the token from the optional
+        let token <- self.withdraw(tokenID: tokenID)
 
         // deposit it in the recipient's account
-        recipient.deposit(token: <-sentNFT, id: tokenID)
-
+        recipient.deposit(token: <-token)
     }
 
+    // idExists checks to see if a NFT with the given ID exists in the collection
     pub fun idExists(tokenID: Int): Bool {
-        var token: <-NFT? <- self.ownedNFTs.remove(key: tokenID)
-        var exists = false
+        return self.ownedNFTs[tokenID] != nil
+    }
 
-        if token != nil {
-            exists = true
-        }
-
-        self.ownedNFTs[tokenID] <-> token
-
-        destroy token
-
-        return exists
+    // getIDs returns an array of the IDs that are in the collection
+    pub fun getIDs(): [Int] {
+        return self.ownedNFTs.keys
     }
 
     destroy() {
         destroy self.ownedNFTs
     }
+
+    // createCollection returns a new collection resource to the caller
+    pub fun createCollection(): <-NFTCollection {
+        return <- create NFTCollection()
+    }
 }
 
-fun createNFT(id: Int): <-NFT {
+pub fun createNFT(id: Int): <-NFT {
     return <- create NFT(newID: id)
 }
 
-fun createCollection(token: <-NFT): <-NFTCollection {
-    return <- create NFTCollection(firstToken: <-token)
+pub fun createCollection(): <-NFTCollection {
+    return <- create NFTCollection()
 }
-
-
-// fun main() {
-
-//     let tokenA <- create NFT(newID: 1)
-//     let collectionA <- create NFTCollection(firstToken: <-tokenA)
-
-//     let tokenB <- create NFT(newID: 2)
-//     let collectionB <- create NFTCollection(firstToken: <-tokenB)
-
-//     collectionA.transfer(token: &collectionB as NFTCollection, tokenID: 1)
-
-
-//     destroy collectionA
-//     destroy collectionB
-
-// }
 

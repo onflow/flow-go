@@ -14,7 +14,7 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 
 	_, err := ParseAndCheckWithOptions(t,
 		`
-            fun test() {
+            pub fun test() {
                 assert(1 == 2)
             }
         `,
@@ -36,7 +36,7 @@ func TestCheckAssertWithMessage(t *testing.T) {
 
 	_, err := ParseAndCheckWithOptions(t,
 		`
-            fun test() {
+            pub fun test() {
                 assert(1 == 2, message: "test message")
             }
         `,

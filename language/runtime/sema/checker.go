@@ -3,8 +3,11 @@ package sema
 import (
 	"math/big"
 
+	"github.com/rivo/uniseg"
+
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 const ArgumentLabelNotRequired = "_"
@@ -34,13 +37,15 @@ type Checker struct {
 	PredeclaredValues       map[string]ValueDeclaration
 	PredeclaredTypes        map[string]TypeDeclaration
 	ImportCheckers          map[ast.LocationID]*Checker
+	AccessCheckMode         AccessCheckMode
 	errors                  []error
-	valueActivations        *ValueActivations
+	valueActivations        *VariableActivations
 	resources               *Resources
-	typeActivations         *TypeActivations
+	typeActivations         *VariableActivations
+	containerTypes          map[Type]bool
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
-	GlobalTypes             map[string]Type
+	GlobalTypes             map[string]*Variable
 	inCondition             bool
 	Occurrences             *Occurrences
 	variableOrigins         map[*Variable]*Origin
@@ -48,6 +53,8 @@ type Checker struct {
 	seenImports             map[ast.LocationID]bool
 	isChecked               bool
 	inCreate                bool
+	inInvocation            bool
+	inAssignment            bool
 	Elaboration             *Elaboration
 	currentMemberExpression *ast.MemberExpression
 }
@@ -79,6 +86,13 @@ func WithPredeclaredTypes(predeclaredTypes map[string]TypeDeclaration) Option {
 	}
 }
 
+func WithAccessCheckMode(mode AccessCheckMode) Option {
+	return func(checker *Checker) error {
+		checker.AccessCheckMode = mode
+		return nil
+	}
+}
+
 func NewChecker(program *ast.Program, location ast.Location, options ...Option) (*Checker, error) {
 
 	functionActivations := &FunctionActivations{}
@@ -87,17 +101,31 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 		0,
 	)
 
+	typeActivations := NewValueActivations()
+	for name, baseType := range baseTypes {
+		_, err := typeActivations.DeclareType(
+			ast.Identifier{Identifier: name},
+			baseType,
+			common.DeclarationKindType,
+			ast.AccessPublic,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	checker := &Checker{
 		Program:             program,
 		Location:            location,
 		ImportCheckers:      map[ast.LocationID]*Checker{},
 		valueActivations:    NewValueActivations(),
 		resources:           &Resources{},
-		typeActivations:     NewTypeActivations(baseTypes),
+		typeActivations:     typeActivations,
 		functionActivations: functionActivations,
 		GlobalValues:        map[string]*Variable{},
-		GlobalTypes:         map[string]Type{},
+		GlobalTypes:         map[string]*Variable{},
 		Occurrences:         NewOccurrences(),
+		containerTypes:      map[Type]bool{},
 		variableOrigins:     map[*Variable]*Origin{},
 		memberOrigins:       map[Type]map[string]*Origin{},
 		seenImports:         map[ast.LocationID]bool{},
@@ -132,6 +160,8 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
+		// TODO: add access to ValueDeclaration and use declaration's access instead here
+		ast.AccessPublic,
 		declaration.ValueDeclarationKind(),
 		declaration.ValueDeclarationPosition(),
 		declaration.ValueDeclarationIsConstant(),
@@ -148,22 +178,25 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	}
 
 	ty := declaration.TypeDeclarationType()
-	err := checker.typeActivations.Declare(identifier, ty)
-	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(
-		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			DeclarationKind: declaration.TypeDeclarationKind(),
-			IsConstant:      true,
-			Type:            ty,
-			Pos:             &identifier.Pos,
-		},
+	// TODO: add access to TypeDeclaration and use declaration's access instead here
+	const access = ast.AccessPublic
+
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		ty,
+		declaration.TypeDeclarationKind(),
+		access,
 	)
+	checker.report(err)
+	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 }
 
 func (checker *Checker) FindType(name string) Type {
-	return checker.typeActivations.Find(name)
+	variable := checker.typeActivations.Find(name)
+	if variable == nil {
+		return nil
+	}
+	return variable.Type
 }
 
 func (checker *Checker) IsChecked() bool {
@@ -256,7 +289,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 				},
 			)
 		}
-	} else {
+	} else if !valueType.IsInvalidType() {
 		if transfer.Operation == ast.TransferOperationMove {
 			checker.report(
 				&IncorrectTransferOperationError{
@@ -316,6 +349,15 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 					return true
 				}
 			}
+		}
+
+	case *ast.StringExpression:
+		unwrappedTargetType := UnwrapOptionalType(targetType)
+
+		if IsSubType(unwrappedTargetType, &CharacterType{}) {
+			checker.checkCharacterLiteral(typedExpression)
+
+			return true
 		}
 	}
 
@@ -463,7 +505,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case *ast.NominalType:
 		identifier := t.Identifier.Identifier
-		result := checker.typeActivations.Find(identifier)
+		result := checker.FindType(identifier)
 		if result == nil {
 			checker.report(
 				&NotDeclaredError{
@@ -513,6 +555,15 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 		keyType := checker.ConvertType(t.KeyType)
 		valueType := checker.ConvertType(t.ValueType)
 
+		if !IsValidDictionaryKeyType(keyType) {
+			checker.report(
+				&InvalidDictionaryKeyTypeError{
+					Type:  keyType,
+					Range: ast.NewRangeFromPositioned(t.KeyType),
+				},
+			)
+		}
+
 		return &DictionaryType{
 			KeyType:   keyType,
 			ValueType: valueType,
@@ -559,6 +610,7 @@ func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterLis
 
 	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
+
 		parameterTypeAnnotations[i] = &TypeAnnotation{
 			Move: parameter.TypeAnnotation.Move,
 			Type: convertedParameterType,
@@ -895,4 +947,142 @@ func (checker *Checker) checkPotentiallyUnevaluated(check TypeCheckFunc) Type {
 
 func (checker *Checker) ResetErrors() {
 	checker.errors = nil
+}
+
+func (checker *Checker) checkDeclarationAccessModifier(
+	access ast.Access,
+	declarationKind common.DeclarationKind,
+	startPos ast.Position,
+	isConstant bool,
+	allowAuth bool,
+) {
+	if checker.functionActivations.IsLocal() {
+
+		if access != ast.AccessNotSpecified {
+			checker.report(
+				&InvalidAccessModifierError{
+					Access:          access,
+					DeclarationKind: declarationKind,
+					Pos:             startPos,
+				},
+			)
+		}
+	} else {
+
+		switch access {
+		case ast.AccessPublicSettable:
+			// Public settable access for a constant is not sensible
+
+			if isConstant {
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessNotSpecified:
+			// In strict mode, access modifiers must be given
+
+			if checker.AccessCheckMode == AccessCheckModeStrict {
+				checker.report(
+					&MissingAccessModifierError{
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessAuthorized:
+			if !allowAuth {
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+		}
+	}
+}
+
+func (checker *Checker) checkFieldsAccessModifier(fields []*ast.FieldDeclaration) {
+	for _, field := range fields {
+		isConstant := field.VariableKind == ast.VariableKindConstant
+
+		checker.checkDeclarationAccessModifier(
+			field.Access,
+			field.DeclarationKind(),
+			field.StartPos,
+			isConstant,
+			true,
+		)
+	}
+}
+
+// checkCharacterLiteral checks that the string literal is a valid character,
+// i.e. it has exactly one grapheme cluster.
+//
+func (checker *Checker) checkCharacterLiteral(expression *ast.StringExpression) {
+	length := uniseg.GraphemeClusterCount(expression.Value)
+
+	if length == 1 {
+		return
+	}
+
+	checker.report(
+		&InvalidCharacterLiteralError{
+			Length: length,
+			Range:  ast.NewRangeFromPositioned(expression),
+		},
+	)
+}
+
+func (checker *Checker) isReadableAccess(access ast.Access) bool {
+	switch checker.AccessCheckMode {
+	case AccessCheckModeStrict,
+		AccessCheckModeNotSpecifiedRestricted:
+
+		return access == ast.AccessAuthorized ||
+			access == ast.AccessPublic ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNotSpecifiedUnrestricted:
+
+		return access == ast.AccessNotSpecified ||
+			access == ast.AccessAuthorized ||
+			access == ast.AccessPublic ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNone:
+		return true
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
+func (checker *Checker) isWriteableAccess(access ast.Access) bool {
+	switch checker.AccessCheckMode {
+	case AccessCheckModeStrict,
+		AccessCheckModeNotSpecifiedRestricted:
+
+		return access == ast.AccessAuthorized ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNotSpecifiedUnrestricted:
+
+		return access == ast.AccessNotSpecified ||
+			access == ast.AccessAuthorized ||
+			access == ast.AccessPublicSettable
+
+	case AccessCheckModeNone:
+		return true
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }

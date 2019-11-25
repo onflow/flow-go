@@ -12,6 +12,14 @@ func (checker *Checker) VisitVariableDeclaration(declaration *ast.VariableDeclar
 
 func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclaration, isOptionalBinding bool) {
 
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		declaration.IsConstant,
+		false,
+	)
+
 	// Determine the type of the initial value of the variable declaration
 	// and save it in the elaboration
 
@@ -158,14 +166,17 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	// Finally, declare the variable in the current value activation
 
+	identifier := declaration.Identifier.Identifier
+
 	variable, err := checker.valueActivations.Declare(
-		declaration.Identifier.Identifier,
+		identifier,
 		declarationType,
+		declaration.Access,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Pos,
 		declaration.IsConstant,
 		nil,
 	)
 	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
+	checker.recordVariableDeclarationOccurrence(identifier, variable)
 }

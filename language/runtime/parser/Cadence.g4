@@ -74,10 +74,29 @@ replDeclaration
 declaration
     : compositeDeclaration
     | interfaceDeclaration
-    | functionDeclaration[true]
+    | functionDeclaration
     | variableDeclaration
     | importDeclaration
     | eventDeclaration
+    | transactionDeclaration
+    ;
+
+transactionDeclaration
+    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `prepare` in semantic analysis to provide better error
+//
+prepare
+    : specialFunctionDeclaration
+    ;
+
+// NOTE: allow any identifier in parser, then check identifier
+// is `execute` in semantic analysis to provide better error
+//
+execute
+    : Identifier block
     ;
 
 importDeclaration
@@ -86,12 +105,14 @@ importDeclaration
 
 access
     : /* Not specified */
+    | Priv
+    | Auth
     | Pub
     | PubSet
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members[true] '}'
+    : access compositeKind identifier conformances '{' members '}'
     ;
 
 conformances
@@ -107,18 +128,22 @@ field
     : access variableKind? identifier ':' typeAnnotation
     ;
 
+fields
+    : (field ';'?)*
+    ;
+
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members[false] '}'
+    : access compositeKind Interface identifier '{' members '}'
     ;
 
-members[bool functionBlockRequired]
-    : (member[functionBlockRequired] ';'?)*
+members
+    : (member ';'?)*
     ;
 
-member[bool functionBlockRequired]
+member
     : field
-    | specialFunctionDeclaration[functionBlockRequired]
-    | functionDeclaration[functionBlockRequired]
+    | specialFunctionDeclaration
+    | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
     ;
@@ -136,16 +161,12 @@ compositeKind
 // NOTE: allow any identifier in parser, then check identifier is one of
 // the valid identifiers in the semantic analysis to provide better error
 //
-specialFunctionDeclaration[bool functionBlockRequired]
-    : identifier parameterList
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+specialFunctionDeclaration
+    : identifier parameterList functionBlock?
     ;
 
-functionDeclaration[bool functionBlockRequired]
-    : access Fun identifier parameterList (':' returnType=typeAnnotation)?
-      // only optional if parameter functionBlockRequired is false
-      b=functionBlock? { !$functionBlockRequired || $ctx.b != nil }?
+functionDeclaration
+    : access Fun identifier parameterList (':' returnType=typeAnnotation)? functionBlock?
     ;
 
 eventDeclaration
@@ -282,7 +303,7 @@ emitStatement
 // Variable declarations might be of the form `let|var <- x <- y`
 //
 variableDeclaration
-    : variableKind identifier (':' typeAnnotation)?
+    : access variableKind identifier (':' typeAnnotation)?
       leftTransfer=transfer leftExpression=expression
       (rightTransfer=transfer rightExpression=expression)?
     ;
@@ -339,12 +360,12 @@ relationalExpression
 
 nilCoalescingExpression
     // NOTE: right associative
-    : failableDowncastingExpression (NilCoalescing nilCoalescingExpression)?
+    : castingExpression (NilCoalescing nilCoalescingExpression)?
     ;
 
-failableDowncastingExpression
+castingExpression
     : concatenatingExpression
-    | failableDowncastingExpression FailableDowncasting typeAnnotation
+    | castingExpression castingOp typeAnnotation
     ;
 
 concatenatingExpression
@@ -438,9 +459,13 @@ Optional : '?' ;
 
 NilCoalescing : WS '??';
 
-Downcasting : 'as' ;
+Casting : 'as' ;
+FailableCasting : 'as?' ;
 
-FailableDowncasting : 'as?' ;
+castingOp
+    : Casting
+    | FailableCasting
+    ;
 
 primaryExpressionStart
     : identifierExpression
@@ -458,7 +483,7 @@ destroyExpression
     ;
 
 referenceExpression
-    : Ampersand expression Downcasting fullType
+    : Ampersand expression Casting fullType
     ;
 
 identifierExpression
@@ -483,7 +508,7 @@ expressionAccess
     ;
 
 memberAccess
-    : '.' identifier
+    : Optional? '.' identifier
     ;
 
 bracketExpression
@@ -564,6 +589,8 @@ Emit : 'emit' ;
 Pre : 'pre' ;
 Post : 'post' ;
 
+Priv : 'priv' ;
+Auth : 'auth' ;
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;
 

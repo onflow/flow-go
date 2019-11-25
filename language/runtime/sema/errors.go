@@ -381,6 +381,30 @@ func (e *InvalidAccessModifierError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
+// MissingAccessModifierError
+
+type MissingAccessModifierError struct {
+	DeclarationKind common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *MissingAccessModifierError) Error() string {
+	return fmt.Sprintf(
+		"missing access modifier for %s",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*MissingAccessModifierError) isSemanticError() {}
+
+func (e *MissingAccessModifierError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingAccessModifierError) EndPosition() ast.Position {
+	return e.Pos
+}
+
 // InvalidNameError
 
 type InvalidNameError struct {
@@ -894,21 +918,17 @@ func (e *MissingReturnStatementError) Error() string {
 
 func (*MissingReturnStatementError) isSemanticError() {}
 
-// UnsupportedExpressionError
+// UnsupportedOptionalChainingAssignmentError
 
-type UnsupportedExpressionError struct {
-	ExpressionKind common.ExpressionKind
+type UnsupportedOptionalChainingAssignmentError struct {
 	ast.Range
 }
 
-func (e *UnsupportedExpressionError) Error() string {
-	return fmt.Sprintf(
-		"%s expressions are not supported yet",
-		e.ExpressionKind.Name(),
-	)
+func (e *UnsupportedOptionalChainingAssignmentError) Error() string {
+	return "cannot assign to optional chaining expression"
 }
 
-func (*UnsupportedExpressionError) isSemanticError() {}
+func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 
 // MissingMoveAnnotationError
 
@@ -1508,18 +1528,38 @@ func (e *UninitializedUseError) EndPosition() ast.Position {
 // InvalidResourceArrayMemberError
 
 type InvalidResourceArrayMemberError struct {
-	Name string
+	Name            string
+	DeclarationKind common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidResourceArrayMemberError) Error() string {
 	return fmt.Sprintf(
-		"array member `%s` is not available for resource arrays",
+		"array %s `%s` is not available for resource arrays",
+		e.DeclarationKind.Name(),
 		e.Name,
 	)
 }
 
 func (*InvalidResourceArrayMemberError) isSemanticError() {}
+
+// InvalidResourceDictionaryMemberError
+
+type InvalidResourceDictionaryMemberError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidResourceDictionaryMemberError) Error() string {
+	return fmt.Sprintf(
+		"dictionary %s `%s` is not available for resource dictionaries",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
 // NonResourceReferenceError
 
@@ -1589,3 +1629,142 @@ func (e *InvalidAssignmentTargetError) Error() string {
 }
 
 func (*InvalidAssignmentTargetError) isSemanticError() {}
+
+// ResourceMethodBindingError
+
+type ResourceMethodBindingError struct {
+	ast.Range
+}
+
+func (e *ResourceMethodBindingError) Error() string {
+	return "cannot create bound method for resource"
+}
+
+func (*ResourceMethodBindingError) isSemanticError() {}
+
+// InvalidDictionaryKeyTypeError
+
+type InvalidDictionaryKeyTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidDictionaryKeyTypeError) Error() string {
+	return fmt.Sprintf(
+		"cannot use type as dictionary key type: `%s`",
+		e.Type,
+	)
+}
+
+func (*InvalidDictionaryKeyTypeError) isSemanticError() {}
+
+// MissingFunctionBodyError
+
+type MissingFunctionBodyError struct {
+	Pos ast.Position
+}
+
+func (e *MissingFunctionBodyError) Error() string {
+	return "missing function implementation"
+}
+
+func (*MissingFunctionBodyError) isSemanticError() {}
+
+func (e *MissingFunctionBodyError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *MissingFunctionBodyError) EndPosition() ast.Position {
+	return e.Pos
+}
+
+// InvalidOptionalChainingError
+
+type InvalidOptionalChainingError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidOptionalChainingError) Error() string {
+	return fmt.Sprintf(
+		"cannot use optional chaining: type '%s' is not optional",
+		e.Type,
+	)
+}
+
+func (*InvalidOptionalChainingError) isSemanticError() {}
+
+// InvalidAccessError
+
+type InvalidAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot access `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAccessError) isSemanticError() {}
+
+// InvalidAssignmentAccessError
+
+type InvalidAssignmentAccessError struct {
+	Name              string
+	RestrictingAccess ast.Access
+	DeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidAssignmentAccessError) Error() string {
+	return fmt.Sprintf(
+		"cannot assign to `%s`: %s has %s access",
+		e.Name,
+		e.DeclarationKind.Name(),
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (e *InvalidAssignmentAccessError) SecondaryError() string {
+	return fmt.Sprintf(
+		"has %s access. Consider making it publicly settable",
+		e.RestrictingAccess.Description(),
+	)
+}
+
+func (*InvalidAssignmentAccessError) isSemanticError() {}
+
+// InvalidCharacterLiteralError
+
+type InvalidCharacterLiteralError struct {
+	Length int
+	ast.Range
+}
+
+func (e *InvalidCharacterLiteralError) Error() string {
+	return fmt.Sprintf(
+		"character literal has invalid length: expected 1, got %d",
+		e.Length,
+	)
+}
+
+func (*InvalidCharacterLiteralError) isSemanticError() {}
+
+// InvalidFailableResourceDowncastOutsideOptionalBindingError
+
+type InvalidFailableResourceDowncastOutsideOptionalBindingError struct {
+	ast.Range
+}
+
+func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() string {
+	return "cannot failably downcast resource type outside of optional binding"
+}
+
+func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}

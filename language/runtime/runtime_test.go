@@ -2,59 +2,57 @@ package runtime
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type testRuntimeInterface struct {
-	resolveImport      func(Location) ([]byte, error)
-	getValue           func(controller, owner, key []byte) (value []byte, err error)
-	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys [][]byte, code []byte) (address flow.Address, err error)
-	addAccountKey      func(address flow.Address, publicKey []byte) error
-	removeAccountKey   func(address flow.Address, index int) (publicKey []byte, err error)
-	updateAccountCode  func(address flow.Address, code []byte) (err error)
-	getSigningAccounts func() []flow.Address
+	resolveImport      func(Location) (values.Bytes, error)
+	getValue           func(controller, owner, key values.Bytes) (value values.Bytes, err error)
+	setValue           func(controller, owner, key, value values.Bytes) (err error)
+	createAccount      func(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
+	addAccountKey      func(address values.Address, publicKey values.Bytes) error
+	removeAccountKey   func(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	updateAccountCode  func(address values.Address, code values.Bytes) (err error)
+	getSigningAccounts func() []values.Address
 	log                func(string)
-	emitEvent          func(flow.Event)
+	emitEvent          func(values.Event)
 }
 
-func (i *testRuntimeInterface) ResolveImport(location Location) ([]byte, error) {
+func (i *testRuntimeInterface) ResolveImport(location Location) (values.Bytes, error) {
 	return i.resolveImport(location)
 }
 
-func (i *testRuntimeInterface) GetValue(controller, owner, key []byte) (value []byte, err error) {
+func (i *testRuntimeInterface) GetValue(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 	return i.getValue(controller, owner, key)
 }
 
-func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (err error) {
+func (i *testRuntimeInterface) SetValue(controller, owner, key, value values.Bytes) (err error) {
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte, code []byte) (address flow.Address, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error) {
 	return i.createAccount(publicKeys, code)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(address flow.Address, publicKey []byte) error {
+func (i *testRuntimeInterface) AddAccountKey(address values.Address, publicKey values.Bytes) error {
 	return i.addAccountKey(address, publicKey)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address flow.Address, index int) (publicKey []byte, err error) {
+func (i *testRuntimeInterface) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
 	return i.removeAccountKey(address, index)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(address flow.Address, code []byte) (err error) {
+func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
 	return i.updateAccountCode(address, code)
 }
 
-func (i *testRuntimeInterface) GetSigningAccounts() []flow.Address {
+func (i *testRuntimeInterface) GetSigningAccounts() []values.Address {
 	if i.getSigningAccounts == nil {
 		return nil
 	}
@@ -65,7 +63,7 @@ func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
 }
 
-func (i *testRuntimeInterface) EmitEvent(event flow.Event) {
+func (i *testRuntimeInterface) EmitEvent(event values.Event) {
 	i.emitEvent(event)
 }
 
@@ -74,15 +72,15 @@ func TestRuntimeImport(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	importedScript := []byte(`
-       fun answer(): Int {
-           return 42
-		}
+      pub fun answer(): Int {
+          return 42
+      }
 	`)
 
 	script := []byte(`
        import "imported"
 
-       fun main(): Int {
+       pub fun main(): Int {
            let answer = answer()
            if answer != 42 {
                panic("?!")
@@ -92,7 +90,7 @@ func TestRuntimeImport(t *testing.T) {
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return importedScript, nil
@@ -104,7 +102,7 @@ func TestRuntimeImport(t *testing.T) {
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), value)
+	assert.Equal(t, values.NewInt(42), value)
 }
 
 func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
@@ -112,14 +110,14 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(): Int {
+       pub fun main(): Int {
            return 42
 		}
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -132,23 +130,23 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(account: Account): Int {
-           log(account.address)
-           return 42
-		}
+      pub fun main(account: Account): Int {
+          log(account.address)
+          return 42
+      }
 	`)
 
 	var loggedMessage string
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return nil, nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessage = message
@@ -158,7 +156,7 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
 
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), value)
+	assert.Equal(t, values.NewInt(42), value)
 	assert.Equal(t, `"2a00000000000000000000000000000000000000"`, loggedMessage)
 }
 
@@ -167,7 +165,7 @@ func TestRuntimeStorage(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            log(account.storage[Int])
 
            account.storage[Int] = 42
@@ -186,15 +184,15 @@ func TestRuntimeStorage(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -208,43 +206,203 @@ func TestRuntimeStorage(t *testing.T) {
 	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
 
-func TestRuntimeStorageMultipleTransactions(t *testing.T) {
+func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	script := []byte(`
-       fun main(account: Account) {
+	script1 := []byte(`
+       pub fun main(account: Account) {
+           log(account.storage[[String]])
+           account.storage[[String]] = []
+       }
+	`)
+
+	script2 := []byte(`
+       pub fun main(account: Account) {
            log(account.storage[[String]])
            account.storage[[String]] = ["A", "B"]
        }
 	`)
 
 	var loggedMessages []string
-	var storedValue []byte
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			return storedValue, nil
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
-			storedValue = value
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.Nil(t, err)
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
 
-	_, err = runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.Nil(t, err)
+	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
 
-	assert.Equal(t, []string{"nil", `["A", "B"]`}, loggedMessages)
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	assert.Equal(t, []string{"nil", `[]`, `[]`, `["A", "B"]`}, loggedMessages)
+}
+
+func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	script1 := []byte(`
+       pub fun main(account: Account) {
+           log(account.storage[{String: Int}])
+           account.storage[{String: Int}] = {}
+       }
+	`)
+
+	script2 := []byte(`
+       pub fun main(account: Account) {
+           log(account.storage[{String: Int}])
+           account.storage[{String: Int}] = {"A": 1, "B": 2}
+       }
+	`)
+
+	var loggedMessages []string
+	storedValues := map[string]values.Bytes{}
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	// Assertion is a bit more complex, because dictionary order is not deterministic
+	require.Len(t, loggedMessages, 4)
+	assert.Equal(t, []string{"nil", `{}`, `{}`}, loggedMessages[:3])
+	assert.Contains(t, []string{`{"A": 1, "B": 2}`, `{"B": 2, "A": 1}`}, loggedMessages[3])
+}
+
+func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	container := []byte(`
+       pub resource Container {
+           pub let values: [Int]
+
+           init() {
+               self.values = []
+           }
+       }
+
+       pub fun createContainer(): <-Container {
+           return <-create Container()
+       }
+	`)
+
+	script1 := []byte(`
+	   import "container"
+
+       pub fun main(account: Account): Int {
+           var container: <-Container? <- createContainer()
+           account.storage[Container] <-> container
+           destroy container
+           let ref = &account.storage[Container] as Container
+           account.storage[&Container] = ref
+           return ref.values.length
+       }
+	`)
+
+	script2 := []byte(`
+	   import "container"
+
+       pub fun main(account: Account): [Int] {
+          let ref = account.storage[&Container] ?? panic("no container")
+          let length = ref.values.length
+          ref.values.append(1)
+          let length2 = ref.values.length
+          return [length, length2]
+       }
+	`)
+
+	script3 := []byte(`
+	   import "container"
+
+       pub fun main(account: Account): [Int] {
+          let ref = account.storage[&Container] ?? panic("no container")
+          let length = ref.values.length
+          ref.values.append(2)
+          let length2 = ref.values.length
+          return [length, length2]
+       }
+	`)
+
+	var loggedMessages []string
+	storedValues := map[string]values.Bytes{}
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			switch location {
+			case StringLocation("container"):
+				return container, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
+	require.Nil(t, err)
+
+	_, err = runtime.ExecuteScript(script3, runtimeInterface, nil)
+	require.Nil(t, err)
 }
 
 // TestRuntimeStorageMultipleTransactionsStructures tests a function call
@@ -255,8 +413,9 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	deepThought := []byte(`
-       struct DeepThought {
-           fun answer(): Int {
+       pub struct DeepThought {
+
+           pub fun answer(): Int {
                return 42
            }
        }
@@ -265,7 +424,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	script1 := []byte(`
 	   import "deep-thought"
 
-       fun main(account: Account) {
+       pub fun main(account: Account) {
            account.storage[DeepThought] = DeepThought()
 
            log(account.storage[DeepThought])
@@ -275,7 +434,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	script2 := []byte(`
 	   import "deep-thought"
 
-       fun main(account: Account): Int {
+       pub fun main(account: Account): Int {
            log(account.storage[DeepThought])
 
            let computer = account.storage[DeepThought]
@@ -286,10 +445,10 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	`)
 
 	var loggedMessages []string
-	var storedValue []byte
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("deep-thought"):
 				return deepThought, nil
@@ -297,15 +456,15 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			return storedValue, nil
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
-			storedValue = value
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -317,7 +476,7 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 
 	answer, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(42), answer)
+	assert.Equal(t, values.NewInt(42), answer)
 }
 
 func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
@@ -325,30 +484,30 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      account.storage[Int] = 42
 	  }
 	`)
 
 	script2 := []byte(`
-	  fun main(account: Account): Int {
+	  pub fun main(account: Account): Int {
 	      return account.storage[Int] ?? panic("stored value is nil")
 	  }
 	`)
 
 	var loggedMessages []string
-	var storedValue []byte
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			return storedValue, nil
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
-			storedValue = value
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -359,7 +518,7 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	assert.Nil(t, err)
 
 	result, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
-	assert.Equal(t, big.NewInt(42), result)
+	assert.Equal(t, values.NewInt(42), result)
 	assert.Nil(t, err)
 }
 
@@ -373,20 +532,20 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 
 	imported := []byte(`
       // function must have arguments
-      fun x(x: Int) {}
+      pub fun x(x: Int) {}
 
       // invocation must be in composite
-      struct Y {
-        fun x() {
-          x(x: 1)
-        }
+      pub struct Y {
+          pub fun x() {
+              x(x: 1)
+          }
       }
     `)
 
 	script1 := []byte(`
       import Y from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
 	      account.storage[Y] = Y()
 	  }
     `)
@@ -394,16 +553,16 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 	script2 := []byte(`
       import Y from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           let y = account.storage[Y] ?? panic("stored value is nil")
           y.x()
       }
     `)
 
-	var storedValue []byte
+	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -411,15 +570,15 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
-			return storedValue, nil
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
-			storedValue = value
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -435,13 +594,13 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource R {
-        fun x() {
-          log("x!")
-        }
+      pub resource R {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -449,7 +608,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	script1 := []byte(`
       import R, createR from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -462,7 +621,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	script2 := []byte(`
       import R from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           let ref = &account.storage[R] as R
           ref.x()
       }
@@ -473,7 +632,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -481,15 +640,15 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -514,13 +673,13 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource R {
-        fun x() {
-          log("x!")
-        }
+      pub resource R {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -528,7 +687,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	script1 := []byte(`
       import R, createR from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -541,12 +700,12 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
     `)
 
 	script2 := []byte(`
-	 import R from "imported"
+	  import R from "imported"
 
-	 fun main(account: Account) {
-	     let ref = account.storage[&R] ?? panic("no R ref")
-	     ref.x()
-	 }
+	  pub fun main(account: Account) {
+	      let ref = account.storage[&R] ?? panic("no R ref")
+	      ref.x()
+	  }
 	`)
 
 	storedValues := map[string][]byte{}
@@ -554,7 +713,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -562,15 +721,15 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -595,21 +754,21 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported1 := []byte(`
-      resource interface RI {
-        fun x()
+      pub resource interface RI {
+          pub fun x()
       }
     `)
 
 	imported2 := []byte(`
       import RI from "imported1"
 
-      resource R: RI {
-        fun x() {
-          log("x!")
-        }
+      pub resource R: RI {
+          pub fun x() {
+              log("x!")
+          }
       }
 
-      fun createR(): <-R {
+      pub fun createR(): <-R {
           return <- create R()
       }
     `)
@@ -618,7 +777,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R, createR from "imported2"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var r: <-R? <- createR()
 	      account.storage[R] <-> r
           if r != nil {
@@ -638,7 +797,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R from "imported2"
 
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      let ref = account.storage[&RI] ?? panic("no RI ref")
 	      ref.x()
 	  }
@@ -649,7 +808,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported1"):
 				return imported1, nil
@@ -659,15 +818,15 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -691,7 +850,7 @@ func TestParseAndCheckProgram(t *testing.T) {
 	t.Run("ValidProgram", func(t *testing.T) {
 		runtime := NewInterpreterRuntime()
 
-		script := []byte("fun test(): Int { return 42 }")
+		script := []byte("pub fun test(): Int { return 42 }")
 		runtimeInterface := &testRuntimeInterface{}
 
 		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
@@ -711,7 +870,7 @@ func TestParseAndCheckProgram(t *testing.T) {
 	t.Run("InvalidSemantics", func(t *testing.T) {
 		runtime := NewInterpreterRuntime()
 
-		script := []byte(`let a: Int = "b"`)
+		script := []byte(`pub let a: Int = "b"`)
 		runtimeInterface := &testRuntimeInterface{}
 
 		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
@@ -724,14 +883,14 @@ func TestRuntimeSyntaxError(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-      fun main(account: Account): String {
+      pub fun main(account: Account): String {
           return "Hello World!
       }
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 	}
 
@@ -745,14 +904,15 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
-      resource X {
-          var x: Int
+      pub resource X {
+          pub(set) var x: Int
+
           init() {
               self.x = 0
           }
       }
 
-      fun createX(): <-X {
+      pub fun createX(): <-X {
           return <-create X()
       }
     `)
@@ -760,7 +920,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	script1 := []byte(`
 	  import X, createX from "imported"
 
-      fun main(account: Account) {
+      pub fun main(account: Account) {
           var x: <-X? <- createX()
           account.storage[X] <-> x
           destroy x
@@ -773,7 +933,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	script2 := []byte(`
 	  import X from "imported"
 
-	  fun main(account: Account) {
+	  pub fun main(account: Account) {
 	      let ref = &account.storage[X] as X
           log(ref.x)
 	  }
@@ -784,7 +944,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	var loggedMessages []string
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes []byte, err error) {
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -792,15 +952,15 @@ func TestRuntimeStorageChanges(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key []byte) (value []byte, err error) {
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value []byte) (err error) {
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []flow.Address {
-			return []flow.Address{[20]byte{42}}
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{[20]byte{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)

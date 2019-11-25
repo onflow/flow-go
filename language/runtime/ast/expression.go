@@ -44,9 +44,8 @@ func (e *BoolExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 func (e *BoolExpression) String() string {
 	if e.Value {
 		return "true"
-	} else {
-		return "false"
 	}
+	return "false"
 }
 
 // NilExpression
@@ -285,6 +284,7 @@ type AccessExpression interface {
 
 type MemberExpression struct {
 	Expression Expression
+	Optional   bool
 	Identifier Identifier
 }
 
@@ -309,9 +309,13 @@ func (e *MemberExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 }
 
 func (e *MemberExpression) String() string {
+	optional := ""
+	if e.Optional {
+		optional = "?"
+	}
 	return fmt.Sprintf(
-		"%s.%s",
-		e.Expression, e.Identifier,
+		"%s%s.%s",
+		e.Expression, optional, e.Identifier,
 	)
 }
 
@@ -496,37 +500,39 @@ func (e *FunctionExpression) EndPosition() Position {
 	return e.FunctionBlock.EndPosition()
 }
 
-// FailableDowncastExpression
+// CastingExpression
 
-type FailableDowncastExpression struct {
-	Expression     Expression
-	TypeAnnotation *TypeAnnotation
+type CastingExpression struct {
+	Expression                Expression
+	Operation                 Operation
+	TypeAnnotation            *TypeAnnotation
+	ParentVariableDeclaration *VariableDeclaration
 }
 
-func (*FailableDowncastExpression) isExpression() {}
+func (*CastingExpression) isExpression() {}
 
-func (*FailableDowncastExpression) isIfStatementTest() {}
+func (*CastingExpression) isIfStatementTest() {}
 
-func (e *FailableDowncastExpression) Accept(visitor Visitor) Repr {
+func (e *CastingExpression) Accept(visitor Visitor) Repr {
 	return e.AcceptExp(visitor)
 }
 
-func (e *FailableDowncastExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitFailableDowncastExpression(e)
+func (e *CastingExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitCastingExpression(e)
 }
 
-func (e *FailableDowncastExpression) String() string {
+func (e *CastingExpression) String() string {
 	return fmt.Sprintf(
-		"(%s as? %s)",
-		e.Expression, e.TypeAnnotation,
+		"(%s %s %s)",
+		e.Expression, e.Operation.Symbol(), e.TypeAnnotation,
 	)
 }
 
-func (e *FailableDowncastExpression) StartPosition() Position {
+func (e *CastingExpression) StartPosition() Position {
 	return e.Expression.StartPosition()
 }
 
-func (e *FailableDowncastExpression) EndPosition() Position {
+func (e *CastingExpression) EndPosition() Position {
 	return e.TypeAnnotation.EndPosition()
 }
 

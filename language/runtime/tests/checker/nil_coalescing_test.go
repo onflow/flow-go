@@ -170,8 +170,8 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
 
 	_, err := ParseAndCheckWithOptions(t,
 		`
-          let x: Int? = nil
-          let y = x ?? panic("nope")
+          pub let x: Int? = nil
+          pub let y = x ?? panic("nope")
         `,
 		ParseAndCheckOptions{
 			Options: []sema.Option{

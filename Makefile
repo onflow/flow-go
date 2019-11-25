@@ -19,7 +19,7 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
-	GO111MODULE=on go get golang.org/x/lint/golint@master; \
+	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master
 
 .PHONY: test
@@ -54,17 +54,20 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
+	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+	GO111MODULE=on mockgen -destination=sdk/emulator/events/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/events Store
+
 
 .PHONY: check-generated-code
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
-.PHONY: lint-sdk
-lint-sdk:
-	GO111MODULE=on golint ./sdk/emulator/... ./sdk/client/... ./sdk/templates/...
+.PHONY: lint
+lint:
+	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence.go ./...
 
 .PHONY: ci
-ci: install-tools generate check-generated-code lint-sdk test
+ci: install-tools generate check-generated-code lint test
 
 .PHONY: docker-ci
 docker-ci:

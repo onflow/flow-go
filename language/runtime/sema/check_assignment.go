@@ -101,6 +101,13 @@ func (checker *Checker) visitAssignmentValueType(
 	valueExpression ast.Expression,
 	valueType Type,
 ) (targetType Type) {
+
+	inAssignment := checker.inAssignment
+	checker.inAssignment = true
+	defer func() {
+		checker.inAssignment = inAssignment
+	}()
+
 	switch target := targetExpression.(type) {
 	case *ast.IdentifierExpression:
 		return checker.visitIdentifierExpressionAssignment(valueExpression, target, valueType)
@@ -190,10 +197,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	valueType Type,
 ) (memberType Type) {
 
-	member := checker.visitMember(target)
+	member, isOptional := checker.visitMember(target)
 
 	if member == nil {
 		return &InvalidType{}
+	}
+
+	if isOptional {
+		checker.report(
+			&UnsupportedOptionalChainingAssignmentError{
+				Range: ast.NewRangeFromPositioned(target),
+			},
+		)
 	}
 
 	// If the value type is valid, check that the value can be assigned to the member type
@@ -206,6 +221,17 @@ func (checker *Checker) visitMemberExpressionAssignment(
 				ExpectedType: member.Type,
 				ActualType:   valueType,
 				Range:        ast.NewRangeFromPositioned(valueExpression),
+			},
+		)
+	}
+
+	if !checker.isWriteableMember(member) {
+		checker.report(
+			&InvalidAssignmentAccessError{
+				Name:              member.Identifier.Identifier,
+				RestrictingAccess: member.Access,
+				DeclarationKind:   member.DeclarationKind,
+				Range:             ast.NewRangeFromPositioned(member.Identifier),
 			},
 		)
 	}

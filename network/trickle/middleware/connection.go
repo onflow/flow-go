@@ -128,8 +128,8 @@ RecvLoop:
 
 	// close and drain the inbound channel
 	close(c.inbound)
-	for range c.inbound {
-	}
+	// for range c.inbound {
+	// }
 }
 
 // send must be run in a goroutine and takes care of continuously sending
@@ -163,6 +163,6 @@ SendLoop:
 
 	// close and drain outbound channel
 	close(c.outbound)
-	for range c.outbound {
-	}
+	// for range c.outbound {
+	// }
 }
