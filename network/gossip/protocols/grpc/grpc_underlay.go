@@ -1,4 +1,4 @@
-// A GRPC implementation of the Underlay interface.
+// Package protocols is a GRPC implementation of the Underlay interface.
 package protocols
 
 import (
@@ -69,10 +69,9 @@ func (u *GRPCUnderlay) Start(address string) error {
 func (u *GRPCUnderlay) Stop() error {
 	if u.grpcServer == nil {
 		return errors.New(" GRPC Server set to nil ")
-	} else {
-		u.grpcServer.GracefulStop()
-		return nil
 	}
+	u.grpcServer.GracefulStop()
+	return nil
 }
 
 // QueueService is invoked remotely using the gRPC stub,
