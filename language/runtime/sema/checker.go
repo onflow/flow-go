@@ -792,7 +792,8 @@ func (checker *Checker) recordResourceInvalidation(
 	case *ast.DictionaryExpression:
 	case *ast.NilExpression:
 	case *ast.CastingExpression:
-
+	case *ast.BinaryExpression:
+		// (nil-coalescing)
 	default:
 		panic(errors.NewUnreachableError())
 	}
