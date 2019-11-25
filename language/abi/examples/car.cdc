@@ -1,25 +1,37 @@
+let speed = "maximum"
+
 struct Car {
     pub var model: String
     pub var make: String
     pub var trim: String
 
     init(fullname: String) {
-        //TODO
+        self.model = ""
+        self.make = ""
+        self.trim = ""
     }
 
+/*
     init(params: [String;3]) {
-        //TODO
+        self.model = params[0]
+        self.make = params[1]
+        self.trim = params[2]
     }
 
     init(model:String, make:String, trim:String) {
-        //TODO
+        self.model = model
+        self.make = make
+        self.trim = trim
     }
+    */
 }
 
 struct Fleet {
     pub let cars: [Car]
 
     init(car1: Car, car2: Car?, car3: Car?) {
-        //TODO
+        self.cars = [car1]
     }
 }
+
+event FenderBender(where place: String, cost: Int)

@@ -45,7 +45,7 @@
     "Fleet": {
       "struct": {
         "fields": {
-          "cards": {
+          "cars": {
             "array": {
               "of": {
                 "struct": "Car"

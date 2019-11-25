@@ -38,13 +38,13 @@ fun callAll(functions fs: [(():Any?)]): [Any?] {
     return ret
 }
 
-fun forEach(array: [Any?], f: ((Any?):Any?):[Any?] {
+fun forEach(array: [Any?], f: ((Any?):Any?)):[Any?] {
     var i = 0
 
     let ret: [Any?] = []
 
     while (i < array.length) {
-        ret.append(f(array[i])
+        ret.append(f(array[i]))
         i=i+1
     }
 

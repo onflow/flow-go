@@ -5,7 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 func TestConstantSizedType_String(t *testing.T) {
@@ -109,4 +111,71 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 	}
 
 	assert.False(t, ty.IsResourceType())
+}
+
+func Test_exportability(t *testing.T) {
+
+	t.Run("structs", func(t *testing.T) {
+		ty := &CompositeType{
+			Location:     nil,
+			Identifier:   "foo",
+			Kind:         common.CompositeKindStructure,
+			Conformances: nil,
+			Members: map[string]*Member{
+				"fieldA": {
+					ContainerType: nil,
+					Access:        0,
+					Identifier: ast.Identifier{
+						Identifier: "fieldA",
+						Pos:        ast.Position{},
+					},
+					Type:            &IntType{},
+					DeclarationKind: 0,
+					VariableKind:    ast.VariableKindVariable,
+					ArgumentLabels:  nil,
+				},
+			},
+			ConstructorParameterTypeAnnotations: nil,
+		}
+
+		ex := ty.Export()
+
+		assert.IsType(t, types.Struct{}, ex)
+	})
+
+	t.Run("string", func(t *testing.T) {
+
+		ty := &StringType{}
+
+		ex := ty.Export()
+
+		assert.IsType(t, types.String{}, ex)
+	})
+
+	t.Run("events", func(t *testing.T) {
+
+		ty := &EventType{
+			Location:   nil,
+			Identifier: "MagicEvent",
+			Fields: []EventFieldType{
+				{
+					Identifier: "who",
+					Type:       &StringType{},
+				},
+				{
+					Identifier: "where",
+					Type:       &IntType{},
+				},
+			},
+			ConstructorParameterTypeAnnotations: nil,
+		}
+
+		assert.IsType(t, &types.Event{}, ty)
+
+		assert.Len(t, ty.Fields, 2)
+
+		assert.Equal(t, ty.Fields[1].Identifier, "where")
+		assert.Equal(t, ty.Fields[1].Type, IntType{})
+	})
+
 }

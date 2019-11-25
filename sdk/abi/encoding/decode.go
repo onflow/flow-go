@@ -313,7 +313,7 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (values.V
 	}
 
 	constantType := types.ConstantSizedArray{
-		Size:        int(size),
+		Size:        uint(size),
 		ElementType: t.ElementType,
 	}
 
@@ -340,10 +340,11 @@ func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (values.C
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) decodeArray(t types.Type, size int) ([]values.Value, error) {
+func (e *Decoder) decodeArray(t types.Type, size uint) ([]values.Value, error) {
 	array := make([]values.Value, size)
 
-	for i := 0; i < size; i++ {
+	var i uint
+	for i = 0; i < size; i++ {
 		value, err := e.Decode(t)
 		if err != nil {
 			return nil, err
@@ -366,12 +367,12 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 		return nil, err
 	}
 
-	keys, err := e.decodeArray(t.KeyType, int(size))
+	keys, err := e.decodeArray(t.KeyType, uint(size))
 	if err != nil {
 		return nil, err
 	}
 
-	elements, err := e.decodeArray(t.ElementType, int(size))
+	elements, err := e.decodeArray(t.ElementType, uint(size))
 	if err != nil {
 		return nil, err
 	}
@@ -395,15 +396,17 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 //
 // A composite is encoded as a fixed-length array of its field values.
 func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
-	fields := make([]values.Value, len(t.FieldTypes))
+	fields := make([]values.Value, len(t.Fields))
 
-	for i, fieldType := range t.FieldTypes {
+	i := 0
+	for _, fieldType := range t.Fields {
 		value, err := e.Decode(fieldType)
 		if err != nil {
 			return values.Composite{}, err
 		}
 
 		fields[i] = value
+		i++
 	}
 
 	return values.Composite{Fields: fields}, nil
@@ -413,9 +416,9 @@ func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
 //
 // An event is encoded as a fixed-length array of its field values.
 func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
-	fields := make([]values.Value, len(t.FieldTypes))
+	fields := make([]values.Value, len(t.Fields))
 
-	for i, field := range t.FieldTypes {
+	for i, field := range t.Fields {
 		value, err := e.Decode(field.Type)
 		if err != nil {
 			return values.Event{}, err
