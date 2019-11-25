@@ -134,6 +134,7 @@ type Interpreter struct {
 	storageReadHandler  StorageReadHandlerFunc
 	storageWriteHandler StorageWriteHandlerFunc
 	storageKeyHandler   StorageKeyHandlerFunc
+	transactions        []HostFunctionValue
 }
 
 type Option func(*Interpreter) error
@@ -424,6 +425,26 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	name := declaration.DeclarationName()
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
+}
+
+func (interpreter *Interpreter) InvokeTransaction(arguments []interface{}) error {
+	function := interpreter.transactions[0]
+
+	argumentValues, err := ToValues(arguments)
+	if err != nil {
+		return err
+	}
+
+	preparedArguments := make([]Value, len(arguments))
+	for i, argument := range argumentValues {
+		preparedArguments[i] = interpreter.convertAndBox(argument, nil, &sema.AccountType{})
+	}
+
+	trampoline := function.invoke(preparedArguments, LocationPosition{})
+
+	_ = interpreter.runAllStatements(trampoline)
+
+	return nil
 }
 
 func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []interface{}) (trampoline Trampoline, err error) {
@@ -1551,7 +1572,6 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
-
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
@@ -2178,8 +2198,73 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
-	// TODO: implement transaction interpretation
-	panic(" not implemented")
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	transactionType := interpreter.Checker.Elaboration.TransactionDeclarationTypes[declaration]
+
+	prepareFunction := declaration.Prepare.FunctionDeclaration.ToExpression()
+	prepareFunctionType := transactionType.Prepare.FunctionType
+
+	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
+	executeFunctionType := &sema.FunctionType{
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.VoidType{}),
+	}
+
+	beforeStatements, rewrittenPostConditions :=
+		interpreter.rewritePostConditions(declaration.PostConditions)
+
+	self := CompositeValue{
+		Location: interpreter.Checker.Location,
+		Fields:   &map[string]Value{},
+	}
+
+	transactionFunction := NewHostFunctionValue(
+		func(arguments []Value, location LocationPosition) Trampoline {
+			interpreter.activations.Push(lexicalScope)
+
+			interpreter.declareVariable(sema.SelfIdentifier, self)
+
+			transactionScope := interpreter.activations.CurrentOrNew()
+
+			prepare := newInterpretedFunction(
+				interpreter,
+				prepareFunction,
+				prepareFunctionType,
+				transactionScope,
+			)
+
+			execute := newInterpretedFunction(
+				interpreter,
+				executeFunction,
+				executeFunctionType,
+				transactionScope,
+			)
+
+			return prepare.invoke(arguments, location).
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitStatements(beforeStatements)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(declaration.PreConditions)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return execute.invoke(nil, location)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(rewrittenPostConditions)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return Done{Result: VoidValue{}}
+				}).
+				Then(func(_ interface{}) {
+					interpreter.activations.Pop()
+				})
+		},
+	)
+
+	interpreter.transactions = append(interpreter.transactions, transactionFunction)
+
+	return Done{}
 }
 
 func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
