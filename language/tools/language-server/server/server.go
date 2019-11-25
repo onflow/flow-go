@@ -84,15 +84,12 @@ func (s Server) Initialize(
 		return nil, err
 	}
 
-	//var buf bytes.Buffer
-	//json.NewEncoder(&buf).Encode(params.Capabilities)
-
 	// TODO remove
-	//conn.LogMessage(&protocol.LogMessageParams{
-	//	Type: protocol.Info,
-	//	Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s\n%s",
-	//		conf.EmulatorAddr, conf.AccountAddr.String(), string(buf.Bytes())),
-	//})
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type: protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s",
+			conf.EmulatorAddr, conf.AccountAddr.String()),
+	})
 
 	// after initialization, indicate to the client which commands we support
 	go s.registerCommands(conn)

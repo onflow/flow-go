@@ -48,17 +48,20 @@ func (s Server) registerCommands(conn protocol.Conn) {
 	// method if the request is sent too soon after the extension loads.
 	// Retrying with a backoff avoids this problem.
 	retryAfter := time.Millisecond * 100
-	for i := 0; i < 10; i++ {
-		if err := conn.RegisterCapability(&registration); err == nil {
+	nRetries := 10
+	for i := 0; i < nRetries; i++ {
+		err := conn.RegisterCapability(&registration)
+		if err == nil {
 			break
-		} else {
-			conn.LogMessage(&protocol.LogMessageParams{
-				Type:    protocol.Warning,
-				Message: fmt.Sprintf("Failed to register command: %s", err.Error()),
-			})
-			time.Sleep(retryAfter)
-			retryAfter *= 2
 		}
+		conn.LogMessage(&protocol.LogMessageParams{
+			Type: protocol.Warning,
+			Message: fmt.Sprintf(
+				"Failed to register command. Will retry %d more times... err: %s",
+				nRetries-1-i, err.Error()),
+		})
+		time.Sleep(retryAfter)
+		retryAfter *= 2
 	}
 
 	// Register each command handler function in the server
