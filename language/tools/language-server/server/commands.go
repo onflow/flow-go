@@ -44,6 +44,9 @@ func (s Server) registerCommands(conn protocol.Conn) {
 		},
 	}
 
+	// We have occasionally observed the client failing to recognize this
+	// method if the request is sent too soon after the extension loads.
+	// Retrying with a backoff avoids this problem.
 	retryAfter := time.Millisecond * 100
 	for i := 0; i < 10; i++ {
 		if err := conn.RegisterCapability(&registration); err == nil {
