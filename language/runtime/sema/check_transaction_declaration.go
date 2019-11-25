@@ -226,4 +226,5 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 	transactionType.Prepare = prepareFunctionType
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
+	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)
 }
