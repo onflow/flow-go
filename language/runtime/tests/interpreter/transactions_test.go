@@ -12,12 +12,6 @@ import (
 
 func TestInterpretTransactions(t *testing.T) {
 
-	type test struct {
-		name  string
-		code  string
-		error error
-	}
-
 	t.Run("NoPrepareFunction", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
 		  transaction {
