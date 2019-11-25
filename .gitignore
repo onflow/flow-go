@@ -18,6 +18,5 @@ flow.json
 .idea
 .vscode
 git
-language/tools/vscode-extension/cadence-0.0.2.vsix
-language/tools/vscode-extension/out/extension.js
-language/tools/vscode-extension/out/extension.js.map
+language/tools/vscode-extension/cadence-*.vsix
+language/tools/vscode-extension/out/*
