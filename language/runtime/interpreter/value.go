@@ -1476,6 +1476,8 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 }
 
 func (v *CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	value.SetOwner(v.Owner)
+
 	v.Fields[name] = value
 }
 

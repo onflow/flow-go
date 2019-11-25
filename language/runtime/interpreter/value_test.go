@@ -38,6 +38,7 @@ func newTestCompositeValue(owner string) *CompositeValue {
 		Location:   utils.TestLocation,
 		Identifier: "Test",
 		Kind:       common.CompositeKindStructure,
+		Fields:     map[string]Value{},
 		Owner:      owner,
 	}
 }
@@ -389,3 +390,70 @@ func TestSetOwnerReferenceCopy(t *testing.T) {
 	assert.Equal(t, newOwner, reference.GetOwner())
 }
 
+func TestOwnerNewComposite(t *testing.T) {
+	oldOwner := "1"
+
+	composite := newTestCompositeValue(oldOwner)
+
+	assert.Equal(t, oldOwner, composite.GetOwner())
+}
+
+func TestSetOwnerComposite(t *testing.T) {
+	oldOwner := "1"
+	newOwner := "2"
+
+	value := newTestCompositeValue(oldOwner)
+	composite := newTestCompositeValue(oldOwner)
+
+	const fieldName = "test"
+
+	composite.Fields[fieldName] = value
+
+	composite.SetOwner(newOwner)
+
+	assert.Equal(t, newOwner, composite.GetOwner())
+	assert.Equal(t, newOwner, value.GetOwner())
+}
+
+func TestSetOwnerCompositeCopy(t *testing.T) {
+	oldOwner := "1"
+
+	value := newTestCompositeValue(oldOwner)
+	composite := newTestCompositeValue(oldOwner)
+
+	const fieldName = "test"
+
+	composite.Fields[fieldName] = value
+
+	compositeCopy := composite.Copy().(*CompositeValue)
+	valueCopy := compositeCopy.Fields[fieldName]
+
+	assert.Equal(t, "", compositeCopy.GetOwner())
+	assert.Equal(t, "", valueCopy.GetOwner())
+	assert.Equal(t, oldOwner, value.GetOwner())
+}
+
+func TestSetOwnerCompositeSetMember(t *testing.T) {
+	oldOwner := "1"
+	newOwner := "2"
+
+	value := newTestCompositeValue(oldOwner)
+	composite := newTestCompositeValue(oldOwner)
+
+	const fieldName = "test"
+
+	composite.SetOwner(newOwner)
+
+	assert.Equal(t, newOwner, composite.GetOwner())
+	assert.Equal(t, oldOwner, value.GetOwner())
+
+	composite.SetMember(
+		nil,
+		LocationRange{},
+		fieldName,
+		value,
+	)
+
+	assert.Equal(t, newOwner, composite.GetOwner())
+	assert.Equal(t, newOwner, value.GetOwner())
+}
