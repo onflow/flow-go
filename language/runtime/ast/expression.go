@@ -44,9 +44,8 @@ func (e *BoolExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 func (e *BoolExpression) String() string {
 	if e.Value {
 		return "true"
-	} else {
-		return "false"
 	}
+	return "false"
 }
 
 // NilExpression

@@ -230,7 +230,7 @@ func TestCheckSwapResourceFields(t *testing.T) {
 //
 func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
 
-	for i := 0; i < 2; i += 1 {
+	for i := 0; i < 2; i++ {
 
 		first := "var"
 		second := "let"

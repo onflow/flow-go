@@ -1,8 +1,7 @@
-package gossip
+package util
 
 import (
 	"fmt"
-	"net"
 	"reflect"
 	"testing"
 
@@ -51,7 +50,7 @@ func TestNewSocket(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		socket, err := newSocket(tc.address)
+		socket, err := NewSocket(tc.address)
 		if tc.err == nil {
 			assert.Nil(err)
 		}
@@ -65,8 +64,6 @@ func TestNewSocket(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(tc.ip, socket.Ip) {
-			t.Log([]byte(net.ParseIP("192.168.1.1")))
-			t.Log(socketToString(socket))
 			t.Errorf("address mismatch. expected: %v, got: %v", tc.ip, socket.Ip)
 		}
 		assert.Equal(tc.port, socket.Port)
@@ -163,9 +160,9 @@ func TestToString(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		socket, err := newSocket(tc.address)
+		socket, err := NewSocket(tc.address)
 		assert.Nil(err)
-		socketString := socketToString(socket)
+		socketString := SocketToString(socket)
 		assert.Equal(tc.expected, socketString)
 	}
 }

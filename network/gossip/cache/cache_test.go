@@ -1,4 +1,4 @@
-package gossip
+package cache
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 // The receive function is then evaluated against the test cases
 func TestReceive(t *testing.T) {
 	assert := assert.New(t)
-	mhc := newMemoryHashCache()
+	mhc := NewMemHashCache()
 
 	//The sole keys that should exist in the cache
 	initKeys := []string{
@@ -20,7 +20,7 @@ func TestReceive(t *testing.T) {
 	}
 
 	for _, el := range initKeys {
-		mhc.receive(el)
+		mhc.Receive(el)
 	}
 
 	tt := []struct {
@@ -46,25 +46,25 @@ func TestReceive(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		found := mhc.isReceived(tc.item)
+		found := mhc.IsReceived(tc.item)
 		assert.Equal(found, tc.found)
 	}
 
 }
 
-// TestConfirm tests the confirmCache of the memoryCache
+// TestConfirm tests the confirm of the MemHashCache
 // The first two test cases are inserted into the cache and the rest two are not.
 // The confirm function is then evaluated against the test cases
 func TestConfirm(t *testing.T) {
 	assert := assert.New(t)
-	mhc := newMemoryHashCache()
+	mhc := NewMemHashCache()
 
 	initKeys := []string{
 		"exists",
 		"found",
 	}
 	for _, el := range initKeys {
-		mhc.confirm(el)
+		mhc.Confirm(el)
 	}
 
 	tt := []struct {
@@ -90,7 +90,7 @@ func TestConfirm(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		found := mhc.isConfirmed(tc.item)
+		found := mhc.IsConfirmed(tc.item)
 		assert.Equal(found, tc.found)
 	}
 }

@@ -119,7 +119,7 @@ func TestParseCodeWithReaders(t *testing.T) {
 		{
 			reader: bytes.NewReader([]byte(`package home
 
-			type TVRemoteServer interface {
+type TVRemoteServer interface {
 					TurnOn(context.Context, *Void) (*Void, error)
 					TurnOff(context.Context, *Void) (*Void, error)
 			}`)),
@@ -207,16 +207,23 @@ import (
 	"context"
 	"fmt"
 
-	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	proto "github.com/golang/protobuf/proto"
+)
+
+//go:generate stringer -type=registry.MessageType
+
+const (
+	TurnOn registry.MessageType = (iota + registry.DefaultTypes)
+	TurnOff
 )
 
 type TVRemoteServerRegistry struct {
 	tvrs TVRemoteServer
 }
 
-// To make sure the class complies with the gossip.Registry interface
-var _ gossip.Registry = (*TVRemoteServerRegistry)(nil)
+// To make sure the class complies with the registry.Registry interface
+var _ registry.Registry = (*TVRemoteServerRegistry)(nil)
 
 func NewTVRemoteServerRegistry(tvrs TVRemoteServer) *TVRemoteServerRegistry {
 	return &TVRemoteServerRegistry{
@@ -262,17 +269,10 @@ func (tvrsr *TVRemoteServerRegistry) TurnOff(ctx context.Context, payloadByte []
 	return respByte, respErr
 }
 
-func (tvrsr *TVRemoteServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	return map[uint64]gossip.HandleFunc{
-		0: tvrsr.TurnOn,
-		1: tvrsr.TurnOff,
-	}
-}
-
-func (tvrsr *TVRemoteServerRegistry) NameMapping() map[string]uint64 {
-	return map[string]uint64{
-		"TurnOn":  0,
-		"TurnOff": 1,
+func (tvrsr *TVRemoteServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	return map[registry.MessageType]registry.HandleFunc{
+		TurnOn:  tvrsr.TurnOn,
+		TurnOff: tvrsr.TurnOff,
 	}
 }
 `,
@@ -317,7 +317,7 @@ func (tvrsr *TVRemoteServerRegistry) NameMapping() map[string]uint64 {
 		}
 
 		if genCode != tc.genCode {
-			fmt.Println(genCode)
+			t.Log(genCode)
 			t.Error("generated code does not match expected code")
 			fmt.Println(tc.genCode)
 		}

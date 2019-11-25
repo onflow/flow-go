@@ -68,24 +68,26 @@ func expectTwoAccessErrors(t *testing.T, err error) {
 
 func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
-	tests := map[ast.Access]bool{
-		ast.AccessNotSpecified:   true,
-		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     true,
-		ast.AccessPublic:         true,
-		ast.AccessPublicSettable: false,
-	}
+	for _, compositeKind := range common.CompositeKinds {
 
-	require.Len(t, tests, len(ast.Accesses))
+		// TODO: add support for contracts
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
-	for access, expectSuccess := range tests {
-		for _, compositeKind := range common.CompositeKinds {
+		isAuthAllowed := compositeKind == common.CompositeKindResource
 
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
+		tests := map[ast.Access]bool{
+			ast.AccessNotSpecified:   true,
+			ast.AccessPrivate:        true,
+			ast.AccessAuthorized:     isAuthAllowed,
+			ast.AccessPublic:         true,
+			ast.AccessPublicSettable: false,
+		}
 
+		require.Len(t, tests, len(ast.Accesses))
+
+		for access, expectSuccess := range tests {
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -243,7 +245,7 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     true,
+		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -273,7 +275,17 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 
 func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 
-	for _, access := range ast.Accesses {
+	tests := map[ast.Access]bool{
+		ast.AccessNotSpecified:   true,
+		ast.AccessPrivate:        true,
+		ast.AccessAuthorized:     false,
+		ast.AccessPublic:         true,
+		ast.AccessPublicSettable: true,
+	}
+
+	require.Len(t, tests, len(ast.Accesses))
+
+	for access, expectSuccess := range tests {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
@@ -283,7 +295,13 @@ func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 				access.Keyword(),
 			))
 
-			assert.Nil(t, err)
+			if expectSuccess {
+				assert.Nil(t, err)
+			} else {
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidAccessModifierError{}, errs[0])
+			}
 		})
 	}
 }
@@ -293,7 +311,7 @@ func TestCheckAccessModifierGlobalConstantDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     true,
+		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -442,7 +460,7 @@ func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     true,
+		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -507,7 +525,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 
 			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
 			assert.Equal(t,
-				"d",
+				"c",
 				errs[1].(*sema.InvalidAccessError).Name,
 			)
 		},
@@ -522,7 +540,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 
 			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
 			assert.Equal(t,
-				"d",
+				"c",
 				errs[1].(*sema.InvalidAccessError).Name,
 			)
 		},
@@ -552,8 +570,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 					`
                       priv fun a() {}
                       pub fun b() {}
-                      auth fun c() {}
-                      %s fun d() {}
+                      %s fun c() {}
                     `,
 					lastAccessModifier,
 				),
@@ -566,8 +583,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 						`
                            priv %[1]s a = 1
                            pub %[1]s b = 2
-                           auth %[1]s c = 3
-                           %[2]s %[1]s d = 4
+                           %[2]s %[1]s c = 3
                         `,
 						variableKind.Keyword(),
 						lastAccessModifier,
@@ -585,7 +601,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 
 				_, err = ParseAndCheckWithOptions(t,
 					`
-                       import a, b, c, d from "imported"
+                       import a, b, c from "imported"
                     `,
 					ParseAndCheckOptions{
 						ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -617,7 +633,7 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 
 			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
 			assert.Equal(t,
-				"D",
+				"C",
 				errs[1].(*sema.InvalidAccessError).Name,
 			)
 		},
@@ -632,7 +648,7 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 
 			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
 			assert.Equal(t,
-				"D",
+				"C",
 				errs[1].(*sema.InvalidAccessError).Name,
 			)
 		},
@@ -678,8 +694,7 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 					`
                        priv %[1]s A {}
                        pub %[1]s B {}
-                       auth %[1]s C {}
-                       %[2]s %[1]s D {}
+                       %[2]s %[1]s C {}
                     `,
 					compositeKind.Keyword(),
 					lastAccessModifier,
@@ -689,7 +704,7 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 
 				_, err = ParseAndCheckWithOptions(t,
 					`
-                       import A, B, C, D from "imported"
+                       import A, B, C from "imported"
                     `,
 					ParseAndCheckOptions{
 						ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -709,42 +724,48 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 
 func TestCheckAccessCompositeFunction(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
-		sema.AccessCheckModeStrict: {
-			ast.AccessNotSpecified:   nil,
-			ast.AccessPrivate:        expectInvalidAccessError,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   expectInvalidAccessError,
-			ast.AccessPrivate:        expectInvalidAccessError,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   expectSuccess,
-			ast.AccessPrivate:        expectInvalidAccessError,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   expectSuccess,
-			ast.AccessPrivate:        expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-	}
-
 	for _, compositeKind := range common.CompositeKinds {
 
 		// TODO: add support for contracts
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		isAuthAllowed := compositeKind == common.CompositeKindResource
+		authExpectation := expectSuccess
+		if !isAuthAllowed {
+			authExpectation = nil
+		}
+
+		checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
+			sema.AccessCheckModeStrict: {
+				ast.AccessNotSpecified:   nil,
+				ast.AccessPrivate:        expectInvalidAccessError,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNotSpecifiedRestricted: {
+				ast.AccessNotSpecified:   expectInvalidAccessError,
+				ast.AccessPrivate:        expectInvalidAccessError,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNotSpecifiedUnrestricted: {
+				ast.AccessNotSpecified:   expectSuccess,
+				ast.AccessPrivate:        expectInvalidAccessError,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNone: {
+				ast.AccessNotSpecified:   expectSuccess,
+				ast.AccessPrivate:        expectSuccess,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
@@ -804,42 +825,48 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 
 func TestCheckAccessInterfaceFunction(t *testing.T) {
 
-	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
-		sema.AccessCheckModeStrict: {
-			ast.AccessNotSpecified:   nil,
-			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNotSpecifiedRestricted: {
-			ast.AccessNotSpecified:   expectInvalidAccessError,
-			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNotSpecifiedUnrestricted: {
-			ast.AccessNotSpecified:   expectSuccess,
-			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-		sema.AccessCheckModeNone: {
-			ast.AccessNotSpecified:   expectSuccess,
-			ast.AccessPrivate:        expectConformanceError,
-			ast.AccessAuthorized:     expectSuccess,
-			ast.AccessPublic:         expectSuccess,
-			ast.AccessPublicSettable: nil,
-		},
-	}
-
 	for _, compositeKind := range common.CompositeKinds {
 
 		// TODO: add support for contracts
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		isAuthAllowed := compositeKind == common.CompositeKindResource
+		authExpectation := expectSuccess
+		if !isAuthAllowed {
+			authExpectation = nil
+		}
+
+		checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
+			sema.AccessCheckModeStrict: {
+				ast.AccessNotSpecified:   nil,
+				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNotSpecifiedRestricted: {
+				ast.AccessNotSpecified:   expectInvalidAccessError,
+				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNotSpecifiedUnrestricted: {
+				ast.AccessNotSpecified:   expectSuccess,
+				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
+			sema.AccessCheckModeNone: {
+				ast.AccessNotSpecified:   expectSuccess,
+				ast.AccessPrivate:        expectConformanceError,
+				ast.AccessAuthorized:     authExpectation,
+				ast.AccessPublic:         expectSuccess,
+				ast.AccessPublicSettable: nil,
+			},
 		}
 
 		for checkMode, checkModeTests := range checkModeTests {
@@ -1524,7 +1551,7 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 	worstCase := func(t *testing.T, err error) {
-		errs := ExpectCheckerErrors(t, err, 10)
+		errs := ExpectCheckerErrors(t, err, 8)
 
 		require.IsType(t, &sema.InvalidAccessError{}, errs[0])
 		assert.Equal(t,
@@ -1534,7 +1561,7 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 		require.IsType(t, &sema.InvalidAccessError{}, errs[1])
 		assert.Equal(t,
-			"d",
+			"c",
 			errs[1].(*sema.InvalidAccessError).Name,
 		)
 
@@ -1558,32 +1585,20 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 		require.IsType(t, &sema.AssignmentToConstantError{}, errs[5])
 		assert.Equal(t,
-			"d",
+			"a",
 			errs[5].(*sema.AssignmentToConstantError).Name,
 		)
 
 		require.IsType(t, &sema.AssignmentToConstantError{}, errs[6])
 		assert.Equal(t,
-			"a",
+			"b",
 			errs[6].(*sema.AssignmentToConstantError).Name,
 		)
 
 		require.IsType(t, &sema.AssignmentToConstantError{}, errs[7])
 		assert.Equal(t,
-			"b",
-			errs[7].(*sema.AssignmentToConstantError).Name,
-		)
-
-		require.IsType(t, &sema.AssignmentToConstantError{}, errs[8])
-		assert.Equal(t,
 			"c",
-			errs[8].(*sema.AssignmentToConstantError).Name,
-		)
-
-		require.IsType(t, &sema.AssignmentToConstantError{}, errs[9])
-		assert.Equal(t,
-			"d",
-			errs[9].(*sema.AssignmentToConstantError).Name,
+			errs[7].(*sema.AssignmentToConstantError).Name,
 		)
 	}
 
@@ -1591,7 +1606,7 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 		sema.AccessCheckModeStrict:                 worstCase,
 		sema.AccessCheckModeNotSpecifiedRestricted: worstCase,
 		sema.AccessCheckModeNotSpecifiedUnrestricted: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 9)
+			errs := ExpectCheckerErrors(t, err, 7)
 
 			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
 			assert.Equal(t,
@@ -1619,36 +1634,24 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[4])
 			assert.Equal(t,
-				"d",
+				"a",
 				errs[4].(*sema.AssignmentToConstantError).Name,
 			)
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[5])
 			assert.Equal(t,
-				"a",
+				"b",
 				errs[5].(*sema.AssignmentToConstantError).Name,
 			)
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[6])
 			assert.Equal(t,
-				"b",
-				errs[6].(*sema.AssignmentToConstantError).Name,
-			)
-
-			require.IsType(t, &sema.AssignmentToConstantError{}, errs[7])
-			assert.Equal(t,
 				"c",
-				errs[7].(*sema.AssignmentToConstantError).Name,
-			)
-
-			require.IsType(t, &sema.AssignmentToConstantError{}, errs[8])
-			assert.Equal(t,
-				"d",
-				errs[8].(*sema.AssignmentToConstantError).Name,
+				errs[6].(*sema.AssignmentToConstantError).Name,
 			)
 		},
 		sema.AccessCheckModeNone: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 8)
+			errs := ExpectCheckerErrors(t, err, 6)
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
 			assert.Equal(t,
@@ -1670,32 +1673,20 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[3])
 			assert.Equal(t,
-				"d",
+				"a",
 				errs[3].(*sema.AssignmentToConstantError).Name,
 			)
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[4])
 			assert.Equal(t,
-				"a",
+				"b",
 				errs[4].(*sema.AssignmentToConstantError).Name,
 			)
 
 			require.IsType(t, &sema.AssignmentToConstantError{}, errs[5])
 			assert.Equal(t,
-				"b",
-				errs[5].(*sema.AssignmentToConstantError).Name,
-			)
-
-			require.IsType(t, &sema.AssignmentToConstantError{}, errs[6])
-			assert.Equal(t,
 				"c",
-				errs[6].(*sema.AssignmentToConstantError).Name,
-			)
-
-			require.IsType(t, &sema.AssignmentToConstantError{}, errs[7])
-			assert.Equal(t,
-				"d",
-				errs[7].(*sema.AssignmentToConstantError).Name,
+				errs[5].(*sema.AssignmentToConstantError).Name,
 			)
 		},
 	}
@@ -1716,8 +1707,7 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 				fmt.Sprintf(`
                    priv var a = 1
                    pub var b = 2
-                   auth var c = 3
-                   %s var d = 4
+                   %s var c = 3
                 `,
 					lastAccessModifier,
 				))
@@ -1726,25 +1716,21 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 
 			_, err = ParseAndCheckWithOptions(t,
 				`
-                  import a, b, c, d from "imported"
+                  import a, b, c from "imported"
 
                   pub fun test() {
-                      a = 5
-                      b = 6
-                      c = 7
-                      d = 8
+                      a = 4
+                      b = 5
+                      c = 6
 
-                      var tempA = 9
+                      var tempA = 7
                       a <-> tempA
 
-                      var tempB = 10
+                      var tempB = 8
                       b <-> tempB
 
-                      var tempC = 11
+                      var tempC = 9
                       c <-> tempC
-
-                      var tempD = 12
-                      d <-> tempD
                   }
                 `,
 				ParseAndCheckOptions{
@@ -1776,14 +1762,13 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 
        priv var x <- createR()
        pub var y <- createR()
-       auth var z <- createR()
     `)
 
 	require.Nil(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
-           import x, y, z, createR from "imported"
+           import x, y, createR from "imported"
 
            pub fun test() {
                let oldX <- x <- createR()
@@ -1791,9 +1776,6 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 
                let oldY <- y <- createR()
                destroy oldY
-
-               let oldZ <- z <- createR()
-               destroy oldZ
            }
         `,
 		ParseAndCheckOptions{
@@ -1803,7 +1785,7 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 		},
 	)
 
-	errs := ExpectCheckerErrors(t, err, 7)
+	errs := ExpectCheckerErrors(t, err, 5)
 
 	require.IsType(t, &sema.InvalidAccessError{}, errs[0])
 	assert.Equal(t,
@@ -1825,13 +1807,5 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 	assert.Equal(t,
 		"y",
 		errs[4].(*sema.AssignmentToConstantError).Name,
-	)
-
-	require.IsType(t, &sema.ResourceCapturingError{}, errs[5])
-
-	require.IsType(t, &sema.AssignmentToConstantError{}, errs[6])
-	assert.Equal(t,
-		"z",
-		errs[6].(*sema.AssignmentToConstantError).Name,
 	)
 }

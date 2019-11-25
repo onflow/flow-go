@@ -963,12 +963,10 @@ func (checker *Checker) checkDeclarationAccessModifier(
 	declarationKind common.DeclarationKind,
 	startPos ast.Position,
 	isConstant bool,
+	allowAuth bool,
 ) {
-	isLocal := checker.functionActivations.IsLocal()
+	if checker.functionActivations.IsLocal() {
 
-	// Constant cannot be set, so allowing writes makes little sense
-
-	if isLocal {
 		if access != ast.AccessNotSpecified {
 			checker.report(
 				&InvalidAccessModifierError{
@@ -979,37 +977,57 @@ func (checker *Checker) checkDeclarationAccessModifier(
 			)
 		}
 	} else {
-		if isConstant && access == ast.AccessPublicSettable {
-			checker.report(
-				&InvalidAccessModifierError{
-					Access:          access,
-					DeclarationKind: declarationKind,
-					Pos:             startPos,
-				},
-			)
-		}
 
-		if checker.AccessCheckMode == AccessCheckModeStrict &&
-			access == ast.AccessNotSpecified {
+		switch access {
+		case ast.AccessPublicSettable:
+			// Public settable access for a constant is not sensible
 
-			checker.report(
-				&MissingAccessModifierError{
-					DeclarationKind: declarationKind,
-					Pos:             startPos,
-				},
-			)
+			if isConstant {
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessNotSpecified:
+			// In strict mode, access modifiers must be given
+
+			if checker.AccessCheckMode == AccessCheckModeStrict {
+				checker.report(
+					&MissingAccessModifierError{
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessAuthorized:
+			if !allowAuth {
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
 		}
 	}
 }
 
-func (checker *Checker) checkFieldsAccess(fields []*ast.FieldDeclaration) {
+func (checker *Checker) checkFieldsAccessModifier(fields []*ast.FieldDeclaration) {
 	for _, field := range fields {
 		isConstant := field.VariableKind == ast.VariableKindConstant
+
 		checker.checkDeclarationAccessModifier(
 			field.Access,
 			field.DeclarationKind(),
 			field.StartPos,
 			isConstant,
+			true,
 		)
 	}
 }

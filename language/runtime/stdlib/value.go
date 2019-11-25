@@ -20,9 +20,8 @@ func (v StandardLibraryValue) ValueDeclarationType() sema.Type {
 func (v StandardLibraryValue) ValueDeclarationKind() common.DeclarationKind {
 	if v.IsConstant {
 		return common.DeclarationKindConstant
-	} else {
-		return common.DeclarationKindVariable
 	}
+	return common.DeclarationKindVariable
 }
 
 func (StandardLibraryValue) ValueDeclarationPosition() ast.Position {
