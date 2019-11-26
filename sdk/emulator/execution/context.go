@@ -22,7 +22,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 // The logic in this runtime context is specific to the emulator and is designed to be
 // used with an EmulatedBlockchain instance.
 type RuntimeContext struct {
-	registers       *flow.RegistersView
+	ledger          *flow.LedgerView
 	signingAccounts []values.Address
 	logger          LoggerFunc
 	checker         CheckerFunc
@@ -30,12 +30,12 @@ type RuntimeContext struct {
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
-func NewRuntimeContext(registers *flow.RegistersView) *RuntimeContext {
+func NewRuntimeContext(ledger *flow.LedgerView) *RuntimeContext {
 	return &RuntimeContext{
-		registers: registers,
-		logger:    func(string) {},
-		checker:   func([]byte, runtime.Location) error { return nil },
-		events:    make([]values.Event, 0),
+		ledger:  ledger,
+		logger:  func(string) {},
+		checker: func([]byte, runtime.Location) error { return nil },
+		events:  make([]values.Event, 0),
 	}
 }
 
@@ -78,13 +78,13 @@ func (r *RuntimeContext) Events() []values.Event {
 
 // GetValue gets a register value from the world state.
 func (r *RuntimeContext) GetValue(owner, controller, key values.Bytes) (values.Bytes, error) {
-	v, _ := r.registers.Get(fullKey(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKey(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *RuntimeContext) SetValue(owner, controller, key, value values.Bytes) error {
-	r.registers.Set(fullKey(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(fullKey(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
@@ -95,7 +95,7 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value values.Bytes) er
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
 func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.Bytes) (values.Address, error) {
-	latestAccountID, _ := r.registers.Get(keyLatestAccount)
+	latestAccountID, _ := r.ledger.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
@@ -109,15 +109,15 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.By
 		return values.Address{}, err
 	}
 
-	r.registers.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
-	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
 	err := r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
 		return values.Address{}, err
 	}
 
-	r.registers.Set(keyLatestAccount, accountID)
+	r.ledger.Set(keyLatestAccount, accountID)
 
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
@@ -133,7 +133,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.By
 func (r *RuntimeContext) AddAccountKey(address values.Address, publicKey values.Bytes) error {
 	accountID := address[:]
 
-	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
@@ -156,7 +156,7 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 	accountID := address[:]
 	i := index.ToInt()
 
-	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
@@ -183,7 +183,7 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []values.Bytes, err error) {
-	countBytes, exists := r.registers.Get(
+	countBytes, exists := r.ledger.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if !exists {
@@ -195,7 +195,7 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []va
 	publicKeys = make([]values.Bytes, count)
 
 	for i := 0; i < count; i++ {
-		publicKey, exists := r.registers.Get(
+		publicKey, exists := r.ledger.Get(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 		)
 		if !exists {
@@ -211,7 +211,7 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []va
 func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []values.Bytes) error {
 	var existingCount int
 
-	countBytes, exists := r.registers.Get(
+	countBytes, exists := r.ledger.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if exists {
@@ -222,7 +222,7 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []val
 
 	newCount := len(publicKeys)
 
-	r.registers.Set(
+	r.ledger.Set(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 		big.NewInt(int64(newCount)).Bytes(),
 	)
@@ -232,7 +232,7 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []val
 			return err
 		}
 
-		r.registers.Set(
+		r.ledger.Set(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
 		)
@@ -240,7 +240,7 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []val
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.registers.Delete(fullKey(string(accountID), string(accountID), keyPublicKey(i)))
+		r.ledger.Delete(fullKey(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
@@ -262,12 +262,12 @@ func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.B
 		return fmt.Errorf("not permitted to update account with ID %s", accountID)
 	}
 
-	_, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
-	r.registers.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
 	return nil
 }
@@ -278,14 +278,14 @@ func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.B
 func (r *RuntimeContext) GetAccount(address flow.Address) *flow.Account {
 	accountID := address.Bytes()
 
-	balanceBytes, exists := r.registers.Get(fullKey(string(accountID), "", keyBalance))
+	balanceBytes, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
 		return nil
 	}
 
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
-	code, _ := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	code, _ := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
@@ -322,7 +322,7 @@ func (r *RuntimeContext) ResolveImport(location runtime.Location) (values.Bytes,
 
 	accountID := []byte(addressLocation)
 
-	code, exists := r.registers.Get(fullKey(string(accountID), string(accountID), keyCode))
+	code, exists := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
 	if !exists {
 		return nil, fmt.Errorf("no code deployed at address %x", accountID)
 	}
