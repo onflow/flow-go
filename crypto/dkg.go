@@ -58,7 +58,7 @@ func optimalThreshold(size int) int {
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
 func NewDKG(dkg DKGType, size int, currentIndex int,
-	processor DKGprocessor, leaderIndex int) (DKGstate, error) {
+	processor DKGProcessor, leaderIndex int) (DKGstate, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", DKGMinSize, DKGMaxSize)}
 	}
@@ -113,7 +113,7 @@ type dkgCommon struct {
 	// running is true when the DKG protocol is running, is false otherwise
 	running bool
 	// processes the action of the DKG interface outputs
-	processor DKGprocessor
+	processor DKGProcessor
 }
 
 // Running returns the running state of the DKG protocol
@@ -142,15 +142,15 @@ func (s *dkgCommon) NextTimeout() error {
 type dkgMsgTag byte
 
 const (
-	feldmanVSSshare dkgMsgTag = iota
+	feldmanVSSShare dkgMsgTag = iota
 	feldmanVSSVerifVec
 	feldmanVSSComplaint
 	feldmanVSSComplaintAnswer
 )
 
-// DKGactor is an interface that implements the DKG output actions
+// DKGProcessor is an interface that implements the DKG output actions
 // an instance of a DKGactor is needed for each DKG
-type DKGprocessor interface {
+type DKGProcessor interface {
 	// sends a private message to a destination
 	Send(dest int, data []byte)
 	// broadcasts a message to all dkg nodes

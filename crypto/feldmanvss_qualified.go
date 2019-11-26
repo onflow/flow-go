@@ -142,7 +142,7 @@ func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg []byte) error {
 	}
 
 	switch dkgMsgTag(msg[0]) {
-	case feldmanVSSshare:
+	case feldmanVSSShare:
 		s.receiveShare(index(orig), msg[1:])
 	case feldmanVSSVerifVec:
 		s.receiveVerifVector(index(orig), msg[1:])

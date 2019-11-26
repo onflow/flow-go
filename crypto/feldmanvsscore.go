@@ -32,7 +32,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) {
 		}
 		// the-other-node shares
 		data := make([]byte, shareSize+1)
-		data[0] = byte(feldmanVSSshare)
+		data[0] = byte(feldmanVSSShare)
 		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		s.processor.Send(int(i-1), data)
 	}

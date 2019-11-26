@@ -187,7 +187,7 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	}
 }
 
-// implements DKGprocessor interface
+// implements DKGProcessor interface
 type testDKGProcessor struct {
 	current   int
 	dkg       DKGstate
