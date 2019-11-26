@@ -2298,9 +2298,6 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 				FlatMap(func(_ interface{}) Trampoline {
 					return interpreter.visitConditions(rewrittenPostConditions)
 				}).
-				FlatMap(func(_ interface{}) Trampoline {
-					return Done{Result: VoidValue{}}
-				}).
 				Then(func(_ interface{}) {
 					interpreter.activations.Pop()
 				})
