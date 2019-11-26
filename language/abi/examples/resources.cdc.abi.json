@@ -29,7 +29,7 @@
       "resource": {
         "fields": {
           "colour": {
-            "struct": "Banana"
+            "struct": "Colour"
           }
         },
         "initializers": [

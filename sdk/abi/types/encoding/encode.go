@@ -14,10 +14,6 @@ type Encoder struct {
 	definitions map[string]interface{}
 }
 
-//func (e *Encoder) EncodeVariable(v *types.Variable) {
-//
-//}
-
 func (encoder *Encoder) Encode(name string, t types.Type) {
 	encoder.definitions[name] = encoder.encode(t)
 }
@@ -59,8 +55,6 @@ type optionalObject struct {
 	Optional interface{} `json:"optional"`
 }
 
-type functionBase struct{}
-
 type function struct {
 	Parameters []parameter `json:"parameters,omitempty"`
 	ReturnType interface{} `json:"returnType,omitempty"`
@@ -73,6 +67,27 @@ type functionType struct {
 
 type functionObject struct {
 	Function interface{} `json:"function"`
+}
+
+type dictionary struct {
+	Keys   interface{} `json:"keys"`
+	Values interface{} `json:"values"`
+}
+
+type dictionaryObject struct {
+	Dictionary dictionary `json:"dictionary"`
+}
+
+type resourceObject struct {
+	Resource struct_ `json:"resource"`
+}
+
+type resourcePointer struct {
+	Resource string `json:"resource"`
+}
+
+type structPointer struct {
+	Struct string `json:"struct"`
 }
 
 //endregion
@@ -125,18 +140,42 @@ func (encoder *Encoder) mapTypes(types []types.Type) []interface{} {
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
 	switch v := (t).(type) {
+	case types.Any:
+		return "Any"
 	case types.Bool:
-		return "Boolean"
-	case types.Int:
-		return "Int"
+		return "Bool"
+	case types.Void:
+		return "Void"
 	case types.String:
 		return "String"
+
+	case types.Int:
+		return "Int"
+	case types.Int8:
+		return "Int8"
+	case types.Int16:
+		return "Int16"
+	case types.Int32:
+		return "Int32"
+	case types.Int64:
+		return "Int64"
+	case types.UInt8:
+		return "UInt8"
+	case types.UInt16:
+		return "UInt16"
+	case types.UInt32:
+		return "UInt16"
+	case types.UInt64:
+		return "UInt16"
+
 	case types.VariableSizedArray:
 		return arrayObject{array{Of: encoder.encode(v.ElementType)}}
 	case types.ConstantSizedArray:
 		return arrayObject{array{Of: encoder.encode(v.ElementType), Size: v.Size}}
+
 	case types.Optional:
 		return optionalObject{Optional: encoder.encode(v.Of)}
+
 	case types.Struct:
 		return structObject{
 			Struct_: struct_{
@@ -144,8 +183,14 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
 		}
-	case types.Pointer:
-		return v.TypeName
+	case types.StructPointer:
+		return structPointer{
+			v.TypeName,
+		}
+	case types.ResourcePointer:
+		return resourcePointer{
+			v.TypeName,
+		}
 	case types.Event:
 		return eventObject{
 			Event: encoder.mapParameters(v.Fields),
@@ -164,8 +209,22 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 				ReturnType: encoder.encode(v.ReturnType),
 			},
 		}
-	case types.Any:
-		return "Any"
+
+	case types.Dictionary:
+		return dictionaryObject{
+			dictionary{
+				Keys:   encoder.encode(v.KeyType),
+				Values: encoder.encode(v.ElementType),
+			},
+		}
+	case types.Resource:
+		return resourceObject{
+			struct_{
+				Fields:       encoder.mapFields(v.Fields),
+				Initializers: encoder.mapNestedParameters(v.Initializers),
+			},
+		}
+
 	}
 
 	panic(fmt.Errorf("unknown type of %T", t))

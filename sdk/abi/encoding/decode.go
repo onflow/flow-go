@@ -66,13 +66,13 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeInt32()
 	case types.Int64:
 		return e.DecodeInt64()
-	case types.Uint8:
+	case types.UInt8:
 		return e.DecodeUint8()
-	case types.Uint16:
+	case types.UInt16:
 		return e.DecodeUint16()
-	case types.Uint32:
+	case types.UInt32:
 		return e.DecodeUint32()
-	case types.Uint64:
+	case types.UInt64:
 		return e.DecodeUint64()
 	case types.VariableSizedArray:
 		return e.DecodeVariableSizedArray(x)

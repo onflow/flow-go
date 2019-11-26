@@ -247,7 +247,7 @@ var blacklist = map[string]interface{}{
 	"Address": nil,
 }
 
-func (checker *Checker) GlobalNewValues() map[string]*Variable {
+func (checker *Checker) UserDefinedValues() map[string]*Variable {
 	ret := map[string]*Variable{}
 	for key, value := range checker.GlobalValues {
 		if _, ok := blacklist[key]; ok == true {
@@ -258,6 +258,10 @@ func (checker *Checker) GlobalNewValues() map[string]*Variable {
 		}
 
 		if _, ok := checker.PredeclaredTypes[key]; ok == true {
+			continue
+		}
+		if typeValue, ok := checker.GlobalTypes[key]; ok == true {
+			ret[key] = typeValue
 			continue
 		}
 		ret[key] = value

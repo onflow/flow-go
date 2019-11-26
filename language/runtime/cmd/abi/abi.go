@@ -20,7 +20,7 @@ func GenerateAbi(args []string) {
 
 	exportedTypes := map[string]types.Type{}
 
-	values := checker.GlobalNewValues()
+	values := checker.UserDefinedValues()
 	for _, variable := range values {
 		exportable, ok := variable.Type.(sema.ExportableType)
 

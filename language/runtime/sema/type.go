@@ -54,13 +54,6 @@ type TypeAnnotation struct {
 	Type Type
 }
 
-//func (a *TypeAnnotation) Export(program *ast.Program) types.Annotation {
-//	return types.Annotation{
-//		IsMove: a.Move,
-//		Type:   a.Type.(ExportableType).Export(),
-//	}
-//}
-
 func (a *TypeAnnotation) String() string {
 	if a.Move {
 		return fmt.Sprintf("<-%s", a.Type)
@@ -150,7 +143,7 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
-func (*VoidType) Export() types.Type {
+func (*VoidType) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Void{}
 }
 
@@ -253,7 +246,7 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
-func (*BoolType) Export() types.Type {
+func (*BoolType) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Bool{}
 }
 
@@ -489,7 +482,7 @@ type Int8Type struct{}
 
 func (*Int8Type) isType() {}
 
-func (*Int8Type) Export() types.Type {
+func (*Int8Type) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Int8{}
 }
 
@@ -530,7 +523,7 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
-func (*Int16Type) Export() types.Type {
+func (*Int16Type) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Int16{}
 }
 
@@ -571,7 +564,7 @@ type Int32Type struct{}
 
 func (*Int32Type) isType() {}
 
-func (*Int32Type) Export() types.Type {
+func (*Int32Type) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Int32{}
 }
 
@@ -612,7 +605,7 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
-func (*Int64Type) Export() types.Type {
+func (*Int64Type) Export(program *ast.Program, variable *Variable) types.Type {
 	return types.Int64{}
 }
 
@@ -653,8 +646,8 @@ type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
 
-func (*UInt8Type) Export() types.Type {
-	return types.Uint8{}
+func (*UInt8Type) Export(program *ast.Program, variable *Variable) types.Type {
+	return types.UInt8{}
 }
 
 func (*UInt8Type) String() string {
@@ -694,8 +687,8 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
-func (*UInt16Type) Export() types.Type {
-	return types.Uint16{}
+func (*UInt16Type) Export(program *ast.Program, variable *Variable) types.Type {
+	return types.UInt16{}
 }
 
 func (*UInt16Type) String() string {
@@ -736,7 +729,7 @@ type UInt32Type struct{}
 func (*UInt32Type) isType() {}
 
 func (*UInt32Type) Export() types.Type {
-	return types.Uint32{}
+	return types.UInt32{}
 }
 
 func (*UInt32Type) String() string {
@@ -777,7 +770,7 @@ type UInt64Type struct{}
 func (*UInt64Type) isType() {}
 
 func (*UInt64Type) Export() types.Type {
-	return types.Uint64{}
+	return types.UInt64{}
 }
 
 func (*UInt64Type) String() string {
@@ -1523,13 +1516,25 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
+func (t *CompositeType) exportAsPointer() types.Type {
+	switch t.Kind {
+	case common.CompositeKindStructure:
+		return types.StructPointer{
+			TypeName: t.Identifier,
+		}
+	case common.CompositeKindResource:
+		return types.ResourcePointer{
+			TypeName: t.Identifier,
+		}
+	}
+	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
+}
+
 func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.Type {
 
 	//this type is exported as a field or parameter type, not main definition
 	if variable == nil {
-		return types.Pointer{
-			TypeName: t.Identifier,
-		}
+		return t.exportAsPointer()
 	}
 
 	convert := func() types.Composite {
@@ -1578,13 +1583,10 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		{
-			return types.Struct{
-				Composite: convert(),
-			}
+		return types.Struct{
+			Composite: convert(),
 		}
 	case common.CompositeKindResource:
-
 		return types.Resource{
 			Composite: convert(),
 		}
@@ -1747,6 +1749,13 @@ func (t *DictionaryType) String() string {
 		t.KeyType,
 		t.ValueType,
 	)
+}
+
+func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.Type {
+	return types.Dictionary{
+		KeyType:     t.KeyType.(ExportableType).Export(program, nil),
+		ElementType: t.ValueType.(ExportableType).Export(program, nil),
+	}
 }
 
 func (t *DictionaryType) ID() string {

@@ -1,6 +1,6 @@
-let speed = "maximum"
+pub let speed = "maximum"
 
-struct Car {
+pub struct Car {
     pub var model: String
     pub var make: String
     pub var trim: String
@@ -26,7 +26,7 @@ struct Car {
     */
 }
 
-struct Fleet {
+pub struct Fleet {
     pub let cars: [Car]
 
     init(car1: Car, car2: Car?, car3: Car?) {

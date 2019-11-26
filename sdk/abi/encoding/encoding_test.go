@@ -186,12 +186,12 @@ func TestEncodeUint8(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint8{},
+			types.UInt8{},
 			values.Uint8(0),
 		},
 		{
 			"Max",
-			types.Uint8{},
+			types.UInt8{},
 			values.Uint8(math.MaxUint8),
 		},
 	}...)
@@ -201,12 +201,12 @@ func TestEncodeUint16(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint16{},
+			types.UInt16{},
 			values.Uint16(0),
 		},
 		{
 			"Max",
-			types.Uint16{},
+			types.UInt16{},
 			values.Uint16(math.MaxUint8),
 		},
 	}...)
@@ -216,12 +216,12 @@ func TestEncodeUint32(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint32{},
+			types.UInt32{},
 			values.Uint32(0),
 		},
 		{
 			"Max",
-			types.Uint32{},
+			types.UInt32{},
 			values.Uint32(math.MaxUint32),
 		},
 	}...)
@@ -231,12 +231,12 @@ func TestEncodeUint64(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint64{},
+			types.UInt64{},
 			values.Uint64(0),
 		},
 		{
 			"Max",
-			types.Uint64{},
+			types.UInt64{},
 			values.Uint64(math.MaxUint64),
 		},
 	}...)
