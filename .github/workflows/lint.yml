@@ -11,7 +11,12 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: '1.13'
+    - Name: Checkout Code
+      uses: actions/checkout@v1
       with:
         fetch-depth: 1
     - name: Run Revive Action
@@ -23,3 +28,5 @@ jobs:
       env:
         # GitHub token for annotations
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Check formatting
+      run: test -z $(gofmt -l .) || (gofmt -l . && exit 1)
