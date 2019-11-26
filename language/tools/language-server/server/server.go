@@ -97,90 +97,50 @@ func (s Server) Initialize(
 	return result, nil
 }
 
+// DidOpenTextDocument is called whenever a new file is opened.
+// We parse and check the text and publish diagnostics about the document.
+func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpenTextDocumentParams) error {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "DidOpenTextDoc",
+	})
+
+	uri := params.TextDocument.URI
+	text := params.TextDocument.Text
+	s.documents[uri] = text
+
+	diagnostics, err := s.getDiagnostics(conn, uri, text)
+	if err != nil {
+		return err
+	}
+	conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
+		URI:         uri,
+		Diagnostics: diagnostics,
+	})
+
+	return nil
+}
+
 // DidChangeTextDocument is called whenever the current document changes.
-// We parse and check the new text and indicate any syntax or semantic errors
-// by publishing "diagnostics".
+// We parse and check the text and publish diagnostics about the document.
 func (s Server) DidChangeTextDocument(
 	conn protocol.Conn,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
-		Message: "DidChangeText",
+		Message: fmt.Sprintf("DidChangeText changes: %d", len(params.ContentChanges)),
 	})
 	uri := params.TextDocument.URI
-	code := params.ContentChanges[0].Text
-	s.documents[uri] = code
+	text := params.ContentChanges[0].Text
+	s.documents[uri] = text
 
-	program, err := parse(conn, code, string(uri))
-
-	diagnostics := []protocol.Diagnostic{}
-
+	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
-
-		if parserError, ok := err.(parser.Error); ok {
-			for _, err := range parserError.Errors {
-				parseError, ok := err.(parser.ParseError)
-				if !ok {
-					continue
-				}
-
-				diagnostic := convertError(parseError)
-				if diagnostic == nil {
-					continue
-				}
-
-				diagnostics = append(diagnostics, *diagnostic)
-			}
-		}
-	} else {
-		// no parsing errors
-
-		// resolve imports
-
-		mainPath := strings.TrimPrefix(string(uri), "file://")
-
-		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-			return resolveImport(mainPath, location)
-		})
-
-		// check program
-
-		checker, err := sema.NewChecker(
-			program,
-			runtime.FileLocation(string(uri)),
-			sema.WithPredeclaredValues(valueDeclarations),
-			sema.WithPredeclaredTypes(typeDeclarations),
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		start := time.Now()
-		err = checker.Check()
-		elapsed := time.Since(start)
-
-		conn.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Info,
-			Message: fmt.Sprintf("checking took %s", elapsed),
-		})
-
-		s.checkers[uri] = checker
-
-		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
-			for _, err := range checkerError.Errors {
-				if semanticError, ok := err.(sema.SemanticError); ok {
-					diagnostic := convertError(semanticError)
-					if diagnostic != nil {
-						diagnostics = append(diagnostics, *diagnostic)
-					}
-				}
-			}
-		}
+		return err
 	}
-
 	conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
-		URI:         params.TextDocument.URI,
+		URI:         uri,
 		Diagnostics: diagnostics,
 	})
 
@@ -335,6 +295,82 @@ func (Server) Exit(_ protocol.Conn) error {
 func (s *Server) getNextNonce() uint64 {
 	s.nonce++
 	return s.nonce
+}
+
+// getDiagnostics parses and checks the given file and generates diagnostics
+// indicating each syntax or semantic error. Returns a list of diagnostics
+// that the caller is responsible for publishing to the client.
+//
+// Returns an error if an unexpected error occurred.
+func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, text string) ([]protocol.Diagnostic, error) {
+	diagnostics := make([]protocol.Diagnostic, 0)
+	program, err := parse(conn, text, string(uri))
+
+	// If there were parsing errors, convert each one to a diagnostic and exit
+	// without checking.
+	if err != nil {
+		if parserError, ok := err.(parser.Error); ok {
+			for _, err := range parserError.Errors {
+				parseError, ok := err.(parser.ParseError)
+				if !ok {
+					continue
+				}
+
+				diagnostic := convertError(parseError)
+				if diagnostic == nil {
+					continue
+				}
+
+				diagnostics = append(diagnostics, *diagnostic)
+			}
+		} else {
+			return nil, err
+		}
+		return diagnostics, nil
+	}
+
+	// There were no parser errors. Proceed to resolving imports and
+	// checking the parsed program.
+	mainPath := strings.TrimPrefix(string(uri), "file://")
+
+	_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
+		return resolveImport(mainPath, location)
+	})
+
+	checker, err := sema.NewChecker(
+		program,
+		runtime.FileLocation(string(uri)),
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	err = checker.Check()
+	elapsed := time.Since(start)
+
+	// Log how long it took to check the file
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
+	})
+
+	s.checkers[uri] = checker
+
+	if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
+		for _, err := range checkerError.Errors {
+			if semanticError, ok := err.(sema.SemanticError); ok {
+				diagnostic := convertError(semanticError)
+				if diagnostic != nil {
+					diagnostics = append(diagnostics, *diagnostic)
+				}
+			}
+		}
+	}
+
+	return diagnostics, nil
 }
 
 // parse parses the given code and returns the resultant program.
