@@ -47,16 +47,15 @@ func GetABIForFile(filename string, pretty bool) []byte {
 
 	encoder := encoding.NewEncoder()
 
-	for name, type_ := range exportedTypes {
-		encoder.Encode(name, type_)
+	for name, typ := range exportedTypes {
+		encoder.Encode(name, typ)
 	}
 
 	marshall := func() ([]byte, error) {
 		if pretty {
 			return json.MarshalIndent(encoder.Get(), "", "  ")
-		} else {
-			return json.Marshal(encoder.Get())
 		}
+		return json.Marshal(encoder.Get())
 	}
 
 	jsonData, err := marshall()

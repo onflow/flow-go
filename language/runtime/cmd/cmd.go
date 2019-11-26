@@ -19,7 +19,7 @@ func PrettyPrintError(err error, filename string, codes map[string]string) {
 			println()
 		}
 		print(runtime.PrettyPrintError(err, filename, codes[filename], true))
-		i += 1
+		i++
 	}
 
 	if parserError, ok := err.(parser.Error); ok {

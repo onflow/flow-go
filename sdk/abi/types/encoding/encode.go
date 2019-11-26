@@ -41,9 +41,9 @@ type array struct {
 }
 
 type structObject struct {
-	Struct_ struct_ `json:"struct"`
+	Struct structData `json:"struct"`
 }
-type struct_ struct {
+type structData struct {
 	Fields       map[string]interface{} `json:"fields"`
 	Initializers [][]parameter          `json:"initializers"`
 }
@@ -88,7 +88,7 @@ type dictionaryObject struct {
 }
 
 type resourceObject struct {
-	Resource struct_ `json:"resource"`
+	Resource structData `json:"resource"`
 }
 
 type resourcePointer struct {
@@ -155,9 +155,8 @@ func (encoder *Encoder) mapTypes(types []types.Type) []interface{} {
 func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
 	if _, ok := returnType.(types.Void); ok == true {
 		return nil
-	} else {
-		return encoder.encode(returnType)
 	}
+	return encoder.encode(returnType)
 }
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
@@ -200,7 +199,7 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 
 	case types.Struct:
 		return structObject{
-			Struct_: struct_{
+			Struct: structData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
@@ -241,7 +240,7 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		}
 	case types.Resource:
 		return resourceObject{
-			struct_{
+			structData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},

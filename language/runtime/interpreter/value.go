@@ -1274,7 +1274,7 @@ func (v CompositeValue) Export() values.Value {
 
 	keys := make([]string, len(v.Fields))
 	i := 0
-	for key, _ := range v.Fields {
+	for key := range v.Fields {
 		keys[i] = key
 		i++
 	}

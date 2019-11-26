@@ -398,7 +398,7 @@ func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
 
 	k := 0
 	keys := make([]string, len(t.Fields))
-	for key, _ := range t.Fields {
+	for key := range t.Fields {
 		keys[k] = key
 		k++
 	}
