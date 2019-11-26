@@ -1,8 +1,12 @@
 package types
 
+// revive:disable:redefines-builtin-id
+
 type Type interface {
 	isType()
 }
+
+// revive:enable
 
 type isAType struct{}
 

@@ -62,9 +62,9 @@ generate-mocks:
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
-.PHONY: lint-sdk
+.PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml ./...
+	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence.go ./...
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint test

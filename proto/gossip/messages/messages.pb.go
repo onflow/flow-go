@@ -198,6 +198,61 @@ func (m *HashMessage) GetSenderSocket() *Socket {
 	return nil
 }
 
+type EventProcessRequest struct {
+	Event                []byte   `protobuf:"bytes,1,opt,name=Event,proto3" json:"Event,omitempty"`
+	EngineID             uint32   `protobuf:"varint,2,opt,name=EngineID,proto3" json:"EngineID,omitempty"`
+	SenderID             string   `protobuf:"bytes,3,opt,name=SenderID,proto3" json:"SenderID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *EventProcessRequest) Reset()         { *m = EventProcessRequest{} }
+func (m *EventProcessRequest) String() string { return proto.CompactTextString(m) }
+func (*EventProcessRequest) ProtoMessage()    {}
+func (*EventProcessRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_f6f1c3d59bb108c3, []int{3}
+}
+
+func (m *EventProcessRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_EventProcessRequest.Unmarshal(m, b)
+}
+func (m *EventProcessRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_EventProcessRequest.Marshal(b, m, deterministic)
+}
+func (m *EventProcessRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EventProcessRequest.Merge(m, src)
+}
+func (m *EventProcessRequest) XXX_Size() int {
+	return xxx_messageInfo_EventProcessRequest.Size(m)
+}
+func (m *EventProcessRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_EventProcessRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EventProcessRequest proto.InternalMessageInfo
+
+func (m *EventProcessRequest) GetEvent() []byte {
+	if m != nil {
+		return m.Event
+	}
+	return nil
+}
+
+func (m *EventProcessRequest) GetEngineID() uint32 {
+	if m != nil {
+		return m.EngineID
+	}
+	return 0
+}
+
+func (m *EventProcessRequest) GetSenderID() string {
+	if m != nil {
+		return m.SenderID
+	}
+	return ""
+}
+
 type GossipReply struct {
 	ResponseByte         []byte   `protobuf:"bytes,1,opt,name=responseByte,proto3" json:"responseByte,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -209,7 +264,7 @@ func (m *GossipReply) Reset()         { *m = GossipReply{} }
 func (m *GossipReply) String() string { return proto.CompactTextString(m) }
 func (*GossipReply) ProtoMessage()    {}
 func (*GossipReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f6f1c3d59bb108c3, []int{3}
+	return fileDescriptor_f6f1c3d59bb108c3, []int{4}
 }
 
 func (m *GossipReply) XXX_Unmarshal(b []byte) error {
@@ -241,36 +296,39 @@ func init() {
 	proto.RegisterType((*GossipMessage)(nil), "flow.gossip.messages.GossipMessage")
 	proto.RegisterType((*Socket)(nil), "flow.gossip.messages.Socket")
 	proto.RegisterType((*HashMessage)(nil), "flow.gossip.messages.HashMessage")
+	proto.RegisterType((*EventProcessRequest)(nil), "flow.gossip.messages.EventProcessRequest")
 	proto.RegisterType((*GossipReply)(nil), "flow.gossip.messages.GossipReply")
 }
 
 func init() { proto.RegisterFile("gossip/messages/messages.proto", fileDescriptor_f6f1c3d59bb108c3) }
 
 var fileDescriptor_f6f1c3d59bb108c3 = []byte{
-	// 360 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x53, 0xc1, 0x4e, 0xab, 0x50,
-	0x10, 0x7d, 0x94, 0x3e, 0xde, 0x63, 0x68, 0x6d, 0x33, 0x31, 0x86, 0x98, 0xa6, 0x41, 0xdc, 0xb0,
-	0x30, 0xa8, 0xf5, 0x07, 0xb4, 0x1b, 0x5d, 0x68, 0x52, 0x2f, 0xd5, 0x85, 0x1b, 0x45, 0x3a, 0x16,
-	0x62, 0xcb, 0xbd, 0xe1, 0x52, 0x0d, 0x6b, 0xbf, 0xc6, 0xbf, 0x34, 0xbd, 0x80, 0xb6, 0x49, 0xe3,
-	0xae, 0xbb, 0x33, 0x67, 0xe6, 0xcc, 0x39, 0x0c, 0xb9, 0xd0, 0x9f, 0x72, 0x29, 0x13, 0x71, 0x3c,
-	0x27, 0x29, 0xc3, 0x29, 0xc9, 0x6f, 0xe0, 0x8b, 0x8c, 0xe7, 0x1c, 0x77, 0x5f, 0x66, 0xfc, 0xdd,
-	0x2f, 0x87, 0xfc, 0xba, 0xe7, 0x7e, 0x6a, 0xd0, 0xbe, 0x54, 0xdc, 0x4d, 0x49, 0xa1, 0x0d, 0xff,
-	0x46, 0x61, 0x31, 0xe3, 0xe1, 0xc4, 0xd6, 0x1c, 0xcd, 0x6b, 0xb1, 0xba, 0x44, 0x07, 0xac, 0x4a,
-	0x37, 0x2e, 0x04, 0xd9, 0x0d, 0x47, 0xf3, 0x9a, 0x6c, 0x95, 0xc2, 0x3e, 0x00, 0xa3, 0x28, 0x11,
-	0x09, 0xa5, 0xb9, 0xb4, 0x75, 0x47, 0xf7, 0x4c, 0xb6, 0xc2, 0xe0, 0x1e, 0x18, 0x01, 0xa5, 0x13,
-	0xca, 0xec, 0xa6, 0xa3, 0x79, 0x26, 0xab, 0x2a, 0x44, 0x68, 0x8e, 0xc2, 0x3c, 0xb6, 0xff, 0x2a,
-	0x85, 0xc2, 0xd8, 0x05, 0x7d, 0x3c, 0xbe, 0xb6, 0x0d, 0xe5, 0xb2, 0x84, 0xee, 0x11, 0x18, 0x01,
-	0x8f, 0x5e, 0x29, 0xc7, 0x1d, 0x68, 0x24, 0xa2, 0x8a, 0xd7, 0x48, 0xc4, 0x52, 0x2f, 0x78, 0x96,
-	0xab, 0x48, 0x6d, 0xa6, 0xb0, 0x3b, 0x07, 0xeb, 0x2a, 0x94, 0x71, 0xfd, 0x59, 0x3d, 0x30, 0xe3,
-	0x50, 0xc6, 0xc3, 0x22, 0x27, 0x59, 0x29, 0x7f, 0x08, 0x3c, 0x87, 0x96, 0x54, 0x51, 0x4a, 0x03,
-	0xb5, 0xc8, 0x1a, 0xf4, 0xfc, 0x4d, 0x37, 0xf3, 0xcb, 0x19, 0xb6, 0xa6, 0x70, 0x4f, 0xc1, 0x2a,
-	0xef, 0xc8, 0x48, 0xcc, 0x0a, 0x74, 0xa1, 0x95, 0x91, 0x14, 0x3c, 0x95, 0xb4, 0x74, 0xa8, 0x1c,
-	0xd7, 0xb8, 0xc1, 0x87, 0x0e, 0x9d, 0x2a, 0x1e, 0xa3, 0x88, 0x92, 0x37, 0xca, 0xf0, 0x1e, 0xe0,
-	0x42, 0x16, 0x69, 0x74, 0xbb, 0xa0, 0x05, 0xe1, 0xe1, 0xe6, 0x00, 0x6b, 0x3f, 0x6c, 0xff, 0xe0,
-	0xb7, 0x21, 0x95, 0xc6, 0xfd, 0x83, 0x77, 0x60, 0x06, 0x5b, 0x58, 0xfb, 0x04, 0xdd, 0x20, 0xcf,
-	0x28, 0x9c, 0x6f, 0x23, 0xb4, 0xa7, 0x9d, 0x68, 0xf8, 0x08, 0x9d, 0xd2, 0x21, 0xd8, 0x8e, 0xc1,
-	0x10, 0x1e, 0xfe, 0xd7, 0xdd, 0x67, 0x43, 0x3d, 0x95, 0xb3, 0xaf, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0xb1, 0xb6, 0x10, 0x09, 0x4c, 0x03, 0x00, 0x00,
+	// 399 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x52, 0xc1, 0x6e, 0xd3, 0x40,
+	0x10, 0x65, 0x93, 0x34, 0x34, 0x63, 0x17, 0xd0, 0x50, 0xa1, 0x55, 0x55, 0x55, 0xc6, 0x5c, 0x7c,
+	0x40, 0x06, 0xca, 0x0f, 0xa0, 0xaa, 0x15, 0x54, 0x02, 0x29, 0xac, 0x73, 0x40, 0xdc, 0x5c, 0x77,
+	0x88, 0x57, 0x24, 0xde, 0x65, 0x77, 0x13, 0xe4, 0x4f, 0xe2, 0x6b, 0xf8, 0x25, 0xe4, 0xf5, 0x3a,
+	0x34, 0x52, 0xc5, 0x8d, 0xdb, 0xbc, 0x37, 0xf3, 0x76, 0xde, 0xcc, 0x0e, 0x9c, 0x2d, 0x95, 0xb5,
+	0x52, 0xbf, 0x5a, 0x93, 0xb5, 0xe5, 0x92, 0xec, 0x2e, 0xc8, 0xb5, 0x51, 0x4e, 0xe1, 0xf1, 0xb7,
+	0x95, 0xfa, 0x99, 0xf7, 0x45, 0xf9, 0x90, 0x4b, 0x7f, 0x31, 0x38, 0x7a, 0xef, 0xb9, 0x4f, 0x3d,
+	0x85, 0x1c, 0x1e, 0xce, 0xcb, 0x76, 0xa5, 0xca, 0x5b, 0xce, 0x12, 0x96, 0xc5, 0x62, 0x80, 0x98,
+	0x40, 0x14, 0x74, 0x8b, 0x56, 0x13, 0x1f, 0x25, 0x2c, 0x9b, 0x88, 0xbb, 0x14, 0x9e, 0x01, 0x08,
+	0xaa, 0xa4, 0x96, 0xd4, 0x38, 0xcb, 0xc7, 0xc9, 0x38, 0x9b, 0x89, 0x3b, 0x0c, 0x3e, 0x83, 0x69,
+	0x41, 0xcd, 0x2d, 0x19, 0x3e, 0x49, 0x58, 0x36, 0x13, 0x01, 0x21, 0xc2, 0x64, 0x5e, 0xba, 0x9a,
+	0x1f, 0x78, 0x85, 0x8f, 0xf1, 0x09, 0x8c, 0x17, 0x8b, 0x8f, 0x7c, 0xea, 0xbb, 0x74, 0x61, 0xfa,
+	0x12, 0xa6, 0x85, 0xaa, 0xbe, 0x93, 0xc3, 0x47, 0x30, 0x92, 0x3a, 0xd8, 0x1b, 0x49, 0xdd, 0xe9,
+	0xb5, 0x32, 0xce, 0x5b, 0x3a, 0x12, 0x3e, 0x4e, 0xd7, 0x10, 0x7d, 0x28, 0x6d, 0x3d, 0x8c, 0x75,
+	0x0a, 0xb3, 0xba, 0xb4, 0xf5, 0x45, 0xeb, 0xc8, 0x06, 0xe5, 0x5f, 0x02, 0xdf, 0x41, 0x6c, 0xbd,
+	0x95, 0xbe, 0x81, 0x7f, 0x28, 0x3a, 0x3f, 0xcd, 0xef, 0xdb, 0x59, 0xde, 0xd7, 0x88, 0x3d, 0x45,
+	0x5a, 0xc1, 0xd3, 0xab, 0x2d, 0x35, 0x6e, 0x6e, 0x54, 0x45, 0xd6, 0x0a, 0xfa, 0xb1, 0x21, 0xeb,
+	0xf0, 0x18, 0x0e, 0x3c, 0x1d, 0x5a, 0xf6, 0x00, 0x4f, 0xe0, 0xf0, 0xaa, 0x59, 0xca, 0x86, 0xae,
+	0x2f, 0x83, 0xe7, 0x1d, 0xee, 0x72, 0xfd, 0x56, 0xae, 0x2f, 0xf9, 0xd8, 0x6f, 0x69, 0x87, 0xd3,
+	0x37, 0x10, 0xf5, 0x9f, 0x25, 0x48, 0xaf, 0x5a, 0x4c, 0x21, 0x36, 0x64, 0xb5, 0x6a, 0x2c, 0x75,
+	0x63, 0x84, 0x1e, 0x7b, 0xdc, 0xf9, 0x6f, 0x06, 0x8f, 0xc3, 0x0e, 0x04, 0x55, 0x24, 0xb7, 0x64,
+	0xf0, 0x0b, 0xc4, 0x9f, 0x37, 0xb4, 0xa1, 0x82, 0xcc, 0x56, 0x56, 0x84, 0x2f, 0xee, 0x9f, 0x73,
+	0xef, 0x2e, 0x4e, 0x9e, 0xff, 0xab, 0xc8, 0xfb, 0x49, 0x1f, 0xe0, 0x0d, 0x60, 0xe1, 0x0c, 0x95,
+	0xeb, 0xff, 0xf3, 0x7e, 0xc6, 0x5e, 0xb3, 0x0b, 0xf8, 0x7a, 0x38, 0x64, 0x6f, 0xa6, 0xfe, 0xb6,
+	0xdf, 0xfe, 0x09, 0x00, 0x00, 0xff, 0xff, 0x9d, 0x02, 0x48, 0x01, 0xfd, 0x02, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -285,10 +343,8 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type MessageReceiverClient interface {
-	AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
-	SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
-	StreamAsyncQueue(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamAsyncQueueClient, error)
-	StreamSyncQueue(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamSyncQueueClient, error)
+	QueueService(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error)
+	StreamQueueService(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamQueueServiceClient, error)
 }
 
 type messageReceiverClient struct {
@@ -299,79 +355,39 @@ func NewMessageReceiverClient(cc *grpc.ClientConn) MessageReceiverClient {
 	return &messageReceiverClient{cc}
 }
 
-func (c *messageReceiverClient) AsyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
+func (c *messageReceiverClient) QueueService(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
 	out := new(GossipReply)
-	err := c.cc.Invoke(ctx, "/flow.gossip.messages.MessageReceiver/AsyncQueue", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/flow.gossip.messages.MessageReceiver/QueueService", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *messageReceiverClient) SyncQueue(ctx context.Context, in *GossipMessage, opts ...grpc.CallOption) (*GossipReply, error) {
-	out := new(GossipReply)
-	err := c.cc.Invoke(ctx, "/flow.gossip.messages.MessageReceiver/SyncQueue", in, out, opts...)
+func (c *messageReceiverClient) StreamQueueService(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamQueueServiceClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_MessageReceiver_serviceDesc.Streams[0], "/flow.gossip.messages.MessageReceiver/StreamQueueService", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-func (c *messageReceiverClient) StreamAsyncQueue(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamAsyncQueueClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_MessageReceiver_serviceDesc.Streams[0], "/flow.gossip.messages.MessageReceiver/StreamAsyncQueue", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &messageReceiverStreamAsyncQueueClient{stream}
+	x := &messageReceiverStreamQueueServiceClient{stream}
 	return x, nil
 }
 
-type MessageReceiver_StreamAsyncQueueClient interface {
+type MessageReceiver_StreamQueueServiceClient interface {
 	Send(*GossipMessage) error
 	Recv() (*GossipReply, error)
 	grpc.ClientStream
 }
 
-type messageReceiverStreamAsyncQueueClient struct {
+type messageReceiverStreamQueueServiceClient struct {
 	grpc.ClientStream
 }
 
-func (x *messageReceiverStreamAsyncQueueClient) Send(m *GossipMessage) error {
+func (x *messageReceiverStreamQueueServiceClient) Send(m *GossipMessage) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *messageReceiverStreamAsyncQueueClient) Recv() (*GossipReply, error) {
-	m := new(GossipReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *messageReceiverClient) StreamSyncQueue(ctx context.Context, opts ...grpc.CallOption) (MessageReceiver_StreamSyncQueueClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_MessageReceiver_serviceDesc.Streams[1], "/flow.gossip.messages.MessageReceiver/StreamSyncQueue", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &messageReceiverStreamSyncQueueClient{stream}
-	return x, nil
-}
-
-type MessageReceiver_StreamSyncQueueClient interface {
-	Send(*GossipMessage) error
-	Recv() (*GossipReply, error)
-	grpc.ClientStream
-}
-
-type messageReceiverStreamSyncQueueClient struct {
-	grpc.ClientStream
-}
-
-func (x *messageReceiverStreamSyncQueueClient) Send(m *GossipMessage) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *messageReceiverStreamSyncQueueClient) Recv() (*GossipReply, error) {
+func (x *messageReceiverStreamQueueServiceClient) Recv() (*GossipReply, error) {
 	m := new(GossipReply)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -381,114 +397,62 @@ func (x *messageReceiverStreamSyncQueueClient) Recv() (*GossipReply, error) {
 
 // MessageReceiverServer is the server API for MessageReceiver service.
 type MessageReceiverServer interface {
-	AsyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
-	SyncQueue(context.Context, *GossipMessage) (*GossipReply, error)
-	StreamAsyncQueue(MessageReceiver_StreamAsyncQueueServer) error
-	StreamSyncQueue(MessageReceiver_StreamSyncQueueServer) error
+	QueueService(context.Context, *GossipMessage) (*GossipReply, error)
+	StreamQueueService(MessageReceiver_StreamQueueServiceServer) error
 }
 
 // UnimplementedMessageReceiverServer can be embedded to have forward compatible implementations.
 type UnimplementedMessageReceiverServer struct {
 }
 
-func (*UnimplementedMessageReceiverServer) AsyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AsyncQueue not implemented")
+func (*UnimplementedMessageReceiverServer) QueueService(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueueService not implemented")
 }
-func (*UnimplementedMessageReceiverServer) SyncQueue(ctx context.Context, req *GossipMessage) (*GossipReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SyncQueue not implemented")
-}
-func (*UnimplementedMessageReceiverServer) StreamAsyncQueue(srv MessageReceiver_StreamAsyncQueueServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamAsyncQueue not implemented")
-}
-func (*UnimplementedMessageReceiverServer) StreamSyncQueue(srv MessageReceiver_StreamSyncQueueServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamSyncQueue not implemented")
+func (*UnimplementedMessageReceiverServer) StreamQueueService(srv MessageReceiver_StreamQueueServiceServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamQueueService not implemented")
 }
 
 func RegisterMessageReceiverServer(s *grpc.Server, srv MessageReceiverServer) {
 	s.RegisterService(&_MessageReceiver_serviceDesc, srv)
 }
 
-func _MessageReceiver_AsyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MessageReceiver_QueueService_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GossipMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MessageReceiverServer).AsyncQueue(ctx, in)
+		return srv.(MessageReceiverServer).QueueService(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/flow.gossip.messages.MessageReceiver/AsyncQueue",
+		FullMethod: "/flow.gossip.messages.MessageReceiver/QueueService",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageReceiverServer).AsyncQueue(ctx, req.(*GossipMessage))
+		return srv.(MessageReceiverServer).QueueService(ctx, req.(*GossipMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MessageReceiver_SyncQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GossipMessage)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MessageReceiverServer).SyncQueue(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.gossip.messages.MessageReceiver/SyncQueue",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageReceiverServer).SyncQueue(ctx, req.(*GossipMessage))
-	}
-	return interceptor(ctx, in, info, handler)
+func _MessageReceiver_StreamQueueService_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MessageReceiverServer).StreamQueueService(&messageReceiverStreamQueueServiceServer{stream})
 }
 
-func _MessageReceiver_StreamAsyncQueue_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(MessageReceiverServer).StreamAsyncQueue(&messageReceiverStreamAsyncQueueServer{stream})
-}
-
-type MessageReceiver_StreamAsyncQueueServer interface {
+type MessageReceiver_StreamQueueServiceServer interface {
 	Send(*GossipReply) error
 	Recv() (*GossipMessage, error)
 	grpc.ServerStream
 }
 
-type messageReceiverStreamAsyncQueueServer struct {
+type messageReceiverStreamQueueServiceServer struct {
 	grpc.ServerStream
 }
 
-func (x *messageReceiverStreamAsyncQueueServer) Send(m *GossipReply) error {
+func (x *messageReceiverStreamQueueServiceServer) Send(m *GossipReply) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *messageReceiverStreamAsyncQueueServer) Recv() (*GossipMessage, error) {
-	m := new(GossipMessage)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func _MessageReceiver_StreamSyncQueue_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(MessageReceiverServer).StreamSyncQueue(&messageReceiverStreamSyncQueueServer{stream})
-}
-
-type MessageReceiver_StreamSyncQueueServer interface {
-	Send(*GossipReply) error
-	Recv() (*GossipMessage, error)
-	grpc.ServerStream
-}
-
-type messageReceiverStreamSyncQueueServer struct {
-	grpc.ServerStream
-}
-
-func (x *messageReceiverStreamSyncQueueServer) Send(m *GossipReply) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *messageReceiverStreamSyncQueueServer) Recv() (*GossipMessage, error) {
+func (x *messageReceiverStreamQueueServiceServer) Recv() (*GossipMessage, error) {
 	m := new(GossipMessage)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -501,24 +465,14 @@ var _MessageReceiver_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*MessageReceiverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "AsyncQueue",
-			Handler:    _MessageReceiver_AsyncQueue_Handler,
-		},
-		{
-			MethodName: "SyncQueue",
-			Handler:    _MessageReceiver_SyncQueue_Handler,
+			MethodName: "QueueService",
+			Handler:    _MessageReceiver_QueueService_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamAsyncQueue",
-			Handler:       _MessageReceiver_StreamAsyncQueue_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
-		},
-		{
-			StreamName:    "StreamSyncQueue",
-			Handler:       _MessageReceiver_StreamSyncQueue_Handler,
+			StreamName:    "StreamQueueService",
+			Handler:       _MessageReceiver_StreamQueueService_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

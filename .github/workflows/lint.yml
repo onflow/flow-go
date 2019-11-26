@@ -18,6 +18,7 @@ jobs:
       uses: morphy2k/revive-action@v1
       with:
         config: revive.toml
+        exclude: "cli/flow/cadence/vscode/cadence.go"
         path: "./..."
       env:
         # GitHub token for annotations

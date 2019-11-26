@@ -4,6 +4,7 @@ package gossip
 import (
 	"context"
 
+	"github.com/dapperlabs/flow-go/network/gossip/registry"
 	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
@@ -24,6 +25,5 @@ func (m Mode) String() string {
 // Service is the interface of the network package and hence the networking streams with all
 // other streams of the system. It defines the function call, the type of input arguments, and the output result
 type Service interface {
-	SyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*messages.GossipReply, error)
-	AsyncGossip(ctx context.Context, payload []byte, recipients []string, method string) ([]*messages.GossipReply, error)
+	Gossip(ctx context.Context, payload []byte, recipients []string, method registry.MessageType) ([]*messages.GossipReply, error)
 }
