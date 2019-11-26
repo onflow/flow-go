@@ -23,13 +23,16 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 	publicKeysStr := languageEncodeBytesArray(publicKeys)
 	codeStr := languageEncodeBytes(code)
 
-	script := fmt.Sprintf(`
-		pub fun main() {
-			let publicKeys: [[Int]] = %s
-			let code: [Int]? = %s
-			createAccount(publicKeys, code)
-		}
-	`, publicKeysStr, codeStr)
+	script := fmt.Sprintf(
+		`
+        transaction {
+          execute {
+            priv let publicKeys: [[Int]] = %s
+            priv let code: [Int]? = %s
+            createAccount(publicKeys, code)
+          }
+        }
+        `, publicKeysStr, codeStr)
 
 	return []byte(script), nil
 }
@@ -38,12 +41,16 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 func UpdateAccountCode(code []byte) []byte {
 	codeStr := languageEncodeBytes(code)
 
-	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
+	script := fmt.Sprintf(
+		`
+        transaction {
+          prepare(signer: Account) {
 			let code = %s
-			updateAccountCode(account.address, code)
-		}
-	`, codeStr)
+            updateAccountCode(signer.address, code)
+          }
+          execute {}
+        }
+        `, codeStr)
 
 	return []byte(script)
 }
@@ -57,24 +64,32 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 
 	publicKeyStr := languageEncodeBytes(accountKeyBytes)
 
-	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
-			let key = %s
-			addAccountKey(account.address, key)
-		}
-	`, publicKeyStr)
+	script := fmt.Sprintf(
+		`
+        transaction {
+          prepare(signer: Account) {
+            let key = %s
+            addAccountKey(signer.address, key)
+          }
+          execute {}
+        }
+        `, publicKeyStr)
 
 	return []byte(script), nil
 }
 
 // RemoveAccountKey generates a script that removes a key from an account.
 func RemoveAccountKey(index int) []byte {
-	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
-			let index = %d
-			removeAccountKey(account.address, index)
-		}
-	`, index)
+	script := fmt.Sprintf(
+		`
+        transaction {
+          prepare(signer: Account) {
+            let index = %d
+            removeAccountKey(signer.address, index)
+          }
+          execute {}
+        }
+        `, index)
 
 	return []byte(script)
 }

@@ -14,14 +14,17 @@ import (
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
-	pub fun main(account: Account) {
-		account.storage[Int] = (account.storage[Int] ?? 0) + 2
+	transaction {
+	  prepare(signer: Account) {
+		signer.storage[Int] = (signer.storage[Int] ?? 0) + 2
+	  }
+	  execute {}
 	}
 `
 
 const sampleCall = `
 	pub fun main(): Int {
-		return getAccount("%s").storage[Int] ?? 0
+		return getAccount(0x%s).storage[Int] ?? 0
 	}
 `
 
@@ -41,7 +44,7 @@ func TestWorldStates(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1.AddSignature(accountAddress, sig)
 
@@ -55,7 +58,7 @@ func TestWorldStates(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx2.AddSignature(accountAddress, sig)
 
@@ -69,7 +72,7 @@ func TestWorldStates(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx3.AddSignature(accountAddress, sig)
 
@@ -81,7 +84,8 @@ func TestWorldStates(t *testing.T) {
 
 	// Submit tx1
 	err = b.SubmitTransaction(tx1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+	fmt.Println(err)
 
 	ws2 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx1: %x\n", ws2)
@@ -105,7 +109,7 @@ func TestWorldStates(t *testing.T) {
 
 	// Submit tx2
 	err = b.SubmitTransaction(tx2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ws4 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx2: %x\n", ws4)
@@ -129,7 +133,7 @@ func TestWorldStates(t *testing.T) {
 
 	// Submit tx3
 	err = b.SubmitTransaction(tx3)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ws6 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx3: %x\n", ws6)
@@ -175,7 +179,7 @@ func TestQueryByVersion(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1.AddSignature(accountAddress, sig)
 
@@ -189,7 +193,7 @@ func TestQueryByVersion(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx2.AddSignature(accountAddress, sig)
 
@@ -199,12 +203,12 @@ func TestQueryByVersion(t *testing.T) {
 	ws1 := b.pendingWorldState.Hash()
 
 	err = b.SubmitTransaction(tx1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ws2 := b.pendingWorldState.Hash()
 
 	err = b.SubmitTransaction(tx2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ws3 := b.pendingWorldState.Hash()
 
@@ -220,7 +224,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx1 does exist at ws2
 	tx, err = b.GetTransactionAtVersion(tx1.Hash(), ws2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, tx)
 
 	// tx2 does not exist at ws2
@@ -230,7 +234,7 @@ func TestQueryByVersion(t *testing.T) {
 
 	// tx2 does exist at ws3
 	tx, err = b.GetTransactionAtVersion(tx2.Hash(), ws3)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, tx)
 
 	// Call script at invalid world state version (errors)
@@ -241,17 +245,17 @@ func TestQueryByVersion(t *testing.T) {
 
 	// Value at ws1 is 0
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(0), value)
 
 	// Value at ws2 is 2 (after script executed)
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(2), value)
 
 	// Value at ws3 is 4 (after script executed)
 	value, err = b.ExecuteScriptAtVersion([]byte(callScript), ws3)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(4), value)
 
 	// Pending state does not change after call scripts/get transactions
