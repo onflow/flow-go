@@ -1942,5 +1942,5 @@ func (v AddressValue) Copy() Value {
 }
 
 func (v AddressValue) String() string {
-	return fmt.Sprintf("%x", v[:])
+	return fmt.Sprintf("%x", [AddressLength]byte(v))
 }
