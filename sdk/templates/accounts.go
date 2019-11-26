@@ -23,16 +23,14 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 	publicKeysStr := languageEncodeBytesArray(publicKeys)
 	codeStr := languageEncodeBytes(code)
 
-	script := fmt.Sprintf(
-		`
+	script := fmt.Sprintf(`
         transaction {
           execute {
             priv let publicKeys: [[Int]] = %s
             priv let code: [Int]? = %s
             createAccount(publicKeys, code)
           }
-        }
-        `, publicKeysStr, codeStr)
+        }`, publicKeysStr, codeStr)
 
 	return []byte(script), nil
 }
@@ -41,16 +39,14 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 func UpdateAccountCode(code []byte) []byte {
 	codeStr := languageEncodeBytes(code)
 
-	script := fmt.Sprintf(
-		`
+	script := fmt.Sprintf(`
         transaction {
           prepare(signer: Account) {
             let code = %s
             updateAccountCode(signer.address, code)
           }
           execute {}
-        }
-        `, codeStr)
+        }`, codeStr)
 
 	return []byte(script)
 }
@@ -64,32 +60,28 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 
 	publicKeyStr := languageEncodeBytes(accountKeyBytes)
 
-	script := fmt.Sprintf(
-		`
+	script := fmt.Sprintf(`
         transaction {
           prepare(signer: Account) {
             let key = %s
             addAccountKey(signer.address, key)
           }
           execute {}
-        }
-        `, publicKeyStr)
+        }`, publicKeyStr)
 
 	return []byte(script), nil
 }
 
 // RemoveAccountKey generates a script that removes a key from an account.
 func RemoveAccountKey(index int) []byte {
-	script := fmt.Sprintf(
-		`
+	script := fmt.Sprintf(`
         transaction {
           prepare(signer: Account) {
             let index = %d
             removeAccountKey(signer.address, index)
           }
           execute {}
-        }
-        `, index)
+        }`, index)
 
 	return []byte(script)
 }
