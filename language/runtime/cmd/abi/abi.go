@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -14,9 +13,25 @@ import (
 /*
  Generates ABIs from provided Cadence file
 */
-func GenerateAbi(args []string) {
+func GenerateABI(args []string) {
 
-	_, checker, _ := cmd.PrepareInterpreter(args)
+	if len(args) < 1 {
+		cmd.ExitWithError("no input file")
+	}
+
+	jsonData := GetABIForFile(args[0])
+
+	_, err := os.Stdout.Write(jsonData)
+
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+func GetABIForFile(filename string) []byte {
+
+	_, checker, _ := cmd.PrepareInterpreter(filename)
 
 	exportedTypes := map[string]types.Type{}
 
@@ -41,47 +56,7 @@ func GenerateAbi(args []string) {
 	if err != nil {
 		panic(err)
 	}
-	os.Stdout.Write(jsonData)
 
-	//fmt.Printf("%+v\n", exportedTypes)
-}
+	return jsonData
 
-//func PrettyPrintError(err error, filename string, codes map[string]string) {
-//	i := 0
-//	printErr := func(err error, filename string) {
-//		if i > 0 {
-//			println()
-//		}
-//		print(runtime.PrettyPrintError(err, filename, codes[filename], true))
-//		i += 1
-//	}
-//
-//	if parserError, ok := err.(parser.Error); ok {
-//		for _, err := range parserError.Errors {
-//			printErr(err, filename)
-//		}
-//	} else if checkerError, ok := err.(*sema.CheckerError); ok {
-//		for _, err := range checkerError.Errors {
-//			printErr(err, filename)
-//			if err, ok := err.(*sema.ImportedProgramError); ok {
-//				filename := string(err.ImportLocation.(ast.StringLocation))
-//				for _, err := range err.CheckerError.Errors {
-//					PrettyPrintError(err, filename, codes)
-//				}
-//			}
-//		}
-//	} else if locatedErr, ok := err.(ast.HasImportLocation); ok {
-//		location := locatedErr.ImportLocation()
-//		if location != nil {
-//			filename = string(location.(ast.StringLocation))
-//		}
-//		printErr(err, filename)
-//	} else {
-//		printErr(err, filename)
-//	}
-//}
-
-func exitWithError(message string) {
-	print(runtime.FormatErrorMessage(message, true))
-	os.Exit(1)
 }

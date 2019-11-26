@@ -19,10 +19,19 @@ func (encoder *Encoder) Encode(name string, t types.Type) {
 }
 
 func (encoder *Encoder) Get() interface{} {
-	return encoder.definitions
+	return abiObject{
+		encoder.definitions,
+		"", //Once we setup schema, probably on withflow.org
+	}
 }
 
 //region JSON Structures
+
+type abiObject struct {
+	Definitions map[string]interface{} `json:"definitions"`
+	Schema      string                 `json:"schema,omitempty"`
+}
+
 type arrayObject struct {
 	Array array `json:"array"`
 }
@@ -90,6 +99,10 @@ type structPointer struct {
 	Struct string `json:"struct"`
 }
 
+type variableObject struct {
+	Variable interface{} `json:"variable"`
+}
+
 //endregion
 
 func (encoder *Encoder) mapFields(m map[string]*types.Field) map[string]interface{} {
@@ -136,6 +149,15 @@ func (encoder *Encoder) mapTypes(types []types.Type) []interface{} {
 	}
 
 	return ret
+}
+
+// For function return type Void is redundant, so we remove it
+func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
+	if _, ok := returnType.(types.Void); ok == true {
+		return nil
+	} else {
+		return encoder.encode(returnType)
+	}
 }
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
@@ -199,14 +221,14 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		return functionObject{
 			function{
 				Parameters: encoder.mapParameters(v.Parameters),
-				ReturnType: encoder.encode(v.ReturnType),
+				ReturnType: encoder.encodeReturnType(v.ReturnType),
 			},
 		}
 	case types.FunctionType:
 		return functionObject{
 			functionType{
 				Parameters: encoder.mapTypes(v.ParameterTypes),
-				ReturnType: encoder.encode(v.ReturnType),
+				ReturnType: encoder.encodeReturnType(v.ReturnType),
 			},
 		}
 
@@ -223,6 +245,10 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
+		}
+	case types.Variable:
+		return variableObject{
+			encoder.encode(v.Type),
 		}
 
 	}

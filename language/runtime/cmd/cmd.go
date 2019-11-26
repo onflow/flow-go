@@ -47,11 +47,7 @@ func PrettyPrintError(err error, filename string, codes map[string]string) {
 	}
 }
 
-func PrepareInterpreter(args []string) (*interpreter.Interpreter, *sema.Checker, func(error)) {
-	if len(args) < 1 {
-		exitWithError("no input file")
-	}
-	filename := args[0]
+func PrepareInterpreter(filename string) (*interpreter.Interpreter, *sema.Checker, func(error)) {
 
 	codes := map[string]string{}
 
@@ -112,7 +108,7 @@ func PrepareInterpreter(args []string) (*interpreter.Interpreter, *sema.Checker,
 	}
 }
 
-func exitWithError(message string) {
+func ExitWithError(message string) {
 	print(runtime.FormatErrorMessage(message, true))
 	os.Exit(1)
 }

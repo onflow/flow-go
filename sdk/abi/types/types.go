@@ -45,6 +45,11 @@ type UInt32 struct{ isAType }
 
 type UInt64 struct{ isAType }
 
+type Variable struct {
+	isAType
+	Type Type
+}
+
 type VariableSizedArray struct {
 	isAType
 	ElementType Type

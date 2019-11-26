@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
@@ -116,9 +117,14 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 func Test_exportability(t *testing.T) {
 
 	t.Run("structs", func(t *testing.T) {
+		position := ast.Position{
+			1, 2, 3,
+		}
+		identifier := "my_structure"
+
 		ty := &CompositeType{
 			Location:     nil,
-			Identifier:   "foo",
+			Identifier:   identifier,
 			Kind:         common.CompositeKindStructure,
 			Conformances: nil,
 			Members: map[string]*Member{
@@ -127,7 +133,7 @@ func Test_exportability(t *testing.T) {
 					Access:        0,
 					Identifier: ast.Identifier{
 						Identifier: "fieldA",
-						Pos:        ast.Position{},
+						Pos:        position,
 					},
 					Type:            &IntType{},
 					DeclarationKind: 0,
@@ -135,19 +141,91 @@ func Test_exportability(t *testing.T) {
 					ArgumentLabels:  nil,
 				},
 			},
-			ConstructorParameterTypeAnnotations: nil,
+			ConstructorParameterTypeAnnotations: []*TypeAnnotation{
+				{
+					Move: false,
+					Type: &Int8Type{},
+				},
+			},
 		}
 
-		ex := ty.Export()
+		program := &ast.Program{
+			Declarations: []ast.Declaration{
+				&ast.CompositeDeclaration{
+					Access:        0,
+					CompositeKind: 0,
+					Identifier: ast.Identifier{
+						Identifier: identifier, Pos: position,
+					},
+					Conformances: nil,
+					Members: &ast.Members{
+						Fields: nil,
+						SpecialFunctions: []*ast.SpecialFunctionDeclaration{
+							{
+								DeclarationKind: common.DeclarationKindInitializer,
+								FunctionDeclaration: &ast.FunctionDeclaration{
+									Access:     0,
+									Identifier: ast.Identifier{},
+									ParameterList: &ast.ParameterList{
+										Parameters: []*ast.Parameter{
+											{
+												Label: "labelA",
+												Identifier: ast.Identifier{
+													Identifier: "fieldA",
+													Pos:        ast.Position{},
+												},
+												TypeAnnotation: &ast.TypeAnnotation{
+													Move: false,
+													Type: nil,
+												},
+												Range: ast.Range{},
+											},
+										},
+										Range: ast.Range{},
+									},
+									ReturnTypeAnnotation: nil,
+									FunctionBlock:        nil,
+									StartPos:             ast.Position{},
+								},
+							},
+						},
+						Functions:             nil,
+						CompositeDeclarations: nil,
+					},
+					Range: ast.Range{},
+				},
+			},
+		}
+
+		variable := &Variable{
+			Identifier:      identifier,
+			DeclarationKind: common.DeclarationKindStructure,
+			Type:            nil,
+			Access:          0,
+			IsConstant:      false,
+			Depth:           0,
+			ArgumentLabels:  nil,
+			Pos:             &position,
+		}
+
+		ex := ty.Export(program, variable)
 
 		assert.IsType(t, types.Struct{}, ex)
+		s := ex.(types.Struct)
+
+		assert.Equal(t, identifier, s.Identifier)
+		require.Len(t, s.Fields, 1)
+
+		require.Contains(t, s.Fields, "fieldA")
+
+		assert.IsType(t, types.Int{}, s.Fields["fieldA"].Type)
 	})
 
 	t.Run("string", func(t *testing.T) {
 
 		ty := &StringType{}
 
-		ex := ty.Export()
+		ex := ty.Export(nil, nil)
 
 		assert.IsType(t, types.String{}, ex)
 	})
@@ -170,12 +248,16 @@ func Test_exportability(t *testing.T) {
 			ConstructorParameterTypeAnnotations: nil,
 		}
 
-		assert.IsType(t, &types.Event{}, ty)
+		ex := ty.Export(nil, nil)
 
-		assert.Len(t, ty.Fields, 2)
+		assert.IsType(t, types.Event{}, ex)
 
-		assert.Equal(t, ty.Fields[1].Identifier, "where")
-		assert.Equal(t, ty.Fields[1].Type, IntType{})
+		event := ex.(types.Event)
+
+		require.Len(t, event.Fields, 2)
+
+		// for fields in event, order matters
+		assert.Equal(t, "where", event.Fields[1].Identifier)
 	})
 
 }

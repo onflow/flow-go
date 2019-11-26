@@ -56,7 +56,21 @@
               }
             }
           }
-        }
+        },
+        "initializers": [
+          [
+            {
+              "name": "bananas",
+              "type": {
+                "array": {
+                  "of": {
+                    "resource": "Banana"
+                  }
+                }
+              }
+            }
+          ]
+        ]
       }
     }
   }

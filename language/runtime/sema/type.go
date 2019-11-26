@@ -30,6 +30,17 @@ type ExportableType interface {
 	Export(program *ast.Program, variable *Variable) types.Type
 }
 
+//Helper function to wrap a types in a variable if a variable is set
+func wrapVariable(t types.Type, variable *Variable) types.Type {
+	if variable != nil {
+		return types.Variable{
+			Type: t,
+		}
+	} else {
+		return t
+	}
+}
+
 // ValueIndexableType
 
 type ValueIndexableType interface {
@@ -101,7 +112,7 @@ func (*AnyType) Equal(other Type) bool {
 }
 
 func (*AnyType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Any{}
+	return wrapVariable(types.Any{}, variable)
 }
 
 func (*AnyType) IsResourceType() bool {
@@ -144,7 +155,7 @@ type VoidType struct{}
 func (*VoidType) isType() {}
 
 func (*VoidType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Void{}
+	return wrapVariable(types.Void{}, variable)
 }
 
 func (*VoidType) String() string {
@@ -236,9 +247,9 @@ func (t *OptionalType) IsInvalidType() bool {
 
 func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
 
-	return types.Optional{
+	return wrapVariable(types.Optional{
 		Of: t.Type.(ExportableType).Export(program, nil),
-	}
+	}, variable)
 }
 
 // BoolType represents the boolean type
@@ -247,7 +258,7 @@ type BoolType struct{}
 func (*BoolType) isType() {}
 
 func (*BoolType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Bool{}
+	return wrapVariable(types.Bool{}, variable)
 }
 
 func (*BoolType) String() string {
@@ -304,7 +315,7 @@ type StringType struct{}
 func (*StringType) isType() {}
 
 func (*StringType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.String{}
+	return wrapVariable(types.String{}, variable)
 }
 
 func (*StringType) String() string {
@@ -444,7 +455,7 @@ type IntType struct{}
 func (*IntType) isType() {}
 
 func (*IntType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Int{}
+	return wrapVariable(types.Int{}, variable)
 }
 
 func (*IntType) String() string {
@@ -483,7 +494,7 @@ type Int8Type struct{}
 func (*Int8Type) isType() {}
 
 func (*Int8Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Int8{}
+	return wrapVariable(types.Int8{}, variable)
 }
 
 func (*Int8Type) String() string {
@@ -524,7 +535,7 @@ type Int16Type struct{}
 func (*Int16Type) isType() {}
 
 func (*Int16Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Int16{}
+	return wrapVariable(types.Int16{}, variable)
 }
 
 func (*Int16Type) String() string {
@@ -565,7 +576,7 @@ type Int32Type struct{}
 func (*Int32Type) isType() {}
 
 func (*Int32Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Int32{}
+	return wrapVariable(types.Int32{}, variable)
 }
 
 func (*Int32Type) String() string {
@@ -606,7 +617,7 @@ type Int64Type struct{}
 func (*Int64Type) isType() {}
 
 func (*Int64Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Int64{}
+	return wrapVariable(types.Int64{}, variable)
 }
 
 func (*Int64Type) String() string {
@@ -647,7 +658,7 @@ type UInt8Type struct{}
 func (*UInt8Type) isType() {}
 
 func (*UInt8Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.UInt8{}
+	return wrapVariable(types.UInt8{}, variable)
 }
 
 func (*UInt8Type) String() string {
@@ -688,7 +699,7 @@ type UInt16Type struct{}
 func (*UInt16Type) isType() {}
 
 func (*UInt16Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.UInt16{}
+	return wrapVariable(types.UInt16{}, variable)
 }
 
 func (*UInt16Type) String() string {
@@ -728,8 +739,8 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
-func (*UInt32Type) Export() types.Type {
-	return types.UInt32{}
+func (*UInt32Type) Export(program *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(types.UInt32{}, variable)
 }
 
 func (*UInt32Type) String() string {
@@ -769,8 +780,8 @@ type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
 
-func (*UInt64Type) Export() types.Type {
-	return types.UInt64{}
+func (*UInt64Type) Export(program *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(types.UInt64{}, variable)
 }
 
 func (*UInt64Type) String() string {
@@ -1047,9 +1058,9 @@ func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
 func (t *VariableSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.VariableSizedArray{
+	return wrapVariable(types.VariableSizedArray{
 		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}
+	}, variable)
 }
 
 func (t *VariableSizedType) String() string {
@@ -1107,10 +1118,10 @@ func (*ConstantSizedType) isType()      {}
 func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.ConstantSizedArray{
+	return wrapVariable(types.ConstantSizedArray{
 		Size:        uint(t.Size),
 		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}
+	}, variable)
 }
 
 func (t *ConstantSizedType) String() string {
@@ -1752,10 +1763,10 @@ func (t *DictionaryType) String() string {
 }
 
 func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.Type {
-	return types.Dictionary{
+	return wrapVariable(types.Dictionary{
 		KeyType:     t.KeyType.(ExportableType).Export(program, nil),
 		ElementType: t.ValueType.(ExportableType).Export(program, nil),
-	}
+	}, variable)
 }
 
 func (t *DictionaryType) ID() string {
@@ -1960,6 +1971,16 @@ func (*EventType) isType() {}
 
 func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type {
 
+	eventDeclaration := func() *ast.EventDeclaration {
+		for _, fn := range program.EventDeclarations() {
+			if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
+				return fn
+			}
+		}
+
+		panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
+	}()
+
 	fieldTypes := make([]*types.Parameter, len(t.Fields))
 
 	for i, field := range t.Fields {
@@ -1968,7 +1989,7 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 				Identifier: field.Identifier,
 				Type:       field.Type.(ExportableType).Export(program, nil),
 			},
-			Label: "",
+			Label: eventDeclaration.ParameterList.Parameters[i].Label,
 		}
 	}
 	return types.Event{

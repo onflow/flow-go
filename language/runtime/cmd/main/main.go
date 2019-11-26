@@ -10,7 +10,7 @@ import (
 func main() {
 	if len(os.Args) > 1 {
 		//execute.Execute(os.Args[1:])
-		abi.GenerateAbi(os.Args[1:])
+		abi.GenerateABI(os.Args[1:])
 	} else {
 		execute.RunREPL()
 	}

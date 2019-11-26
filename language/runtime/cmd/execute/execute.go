@@ -10,7 +10,11 @@ import (
 // The program may call the function `log` to print a value.
 func Execute(args []string) {
 
-	inter, _, must := cmd.PrepareInterpreter(args)
+	if len(args) < 1 {
+		cmd.ExitWithError("no input file")
+	}
+
+	inter, _, must := cmd.PrepareInterpreter(args[0])
 
 	if _, hasMain := inter.Globals["main"]; !hasMain {
 		return
