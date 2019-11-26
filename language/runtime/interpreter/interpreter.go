@@ -1483,10 +1483,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return invocationExpression.InvokedExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			// Handle optional chaining on member expression, if any
+			// Handle optional chaining on member expression, if any:
+			// - If the member expression is nil, finish execution
+			// - If the member expression is some value, the wrapped value
+			//   is the function value that should be invoked
+
+			isOptionalChaining := false
 
 			if invokedMemberExpression, ok :=
 				invocationExpression.InvokedExpression.(*ast.MemberExpression); ok && invokedMemberExpression.Optional {
+
+				isOptionalChaining = true
 
 				switch typedResult := result.(type) {
 				case NilValue:
@@ -1529,7 +1536,19 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 						Position: invocationExpression.StartPosition(),
 						Location: interpreter.Checker.Location,
 					}
-					return function.invoke(argumentCopies, location)
+
+					invocation := function.invoke(argumentCopies, location)
+
+					// If this is invocation is optional chaining, wrap the result
+					// as an optional, as the result is expected to be an optional
+
+					if !isOptionalChaining {
+						return invocation
+					}
+
+					return invocation.Map(func(result interface{}) interface{} {
+						return SomeValue{Value: result.(Value)}
+					})
 				})
 		})
 }
