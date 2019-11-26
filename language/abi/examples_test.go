@@ -38,7 +38,7 @@ func TestExamples(t *testing.T) {
 
 					require.NoError(t, err)
 
-					generatedAbi := abi.GetABIForFile("examples/" + file.Name())
+					generatedAbi := abi.GetABIForFile("examples/"+file.Name(), false)
 
 					options := jsondiff.DefaultConsoleOptions()
 					diff, s := jsondiff.Compare(generatedAbi, abiBytes, &options)

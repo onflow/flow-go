@@ -12,7 +12,12 @@ type Person interface {
 }
 
 var PersonType types.Type = types.Composite{
-	FieldTypes: []types.Type{types.String{}},
+	Fields: map[string]*types.Field{
+		"FullName": {
+			Type:       types.String{},
+			Identifier: "FullName",
+		},
+	},
 }
 
 func EncodePerson(p Person) ([]byte, error) {

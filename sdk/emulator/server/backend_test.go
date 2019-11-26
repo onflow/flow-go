@@ -52,10 +52,12 @@ func TestGetEvents(t *testing.T) {
 
 		transferEventType types.Type = types.Event{
 			Identifier: transferType,
-			FieldTypes: []types.EventField{
+			Fields: []*types.Parameter{
 				{
-					Identifier: "to",
-					Type:       types.Address{},
+					Field: types.Field{
+						Identifier: "to",
+						Type:       types.Address{},
+					},
 				},
 			},
 		}

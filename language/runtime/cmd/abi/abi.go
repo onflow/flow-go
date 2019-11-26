@@ -13,13 +13,13 @@ import (
 /*
  Generates ABIs from provided Cadence file
 */
-func GenerateABI(args []string) {
+func GenerateABI(args []string, pretty bool) {
 
 	if len(args) < 1 {
 		cmd.ExitWithError("no input file")
 	}
 
-	jsonData := GetABIForFile(args[0])
+	jsonData := GetABIForFile(args[0], pretty)
 
 	_, err := os.Stdout.Write(jsonData)
 
@@ -29,7 +29,7 @@ func GenerateABI(args []string) {
 
 }
 
-func GetABIForFile(filename string) []byte {
+func GetABIForFile(filename string, pretty bool) []byte {
 
 	_, checker, _ := cmd.PrepareInterpreter(filename)
 
@@ -51,12 +51,19 @@ func GetABIForFile(filename string) []byte {
 		encoder.Encode(name, type_)
 	}
 
-	jsonData, err := json.MarshalIndent(encoder.Get(), "", "  ")
+	marshall := func() ([]byte, error) {
+		if pretty {
+			return json.MarshalIndent(encoder.Get(), "", "  ")
+		} else {
+			return json.Marshal(encoder.Get())
+		}
+	}
+
+	jsonData, err := marshall()
 
 	if err != nil {
 		panic(err)
 	}
 
 	return jsonData
-
 }

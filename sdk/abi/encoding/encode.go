@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sort"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -14,6 +15,11 @@ import (
 // An Encoder converts Cadence values into XDR-encoded bytes.
 type Encoder struct {
 	enc *xdr.Encoder
+}
+
+//Central point to keep ordering for encoding the same
+func EncodingOrder(names []string) {
+	sort.Strings(names)
 }
 
 // Encode returns the XDR-encoded representation of the given value.

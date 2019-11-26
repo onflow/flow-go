@@ -1700,8 +1700,8 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 			value := CompositeValue{
 				Location:   interpreter.Checker.Location,
 				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				Fields:     map[string]Value{},
+				Functions:  functions,
 				Destructor: destructorFunction,
 			}
 

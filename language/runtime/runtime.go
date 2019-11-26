@@ -322,7 +322,7 @@ func accountValue(address values.Address) interpreter.Value {
 
 	return interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
-		Fields: &map[string]interpreter.Value{
+		Fields: map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(addressHex),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},

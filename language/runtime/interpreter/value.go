@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1224,8 +1225,8 @@ func ConvertUInt64(value Value) Value {
 type CompositeValue struct {
 	Location   ast.Location
 	Identifier string
-	Fields     *map[string]Value
-	Functions  *map[string]FunctionValue
+	Fields     map[string]Value
+	Functions  map[string]FunctionValue
 	Destructor *InterpretedFunctionValue
 }
 
@@ -1251,8 +1252,8 @@ func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosit
 func (CompositeValue) isValue() {}
 
 func (v CompositeValue) Copy() Value {
-	newFields := make(map[string]Value, len(*v.Fields))
-	for field, value := range *v.Fields {
+	newFields := make(map[string]Value, len(v.Fields))
+	for field, value := range v.Fields {
 		newFields[field] = value.Copy()
 	}
 
@@ -1261,26 +1262,34 @@ func (v CompositeValue) Copy() Value {
 	return CompositeValue{
 		Location:   v.Location,
 		Identifier: v.Identifier,
-		Fields:     &newFields,
+		Fields:     newFields,
 		Functions:  v.Functions,
 		Destructor: v.Destructor,
 	}
 }
 
 func (v CompositeValue) Export() values.Value {
-	fieldMap := *v.Fields
 
-	fields := make([]values.Value, 0, len(fieldMap))
+	fields := make([]values.Value, 0)
 
-	for _, value := range fieldMap {
-		fields = append(fields, value.(ExportableValue).Export())
+	keys := make([]string, len(v.Fields))
+	i := 0
+	for key, _ := range v.Fields {
+		keys[i] = key
+		i++
 	}
 
-	return values.Composite{fields}
+	encoding.EncodingOrder(keys)
+
+	for _, key := range keys {
+		fields = append(fields, v.Fields[key].(ExportableValue).Export())
+	}
+
+	return values.Composite{Fields: fields}
 }
 
 func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
-	value, ok := (*v.Fields)[name]
+	value, ok := v.Fields[name]
 	if ok {
 		return value
 	}
@@ -1296,10 +1305,10 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 	// if composite was deserialized, dynamically link in the functions
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
-		v.Functions = &functions
+		v.Functions = functions
 	}
 
-	function, ok := (*v.Functions)[name]
+	function, ok := v.Functions[name]
 	if ok {
 		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
 			function = interpreter.bindSelf(interpretedFunction, v)
@@ -1311,7 +1320,7 @@ func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, nam
 }
 
 func (v CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
-	(*v.Fields)[name] = value
+	v.Fields[name] = value
 }
 
 func (v CompositeValue) GobEncode() ([]byte, error) {
@@ -1359,7 +1368,7 @@ func (v CompositeValue) String() string {
 	builder.WriteString(v.Identifier)
 	builder.WriteString("(")
 	i := 0
-	for name, value := range *v.Fields {
+	for name, value := range v.Fields {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -1373,7 +1382,7 @@ func (v CompositeValue) String() string {
 }
 
 func (v CompositeValue) GetField(name string) Value {
-	return (*v.Fields)[name]
+	return v.Fields[name]
 }
 
 // DictionaryValue

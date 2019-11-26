@@ -87,8 +87,6 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
 	}
-
-	return nil, nil
 }
 
 // DecodeVoid reads the XDR-encoded representation of a void value.
@@ -398,9 +396,18 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
 	fields := make([]values.Value, len(t.Fields))
 
+	k := 0
+	keys := make([]string, len(t.Fields))
+	for key, _ := range t.Fields {
+		keys[k] = key
+		k++
+	}
+
+	EncodingOrder(keys)
+
 	i := 0
-	for _, fieldType := range t.Fields {
-		value, err := e.Decode(fieldType)
+	for _, key := range keys {
+		value, err := e.Decode(t.Fields[key].Type)
 		if err != nil {
 			return values.Composite{}, err
 		}

@@ -463,10 +463,12 @@ func TestGetTransaction(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
 
 	myEventType := types.Event{
-		FieldTypes: []types.EventField{
+		Fields: []*types.Parameter{
 			{
-				Identifier: "x",
-				Type:       types.Int{},
+				Field: types.Field{
+					Identifier: "x",
+					Type:       types.Int{},
+				},
 			},
 		},
 	}

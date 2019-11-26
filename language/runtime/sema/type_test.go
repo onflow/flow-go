@@ -232,6 +232,10 @@ func Test_exportability(t *testing.T) {
 
 	t.Run("events", func(t *testing.T) {
 
+		position := ast.Position{
+			2, 1, 37,
+		}
+
 		ty := &EventType{
 			Location:   nil,
 			Identifier: "MagicEvent",
@@ -248,7 +252,45 @@ func Test_exportability(t *testing.T) {
 			ConstructorParameterTypeAnnotations: nil,
 		}
 
-		ex := ty.Export(nil, nil)
+		program := &ast.Program{
+			Declarations: []ast.Declaration{
+				&ast.EventDeclaration{
+					Identifier: ast.Identifier{
+						Identifier: "MagicEvent",
+						Pos:        position,
+					},
+					ParameterList: &ast.ParameterList{
+						Parameters: []*ast.Parameter{
+							{
+								Label: "magic_caster",
+								Identifier: ast.Identifier{
+									Identifier: "who",
+								},
+							},
+							{
+								Label: "magic_place",
+								Identifier: ast.Identifier{
+									Identifier: "where",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		variable := Variable{
+			Identifier:      "MagicEvent",
+			DeclarationKind: 0,
+			Type:            nil,
+			Access:          0,
+			IsConstant:      false,
+			Depth:           0,
+			ArgumentLabels:  nil,
+			Pos:             &position,
+		}
+
+		ex := ty.Export(program, &variable)
 
 		assert.IsType(t, types.Event{}, ex)
 
@@ -258,6 +300,7 @@ func Test_exportability(t *testing.T) {
 
 		// for fields in event, order matters
 		assert.Equal(t, "where", event.Fields[1].Identifier)
+		assert.Equal(t, "magic_place", event.Fields[1].Label)
 	})
 
 }
