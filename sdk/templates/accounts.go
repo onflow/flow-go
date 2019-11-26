@@ -45,7 +45,7 @@ func UpdateAccountCode(code []byte) []byte {
 		`
         transaction {
           prepare(signer: Account) {
-			let code = %s
+            let code = %s
             updateAccountCode(signer.address, code)
           }
           execute {}
