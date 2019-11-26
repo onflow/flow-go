@@ -5956,27 +5956,55 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
 	const rTypeIdentifier = "R"
 
-	rValue := interpreter.NewSomeValueOwningNonCopying(
-		&interpreter.CompositeValue{
-			Identifier: rTypeIdentifier,
-			Fields:     map[string]interpreter.Value{},
-		},
-	)
+	originalValue := &interpreter.CompositeValue{
+		Identifier: rTypeIdentifier,
+		Kind:       common.CompositeKindResource,
+		Fields:     map[string]interpreter.Value{},
+		Owner:      storageIdentifier1,
+	}
+
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
-		rTypeIdentifier: rValue,
+		rTypeIdentifier: interpreter.NewSomeValueOwningNonCopying(
+			originalValue,
+		),
 	}
 
 	_, err := inter.Invoke("test")
 	require.Nil(t, err)
 
+	// Assert the ownership of the resource changed to account 2
+
 	assert.Equal(t,
-		interpreter.NilValue{},
-		allStoredValues[storageIdentifier1][rTypeIdentifier],
+		storageIdentifier2,
+		originalValue.GetOwner(),
 	)
 
-	assert.IsType(t,
+	// Assert the resource was removed from storage of account 1
+
+	storedValue1 := allStoredValues[storageIdentifier1][rTypeIdentifier]
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		storedValue1,
+	)
+
+	// Assert the resource was moved into storage of account 2
+
+	storedValue2 := allStoredValues[storageIdentifier2][rTypeIdentifier]
+
+	assert.Equal(t,
+		storageIdentifier2,
+		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
+	)
+
+	require.IsType(t,
 		&interpreter.SomeValue{},
-		allStoredValues[storageIdentifier2][rTypeIdentifier],
+		storedValue2,
+	)
+
+	assert.Equal(t,
+		storageIdentifier2,
+		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
 	)
 }
 
@@ -6070,26 +6098,54 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 
 	const rTypeIdentifier = "R"
 
-	rValue := interpreter.NewSomeValueOwningNonCopying(
-		&interpreter.CompositeValue{
-			Identifier: rTypeIdentifier,
-			Fields:     map[string]interpreter.Value{},
-		},
-	)
+	originalValue := &interpreter.CompositeValue{
+		Identifier: rTypeIdentifier,
+		Kind:       common.CompositeKindResource,
+		Fields:     map[string]interpreter.Value{},
+		Owner:      storageIdentifier1,
+	}
+
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
-		rTypeIdentifier: rValue,
+		rTypeIdentifier: interpreter.NewSomeValueOwningNonCopying(
+			originalValue,
+		),
 	}
 
 	_, err := inter.Invoke("test")
 	require.Nil(t, err)
 
+	// Assert the ownership of the resource changed to account 2
+
 	assert.Equal(t,
-		interpreter.NilValue{},
-		allStoredValues[storageIdentifier1][rTypeIdentifier],
+		storageIdentifier2,
+		originalValue.GetOwner(),
 	)
 
-	assert.IsType(t,
+	// Assert the resource was removed from storage of account 1
+
+	storedValue1 := allStoredValues[storageIdentifier1][rTypeIdentifier]
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		storedValue1,
+	)
+
+	// Assert the resource was moved into storage of account 2
+
+	storedValue2 := allStoredValues[storageIdentifier2][rTypeIdentifier]
+
+	assert.Equal(t,
+		storageIdentifier2,
+		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
+	)
+
+	require.IsType(t,
 		&interpreter.SomeValue{},
-		allStoredValues[storageIdentifier2][rTypeIdentifier],
+		storedValue2,
+	)
+
+	assert.Equal(t,
+		storageIdentifier2,
+		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
 	)
 }
