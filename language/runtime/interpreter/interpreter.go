@@ -2335,6 +2335,8 @@ func (interpreter *Interpreter) readStored(storageIdentifier string, key string)
 }
 
 func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
+	value.SetOwner(storageIdentifier)
+
 	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
 }
 
