@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -696,14 +695,10 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	assert.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
