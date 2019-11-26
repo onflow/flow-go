@@ -519,8 +519,8 @@ func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint6
 
 			address := acctCreatedEvent.Address()
 
-			account, err := b.GetAccount(address)
-			if err != nil {
+			account := b.getAccount(address)
+			if account == nil {
 				panic("failed to get newly-created account")
 			}
 

@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
+
 	"github.com/dapperlabs/flow-go/sdk/keys"
 
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -47,7 +49,7 @@ func TestInitialization(t *testing.T) {
 		script := `
 			event MyEvent(x: Int)
 			
-			fun main(acct: Account) {
+			pub fun main(acct: Account) {
 				emit MyEvent(x: 1)
 
 				acct.storage[Int] = 1
@@ -109,14 +111,15 @@ func TestInitialization(t *testing.T) {
 
 		t.Run("should be able to read ledger state", func(t *testing.T) {
 			readScript := fmt.Sprintf(`
-				fun main(): Int {
+				pub fun main(): Int {
 					return getAccount("%s").storage[Int] ?? 0
 				}
 			`, b.RootAccountAddress())
 
 			res, _, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)
-			assert.Equal(t, big.NewInt(1), res)
+
+			assert.Equal(t, values.Int{big.NewInt(1)}, res)
 		})
 	})
 }
