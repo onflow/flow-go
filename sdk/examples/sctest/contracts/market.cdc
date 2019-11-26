@@ -22,16 +22,22 @@ import INFT, NFT, INFTCollection, NFTCollection from 0x0000000000000000000000000
 
 // this is only for one type of NFT for now
 // TODO: make it a marketplace that can buy and sell different classes of NFTs
-//       how do I do this?
+//       how do I do this? Generic NFTs? Using interfaces instead of resources as argument
+//       and storage types?
 
 
 pub resource SaleCollection {
 
+    // a dictionary of the NFTs that the user is putting up for sale
     pub var forSale: <-{Int: NFT}
 
-    pub let ownerVault: &Receiver
-
+    // dictionary of the prices for each NFT by ID
     pub var prices: {Int: Int}
+
+    // the fungible token vault of the owner of this sale
+    // so that when someone buys a token, this resource can deposit
+    // tokens in their account
+    pub let ownerVault: &Receiver
 
     init (vault: &Receiver) {
         self.forSale = {}
@@ -39,12 +45,16 @@ pub resource SaleCollection {
         self.prices = {}
     }
 
+    // withdraw gives the owner the opportunity to remove a sale from the collection
     pub fun withdraw(tokenID: Int): <-NFT {
+        // remove the price
         self.prices.remove(key: tokenID)
+        // remove and return the token
         let token <- self.forSale.remove(key: tokenID) ?? panic("missing NFT")
         return <-token
     }
 
+    // listForSale lists an NFT for sale in this collection
     pub fun listForSale(token: <-NFT, price: Int) {
         let id: Int = token.id
 
@@ -54,27 +64,35 @@ pub resource SaleCollection {
         destroy oldToken
     }
 
+    // changePrice changes the price of a token that is currently for sale
+    pub fun changePrice(tokenID: Int, newPrice: Int) {
+        self.prices[tokenID] = newPrice
+    }
+
+    // purchase lets a user send tokens to purchase an NFT that is for sale
     pub fun purchase(tokenID: Int, recipient: &NFTCollection, buyTokens: <-Receiver) {
         pre {
             self.forSale[tokenID] != nil:
                 "No token matching this ID for sale!"
-        }
-        let price = self.prices[tokenID] ?? panic("missing price!")
-        if buyTokens.balance < price {
-            panic("Not enough tokens to buy the NFT!")
+            buyTokens.balance >= (self.prices[tokenID] ?? panic("missing price!")):
+                "Not enough tokens to by the NFT!"
         }
 
+        // deposit the purchasing tokens into the owners vault
         self.ownerVault.deposit(from: <-buyTokens)
 
+        // deposit the NFT into the buyers collection
         recipient.deposit(token: <-self.withdraw(tokenID: tokenID))
 
     }
 
+    // idPrice returns the price of a specific token in the sale
     pub fun idPrice(tokenID: Int): Int {
         let price = self.prices[tokenID] ?? panic("no price!")
         return price
     }
 
+    // getIDs returns an array of token IDs that are for sale
     pub fun getIDs(): [Int] {
         return self.forSale.keys
     }
@@ -94,16 +112,26 @@ pub fun createCollection(ownerVault: &Receiver): <-SaleCollection {
     return <- create SaleCollection(vault: ownerVault)
 }
 
-// pub resource Marketplace {
-//     // Data structure to store active sales
-//     var tokensForSale: [&SaleCollection]
+pub resource Marketplace {
+    // Data structure to store active sales
+    pub var tokensForSale: [&SaleCollection]
 
-//     init() {
-//         self.tokensForSale = []
-//     }
+    init() {
+        self.tokensForSale = []
+    }
 
-//     // pub fun listSaleCollection(collection: &SaleCollection) {
+    // listSaleCollection lists a users sale reference in the array
+    // and returns the index of the sale so that users can know
+    // how to remove it from the marketplace
+    pub fun listSaleCollection(collection: &SaleCollection): Int {
+        self.tokensForSale.append(collection)
+        return (self.tokensForSale.length - 1)
+    }
 
-//     // }
+    // removeSaleCollection removes a user's sale from the array
+    // of sale references
+    pub fun removeSaleCollection(index: Int) {
+        self.tokensForSale.remove(at: index)
+    }
 
-// }
+}
