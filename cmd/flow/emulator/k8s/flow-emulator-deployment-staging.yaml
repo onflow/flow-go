@@ -94,11 +94,10 @@ spec:
               containerPort: 3569
             - name: http
               containerPort: 8080
-
             # Prometheus is looking specifically for a port named 'metrics'
             # This may be the same as the above port, or different
-            # - name: metrics
-            #   containerPort: 3001
+            - name: metrics
+              containerPort: 8080
 
           # Environment variables
           env:

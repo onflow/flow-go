@@ -39,7 +39,7 @@ func TestPing(t *testing.T) {
 			Times(1)
 
 		err := c.Ping(ctx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("ServerError", func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestSendTransaction(t *testing.T) {
 			Times(1)
 
 		err := c.SendTransaction(ctx, tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestGetLatestBlock(t *testing.T) {
 			Times(1)
 
 		blockHeaderA, err := c.GetLatestBlock(ctx, true)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		blockHeaderB := convert.MessageToBlockHeader(res.GetBlock())
 		assert.Equal(t, *blockHeaderA, blockHeaderB)
@@ -197,7 +197,7 @@ func TestGetTransaction(t *testing.T) {
 			Times(1)
 
 		res, err := c.GetTransaction(ctx, crypto.Hash{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, res.Events, 1)
 		assert.Equal(t, events[0].Type, res.Events[0].Type)
 	})
