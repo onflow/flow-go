@@ -5974,8 +5974,8 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 		allStoredValues[storageIdentifier1][rTypeIdentifier],
 	)
 
-	assert.Equal(t,
-		rValue,
+	assert.IsType(t,
+		&interpreter.SomeValue{},
 		allStoredValues[storageIdentifier2][rTypeIdentifier],
 	)
 }
@@ -6088,8 +6088,8 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 		allStoredValues[storageIdentifier1][rTypeIdentifier],
 	)
 
-	assert.Equal(t,
-		rValue,
+	assert.IsType(t,
+		&interpreter.SomeValue{},
 		allStoredValues[storageIdentifier2][rTypeIdentifier],
 	)
 }
