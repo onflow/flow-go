@@ -66,45 +66,221 @@ type Runtime interface {
 	// or if the execution fails.
 	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error)
 
+	// ExecuteTransaction executes the given transaction.
+	//
+	// This function returns an error if the program has errors (e.g syntax errors, type errors),
+	// or if the execution fails.
+	ExecuteTransaction(script []byte, runtimeInterface Interface, location Location) error
+
 	// ParseAndCheckProgram parses and checks the given code without executing the program.
 	//
 	// This function returns an error if the program contains any syntax or semantic errors.
 	ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error
 }
 
-// mockRuntime is a mocked version of the Flow runtime
-type mockRuntime struct{}
+var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-// NewMockRuntime returns a mocked version of the Flow runtime.
-func NewMockRuntime() Runtime {
-	return &mockRuntime{}
-}
-
-func (r *mockRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
-	return nil, nil
-}
-
-func (r *mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error {
-	return nil
-}
+type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
 
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
-type interpreterRuntime struct {
-}
+type interpreterRuntime struct{}
 
 // NewInterpreterRuntime returns a interpreter-based version of the Flow runtime.
 func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
+	functions := r.standardLibraryFunctions(runtimeInterface)
 
-func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err error) {
-	program, _, err = parser.ParseProgram(string(script))
-	return
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	if err != nil {
+		return nil, Error{[]error{err}}
+	}
+
+	_, ok := checker.GlobalValues["main"]
+	if !ok {
+		// TODO: error because no main?
+		return nil, nil
+	}
+
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := inter.Interpret(); err != nil {
+		return nil, err
+	}
+
+	value, err := inter.Invoke("main")
+	if err != nil {
+		return nil, err
+	}
+
+	// Write back all stored values, which were actually just cached, back into storage
+	runtimeStorage.writeCached()
+
+	return value.(interpreter.ExportableValue).Export(), nil
 }
 
-type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
+func (r *interpreterRuntime) ExecuteTransaction(
+	script []byte,
+	runtimeInterface Interface,
+	location Location,
+) error {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	if err != nil {
+		return Error{[]error{err}}
+	}
+
+	transactions := checker.TransactionTypes
+	if len(transactions) < 1 {
+		return fmt.Errorf("no transaction declared")
+	} else if len(transactions) > 1 {
+		return fmt.Errorf("more than one transaction declared")
+	}
+
+	transactionType := transactions[0]
+	transactionPrepareFunctionType := transactionType.Prepare.InvocationFunctionType()
+
+	signingAccountAddresses := runtimeInterface.GetSigningAccounts()
+
+	// check parameter count
+
+	signingAccountsCount := len(signingAccountAddresses)
+	prepareFunctionParameterCount := len(transactionPrepareFunctionType.ParameterTypeAnnotations)
+	if signingAccountsCount != prepareFunctionParameterCount {
+		return fmt.Errorf(
+			"parameter count mismatch for transaction `prepare` function: expected %d, got %d",
+			prepareFunctionParameterCount,
+			signingAccountsCount,
+		)
+	}
+
+	// check parameter types
+
+	for _, parameterTypeAnnotation := range transactionPrepareFunctionType.ParameterTypeAnnotations {
+		parameterType := parameterTypeAnnotation.Type
+
+		if !parameterType.Equal(&sema.AccountType{}) {
+			err := fmt.Errorf(
+				"parameter type mismatch for transaction `prepare` function: expected `%s`, got `%s`",
+				&sema.AccountType{},
+				parameterType,
+			)
+			return err
+		}
+	}
+
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	if err != nil {
+		return err
+	}
+
+	if err := inter.Interpret(); err != nil {
+		return err
+	}
+
+	signingAccounts := make([]interface{}, signingAccountsCount)
+
+	for i, address := range signingAccountAddresses {
+		signingAccounts[i] = accountValue(address)
+	}
+
+	err = inter.InvokeTransaction(0, signingAccounts...)
+	if err != nil {
+		return err
+	}
+
+	// Write back all stored values, which were actually just cached, back into storage
+	runtimeStorage.writeCached()
+
+	return nil
+}
+
+func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
+	functions := r.standardLibraryFunctions(runtimeInterface)
+
+	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	return err
+}
+
+func (r *interpreterRuntime) parseAndCheckProgram(
+	script []byte,
+	runtimeInterface Interface,
+	location Location,
+	functions stdlib.StandardLibraryFunctions,
+) (*sema.Checker, error) {
+	program, err := r.parse(script)
+	if err != nil {
+		return nil, err
+	}
+
+	importResolver := r.importResolver(runtimeInterface)
+	err = program.ResolveImports(importResolver)
+	if err != nil {
+		return nil, err
+	}
+
+	valueDeclarations := functions.ToValueDeclarations()
+
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := checker.Check(); err != nil {
+		return nil, err
+	}
+
+	return checker, nil
+}
+
+func (r *interpreterRuntime) newInterpreter(
+	checker *sema.Checker,
+	functions stdlib.StandardLibraryFunctions,
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) (*interpreter.Interpreter, error) {
+	return interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(functions.ToValues()),
+		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
+			r.emitEvent(eventValue, runtimeInterface)
+		}),
+		interpreter.WithStorageReadHandler(runtimeStorage.readValue),
+		interpreter.WithStorageWriteHandler(runtimeStorage.writeValue),
+		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+			return indexingType.String()
+		}),
+	)
+}
+
+func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
+	return append(
+		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
+			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
+			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface),
+			GetAccount:        r.newGetAccountFunction(runtimeInterface),
+			Log:               r.newLogFunction(runtimeInterface),
+		}),
+		stdlib.BuiltinFunctions...,
+	)
+}
 
 func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
 	return func(astLocation ast.Location) (program *ast.Program, e error) {
@@ -123,6 +299,11 @@ func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportRe
 		}
 		return r.parse(script)
 	}
+}
+
+func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err error) {
+	program, _, err = parser.ParseProgram(string(script))
+	return
 }
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
@@ -161,160 +342,6 @@ func (r *interpreterRuntime) emitAccountEvent(
 	}
 
 	runtimeInterface.EmitEvent(event)
-}
-
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
-	return r.executeScript(script, runtimeInterface, location)
-}
-
-func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
-	functions := r.standardLibraryFunctions(runtimeInterface)
-
-	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
-	return err
-}
-
-func (r *interpreterRuntime) parseAndCheckProgram(
-	script []byte,
-	runtimeInterface Interface,
-	location Location,
-	functions stdlib.StandardLibraryFunctions,
-) (*sema.Checker, error) {
-	program, err := r.parse(script)
-	if err != nil {
-		return nil, err
-	}
-
-	importResolver := r.importResolver(runtimeInterface)
-	err = program.ResolveImports(importResolver)
-	if err != nil {
-		return nil, err
-	}
-
-	valueDeclarations := functions.ToValueDeclarations()
-
-	checker, err := sema.NewChecker(
-		program,
-		location,
-		sema.WithPredeclaredValues(valueDeclarations),
-		sema.WithPredeclaredTypes(typeDeclarations),
-	)
-	if err != nil {
-		return nil, Error{[]error{err}}
-	}
-
-	if err := checker.Check(); err != nil {
-		return nil, Error{[]error{err}}
-	}
-
-	return checker, nil
-}
-
-func (r *interpreterRuntime) executeScript(
-	script []byte,
-	runtimeInterface Interface,
-	location Location,
-) (values.Value, error) {
-	functions := r.standardLibraryFunctions(runtimeInterface)
-
-	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
-	if err != nil {
-		return nil, err
-	}
-
-	main, ok := checker.GlobalValues["main"]
-	if !ok {
-		// TODO: error because no main?
-		return nil, nil
-	}
-
-	mainFunctionType, ok := main.Type.(*sema.FunctionType)
-	if !ok {
-		err := errors.New("`main` is not a function")
-		return nil, Error{[]error{err}}
-	}
-
-	signingAccountAddresses := runtimeInterface.GetSigningAccounts()
-
-	// check parameter count
-
-	signingAccountsCount := len(signingAccountAddresses)
-	mainFunctionParameterCount := len(mainFunctionType.ParameterTypeAnnotations)
-	if signingAccountsCount != mainFunctionParameterCount {
-		err := fmt.Errorf(
-			"parameter count mismatch for `main` function: expected %d, got %d",
-			signingAccountsCount,
-			mainFunctionParameterCount,
-		)
-		return nil, Error{[]error{err}}
-	}
-
-	// check parameter types
-
-	for _, parameterTypeAnnotation := range mainFunctionType.ParameterTypeAnnotations {
-		parameterType := parameterTypeAnnotation.Type
-
-		if !parameterType.Equal(&sema.AccountType{}) {
-			err := fmt.Errorf(
-				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				&sema.AccountType{},
-				parameterType,
-			)
-			return nil, Error{[]error{err}}
-		}
-	}
-
-	interpreterRuntimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
-
-	inter, err := interpreter.NewInterpreter(
-		checker,
-		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
-			r.emitEvent(eventValue, runtimeInterface)
-		}),
-		interpreter.WithStorageReadHandler(interpreterRuntimeStorage.readValue),
-		interpreter.WithStorageWriteHandler(interpreterRuntimeStorage.writeValue),
-		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-			return indexingType.String()
-		}),
-	)
-	if err != nil {
-		return nil, Error{[]error{err}}
-	}
-
-	if err := inter.Interpret(); err != nil {
-		return nil, Error{[]error{err}}
-	}
-
-	signingAccounts := make([]interface{}, signingAccountsCount)
-
-	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = accountValue(address)
-	}
-
-	value, err := inter.Invoke("main", signingAccounts...)
-	if err != nil {
-		return nil, Error{[]error{err}}
-	}
-
-	// Write back all stored values, which were actually just cached, back into storage
-	interpreterRuntimeStorage.writeCached()
-
-	return value.(interpreter.ExportableValue).Export(), nil
-}
-
-func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
-	return append(
-		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
-			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
-			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
-			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface),
-			GetAccount:        r.newGetAccountFunction(runtimeInterface),
-			Log:               r.newLogFunction(runtimeInterface),
-		}),
-		stdlib.BuiltinFunctions...,
-	)
 }
 
 func accountValue(address values.Address) interpreter.Value {
