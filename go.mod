@@ -9,6 +9,7 @@ require (
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
 	github.com/ethereum/go-ethereum v1.9.2
+	github.com/go-test/deep v1.0.4
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2

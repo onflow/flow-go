@@ -6,8 +6,8 @@ type TransactionDeclaration struct {
 	Fields         []*FieldDeclaration
 	Prepare        *SpecialFunctionDeclaration
 	PreConditions  []*Condition
-	Execute        *Block
 	PostConditions []*Condition
+	Execute        *SpecialFunctionDeclaration
 	Range
 }
 

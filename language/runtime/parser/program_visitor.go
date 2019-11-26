@@ -203,6 +203,19 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
 	}
 
+	var prepareFunction *ast.SpecialFunctionDeclaration
+	prepareCtx := ctx.Prepare()
+	if prepareCtx != nil {
+		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+		prepareFunction.DeclarationKind = common.DeclarationKindPrepare
+	}
+
+	var executeFunction *ast.SpecialFunctionDeclaration
+	executeCtx := ctx.Execute()
+	if executeCtx != nil {
+		executeFunction = executeCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+	}
+
 	var preConditions []*ast.Condition
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
@@ -215,26 +228,14 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
 	}
 
-	var prepareFunction *ast.SpecialFunctionDeclaration
-	prepareCtx := ctx.Prepare()
-	if prepareCtx != nil {
-		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
-	}
-
-	var executeBlock *ast.Block
-	executeCtx := ctx.Execute()
-	if executeCtx != nil {
-		executeBlock = executeCtx.Accept(v).(*ast.Block)
-	}
-
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
 		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
-		Execute:        executeBlock,
 		PostConditions: postConditions,
+		Execute:        executeFunction,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -247,7 +248,23 @@ func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
-	return ctx.Block().Accept(v)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	block := ctx.Block().Accept(v).(*ast.Block)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.SpecialFunctionDeclaration{
+		DeclarationKind: common.DeclarationKindExecute,
+		FunctionDeclaration: &ast.FunctionDeclaration{
+			Access:        ast.AccessNotSpecified,
+			Identifier:    identifier,
+			ParameterList: &ast.ParameterList{},
+			FunctionBlock: &ast.FunctionBlock{
+				Block: block,
+			},
+			StartPos: startPosition,
+		},
+	}
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
