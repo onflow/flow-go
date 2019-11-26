@@ -16,12 +16,12 @@ import (
 func TestInterpretTransactions(t *testing.T) {
 	t.Run("NoPrepareFunction", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-		    execute {
- 			  let x = 1 + 2
+          transaction {
+            execute {
+              let x = 1 + 2
             }
-		  }
-		`)
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		assert.NoError(t, err)
@@ -29,19 +29,19 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("SetTransactionField", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-    		
-			var x: Int
+          transaction {
+            
+            var x: Int
 
-			prepare() {
+            prepare() {
               self.x = 5
-			}
-			
-		    execute {
- 			  let y = self.x + 1
-			}
-		  }
-		`)
+            }
+            
+            execute {
+              let y = self.x + 1
+            }
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		assert.NoError(t, err)
@@ -49,21 +49,21 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("PreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-    		
-			var x: Int
+          transaction {
+            
+            var x: Int
 
-			prepare() {
+            prepare() {
               self.x = 5
-			}
-
-			pre {
-			  self.x > 1
             }
-			
-		    execute {}
-		  }
-		`)
+
+            pre {
+              self.x > 1
+            }
+            
+            execute {}
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		assert.NoError(t, err)
@@ -71,21 +71,21 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("FailingPreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-    		
-			var x: Int
+          transaction {
+            
+            var x: Int
 
-			prepare() {
+            prepare() {
               self.x = 5
-			}
-
-			pre {
-			  self.x > 10
             }
-			
-		    execute {}
-		  }
-		`)
+
+            pre {
+              self.x > 10
+            }
+            
+            execute {}
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		require.IsType(t, &interpreter.ConditionError{}, err)
@@ -97,23 +97,23 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("PostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-    		
-			var x: Int
+          transaction {
+            
+            var x: Int
 
-			prepare() {
+            prepare() {
               self.x = 5
-			}
-			
-		    execute {
- 			  self.x = 10
-			}
+            }
+            
+            execute {
+              self.x = 10
+            }
 
-			post {
-			  self.x == 10
-			}
-		  }
-		`)
+            post {
+              self.x == 10
+            }
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		assert.NoError(t, err)
@@ -121,23 +121,23 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("FailingPostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-    		
-			var x: Int
+          transaction {
+            
+            var x: Int
 
-			prepare() {
+            prepare() {
               self.x = 5
-			}
-			
-		    execute {
- 			  self.x = 10
-			}
+            }
+            
+            execute {
+              self.x = 10
+            }
 
-			post {
-			  self.x == 5
-			}
-		  }
-		`)
+            post {
+              self.x == 5
+            }
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		require.IsType(t, &interpreter.ConditionError{}, err)
@@ -149,18 +149,18 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("MultipleTransactions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-		    execute {
- 			  let x = 1 + 2
+          transaction {
+            execute {
+              let x = 1 + 2
             }
-		  }
+          }
 
-		  transaction {
-		    execute {
- 			  let y = 3 + 4
+          transaction {
+            execute {
+              let y = 3 + 4
             }
-		  }
-		`)
+          }
+        `)
 
 		// first transaction
 		err := inter.InvokeTransaction(0)
@@ -177,12 +177,12 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("TooFewArguments", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
+          transaction {
             prepare(signer: Account) {}
 
-		    execute {}
-		  }
-		`)
+            execute {}
+          }
+        `)
 
 		err := inter.InvokeTransaction(0)
 		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
@@ -190,16 +190,16 @@ func TestInterpretTransactions(t *testing.T) {
 
 	t.Run("TooManyArguments", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
-		  transaction {
-		    execute {}
-		  }
+          transaction {
+            execute {}
+          }
 
-		  transaction {
+          transaction {
             prepare(signer: Account) {}
 
-		    execute {}
-		  }
-		`)
+            execute {}
+          }
+        `)
 
 		signer1 := accountValue(values.BytesToAddress([]byte{1}))
 		signer2 := accountValue(values.BytesToAddress([]byte{2}))
