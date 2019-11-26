@@ -14,7 +14,7 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 	template := `
 		import Vault, createVault, Receiver, Provider from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			var vaultA: <-Vault? <- createVault(initialBalance: %d)
 			
 			acct.storage[Vault] <-> vaultA
@@ -35,7 +35,7 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 	template := `
 		import Vault, createVault from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let vaultA: <-Vault <- createVault(initialBalance: %d)
     		let vaultB: <-Vault <- createVault(initialBalance: %d)
 			let vaultC: <-Vault <- createVault(initialBalance: %d)
@@ -58,7 +58,7 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 	template := `
 		import Vault from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
@@ -80,7 +80,7 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 	template := `
 		import Vault from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
@@ -102,7 +102,7 @@ func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Ad
 	template := `
 		import Vault, Provider, Receiver from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
@@ -122,7 +122,7 @@ func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.A
 	template := `
 		import Vault, Provider, Receiver from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
@@ -139,7 +139,7 @@ func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAdd
 	template := `
 		import Vault, Provider, Receiver from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
@@ -156,7 +156,7 @@ func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverA
 	template := `
 		import Vault, Provider, Receiver from 0x%s
 
-		fun main(acct: Account) {
+		pub fun main(acct: Account) {
 			let recipient = getAccount("%s")
 
 			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
@@ -175,7 +175,7 @@ func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBa
 	template := `
 		import Vault, Receiver from 0x%s
 
-		fun main() {
+		pub fun main() {
 			let acct = getAccount("%s")
 			let vaultRef = acct.storage[&Receiver] ?? panic("missing Receiver reference")
 			if vaultRef.balance != %d {
@@ -193,7 +193,7 @@ func GenerateInspectVaultArrayScript(tokenCodeAddr, userAddr flow.Address, vault
 	template := `
 		import Vault from 0x%s
 
-		fun main() {
+		pub fun main() {
 			let acct = getAccount("%s")
 			let vaultArray <- acct.storage[[Vault]] ?? panic("missing vault")
 			if vaultArray[%d].balance != %d {

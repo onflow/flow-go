@@ -21,8 +21,8 @@ func init() {
 // Address represents the 20 byte address of an account.
 type Address [AddressLength]byte
 
-// ZeroAddress represents the "zero address" (account that no one owns).
 var (
+	// ZeroAddress represents the "zero address" (account that no one owns).
 	ZeroAddress = Address{}
 	RootAddress = BytesToAddress(big.NewInt(1).Bytes())
 )

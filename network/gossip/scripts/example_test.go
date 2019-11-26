@@ -30,16 +30,23 @@ func Example_generateCodeFromFile() {
 	// 	"context"
 	// 	"fmt"
 	//
-	// 	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	// 	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	// 	proto "github.com/golang/protobuf/proto"
+	// )
+	//
+	// //go:generate stringer -type=registry.MessageType
+	//
+	// const (
+	// 	Ping registry.MessageType = (iota + registry.DefaultTypes)
+	// 	SubmitExecutionReceipt
 	// )
 	//
 	// type VerifyServiceServerRegistry struct {
 	// 	vss VerifyServiceServer
 	// }
 	//
-	// // To make sure the class complies with the gossip.Registry interface
-	// var _ gossip.Registry = (*VerifyServiceServerRegistry)(nil)
+	// // To make sure the class complies with the registry.Registry interface
+	// var _ registry.Registry = (*VerifyServiceServerRegistry)(nil)
 	//
 	// func NewVerifyServiceServerRegistry(vss VerifyServiceServer) *VerifyServiceServerRegistry {
 	// 	return &VerifyServiceServerRegistry{
@@ -85,17 +92,10 @@ func Example_generateCodeFromFile() {
 	// 	return respByte, respErr
 	// }
 	//
-	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	// 	return map[uint64]gossip.HandleFunc{
-	// 		0: vssr.Ping,
-	// 		1: vssr.SubmitExecutionReceipt,
-	// 	}
-	// }
-	//
-	// func (vssr *VerifyServiceServerRegistry) NameMapping() map[string]uint64 {
-	// 	return map[string]uint64{
-	// 		"Ping":                   0,
-	// 		"SubmitExecutionReceipt": 1,
+	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	// 	return map[registry.MessageType]registry.HandleFunc{
+	// 		Ping:                   vssr.Ping,
+	// 		SubmitExecutionReceipt: vssr.SubmitExecutionReceipt,
 	// 	}
 	// }
 	//
@@ -157,16 +157,23 @@ func Example_parseCode_fromRegistry() {
 	// 	"context"
 	// 	"fmt"
 	//
-	// 	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	// 	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	// 	proto "github.com/golang/protobuf/proto"
+	// )
+	//
+	// //go:generate stringer -type=registry.MessageType
+	//
+	// const (
+	// 	Ping registry.MessageType = (iota + registry.DefaultTypes)
+	// 	SubmitExecutionReceipt
 	// )
 	//
 	// type VerifyServiceServerRegistry struct {
 	// 	vss VerifyServiceServer
 	// }
 	//
-	// // To make sure the class complies with the gossip.Registry interface
-	// var _ gossip.Registry = (*VerifyServiceServerRegistry)(nil)
+	// // To make sure the class complies with the registry.Registry interface
+	// var _ registry.Registry = (*VerifyServiceServerRegistry)(nil)
 	//
 	// func NewVerifyServiceServerRegistry(vss VerifyServiceServer) *VerifyServiceServerRegistry {
 	// 	return &VerifyServiceServerRegistry{
@@ -212,17 +219,10 @@ func Example_parseCode_fromRegistry() {
 	// 	return respByte, respErr
 	// }
 	//
-	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	// 	return map[uint64]gossip.HandleFunc{
-	// 		0: vssr.Ping,
-	// 		1: vssr.SubmitExecutionReceipt,
-	// 	}
-	// }
-	//
-	// func (vssr *VerifyServiceServerRegistry) NameMapping() map[string]uint64 {
-	// 	return map[string]uint64{
-	// 		"Ping":                   0,
-	// 		"SubmitExecutionReceipt": 1,
+	// func (vssr *VerifyServiceServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	// 	return map[registry.MessageType]registry.HandleFunc{
+	// 		Ping:                   vssr.Ping,
+	// 		SubmitExecutionReceipt: vssr.SubmitExecutionReceipt,
 	// 	}
 	// }
 	//

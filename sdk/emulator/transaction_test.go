@@ -2,7 +2,6 @@ package emulator_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +9,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -211,7 +213,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
 		// script only supports one account
-		script := []byte("fun main(account: Account) {}")
+		script := []byte("pub fun main(account: Account) {}")
 
 		// create transaction with two accounts
 		tx := flow.Transaction{
@@ -238,7 +240,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
 		// script requires two accounts
-		script := []byte("fun main(accountA: Account, accountB: Account) {}")
+		script := []byte("pub fun main(accountA: Account, accountB: Account) {}")
 
 		// create transaction with two accounts
 		tx := flow.Transaction{
@@ -352,7 +354,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		accountAddressA, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
 		assert.NoError(t, err)
 
-		script := []byte("fun main(account: Account) {}")
+		script := []byte("pub fun main(account: Account) {}")
 
 		tx := flow.Transaction{
 			Script:             script,
@@ -435,7 +437,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		assert.NoError(t, err)
 
 		multipleAccountScript := []byte(`
-			fun main(accountA: Account, accountB: Account) {
+			pub fun main(accountA: Account, accountB: Account) {
 				log(accountA.address)
 				log(accountB.address)
 			}
@@ -471,10 +473,19 @@ func TestGetTransaction(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
+	myEventType := types.Event{
+		FieldTypes: []types.EventField{
+			{
+				Identifier: "x",
+				Type:       types.Int{},
+			},
+		},
+	}
+
 	eventsScript := `
 		event MyEvent(x: Int)
 
-		fun main(account: Account) {
+		pub fun main(account: Account) {
 			emit MyEvent(x: 1)	
 		}
 	`
@@ -509,9 +520,19 @@ func TestGetTransaction(t *testing.T) {
 
 		assert.Equal(t, resTx.Status, flow.TransactionFinalized)
 		assert.Len(t, resTx.Events, 1)
-		assert.Equal(t, tx.Hash(), resTx.Events[0].TxHash)
-		assert.Equal(t, fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex()), resTx.Events[0].Type)
-		assert.Equal(t, uint(0), resTx.Events[0].Index)
-		assert.Equal(t, big.NewInt(1), resTx.Events[0].Values["x"])
+
+		actualEvent := resTx.Events[0]
+
+		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		require.Nil(t, err)
+
+		decodedEvent := eventValue.(values.Event)
+
+		eventType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+
+		assert.Equal(t, tx.Hash(), actualEvent.TxHash)
+		assert.Equal(t, eventType, actualEvent.Type)
+		assert.Equal(t, uint(0), actualEvent.Index)
+		assert.Equal(t, values.NewInt(1), decodedEvent.Fields[0])
 	})
 }

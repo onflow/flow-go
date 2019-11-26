@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -62,7 +63,7 @@ type EmulatedBlockchainAPI interface {
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	SubmitTransaction(tx flow.Transaction) error
-	ExecuteScript(script []byte) (interface{}, []flow.Event, error)
+	ExecuteScript(script []byte) (values.Value, []flow.Event, error)
 	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error)
 	CommitBlock() (*types.Block, error)
 	LastCreatedAccount() flow.Account
@@ -339,17 +340,12 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScript(script []byte) (interface{}, []flow.Event, error) {
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, []flow.Event, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	ledger := b.pendingState.NewView()
-	value, events, err := b.computer.ExecuteScript(ledger, script)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return value, events, nil
+	return b.computer.ExecuteScript(ledger, script)
 }
 
 // TODO: implement
@@ -516,10 +512,15 @@ func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint6
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {
-			accountAddress := event.Values["address"].(flow.Address)
+			acctCreatedEvent, err := flow.DecodeAccountCreatedEvent(event.Payload)
+			if err != nil {
+				panic("failed to decode AccountCreated event")
+			}
 
-			account := b.getAccount(accountAddress)
-			if account == nil {
+			address := acctCreatedEvent.Address()
+
+			account, err := b.GetAccount(address)
+			if err != nil {
 				panic("failed to get newly-created account")
 			}
 
@@ -539,9 +540,10 @@ func createAccount(ledger flow.Ledger, privateKey flow.AccountPrivateKey) flow.A
 	}
 
 	view := ledger.NewView()
+
 	runtimeContext := execution.NewRuntimeContext(view)
-	accountAddress, err := runtimeContext.CreateAccount(
-		[][]byte{publicKeyBytes},
+	accountAddress, _ := runtimeContext.CreateAccount(
+		[]values.Bytes{publicKeyBytes},
 		[]byte{},
 	)
 	if err != nil {
@@ -550,7 +552,7 @@ func createAccount(ledger flow.Ledger, privateKey flow.AccountPrivateKey) flow.A
 
 	ledger.MergeWith(view.Updated())
 
-	account := runtimeContext.GetAccount(accountAddress)
+	account := runtimeContext.GetAccount(flow.Address(accountAddress))
 	return *account
 }
 

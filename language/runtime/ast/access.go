@@ -11,6 +11,7 @@ type Access int
 const (
 	AccessNotSpecified Access = iota
 	AccessPrivate
+	AccessAuthorized
 	AccessPublic
 	AccessPublicSettable
 )
@@ -18,16 +19,19 @@ const (
 var Accesses = []Access{
 	AccessNotSpecified,
 	AccessPrivate,
+	AccessAuthorized,
 	AccessPublic,
 	AccessPublicSettable,
 }
 
-func (s Access) Keyword() string {
-	switch s {
+func (a Access) Keyword() string {
+	switch a {
 	case AccessNotSpecified:
 		return ""
 	case AccessPrivate:
 		return "priv"
+	case AccessAuthorized:
+		return "auth"
 	case AccessPublic:
 		return "pub"
 	case AccessPublicSettable:
@@ -35,4 +39,25 @@ func (s Access) Keyword() string {
 	}
 
 	panic(errors.NewUnreachableError())
+}
+
+func (a Access) Description() string {
+	switch a {
+	case AccessNotSpecified:
+		return "not specified"
+	case AccessPrivate:
+		return "private"
+	case AccessAuthorized:
+		return "authorized"
+	case AccessPublic:
+		return "public"
+	case AccessPublicSettable:
+		return "public settable"
+	}
+
+	panic(errors.NewUnreachableError())
+}
+
+func (a Access) IsLessPermissiveThan(otherAccess Access) bool {
+	return a < otherAccess
 }

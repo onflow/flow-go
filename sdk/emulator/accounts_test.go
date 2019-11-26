@@ -120,7 +120,7 @@ func TestCreateAccount(t *testing.T) {
 			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
-		code := []byte("fun main() {}")
+		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, code)
 		assert.NoError(t, err)
@@ -154,7 +154,7 @@ func TestCreateAccount(t *testing.T) {
 		b, err := emulator.NewEmulatedBlockchain()
 		require.NoError(t, err)
 
-		code := []byte("fun main() {}")
+		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
 		assert.NoError(t, err)
@@ -193,7 +193,7 @@ func TestCreateAccount(t *testing.T) {
 			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
-		code := []byte("fun main() {}")
+		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, code)
 		assert.NoError(t, err)
@@ -220,10 +220,11 @@ func TestCreateAccount(t *testing.T) {
 		events, err := b.GetEvents(flow.EventAccountCreated, block.Number, block.Number)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
-		assert.Equal(t, flow.EventAccountCreated, events[0].Type)
-		require.IsType(t, flow.Address{}, events[0].Values["address"])
 
-		accountAddress := events[0].Values["address"].(flow.Address)
+		accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(events[0].Payload)
+		assert.Nil(t, err)
+		accountAddress := accountCreatedEvent.Address()
+
 		account, err := b.GetAccount(accountAddress)
 		assert.NoError(t, err)
 
@@ -332,7 +333,7 @@ func TestAddAccountKey(t *testing.T) {
 		err = b.SubmitTransaction(tx1)
 		assert.NoError(t, err)
 
-		script := []byte("fun main(account: Account) {}")
+		script := []byte("pub fun main(account: Account) {}")
 
 		tx2 := flow.Transaction{
 			Script:             script,
@@ -487,8 +488,8 @@ func TestRemoveAccountKey(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	codeA := []byte("fun a(): Int { return 1 }")
-	codeB := []byte("fun b(): Int { return 2 }")
+	codeA := []byte("pub fun a(): Int { return 1 }")
+	codeB := []byte("pub fun b(): Int { return 2 }")
 
 	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 		[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
@@ -502,10 +503,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		assert.NoError(t, err)
+		require.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-		assert.NoError(t, err)
+		require.Nil(t, err)
 
 		assert.Equal(t, codeA, account.Code)
 
@@ -544,11 +545,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		assert.NoError(t, err)
+		require.Nil(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-
-		assert.NoError(t, err)
+		require.Nil(t, err)
 		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
@@ -591,7 +591,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.Equal(t, codeA, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
-			fun main(account: Account) {
+			pub fun main(account: Account) {
 				updateAccountCode(%s, nil)
 			}
 		`, accountAddressB.Hex()))
@@ -626,7 +626,7 @@ func TestImportAccountCode(t *testing.T) {
 	require.NoError(t, err)
 
 	accountScript := []byte(`
-		fun answer(): Int {
+		pub fun answer(): Int {
 			return 42
 		}
 	`)
@@ -639,7 +639,7 @@ func TestImportAccountCode(t *testing.T) {
 	script := []byte(fmt.Sprintf(`
 		import 0x%s
 
-		fun main(account: Account) {
+		pub fun main(account: Account) {
 			let answer = answer()
 			if answer != 42 {
 				panic("?!")

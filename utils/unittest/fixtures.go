@@ -48,7 +48,7 @@ func BlockHeaderFixture() flow.BlockHeader {
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{
-		Script:             []byte("fun main() {}"),
+		Script:             []byte("pub fun main() {}"),
 		ReferenceBlockHash: nil,
 		Nonce:              0,
 		ComputeLimit:       10,
@@ -66,7 +66,7 @@ func AccountFixture() flow.Account {
 	return flow.Account{
 		Address: AddressFixture(),
 		Balance: 10,
-		Code:    []byte("fun main() {}"),
+		Code:    []byte("pub fun main() {}"),
 		Keys:    []flow.AccountPublicKey{AccountPublicKeyFixture()},
 	}
 }
@@ -84,11 +84,13 @@ func EventFixture(n ...func(e *flow.Event)) flow.Event {
 
 	event := flow.Event{
 		Type: "Transfer",
-		Values: map[string]interface{}{
-			"to":   flow.ZeroAddress,
-			"from": flow.ZeroAddress,
-			"id":   1,
-		},
+		// TODO: create proper fixture
+		// Values: map[string]interface{}{
+		// 	"to":   flow.ZeroAddress,
+		// 	"from": flow.ZeroAddress,
+		// 	"id":   1,
+		// },
+		Payload: []byte{},
 	}
 	if len(n) >= 1 {
 		n[0](&event)

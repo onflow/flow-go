@@ -67,10 +67,3 @@ func (f *FieldDeclaration) DeclarationName() string {
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindField
 }
-
-// SpecialFunctionDeclaration
-
-type SpecialFunctionDeclaration struct {
-	DeclarationKind common.DeclarationKind
-	*FunctionDeclaration
-}

@@ -1,11 +1,8 @@
 package server_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"math/big"
 	"testing"
 	"time"
 
@@ -19,10 +16,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
-	"github.com/dapperlabs/flow-go/sdk/emulator/types"
+	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -35,22 +36,6 @@ func TestPing(t *testing.T) {
 	res, err := server.Ping(ctx, &observation.PingRequest{})
 	assert.NoError(t, err)
 	assert.Equal(t, res.GetAddress(), []byte("pong!"))
-}
-
-func TestGetEvents(t *testing.T) {
-	ctx := context.Background()
-	b, err := emulator.NewEmulatedBlockchain()
-	require.NoError(t, err)
-	server := server.NewBackend(b, log.New())
-
-	t.Run("should return error for invalid query", func(t *testing.T) {
-		// End block cannot be less than start block
-		_, err := server.GetEvents(ctx, &observation.GetEventsRequest{
-			StartBlock: 2,
-			EndBlock:   1,
-		})
-		assert.Error(t, err)
-	})
 }
 
 func TestBackend(t *testing.T) {
@@ -79,16 +64,16 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(big.NewInt(2137), nil, nil).
+			ExecuteScript(sampleScriptText).Return(values.NewInt(2137), nil, nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
+		assert.NoError(t, err)
 
-		assert.Nil(t, err)
+		value, err := encoding.Decode(types.Int{}, response.GetValue())
+		assert.NoError(t, err)
 
-		//TODO likely to be refactored with a proper serialization/ABI implemented
-		assert.Equal(t, "*big.Int", response.Type)
-		assert.Equal(t, []uint8("2137"), response.Value)
+		assert.Equal(t, values.NewInt(2137), value)
 	}))
 
 	t.Run("GetAccount", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
@@ -157,40 +142,37 @@ func TestBackend(t *testing.T) {
 			}),
 			unittest.EventFixture(func(e *flow.Event) {
 				e.Index = 1
-			})}
+			}),
+		}
 
 		api.EXPECT().
 			GetEvents(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(eventsToReturn, nil).
 			Times(1)
 
-		startBlock := 21
-		endBlock := 37
+		var startBlock uint64 = 21
+		var endBlock uint64 = 37
 
 		response, err := backend.GetEvents(context.Background(), &observation.GetEventsRequest{
 			Type:       eventType,
-			StartBlock: uint64(startBlock),
-			EndBlock:   uint64(endBlock),
+			StartBlock: startBlock,
+			EndBlock:   endBlock,
 		})
 
 		assert.NoError(t, err)
-
 		assert.NotNil(t, response)
 
-		var decodedEvents []flow.Event
+		resEvents := response.GetEvents()
 
-		err = json.NewDecoder(bytes.NewReader(response.EventsJson)).Decode(&decodedEvents)
-		assert.NoError(t, err)
-
-		require.Len(t, decodedEvents, 2)
-		assert.Equal(t, uint(0), decodedEvents[0].Index)
-		assert.Equal(t, uint(1), decodedEvents[1].Index)
+		assert.Len(t, resEvents, 2)
+		assert.EqualValues(t, 0, resEvents[0].GetIndex())
+		assert.EqualValues(t, 1, resEvents[1].GetIndex())
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		blockTimestamp := time.Time{}
-		block := types.Block{
+		block := etypes.Block{
 			Number:            11,
 			Timestamp:         blockTimestamp,
 			PreviousBlockHash: nil,
@@ -266,14 +248,14 @@ func TestBackend(t *testing.T) {
 
 		assert.Equal(t, tx.Nonce, response.Transaction.Nonce)
 
-		var decodedEvents []flow.Event
+		resEvents := response.GetEvents()
 
-		err = json.NewDecoder(bytes.NewReader(response.EventsJson)).Decode(&decodedEvents)
-		assert.NoError(t, err)
+		require.Len(t, resEvents, 1)
 
-		assert.Len(t, decodedEvents, 1)
-		assert.Equal(t, txHash, decodedEvents[0].TxHash)
-		assert.Equal(t, txEventType, decodedEvents[0].Type)
+		event := convert.MessageToEvent(resEvents[0])
+
+		assert.Equal(t, txHash, event.TxHash)
+		assert.Equal(t, txEventType, event.Type)
 	}))
 
 	t.Run("Ping", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {

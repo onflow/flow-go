@@ -87,6 +87,8 @@ func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
 		members = containerType.Members
 	case *InterfaceType:
 		members = containerType.Members
+	case *TransactionType:
+		members = containerType.Members
 	default:
 		panic(errors.NewUnreachableError())
 	}
@@ -197,10 +199,18 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	valueType Type,
 ) (memberType Type) {
 
-	member := checker.visitMember(target)
+	member, isOptional := checker.visitMember(target)
 
 	if member == nil {
 		return &InvalidType{}
+	}
+
+	if isOptional {
+		checker.report(
+			&UnsupportedOptionalChainingAssignmentError{
+				Range: ast.NewRangeFromPositioned(target),
+			},
+		)
 	}
 
 	// If the value type is valid, check that the value can be assigned to the member type
@@ -213,6 +223,17 @@ func (checker *Checker) visitMemberExpressionAssignment(
 				ExpectedType: member.Type,
 				ActualType:   valueType,
 				Range:        ast.NewRangeFromPositioned(valueExpression),
+			},
+		)
+	}
+
+	if !checker.isWriteableMember(member) {
+		checker.report(
+			&InvalidAssignmentAccessError{
+				Name:              member.Identifier.Identifier,
+				RestrictingAccess: member.Access,
+				DeclarationKind:   member.DeclarationKind,
+				Range:             ast.NewRangeFromPositioned(member.Identifier),
 			},
 		)
 	}

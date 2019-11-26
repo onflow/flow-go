@@ -23,8 +23,11 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 
 	compositeType, isCompositeType := ty.(*CompositeType)
 
-	if !ty.IsInvalidType() &&
-		(!isCompositeType || compositeType.Kind != common.CompositeKindResource) {
+	if ty.IsInvalidType() {
+		return ty
+	}
+
+	if !isCompositeType || compositeType.Kind != common.CompositeKindResource {
 
 		checker.report(
 			&InvalidConstructionError{

@@ -3,14 +3,14 @@
 package flow
 
 import (
-	"encoding/gob"
 	"fmt"
-	"math/big"
-	"strings"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
+	abiencoding "github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 // List of built-in account event types.
@@ -20,33 +20,20 @@ const (
 )
 
 type Event struct {
-	// TxHash is the hash of the transaction this event was emitted from.
-	TxHash crypto.Hash
 	// Type is the qualified event type.
 	Type string
-	// Values is a map of all the parameters to the event, keys are parameter
-	// names, values are the parameter values and must be primitive types.
-	Values map[string]interface{}
+	// TxHash is the hash of the transaction this event was emitted from.
+	TxHash crypto.Hash
 	// Index defines the ordering of events in a transaction. The first event
 	// emitted has index 0, the second has index 1, and so on.
 	Index uint
+	// Payload contains the encoded event data.
+	Payload []byte
 }
 
 // String returns the string representation of this event.
 func (e Event) String() string {
-	var values strings.Builder
-
-	i := 0
-	for key, value := range e.Values {
-		if i > 0 {
-			values.WriteString(", ")
-		}
-
-		values.WriteString(fmt.Sprintf("%s: %s", key, value))
-		i++
-	}
-
-	return fmt.Sprintf("%s(%s)", e.Type, values.String())
+	return fmt.Sprintf("%s: %s", e.Type, e.ID())
 }
 
 // ID returns a canonical identifier that is guaranteed to be unique.
@@ -74,6 +61,38 @@ func wrapEvent(e Event) eventWrapper {
 	}
 }
 
-func init() {
-	gob.Register(big.Int{})
+type AccountCreatedEvent interface {
+	Address() Address
+}
+
+var AccountCreatedEventType types.Type = types.Event{
+	Identifier: EventAccountCreated,
+	FieldTypes: []types.EventField{
+		{
+			Identifier: "address",
+			Type:       types.Address{},
+		},
+	},
+}
+
+func newAccountCreatedEventFromValue(v values.Value) AccountCreatedEvent {
+	eventValue := v.(values.Event)
+	return accountCreatedEvent{eventValue}
+}
+
+type accountCreatedEvent struct {
+	values.Event
+}
+
+func (a accountCreatedEvent) Address() Address {
+	return Address(a.Fields[0].(values.Address))
+}
+
+func DecodeAccountCreatedEvent(b []byte) (AccountCreatedEvent, error) {
+	value, err := abiencoding.Decode(AccountCreatedEventType, b)
+	if err != nil {
+		return nil, err
+	}
+
+	return newAccountCreatedEventFromValue(value), nil
 }

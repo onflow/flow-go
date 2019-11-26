@@ -10,6 +10,8 @@ type Variable struct {
 	DeclarationKind common.DeclarationKind
 	// Type is the type of the variable
 	Type Type
+	// Access is the access modifier
+	Access ast.Access
 	// IsConstant indicates if the variable is read-only
 	IsConstant bool
 	// Depth is the depth of scopes in which the variable was declared

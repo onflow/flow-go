@@ -48,3 +48,10 @@ func (f *FunctionDeclaration) ToExpression() *FunctionExpression {
 		StartPos:             f.StartPos,
 	}
 }
+
+// SpecialFunctionDeclaration
+
+type SpecialFunctionDeclaration struct {
+	DeclarationKind common.DeclarationKind
+	*FunctionDeclaration
+}

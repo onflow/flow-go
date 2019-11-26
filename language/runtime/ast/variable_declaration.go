@@ -3,15 +3,16 @@ package ast
 import "github.com/dapperlabs/flow-go/language/runtime/common"
 
 type VariableDeclaration struct {
-	Access         Access
-	IsConstant     bool
-	Identifier     Identifier
-	TypeAnnotation *TypeAnnotation
-	Value          Expression
-	Transfer       *Transfer
-	StartPos       Position
-	SecondTransfer *Transfer
-	SecondValue    Expression
+	Access            Access
+	IsConstant        bool
+	Identifier        Identifier
+	TypeAnnotation    *TypeAnnotation
+	Value             Expression
+	Transfer          *Transfer
+	StartPos          Position
+	SecondTransfer    *Transfer
+	SecondValue       Expression
+	ParentIfStatement *IfStatement
 }
 
 func (v *VariableDeclaration) StartPosition() Position {
@@ -39,7 +40,6 @@ func (v *VariableDeclaration) DeclarationName() string {
 func (v *VariableDeclaration) DeclarationKind() common.DeclarationKind {
 	if v.IsConstant {
 		return common.DeclarationKindConstant
-	} else {
-		return common.DeclarationKindVariable
 	}
+	return common.DeclarationKindVariable
 }

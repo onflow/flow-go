@@ -50,7 +50,7 @@ type ExpressionVisitor interface {
 	VisitBinaryExpression(*BinaryExpression) Repr
 	VisitFunctionExpression(*FunctionExpression) Repr
 	VisitStringExpression(*StringExpression) Repr
-	VisitFailableDowncastExpression(*FailableDowncastExpression) Repr
+	VisitCastingExpression(*CastingExpression) Repr
 	VisitCreateExpression(*CreateExpression) Repr
 	VisitDestroyExpression(*DestroyExpression) Repr
 	VisitReferenceExpression(*ReferenceExpression) Repr
@@ -69,4 +69,5 @@ type Visitor interface {
 	VisitCondition(*Condition) Repr
 	VisitImportDeclaration(*ImportDeclaration) Repr
 	VisitEventDeclaration(*EventDeclaration) Repr
+	VisitTransactionDeclaration(*TransactionDeclaration) Repr
 }

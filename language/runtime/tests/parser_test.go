@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	. "github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestParseReplInput(t *testing.T) {
@@ -535,6 +535,47 @@ func TestParseMemberExpression(t *testing.T) {
 			Identifier: Identifier{
 				Identifier: "c",
 				Pos:        Position{Offset: 16, Line: 2, Column: 15},
+			},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseOptionalMemberExpression(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+	    let a = b?.c
+	`)
+
+	assert.Nil(t, err)
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "a",
+			Pos:        Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Value: &MemberExpression{
+			Optional: true,
+			Expression: &IdentifierExpression{
+				Identifier: Identifier{
+					Identifier: "b",
+					Pos:        Position{Offset: 14, Line: 2, Column: 13},
+				},
+			},
+			Identifier: Identifier{
+				Identifier: "c",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},
@@ -1417,6 +1458,68 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 
 	assert.Nil(t, err)
 
+	ifStatement := &IfStatement{
+		Then: &Block{
+			Statements: []Statement{
+				&ExpressionStatement{
+					Expression: &IntExpression{
+						Value: big.NewInt(1),
+						Base:  10,
+						Range: Range{
+							StartPos: Position{Offset: 62, Line: 4, Column: 16},
+							EndPos:   Position{Offset: 62, Line: 4, Column: 16},
+						},
+					},
+				},
+			},
+			Range: Range{
+				StartPos: Position{Offset: 44, Line: 3, Column: 25},
+				EndPos:   Position{Offset: 76, Line: 5, Column: 12},
+			},
+		},
+		Else: &Block{
+			Statements: []Statement{
+				&ExpressionStatement{
+					Expression: &IntExpression{
+						Value: big.NewInt(2),
+						Base:  10,
+						Range: Range{
+							StartPos: Position{Offset: 101, Line: 6, Column: 16},
+							EndPos:   Position{Offset: 101, Line: 6, Column: 16},
+						},
+					},
+				},
+			},
+			Range: Range{
+				StartPos: Position{Offset: 83, Line: 5, Column: 19},
+				EndPos:   Position{Offset: 115, Line: 7, Column: 12},
+			},
+		},
+		StartPos: Position{Offset: 31, Line: 3, Column: 12},
+	}
+
+	ifTestVariableDeclaration := &VariableDeclaration{
+		IsConstant: false,
+		Identifier: Identifier{
+			Identifier: "y",
+			Pos:        Position{Offset: 38, Line: 3, Column: 19},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 40, Line: 3, Column: 21},
+		},
+		Value: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 42, Line: 3, Column: 23},
+			},
+		},
+		StartPos:          Position{Offset: 34, Line: 3, Column: 15},
+		ParentIfStatement: ifStatement,
+	}
+
+	ifStatement.Test = ifTestVariableDeclaration
+
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
 		Identifier: Identifier{
@@ -1441,63 +1544,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Statements: []Statement{
-					&IfStatement{
-						Test: &VariableDeclaration{
-							IsConstant: false,
-							Identifier: Identifier{
-								Identifier: "y",
-								Pos:        Position{Offset: 38, Line: 3, Column: 19},
-							},
-							Transfer: &Transfer{
-								Operation: TransferOperationCopy,
-								Pos:       Position{Offset: 40, Line: 3, Column: 21},
-							},
-							Value: &IdentifierExpression{
-								Identifier: Identifier{
-									Identifier: "x",
-									Pos:        Position{Offset: 42, Line: 3, Column: 23},
-								},
-							},
-							StartPos: Position{Offset: 34, Line: 3, Column: 15},
-						},
-						Then: &Block{
-							Statements: []Statement{
-								&ExpressionStatement{
-									Expression: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 62, Line: 4, Column: 16},
-											EndPos:   Position{Offset: 62, Line: 4, Column: 16},
-										},
-									},
-								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 44, Line: 3, Column: 25},
-								EndPos:   Position{Offset: 76, Line: 5, Column: 12},
-							},
-						},
-						Else: &Block{
-							Statements: []Statement{
-								&ExpressionStatement{
-									Expression: &IntExpression{
-										Value: big.NewInt(2),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 101, Line: 6, Column: 16},
-											EndPos:   Position{Offset: 101, Line: 6, Column: 16},
-										},
-									},
-								},
-							},
-							Range: Range{
-								StartPos: Position{Offset: 83, Line: 5, Column: 19},
-								EndPos:   Position{Offset: 115, Line: 7, Column: 12},
-							},
-						},
-						StartPos: Position{Offset: 31, Line: 3, Column: 12},
-					},
+					ifStatement,
 				},
 				Range: Range{
 					StartPos: Position{Offset: 17, Line: 2, Column: 16},
@@ -3974,17 +4021,6 @@ func TestParseStructureWithConformances(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseInvalidStructureWithMissingFunctionBlock(t *testing.T) {
-
-	_, _, err := parser.ParseProgram(`
-        struct Test {
-            pub fun getFoo(): Int
-        }
-	`)
-
-	assert.NotNil(t, err)
-}
-
 func TestParsePreAndPostConditions(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
@@ -4523,7 +4559,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncasting(t *testing.T) {
+func TestParseFailableCasting(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
        let x = 0 as? Int
@@ -4531,40 +4567,47 @@ func TestParseFailableDowncasting(t *testing.T) {
 
 	assert.Nil(t, err)
 
+	failableDowncast := &CastingExpression{
+		Expression: &IntExpression{
+			Value: big.NewInt(0),
+			Base:  10,
+			Range: Range{
+				StartPos: Position{Offset: 16, Line: 2, Column: 15},
+				EndPos:   Position{Offset: 16, Line: 2, Column: 15},
+			},
+		},
+		Operation: OperationFailableCast,
+		TypeAnnotation: &TypeAnnotation{
+			Move: false,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "Int",
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
+				},
+			},
+			StartPos: Position{Offset: 22, Line: 2, Column: 21},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "x",
+			Pos:        Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 14, Line: 2, Column: 13},
+		},
+		Value:    failableDowncast,
+		StartPos: Position{Offset: 8, Line: 2, Column: 7},
+	}
+
+	failableDowncast.ParentVariableDeclaration = variableDeclaration
+
 	expected := &Program{
 		Declarations: []Declaration{
-			&VariableDeclaration{
-				IsConstant: true,
-				Identifier: Identifier{
-					Identifier: "x",
-					Pos:        Position{Offset: 12, Line: 2, Column: 11},
-				},
-				Transfer: &Transfer{
-					Operation: TransferOperationCopy,
-					Pos:       Position{Offset: 14, Line: 2, Column: 13},
-				},
-				Value: &FailableDowncastExpression{
-					Expression: &IntExpression{
-						Value: big.NewInt(0),
-						Base:  10,
-						Range: Range{
-							StartPos: Position{Offset: 16, Line: 2, Column: 15},
-							EndPos:   Position{Offset: 16, Line: 2, Column: 15},
-						},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Int",
-								Pos:        Position{Offset: 22, Line: 2, Column: 21},
-							},
-						},
-						StartPos: Position{Offset: 22, Line: 2, Column: 21},
-					},
-				},
-				StartPos: Position{Offset: 8, Line: 2, Column: 7},
-			},
+			variableDeclaration,
 		},
 	}
 
@@ -5574,7 +5617,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
+func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
         let y = x as? <-R
@@ -5582,7 +5625,27 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	test := &VariableDeclaration{
+	failableDowncast := &CastingExpression{
+		Expression: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
+			},
+		},
+		Operation: OperationFailableCast,
+		TypeAnnotation: &TypeAnnotation{
+			Move: true,
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "R",
+					Pos:        Position{Offset: 25, Line: 2, Column: 24},
+				},
+			},
+			StartPos: Position{Offset: 23, Line: 2, Column: 22},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
 		IsConstant: true,
 		Identifier: Identifier{
 			Identifier: "y",
@@ -5592,29 +5655,64 @@ func TestParseFailableDowncastingMoveTypeAnnotation(t *testing.T) {
 			Operation: TransferOperationCopy,
 			Pos:       Position{Offset: 15, Line: 2, Column: 14},
 		},
-		Value: &FailableDowncastExpression{
-			Expression: &IdentifierExpression{
-				Identifier: Identifier{
-					Identifier: "x",
-					Pos:        Position{Offset: 17, Line: 2, Column: 16},
-				},
-			},
-			TypeAnnotation: &TypeAnnotation{
-				Move: true,
-				Type: &NominalType{
-					Identifier: Identifier{
-						Identifier: "R",
-						Pos:        Position{Offset: 25, Line: 2, Column: 24},
-					},
-				},
-				StartPos: Position{Offset: 23, Line: 2, Column: 22},
-			},
-		},
+		Value:    failableDowncast,
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
 
+	failableDowncast.ParentVariableDeclaration = variableDeclaration
+
 	expected := &Program{
-		Declarations: []Declaration{test},
+		Declarations: []Declaration{variableDeclaration},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestParseCasting(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+        let y = x as Y
+	`)
+
+	assert.Nil(t, err)
+
+	cast := &CastingExpression{
+		Expression: &IdentifierExpression{
+			Identifier: Identifier{
+				Identifier: "x",
+				Pos:        Position{Offset: 17, Line: 2, Column: 16},
+			},
+		},
+		Operation: OperationCast,
+		TypeAnnotation: &TypeAnnotation{
+			Type: &NominalType{
+				Identifier: Identifier{
+					Identifier: "Y",
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
+				},
+			},
+			StartPos: Position{Offset: 22, Line: 2, Column: 21},
+		},
+	}
+
+	variableDeclaration := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{
+			Identifier: "y",
+			Pos:        Position{Offset: 13, Line: 2, Column: 12},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 15, Line: 2, Column: 14},
+		},
+		Value:    cast,
+		StartPos: Position{Offset: 9, Line: 2, Column: 8},
+	}
+
+	cast.ParentVariableDeclaration = variableDeclaration
+
+	expected := &Program{
+		Declarations: []Declaration{variableDeclaration},
 	}
 
 	assert.Equal(t, expected, actual)
@@ -6285,4 +6383,693 @@ func TestParseAccessModifiers(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestParseTransactionDeclaration(t *testing.T) {
+	t.Run("EmptyTransaction", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {}
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields:         []*FieldDeclaration{},
+					Prepare:        nil,
+					PreConditions:  nil,
+					PostConditions: nil,
+					Execute:        nil,
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
+					},
+				},
+			},
+		}
+
+		unittest.AssertEqualWithDiff(t, expected, actual)
+	})
+
+	t.Run("SimpleTransaction", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {
+	
+		    var x: Int
+	
+		    prepare(signer: Account) {
+	          x = 0
+			}
+	
+		    execute {
+	          x = 1 + 1
+			}
+		  }
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields: []*FieldDeclaration{
+						{
+							Access:       AccessNotSpecified,
+							VariableKind: VariableKindVariable,
+							Identifier: Identifier{
+								Identifier: "x",
+								Pos:        Position{Offset: 31, Line: 4, Column: 10},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								Move: false,
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 34, Line: 4, Column: 13},
+									},
+								},
+								StartPos: Position{Offset: 34, Line: 4, Column: 13},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 27, Line: 4, Column: 6},
+								EndPos:   Position{Offset: 36, Line: 4, Column: 15},
+							},
+						},
+					},
+					Prepare: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindPrepare,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "prepare",
+								Pos:        Position{Offset: 46, Line: 6, Column: 6},
+							},
+							ParameterList: &ParameterList{
+								Parameters: []*Parameter{
+									{
+										Label: "",
+										Identifier: Identifier{
+											Identifier: "signer",
+											Pos:        Position{Offset: 54, Line: 6, Column: 14},
+										},
+										TypeAnnotation: &TypeAnnotation{
+											Move: false,
+											Type: &NominalType{
+												Identifier: Identifier{
+													Identifier: "Account",
+													Pos:        Position{Offset: 62, Line: 6, Column: 22},
+												},
+											},
+											StartPos: Position{Offset: 62, Line: 6, Column: 22},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 54, Line: 6, Column: 14},
+											EndPos:   Position{Offset: 62, Line: 6, Column: 22},
+										},
+									},
+								},
+								Range: Range{
+									StartPos: Position{Offset: 53, Line: 6, Column: 13},
+									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+								},
+							},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+											},
+											Value: &IntExpression{
+												Value: big.NewInt(0),
+												Base:  10,
+												Range: Range{
+													StartPos: Position{Offset: 88, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 71, Line: 6, Column: 31},
+										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 46, Line: 6, Column: 6},
+						},
+					},
+					PreConditions:  nil,
+					PostConditions: nil,
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 103, Line: 10, Column: 6},
+							},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 124, Line: 11, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 126, Line: 11, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 128, Line: 11, Column: 15},
+														EndPos:   Position{Offset: 128, Line: 11, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 132, Line: 11, Column: 19},
+														EndPos:   Position{Offset: 132, Line: 11, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 111, Line: 10, Column: 14},
+										EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 103, Line: 10, Column: 6},
+						},
+					},
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 143, Line: 13, Column: 4},
+					},
+				},
+			},
+		}
+
+		unittest.AssertEqualWithDiff(t, expected, actual)
+	})
+
+	t.Run("PreExecutePost", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {
+	
+		    var x: Int
+	
+		    prepare(signer: Account) {
+	          x = 0
+			}
+	
+			pre {
+	      	  x == 0
+			}
+	
+		    execute {
+	          x = 1 + 1
+			}
+	
+		    post {
+	          x == 2
+	        }
+		  }
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields: []*FieldDeclaration{
+						{
+							Access:       AccessNotSpecified,
+							VariableKind: VariableKindVariable,
+							Identifier: Identifier{
+								Identifier: "x",
+								Pos:        Position{Offset: 31, Line: 4, Column: 10},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								Move: false,
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 34, Line: 4, Column: 13},
+									},
+								},
+								StartPos: Position{Offset: 34, Line: 4, Column: 13},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 27, Line: 4, Column: 6},
+								EndPos:   Position{Offset: 36, Line: 4, Column: 15},
+							},
+						},
+					},
+					Prepare: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindPrepare,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "prepare",
+								Pos:        Position{Offset: 46, Line: 6, Column: 6},
+							},
+							ParameterList: &ParameterList{
+								Parameters: []*Parameter{
+									{
+										Label: "",
+										Identifier: Identifier{
+											Identifier: "signer",
+											Pos:        Position{Offset: 54, Line: 6, Column: 14},
+										},
+										TypeAnnotation: &TypeAnnotation{
+											Move: false,
+											Type: &NominalType{
+												Identifier: Identifier{
+													Identifier: "Account",
+													Pos:        Position{Offset: 62, Line: 6, Column: 22},
+												},
+											},
+											StartPos: Position{Offset: 62, Line: 6, Column: 22},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 54, Line: 6, Column: 14},
+											EndPos:   Position{Offset: 62, Line: 6, Column: 22},
+										},
+									},
+								},
+								Range: Range{
+									StartPos: Position{Offset: 53, Line: 6, Column: 13},
+									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+								},
+							},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+											},
+											Value: &IntExpression{
+												Value: big.NewInt(0),
+												Base:  10,
+												Range: Range{
+													StartPos: Position{Offset: 88, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 71, Line: 6, Column: 31},
+										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 46, Line: 6, Column: 6},
+						},
+					},
+					PreConditions: []*Condition{
+						{
+							Kind: ConditionKindPre,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 116, Line: 11, Column: 10},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(0),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 121, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
+									},
+								},
+							},
+						},
+					},
+					PostConditions: []*Condition{
+						{
+							Kind: ConditionKindPost,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 198, Line: 19, Column: 11},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(2),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 203, Line: 19, Column: 16},
+										EndPos:   Position{Offset: 203, Line: 19, Column: 16},
+									},
+								},
+							},
+						},
+					},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 136, Line: 14, Column: 6},
+							},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 157, Line: 15, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 159, Line: 15, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 161, Line: 15, Column: 15},
+														EndPos:   Position{Offset: 161, Line: 15, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 165, Line: 15, Column: 19},
+														EndPos:   Position{Offset: 165, Line: 15, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 144, Line: 14, Column: 14},
+										EndPos:   Position{Offset: 170, Line: 16, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 136, Line: 14, Column: 6},
+						},
+					},
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 220, Line: 21, Column: 4},
+					},
+				},
+			},
+		}
+
+		unittest.AssertEqualWithDiff(t, expected, actual)
+	})
+
+	t.Run("PrePostExecute", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {
+	
+		    var x: Int
+	
+		    prepare(signer: Account) {
+	          x = 0
+			}
+	
+			pre {
+	      	  x == 0
+			}
+
+		    post {
+	          x == 2
+	        }
+	
+		    execute {
+	          x = 1 + 1
+			}
+		  }
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields: []*FieldDeclaration{
+						{
+							Access:       AccessNotSpecified,
+							VariableKind: VariableKindVariable,
+							Identifier: Identifier{
+								Identifier: "x",
+								Pos:        Position{Offset: 31, Line: 4, Column: 10},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								Move: false,
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 34, Line: 4, Column: 13},
+									},
+								},
+								StartPos: Position{Offset: 34, Line: 4, Column: 13},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 27, Line: 4, Column: 6},
+								EndPos:   Position{Offset: 36, Line: 4, Column: 15},
+							},
+						},
+					},
+					Prepare: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindPrepare,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "prepare",
+								Pos:        Position{Offset: 46, Line: 6, Column: 6},
+							},
+							ParameterList: &ParameterList{
+								Parameters: []*Parameter{
+									{
+										Label: "",
+										Identifier: Identifier{
+											Identifier: "signer",
+											Pos:        Position{Offset: 54, Line: 6, Column: 14},
+										},
+										TypeAnnotation: &TypeAnnotation{
+											Move: false,
+											Type: &NominalType{
+												Identifier: Identifier{
+													Identifier: "Account",
+													Pos:        Position{Offset: 62, Line: 6, Column: 22},
+												},
+											},
+											StartPos: Position{Offset: 62, Line: 6, Column: 22},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 54, Line: 6, Column: 14},
+											EndPos:   Position{Offset: 62, Line: 6, Column: 22},
+										},
+									},
+								},
+								Range: Range{
+									StartPos: Position{Offset: 53, Line: 6, Column: 13},
+									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+								},
+							},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+											},
+											Value: &IntExpression{
+												Value: big.NewInt(0),
+												Base:  10,
+												Range: Range{
+													StartPos: Position{Offset: 88, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 71, Line: 6, Column: 31},
+										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 46, Line: 6, Column: 6},
+						},
+					},
+					PreConditions: []*Condition{
+						{
+							Kind: ConditionKindPre,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 116, Line: 11, Column: 10},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(0),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 121, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
+									},
+								},
+							},
+						},
+					},
+					PostConditions: []*Condition{
+						{
+							Kind: ConditionKindPost,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 153, Line: 15, Column: 11},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(2),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 158, Line: 15, Column: 16},
+										EndPos:   Position{Offset: 158, Line: 15, Column: 16},
+									},
+								},
+							},
+						},
+					},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 179, Line: 18, Column: 6},
+							},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 200, Line: 19, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 202, Line: 19, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 204, Line: 19, Column: 15},
+														EndPos:   Position{Offset: 204, Line: 19, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 208, Line: 19, Column: 19},
+														EndPos:   Position{Offset: 208, Line: 19, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 187, Line: 18, Column: 14},
+										EndPos:   Position{Offset: 213, Line: 20, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 179, Line: 18, Column: 6},
+						},
+					},
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 219, Line: 21, Column: 4},
+					},
+				},
+			},
+		}
+
+		unittest.AssertEqualWithDiff(t, expected, actual)
+	})
 }

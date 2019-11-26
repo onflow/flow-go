@@ -7,21 +7,27 @@ import (
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
 
+	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
+
+	checker.containerTypes[interfaceType] = true
+	defer func() {
+		checker.containerTypes[interfaceType] = false
+	}()
+
 	checker.checkDeclarationAccessModifier(
 		declaration.Access,
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
+		false,
 	)
-
-	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	// TODO: also check nested composite members
 
 	// TODO: also check nested composite members' identifiers
 
 	// NOTE: functions are checked separately
-	checker.checkFieldsAccess(declaration.Members.Fields)
+	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
 	checker.checkMemberIdentifiers(
 		declaration.Members.Fields,
@@ -29,6 +35,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	)
 
 	members, origins := checker.membersAndOrigins(
+		interfaceType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,
 		false,
@@ -108,9 +115,11 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 func (checker *Checker) checkInterfaceFunctions(
 	functions []*ast.FunctionDeclaration,
-	interfaceType Type,
+	interfaceType *InterfaceType,
 	declarationKind common.DeclarationKind,
 ) {
+	inResource := interfaceType.CompositeKind == common.CompositeKindResource
+
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
 		// shouldn't be visible in other function declarations,
@@ -126,9 +135,10 @@ func (checker *Checker) checkInterfaceFunctions(
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:          false,
-					declareFunction:   false,
-					checkResourceLoss: false,
+					mustExit:                false,
+					declareFunction:         false,
+					checkResourceLoss:       false,
+					allowAuthAccessModifier: inResource,
 				},
 			)
 
@@ -152,22 +162,19 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	// then fix up the type reference
 
 	interfaceType := &InterfaceType{
-		CompositeKind: declaration.CompositeKind,
+		Location:      checker.Location,
 		Identifier:    identifier.Identifier,
+		CompositeKind: declaration.CompositeKind,
 	}
 
-	err := checker.typeActivations.Declare(identifier, interfaceType)
-	checker.report(err)
-	checker.recordVariableDeclarationOccurrence(
-		identifier.Identifier,
-		&Variable{
-			Identifier:      identifier.Identifier,
-			DeclarationKind: declaration.DeclarationKind(),
-			IsConstant:      true,
-			Type:            interfaceType,
-			Pos:             &identifier.Pos,
-		},
+	variable, err := checker.typeActivations.DeclareType(
+		identifier,
+		interfaceType,
+		declaration.DeclarationKind(),
+		declaration.Access,
 	)
+	checker.report(err)
+	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 
 	// NOTE: interface type's `InitializerParameterTypeAnnotations` and  `members` fields
 	// are added in `VisitInterfaceDeclaration`.
