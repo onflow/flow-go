@@ -228,7 +228,9 @@ func TestEvents(t *testing.T) {
 	}()
 
 	t.Run("should be able to insert events", func(t *testing.T) {
-		events := []flow.Event{unittest.EventFixture()}
+		events := []flow.Event{unittest.EventFixture(func(e *flow.Event) {
+			e.Payload = []byte{1, 2, 3, 4}
+		})}
 		var blockNumber uint64 = 1
 
 		err := store.InsertEvents(blockNumber, events...)
@@ -249,8 +251,10 @@ func TestEvents(t *testing.T) {
 		for i := 1; i <= 10; i++ {
 			var events []flow.Event
 			for j := 1; j <= i; j++ {
-				event := unittest.EventFixture()
-				event.Type = fmt.Sprintf("%d", j)
+				event := unittest.EventFixture(func(e *flow.Event) {
+					e.Payload = []byte{1, 2, 3, 4}
+					e.Type = fmt.Sprintf("%d", j)
+				})
 				events = append(events, event)
 			}
 			eventsByBlock[uint64(i)] = events
@@ -329,7 +333,9 @@ func TestPersistence(t *testing.T) {
 
 	block := types.Block{Number: 1}
 	tx := unittest.TransactionFixture()
-	events := []flow.Event{unittest.EventFixture()}
+	events := []flow.Event{unittest.EventFixture(func(e *flow.Event) {
+		e.Payload = []byte{1, 2, 3, 4}
+	})}
 	ledger := unittest.LedgerFixture()
 
 	// insert some stuff to to the store

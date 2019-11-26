@@ -58,7 +58,9 @@ func TestEncodeLedger(t *testing.T) {
 }
 
 func TestEncodeEventList(t *testing.T) {
-	eventList := []flow.Event{unittest.EventFixture()}
+	eventList := []flow.Event{unittest.EventFixture(func(e *flow.Event) {
+		e.Payload = []byte{1, 2, 3, 4}
+	})}
 	data, err := encodeEvents(eventList)
 	require.Nil(t, err)
 
