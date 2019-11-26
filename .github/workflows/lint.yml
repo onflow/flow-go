@@ -5,7 +5,7 @@ on:
     paths:
       - '**.go'
       - 'revive.toml'
-      - '.github/workflows/lint.yaml'
+      - '.github/workflows/lint.yml'
 
 jobs:
   lint:
