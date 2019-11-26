@@ -323,7 +323,7 @@ func accountValue(address values.Address) interpreter.Value {
 	return interpreter.CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: &map[string]interpreter.Value{
-			"address": interpreter.NewStringValue(addressHex),
+			"address": interpreter.AddressValue(address),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},
 	}
@@ -370,9 +370,9 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddress, ok := arguments[0].(interpreter.AddressValue)
 		if !ok {
-			panic(fmt.Sprintf("addAccountKey requires the first parameter to be a string"))
+			panic(fmt.Sprintf("addAccountKey requires the first parameter to be an address"))
 		}
 
 		publicKey, err := toBytes(arguments[1])
@@ -380,9 +380,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
-		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
-		accountAddressValue := values.Address(accountAddress)
+		accountAddressValue := accountAddress.Export().(values.Address)
 
 		err = runtimeInterface.AddAccountKey(accountAddressValue, publicKey)
 		if err != nil {
@@ -402,9 +400,9 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddress, ok := arguments[0].(interpreter.AddressValue)
 		if !ok {
-			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be a string"))
+			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be an address"))
 		}
 
 		index, ok := arguments[1].(interpreter.IntValue)
@@ -413,9 +411,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		}
 
-		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
-		accountAddressValue := values.Address(accountAddress)
+		accountAddressValue := accountAddress.Export().(values.Address)
 
 		indexValue := index.Export().(values.Int)
 
@@ -437,9 +433,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddress, ok := arguments[0].(interpreter.AddressValue)
 		if !ok {
-			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be a string"))
+			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an address"))
 		}
 
 		code, err := toBytes(arguments[1])
@@ -447,9 +443,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
-		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
-		accountAddressValue := values.Address(accountAddress)
+		accountAddressValue := accountAddress.Export().(values.Address)
 
 		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
 		if err != nil {
@@ -469,14 +463,12 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires 1 parameter"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddress, ok := arguments[0].(interpreter.AddressValue)
 		if !ok {
-			panic(fmt.Sprintf("getAccount requires the first parameter to be a string"))
+			panic(fmt.Sprintf("getAccount requires the first parameter to be an address"))
 		}
 
-		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
-		accountAddressValue := values.Address(accountAddress)
+		accountAddressValue := accountAddress.Export().(values.Address)
 
 		account := accountValue(accountAddressValue)
 

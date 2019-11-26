@@ -1940,3 +1940,7 @@ func (v AddressValue) Export() values.Value {
 func (v AddressValue) Copy() Value {
 	return v
 }
+
+func (v AddressValue) String() string {
+	return fmt.Sprintf("%x", v[:])
+}
