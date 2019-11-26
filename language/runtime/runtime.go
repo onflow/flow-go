@@ -80,7 +80,7 @@ type Runtime interface {
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
+type ImportResolver func(astLocation ast.Location) (program *ast.Program, e error)
 
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct{}
