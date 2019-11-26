@@ -515,6 +515,7 @@ func (interpreter *Interpreter) prepareInvoke(
 				Value: functionValue,
 			}
 		}
+
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 

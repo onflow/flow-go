@@ -9,7 +9,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestTransactions(t *testing.T) {
+func TestCheckTransactions(t *testing.T) {
 
 	type test struct {
 		name   string
@@ -82,7 +82,7 @@ func TestTransactions(t *testing.T) {
 	}
 
 	validPrepareParameters := test{
-		"InvalidPrepareIdentifier",
+		"ValidPrepareParameters",
 		`
 		  transaction {
 
