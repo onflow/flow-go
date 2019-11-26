@@ -132,6 +132,10 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 				Type:    protocol.Warning,
 				Message: "The transaction could not be submitted.",
 			})
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to submit transaction error: %s", grpcErr.Message()),
+			})
 			return nil, nil
 		}
 	}
@@ -180,6 +184,10 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 			conn.ShowMessage(&protocol.ShowMessageParams{
 				Type:    protocol.Warning,
 				Message: "The script could not be executed.",
+			})
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to execute script error: %s", grpcErr.Message()),
 			})
 			return nil, nil
 		}
