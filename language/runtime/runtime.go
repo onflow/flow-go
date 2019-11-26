@@ -254,10 +254,10 @@ func (r *interpreterRuntime) executeScript(
 	for _, parameterTypeAnnotation := range mainFunctionType.ParameterTypeAnnotations {
 		parameterType := parameterTypeAnnotation.Type
 
-		if !parameterType.Equal(stdlib.AccountType.Type) {
+		if !parameterType.Equal(&sema.AccountType{}) {
 			err := fmt.Errorf(
 				"parameter type mismatch for `main` function: expected `%s`, got `%s`",
-				stdlib.AccountType.Type,
+				&sema.AccountType{},
 				parameterType,
 			)
 			return nil, Error{[]error{err}}
@@ -321,7 +321,7 @@ func accountValue(address values.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
 	return interpreter.CompositeValue{
-		Identifier: stdlib.AccountType.Name,
+		Identifier: (&sema.AccountType{}).ID(),
 		Fields: &map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(addressHex),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
