@@ -75,7 +75,7 @@ func (e *AnyParameterTypeInInvocationError) Error() string {
 	return "cannot invoke functions with `Any` parameter type"
 }
 
-// TransactionNotDeclared
+// TransactionNotDeclaredError
 
 type TransactionNotDeclaredError struct {
 	Index int
