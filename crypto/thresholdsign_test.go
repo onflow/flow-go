@@ -112,22 +112,23 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	for phase := 1; phase <= 2; phase++ {
 		sync.Wait()
 		sync.Add(n)
-		for i := 0; i < n; i++ {
-			go tsDkgRunChan(&processors[i], &sync, t, phase)
+		for current := 0; current < n; current++ {
+			go tsDkgRunChan(&processors[current], &sync, t, phase)
 		}
 	}
 
 	// synchronize the main thread to end DKG
 	sync.Wait()
 	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
+		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
+			"2 group public keys are mismatching")
 	}
 
 	// Start TS
 	log.Info("TS starts")
 	sync.Add(n)
-	for i := 0; i < n; i++ {
-		go tsRunChan(&processors[i], &sync, t)
+	for current := 0; current < n; current++ {
+		go tsRunChan(&processors[current], &sync, t)
 	}
 	// synchronize the main thread to end TS
 	sync.Wait()

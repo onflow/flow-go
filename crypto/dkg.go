@@ -13,7 +13,7 @@ type DKGType int
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	FeldmanVSS DKGType = iota
-	// FeldmanVSS is Feldman Verifiable Secret Sharing using a complaint
+	// FeldmanVSSQual is Feldman Verifiable Secret Sharing using a complaint
 	// system to qualify/disqualify the leader
 	FeldmanVSSQual
 	// Joint Feldman (Pedersen)

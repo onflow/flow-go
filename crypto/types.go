@@ -66,10 +66,10 @@ const (
 	PubKeyLenECDSA_SECp256k1        = 64
 	KeyGenSeedMinLenECDSA_SECp256k1 = 40
 
-	DKGMinSize int = 3
-	ThresholdMinSize
-	DKGMaxSize int = 254
-	ThresholdMaxSize
+	DKGMinSize       int = 3
+	ThresholdMinSize     = DKGMinSize
+	DKGMaxSize       int = 254
+	ThresholdMaxSize     = DKGMaxSize
 )
 
 // Signature is a generic type, regardless of the signature scheme

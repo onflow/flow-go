@@ -150,7 +150,7 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 		assert.Nil(t, err)
 	}
 
-	var phase int
+	phase := 0
 	if dkg == FeldmanVSS {
 		phase = 2
 	}
@@ -173,8 +173,8 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	for ; phase <= 2; phase++ {
 		sync.Wait()
 		sync.Add(n)
-		for i := 0; i < n; i++ {
-			go dkgRunChan(&processors[i], &sync, t, phase)
+		for current := 0; current < n; current++ {
+			go dkgRunChan(&processors[current], &sync, t, phase)
 		}
 	}
 
@@ -182,7 +182,8 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	sync.Wait()
 	log.Info("PK", processors[0].pkBytes)
 	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
+		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
+			"2 group public keys are mismatching")
 	}
 }
 
