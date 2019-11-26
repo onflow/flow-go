@@ -30,7 +30,8 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
             priv let code: [Int]? = %s
             createAccount(publicKeys, code)
           }
-        }`, publicKeysStr, codeStr)
+        }
+    `, publicKeysStr, codeStr)
 
 	return []byte(script), nil
 }
@@ -46,7 +47,8 @@ func UpdateAccountCode(code []byte) []byte {
             updateAccountCode(signer.address, code)
           }
           execute {}
-        }`, codeStr)
+        }
+    `, codeStr)
 
 	return []byte(script)
 }
@@ -67,7 +69,8 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
             addAccountKey(signer.address, key)
           }
           execute {}
-        }`, publicKeyStr)
+        }
+   	`, publicKeyStr)
 
 	return []byte(script), nil
 }
@@ -81,7 +84,8 @@ func RemoveAccountKey(index int) []byte {
             removeAccountKey(signer.address, index)
           }
           execute {}
-        }`, index)
+        }
+    `, index)
 
 	return []byte(script)
 }
