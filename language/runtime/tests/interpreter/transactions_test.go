@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestInterpretTransactions(t *testing.T) {
@@ -201,8 +201,8 @@ func TestInterpretTransactions(t *testing.T) {
           }
         `)
 
-		signer1 := accountValue(values.BytesToAddress([]byte{1}))
-		signer2 := accountValue(values.BytesToAddress([]byte{2}))
+		signer1 := accountValue(flow.HexToAddress("0x01"))
+		signer2 := accountValue(flow.HexToAddress("0x02"))
 
 		// first transaction
 		err := inter.InvokeTransaction(0, signer1)
@@ -215,7 +215,7 @@ func TestInterpretTransactions(t *testing.T) {
 }
 
 // TODO: consolidate this with the function defined in runtime.go
-func accountValue(address values.Address) interpreter.Value {
+func accountValue(address flow.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
 	return interpreter.CompositeValue{
