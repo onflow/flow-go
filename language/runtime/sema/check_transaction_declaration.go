@@ -8,6 +8,11 @@ import (
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
+	checker.containerTypes[transactionType] = true
+	defer func() {
+		checker.containerTypes[transactionType] = false
+	}()
+
 	fieldMembers := map[*Member]*ast.FieldDeclaration{}
 
 	for _, field := range declaration.Fields {
