@@ -4,16 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	proto "github.com/golang/protobuf/proto"
+)
+
+//go:generate stringer -type=registry.MessageType
+
+const (
+	Ping registry.MessageType = (iota + registry.DefaultTypes)
+	SubmitTransaction
+	SubmitCollection
+	GetTransaction
+	GetCollection
 )
 
 type CollectServiceServerRegistry struct {
 	css CollectServiceServer
 }
 
-// To make sure the class complies with the gossip.Registry interface
-var _ gossip.Registry = (*CollectServiceServerRegistry)(nil)
+// To make sure the class complies with the registry.Registry interface
+var _ registry.Registry = (*CollectServiceServerRegistry)(nil)
 
 func NewCollectServiceServerRegistry(css CollectServiceServer) *CollectServiceServerRegistry {
 	return &CollectServiceServerRegistry{
@@ -116,22 +126,12 @@ func (cssr *CollectServiceServerRegistry) GetCollection(ctx context.Context, pay
 	return respByte, respErr
 }
 
-func (cssr *CollectServiceServerRegistry) MessageTypes() map[uint64]gossip.HandleFunc {
-	return map[uint64]gossip.HandleFunc{
-		0: cssr.Ping,
-		1: cssr.SubmitTransaction,
-		2: cssr.SubmitCollection,
-		3: cssr.GetTransaction,
-		4: cssr.GetCollection,
-	}
-}
-
-func (cssr *CollectServiceServerRegistry) NameMapping() map[string]uint64 {
-	return map[string]uint64{
-		"Ping":              0,
-		"SubmitTransaction": 1,
-		"SubmitCollection":  2,
-		"GetTransaction":    3,
-		"GetCollection":     4,
+func (cssr *CollectServiceServerRegistry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	return map[registry.MessageType]registry.HandleFunc{
+		Ping:              cssr.Ping,
+		SubmitTransaction: cssr.SubmitTransaction,
+		SubmitCollection:  cssr.SubmitCollection,
+		GetTransaction:    cssr.GetTransaction,
+		GetCollection:     cssr.GetCollection,
 	}
 }

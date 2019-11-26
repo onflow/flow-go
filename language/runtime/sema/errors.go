@@ -1778,7 +1778,7 @@ type InvalidTransactionBlockError struct {
 
 func (e *InvalidTransactionBlockError) Error() string {
 	return fmt.Sprintf(
-		"invalid transaction block `%s`, expected `prepare` or `execute`",
+		"invalid transaction block: expected `prepare` or `execute`, got `%s`",
 		e.Name,
 	)
 }
@@ -1841,7 +1841,7 @@ type InvalidTransactionFieldAccessModifierError struct {
 
 func (e *InvalidTransactionFieldAccessModifierError) Error() string {
 	return fmt.Sprintf(
-		"access modifier not required for transaction field `%s`",
+		"access modifier not allowed for transaction field `%s`",
 		e.Name,
 	)
 }

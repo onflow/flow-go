@@ -1,9 +1,8 @@
-import {window, workspace} from "vscode";
+import {commands, window, workspace} from "vscode";
 
 // The config used by the extension
 export type Config = {
-    languageServerCommand: string
-    languageServerArgs: string[]
+    flowCommand: string
     serverConfig: ServerConfig
 };
 
@@ -19,17 +18,10 @@ export function getConfig(): Config | undefined {
     const cadenceConfig = workspace
         .getConfiguration("cadence");
 
-    const languageServerCommandRaw: string | undefined = cadenceConfig.get("languageServerCommand")
-    if (!languageServerCommandRaw) {
+    const flowCommand: string | undefined = cadenceConfig.get("flowCommand")
+    if (!flowCommand) {
         return;
     }
-    const commandAndArgs = languageServerCommandRaw.split(/\s+/);
-    if (commandAndArgs.length < 1) {
-        window.showWarningMessage("Malformed language server command");
-        return;
-    }
-    const command = commandAndArgs[0];
-    const args = commandAndArgs.splice(1);
 
     const accountKey : string | undefined = cadenceConfig.get("accountKey");
     if (!accountKey) {
@@ -47,13 +39,37 @@ export function getConfig(): Config | undefined {
     }
 
     return {
-        languageServerCommand: command,
-        languageServerArgs: args,
+        flowCommand: flowCommand,
         serverConfig: {
             accountKey: accountKey,
             accountAddress: accountAddress,
             emulatorAddress: emulatorAddress,
         },
     };
+}
+
+// Adds an event handler that prompts the user to reload whenever the config
+// changes.
+export function handleConfigChanges() {
+    workspace.onDidChangeConfiguration(e => {
+        // TODO: do something smarter for account/emulator config (re-send to server)
+        const promptRestartKeys = ["languageServerPath", "accountKey", "accountAddress", "emulatorAddress"];
+        const shouldPromptRestart = promptRestartKeys.some(key =>
+            e.affectsConfiguration(`cadence.${key}`)
+        );
+        if (shouldPromptRestart) {
+            window
+                .showInformationMessage(
+                    "Server launch configuration change detected. Reload the window for changes to take effect",
+                    "Reload Window",
+                    "Not now"
+                )
+                .then(choice => {
+                    if (choice === "Reload Window") {
+                        commands.executeCommand("workbench.action.reloadWindow");
+                    }
+                });
+        }
+    });
 }
 

@@ -291,30 +291,29 @@ func (checker *Checker) checkBinaryExpressionNilCoalescing(
 
 	if _, ok := leftInner.(*NeverType); ok {
 		return rightType
-	} else {
-		canNarrow := false
-
-		if !rightIsInvalid {
-			if !IsSubType(rightType, leftOptional) {
-				checker.report(
-					&InvalidBinaryOperandError{
-						Operation:    operation,
-						Side:         common.OperandSideRight,
-						ExpectedType: leftOptional,
-						ActualType:   rightType,
-						Range:        ast.NewRangeFromPositioned(expression.Right),
-					},
-				)
-			} else {
-				canNarrow = IsSubType(rightType, leftInner)
-			}
-		}
-
-		if !canNarrow {
-			return leftOptional
-		}
-		return leftInner
 	}
+	canNarrow := false
+
+	if !rightIsInvalid {
+		if !IsSubType(rightType, leftOptional) {
+			checker.report(
+				&InvalidBinaryOperandError{
+					Operation:    operation,
+					Side:         common.OperandSideRight,
+					ExpectedType: leftOptional,
+					ActualType:   rightType,
+					Range:        ast.NewRangeFromPositioned(expression.Right),
+				},
+			)
+		} else {
+			canNarrow = IsSubType(rightType, leftInner)
+		}
+	}
+
+	if !canNarrow {
+		return leftOptional
+	}
+	return leftInner
 }
 
 func (checker *Checker) checkBinaryExpressionConcatenation(

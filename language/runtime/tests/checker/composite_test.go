@@ -317,7 +317,7 @@ func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -352,7 +352,7 @@ func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -386,7 +386,7 @@ func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -451,7 +451,7 @@ func TestCheckInvalidCompositeFieldType(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -485,7 +485,7 @@ func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -518,7 +518,7 @@ func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -591,7 +591,7 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -714,7 +714,7 @@ func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -874,7 +874,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1039,7 +1039,7 @@ func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1089,7 +1089,7 @@ func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1133,7 +1133,7 @@ func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1200,7 +1200,7 @@ func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1237,7 +1237,7 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1476,7 +1476,7 @@ func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
@@ -1509,7 +1509,7 @@ func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 			if kind != common.CompositeKindStructure &&
 				kind != common.CompositeKindResource {
 
-				expectedErrorCount += 1
+				expectedErrorCount++
 			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)

@@ -8,6 +8,8 @@ import (
 
 var registryTemplate = template.Must(template.New("registry").Parse(registryTmplText))
 
+
+
 // registryTmplText contains the template structure to be used
 const registryTmplText = `package {{ .Package }}
 
@@ -15,17 +17,29 @@ import (
 	"context"
 	"fmt"
 
-	gossip "github.com/dapperlabs/flow-go/network/gossip"
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	proto "github.com/golang/protobuf/proto"
 )
+
+//go:generate stringer -type=registry.MessageType
+
+{{- range $idx, $reg := .Registries}}
+{{if (eq $idx 0)}}
+const (
+	{{- range $Index, $Method := $reg.Methods}}
+		{{ $Method.Name }} {{if (eq $Index 0)}} registry.MessageType = (iota + registry.DefaultTypes) {{- end}}
+	{{- end}}
+)
+{{- end}}
+{{- end}}
 
 {{- range $reg := .Registries }}
 type {{ $reg.InterfaceLong }}Registry struct {
 	{{ $reg.InterfaceShort }} {{ $reg.InterfaceLong }}
 }
 
-// To make sure the class complies with the gossip.Registry interface
-var _ gossip.Registry = (*{{ $reg.InterfaceLong }}Registry)(nil)
+// To make sure the class complies with the registry.Registry interface
+var _ registry.Registry = (*{{ $reg.InterfaceLong }}Registry)(nil)
 
 func New{{ $reg.InterfaceLong }}Registry({{ $reg.InterfaceShort }} {{ $reg.InterfaceLong }}) *{{ $reg.InterfaceLong }}Registry {
 	return &{{ $reg.InterfaceLong }}Registry{
@@ -55,19 +69,14 @@ func ({{ $reg.InterfaceShort }}r *{{ $reg.InterfaceLong }}Registry) {{ .Name }}(
 }
 {{- end}}
 
-func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) MessageTypes() map[uint64]gossip.HandleFunc {
-	return map[uint64]gossip.HandleFunc{
+func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) MessageTypes() map[registry.MessageType]registry.HandleFunc {
+	return map[registry.MessageType]registry.HandleFunc{
 	 {{- range $Index, $Method := .Methods }}
-		{{ $Index }}: {{ $reg.InterfaceShort }}r.{{ $Method.Name }},
+	 {{ $Method.Name }}: {{ $reg.InterfaceShort }}r.{{ $Method.Name }},
 		{{- end}}
 	}
 }
+{{- end}}
+`
 
-func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) NameMapping() map[string]uint64{
-	return map[string]uint64{
-	 {{- range $Index, $Method := .Methods }}
-		"{{ $Method.Name }}": {{ $Index }},
-		{{- end}}
-	}
-}
-{{- end}}`
+

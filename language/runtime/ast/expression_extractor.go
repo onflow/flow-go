@@ -106,7 +106,7 @@ func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionE
 
 func (extractor *ExpressionExtractor) FreshIdentifier() string {
 	defer func() {
-		extractor.nextIdentifier += 1
+		extractor.nextIdentifier++
 	}()
 	// TODO: improve
 	// NOTE: to avoid naming clashes with identifiers in the program,
@@ -137,9 +137,8 @@ func (extractor *ExpressionExtractor) VisitBoolExpression(expression *BoolExpres
 
 	if extractor.BoolExtractor != nil {
 		return extractor.BoolExtractor.ExtractBool(extractor, expression)
-	} else {
-		return extractor.ExtractBool(expression)
 	}
+	return extractor.ExtractBool(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractBool(expression *BoolExpression) ExpressionExtraction {
@@ -159,9 +158,8 @@ func (extractor *ExpressionExtractor) VisitNilExpression(expression *NilExpressi
 
 	if extractor.NilExtractor != nil {
 		return extractor.NilExtractor.ExtractNil(extractor, expression)
-	} else {
-		return extractor.ExtractNil(expression)
 	}
+	return extractor.ExtractNil(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractNil(expression *NilExpression) ExpressionExtraction {
@@ -181,9 +179,8 @@ func (extractor *ExpressionExtractor) VisitIntExpression(expression *IntExpressi
 
 	if extractor.IntExtractor != nil {
 		return extractor.IntExtractor.ExtractInt(extractor, expression)
-	} else {
-		return extractor.ExtractInt(expression)
 	}
+	return extractor.ExtractInt(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractInt(expression *IntExpression) ExpressionExtraction {
@@ -203,9 +200,8 @@ func (extractor *ExpressionExtractor) VisitStringExpression(expression *StringEx
 
 	if extractor.StringExtractor != nil {
 		return extractor.StringExtractor.ExtractString(extractor, expression)
-	} else {
-		return extractor.ExtractString(expression)
 	}
+	return extractor.ExtractString(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractString(expression *StringExpression) ExpressionExtraction {
@@ -225,9 +221,8 @@ func (extractor *ExpressionExtractor) VisitArrayExpression(expression *ArrayExpr
 
 	if extractor.ArrayExtractor != nil {
 		return extractor.ArrayExtractor.ExtractArray(extractor, expression)
-	} else {
-		return extractor.ExtractArray(expression)
 	}
+	return extractor.ExtractArray(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractArray(expression *ArrayExpression) ExpressionExtraction {
@@ -280,9 +275,8 @@ func (extractor *ExpressionExtractor) VisitDictionaryExpression(expression *Dict
 
 	if extractor.DictionaryExtractor != nil {
 		return extractor.DictionaryExtractor.ExtractDictionary(extractor, expression)
-	} else {
-		return extractor.ExtractDictionary(expression)
 	}
+	return extractor.ExtractDictionary(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractDictionary(expression *DictionaryExpression) ExpressionExtraction {
@@ -324,9 +318,8 @@ func (extractor *ExpressionExtractor) VisitIdentifierExpression(expression *Iden
 
 	if extractor.IdentifierExtractor != nil {
 		return extractor.IdentifierExtractor.ExtractIdentifier(extractor, expression)
-	} else {
-		return extractor.ExtractIdentifier(expression)
 	}
+	return extractor.ExtractIdentifier(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractIdentifier(expression *IdentifierExpression) ExpressionExtraction {
@@ -345,9 +338,8 @@ func (extractor *ExpressionExtractor) VisitInvocationExpression(expression *Invo
 
 	if extractor.InvocationExtractor != nil {
 		return extractor.InvocationExtractor.ExtractInvocation(extractor, expression)
-	} else {
-		return extractor.ExtractInvocation(expression)
 	}
+	return extractor.ExtractInvocation(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractInvocation(expression *InvocationExpression) ExpressionExtraction {
@@ -415,9 +407,8 @@ func (extractor *ExpressionExtractor) VisitMemberExpression(expression *MemberEx
 
 	if extractor.MemberExtractor != nil {
 		return extractor.MemberExtractor.ExtractMember(extractor, expression)
-	} else {
-		return extractor.ExtractMember(expression)
 	}
+	return extractor.ExtractMember(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractMember(expression *MemberExpression) ExpressionExtraction {
@@ -444,9 +435,8 @@ func (extractor *ExpressionExtractor) VisitIndexExpression(expression *IndexExpr
 
 	if extractor.IndexExtractor != nil {
 		return extractor.IndexExtractor.ExtractIndex(extractor, expression)
-	} else {
-		return extractor.ExtractIndex(expression)
 	}
+	return extractor.ExtractIndex(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractIndex(expression *IndexExpression) ExpressionExtraction {
@@ -473,9 +463,8 @@ func (extractor *ExpressionExtractor) VisitConditionalExpression(expression *Con
 
 	if extractor.ConditionalExtractor != nil {
 		return extractor.ConditionalExtractor.ExtractConditional(extractor, expression)
-	} else {
-		return extractor.ExtractConditional(expression)
 	}
+	return extractor.ExtractConditional(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractConditional(expression *ConditionalExpression) ExpressionExtraction {
@@ -509,10 +498,8 @@ func (extractor *ExpressionExtractor) VisitUnaryExpression(expression *UnaryExpr
 
 	if extractor.UnaryExtractor != nil {
 		return extractor.UnaryExtractor.ExtractUnary(extractor, expression)
-	} else {
-		return extractor.ExtractUnary(expression)
-
 	}
+	return extractor.ExtractUnary(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractUnary(expression *UnaryExpression) ExpressionExtraction {
@@ -539,9 +526,8 @@ func (extractor *ExpressionExtractor) VisitBinaryExpression(expression *BinaryEx
 
 	if extractor.BinaryExtractor != nil {
 		return extractor.BinaryExtractor.ExtractBinary(extractor, expression)
-	} else {
-		return extractor.ExtractBinary(expression)
 	}
+	return extractor.ExtractBinary(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractBinary(expression *BinaryExpression) ExpressionExtraction {
@@ -573,9 +559,8 @@ func (extractor *ExpressionExtractor) VisitFunctionExpression(expression *Functi
 
 	if extractor.FunctionExtractor != nil {
 		return extractor.FunctionExtractor.ExtractFunction(extractor, expression)
-	} else {
-		return extractor.ExtractFunction(expression)
 	}
+	return extractor.ExtractFunction(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpression) ExpressionExtraction {
@@ -590,9 +575,9 @@ func (extractor *ExpressionExtractor) VisitCastingExpression(expression *Casting
 
 	if extractor.CastingExtractor != nil {
 		return extractor.CastingExtractor.ExtractCast(extractor, expression)
-	} else {
-		return extractor.ExtractCast(expression)
 	}
+	return extractor.ExtractCast(expression)
+
 }
 
 func (extractor *ExpressionExtractor) ExtractCast(expression *CastingExpression) ExpressionExtraction {
@@ -618,9 +603,8 @@ func (extractor *ExpressionExtractor) VisitCreateExpression(expression *CreateEx
 
 	if extractor.CreateExtractor != nil {
 		return extractor.CreateExtractor.ExtractCreate(extractor, expression)
-	} else {
-		return extractor.ExtractCreate(expression)
 	}
+	return extractor.ExtractCreate(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractCreate(expression *CreateExpression) ExpressionExtraction {
@@ -646,9 +630,8 @@ func (extractor *ExpressionExtractor) VisitDestroyExpression(expression *Destroy
 
 	if extractor.DestroyExtractor != nil {
 		return extractor.DestroyExtractor.ExtractDestroy(extractor, expression)
-	} else {
-		return extractor.ExtractDestroy(expression)
 	}
+	return extractor.ExtractDestroy(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractDestroy(expression *DestroyExpression) ExpressionExtraction {
@@ -674,9 +657,8 @@ func (extractor *ExpressionExtractor) VisitReferenceExpression(expression *Refer
 
 	if extractor.ReferenceExtractor != nil {
 		return extractor.ReferenceExtractor.ExtractReference(extractor, expression)
-	} else {
-		return extractor.ExtractReference(expression)
 	}
+	return extractor.ExtractReference(expression)
 }
 
 func (extractor *ExpressionExtractor) ExtractReference(expression *ReferenceExpression) ExpressionExtraction {

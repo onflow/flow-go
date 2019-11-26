@@ -1,9 +1,8 @@
 package sema
 
 import (
+	interfaceentry "github.com/dapperlabs/flow-go/language/runtime/common/interface_entry"
 	"github.com/raviqqe/hamt"
-
-	"github.com/dapperlabs/flow-go/language/runtime/common/interface_entry"
 )
 
 // MemberSet is an immutable set of field assignments.
@@ -19,7 +18,7 @@ func NewMemberSet() *MemberSet {
 }
 
 func (ms *MemberSet) entry(member *Member) hamt.Entry {
-	return interface_entry.InterfaceEntry{Interface: member}
+	return interfaceentry.InterfaceEntry{Interface: member}
 }
 
 // Add inserts a member into the set.

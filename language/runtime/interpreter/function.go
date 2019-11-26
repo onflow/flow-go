@@ -1,11 +1,12 @@
 package interpreter
 
 import (
-	"github.com/raviqqe/hamt"
-
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/raviqqe/hamt"
+	// revive:disable:dot-imports
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	// revive:enable
 )
 
 // FunctionValue
