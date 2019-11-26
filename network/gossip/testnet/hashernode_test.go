@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // TestHasherNodeOneToAll initializes hasherNodes and sends messages using gossip from each node to
 // every other node, checking whether the nodes are correctly received
 func TestHasherNodeOneToAll(t *testing.T) {
@@ -219,4 +218,3 @@ func TestHasherNode(t *testing.T) {
 		}
 	}
 }
-
