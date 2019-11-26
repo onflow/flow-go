@@ -41,7 +41,7 @@ func RunREPL() {
 
 	executor := func(line string) {
 		defer func() {
-			lineNumber += 1
+			lineNumber++
 		}()
 
 		if code == "" && strings.HasPrefix(line, ".") {

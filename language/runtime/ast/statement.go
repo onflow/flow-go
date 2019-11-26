@@ -64,9 +64,8 @@ func (s *IfStatement) StartPosition() Position {
 func (s *IfStatement) EndPosition() Position {
 	if s.Else != nil {
 		return s.Else.EndPosition()
-	} else {
-		return s.Then.EndPosition()
 	}
+	return s.Then.EndPosition()
 }
 
 func (*IfStatement) isStatement() {}

@@ -11,7 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	//revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	//revive:enable
 )
 
 type controlReturn interface {
@@ -848,7 +850,9 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 				FlatMap(func(value interface{}) Trampoline {
 					if _, ok := value.(loopBreak); ok {
 						return Done{}
+						// revive:disable:empty-block
 					} else if _, ok := value.(loopContinue); ok {
+						// revive:enable
 						// NO-OP
 					} else if functionReturn, ok := value.(functionReturn); ok {
 						return Done{Result: functionReturn}
@@ -1432,9 +1436,8 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 
 			if expression.Optional {
 				return SomeValue{Value: resultValue}
-			} else {
-				return resultValue
 			}
+			return resultValue
 		})
 }
 
@@ -1470,9 +1473,8 @@ func (interpreter *Interpreter) VisitConditionalExpression(expression *ast.Condi
 
 			if value {
 				return expression.Then.Accept(interpreter).(Trampoline)
-			} else {
-				return expression.Else.Accept(interpreter).(Trampoline)
 			}
+			return expression.Else.Accept(interpreter).(Trampoline)
 		})
 }
 

@@ -842,19 +842,26 @@ func (checker *Checker) checkDestructor(
 		nil,
 	)
 
-	checker.checkResourceFieldInvalidation(containerType, containerTypeIdentifier)
+	checker.checkCompositeResourceInvalidated(containerType, containerTypeIdentifier)
 }
 
-// checkResourceFieldInvalidation checks that if the container is a resource,
+// checkCompositeResourceInvalidated checks that if the container is a resource,
 // that all resource fields are invalidated (moved or destroyed)
 //
-func (checker *Checker) checkResourceFieldInvalidation(containerType Type, containerTypeIdentifier string) {
+func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, containerTypeIdentifier string) {
 	compositeType, isComposite := containerType.(*CompositeType)
 	if !isComposite || compositeType.Kind != common.CompositeKindResource {
 		return
 	}
 
-	for name, member := range compositeType.Members {
+	checker.checkResourceFieldsInvalidated(containerTypeIdentifier, compositeType.Members)
+}
+
+// checkResourceFieldsInvalidated checks that all resource fields for a container
+// type are invalidated.
+//
+func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {
+	for _, member := range members {
 		if !member.Type.IsResourceType() {
 			return
 		}
@@ -863,10 +870,9 @@ func (checker *Checker) checkResourceFieldInvalidation(containerType Type, conta
 		if !info.DefinitivelyInvalidated {
 			checker.report(
 				&ResourceFieldNotInvalidatedError{
-					FieldName: name,
+					FieldName: member.Identifier.Identifier,
 					TypeName:  containerTypeIdentifier,
-					// TODO:
-					Pos: ast.Position{},
+					Pos:       member.Identifier.StartPosition(),
 				},
 			)
 		}

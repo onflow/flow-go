@@ -97,243 +97,6 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-// TODO: improve types
-var setValueFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// value
-		// TODO: add proper type
-		&sema.IntType{},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// TODO: improve types
-var getValueFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// owner
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// controller
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-	),
-	// value
-	// TODO: add proper type
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.IntType{},
-	),
-}
-
-// TODO: improve types
-var createAccountFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// publicKeys
-		&sema.VariableSizedType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-		// code
-		&sema.OptionalType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	),
-	// value
-	// TODO: add proper type
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.IntType{},
-	),
-}
-
-// TODO: improve types
-var addAccountKeyFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// TODO: improve types
-var removeAccountKeyFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// index
-		&sema.IntType{},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// TODO: improve types
-var updateAccountCodeFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-var getAccountFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// TODO:
-		// address
-		&sema.StringType{},
-	),
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.AccountType{}),
-}
-
-var logFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.AnyType{},
-	),
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// built-in event types
-
-var accountCreatedEventType = sema.EventType{
-	Identifier: "AccountCreated",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			Move: false,
-			Type: &sema.StringType{},
-		},
-	},
-}
-
-var accountKeyAddedEventType = sema.EventType{
-	Identifier: "AccountKeyAdded",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			Move: false,
-			Type: &sema.StringType{},
-		},
-		{
-			Move: false,
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-}
-
-var accountKeyRemovedEventType = sema.EventType{
-	Identifier: "AccountKeyRemoved",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			Move: false,
-			Type: &sema.StringType{},
-		},
-		{
-			Move: false,
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-}
-
-var accountCodeUpdatedEventType = sema.EventType{
-	Identifier: "AccountCodeUpdated",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "codeHash",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			Move: false,
-			Type: &sema.StringType{},
-		},
-		{
-			Move: false,
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
-}
-
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err error) {
@@ -542,43 +305,15 @@ func (r *interpreterRuntime) executeScript(
 
 func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
 	return append(
-		stdlib.BuiltinFunctions,
-		stdlib.NewStandardLibraryFunction(
-			"createAccount",
-			&createAccountFunctionType,
-			r.newCreateAccountFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"addAccountKey",
-			&addAccountKeyFunctionType,
-			r.addAccountKeyFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"removeAccountKey",
-			&removeAccountKeyFunctionType,
-			r.removeAccountKeyFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"updateAccountCode",
-			&updateAccountCodeFunctionType,
-			r.newUpdateAccountCodeFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"getAccount",
-			&getAccountFunctionType,
-			r.newGetAccountFunction(runtimeInterface),
-			nil,
-		),
-		stdlib.NewStandardLibraryFunction(
-			"log",
-			&logFunctionType,
-			r.newLogFunction(runtimeInterface),
-			nil,
-		),
+		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
+			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
+			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface),
+			GetAccount:        r.newGetAccountFunction(runtimeInterface),
+			Log:               r.newLogFunction(runtimeInterface),
+		}),
+		stdlib.BuiltinFunctions...,
 	)
 }
 
@@ -622,7 +357,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountCreatedEventType, runtimeInterface, accountAddress)
+		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, accountAddress)
 
 		result := interpreter.AddressValue(accountAddress)
 		return trampoline.Done{Result: result}
@@ -654,7 +389,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
+		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -689,7 +424,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
+		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -721,7 +456,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(err)
 		}
 
-		r.emitAccountEvent(accountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
+		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
