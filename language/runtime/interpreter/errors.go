@@ -75,6 +75,19 @@ func (e *AnyParameterTypeInInvocationError) Error() string {
 	return "cannot invoke functions with `Any` parameter type"
 }
 
+// TransactionNotDeclared
+
+type TransactionNotDeclaredError struct {
+	Index int
+}
+
+func (e *TransactionNotDeclaredError) Error() string {
+	return fmt.Sprintf(
+		"cannot find transaction with index %d in this scope",
+		e.Index,
+	)
+}
+
 // ConditionError
 
 type ConditionError struct {

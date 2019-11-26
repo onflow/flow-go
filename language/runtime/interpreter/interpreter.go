@@ -464,14 +464,13 @@ func (interpreter *Interpreter) prepareInvokeTransaction(
 	index int,
 	arguments []interface{},
 ) (trampoline Trampoline, err error) {
-
-	functionValue := interpreter.Transactions[index]
-	if functionValue == nil {
-		return nil, nil
+	if index >= len(interpreter.Transactions) {
+		return nil, &TransactionNotDeclaredError{Index: index}
 	}
 
-	transactionType := interpreter.Checker.TransactionTypes[index]
+	functionValue := interpreter.Transactions[index]
 
+	transactionType := interpreter.Checker.TransactionTypes[index]
 	functionType := transactionType.Prepare.InvocationFunctionType()
 
 	return interpreter.prepareInvoke(functionValue, functionType, arguments)

@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,10 +9,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 func TestInterpretTransactions(t *testing.T) {
-
 	t.Run("NoPrepareFunction", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
 		  transaction {
@@ -160,13 +162,66 @@ func TestInterpretTransactions(t *testing.T) {
 		  }
 		`)
 
+		// first transaction
 		err := inter.InvokeTransaction(0)
 		assert.NoError(t, err)
 
+		// second transaction
 		err = inter.InvokeTransaction(1)
 		assert.NoError(t, err)
 
-		// err = inter.InvokeTransaction(2)
-		// assert.IsType(t, &interpreter.ConditionError{}, err)
+		// third transaction is not declared
+		err = inter.InvokeTransaction(2)
+		assert.IsType(t, &interpreter.TransactionNotDeclaredError{}, err)
 	})
+
+	t.Run("TooFewArguments", func(t *testing.T) {
+		inter := parseCheckAndInterpret(t, `
+		  transaction {
+            prepare(signer: Account) {}
+
+		    execute {}
+		  }
+		`)
+
+		err := inter.InvokeTransaction(0)
+		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
+	})
+
+	t.Run("TooManyArguments", func(t *testing.T) {
+		inter := parseCheckAndInterpret(t, `
+		  transaction {
+		    execute {}
+		  }
+
+		  transaction {
+            prepare(signer: Account) {}
+
+		    execute {}
+		  }
+		`)
+
+		signer1 := accountValue(values.BytesToAddress([]byte{1}))
+		signer2 := accountValue(values.BytesToAddress([]byte{2}))
+
+		// first transaction
+		err := inter.InvokeTransaction(0, signer1)
+		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
+
+		// second transaction
+		err = inter.InvokeTransaction(0, signer1, signer2)
+		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
+	})
+}
+
+// TODO: consolidate this with the function defined in runtime.go
+func accountValue(address values.Address) interpreter.Value {
+	addressHex := fmt.Sprintf("%x", address)
+
+	return interpreter.CompositeValue{
+		Identifier: (&sema.AccountType{}).ID(),
+		Fields: &map[string]interpreter.Value{
+			"address": interpreter.NewStringValue(addressHex),
+		},
+	}
 }
